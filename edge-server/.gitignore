@@ -1,0 +1,7 @@
+/target
+/database
+.env
+.claude
+.surrealdb
+.serena
+/workspace

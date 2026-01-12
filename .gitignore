@@ -1,0 +1,50 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo lock for workspace (keep for applications, ignore for libraries)
+# We keep it since edge-server is an application
+# Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.rocksdb/
+database/
+
+# Logs
+logs/
+*.log
+
+# Uploads and data
+uploads/
+data/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# SurrealDB
+.surrealdb
+
+# Claude/Serena
+.claude/
+.serena/
+
+# OS specific
+Thumbs.db

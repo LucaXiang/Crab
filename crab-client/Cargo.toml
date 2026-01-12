@@ -1,0 +1,45 @@
+[package]
+name = "crab-client"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# Shared types
+shared.workspace = true
+
+# HTTP client
+reqwest.workspace = true
+
+# Async runtime
+tokio.workspace = true
+tokio-util.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# HTTP types
+http.workspace = true
+axum.workspace = true
+
+# Async trait for defining traits
+async-trait.workspace = true
+
+[[example]]
+name = "message_client"
+path = "examples/message_client.rs"
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
+features = ["env-filter", "json"]
+
+[dev-dependencies.tracing]
+version = "0.1"
+
+[dev-dependencies.chrono]
+version = "0.4"
+features = ["serde"]

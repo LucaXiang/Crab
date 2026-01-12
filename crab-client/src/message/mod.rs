@@ -1,0 +1,18 @@
+pub mod client;
+pub mod transport;
+
+pub use client::MessageClient;
+pub use shared::message::{BusMessage, EventType};
+
+/// Error type for message client operations
+#[derive(Debug, thiserror::Error)]
+pub enum MessageError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Connection failed: {0}")]
+    Connection(String),
+
+    #[error("Invalid message format: {0}")]
+    InvalidMessage(String),
+}

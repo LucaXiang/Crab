@@ -1,0 +1,81 @@
+[package]
+name = "edge-server"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# Workspace shared types
+shared.workspace = true
+
+# Web framework
+axum = { workspace = true, features = ["multipart"] }
+tower.workspace = true
+tower-http.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Database
+surrealdb.workspace = true
+surrealdb-migrations.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# JWT and Authentication
+jsonwebtoken.workspace = true
+argon2.workspace = true
+
+# HTTP types
+http.workspace = true
+hyper.workspace = true
+
+# Time and UUID
+chrono.workspace = true
+uuid.workspace = true
+
+# WebSocket
+socketioxide.workspace = true
+
+# Validation
+validator.workspace = true
+
+# Cryptography
+sha2.workspace = true
+hex.workspace = true
+
+# Async runtime
+tokio.workspace = true
+tokio-util.workspace = true
+async-trait.workspace = true
+
+# HTTP Client
+reqwest.workspace = true
+
+# Image processing
+image.workspace = true
+mime_guess.workspace = true
+
+# Other utilities
+dotenv.workspace = true
+include_dir.workspace = true
+symlink.workspace = true
+
+[dev-dependencies]
+# Testing
+reqwest.workspace = true
+tempfile.workspace = true
+argon2.workspace = true
+jsonwebtoken.workspace = true
+crab-client = { path = "../crab-client" }
+
+[[test]]
+name = "integration"
+path = "tests/integration_test.rs"
