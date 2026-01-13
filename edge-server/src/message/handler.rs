@@ -121,7 +121,7 @@ impl MessageHandler {
         if let Some(processor) = self.processors.get(&event_type) {
             self.process_with_retry(msg, processor.clone()).await?;
 
-            // After successfully processing OrderIntent, broadcast OrderSync
+            // After successfully processing, handle broadcasting
             if event_type == EventType::OrderIntent {
                 self.broadcast_order_sync(msg).await;
             }
@@ -131,6 +131,16 @@ impl MessageHandler {
         }
 
         Ok(())
+    }
+
+    /// Broadcast a message to all subscribers
+    #[allow(dead_code)]
+    async fn broadcast_message(&self, msg: BusMessage) {
+        if let Some(ref tx) = self.broadcast_tx
+            && let Err(e) = tx.send(msg)
+        {
+            tracing::warn!("Failed to broadcast message: {}", e);
+        }
     }
 
     /// Broadcast OrderSync after processing OrderIntent

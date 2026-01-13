@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n🦀 Interactive Message Client");
     println!("================================\n");
 
-    interactive_client("127.0.0.1:8081").await
+    interactive_client("192.168.1.176:8082").await
 }
 
 async fn interactive_client(addr: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -271,16 +271,16 @@ async fn interactive_client(addr: &str) -> Result<(), Box<dyn std::error::Error>
 }
 
 fn print_menu() {
-    println!("📋 Select an action:");
-    println!("  1. 📝 Add dish to table");
-    println!("  2. 💰 Payment request");
-    println!("  3. 🧾 Checkout");
-    println!("  4. 💾 Update dish price");
-    println!("  5. ❌ Mark dish sold out");
-    println!("  6. 📢 System notification");
-    println!("  7. 🎮 Server command");
-    println!("  8. 🔧 Custom JSON");
-    println!("  0. ❌ Exit");
+    println!("📋 请选择操作:");
+    println!("  1. 📝 添加菜品");
+    println!("  2. 💰 支付请求");
+    println!("  3. 🧾 结账");
+    println!("  4. 💾 更新菜价");
+    println!("  5. ❌ 菜品售罄");
+    println!("  6. 📢 系统通知");
+    println!("  7. 🎮 服务器指令");
+    println!("  8. 🔧 自定义 JSON");
+    println!("  0. ❌ 退出");
     println!();
 }
 

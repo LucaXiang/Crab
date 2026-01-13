@@ -4,12 +4,12 @@
 
 pub mod models;
 
-use surrealdb::{
-    engine::local::{Db, RocksDb},
-    Surreal,
-};
-use std::path::PathBuf;
 use crate::common::AppError;
+use std::path::PathBuf;
+use surrealdb::{
+    Surreal,
+    engine::local::{Db, RocksDb},
+};
 
 /// Database service wrapper
 #[derive(Clone)]

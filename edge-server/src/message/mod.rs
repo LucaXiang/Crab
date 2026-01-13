@@ -246,8 +246,10 @@ impl MessageBus {
 
     /// Create a new message bus with custom channel capacity
     pub fn with_capacity(capacity: usize) -> Self {
-        let mut config = TransportConfig::default();
-        config.channel_capacity = capacity;
+        let config = TransportConfig {
+            channel_capacity: capacity,
+            ..Default::default()
+        };
         Self::from_config(config)
     }
 

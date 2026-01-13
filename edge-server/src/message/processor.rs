@@ -188,8 +188,8 @@ impl MessageProcessor for DataSyncProcessor {
         // match sync_type {
         //     "dish_price" => {
         //         // 更新菜品价格
-        //         let dish_id = data["dish_id"].as_str().unwrap();
-        //         let new_price = data["new_price"].as_u64().unwrap();
+        //         let dish_id = data["dish_id"].as_str().ok_or(AppError::Invalid("Missing dish_id".into()))?;
+        //         let new_price = data["new_price"].as_u64().ok_or(AppError::Invalid("Missing new_price".into()))?;
         //         db.update_dish_price(dish_id, new_price, &tx).await?;
         //
         //         // 记录价格历史
@@ -197,7 +197,7 @@ impl MessageProcessor for DataSyncProcessor {
         //     }
         //     "dish_sold_out" => {
         //         // 菜品沽清
-        //         let dish_id = data["dish_id"].as_str().unwrap();
+        //         let dish_id = data["dish_id"].as_str().ok_or(AppError::Invalid("Missing dish_id".into()))?;
         //         db.set_dish_available(dish_id, false, &tx).await?;
         //     }
         //     "dish_added" => {
@@ -290,7 +290,7 @@ impl MessageProcessor for ServerCommandProcessor {
         // match command {
         //     "config_update" => {
         //         // 更新本地配置
-        //         let key = data["key"].as_str().unwrap();
+        //         let key = data["key"].as_str().ok_or(AppError::Invalid("Missing key".into()))?;
         //         let value = &data["value"];
         //         config_manager.update(key, value).await?;
         //     }

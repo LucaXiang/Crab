@@ -4,6 +4,8 @@ members = [
     "edge-server",
     "shared",
     "crab-client",
+    "crab-cert",
+    "crab-desktop/src-tauri",
 ]
 exclude = []
 

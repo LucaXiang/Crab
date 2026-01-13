@@ -4,13 +4,14 @@
 //! in-process (memory) and network (TCP) communication.
 
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub mod payload;
 pub use payload::*;
 
 /// Event types for bus messages
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EventType {
     /// Order intent - client requests to server
     /// 订单意图（客户端 → 边缘服务端）：点菜请求、付款请求、结账请求等
@@ -61,7 +62,7 @@ impl fmt::Display for EventType {
 }
 
 /// Binary message for the message bus
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BusMessage {
     /// Event type identifier
     pub event_type: EventType,

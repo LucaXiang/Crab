@@ -40,10 +40,19 @@ Crab is a distributed restaurant management system written in Rust, featuring an
   - `MessageClient` handles real-time bidirectional communication.
 
 ## Coding Standards
-- **Error Handling**: Use `thiserror` for libraries, `anyhow` for apps. No panics in library code.
+- **Error Handling**: 
+  - **Current Phase (PoC/Alpha)**: `unwrap()`/`expect()` are permitted for rapid prototyping and asserting invariants in controlled environments.
+  - **Production Goal**: Move towards strict, typed error handling (`AppError`, `Result<T, E>`). Eliminate panics in runtime paths.
 - **Async**: Prefer `tokio`. Use `#[async_trait]` for traits with async methods.
 - **Ownership**: Prefer borrowing over cloning. Use `Arc` for shared state.
 - **Documentation**: Document public APIs with examples. Run `cargo test --doc` to verify.
+
+## Project Status & Philosophy
+- **Phase**: **Feasibility Testing / Prototype**
+- **Edge Server Focus**: 
+  - Designed as an **Edge Node**: Self-contained, offline-capable, and maintenance-free.
+  - **Embedded DB**: Uses embedded SurrealDB to avoid external dependencies.
+  - **Future Roadmap**: Transition to strong typing enforcement and robust error handling as the project matures from prototype to production.
 
 ## User Preferences (from Custom Instructions)
 - **Language**: Rust Idiomatic.
