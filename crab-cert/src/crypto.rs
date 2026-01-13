@@ -1,9 +1,69 @@
 use crate::error::{CertError, Result};
+use ::pem::Pem;
 use ring::{rand as ring_rand, signature};
 use rsa::pkcs1::DecodeRsaPublicKey;
 use rsa::pkcs8::DecodePrivateKey;
 use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
-use x509_parser::prelude::*;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use x509_parser::pem::parse_x509_pem;
+
+pub fn to_rustls_certs(cert_pem: &str) -> Result<Vec<CertificateDer<'static>>> {
+    let mut certs = Vec::new();
+    let pems: Vec<Pem> = ::pem::parse_many(cert_pem)
+        .map_err(|e| CertError::VerificationFailed(format!("PEM parse error: {}", e)))?;
+
+    for p in pems {
+        if p.tag() == "CERTIFICATE" {
+            certs.push(CertificateDer::from(p.into_contents()));
+        }
+    }
+
+    if certs.is_empty() {
+        return Err(CertError::VerificationFailed(
+            "No certificates found in PEM".into(),
+        ));
+    }
+
+    Ok(certs)
+}
+
+pub fn to_rustls_key(key_pem: &str) -> Result<PrivateKeyDer<'static>> {
+    let pems: Vec<Pem> = ::pem::parse_many(key_pem)
+        .map_err(|e| CertError::VerificationFailed(format!("PEM parse error: {}", e)))?;
+
+    for p in pems {
+        if p.tag() == "PRIVATE KEY" {
+            // PKCS#8
+            return Ok(PrivateKeyDer::Pkcs8(p.contents().to_vec().into()));
+        } else if p.tag() == "RSA PRIVATE KEY" {
+            // PKCS#1
+            return Ok(PrivateKeyDer::Pkcs1(p.contents().to_vec().into()));
+        } else if p.tag() == "EC PRIVATE KEY" {
+            // SEC1
+            return Ok(PrivateKeyDer::Sec1(p.contents().to_vec().into()));
+        }
+    }
+
+    Err(CertError::VerificationFailed(
+        "No supported private key found in PEM".into(),
+    ))
+}
+
+fn decode_pem(pem_str: &str, expected_tag: &str) -> Result<Vec<u8>> {
+    let pems: Vec<Pem> = ::pem::parse_many(pem_str)
+        .map_err(|e| CertError::VerificationFailed(format!("PEM parse error: {}", e)))?;
+
+    for p in pems {
+        if p.tag() == expected_tag {
+            return Ok(p.into_contents());
+        }
+    }
+
+    Err(CertError::VerificationFailed(format!(
+        "No {} found in PEM",
+        expected_tag
+    )))
+}
 
 /// Sign data using a private key (supports ECDSA P-256 and RSA)
 pub fn sign(priv_key_pem: &str, data: &[u8]) -> Result<Vec<u8>> {
@@ -105,20 +165,4 @@ pub fn decrypt(priv_key_pem: &str, ciphertext: &[u8]) -> Result<Vec<u8>> {
         .map_err(|e| CertError::VerificationFailed(format!("Decryption failed: {}", e)))?;
 
     Ok(data)
-}
-
-fn decode_pem(pem_str: &str, tag: &str) -> Result<Vec<u8>> {
-    let pems = ::pem::parse_many(pem_str)
-        .map_err(|e| CertError::VerificationFailed(format!("PEM parse error: {}", e)))?;
-
-    for p in pems {
-        if p.tag() == tag {
-            return Ok(p.into_contents());
-        }
-    }
-
-    Err(CertError::VerificationFailed(format!(
-        "PEM tag '{}' not found",
-        tag
-    )))
 }

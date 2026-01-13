@@ -28,6 +28,28 @@ pub struct CaProfile {
     pub key_type: KeyType,
 }
 
+impl CaProfile {
+    pub fn root(common_name: &str) -> Self {
+        Self {
+            common_name: common_name.to_string(),
+            organization: "Crab Inc.".to_string(),
+            validity_days: 365 * 20,
+            path_len: Some(1), // Allow 1 level of intermediate CA
+            key_type: KeyType::default(),
+        }
+    }
+
+    pub fn intermediate(common_name: &str, organization: &str) -> Self {
+        Self {
+            common_name: common_name.to_string(),
+            organization: organization.to_string(),
+            validity_days: 365 * 5,
+            path_len: Some(0), // Can sign leaf certs, but not other CAs
+            key_type: KeyType::default(),
+        }
+    }
+}
+
 impl Default for CaProfile {
     fn default() -> Self {
         Self {

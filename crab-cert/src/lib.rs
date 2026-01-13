@@ -5,19 +5,14 @@ mod error;
 mod machine;
 mod metadata;
 mod profile;
+pub mod signer; // Export signer module
+pub mod trust; // Export trust module
 
+pub use adapter::{SkipHostnameVerifier, to_identity_pem, verify_client_cert, verify_server_cert};
 pub use ca::CertificateAuthority;
-pub use crypto::{decrypt, encrypt, sign, verify};
+pub use crypto::{decrypt, encrypt, sign, to_rustls_certs, to_rustls_key, verify}; // Export helpers
 pub use error::{CertError, Result};
 pub use machine::generate_hardware_id;
 pub use metadata::CertMetadata;
 pub use profile::{CaProfile, CertProfile, KeyType};
-// We don't export adapter functions at top level to keep it clean, or maybe we do?
-// User said "simple and intuitive".
-// Maybe `CertificateAuthority` should have methods `to_rustls_config`?
-// But `CertificateAuthority` is for CA.
-// For client certs, we get (cert_pem, key_pem).
-// So `adapter` functions are useful utilities.
-pub use adapter::{
-    to_identity_pem, to_rustls_certs, to_rustls_key, verify_client_cert, verify_server_cert,
-};
+pub use trust::{ROOT_CA_PEM, verify_ca_signature, verify_chain_against_root};

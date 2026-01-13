@@ -1,5 +1,3 @@
-use std::ptr::without_provenance;
-
 use sha2::{Digest, Sha256};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 
@@ -23,7 +21,6 @@ pub fn generate_hardware_id() -> String {
     let refresh_kind = RefreshKind::nothing()
         .with_cpu(CpuRefreshKind::everything())
         .with_memory(MemoryRefreshKind::everything());
-
     let sys = System::new_with_specifics(refresh_kind);
 
     // 1. System Name (e.g., "Darwin", "Linux", "Windows")

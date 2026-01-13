@@ -34,8 +34,7 @@ fn test_certificate_chain() {
     let chain_pem = format!("{}\n{}", leaf_cert_pem, intermediate_ca.cert_pem());
 
     println!("Verifying Leaf Chain against Root...");
-    verify_server_cert(&chain_pem, root_ca.cert_pem(), "leaf.local")
-        .expect("Chain verification failed");
+    verify_server_cert(&chain_pem, root_ca.cert_pem()).expect("Chain verification failed");
 
     println!("Chain verification passed!");
 }
@@ -60,7 +59,7 @@ fn test_ca_load() {
         .expect("Failed to issue cert from loaded CA");
 
     // 4. Verify the issued certificate against the original CA cert
-    verify_server_cert(&server_cert, cert_pem, "loaded.local").expect("Verification failed");
+    verify_server_cert(&server_cert, cert_pem).expect("Verification failed");
 }
 
 #[test]
@@ -178,7 +177,7 @@ fn test_certificate_lifecycle() {
 
     // 6. Verify Server Certificate using helper
     println!("Verifying Server Certificate...");
-    verify_server_cert(&server_cert_pem, ca.cert_pem(), "localhost")
+    verify_server_cert(&server_cert_pem, ca.cert_pem())
         .expect("Server certificate verification failed");
     println!("Server certificate verification passed!");
 

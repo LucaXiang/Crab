@@ -12,6 +12,8 @@ pub enum CertError {
     InvalidKey,
     #[error("Verification failed: {0}")]
     VerificationFailed(String),
+    #[error("TLS error: {0}")]
+    Tls(#[from] rustls::Error),
 }
 
 pub type Result<T> = std::result::Result<T, CertError>;
