@@ -100,18 +100,25 @@ mod tests {
     #[tokio::test]
     async fn test_message_client_memory() {
         let bus = MessageBus::new();
+        let mut server_rx = bus.subscribe_to_clients(); // Simulate server listening
         let client = MessageClient::memory(&bus);
 
         // Send a message
         let payload = shared::message::OrderIntentPayload {
-            action: "test_action".to_string(),
-            table_id: "T01".to_string(),
+            table_id: shared::message::TableId::new_unchecked("T01"),
             order_id: None,
-            data: serde_json::json!({"test": "data"}),
             operator: None,
+            action: shared::message::OrderAction::AddDish { dishes: vec![] },
         };
         let msg = BusMessage::order_intent(&payload);
         client.send(&msg).await.unwrap();
+
+        // Verify server received it
+        let received_by_server = server_rx.recv().await.unwrap();
+        assert_eq!(received_by_server.event_type, crate::EventType::OrderIntent);
+
+        // Simulate server broadcasting the message back
+        bus.publish(msg).await.unwrap();
 
         // Receive it
         let received = client.recv().await.unwrap();

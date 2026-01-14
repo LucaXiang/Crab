@@ -57,17 +57,17 @@ async fn read_from_stream<R: AsyncReadExt + Unpin>(reader: &mut R) -> Result<Bus
     reader
         .read_exact(&mut type_buf)
         .await
-        .map_err(|e| AppError::Internal(format!("Read type failed: {}", e)))?;
+        .map_err(|e| AppError::internal(format!("Read type failed: {}", e)))?;
 
-    let event_type = EventType::try_from(type_buf[0])
-        .map_err(|_| AppError::Invalid("Invalid event type".into()))?;
+    let event_type =
+        EventType::try_from(type_buf[0]).map_err(|_| AppError::invalid("Invalid event type"))?;
 
     // Read payload length (4 bytes)
     let mut len_buf = [0u8; 4];
     reader
         .read_exact(&mut len_buf)
         .await
-        .map_err(|e| AppError::Internal(format!("Read len failed: {}", e)))?;
+        .map_err(|e| AppError::internal(format!("Read len failed: {}", e)))?;
 
     let len = u32::from_le_bytes(len_buf) as usize;
 
@@ -76,7 +76,7 @@ async fn read_from_stream<R: AsyncReadExt + Unpin>(reader: &mut R) -> Result<Bus
     reader
         .read_exact(&mut payload)
         .await
-        .map_err(|e| AppError::Internal(format!("Read payload failed: {}", e)))?;
+        .map_err(|e| AppError::internal(format!("Read payload failed: {}", e)))?;
 
     Ok(BusMessage::new(event_type, payload))
 }
@@ -93,7 +93,7 @@ async fn write_to_stream<W: AsyncWriteExt + Unpin>(
     writer
         .write_all(&data)
         .await
-        .map_err(|e| AppError::Internal(format!("Write failed: {}", e)))?;
+        .map_err(|e| AppError::internal(format!("Write failed: {}", e)))?;
     Ok(())
 }
 
@@ -110,7 +110,7 @@ impl TcpTransport {
     pub async fn connect(addr: &str) -> Result<Self, AppError> {
         let stream = TcpStream::connect(addr)
             .await
-            .map_err(|e| AppError::Internal(format!("TCP connect failed: {}", e)))?;
+            .map_err(|e| AppError::internal(format!("TCP connect failed: {}", e)))?;
         let (reader, writer) = stream.into_split();
         Ok(Self {
             reader: Arc::new(Mutex::new(reader)),
@@ -221,14 +221,14 @@ impl MemoryTransport {
         let mut rx = self.rx.lock().await;
         rx.recv()
             .await
-            .map_err(|e| AppError::Internal(e.to_string()))
+            .map_err(|e| AppError::internal(e.to_string()))
     }
 
     pub async fn write_message(&self, msg: &BusMessage) -> Result<(), AppError> {
         // Send to server via client_tx (for simulating client messages)
         if let Some(tx) = &self.tx {
             tx.send(msg.clone())
-                .map_err(|e| AppError::Internal(e.to_string()))?;
+                .map_err(|e| AppError::internal(e.to_string()))?;
         }
         Ok(())
     }
@@ -327,7 +327,7 @@ impl MessageBus {
     pub async fn publish(&self, msg: BusMessage) -> Result<(), AppError> {
         self.server_tx
             .send(msg)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+            .map_err(|e| AppError::internal(e.to_string()))?;
         Ok(())
     }
 
@@ -335,7 +335,7 @@ impl MessageBus {
     pub async fn send_to_server(&self, msg: BusMessage) -> Result<(), AppError> {
         self.client_tx
             .send(msg)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+            .map_err(|e| AppError::internal(e.to_string()))?;
         Ok(())
     }
 
@@ -395,7 +395,7 @@ impl MessageBus {
     ) -> Result<(), AppError> {
         let listener = TcpListener::bind(&self.config.tcp_listen_addr)
             .await
-            .map_err(|e| AppError::Internal(format!("Failed to bind: {}", e)))?;
+            .map_err(|e| AppError::internal(format!("Failed to bind: {}", e)))?;
 
         tracing::info!(
             "Message bus TCP server listening on {}",
@@ -415,8 +415,8 @@ impl MessageBus {
         } else {
             // STRICT MODE: Do not start TCP server without TLS
             tracing::error!("❌ mTLS configuration missing. Refusing to start TCP server!");
-            return Err(AppError::Internal(
-                "Refusing to start TCP server without mTLS configuration".into(),
+            return Err(AppError::internal(
+                "Refusing to start TCP server without mTLS configuration",
             ));
         };
 
@@ -547,7 +547,8 @@ mod tests {
         let transport = bus.memory_transport();
 
         // Publish
-        let msg = BusMessage::notification("Test", "Hello");
+        let payload = NotificationPayload::info("Test", "Hello");
+        let msg = BusMessage::notification(&payload);
         bus.publish(msg.clone()).await.unwrap();
 
         // Receive via transport
@@ -561,7 +562,13 @@ mod tests {
         let t1 = bus.memory_transport();
         let t2 = bus.memory_transport();
 
-        let msg = BusMessage::data_sync("test_action", serde_json::json!({"test": "data"}));
+        use shared::message::{DataSyncPayload, DishId};
+        let payload = DataSyncPayload::DishPrice {
+            dish_id: DishId::new("D001"),
+            old_price: 100,
+            new_price: 200,
+        };
+        let msg = BusMessage::data_sync(&payload);
         bus.publish(msg.clone()).await.unwrap();
 
         let r1 = t1.read_message().await.unwrap();

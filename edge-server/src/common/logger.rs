@@ -66,11 +66,16 @@ pub fn cleanup_old_logs(log_dir: &Path) -> anyhow::Result<()> {
 ///
 /// # Examples
 /// ```no_run
-/// // Development setup (console only)
-/// init_logger_with_file("debug", false, None)?;
+/// use edge_server::common::init_logger_with_file;
 ///
-/// // Production setup (console + file)
-/// init_logger_with_file("info", true, Some("./work_dir/logs"))?;
+/// fn main() -> anyhow::Result<()> {
+///     // Development setup (console only)
+///     init_logger_with_file("debug", false, None)?;
+///
+///     // Production setup (console + file)
+///     init_logger_with_file("info", true, Some("./work_dir/logs"))?;
+///     Ok(())
+/// }
 /// ```
 pub fn init_logger_with_file(
     level: &str,
@@ -280,6 +285,8 @@ pub fn init_logger(level: &str, json_format: bool) -> anyhow::Result<()> {
 ///
 /// # Examples
 /// ```no_run
+/// use edge_server::audit_log;
+///
 /// // Login event
 /// audit_log!("user123", "login", "employee:admin");
 ///
@@ -322,6 +329,8 @@ macro_rules! audit_log {
 ///
 /// # Examples
 /// ```no_run
+/// use edge_server::security_log;
+///
 /// // Failed authentication
 /// security_log!(WARN, "auth_failed", username = "admin", ip = "192.168.1.1", reason = "invalid_password");
 ///

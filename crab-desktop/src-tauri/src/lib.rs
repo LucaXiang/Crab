@@ -39,6 +39,7 @@ fn get_local_ip() -> Result<String, String> {
 }
 
 #[derive(serde::Deserialize)]
+#[allow(dead_code)]
 struct ActivationParams {
     username: String,
     password: String,
@@ -51,16 +52,19 @@ struct ActivationParams {
 #[tauri::command]
 async fn activate_server(
     state: tauri::State<'_, AppState>,
-    params: ActivationParams,
+    _params: ActivationParams,
 ) -> Result<String, String> {
     let guard = state.server_state.read().await;
     let server_state = guard
         .as_ref()
         .ok_or_else(|| "Server is still initializing...".to_string())?;
 
-    let bus = server_state.get_message_bus();
+    let _bus = server_state.get_message_bus();
 
     // Construct activation command
+    // TODO: Update ServerCommand to support activation request with credentials
+    // The current ServerCommand::Activate expects certificates, not credentials.
+    /*
     let payload = shared::message::ServerCommandPayload {
         command: "activate_server".to_string(),
         data: serde_json::json!({
@@ -81,6 +85,8 @@ async fn activate_server(
         .map_err(|e| e.to_string())?;
 
     Ok("Activation triggered".to_string())
+    */
+    Err("Activation not implemented in current protocol version".to_string())
 }
 
 #[tauri::command]
@@ -93,13 +99,12 @@ async fn send_test_message(state: tauri::State<'_, AppState>, msg: String) -> Re
     let bus = server_state.get_message_bus();
 
     // Use OrderIntent instead of Notification to comply with client-side restrictions
-    let payload = shared::message::OrderIntentPayload {
-        action: "test_message".to_string(),
-        table_id: "T_TEST".to_string(),
-        order_id: None,
-        data: serde_json::json!({ "message": msg }),
-        operator: Some("tauri_user".to_string()),
-    };
+    // Using a dummy dish item to carry the message in notes
+    let payload = shared::message::OrderIntentPayload::add_dish(
+        shared::message::TableId::new_unchecked("T_TEST"),
+        vec![shared::message::DishItem::with_notes("TEST_MSG", 1, msg)],
+        Some(shared::message::OperatorId::new("tauri_user")),
+    );
 
     let message = edge_server::message::BusMessage::order_intent(&payload);
 
@@ -208,13 +213,10 @@ pub fn run() {
 
                 println!("Initializing Edge Server in: {:?}", work_dir);
 
-                let config = Config {
-                    work_dir: work_dir.to_string_lossy().to_string(),
-                    jwt: JwtConfig::default(),
-                    http_port: 3002, // 避免与默认 3000 (前端) 和 3001 (Auth Server) 冲突
-                    environment: "development".to_string(),
-                    message_tcp_port: 8082, // 避免与默认 8081 冲突
-                };
+                let mut config =
+                    Config::with_overrides(work_dir.to_string_lossy().to_string(), 3002, 8082);
+                config.jwt = JwtConfig::default();
+                config.environment = "development".to_string();
 
                 let server_state = ServerState::initialize(&config).await;
                 let server_state = Arc::new(server_state);

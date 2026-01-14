@@ -14,7 +14,7 @@ use crate::common::AppError;
 pub type ActivationId = Thing;
 
 /// Edge activation state from database
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EdgeActivation {
     pub id: Option<ActivationId>,
     pub is_activated: bool,
@@ -26,23 +26,6 @@ pub struct EdgeActivation {
     pub cert_fingerprint: Option<String>,
     pub cert_expires_at: Option<DateTime<Utc>>,
     pub last_heartbeat: Option<DateTime<Utc>>,
-}
-
-impl Default for EdgeActivation {
-    fn default() -> Self {
-        Self {
-            id: None,
-            is_activated: false,
-            activated_at: None,
-            tenant_id: None,
-            tenant_name: None,
-            edge_id: None,
-            edge_name: None,
-            cert_fingerprint: None,
-            cert_expires_at: None,
-            last_heartbeat: None,
-        }
-    }
 }
 
 /// Activation service for database operations

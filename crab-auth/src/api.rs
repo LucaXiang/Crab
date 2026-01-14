@@ -24,12 +24,6 @@ pub struct LoginRequest {
     password: String,
 }
 
-#[derive(Serialize)]
-pub struct LoginResponse {
-    token: String,
-    message: String,
-}
-
 async fn login(
     State(state): State<Arc<AppState>>,
     Json(req): Json<LoginRequest>,

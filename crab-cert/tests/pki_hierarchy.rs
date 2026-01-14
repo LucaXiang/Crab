@@ -4,6 +4,15 @@ use crab_cert::{
 };
 use rustls::client::danger::ServerCertVerifier;
 use rustls::pki_types::{ServerName, UnixTime};
+use std::sync::Once;
+
+static INIT: Once = Once::new();
+
+fn init_crypto() {
+    INIT.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
 
 /// 测试 PKI (公钥基础设施) 的层级结构流程
 ///
@@ -16,6 +25,7 @@ use rustls::pki_types::{ServerName, UnixTime};
 /// 3. 签名验证：直接验证 CA 证书本身的数字签名。
 #[test]
 fn test_pki_hierarchy_flow() {
+    init_crypto();
     // 1. 创建 Root CA (根证书)
     // 注意：在真实生产系统中，Root CA 是硬编码在二进制文件中的 (trust anchor)。
     // 这里我们从文件系统加载生成的 Root CA 证书和私钥，以便在测试中进行签发操作。
@@ -94,6 +104,7 @@ fn test_pki_hierarchy_flow() {
 /// 仅验证证书链的有效性和受信任的根证书签名。
 #[test]
 fn test_skip_hostname_verifier() {
+    init_crypto();
     // 1. 加载 Root CA
     let root_cert_pem =
         std::fs::read_to_string("certs/root_ca.pem").expect("Failed to read root cert");

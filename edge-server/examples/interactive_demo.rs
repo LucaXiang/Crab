@@ -11,7 +11,6 @@
 use edge_server::Config;
 use edge_server::server::ServerState;
 use edge_server::{BusMessage, MessageClient};
-use shared::message::ServerCommandPayload;
 use std::io::{self, Write};
 
 #[tokio::main]
@@ -27,16 +26,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 1. Start edge-server
     println!("1️⃣  Starting edge-server...");
-    let config = Config {
-        work_dir: temp_dir.to_string(),
-        jwt: edge_server::server::auth::JwtConfig {
-            secret: "demo-secret".to_string(),
-            ..Default::default()
-        },
-        http_port: 3000,
-        environment: "development".to_string(),
-        message_tcp_port: 8081,
-    };
+    let mut config = Config::with_overrides(temp_dir, 3000, 8081);
+    config.environment = "development".to_string();
+    config.jwt.secret = "demo-secret".to_string();
+
     let state: ServerState = ServerState::initialize(&config).await;
     println!("✅ Edge-server started! (HTTP: 3000, TCP: 8081)\n");
 

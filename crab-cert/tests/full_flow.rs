@@ -2,9 +2,19 @@ use crab_cert::{
     CaProfile, CertMetadata, CertProfile, CertificateAuthority, to_identity_pem, to_rustls_certs,
     to_rustls_key, verify_client_cert, verify_server_cert,
 };
+use std::sync::Once;
+
+static INIT: Once = Once::new();
+
+fn init_crypto() {
+    INIT.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
 
 #[test]
 fn test_certificate_chain() {
+    init_crypto();
     // 1. Create Root CA
     println!("Creating Root CA...");
     let mut root_profile = CaProfile::default();
@@ -41,6 +51,7 @@ fn test_certificate_chain() {
 
 #[test]
 fn test_ca_load() {
+    init_crypto();
     // 1. Create and persist a Root CA
     let mut profile = CaProfile::default();
     profile.common_name = "Crab Loaded CA".to_string();
@@ -110,6 +121,7 @@ fn test_file_io() {
 
 #[test]
 fn test_certificate_lifecycle() {
+    init_crypto();
     println!("Creating Root CA...");
     let mut ca_profile = CaProfile::default();
     ca_profile.common_name = "Crab Test Root CA".to_string();

@@ -86,15 +86,15 @@ impl BusMessage {
     /// # Examples
     ///
     /// ```rust
-    /// use shared::message::{BusMessage, OrderIntentPayload};
-    /// use serde_json::json;
+    /// use shared::message::{BusMessage, OrderIntentPayload, TableId, OperatorId, OrderAction, DishItem};
     ///
     /// let payload = OrderIntentPayload {
-    ///     action: "add_dish".to_string(),
-    ///     table_id: "T01".to_string(),
+    ///     table_id: TableId::new_unchecked("T01"),
     ///     order_id: None,
-    ///     data: json!({}),
-    ///     operator: Some("waiter_001".to_string()),
+    ///     operator: Some(OperatorId::new("waiter_001")),
+    ///     action: OrderAction::AddDish {
+    ///         dishes: vec![DishItem::simple("D001", 1)],
+    ///     },
     /// };
     /// BusMessage::order_intent(&payload);
     /// ```
@@ -123,37 +123,20 @@ impl BusMessage {
     /// # Examples
     ///
     /// ```rust
-    /// use shared::message::BusMessage;
-    /// use serde_json::json;
+    /// use shared::message::{BusMessage, DataSyncPayload, DishId};
     ///
-    /// // 菜品价格更新
-    /// BusMessage::data_sync("dish_price", json!({
-    ///     "dish_id": "D001",
-    ///     "old_price": 3800,
-    ///     "new_price": 4200
-    /// }));
-    ///
-    /// // 菜品沽清
-    /// BusMessage::data_sync("dish_sold_out", json!({
-    ///     "dish_id": "D001",
-    ///     "available": false
-    /// }));
-    ///
-    /// // 新菜品上架
-    /// BusMessage::data_sync("dish_added", json!({
-    ///     "dish_id": "D999",
-    ///     "name": "新品推荐",
-    ///     "price": 5800,
-    ///     "category": "hot"
-    /// }));
+    /// let payload = DataSyncPayload::DishPrice {
+    ///     dish_id: DishId::new("D001"),
+    ///     old_price: 3800,
+    ///     new_price: 4200
+    /// };
+    /// BusMessage::data_sync(&payload);
     /// ```
-    pub fn data_sync(sync_type: &str, data: serde_json::Value) -> Self {
-        let payload = serde_json::json!({
-            "sync_type": sync_type,
-            "data": data,
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        });
-        Self::new(EventType::DataSync, serde_json::to_vec(&payload).unwrap())
+    pub fn data_sync(payload: &DataSyncPayload) -> Self {
+        Self::new(
+            EventType::DataSync,
+            serde_json::to_vec(payload).expect("Failed to serialize data sync"),
+        )
     }
 
     /// Create a notification message
@@ -161,23 +144,15 @@ impl BusMessage {
     /// # Examples
     ///
     /// ```rust
-    /// use shared::message::BusMessage;
+    /// use shared::message::{BusMessage, NotificationPayload};
     ///
-    /// // 系统通知
-    /// BusMessage::notification("打印机缺纸", "请及时添加打印纸");
-    ///
-    /// // 网络异常
-    /// BusMessage::notification("网络异常", "与服务器连接中断");
+    /// let payload = NotificationPayload::info("打印机缺纸", "请及时添加打印纸");
+    /// BusMessage::notification(&payload);
     /// ```
-    pub fn notification(title: &str, body: &str) -> Self {
-        let payload = serde_json::json!({
-            "title": title,
-            "body": body,
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        });
+    pub fn notification(payload: &NotificationPayload) -> Self {
         Self::new(
             EventType::Notification,
-            serde_json::to_vec(&payload).unwrap(),
+            serde_json::to_vec(payload).expect("Failed to serialize notification"),
         )
     }
 
@@ -188,30 +163,25 @@ impl BusMessage {
     /// # Examples
     ///
     /// ```rust
-    /// use shared::message::{BusMessage, ServerCommandPayload};
+    /// use shared::message::{BusMessage, ServerCommandPayload, ServerCommand};
     /// use serde_json::json;
     ///
     /// // 配置更新指令
     /// BusMessage::server_command(&ServerCommandPayload {
-    ///     command: "config_update".to_string(),
-    ///     data: json!({
-    ///         "key": "printer.enabled",
-    ///         "value": false,
-    ///         "reason": "maintenance"
-    ///     })
+    ///     command: ServerCommand::ConfigUpdate {
+    ///         key: "printer.enabled".to_string(),
+    ///         value: json!(false),
+    ///     }
     /// });
     ///
     /// // 数据同步指令
-    /// BusMessage::server_command("sync_dishes", json!({
-    ///     "force": true,
-    ///     "categories": ["hot", "cold"]
-    /// }));
-    ///
-    /// // 远程控制指令
-    /// BusMessage::server_command("restart", json!({
-    ///     "delay_seconds": 30,
-    ///     "reason": "system_upgrade"
-    /// }));
+    /// use shared::message::{DataSyncType};
+    /// BusMessage::server_command(&ServerCommandPayload {
+    ///     command: ServerCommand::SyncData {
+    ///         data_type: DataSyncType::Dishes,
+    ///         force: true,
+    ///     }
+    /// });
     /// ```
     /// Parse payload as JSON
     pub fn parse_payload<T: DeserializeOwned>(&self) -> Result<T, serde_json::Error> {
@@ -225,62 +195,102 @@ mod tests {
 
     #[test]
     fn test_notification_message() {
-        let msg = BusMessage::notification("Test Title", "Test Body");
+        let payload = NotificationPayload::info("Test Title", "Test Body");
+        let msg = BusMessage::notification(&payload);
         assert_eq!(msg.event_type, EventType::Notification);
-        let parsed: serde_json::Value = msg.parse_payload().unwrap();
-        assert_eq!(parsed["title"], "Test Title");
-        assert_eq!(parsed["body"], "Test Body");
+        let parsed: NotificationPayload = msg.parse_payload().unwrap();
+        assert_eq!(parsed.title, "Test Title");
+        assert_eq!(parsed.message, "Test Body");
     }
 
     #[test]
-    fn test_table_intent_message() {
-        let msg = BusMessage::table_intent(
-            "add_dish",
-            serde_json::json!({"table_id": "T01", "dishes": [{"id": "D001"}]}),
-        );
-        assert_eq!(msg.event_type, EventType::TableIntent);
-        let parsed: serde_json::Value = msg.parse_payload().unwrap();
-        assert_eq!(parsed["action"], "add_dish");
+    fn test_order_intent_message() {
+        let payload = OrderIntentPayload {
+            table_id: TableId::new_unchecked("T01"),
+            order_id: None,
+            operator: Some(OperatorId::new("waiter_001")),
+            action: OrderAction::AddDish {
+                dishes: vec![DishItem::simple("D001", 1)],
+            },
+        };
+        let msg = BusMessage::order_intent(&payload);
+        assert_eq!(msg.event_type, EventType::OrderIntent);
+        let parsed: OrderIntentPayload = msg.parse_payload().unwrap();
+        match parsed.action {
+            OrderAction::AddDish { dishes } => {
+                assert_eq!(dishes[0].dish_id.as_str(), "D001");
+            }
+            _ => panic!("Wrong action type"),
+        }
     }
 
     #[test]
-    fn test_table_sync_message() {
-        let msg = BusMessage::table_sync(
-            "dish_added",
-            serde_json::json!({"table_id": "T01", "order_id": "ORD123"}),
-        );
-        assert_eq!(msg.event_type, EventType::TableSync);
-        let parsed: serde_json::Value = msg.parse_payload().unwrap();
-        assert_eq!(parsed["action"], "dish_added");
+    fn test_order_sync_message() {
+        let payload = OrderSyncPayload {
+            table_id: TableId::new_unchecked("T01"),
+            order_id: Some(OrderId::new_unchecked("ORD123")),
+            status: OrderStatus::Pending,
+            source: OperatorId::new("server"),
+            data: None,
+            action: OrderAction::AddDish {
+                dishes: vec![DishItem::simple("D001", 1)],
+            },
+        };
+        let msg = BusMessage::order_sync(&payload);
+        assert_eq!(msg.event_type, EventType::OrderSync);
+        let parsed: OrderSyncPayload = msg.parse_payload().unwrap();
+        assert_eq!(parsed.table_id.as_str(), "T01");
+        assert_eq!(parsed.order_id.unwrap().as_str(), "ORD123");
     }
 
     #[test]
     fn test_data_sync_message() {
-        let msg = BusMessage::data_sync(
-            "dish_price",
-            serde_json::json!({"dish_id": "D001", "new_price": 4200}),
-        );
+        let payload = DataSyncPayload::DishPrice {
+            dish_id: DishId::new("D001"),
+            old_price: 100,
+            new_price: 200,
+        };
+        let msg = BusMessage::data_sync(&payload);
         assert_eq!(msg.event_type, EventType::DataSync);
-        let parsed: serde_json::Value = msg.parse_payload().unwrap();
-        assert_eq!(parsed["sync_type"], "dish_price");
+        let parsed: DataSyncPayload = msg.parse_payload().unwrap();
+        match parsed {
+            DataSyncPayload::DishPrice {
+                dish_id,
+                old_price,
+                new_price,
+            } => {
+                assert_eq!(dish_id.as_str(), "D001");
+                assert_eq!(old_price, 100);
+                assert_eq!(new_price, 200);
+            }
+            _ => panic!("Wrong sync type"),
+        }
     }
 
     #[test]
     fn test_server_command_message() {
         let payload = ServerCommandPayload {
-            command: "config_update".to_string(),
-            data: serde_json::json!({"key": "printer.enabled", "value": false}),
+            command: ServerCommand::ConfigUpdate {
+                key: "printer.enabled".to_string(),
+                value: serde_json::json!(false),
+            },
         };
         let msg = BusMessage::server_command(&payload);
         assert_eq!(msg.event_type, EventType::ServerCommand);
         let parsed: ServerCommandPayload = msg.parse_payload().unwrap();
-        assert_eq!(parsed.command, "config_update");
+        match parsed.command {
+            ServerCommand::ConfigUpdate { key, value } => {
+                assert_eq!(key, "printer.enabled");
+                assert_eq!(value, false);
+            }
+            _ => panic!("Wrong command type"),
+        }
     }
 
     #[test]
     fn test_event_type_from_u8() {
-        assert_eq!(EventType::try_from(1).unwrap(), EventType::TableIntent);
-        assert_eq!(EventType::try_from(2).unwrap(), EventType::TableSync);
+        assert_eq!(EventType::try_from(1).unwrap(), EventType::OrderIntent);
+        assert_eq!(EventType::try_from(2).unwrap(), EventType::OrderSync);
         assert_eq!(EventType::try_from(3).unwrap(), EventType::DataSync);
         assert_eq!(EventType::try_from(4).unwrap(), EventType::Notification);
         assert_eq!(EventType::try_from(5).unwrap(), EventType::ServerCommand);
