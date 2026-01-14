@@ -9,7 +9,7 @@ use thiserror::Error;
 use chrono::{Duration, Utc};
 
 /// JWT Configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JwtConfig {
     /// JWT secret key (should be at least 32 bytes)
     pub secret: String,

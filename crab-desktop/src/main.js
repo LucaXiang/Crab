@@ -102,11 +102,41 @@ async function exportLogs() {
     }
 }
 
+async function activateServer() {
+    try {
+        const auth_url = document.getElementById('act-auth-url').value;
+        const tenant_id = document.getElementById('act-tenant').value;
+        const common_name = document.getElementById('act-common-name').value;
+        const username = document.getElementById('act-user').value;
+        const password = document.getElementById('act-pass').value;
+
+        if (!auth_url || !tenant_id || !common_name || !username || !password) {
+            alert("Please fill all activation fields");
+            return;
+        }
+
+        const res = await invoke('activate_server', { 
+            params: {
+                username,
+                password,
+                auth_url,
+                tenant_id,
+                common_name,
+                role: "server"
+            }
+        });
+        document.getElementById('output').textContent = 'Activation: ' + res;
+    } catch (e) {
+        document.getElementById('output').textContent = 'Error activating: ' + e;
+    }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   const btnHealth = document.getElementById('btn-health');
   const btnSend = document.getElementById('btn-send');
   const btnExit = document.getElementById('btn-exit');
-  const btnExport = document.getElementById('btn-export');
+  const btnExport = document.getElementById('btn-logs');
+  const btnActivate = document.getElementById('btn-activate');
 
   if (btnHealth) {
     btnHealth.addEventListener('click', checkHealth);
@@ -119,6 +149,9 @@ window.addEventListener("DOMContentLoaded", () => {
   }
   if (btnExport) {
     btnExport.addEventListener('click', exportLogs);
+  }
+  if (btnActivate) {
+    btnActivate.addEventListener('click', activateServer);
   }
 
   getIpAddress();

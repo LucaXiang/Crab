@@ -29,6 +29,13 @@ axum.workspace = true
 # Async trait for defining traits
 async-trait.workspace = true
 
+# TLS support
+tokio-rustls = "0.26.4"
+rustls = "0.23.36"
+rustls-pki-types = "1"
+webpki-roots = "0.26"
+
+
 [[example]]
 name = "message_client"
 path = "examples/message_client.rs"
@@ -42,4 +49,29 @@ version = "0.1"
 
 [dev-dependencies.chrono]
 version = "0.4"
-features = ["serde"]
+
+[dev-dependencies.rustls]
+version = "0.23.36"
+features = ["ring"]
+
+[dev-dependencies.rustls-pki-types]
+version = "1"
+
+[dev-dependencies.tokio-rustls]
+version = "0.26.4"
+
+[dev-dependencies.base64]
+version = "0.22"
+
+[dev-dependencies.sha2]
+version = "0.10"
+
+[dev-dependencies.hex]
+version = "0.4"
+
+[dev-dependencies.rustls-pemfile]
+version = "2"
+
+[dev-dependencies.rustls-webpki]
+version = "0.102"
+

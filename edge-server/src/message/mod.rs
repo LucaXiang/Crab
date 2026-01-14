@@ -20,12 +20,14 @@
 //! ```
 
 // use async_trait::async_trait;
+use async_trait::async_trait;
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf, split};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
 use tokio::sync::broadcast;
+use tokio_rustls::{TlsAcceptor, server::TlsStream};
 use tokio_util::sync::CancellationToken;
 
 pub mod handler;
@@ -35,16 +37,69 @@ pub use handler::MessageHandler;
 pub use processor::{MessageProcessor, ProcessResult};
 pub use shared::message::{
     BusMessage, EventType, NotificationPayload, OrderIntentPayload, OrderSyncPayload,
+    ServerCommandPayload,
 };
 
 use crate::common::AppError;
 
+// ========== Transport Trait ==========
+
+#[async_trait]
+pub trait Transport: Send + Sync {
+    async fn read_message(&self) -> Result<BusMessage, AppError>;
+    async fn write_message(&self, msg: &BusMessage) -> Result<(), AppError>;
+}
+
+// Helper functions
+async fn read_from_stream<R: AsyncReadExt + Unpin>(reader: &mut R) -> Result<BusMessage, AppError> {
+    // Read event type (1 byte)
+    let mut type_buf = [0u8; 1];
+    reader
+        .read_exact(&mut type_buf)
+        .await
+        .map_err(|e| AppError::Internal(format!("Read type failed: {}", e)))?;
+
+    let event_type = EventType::try_from(type_buf[0])
+        .map_err(|_| AppError::Invalid("Invalid event type".into()))?;
+
+    // Read payload length (4 bytes)
+    let mut len_buf = [0u8; 4];
+    reader
+        .read_exact(&mut len_buf)
+        .await
+        .map_err(|e| AppError::Internal(format!("Read len failed: {}", e)))?;
+
+    let len = u32::from_le_bytes(len_buf) as usize;
+
+    // Read payload
+    let mut payload = vec![0u8; len];
+    reader
+        .read_exact(&mut payload)
+        .await
+        .map_err(|e| AppError::Internal(format!("Read payload failed: {}", e)))?;
+
+    Ok(BusMessage::new(event_type, payload))
+}
+
+async fn write_to_stream<W: AsyncWriteExt + Unpin>(
+    writer: &mut W,
+    msg: &BusMessage,
+) -> Result<(), AppError> {
+    let mut data = Vec::new();
+    data.push(msg.event_type as u8);
+    data.extend_from_slice(&(msg.payload.len() as u32).to_le_bytes());
+    data.extend_from_slice(&msg.payload);
+
+    writer
+        .write_all(&data)
+        .await
+        .map_err(|e| AppError::Internal(format!("Write failed: {}", e)))?;
+    Ok(())
+}
+
 // ========== TCP Transport ==========
 
 /// TCP transport implementation
-///
-/// Splits the TCP stream into separate read and write halves for concurrent operations.
-/// This allows reading and writing to happen simultaneously without blocking each other.
 #[derive(Debug, Clone)]
 pub struct TcpTransport {
     reader: Arc<Mutex<OwnedReadHalf>>,
@@ -73,48 +128,12 @@ impl TcpTransport {
 
     pub async fn read_message(&self) -> Result<BusMessage, AppError> {
         let mut reader = self.reader.lock().await;
-
-        // Read event type (1 byte)
-        let mut type_buf = [0u8; 1];
-        reader
-            .read_exact(&mut type_buf)
-            .await
-            .map_err(|e| AppError::Internal(format!("Read type failed: {}", e)))?;
-
-        let event_type = EventType::try_from(type_buf[0])
-            .map_err(|_| AppError::Invalid("Invalid event type".into()))?;
-
-        // Read payload length (4 bytes)
-        let mut len_buf = [0u8; 4];
-        reader
-            .read_exact(&mut len_buf)
-            .await
-            .map_err(|e| AppError::Internal(format!("Read len failed: {}", e)))?;
-
-        let len = u32::from_le_bytes(len_buf) as usize;
-
-        // Read payload
-        let mut payload = vec![0u8; len];
-        reader
-            .read_exact(&mut payload)
-            .await
-            .map_err(|e| AppError::Internal(format!("Read payload failed: {}", e)))?;
-
-        Ok(BusMessage::new(event_type, payload))
+        read_from_stream(&mut *reader).await
     }
 
     pub async fn write_message(&self, msg: &BusMessage) -> Result<(), AppError> {
         let mut writer = self.writer.lock().await;
-        let mut data = Vec::new();
-        data.push(msg.event_type as u8);
-        data.extend_from_slice(&(msg.payload.len() as u32).to_le_bytes());
-        data.extend_from_slice(&msg.payload);
-
-        writer
-            .write_all(&data)
-            .await
-            .map_err(|e| AppError::Internal(format!("Write failed: {}", e)))?;
-        Ok(())
+        write_to_stream(&mut *writer, msg).await
     }
 
     pub async fn close(&self) -> Result<(), AppError> {
@@ -122,6 +141,48 @@ impl TcpTransport {
         drop(self.reader.lock().await);
         drop(self.writer.lock().await);
         Ok(())
+    }
+}
+
+#[async_trait]
+impl Transport for TcpTransport {
+    async fn read_message(&self) -> Result<BusMessage, AppError> {
+        self.read_message().await
+    }
+
+    async fn write_message(&self, msg: &BusMessage) -> Result<(), AppError> {
+        self.write_message(msg).await
+    }
+}
+
+// ========== TLS Transport ==========
+
+#[derive(Debug, Clone)]
+pub struct TlsTransport {
+    reader: Arc<Mutex<ReadHalf<TlsStream<TcpStream>>>>,
+    writer: Arc<Mutex<WriteHalf<TlsStream<TcpStream>>>>,
+}
+
+impl TlsTransport {
+    pub fn new(stream: TlsStream<TcpStream>) -> Self {
+        let (reader, writer) = split(stream);
+        Self {
+            reader: Arc::new(Mutex::new(reader)),
+            writer: Arc::new(Mutex::new(writer)),
+        }
+    }
+}
+
+#[async_trait]
+impl Transport for TlsTransport {
+    async fn read_message(&self) -> Result<BusMessage, AppError> {
+        let mut reader = self.reader.lock().await;
+        read_from_stream(&mut *reader).await
+    }
+
+    async fn write_message(&self, msg: &BusMessage) -> Result<(), AppError> {
+        let mut writer = self.writer.lock().await;
+        write_to_stream(&mut *writer, msg).await
     }
 }
 
@@ -185,6 +246,8 @@ pub struct TransportConfig {
     pub tcp_listen_addr: String,
     /// Capacity of the broadcast channel (default: 1024)
     pub channel_capacity: usize,
+    /// TLS configuration for mTLS (optional)
+    pub tls_config: Option<Arc<rustls::ServerConfig>>,
 }
 
 impl Default for TransportConfig {
@@ -192,6 +255,7 @@ impl Default for TransportConfig {
         Self {
             tcp_listen_addr: "0.0.0.0:8081".to_string(),
             channel_capacity: 1024,
+            tls_config: None,
         }
     }
 }
@@ -325,7 +389,10 @@ impl MessageBus {
     /// 2. Reads messages from clients and publishes to client_tx (server receives)
     /// 3. Forwards server broadcast messages to connected clients
     /// 4. Gracefully shuts down on cancellation signal
-    pub async fn start_tcp_server(&self) -> Result<(), AppError> {
+    pub async fn start_tcp_server(
+        &self,
+        tls_config_override: Option<Arc<rustls::ServerConfig>>,
+    ) -> Result<(), AppError> {
         let listener = TcpListener::bind(&self.config.tcp_listen_addr)
             .await
             .map_err(|e| AppError::Internal(format!("Failed to bind: {}", e)))?;
@@ -338,6 +405,20 @@ impl MessageBus {
         let server_tx = self.server_tx.clone();
         let client_tx = self.client_tx.clone();
         let shutdown_token = self.shutdown_token.clone();
+
+        // Prepare TLS acceptor: prefer override (from activation), then config
+        let final_tls_config = tls_config_override.or(self.config.tls_config.clone());
+
+        let tls_acceptor = if let Some(tls_config) = final_tls_config {
+            tracing::info!("🔐 Message Bus mTLS enabled");
+            Some(TlsAcceptor::from(tls_config))
+        } else {
+            // STRICT MODE: Do not start TCP server without TLS
+            tracing::error!("❌ mTLS configuration missing. Refusing to start TCP server!");
+            return Err(AppError::Internal(
+                "Refusing to start TCP server without mTLS configuration".into(),
+            ));
+        };
 
         loop {
             tokio::select! {
@@ -353,51 +434,70 @@ impl MessageBus {
                         Ok((stream, addr)) => {
                             tracing::info!("Client connected: {}", addr);
 
-                            let transport = TcpTransport::from_stream(stream);
-                            let mut rx = server_tx.subscribe();
-                            let transport_clone = transport.clone();
-                            let client_shutdown = shutdown_token.clone();
+                            let tls_acceptor = tls_acceptor.clone();
+                            let server_tx = server_tx.clone();
+                            let client_tx = client_tx.clone();
+                            let shutdown_token = shutdown_token.clone();
 
-                            // Spawn task to forward messages to this client (server → client)
                             tokio::spawn(async move {
-                                loop {
-                                    tokio::select! {
-                                        // Listen for shutdown signal
-                                        _ = client_shutdown.cancelled() => {
-                                            tracing::info!("Client {} handler shutting down", addr);
-                                            break;
+                                let transport: Arc<dyn Transport> = if let Some(acceptor) = tls_acceptor {
+                                    match acceptor.accept(stream).await {
+                                        Ok(tls_stream) => {
+                                            tracing::info!("🔐 Client {} TLS handshake successful", addr);
+                                            Arc::new(TlsTransport::new(tls_stream))
                                         }
+                                        Err(e) => {
+                                            tracing::error!("Client {} TLS handshake failed: {}", addr, e);
+                                            return;
+                                        }
+                                    }
+                                } else {
+                                    Arc::new(TcpTransport::from_stream(stream))
+                                };
 
-                                        // Receive messages from bus (server broadcasts)
-                                        msg_result = rx.recv() => {
-                                            match msg_result {
-                                                Ok(msg) => {
-                                                    if let Err(e) = transport_clone.write_message(&msg).await {
-                                                        tracing::info!("Client {} disconnected: {}", addr, e);
+                                let mut rx = server_tx.subscribe();
+                                let transport_clone = transport.clone();
+                                let client_shutdown = shutdown_token.clone();
+
+                                // Spawn task to forward messages to this client (server → client)
+                                tokio::spawn(async move {
+                                    loop {
+                                        tokio::select! {
+                                            // Listen for shutdown signal
+                                            _ = client_shutdown.cancelled() => {
+                                                tracing::info!("Client {} handler shutting down", addr);
+                                                break;
+                                            }
+
+                                            // Receive messages from bus (server broadcasts)
+                                            msg_result = rx.recv() => {
+                                                match msg_result {
+                                                    Ok(msg) => {
+                                                        if let Err(e) = transport_clone.write_message(&msg).await {
+                                                            tracing::info!("Client {} disconnected: {}", addr, e);
+                                                            break;
+                                                        }
+                                                    }
+                                                    Err(_) => {
+                                                        // Channel closed
                                                         break;
                                                     }
-                                                }
-                                                Err(_) => {
-                                                    // Channel closed
-                                                    break;
                                                 }
                                             }
                                         }
                                     }
-                                }
-                            });
+                                });
 
-                            // Spawn task to read messages from client (client → server)
-                            let client_tx_clone = client_tx.clone();
-                            let client_shutdown2 = shutdown_token.clone();
-                            tokio::spawn(async move {
+                                // Read messages from client (client → server)
+                                let client_tx_clone = client_tx.clone();
+                                let client_shutdown2 = shutdown_token.clone();
                                 loop {
                                     tokio::select! {
                                         _ = client_shutdown2.cancelled() => {
                                             break;
                                         }
                                         // Read message from client
-                                        read_result = async { transport.read_message().await } => {
+                                        read_result = transport.read_message() => {
                                             match read_result {
                                                 Ok(msg) => {
                                                     // Publish to client_tx so server handlers receive it
@@ -461,13 +561,13 @@ mod tests {
         let t1 = bus.memory_transport();
         let t2 = bus.memory_transport();
 
-        let msg = BusMessage::table_sync("test_action", serde_json::json!({"test": "data"}));
+        let msg = BusMessage::data_sync("test_action", serde_json::json!({"test": "data"}));
         bus.publish(msg.clone()).await.unwrap();
 
         let r1 = t1.read_message().await.unwrap();
         let r2 = t2.read_message().await.unwrap();
 
-        assert_eq!(r1.event_type, EventType::TableSync);
-        assert_eq!(r2.event_type, EventType::TableSync);
+        assert_eq!(r1.event_type, EventType::DataSync);
+        assert_eq!(r2.event_type, EventType::DataSync);
     }
 }

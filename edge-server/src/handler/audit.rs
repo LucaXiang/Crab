@@ -36,10 +36,10 @@ pub async fn create_audit_log(
 ) -> Result<Json<AppResponse<AuditLogResponse>>, AppError> {
     // Validate category and action are not empty
     if request.category.trim().is_empty() {
-        return Err(AppError::Validation("Category is required".to_string()));
+        return Err(AppError::validation("Category is required".to_string()));
     }
     if request.action.trim().is_empty() {
-        return Err(AppError::Validation("Action is required".to_string()));
+        return Err(AppError::validation("Action is required".to_string()));
     }
 
     let description = request

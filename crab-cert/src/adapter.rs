@@ -101,7 +101,7 @@ impl ServerCertVerifier for SkipHostnameVerifier {
                         }
                     }
                     x509_parser::extensions::GeneralName::IPAddress(ip) => {
-                        let sn = ServerName::from(std::net::IpAddr::from(match ip.len() {
+                        let ip_addr = match ip.len() {
                             4 => std::net::IpAddr::V4(std::net::Ipv4Addr::new(
                                 ip[0], ip[1], ip[2], ip[3],
                             )),
@@ -110,7 +110,8 @@ impl ServerCertVerifier for SkipHostnameVerifier {
                                 std::net::IpAddr::V6(std::net::Ipv6Addr::from(b))
                             }
                             _ => continue,
-                        }));
+                        };
+                        let sn = ServerName::from(ip_addr);
                         valid_name = Some(sn.to_owned());
                         break;
                     }
@@ -123,12 +124,11 @@ impl ServerCertVerifier for SkipHostnameVerifier {
         if valid_name.is_none() {
             for rdn in cert.subject().iter_rdn() {
                 for attr in rdn.iter() {
-                    if attr.attr_type() == &x509_parser::oid_registry::OID_X509_COMMON_NAME {
-                        if let Ok(s) = attr.as_str() {
-                            if let Ok(sn) = ServerName::try_from(s) {
-                                valid_name = Some(sn);
-                            }
-                        }
+                    if attr.attr_type() == &x509_parser::oid_registry::OID_X509_COMMON_NAME
+                        && let Ok(s) = attr.as_str()
+                        && let Ok(sn) = ServerName::try_from(s)
+                    {
+                        valid_name = Some(sn);
                     }
                 }
             }

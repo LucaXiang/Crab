@@ -4,6 +4,7 @@
 
 use async_trait::async_trait;
 use serde_json::Value;
+use std::sync::Arc;
 
 use crate::common::AppError;
 use crate::message::{BusMessage, EventType};
@@ -87,7 +88,7 @@ impl MessageProcessor for OrderIntentProcessor {
     async fn process(&self, msg: &BusMessage) -> Result<ProcessResult, AppError> {
         let payload: Value = msg
             .parse_payload()
-            .map_err(|e| AppError::Invalid(format!("Invalid payload: {}", e)))?;
+            .map_err(|e| AppError::invalid(format!("Invalid payload: {}", e)))?;
 
         let action = payload["action"].as_str().unwrap_or("unknown");
         let _data = &payload["data"];
@@ -170,7 +171,7 @@ impl MessageProcessor for DataSyncProcessor {
     async fn process(&self, msg: &BusMessage) -> Result<ProcessResult, AppError> {
         let payload: Value = msg
             .parse_payload()
-            .map_err(|e| AppError::Invalid(format!("Invalid payload: {}", e)))?;
+            .map_err(|e| AppError::invalid(format!("Invalid payload: {}", e)))?;
 
         let sync_type = payload["sync_type"].as_str().unwrap_or("unknown");
         let _data = &payload["data"];
@@ -188,8 +189,8 @@ impl MessageProcessor for DataSyncProcessor {
         // match sync_type {
         //     "dish_price" => {
         //         // 更新菜品价格
-        //         let dish_id = data["dish_id"].as_str().ok_or(AppError::Invalid("Missing dish_id".into()))?;
-        //         let new_price = data["new_price"].as_u64().ok_or(AppError::Invalid("Missing new_price".into()))?;
+        //         let dish_id = data["dish_id"].as_str().ok_or(AppError::invalid("Missing dish_id".into()))?;
+        //         let new_price = data["new_price"].as_u64().ok_or(AppError::invalid("Missing new_price".into()))?;
         //         db.update_dish_price(dish_id, new_price, &tx).await?;
         //
         //         // 记录价格历史
@@ -197,7 +198,7 @@ impl MessageProcessor for DataSyncProcessor {
         //     }
         //     "dish_sold_out" => {
         //         // 菜品沽清
-        //         let dish_id = data["dish_id"].as_str().ok_or(AppError::Invalid("Missing dish_id".into()))?;
+        //         let dish_id = data["dish_id"].as_str().ok_or(AppError::invalid("Missing dish_id".into()))?;
         //         db.set_dish_available(dish_id, false, &tx).await?;
         //     }
         //     "dish_added" => {
@@ -237,7 +238,7 @@ impl MessageProcessor for NotificationProcessor {
     async fn process(&self, msg: &BusMessage) -> Result<ProcessResult, AppError> {
         let payload: Value = msg
             .parse_payload()
-            .map_err(|e| AppError::Invalid(format!("Invalid payload: {}", e)))?;
+            .map_err(|e| AppError::invalid(format!("Invalid payload: {}", e)))?;
 
         let title = payload["title"].as_str().unwrap_or("(no title)");
         let body = payload["body"].as_str().unwrap_or("(no body)");
@@ -263,7 +264,15 @@ impl MessageProcessor for NotificationProcessor {
 /// Server command processor - handles commands from upstream/central server
 ///
 /// 处理上层服务器发来的指令（配置更新、数据同步指令、远程控制等）
-pub struct ServerCommandProcessor;
+pub struct ServerCommandProcessor {
+    state: Arc<crate::server::ServerState>,
+}
+
+impl ServerCommandProcessor {
+    pub fn new(state: Arc<crate::server::ServerState>) -> Self {
+        Self { state }
+    }
+}
 
 #[async_trait]
 impl MessageProcessor for ServerCommandProcessor {
@@ -272,53 +281,103 @@ impl MessageProcessor for ServerCommandProcessor {
     }
 
     async fn process(&self, msg: &BusMessage) -> Result<ProcessResult, AppError> {
-        let payload: Value = msg
+        let payload: shared::message::ServerCommandPayload = msg
             .parse_payload()
-            .map_err(|e| AppError::Invalid(format!("Invalid payload: {}", e)))?;
+            .map_err(|e| AppError::invalid(format!("Invalid payload: {}", e)))?;
 
-        let command = payload["command"].as_str().unwrap_or("unknown");
-        let _data = &payload["data"];
+        match payload.command {
+            shared::message::ServerCommand::Activate {
+                tenant_id,
+                tenant_name,
+                edge_id,
+                edge_name,
+                tenant_ca_pem,
+                edge_cert_pem,
+                edge_key_pem,
+            } => {
+                tracing::info!(
+                    "🚀 Received Activate command: tenant={}, edge={}",
+                    tenant_name,
+                    edge_name
+                );
 
-        tracing::info!(
-            event = "server_command",
-            command = %command,
-            "Processing server command from upstream"
-        );
+                // Save certificates to filesystem
+                if let Err(e) = self
+                    .state
+                    .save_certificates(&tenant_ca_pem, &edge_cert_pem, &edge_key_pem)
+                    .await
+                {
+                    tracing::error!("Failed to save certificates: {}", e);
+                    return Ok(ProcessResult::Failed {
+                        reason: format!("Failed to save certificates: {}", e),
+                    });
+                }
 
-        // TODO: 处理上层服务器指令
-        //
-        // match command {
-        //     "config_update" => {
-        //         // 更新本地配置
-        //         let key = data["key"].as_str().ok_or(AppError::Invalid("Missing key".into()))?;
-        //         let value = &data["value"];
-        //         config_manager.update(key, value).await?;
-        //     }
-        //     "sync_dishes" => {
-        //         // 从中央服务器同步菜品数据
-        //         let force = data["force"].as_bool().unwrap_or(false);
-        //         if force {
-        //             dish_sync.force_sync_all().await?;
-        //         } else {
-        //             dish_sync.incremental_sync().await?;
-        //         }
-        //     }
-        //     "restart" => {
-        //         // 重启边缘服务器
-        //         let delay_seconds = data["delay_seconds"].as_u64().unwrap_or(0);
-        //         scheduler.schedule_restart(delay_seconds).await?;
-        //     }
-        //     _ => return Ok(ProcessResult::Failed {
-        //         reason: format!("Unknown command: {}", command),
-        //     }),
-        // }
+                // Calculate certificate fingerprint using SHA256
+                use sha2::{Sha256, Digest};
+                let mut hasher = Sha256::new();
+                hasher.update(edge_cert_pem.as_bytes());
+                let cert_fingerprint = hex::encode(hasher.finalize());
 
-        Ok(ProcessResult::Success {
-            message: format!("Server command processed: {}", command),
-        })
-    }
-
-    fn max_retries(&self) -> u32 {
-        3 // 服务器指令重试 3 次
+                // Update activation state in database
+                match self
+                    .state
+                    .activate_with_metadata(
+                        &tenant_id,
+                        &tenant_name,
+                        &edge_id,
+                        &edge_name,
+                        &cert_fingerprint,
+                    )
+                    .await
+                {
+                    Ok(_) => Ok(ProcessResult::Success {
+                        message: format!(
+                            "Server activated: tenant={}, edge={}",
+                            tenant_name, edge_name
+                        ),
+                    }),
+                    Err(e) => {
+                        tracing::error!("Activation failed: {}", e);
+                        Ok(ProcessResult::Failed {
+                            reason: format!("Activation failed: {}", e),
+                        })
+                    }
+                }
+            }
+            shared::message::ServerCommand::Ping => {
+                Ok(ProcessResult::Success {
+                    message: "Pong".to_string(),
+                })
+            }
+            shared::message::ServerCommand::ConfigUpdate { key, value } => {
+                tracing::info!("Received ConfigUpdate: {} = {:?}", key, value);
+                // TODO: Implement config update logic
+                Ok(ProcessResult::Skipped {
+                    reason: "Config update not implemented yet".to_string(),
+                })
+            }
+            shared::message::ServerCommand::SyncData { data_type, force } => {
+                tracing::info!("Received SyncData: {:?}, force={}", data_type, force);
+                // TODO: Implement data sync logic
+                Ok(ProcessResult::Skipped {
+                    reason: "Data sync not implemented yet".to_string(),
+                })
+            }
+            shared::message::ServerCommand::Restart {
+                delay_seconds,
+                reason,
+            } => {
+                tracing::warn!(
+                    "Received Restart command: delay={}s, reason={:?}",
+                    delay_seconds,
+                    reason
+                );
+                // TODO: Implement graceful restart
+                Ok(ProcessResult::Skipped {
+                    reason: "Restart not implemented yet".to_string(),
+                })
+            }
+        }
     }
 }

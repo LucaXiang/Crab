@@ -30,6 +30,8 @@ pub enum ApiErrorCode {
     Internal,
     /// Database error (500)
     Database,
+    /// Invalid request (400)
+    Invalid,
 }
 
 impl ApiErrorCode {
@@ -47,6 +49,7 @@ impl ApiErrorCode {
             Self::BusinessRule => StatusCode::UNPROCESSABLE_ENTITY,
             Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
             Self::Database => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Invalid => StatusCode::BAD_REQUEST,
         }
     }
 
@@ -64,6 +67,7 @@ impl ApiErrorCode {
             Self::BusinessRule => "Business rule violation",
             Self::Internal => "Internal server error",
             Self::Database => "Database error",
+            Self::Invalid => "Invalid request",
         }
     }
 
@@ -81,6 +85,7 @@ impl ApiErrorCode {
             Self::BusinessRule => "E0005",
             Self::Internal => "E9001",
             Self::Database => "E9002",
+            Self::Invalid => "E0006",
         }
     }
 }
@@ -136,9 +141,62 @@ pub enum ApiError {
     /// Internal server error
     #[error("Internal error: {message}")]
     Internal { message: String },
+
+    /// Invalid request
+    #[error("Invalid request: {message}")]
+    Invalid { message: String },
 }
 
 impl ApiError {
+    // ========== Convenient constructors ==========
+
+    /// Create an Internal error
+    pub fn internal(message: impl Into<String>) -> Self {
+        Self::Internal { message: message.into() }
+    }
+
+    /// Create a Database error
+    pub fn database(message: impl Into<String>) -> Self {
+        Self::Database { message: message.into() }
+    }
+
+    /// Create a Validation error
+    pub fn validation(message: impl Into<String>) -> Self {
+        Self::Validation { message: message.into(), source: None }
+    }
+
+    /// Create a Forbidden error
+    pub fn forbidden(message: impl Into<String>) -> Self {
+        Self::Forbidden { message: message.into() }
+    }
+
+    /// Create a NotFound error
+    pub fn not_found(resource: impl Into<String>) -> Self {
+        Self::NotFound { resource: resource.into() }
+    }
+
+    /// Create a Conflict error
+    pub fn conflict(resource: impl Into<String>) -> Self {
+        Self::Conflict { resource: resource.into() }
+    }
+
+    /// Create an Invalid error
+    pub fn invalid(message: impl Into<String>) -> Self {
+        Self::Invalid { message: message.into() }
+    }
+
+    /// Create a BusinessRule error
+    pub fn business_rule(message: impl Into<String>) -> Self {
+        Self::BusinessRule { message: message.into() }
+    }
+
+    /// Create an InvalidToken error
+    pub fn invalid_token(message: impl Into<String>) -> Self {
+        Self::InvalidToken { message: message.into() }
+    }
+
+    // ========== Error inspection methods ==========
+
     /// Get the error code for this error
     pub fn error_code(&self) -> ApiErrorCode {
         match self {
@@ -152,6 +210,7 @@ impl ApiError {
             Self::BusinessRule { .. } => ApiErrorCode::BusinessRule,
             Self::Database { .. } => ApiErrorCode::Database,
             Self::Internal { .. } => ApiErrorCode::Internal,
+            Self::Invalid { .. } => ApiErrorCode::Invalid,
         }
     }
 
@@ -168,6 +227,7 @@ impl ApiError {
             Self::BusinessRule { message } => message.clone(),
             Self::Database { message } => message.clone(),
             Self::Internal { message } => message.clone(),
+            Self::Invalid { message } => message.clone(),
         }
     }
 }
@@ -198,3 +258,8 @@ impl axum::response::IntoResponse for ApiError {
 
 /// Result type for API operations
 pub type ApiResult<T> = Result<T, ApiError>;
+
+// ========== From implementations ==========
+
+// Note: Multipart error conversion would require axum::extract::multipart::MultipartError
+// This is implemented in edge-server's upload handler instead for better feature isolation

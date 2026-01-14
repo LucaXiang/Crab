@@ -62,7 +62,7 @@ impl Oneshot {
 
         let request = request
             .body(Vec::new().into())
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+            .map_err(|e| AppError::internal(e.to_string()))?;
 
         self.execute(request).await
     }
@@ -73,7 +73,7 @@ impl Oneshot {
         path: &str,
         body: &B,
     ) -> Result<T, AppError> {
-        let body_bytes = serde_json::to_vec(body).map_err(|e| AppError::Internal(e.to_string()))?;
+        let body_bytes = serde_json::to_vec(body).map_err(|e| AppError::internal(e.to_string()))?;
 
         let mut request = Request::builder()
             .uri(path)
@@ -86,7 +86,7 @@ impl Oneshot {
 
         let request = request
             .body(body_bytes.into())
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+            .map_err(|e| AppError::internal(e.to_string()))?;
 
         self.execute(request).await
     }
@@ -101,7 +101,7 @@ impl Oneshot {
 
         let request = request
             .body(Vec::new().into())
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+            .map_err(|e| AppError::internal(e.to_string()))?;
 
         self.execute(request).await
     }
@@ -115,24 +115,24 @@ impl Oneshot {
             .state
             .oneshot(request)
             .await
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+            .map_err(|e| AppError::internal(e.to_string()))?;
         let status = response.status();
         let body = to_bytes(response.into_body(), usize::MAX)
             .await
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+            .map_err(|e| AppError::internal(e.to_string()))?;
 
         if !status.is_success() {
             let text = String::from_utf8_lossy(&body).to_string();
             return match status {
                 http::StatusCode::UNAUTHORIZED => Err(AppError::Unauthorized),
-                http::StatusCode::FORBIDDEN => Err(AppError::Forbidden(text)),
-                http::StatusCode::NOT_FOUND => Err(AppError::NotFound(text)),
-                http::StatusCode::BAD_REQUEST => Err(AppError::Validation(text)),
-                _ => Err(AppError::Internal(text)),
+                http::StatusCode::FORBIDDEN => Err(AppError::forbidden(text)),
+                http::StatusCode::NOT_FOUND => Err(AppError::not_found(text)),
+                http::StatusCode::BAD_REQUEST => Err(AppError::validation(text)),
+                _ => Err(AppError::internal(text)),
             };
         }
 
-        serde_json::from_slice(&body).map_err(|e| AppError::Internal(e.to_string()))
+        serde_json::from_slice(&body).map_err(|e| AppError::internal(e.to_string()))
     }
 }
 
@@ -170,7 +170,7 @@ impl CrabClient for Oneshot {
             Oneshot::post::<ApiResponse<LoginResponse>, _>(self, "/api/auth/login", &request)
                 .await?
                 .data
-                .ok_or_else(|| AppError::Internal("Missing login data".to_string()))?;
+                .ok_or_else(|| AppError::internal("Missing login data".to_string()))?;
 
         // Store the token for subsequent requests
         self.token = Some(response.token.clone());
@@ -182,7 +182,7 @@ impl CrabClient for Oneshot {
         Oneshot::get::<ApiResponse<CurrentUserResponse>>(self, "/api/auth/me")
             .await?
             .data
-            .ok_or_else(|| AppError::Internal("Missing user data".to_string()))
+            .ok_or_else(|| AppError::internal("Missing user data".to_string()))
     }
 
     async fn logout(&mut self) -> Result<(), AppError> {

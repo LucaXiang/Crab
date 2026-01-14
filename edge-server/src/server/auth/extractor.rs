@@ -36,7 +36,7 @@ impl FromRequestParts<ServerState> for CurrentUser {
 
         let token = match auth_header {
             Some(header) => JwtService::extract_from_header(header)
-                .ok_or(AppError::InvalidToken)?,
+                .ok_or_else(|| AppError::invalid_token("Invalid authorization header"))?,
             None => {
                 security_log!(WARN, "auth_missing", uri = ?parts.uri);
                 return Err(AppError::Unauthorized);
@@ -68,7 +68,7 @@ impl FromRequestParts<ServerState> for CurrentUser {
                     crate::server::auth::JwtError::ExpiredToken => {
                         Err(AppError::TokenExpired)
                     }
-                    _ => Err(AppError::InvalidToken),
+                    _ => Err(AppError::invalid_token("Invalid token")),
                 }
             }
         }

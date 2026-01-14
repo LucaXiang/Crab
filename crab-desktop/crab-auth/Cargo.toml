@@ -1,0 +1,6 @@
+[package]
+name = "crab-auth"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

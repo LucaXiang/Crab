@@ -49,7 +49,8 @@ pub async fn require_auth(
         .and_then(|h| h.to_str().ok());
 
     let token = match auth_header {
-        Some(header) => JwtService::extract_from_header(header).ok_or(AppError::InvalidToken)?,
+        Some(header) => JwtService::extract_from_header(header)
+            .ok_or_else(|| AppError::invalid_token("Invalid authorization header"))?,
         None => {
             security_log!(WARN, "auth_missing", uri = ?req.uri());
             return Err(AppError::Unauthorized);
@@ -76,7 +77,7 @@ pub async fn require_auth(
 
             match e {
                 crate::server::auth::JwtError::ExpiredToken => Err(AppError::TokenExpired),
-                _ => Err(AppError::InvalidToken),
+                _ => Err(AppError::invalid_token("Invalid token")),
             }
         }
     }
@@ -105,7 +106,7 @@ pub async fn require_permission(
                     username = %user.username,
                     required_permission = permission
                 );
-                return Err(AppError::Forbidden(format!(
+                return Err(AppError::forbidden(format!(
                     "Permission denied: {}",
                     permission
                 )));
@@ -131,7 +132,7 @@ pub async fn require_admin(req: Request, next: Next) -> Result<Response, AppErro
             username = %user.username,
             user_role = %user.role
         );
-        return Err(AppError::Forbidden("Admin access required".to_string()));
+        return Err(AppError::forbidden("Admin access required".to_string()));
     }
 
     Ok(next.run(req).await)

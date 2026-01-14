@@ -11,6 +11,7 @@
 use edge_server::Config;
 use edge_server::server::ServerState;
 use edge_server::{BusMessage, MessageClient};
+use shared::message::ServerCommandPayload;
 use std::io::{self, Write};
 
 #[tokio::main]
@@ -136,33 +137,38 @@ async fn interactive_cli(state: ServerState) -> Result<(), Box<dyn std::error::E
                 // Add dish to table (client message via send)
                 let table_id = get_input("Table ID (e.g., T01): ");
                 let dish_name = get_input("Dish name: ");
-                let quantity = get_input("Quantity: ").parse::<i32>().unwrap_or(1);
+                let quantity = get_input("Quantity: ").parse::<u32>().unwrap_or(1);
 
-                let msg = BusMessage::order_intent(&serde_json::json!({
-                    "action": "add_dish",
-                    "table_id": table_id,
-                    "dishes": [{
-                        "name": dish_name,
-                        "quantity": quantity
-                    }],
-                    "operator": "demo_user"
-                }));
+                let payload = shared::message::OrderIntentPayload::add_dish(
+                    shared::message::TableId::new_unchecked(table_id.clone()),
+                    vec![shared::message::DishItem::simple(&dish_name, quantity)],
+                    Some(shared::message::OperatorId::new("demo_user")),
+                );
+                let msg = BusMessage::order_intent(&payload);
                 msg_client.send(&msg).await?;
                 println!("✅ Sent: Add dish to {}\n", table_id);
             }
             "2" => {
                 // Payment request (client message via send)
                 let table_id = get_input("Table ID: ");
-                let amount = get_input("Amount (cents): ").parse::<i32>().unwrap_or(0);
-                let method = get_input("Payment method (cash/card/wechat): ");
+                let _amount = get_input("Amount (cents): ").parse::<u64>().unwrap_or(0);
+                let method = get_input("Payment method (cash/card/wechat/alipay): ");
 
-                let msg = BusMessage::order_intent(&serde_json::json!({
-                    "action": "payment",
-                    "table_id": table_id,
-                    "amount": amount,
-                    "method": method,
-                    "operator": "demo_user"
-                }));
+                let payment_method = match method.to_lowercase().as_str() {
+                    "cash" => shared::message::PaymentMethod::Cash,
+                    "card" => shared::message::PaymentMethod::Card,
+                    "wechat" => shared::message::PaymentMethod::Wechat,
+                    "alipay" => shared::message::PaymentMethod::Alipay,
+                    _ => shared::message::PaymentMethod::Cash,
+                };
+
+                let payload = shared::message::OrderIntentPayload::checkout(
+                    shared::message::TableId::new_unchecked(table_id.clone()),
+                    shared::message::OrderId::new_unchecked("ORD_DEMO"),
+                    payment_method,
+                    Some(shared::message::OperatorId::new("demo_user")),
+                );
+                let msg = BusMessage::order_intent(&payload);
                 msg_client.send(&msg).await?;
                 println!("✅ Sent: Payment for {}\n", table_id);
             }
@@ -170,27 +176,27 @@ async fn interactive_cli(state: ServerState) -> Result<(), Box<dyn std::error::E
                 // Checkout (client message via send)
                 let table_id = get_input("Table ID: ");
 
-                let msg = BusMessage::order_intent(&serde_json::json!({
-                    "action": "checkout",
-                    "table_id": table_id,
-                    "operator": "demo_user"
-                }));
+                let payload = shared::message::OrderIntentPayload::checkout(
+                    shared::message::TableId::new_unchecked(table_id.clone()),
+                    shared::message::OrderId::new_unchecked("ORD_DEMO"),
+                    shared::message::PaymentMethod::Cash,
+                    Some(shared::message::OperatorId::new("demo_user")),
+                );
+                let msg = BusMessage::order_intent(&payload);
                 msg_client.send(&msg).await?;
                 println!("✅ Sent: Checkout for {}\n", table_id);
             }
             "4" => {
                 // Dish price update (server broadcast via publish)
                 let dish_id = get_input("Dish ID: ");
-                let new_price = get_input("New price (cents): ").parse::<i32>().unwrap_or(0);
+                let new_price = get_input("New price (cents): ").parse::<u64>().unwrap_or(0);
 
-                let msg = BusMessage::data_sync(
-                    "dish_price",
-                    serde_json::json!({
-                        "dish_id": dish_id,
-                        "new_price": new_price,
-                        "updated_by": "demo_user"
-                    }),
-                );
+                let payload = shared::message::DataSyncPayload::DishPrice {
+                    dish_id: shared::message::DishId::new(dish_id.clone()),
+                    old_price: 0,
+                    new_price,
+                };
+                let msg = BusMessage::data_sync(&payload);
                 state.get_message_bus().publish(msg).await?;
                 println!("✅ Sent: Price update for {}\n", dish_id);
             }
@@ -198,13 +204,11 @@ async fn interactive_cli(state: ServerState) -> Result<(), Box<dyn std::error::E
                 // Dish sold out (server broadcast via publish)
                 let dish_id = get_input("Dish ID: ");
 
-                let msg = BusMessage::data_sync(
-                    "dish_sold_out",
-                    serde_json::json!({
-                        "dish_id": dish_id,
-                        "available": false
-                    }),
-                );
+                let payload = shared::message::DataSyncPayload::DishSoldOut {
+                    dish_id: shared::message::DishId::new(dish_id.clone()),
+                    available: false,
+                };
+                let msg = BusMessage::data_sync(&payload);
                 state.get_message_bus().publish(msg).await?;
                 println!("✅ Sent: Marked {} as sold out\n", dish_id);
             }
@@ -213,84 +217,61 @@ async fn interactive_cli(state: ServerState) -> Result<(), Box<dyn std::error::E
                 let title = get_input("Notification title: ");
                 let body = get_input("Notification body: ");
 
-                let msg = BusMessage::notification(&title, &body);
+                let payload = shared::message::NotificationPayload::info(title, body);
+                let msg = BusMessage::notification(&payload);
                 state.get_message_bus().publish(msg).await?;
                 println!("✅ Sent: Notification\n");
             }
             "7" => {
                 // Server command (server broadcast via publish)
-                let command = get_input("Command (config_update/sync_dishes/restart): ");
-                let key = get_input("Key (optional): ");
+                let command_str = get_input("Command (ping/config_update/restart): ");
+                let key = get_input("Key (for config_update, optional): ");
 
-                let msg = BusMessage::server_command(
-                    &command,
-                    if key.is_empty() {
-                        serde_json::json!({
-                            "command": command,
-                            "reason": "demo"
-                        })
-                    } else {
-                        serde_json::json!({
-                            "command": command,
-                            "key": key,
-                            "reason": "demo"
-                        })
+                let command = match command_str.to_lowercase().as_str() {
+                    "ping" => shared::message::ServerCommand::Ping,
+                    "restart" => shared::message::ServerCommand::Restart {
+                        delay_seconds: 5,
+                        reason: Some("demo".to_string()),
                     },
-                );
+                    "config_update" | _ => shared::message::ServerCommand::ConfigUpdate {
+                        key: if key.is_empty() {
+                            "demo.key".to_string()
+                        } else {
+                            key
+                        },
+                        value: serde_json::json!("demo_value"),
+                    },
+                };
+
+                let payload = shared::message::ServerCommandPayload { command };
+                let msg = BusMessage::server_command(&payload);
                 state.get_message_bus().publish(msg).await?;
-                println!("✅ Sent: Server command: {}\n", command);
+                println!("✅ Sent: Server command: {}\n", command_str);
             }
             "8" => {
-                // Custom JSON
-                println!("Enter custom JSON payload:");
-                let json_str = get_input("JSON: ");
+                // Custom notification (simplified)
+                println!("Send custom notification:");
+                let title = get_input("Title: ");
+                let message = get_input("Message: ");
+                let level = get_input("Level (info/warning/error): ");
 
-                match serde_json::from_str::<serde_json::Value>(&json_str) {
-                    Ok(value) => {
-                        let msg_type = value
-                            .get("type")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("notification");
-                        let msg = match msg_type {
-                            "order_intent" | "table_intent" => {
-                                BusMessage::order_intent(&serde_json::json!({
-                                    "action": value["action"].as_str().unwrap_or("custom"),
-                                    "table_id": value["table_id"].as_str().unwrap_or("unknown"),
-                                    "data": value["data"].clone(),
-                                    "operator": value["operator"].as_str().unwrap_or("demo")
-                                }))
-                            }
-                            "order_sync" | "table_sync" => {
-                                BusMessage::order_sync(&serde_json::json!({
-                                    "action": value["action"].as_str().unwrap_or("custom"),
-                                    "table_id": value["table_id"].as_str().unwrap_or("unknown"),
-                                    "status": value["status"].as_str().unwrap_or("updated"),
-                                    "source": "demo",
-                                    "data": value["data"].clone()
-                                }))
-                            }
-                            "data_sync" => BusMessage::data_sync(
-                                value["sync_type"].as_str().unwrap_or("custom"),
-                                value["data"].clone(),
-                            ),
-                            "server_command" => BusMessage::server_command(
-                                value["command"].as_str().unwrap_or("custom"),
-                                value["data"].clone(),
-                            ),
-                            _ => BusMessage::notification("Custom", &json_str),
-                        };
-                        // Use send for client messages, publish for server broadcasts
-                        if msg_type == "order_intent" || msg_type == "table_intent" {
-                            msg_client.send(&msg).await?;
-                        } else {
-                            state.get_message_bus().publish(msg).await?;
-                        }
-                        println!("✅ Sent: Custom message\n");
-                    }
-                    Err(e) => {
-                        println!("❌ Invalid JSON: {}\n", e);
-                    }
-                }
+                let notification_level = match level.to_lowercase().as_str() {
+                    "warning" => shared::message::NotificationLevel::Warning,
+                    "error" => shared::message::NotificationLevel::Error,
+                    _ => shared::message::NotificationLevel::Info,
+                };
+
+                let payload = shared::message::NotificationPayload {
+                    title,
+                    message,
+                    level: notification_level,
+                    category: shared::message::NotificationCategory::System,
+                    data: None,
+                };
+
+                let msg = BusMessage::notification(&payload);
+                state.get_message_bus().publish(msg).await?;
+                println!("✅ Sent: Custom notification\n");
             }
             _ => {
                 println!("❌ Invalid choice. Please try again.\n");

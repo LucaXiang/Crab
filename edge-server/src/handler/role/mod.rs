@@ -41,9 +41,9 @@ pub async fn get(
     let result: Vec<Role> = db
         .query(sql)
         .await
-        .map_err(|e| crate::common::AppError::Database(e.to_string()))?
+        .map_err(|e| crate::common::AppError::database(e.to_string()))?
         .take(0)
-        .map_err(|e| crate::common::AppError::Database(e.to_string()))?;
+        .map_err(|e| crate::common::AppError::database(e.to_string()))?;
 
     Ok(Json(result))
 }

@@ -68,19 +68,19 @@ impl IntoResponse for AppError {
             // Authentication errors (401)
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "E3001", "Please login first"),
             AppError::TokenExpired => (StatusCode::UNAUTHORIZED, "E3003", "Token expired"),
-            AppError::InvalidToken => (StatusCode::UNAUTHORIZED, "E3002", "Invalid token"),
+            AppError::invalid_token => (StatusCode::UNAUTHORIZED, "E3002", "Invalid token"),
 
             // Authorization errors (403)
-            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, "E2001", msg.as_str()),
+            AppError::forbidden(msg) => (StatusCode::FORBIDDEN, "E2001", msg.as_str()),
 
             // Not found (404)
-            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, "E0003", msg.as_str()),
+            AppError::not_found(msg) => (StatusCode::NOT_FOUND, "E0003", msg.as_str()),
 
             // Conflict (409)
             AppError::Conflict(msg) => (StatusCode::CONFLICT, "E0004", msg.as_str()),
 
             // Validation (400)
-            AppError::Validation(msg) => (StatusCode::BAD_REQUEST, "E0002", msg.as_str()),
+            AppError::validation(msg) => (StatusCode::BAD_REQUEST, "E0002", msg.as_str()),
 
             // Business rule (422)
             AppError::BusinessRule(msg) => {
@@ -88,19 +88,19 @@ impl IntoResponse for AppError {
             }
 
             // Database errors (500)
-            AppError::Database(msg) => {
+            AppError::database(msg) => {
                 error!(target: "database", error = %msg, "Database error occurred");
                 (StatusCode::INTERNAL_SERVER_ERROR, "E9002", "Database error")
             }
 
             // Internal errors (500)
-            AppError::Internal(msg) => {
+            AppError::internal(msg) => {
                 error!(target: "internal", error = %msg, "Internal error occurred");
                 (StatusCode::INTERNAL_SERVER_ERROR, "E9001", "Internal server error")
             }
 
             // Invalid request (400)
-            AppError::Invalid(msg) => (StatusCode::BAD_REQUEST, "E0006", msg.as_str()),
+            AppError::invalid(msg) => (StatusCode::BAD_REQUEST, "E0006", msg.as_str()),
         };
 
         let body = Json(AppResponse::<()> {
@@ -116,7 +116,7 @@ impl IntoResponse for AppError {
 
 impl From<MultipartError> for AppError {
     fn from(e: MultipartError) -> Self {
-        AppError::Validation(format!("Multipart error: {}", e))
+        AppError::validation(format!("Multipart error: {}", e))
     }
 }
 
@@ -128,37 +128,37 @@ impl From<MultipartError> for AppError {
 //     fn from(e: crate::error::ServiceError) -> Self {
 //         match e {
 //             crate::error::ServiceError::NotFound { entity } => {
-//                 AppError::NotFound(format!("{} not found", entity))
+//                 AppError::not_found(format!("{} not found", entity))
 //             }
 //             crate::error::ServiceError::AlreadyExists { entity, value } => {
 //                 AppError::Conflict(format!("{} already exists: {}", entity, value))
 //             }
 //             crate::error::ServiceError::InvalidInput { field, reason } => {
-//                 AppError::Validation(format!("Invalid {}: {}", field, reason))
+//                 AppError::validation(format!("Invalid {}: {}", field, reason))
 //             }
 //             crate::error::ServiceError::InvalidCredentials => {
 //                 AppError::Unauthorized
 //             }
 //             crate::error::ServiceError::InactiveUser => {
-//                 AppError::Forbidden("User account is inactive".to_string())
+//                 AppError::forbidden("User account is inactive".to_string())
 //             }
 //             crate::error::ServiceError::PasswordMismatch => {
 //                 AppError::Unauthorized
 //             }
 //             crate::error::ServiceError::PermissionDenied(msg) => {
-//                 AppError::Forbidden(msg)
+//                 AppError::forbidden(msg)
 //             }
 //             crate::error::ServiceError::BusinessRule(msg) => {
 //                 AppError::BusinessRule(msg)
 //             }
 //             crate::error::ServiceError::Database(msg) => {
-//                 AppError::Database(msg)
+//                 AppError::database(msg)
 //             }
 //             crate::error::ServiceError::Transaction(msg) => {
-//                 AppError::Database(msg)
+//                 AppError::database(msg)
 //             }
 //             crate::error::ServiceError::Other(msg) => {
-//                 AppError::Internal(msg)
+//                 AppError::internal(msg)
 //             }
 //         }
 //     }

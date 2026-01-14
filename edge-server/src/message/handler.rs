@@ -18,6 +18,8 @@ use crate::common::AppError;
 use crate::message::processor::{MessageProcessor, ProcessResult};
 use crate::message::{BusMessage, EventType};
 
+use crate::server::ServerState;
+
 /// Server-side message handler with ACID guarantees
 ///
 /// This handler runs in the background and processes all messages
@@ -66,6 +68,7 @@ impl MessageHandler {
     pub fn with_default_processors(
         receiver: broadcast::Receiver<BusMessage>,
         shutdown_token: CancellationToken,
+        state: Arc<ServerState>,
     ) -> Self {
         use crate::message::processor::*;
 
@@ -73,7 +76,7 @@ impl MessageHandler {
             .register_processor(Arc::new(OrderIntentProcessor))
             .register_processor(Arc::new(DataSyncProcessor))
             .register_processor(Arc::new(NotificationProcessor))
-            .register_processor(Arc::new(ServerCommandProcessor))
+            .register_processor(Arc::new(ServerCommandProcessor::new(state)))
     }
 
     /// Start processing messages
@@ -147,24 +150,16 @@ impl MessageHandler {
     async fn broadcast_order_sync(&self, original_msg: &BusMessage) {
         if let Some(ref tx) = self.broadcast_tx {
             // Parse the original intent to extract relevant info
-            if let Ok(payload) = original_msg.parse_payload::<serde_json::Value>() {
-                let action = payload
-                    .get("action")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown");
-                let table_id = payload
-                    .get("table_id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("?");
-                let order_id = payload.get("order_id").and_then(|v| v.as_str());
-
+            if let Ok(intent_payload) = original_msg.parse_payload::<shared::message::OrderIntentPayload>() {
                 // Create a OrderSync message reflecting the result
-                let sync_payload = crate::message::OrderSyncPayload {
-                    action: action.to_string(),
-                    table_id: table_id.to_string(),
-                    order_id: order_id.map(|s| s.to_string()),
-                    status: "updated".to_string(),
-                    source: "server".to_string(),
+                let sync_payload = shared::message::OrderSyncPayload {
+                    action: intent_payload.action.clone(),
+                    table_id: intent_payload.table_id.clone(),
+                    order_id: intent_payload.order_id.clone(),
+                    status: shared::message::OrderStatus::Confirmed,
+                    source: intent_payload
+                        .operator
+                        .unwrap_or_else(|| shared::message::OperatorId::new("server")),
                     data: None,
                 };
 
@@ -173,7 +168,10 @@ impl MessageHandler {
                 if let Err(e) = tx.send(sync_msg) {
                     tracing::warn!("Failed to broadcast OrderSync: {}", e);
                 } else {
-                    tracing::info!(action = %action, table_id = %table_id, "Broadcasted OrderSync");
+                    tracing::info!(
+                        table_id = %intent_payload.table_id,
+                        "Broadcasted OrderSync"
+                    );
                 }
             }
         }
@@ -217,7 +215,7 @@ impl MessageHandler {
                             "Message processing failed permanently"
                         );
                         self.send_to_dead_letter_queue(msg, &reason).await;
-                        return Err(AppError::Internal(format!("Processing failed: {}", reason)));
+                        return Err(AppError::internal(format!("Processing failed: {}", reason)));
                     }
                     ProcessResult::Retry {
                         reason,
@@ -232,7 +230,7 @@ impl MessageHandler {
                                 "Max retries exceeded"
                             );
                             self.send_to_dead_letter_queue(msg, &reason).await;
-                            return Err(AppError::Internal(format!(
+                            return Err(AppError::internal(format!(
                                 "Max retries exceeded: {}",
                                 reason
                             )));

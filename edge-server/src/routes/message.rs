@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::message::BusMessage;
 use crate::server::ServerState;
+use shared::message::*;
 use shared::response::ApiResponse;
 
 /// Request to emit a message
@@ -58,52 +59,61 @@ async fn emit_message(
     let msg = match req.message_type.as_str() {
         "notification" => {
             let title = req.title.unwrap_or_else(|| "Notification".to_string());
-            BusMessage::notification(&title, &req.body)
+            let payload = NotificationPayload::info(title, req.body);
+            BusMessage::notification(&payload)
         }
         "intent" | "order_intent" => {
-            BusMessage::order_intent(&crate::message::OrderIntentPayload {
-                action: "add_dish".to_string(),
-                table_id: "T01".to_string(),
-                order_id: None,
-                data: serde_json::json!({
-                    "dishes": [{"id": "D001", "name": req.body}]
-                }),
-                operator: None,
-            })
+            let payload = OrderIntentPayload::add_dish(
+                TableId::new_unchecked("T01"),
+                vec![DishItem::simple("D001", 1)],
+                Some(OperatorId::new("test_api")),
+            );
+            BusMessage::order_intent(&payload)
         }
-        "sync" | "order_sync" => BusMessage::order_sync(&crate::message::OrderSyncPayload {
-            action: "dish_added".to_string(),
-            table_id: "T01".to_string(),
-            order_id: Some("ORD123".to_string()),
-            status: "updated".to_string(),
-            source: "server".to_string(),
-            data: Some(serde_json::json!({
-                "message": req.body
-            })),
-        }),
-        "data" | "data_sync" => BusMessage::data_sync(
-            "dish_price",
-            serde_json::json!({
-                "dish_id": "D001",
-                "data": req.body
-            }),
-        ),
-        "server" | "server_command" | "command" => BusMessage::server_command(
-            "config_update",
-            serde_json::json!({
-                "command": req.body
-            }),
-        ),
-        _ => BusMessage::notification("Unknown", &req.body),
+        "sync" | "order_sync" => {
+            let payload = OrderSyncPayload {
+                action: OrderAction::AddDish {
+                    dishes: vec![DishItem::simple("D001", 1)],
+                },
+                table_id: TableId::new_unchecked("T01"),
+                order_id: Some(OrderId::new_unchecked("ORD123")),
+                status: OrderStatus::Confirmed,
+                source: OperatorId::new("server"),
+                data: None,
+            };
+            BusMessage::order_sync(&payload)
+        }
+        "data" | "data_sync" => {
+            let payload = DataSyncPayload::DishPrice {
+                dish_id: DishId::new("D001"),
+                old_price: 3800,
+                new_price: 4200,
+            };
+            BusMessage::data_sync(&payload)
+        }
+        "server" | "server_command" | "command" => {
+            let payload = ServerCommandPayload {
+                command: ServerCommand::ConfigUpdate {
+                    key: "test.key".to_string(),
+                    value: serde_json::json!(req.body),
+                },
+            };
+            BusMessage::server_command(&payload)
+        }
+        _ => {
+            let payload = NotificationPayload::info("Unknown", req.body);
+            BusMessage::notification(&payload)
+        }
     };
 
     // Publish to bus
+    let message_type = req.message_type.clone();
     match bus.publish(msg).await {
         Ok(_) => {
-            tracing::info!("Message emitted: {} - {}", req.message_type, req.body);
+            tracing::info!("Message emitted: {}", message_type);
             Json(ApiResponse::ok(EmitResponse {
                 success: true,
-                message: format!("Message emitted successfully: {}", req.message_type),
+                message: format!("Message emitted successfully: {}", message_type),
             }))
         }
         Err(e) => {
@@ -137,56 +147,70 @@ async fn emit_message_get(
 
     let bus = state.get_message_bus();
     bus.memory_transport();
+
     // Create message based on type
     let msg = match req.message_type.as_str() {
         "notification" => {
             let title = req.title.unwrap_or_else(|| "Notification".to_string());
-            BusMessage::notification(&title, &req.body)
+            let payload = NotificationPayload::info(title, req.body);
+            BusMessage::notification(&payload)
         }
         "intent" | "order_intent" => {
-            BusMessage::order_intent(&crate::message::OrderIntentPayload {
-                action: "add_dish".to_string(),
-                table_id: "T01".to_string(),
-                order_id: None,
-                data: serde_json::json!({
-                    "dishes": [{"id": "D001", "name": req.body}]
-                }),
-                operator: None,
-            })
+            let payload = OrderIntentPayload::add_dish(
+                TableId::new_unchecked("T01"),
+                vec![DishItem::simple("D001", 1)],
+                Some(OperatorId::new("test_api")),
+            );
+            BusMessage::order_intent(&payload)
         }
-        "sync" | "order_sync" => BusMessage::order_sync(&crate::message::OrderSyncPayload {
-            action: "dish_added".to_string(),
-            table_id: "T01".to_string(),
-            order_id: Some("ORD123".to_string()),
-            status: "updated".to_string(),
-            source: "server".to_string(),
-            data: Some(serde_json::json!({
-                "message": req.body
-            })),
-        }),
-        "data" | "data_sync" => BusMessage::data_sync(
-            "dish_price",
-            serde_json::json!({
-                "dish_id": "D001",
-                "data": req.body
-            }),
-        ),
-        "server" | "server_command" | "command" => BusMessage::server_command(
-            "config_update",
-            serde_json::json!({
-                "command": req.body
-            }),
-        ),
-        _ => BusMessage::notification("Unknown", &req.body),
+        "sync" | "order_sync" => {
+            let payload = OrderSyncPayload {
+                action: OrderAction::AddDish {
+                    dishes: vec![DishItem::simple("D001", 1)],
+                },
+                table_id: TableId::new_unchecked("T01"),
+                order_id: Some(OrderId::new_unchecked("ORD123")),
+                status: OrderStatus::Confirmed,
+                source: OperatorId::new("server"),
+                data: None,
+            };
+            BusMessage::order_sync(&payload)
+        }
+        "data" | "data_sync" => {
+            let payload = DataSyncPayload::DishPrice {
+                dish_id: DishId::new("D001"),
+                old_price: 3800,
+                new_price: 4200,
+            };
+            BusMessage::data_sync(&payload)
+        }
+        "server" | "server_command" | "command" => {
+            let payload = ServerCommandPayload {
+                command: if req.body == "activate" || req.body == "ping" {
+                    ServerCommand::Ping
+                } else {
+                    ServerCommand::ConfigUpdate {
+                        key: "test.key".to_string(),
+                        value: serde_json::json!(req.body),
+                    }
+                },
+            };
+            BusMessage::server_command(&payload)
+        }
+        _ => {
+            let payload = NotificationPayload::info("Unknown", req.body);
+            BusMessage::notification(&payload)
+        }
     };
 
     // Publish to bus
+    let message_type = req.message_type.clone();
     match bus.publish(msg).await {
         Ok(_) => {
-            tracing::info!("Message emitted: {} - {}", req.message_type, req.body);
+            tracing::info!("Message emitted: {}", message_type);
             Json(ApiResponse::ok(EmitResponse {
                 success: true,
-                message: format!("Message emitted successfully: {}", req.message_type),
+                message: format!("Message emitted successfully: {}", message_type),
             }))
         }
         Err(e) => {

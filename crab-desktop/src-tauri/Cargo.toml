@@ -32,3 +32,4 @@ shared = { path = "../../shared" }
 crab-client = { path = "../../crab-client" }
 local-ip-address = "0.6.8"
 zip = "7.0.0"
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }

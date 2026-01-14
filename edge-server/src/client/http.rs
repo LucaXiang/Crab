@@ -62,20 +62,20 @@ impl Http {
             let text = response
                 .text()
                 .await
-                .map_err(|e: reqwest::Error| AppError::Internal(e.to_string()))?;
+                .map_err(|e: reqwest::Error| AppError::internal(e.to_string()))?;
             return match status {
                 ReqwestStatusCode::UNAUTHORIZED => Err(AppError::Unauthorized),
-                ReqwestStatusCode::FORBIDDEN => Err(AppError::Forbidden(text)),
-                ReqwestStatusCode::NOT_FOUND => Err(AppError::NotFound(text)),
-                ReqwestStatusCode::BAD_REQUEST => Err(AppError::Validation(text)),
-                _ => Err(AppError::Internal(text)),
+                ReqwestStatusCode::FORBIDDEN => Err(AppError::forbidden(text)),
+                ReqwestStatusCode::NOT_FOUND => Err(AppError::not_found(text)),
+                ReqwestStatusCode::BAD_REQUEST => Err(AppError::validation(text)),
+                _ => Err(AppError::internal(text)),
             };
         }
 
         response
             .json()
             .await
-            .map_err(|e| AppError::Internal(e.to_string()))
+            .map_err(|e| AppError::internal(e.to_string()))
     }
 }
 
@@ -92,7 +92,7 @@ impl CrabClient for Http {
         let response = request
             .send()
             .await
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+            .map_err(|e| AppError::internal(e.to_string()))?;
         Self::handle_response(response).await
     }
 
@@ -111,7 +111,7 @@ impl CrabClient for Http {
         let response = request
             .send()
             .await
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+            .map_err(|e| AppError::internal(e.to_string()))?;
         Self::handle_response(response).await
     }
 
@@ -126,7 +126,7 @@ impl CrabClient for Http {
         let response = request
             .send()
             .await
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+            .map_err(|e| AppError::internal(e.to_string()))?;
         Self::handle_response(response).await
     }
 
@@ -146,7 +146,7 @@ impl CrabClient for Http {
             .post::<ApiResponse<LoginResponse>, _>("/api/auth/login", &request)
             .await?
             .data
-            .ok_or_else(|| AppError::Internal("Missing login data".to_string()))?;
+            .ok_or_else(|| AppError::internal("Missing login data".to_string()))?;
 
         // Store the token for subsequent requests
         self.token = Some(response.token.clone());
@@ -158,7 +158,7 @@ impl CrabClient for Http {
         self.get::<ApiResponse<CurrentUserResponse>>("/api/auth/me")
             .await?
             .data
-            .ok_or_else(|| AppError::Internal("Missing user data".to_string()))
+            .ok_or_else(|| AppError::internal("Missing user data".to_string()))
     }
 
     async fn logout(&mut self) -> Result<(), AppError> {
@@ -175,13 +175,14 @@ impl CrabClient for Http {
             // TODO: Implement TCP connection to message bus
             // For now, create a dummy channel that won't receive anything
             let (tx, rx) = broadcast::channel(1024);
-            let _ = tx.send(BusMessage::notification(
+            let payload = shared::message::NotificationPayload::info(
                 "Info",
                 "TCP subscription not yet implemented",
-            ));
+            );
+            let _ = tx.send(BusMessage::notification(&payload));
             return Ok(rx);
         }
-        Err(AppError::Internal(
+        Err(AppError::internal(
             "TCP address not configured. Use with_tcp_addr()".to_string(),
         ))
     }

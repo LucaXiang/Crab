@@ -24,13 +24,13 @@ impl DbService {
 
         let db = Surreal::new::<RocksDb>(path)
             .await
-            .map_err(|e| AppError::Database(format!("Failed to open database: {}", e)))?;
+            .map_err(|e| AppError::database(format!("Failed to open database: {}", e)))?;
 
         // Use namespace and database
         db.use_ns("edge_server")
             .use_db("edge_server")
             .await
-            .map_err(|e| AppError::Database(format!("Failed to use ns/db: {}", e)))?;
+            .map_err(|e| AppError::database(format!("Failed to use ns/db: {}", e)))?;
 
         tracing::info!("Database connection established");
 

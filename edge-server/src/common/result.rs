@@ -2,12 +2,12 @@
 //!
 //! Provides type aliases for commonly used Result types across the application
 
-use super::error::AppError;
+use shared::error::ApiError;
 
 /// Application-level Result type
 ///
 /// Used in HTTP handlers and application logic
-pub type AppResult<T> = Result<T, AppError>;
+pub type AppResult<T> = Result<T, ApiError>;
 
 // NOTE: Uncomment these when integrating with existing error types
 //

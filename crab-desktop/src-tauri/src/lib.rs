@@ -38,6 +38,51 @@ fn get_local_ip() -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
+#[derive(serde::Deserialize)]
+struct ActivationParams {
+    username: String,
+    password: String,
+    auth_url: String,
+    tenant_id: String,
+    common_name: String,
+    role: Option<String>,
+}
+
+#[tauri::command]
+async fn activate_server(
+    state: tauri::State<'_, AppState>,
+    params: ActivationParams,
+) -> Result<String, String> {
+    let guard = state.server_state.read().await;
+    let server_state = guard
+        .as_ref()
+        .ok_or_else(|| "Server is still initializing...".to_string())?;
+
+    let bus = server_state.get_message_bus();
+
+    // Construct activation command
+    let payload = shared::message::ServerCommandPayload {
+        command: "activate_server".to_string(),
+        data: serde_json::json!({
+            "username": params.username,
+            "password": params.password,
+            "auth_url": params.auth_url,
+            "tenant_id": params.tenant_id,
+            "common_name": params.common_name,
+            "role": params.role.unwrap_or("server".to_string())
+        }),
+    };
+
+    let message = edge_server::message::BusMessage::server_command(&payload);
+
+    // Publish to bus (Send to server for processing)
+    bus.send_to_server(message)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok("Activation triggered".to_string())
+}
+
 #[tauri::command]
 async fn send_test_message(state: tauri::State<'_, AppState>, msg: String) -> Result<(), String> {
     let guard = state.server_state.read().await;
@@ -108,6 +153,9 @@ async fn export_logs(app: tauri::AppHandle) -> Result<Vec<u8>, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Install default crypto provider for Rustls if not already installed
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -134,15 +182,16 @@ pub fn run() {
 
             // 初始化日志：INFO 级别，非 JSON 格式（方便阅读），写入 log_dir
             // 注意：这会初始化全局 tracing subscriber
-            if let Err(e) = edge_server::common::init_logger_with_file(
-                "info",
-                false,
-                Some(log_dir.to_str().unwrap()),
-            ) {
-                eprintln!("Failed to initialize logger: {}", e);
-            } else {
-                info!("Logger initialized! Logs will be written to: {:?}", log_dir);
-            }
+            // 使用 block_on 确保 init_logger_with_file 内部的 tokio::spawn 能找到运行时
+            let log_dir_str = log_dir.to_str().unwrap().to_string();
+            tauri::async_runtime::block_on(async {
+                if let Err(e) =
+                    edge_server::common::init_logger_with_file("info", false, Some(&log_dir_str))
+                {
+                    eprintln!("Failed to initialize logger: {}", e);
+                }
+            });
+            info!("Logger initialized! Logs will be written to: {:?}", log_dir);
 
             // 在异步运行时中初始化 Edge Server
             tauri::async_runtime::spawn(async move {
@@ -162,7 +211,7 @@ pub fn run() {
                 let config = Config {
                     work_dir: work_dir.to_string_lossy().to_string(),
                     jwt: JwtConfig::default(),
-                    http_port: 3001, // 避免与默认 3000 冲突
+                    http_port: 3002, // 避免与默认 3000 (前端) 和 3001 (Auth Server) 冲突
                     environment: "development".to_string(),
                     message_tcp_port: 8082, // 避免与默认 8081 冲突
                 };
@@ -215,8 +264,6 @@ pub fn run() {
                         }
                     }
                 });
-
-                println!("Edge Server initialized and running!");
             });
 
             Ok(())
@@ -224,6 +271,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             check_health,
             send_test_message,
+            activate_server,
             get_local_ip,
             exit_app,
             export_logs

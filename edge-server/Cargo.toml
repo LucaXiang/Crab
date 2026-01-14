@@ -57,7 +57,7 @@ tokio-util.workspace = true
 async-trait.workspace = true
 
 # HTTP Client
-reqwest.workspace = true
+reqwest = { workspace = true, features = ["rustls-tls"] }
 
 # Image processing
 image.workspace = true
@@ -67,15 +67,15 @@ mime_guess.workspace = true
 dotenv.workspace = true
 include_dir.workspace = true
 symlink.workspace = true
+crab-cert = { version = "0.1.0", path = "../crab-cert" }
+rustls = "0.23.36"
+tokio-rustls = "0.26.4"
+axum-server = { version = "0.8.0", features = ["tls-rustls"] }
 
 [dev-dependencies]
 # Testing
 reqwest.workspace = true
 tempfile.workspace = true
-argon2.workspace = true
-jsonwebtoken.workspace = true
 crab-client = { path = "../crab-client" }
 
-[[test]]
-name = "integration"
-path = "tests/integration_test.rs"
+

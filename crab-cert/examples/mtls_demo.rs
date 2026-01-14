@@ -132,7 +132,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 注意：我们使用 Tenant CA 作为 LAN 的信任根。
     // 在真实的浏览器/操作系统中，我们可能需要完整的证书链（Root + Tenant），
     // 但对于我们的自定义 mTLS，信任 Tenant CA 足以实现 LAN 隔离。
-    match verify_server_cert(&server_cert_pem, tenant_ca.cert_pem(), "edge-server") {
+    match verify_server_cert(&server_cert_pem, tenant_ca.cert_pem()) {
         Ok(_) => println!("   ✅ 验证成功：POS 信任 Edge Server。"),
         Err(e) => println!("   ❌ 验证失败：{}", e),
     }

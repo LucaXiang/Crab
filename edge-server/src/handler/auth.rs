@@ -48,28 +48,28 @@ pub async fn login(
         .query("SELECT * FROM employee WHERE username = $username LIMIT 1")
         .bind(("username", username))
         .await
-        .map_err(|e| AppError::Database(format!("Query failed: {}", e)))?;
+        .map_err(|e| AppError::database(format!("Query failed: {}", e)))?;
 
     let employee: Option<Employee> = result
         .take(0)
-        .map_err(|e| AppError::Database(format!("Failed to parse employee: {}", e)))?;
+        .map_err(|e| AppError::database(format!("Failed to parse employee: {}", e)))?;
 
     let employee = employee.ok_or_else(|| {
-        AppError::Validation("Invalid username or password".to_string())
+        AppError::validation("Invalid username or password".to_string())
     })?;
 
     // Check if user is active
     if !employee.is_active {
-        return Err(AppError::Forbidden("Account has been disabled".to_string()));
+        return Err(AppError::forbidden("Account has been disabled".to_string()));
     }
 
     // Verify password using argon2
     let password_valid = employee
         .verify_password(&req.password)
-        .map_err(|e| AppError::Internal(format!("Password verification failed: {}", e)))?;
+        .map_err(|e| AppError::internal(format!("Password verification failed: {}", e)))?;
 
     if !password_valid {
-        return Err(AppError::Validation("Invalid username or password".to_string()));
+        return Err(AppError::validation("Invalid username or password".to_string()));
     }
 
     // Fetch role information
@@ -78,18 +78,18 @@ pub async fn login(
         .query("SELECT * FROM $role_id")
         .bind(("role_id", role_id))
         .await
-        .map_err(|e| AppError::Database(format!("Failed to query role: {}", e)))?;
+        .map_err(|e| AppError::database(format!("Failed to query role: {}", e)))?;
 
     let role: Option<Role> = role_result
         .take(0)
-        .map_err(|e| AppError::Database(format!("Failed to parse role: {}", e)))?;
+        .map_err(|e| AppError::database(format!("Failed to parse role: {}", e)))?;
 
     let role = role.ok_or_else(|| {
-        AppError::Internal("Role not found".to_string())
+        AppError::internal("Role not found".to_string())
     })?;
 
     if !role.is_active {
-        return Err(AppError::Forbidden("Role has been disabled".to_string()));
+        return Err(AppError::forbidden("Role has been disabled".to_string()));
     }
 
     // Generate JWT token
@@ -106,7 +106,7 @@ pub async fn login(
             &role.role_name,
             &role.permissions,
         )
-        .map_err(|e| AppError::Internal(format!("Failed to generate token: {}", e)))?;
+        .map_err(|e| AppError::internal(format!("Failed to generate token: {}", e)))?;
 
     // Log successful login (audit log)
     audit_log!(&user_id, "login", &req.username);

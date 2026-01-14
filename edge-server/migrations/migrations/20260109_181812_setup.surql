@@ -1,9 +1,4 @@
-DEFINE NAMESPACE IF NOT EXISTS edge_server;
-USE NS edge_server;
-DEFINE DATABASE IF NOT EXISTS edge_server;
-USE DB edge_server;
-
-CREATE role:admin CONTENT {
+UPDATE role:admin CONTENT {
 	is_active: true,
 	is_system: true,
 	permissions: [
@@ -12,7 +7,7 @@ CREATE role:admin CONTENT {
 	role_name: 'admin',
 };
 
-CREATE employee:admin CONTENT {
+UPDATE employee:admin CONTENT {
     username: 'admin',
     hash_pass: '$argon2id$v=19$m=19456,t=2,p=1$ufh/dTiLBQM6xDgFXG/p2Q$n4Z6pHZkJqhBcXnhOA/QHqu4a5tI7fPdWfYm1fkxh40',
     employee_name: 'admin',

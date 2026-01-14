@@ -89,6 +89,21 @@
       
       <div>
         <button id="btn-health">Check Health (Oneshot)</button>
+        <button id="btn-logs">Export Logs</button>
+        <button id="btn-exit" style="background-color: #dc3545;">Exit App</button>
+        
+        <div style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 20px;">
+          <h3>Server Activation</h3>
+          <div style="display: grid; gap: 10px; max-width: 400px; margin-bottom: 10px;">
+            <input type="text" id="act-auth-url" placeholder="Auth URL (e.g. http://localhost:3001)" value="http://localhost:3001">
+            <input type="text" id="act-tenant" placeholder="Tenant ID" value="tenant-123">
+            <input type="text" id="act-common-name" placeholder="Common Name (Device ID)" value="pos-device-1">
+            <input type="text" id="act-user" placeholder="Username" value="admin">
+            <input type="password" id="act-pass" placeholder="Password" value="admin123">
+          </div>
+          <button id="btn-activate">Activate Server</button>
+        </div>
+
         <div style="margin-top: 10px; display: flex; gap: 10px;">
             <input type="text" id="msg-input" placeholder="Type a message..." style="flex: 1; padding: 10px; border-radius: 4px; border: 1px solid #ccc;">
             <button id="btn-send">Send Message</button>

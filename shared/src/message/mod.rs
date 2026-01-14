@@ -98,6 +98,11 @@ impl BusMessage {
     /// };
     /// BusMessage::order_intent(&payload);
     /// ```
+    pub fn server_command(payload: &ServerCommandPayload) -> Self {
+        let payload_bytes = serde_json::to_vec(payload).expect("Failed to serialize ServerCommand");
+        Self::new(EventType::ServerCommand, payload_bytes)
+    }
+
     pub fn order_intent<T: serde::Serialize>(payload: &T) -> Self {
         Self::new(
             EventType::OrderIntent,
@@ -183,15 +188,18 @@ impl BusMessage {
     /// # Examples
     ///
     /// ```rust
-    /// use shared::message::BusMessage;
+    /// use shared::message::{BusMessage, ServerCommandPayload};
     /// use serde_json::json;
     ///
     /// // 配置更新指令
-    /// BusMessage::server_command("config_update", json!({
-    ///     "key": "printer.enabled",
-    ///     "value": false,
-    ///     "reason": "maintenance"
-    /// }));
+    /// BusMessage::server_command(&ServerCommandPayload {
+    ///     command: "config_update".to_string(),
+    ///     data: json!({
+    ///         "key": "printer.enabled",
+    ///         "value": false,
+    ///         "reason": "maintenance"
+    ///     })
+    /// });
     ///
     /// // 数据同步指令
     /// BusMessage::server_command("sync_dishes", json!({
@@ -205,18 +213,6 @@ impl BusMessage {
     ///     "reason": "system_upgrade"
     /// }));
     /// ```
-    pub fn server_command(command: &str, data: serde_json::Value) -> Self {
-        let payload = serde_json::json!({
-            "command": command,
-            "data": data,
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        });
-        Self::new(
-            EventType::ServerCommand,
-            serde_json::to_vec(&payload).unwrap(),
-        )
-    }
-
     /// Parse payload as JSON
     pub fn parse_payload<T: DeserializeOwned>(&self) -> Result<T, serde_json::Error> {
         serde_json::from_slice(&self.payload)
@@ -271,13 +267,14 @@ mod tests {
 
     #[test]
     fn test_server_command_message() {
-        let msg = BusMessage::server_command(
-            "config_update",
-            serde_json::json!({"key": "printer.enabled", "value": false}),
-        );
+        let payload = ServerCommandPayload {
+            command: "config_update".to_string(),
+            data: serde_json::json!({"key": "printer.enabled", "value": false}),
+        };
+        let msg = BusMessage::server_command(&payload);
         assert_eq!(msg.event_type, EventType::ServerCommand);
-        let parsed: serde_json::Value = msg.parse_payload().unwrap();
-        assert_eq!(parsed["command"], "config_update");
+        let parsed: ServerCommandPayload = msg.parse_payload().unwrap();
+        assert_eq!(parsed.command, "config_update");
     }
 
     #[test]

@@ -1,34 +1,143 @@
-//! Interactive Message Client Example
+//! Interactive Message Client Example with mTLS support
 //!
 //! Demonstrates an interactive MessageClient that can:
-//! 1. Subscribe and display messages from the edge server
-//! 2. Send messages via interactive menu
+//! 1. Authenticate with Auth Server to get mTLS certificates
+//! 2. Connect to Edge Server using mTLS
+//! 3. Send/Receive messages
 //!
 //! Run: cargo run --example message_client
 
-use crab_client::{BusMessage, EventType, MessageClient};
+use crab_client::{BusMessage, MessageClient};
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use rustls::{ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme};
 use std::io::{self, Write};
+use std::sync::Arc;
+use webpki;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Install default crypto provider (ring)
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .init();
 
-    println!("\n🦀 Interactive Message Client");
-    println!("================================\n");
+    println!("\n🦀 Interactive Message Client (mTLS)");
+    println!("=====================================\n");
 
-    interactive_client("192.168.1.176:8082").await
-}
+    let auth_url = get_input_with_default("Auth Server URL", "http://localhost:3001");
+    let edge_addr = get_input_with_default("Edge Server Address", "127.0.0.1:8082");
 
-async fn interactive_client(addr: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("📡 Connecting to message bus at {}...", addr);
+    // 1. Authenticate
+    println!("\n🔑 Authentication required");
+    let username = get_input("Username: ");
+    let password = get_input("Password: ");
 
-    let client = MessageClient::connect(addr).await?;
+    println!("Connecting to Auth Server...");
+    let http_client = reqwest::Client::new();
 
-    println!("✅ Connected successfully!\n");
+    let login_res = http_client
+        .post(format!("{}/api/auth/login", auth_url))
+        .json(&serde_json::json!({
+            "username": username,
+            "password": password
+        }))
+        .send()
+        .await?;
+
+    if !login_res.status().is_success() {
+        return Err(format!("Login failed: {}", login_res.text().await?).into());
+    }
+
+    let login_data: serde_json::Value = login_res.json().await?;
+    let token = login_data["token"]
+        .as_str()
+        .ok_or("No token in login response")?
+        .to_string();
+
+    println!("✅ Login successful! Token received.");
+
+    // 2. Request Certificate
+    println!("\n📜 Requesting Client Certificate...");
+    let tenant_id = get_input_with_default("Tenant ID", "tenant-123");
+    let common_name = get_input_with_default("Common Name", "pos-device-1");
+
+    let issue_res = http_client
+        .post(format!("{}/api/cert/issue", auth_url))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({
+            "tenant_id": tenant_id,
+            "common_name": common_name,
+            "is_server": false
+        }))
+        .send()
+        .await?;
+
+    if !issue_res.status().is_success() {
+        return Err(format!("Cert issuance failed: {}", issue_res.text().await?).into());
+    }
+
+    let cert_data: serde_json::Value = issue_res.json().await?;
+
+    let cert_pem = cert_data["cert"].as_str().ok_or("No cert received")?;
+    let key_pem = cert_data["key"].as_str().ok_or("No key received")?;
+    let tenant_ca_pem = cert_data["tenant_ca_cert"]
+        .as_str()
+        .ok_or("No tenant CA received")?;
+
+    println!("✅ Certificate received!");
+
+    // 3. Configure mTLS
+    println!("\n🔐 Configuring mTLS...");
+
+    // Load Client Cert/Key
+    let mut cert_reader = std::io::Cursor::new(cert_pem);
+    let certs: Vec<CertificateDer> =
+        rustls_pemfile::certs(&mut cert_reader).collect::<Result<_, _>>()?;
+
+    let mut key_reader = std::io::Cursor::new(key_pem);
+    let key = rustls_pemfile::private_key(&mut key_reader)?.ok_or("No private key found")?;
+
+    // Load Tenant CA as Root
+    let mut roots = RootCertStore::empty();
+    let mut ca_reader = std::io::Cursor::new(tenant_ca_pem);
+    for cert in rustls_pemfile::certs(&mut ca_reader) {
+        roots.add(cert?)?;
+    }
+
+    // Custom Verifier that skips hostname check
+    // This allows connecting via IP (e.g. 192.168.1.x) while still verifying the chain against Tenant CA.
+    let verifier = Arc::new(SkipHostnameVerifier::new(Arc::new(roots)));
+
+    let tls_config = ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(verifier)
+        .with_client_auth_cert(certs, key)?;
+
+    println!("✅ mTLS Configuration ready.");
+
+    // 4. Connect to Edge Server
+    println!("\n📡 Connecting to Edge Server at {} (mTLS)...", edge_addr);
+
+    let client = MessageClient::connect_tls(
+        &edge_addr,
+        "edge-server", // This matches the Server Cert CN (though ignored by verifier)
+        tls_config,
+    )
+    .await?;
+
+    println!("✅ Connected successfully to Edge Server via mTLS!\n");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
+    // ... Interactive loop (same as before) ...
+    interactive_loop(client).await
+}
+
+async fn interactive_loop(client: MessageClient) -> Result<(), Box<dyn std::error::Error>> {
     // Spawn a task to receive and display messages
     let recv_client = client.clone();
     tokio::spawn(async move {
@@ -61,79 +170,74 @@ async fn interactive_client(addr: &str) -> Result<(), Box<dyn std::error::Error>
                 // Add dish to table
                 let table_id = get_input("Table ID (e.g., T01): ");
                 let dish_name = get_input("Dish name: ");
-                let quantity = get_input("Quantity: ").parse::<i32>().unwrap_or(1);
+                let quantity = get_input("Quantity: ").parse::<u32>().unwrap_or(1);
 
-                let msg = BusMessage::order_intent(&shared::message::OrderIntentPayload {
-                    action: "add_dish".to_string(),
-                    table_id: table_id,
-                    order_id: None,
-                    data: serde_json::json!({
-                        "dishes": [{
-                            "name": dish_name,
-                            "quantity": quantity
-                        }]
-                    }),
-                    operator: Some("client_user".to_string()),
-                });
+                let payload = shared::message::OrderIntentPayload::add_dish(
+                    shared::message::TableId::new_unchecked(table_id),
+                    vec![shared::message::DishItem::simple(&dish_name, quantity)],
+                    Some(shared::message::OperatorId::new("client_user")),
+                );
+                let msg = BusMessage::order_intent(&payload);
                 client.send(&msg).await?;
             }
             "2" => {
                 // Payment request
                 let table_id = get_input("Table ID: ");
-                let amount = get_input("Amount (cents): ").parse::<i32>().unwrap_or(0);
-                let method = get_input("Payment method (cash/card/wechat): ");
+                let _amount = get_input("Amount (cents): ").parse::<u64>().unwrap_or(0);
+                let method = get_input("Payment method (cash/card/wechat/alipay): ");
 
-                let msg = BusMessage::order_intent(&shared::message::OrderIntentPayload {
-                    action: "payment".to_string(),
-                    table_id: table_id,
-                    order_id: None,
-                    data: serde_json::json!({
-                        "amount": amount,
-                        "method": method
-                    }),
-                    operator: Some("client_user".to_string()),
-                });
+                let payment_method = match method.to_lowercase().as_str() {
+                    "cash" => shared::message::PaymentMethod::Cash,
+                    "card" => shared::message::PaymentMethod::Card,
+                    "wechat" => shared::message::PaymentMethod::Wechat,
+                    "alipay" => shared::message::PaymentMethod::Alipay,
+                    _ => shared::message::PaymentMethod::Cash,
+                };
+
+                let payload = shared::message::OrderIntentPayload::checkout(
+                    shared::message::TableId::new_unchecked(table_id.clone()),
+                    shared::message::OrderId::new_unchecked("ORD_CLIENT"),
+                    payment_method,
+                    Some(shared::message::OperatorId::new("client_user")),
+                );
+                let msg = BusMessage::order_intent(&payload);
                 client.send(&msg).await?;
             }
             "3" => {
                 // Checkout
                 let table_id = get_input("Table ID: ");
 
-                let msg = BusMessage::order_intent(&shared::message::OrderIntentPayload {
-                    action: "checkout".to_string(),
-                    table_id: table_id,
-                    order_id: None,
-                    data: serde_json::Value::Null,
-                    operator: Some("client_user".to_string()),
-                });
+                let payload = shared::message::OrderIntentPayload::checkout(
+                    shared::message::TableId::new_unchecked(table_id),
+                    shared::message::OrderId::new_unchecked("ORD_CLIENT"),
+                    shared::message::PaymentMethod::Cash,
+                    Some(shared::message::OperatorId::new("client_user")),
+                );
+                let msg = BusMessage::order_intent(&payload);
                 client.send(&msg).await?;
             }
             "4" => {
                 // Dish price update
                 let dish_id = get_input("Dish ID: ");
-                let new_price = get_input("New price (cents): ").parse::<i32>().unwrap_or(0);
+                let new_price = get_input("New price (cents): ").parse::<u64>().unwrap_or(0);
 
-                let msg = BusMessage::data_sync(
-                    "dish_price",
-                    serde_json::json!({
-                        "dish_id": dish_id,
-                        "new_price": new_price,
-                        "updated_by": "client_user"
-                    }),
-                );
+                let payload = shared::message::DataSyncPayload::DishPrice {
+                    dish_id: shared::message::DishId::new(dish_id),
+                    old_price: 0,
+                    new_price,
+                };
+                let msg = BusMessage::data_sync(&payload);
                 client.send(&msg).await?;
             }
             "5" => {
                 // Dish sold out
                 let dish_id = get_input("Dish ID: ");
 
-                let msg = BusMessage::data_sync(
-                    "dish_sold_out",
-                    serde_json::json!({
-                        "dish_id": dish_id,
-                        "available": false
-                    }),
-                );
+                let payload = shared::message::DataSyncPayload::DishSoldOut {
+                    dish_id: shared::message::DishId::new(dish_id),
+                    available: false,
+                };
+                let msg = BusMessage::data_sync(&payload);
                 client.send(&msg).await?;
             }
             "6" => {
@@ -141,29 +245,28 @@ async fn interactive_client(addr: &str) -> Result<(), Box<dyn std::error::Error>
                 let title = get_input("Notification title: ");
                 let body = get_input("Notification body: ");
 
-                let msg = BusMessage::notification(&title, &body);
+                let payload = shared::message::NotificationPayload::info(title, body);
+                let msg = BusMessage::notification(&payload);
                 client.send(&msg).await?;
             }
             "7" => {
                 // Server command
-                let command = get_input("Command (config_update/sync_dishes/restart): ");
-                let key = get_input("Key (optional): ");
+                let command_str = get_input("Command (ping/config_update/restart): ");
 
-                let msg = BusMessage::server_command(
-                    &command,
-                    if key.is_empty() {
-                        serde_json::json!({
-                            "command": command,
-                            "reason": "client"
-                        })
-                    } else {
-                        serde_json::json!({
-                            "command": command,
-                            "key": key,
-                            "reason": "client"
-                        })
+                let command = match command_str.to_lowercase().as_str() {
+                    "ping" => shared::message::ServerCommand::Ping,
+                    "restart" => shared::message::ServerCommand::Restart {
+                        delay_seconds: 5,
+                        reason: Some("client".to_string()),
                     },
-                );
+                    "config_update" | _ => shared::message::ServerCommand::ConfigUpdate {
+                        key: "client.config".to_string(),
+                        value: serde_json::json!("client_value"),
+                    },
+                };
+
+                let payload = shared::message::ServerCommandPayload { command };
+                let msg = BusMessage::server_command(&payload);
                 client.send(&msg).await?;
             }
             "8" => {
@@ -179,109 +282,67 @@ async fn interactive_client(addr: &str) -> Result<(), Box<dyn std::error::Error>
                             .unwrap_or("notification");
                         let msg = match msg_type {
                             "order_intent" => {
-                                BusMessage::order_intent(&shared::message::OrderIntentPayload {
-                                    action: value
-                                        .get("action")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("custom")
-                                        .to_string(),
-                                    table_id: value
-                                        .get("table_id")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .to_string(),
-                                    order_id: value
-                                        .get("order_id")
-                                        .and_then(|v| v.as_str())
-                                        .map(|s| s.to_string()),
-                                    data: value
-                                        .get("data")
-                                        .cloned()
-                                        .unwrap_or(serde_json::Value::Null),
-                                    operator: value
-                                        .get("operator")
-                                        .and_then(|v| v.as_str())
-                                        .map(|s| s.to_string()),
-                                })
-                            }
-                            "order_sync" => {
-                                BusMessage::order_sync(&shared::message::OrderSyncPayload {
-                                    action: value
-                                        .get("action")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("custom")
-                                        .to_string(),
-                                    table_id: value
-                                        .get("table_id")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .to_string(),
-                                    order_id: value
-                                        .get("order_id")
-                                        .and_then(|v| v.as_str())
-                                        .map(|s| s.to_string()),
-                                    status: value
-                                        .get("status")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("unknown")
-                                        .to_string(),
-                                    source: value
-                                        .get("source")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("unknown")
-                                        .to_string(),
-                                    data: value.get("data").cloned(),
-                                })
-                            }
-                            "data_sync" => BusMessage::data_sync(
-                                value
-                                    .get("sync_type")
+                                let table_id = value
+                                    .get("table_id")
                                     .and_then(|v| v.as_str())
-                                    .unwrap_or("custom"),
-                                value.get("data").cloned().unwrap_or_default(),
-                            ),
-                            "server_command" => BusMessage::server_command(
-                                value
-                                    .get("command")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("custom"),
-                                value.get("data").cloned().unwrap_or_default(),
-                            ),
-                            _ => BusMessage::notification("Custom", &json_str),
+                                    .unwrap_or("T01");
+
+                                let payload = shared::message::OrderIntentPayload::add_dish(
+                                    shared::message::TableId::new_unchecked(table_id),
+                                    vec![shared::message::DishItem::simple("custom_dish", 1)],
+                                    Some(shared::message::OperatorId::new("client_user")),
+                                );
+                                BusMessage::order_intent(&payload)
+                            }
+                            _ => {
+                                let payload = shared::message::NotificationPayload::info(
+                                    "Custom".to_string(),
+                                    json_str,
+                                );
+                                BusMessage::notification(&payload)
+                            }
                         };
                         client.send(&msg).await?;
                     }
-                    Err(e) => {
-                        println!("❌ Invalid JSON: {}\n", e);
-                        continue;
-                    }
+                    Err(e) => println!("❌ Invalid JSON: {}", e),
                 }
             }
-            _ => {
-                println!("❌ Invalid choice. Please try again.\n");
-                continue;
-            }
+            _ => println!("❌ Invalid choice"),
         }
-
-        // 用户要求不显示发出的消息，所以这里不打印
-        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
     }
 
     Ok(())
 }
 
+fn print_received_message(msg: &BusMessage) {
+    println!("\n📨 Received: [{}]", msg.event_type);
+
+    match msg.parse_payload::<serde_json::Value>() {
+        Ok(payload) => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&payload).unwrap_or_default()
+            );
+        }
+        Err(_) => {
+            println!("(Raw payload: {} bytes)", msg.payload.len());
+        }
+    }
+    print!("\n> "); // Restore prompt
+    let _ = io::stdout().flush();
+}
+
 fn print_menu() {
-    println!("📋 请选择操作:");
-    println!("  1. 📝 添加菜品");
-    println!("  2. 💰 支付请求");
-    println!("  3. 🧾 结账");
-    println!("  4. 💾 更新菜价");
-    println!("  5. ❌ 菜品售罄");
-    println!("  6. 📢 系统通知");
-    println!("  7. 🎮 服务器指令");
-    println!("  8. 🔧 自定义 JSON");
-    println!("  0. ❌ 退出");
-    println!();
+    println!("\nAvailable Actions:");
+    println!("1. Add Dish (OrderIntent)");
+    println!("2. Payment (OrderIntent)");
+    println!("3. Checkout (OrderIntent)");
+    println!("4. Update Dish Price (DataSync)");
+    println!("5. Set Dish Sold Out (DataSync)");
+    println!("6. Send Notification");
+    println!("7. Server Command");
+    println!("8. Custom JSON");
+    println!("0. Exit");
 }
 
 fn get_input(prompt: &str) -> String {
@@ -292,174 +353,88 @@ fn get_input(prompt: &str) -> String {
     input.trim().to_string()
 }
 
-fn print_received_message(msg: &BusMessage) {
-    let timestamp = chrono::Local::now().format("%H:%M:%S");
+fn get_input_with_default(prompt: &str, default: &str) -> String {
+    print!("{} [{}]: ", prompt, default);
+    io::stdout().flush().unwrap();
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    let input = input.trim();
+    if input.is_empty() {
+        default.to_string()
+    } else {
+        input.to_string()
+    }
+}
 
-    match msg.event_type {
-        EventType::OrderIntent => {
-            if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
-                let action = payload
-                    .get("action")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown");
-                let table_id = payload
-                    .get("table_id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("(no table)");
+#[derive(Debug)]
+struct SkipHostnameVerifier {
+    roots: Arc<RootCertStore>,
+    inner: Arc<dyn ServerCertVerifier>,
+}
 
-                let details = match action {
-                    "add_dish" => {
-                        let dishes = payload
-                            .get("data")
-                            .and_then(|v| v.get("dishes"))
-                            .and_then(|v| v.as_array());
-                        if let Some(dishes) = dishes {
-                            let dish_list: Vec<String> = dishes
-                                .iter()
-                                .map(|d| {
-                                    let name =
-                                        d.get("name").and_then(|v| v.as_str()).unwrap_or("?");
-                                    let qty =
-                                        d.get("quantity").and_then(|v| v.as_i64()).unwrap_or(0);
-                                    format!("{}x{}", qty, name)
-                                })
-                                .collect();
-                            format!("桌台: {} | 菜品: {}", table_id, dish_list.join(", "))
-                        } else {
-                            format!("桌台: {}", table_id)
-                        }
-                    }
-                    "payment" => {
-                        let amount = payload
-                            .get("data")
-                            .and_then(|v| v.get("amount"))
-                            .and_then(|v| v.as_i64())
-                            .unwrap_or(0);
-                        let method = payload
-                            .get("data")
-                            .and_then(|v| v.get("method"))
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("?");
-                        format!("桌台: {} | 金额: {}分 | 方式: {}", table_id, amount, method)
-                    }
-                    "checkout" => {
-                        format!("桌台: {} | 结算请求", table_id)
-                    }
-                    _ => format!("桌台: {} | 操作: {}", table_id, action),
-                };
+impl SkipHostnameVerifier {
+    fn new(roots: Arc<RootCertStore>) -> Self {
+        let inner = rustls::client::WebPkiServerVerifier::builder(roots.clone())
+            .build()
+            .unwrap();
+        Self { roots, inner }
+    }
+}
 
-                println!("[{}] [收到] 📝 ORDER INTENT | {}", timestamp, details);
-            } else {
-                println!("[{}] [收到] 📝 ORDER INTENT", timestamp);
-            }
-        }
-        EventType::OrderSync => {
-            if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
-                let action = payload
-                    .get("action")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown");
-                let table_id = payload
-                    .get("table_id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("(no table)");
-                let status = payload
-                    .get("status")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("(no status)");
+impl ServerCertVerifier for SkipHostnameVerifier {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        now: UnixTime,
+    ) -> Result<ServerCertVerified, rustls::Error> {
+        let cert = webpki::EndEntityCert::try_from(end_entity).map_err(|e| {
+            rustls::Error::InvalidCertificate(rustls::CertificateError::Other(rustls::OtherError(
+                Arc::new(e),
+            )))
+        })?;
 
-                println!(
-                    "[{}] [收到] 🔄 ORDER SYNC | 桌台: {} | 状态: {} | 操作: {}",
-                    timestamp, table_id, status, action
-                );
-            } else {
-                println!("[{}] [收到] 🔄 ORDER SYNC", timestamp);
-            }
-        }
-        EventType::DataSync => {
-            if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
-                let sync_type = payload
-                    .get("sync_type")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown");
+        // Use verify_for_usage instead of verify_is_valid_tls_server_cert
+        // Pass anchors directly from RootCertStore (Vec<TrustAnchor>)
+        cert.verify_for_usage(
+            &webpki::ALL_VERIFICATION_ALGS,
+            &self.roots.roots,
+            intermediates,
+            now,
+            webpki::KeyUsage::server_auth(),
+            None, // No CRLs
+            None, // No revocation policy?
+        )
+        .map_err(|e| {
+            rustls::Error::InvalidCertificate(rustls::CertificateError::Other(rustls::OtherError(
+                Arc::new(e),
+            )))
+        })?;
 
-                match sync_type {
-                    "dish_price" => {
-                        let dish_id = payload
-                            .get("dish_id")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("?");
-                        let new_price = payload
-                            .get("new_price")
-                            .and_then(|v| v.as_i64())
-                            .unwrap_or(0);
-                        println!(
-                            "[{}] [收到] 💾 DATA SYNC | 菜品价格 | ID: {} | 新价格: {}分",
-                            timestamp, dish_id, new_price
-                        );
-                    }
-                    "dish_sold_out" => {
-                        let dish_id = payload
-                            .get("dish_id")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("?");
-                        let available = payload
-                            .get("available")
-                            .and_then(|v| v.as_bool())
-                            .unwrap_or(false);
-                        let status = if available { "有货" } else { "售罄" };
-                        println!(
-                            "[{}] [收到] 💾 DATA SYNC | 菜品状态 | ID: {} | 状态: {}",
-                            timestamp, dish_id, status
-                        );
-                    }
-                    _ => {
-                        println!(
-                            "[{}] [收到] 💾 DATA SYNC | 类型: {} | {}",
-                            timestamp, sync_type, payload
-                        );
-                    }
-                }
-            } else {
-                println!("[{}] [收到] 💾 DATA SYNC", timestamp);
-            }
-        }
-        EventType::Notification => {
-            if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
-                let title = payload
-                    .get("title")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("(no title)");
-                let body = payload
-                    .get("body")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("(no body)");
-                println!(
-                    "[{}] [收到] 📢 NOTIFICATION | 标题: {} | 内容: {}",
-                    timestamp, title, body
-                );
-            } else {
-                println!("[{}] [收到] 📢 NOTIFICATION", timestamp);
-            }
-        }
-        EventType::ServerCommand => {
-            if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
-                let command = payload
-                    .get("command")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown");
-                let reason = payload
-                    .get("reason")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("(no reason)");
+        Ok(ServerCertVerified::assertion())
+    }
 
-                println!(
-                    "[{}] [收到] 🎮 SERVER COMMAND | 指令: {} | 原因: {}",
-                    timestamp, command, reason
-                );
-            } else {
-                println!("[{}] [收到] 🎮 SERVER COMMAND", timestamp);
-            }
-        }
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        self.inner.verify_tls12_signature(message, cert, dss)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        self.inner.verify_tls13_signature(message, cert, dss)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.inner.supported_verify_schemes()
     }
 }
