@@ -1,272 +1,629 @@
-//! Interactive Demo - Complete Edge Server Experience
-//!
-//! This example demonstrates:
-//! 1. Starting edge-server
-//! 2. Using MessageClient for simple send/recv interface
-//! 3. Multiple event receivers (both client and server messages)
-//! 4. Interactive command line to send messages
+//! Interactive Demo - TUI Enhanced Edge Server Experience
 //!
 //! Run: cargo run --example interactive_demo
 
+use crossterm::{
+    event::{self, Event, KeyCode, KeyEventKind},
+    execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+};
 use edge_server::Config;
 use edge_server::server::ServerState;
 use edge_server::{BusMessage, MessageClient};
-use std::io::{self, Write};
+use ratatui::{prelude::*, widgets::*};
+use std::io::{self, Stdout};
+use std::time::Duration;
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+use tui_input::Input;
+use tui_input::backend::crossterm::EventHandler;
+use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
+
+use tokio::sync::mpsc;
+
+#[derive(Default, Clone)]
+struct DemoStatus {
+    is_active: bool,
+    tenant_id: String,
+    device_id: String,
+    plan: String,
+    sub_status: String,
+    expires_at: String,
+}
+
+#[derive(Default)]
+struct App {
+    /// Input field state
+    input: Input,
+    /// Current input mode
+    input_mode: InputMode,
+    /// Message client for sending commands
+    msg_client: Option<MessageClient>,
+    /// Server state reference
+    server_state: Option<ServerState>,
+    /// Loading state
+    is_loading: bool,
+    /// Current Status
+    status: DemoStatus,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+enum InputMode {
+    #[default]
+    Normal,
+    Editing,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Install default crypto provider to avoid panic
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .ok();
+    // Install default crypto provider
+    let _ = rustls::crypto::ring::default_provider().install_default();
 
-    // Set default log level to info/debug if not set
-    let env_filter = std::env::var("RUST_LOG")
-        .unwrap_or_else(|_| "info,edge_server=debug,surrealdb=warn".to_string());
+    // Initialize TUI Logger with Tracing
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-    tracing_subscriber::fmt().with_env_filter(env_filter).init();
+    tracing_subscriber::registry()
+        .with(tui_logger::tracing_subscriber_layer())
+        .with(env_filter)
+        .init();
 
-    println!("\n🦀 Interactive Edge Server Demo");
-    println!("================================\n");
+    // Also init log crate adapter just in case dependencies use log crate
+    tui_logger::init_logger(log::LevelFilter::Info).ok();
+    tui_logger::set_default_level(log::LevelFilter::Info);
 
-    // Create a temporary directory for this demo
-    let temp_dir = "./temp_interactive_demo";
-    std::fs::create_dir_all(temp_dir).ok();
+    // Setup terminal
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
 
-    // 1. Initialize edge-server state
-    tracing::info!("1️⃣  Initializing edge-server state...");
-    let mut config = Config::with_overrides(temp_dir, 3000, 8081);
-    config.environment = "development".to_string();
-    config.jwt.secret = "demo-secret".to_string();
+    // Create App state
+    let mut app = App::default();
+    app.is_loading = true;
 
-    let state: ServerState = ServerState::initialize(&config).await;
-    state.start_background_tasks().await;
+    // Channel to receive initialized state
+    let (tx, mut rx) = mpsc::channel(1);
+    // Channel to receive status updates
+    let (status_tx, mut status_rx) = mpsc::channel(1);
 
-    // Check activation status and print banner
-    state.print_activation_banner().await;
+    // Start Server Logic in Background
+    tokio::spawn(async move {
+        tracing::debug!("Starting Edge Server...");
 
-    // Start TCP Server if activated and certs exist
-    if let Ok(Some(tls_config)) = state.load_tls_config() {
-        let bus = state.get_message_bus();
-        let tcp_tls_config = tls_config.clone();
+        // Create a temporary directory for this demo
+        let temp_dir = "./temp_interactive_demo";
+        if !std::path::Path::new(temp_dir).exists() {
+            std::fs::create_dir_all(temp_dir).ok();
+        }
+        tracing::debug!("Data directory: {}", temp_dir);
+
+        // 1. Start edge-server
+        let mut config = Config::with_overrides(temp_dir, 3000, 8081);
+        config.environment = "production".to_string();
+        config.jwt.secret = "demo-secret".to_string();
+        config.auth_server_url = "http://127.0.0.1:3001".to_string();
+
+        let state = ServerState::initialize(&config).await;
+        // Start background tasks immediately as we are not using Server::run to initialize state
+        // But since we are going to use Server::with_state().run(), we need to be careful not to double start
+        // NOTE: Server::run() now unconditionally calls start_background_tasks().
+        // However, the interactive demo needs MessageBus running BEFORE Server::run() is called
+        // because we create a MessageClient below and start subscribing.
+        // If we wait for Server::run(), the MessageClient might try to connect to a non-running bus (though memory transport might be fine).
+        // Actually, MemoryTransport doesn't need "start_background_tasks" to be *called* to exist,
+        // but MessageHandler needs to run to *process* messages.
+        //
+        // If we let Server::run() start it, we are fine as long as we don't block.
+        // Server::run() is spawned below.
+        //
+        // But to be safe and allow UI to work even if Server::run takes a moment,
+        // we might want to start it here. BUT Server::run will start it again.
+        //
+        // Ideally, start_background_tasks should be idempotent.
+        // For now, let's trust Server::run() to start it, and we spawn Server::run immediately.
+
+        // state.start_background_tasks().await; // <-- REMOVED to avoid double start
+
+        // Send state back to UI
+        if let Err(_) = tx.send(state.clone()).await {
+            tracing::error!("Failed to send server state to UI");
+        }
+
+        // Start Status Poller
+        let poller_state = state.clone();
+        let status_tx_clone = status_tx.clone();
         tokio::spawn(async move {
-            tracing::info!("Starting Message Bus TCP server...");
-            if let Err(e) = bus.start_tcp_server(Some(tcp_tls_config)).await {
-                tracing::error!("Message bus TCP server error: {}", e);
+            loop {
+                // Gather status
+                let activation_res = poller_state.activation_service().get_status().await;
+                let sub_cache = poller_state
+                    .activation_service()
+                    .credential_cache
+                    .read()
+                    .await;
+
+                let mut status = DemoStatus::default();
+                if let Ok(act) = activation_res {
+                    status.is_active = act.is_activated;
+                    status.tenant_id = act.tenant_id.unwrap_or("-".to_string());
+                    status.device_id = act.edge_id.unwrap_or("-".to_string());
+                }
+
+                if let Some(sub) = &*sub_cache {
+                    status.plan = format!("{:?}", sub.plan);
+                    status.sub_status = format!("{:?}", sub.status);
+                    status.expires_at = sub
+                        .expires_at
+                        .map(|d| d.to_rfc3339())
+                        .unwrap_or_else(|| "Never".to_string());
+                } else {
+                    status.plan = "None".to_string();
+                    status.sub_status = "None".to_string();
+                    status.expires_at = "-".to_string();
+                }
+
+                if let Err(_) = status_tx_clone.send(status).await {
+                    break;
+                }
+
+                tokio::time::sleep(Duration::from_secs(2)).await;
             }
         });
-    } else {
-        tracing::warn!("TCP Server not started (Not activated or missing certs)");
-    }
 
-    // 2. Start event receiver that listens to BOTH client and server messages
-    tracing::info!("2️⃣  Starting event receiver...");
-    let bus = state.get_message_bus();
+        // Lifecycle Manager: Use Server::run() instead of manual orchestration
+        // This ensures we test the exact same code path as the real binary
+        let server = edge_server::Server::with_state(config, state.clone());
 
-    // Create two receivers: one for client messages, one for server broadcasts
-    let mut client_rx = bus.subscribe_to_clients();
-    let mut server_rx = bus.subscribe();
+        // We spawn Server::run in a separate task because it's blocking (until shutdown)
+        tokio::spawn(async move {
+            tracing::debug!("🚀 Starting Edge Server via Server::run()...");
+            if let Err(e) = server.run().await {
+                tracing::error!("❌ Server run error: {}", e);
+            }
+        });
 
-    tokio::spawn(async move {
-        tracing::info!("📨 Event receiver started (listening to clients + server)");
-        loop {
-            tokio::select! {
-                // Receive messages FROM CLIENTS (interactive_demo sends via publish)
-                msg_result = client_rx.recv() => {
-                    match msg_result {
-                        Ok(msg) => {
-                            {
-                                tracing::info!("📨 [来自客户端] {:?}", msg.event_type);
-                            }
+        // 2. Start event receiver
+        let bus = state.message_bus();
+        let mut client_rx = bus.subscribe_to_clients();
+        let mut server_rx = bus.subscribe();
+
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    msg_result = client_rx.recv() => {
+                        if let Ok(msg) = msg_result {
+                            tracing::info!("📨 [CLIENT] {:?} | ID: {}", msg.event_type, msg.request_id);
                             if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
                                 tracing::info!("   Data: {}", payload);
                             }
                         }
-                        Err(_) => break,
                     }
-                }
-                // Receive broadcasts FROM SERVER (TCP clients would receive this)
-                msg_result = server_rx.recv() => {
-                    match msg_result {
-                        Ok(msg) => {
-                            match msg.event_type {
-                                edge_server::message::EventType::Notification => {
-                                    tracing::info!("📢 [服务端广播] NOTIFICATION | 系统通知");
-                                }
-                                edge_server::message::EventType::ServerCommand => {
-                                    tracing::info!("🎮 [服务端广播] SERVER COMMAND | 服务器指令");
-                                }
-                            }
+                    msg_result = server_rx.recv() => {
+                        if let Ok(msg) = msg_result {
+                            let prefix = match msg.event_type {
+                                edge_server::message::EventType::Notification => "📢 [NOTIFY]",
+                                edge_server::message::EventType::ServerCommand => "🎮 [CMD]",
+                                edge_server::message::EventType::Handshake => "🤝 [HANDSHAKE]",
+                                edge_server::message::EventType::RequestCommand => "⚡ [REQ]",
+                                edge_server::message::EventType::Sync => "🔄 [SYNC]",
+                                edge_server::message::EventType::Response => "🔙 [RESP]",
+                            };
+                            tracing::info!("{} {:?}", prefix, msg.event_type);
                             if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
                                 tracing::info!("   Data: {}", payload);
                             }
                         }
-                        Err(_) => break,
                     }
                 }
             }
+        });
+
+        // Send state back to UI
+        if let Err(_) = tx.send(state.clone()).await {
+            tracing::error!("Failed to send server state to UI");
         }
+
+        // Start Status Poller
+        tokio::spawn(async move {
+            loop {
+                // Gather status
+                let activation_res = state.activation_service().get_status().await;
+                let sub_cache = state.activation_service().subscription_cache.read().await;
+
+                let mut status = DemoStatus::default();
+                if let Ok(act) = activation_res {
+                    status.is_active = act.is_activated;
+                    status.tenant_id = act.tenant_id.unwrap_or("-".to_string());
+                    status.device_id = act.edge_id.unwrap_or("-".to_string());
+                }
+
+                if let Some(sub) = &*sub_cache {
+                    status.plan = format!("{:?}", sub.plan);
+                    status.sub_status = format!("{:?}", sub.status);
+                    status.expires_at = sub
+                        .expires_at
+                        .map(|d| d.to_rfc3339())
+                        .unwrap_or_else(|| "Never".to_string());
+                } else {
+                    status.plan = "None".to_string();
+                    status.sub_status = "None".to_string();
+                    status.expires_at = "-".to_string();
+                }
+
+                if let Err(_) = status_tx.send(status).await {
+                    break;
+                }
+
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+        });
     });
 
-    tracing::info!("3️⃣  Receiver started!");
+    // Run TUI loop
+    let res = run_app(&mut terminal, &mut app, &mut rx, &mut status_rx).await;
 
-    // Give the receiver a moment to print its startup message
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    // Restore terminal
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
 
-    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
-    // 3. Interactive command line
-    interactive_cli(state).await?;
-
-    tracing::info!("👋 Demo complete!");
-    tracing::info!("Cleaning up...");
-
-    // Cleanup - DISABLED to allow persistence testing
-    // std::fs::remove_dir_all(temp_dir).ok();
+    if let Err(err) = res {
+        println!("{:?}", err);
+    }
 
     Ok(())
 }
 
-async fn interactive_cli(state: ServerState) -> Result<(), Box<dyn std::error::Error>> {
-    // Create message client for simple send/recv interface
-    let msg_client = MessageClient::memory(&state.get_message_bus());
-
+async fn run_app(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    app: &mut App,
+    rx: &mut mpsc::Receiver<ServerState>,
+    status_rx: &mut mpsc::Receiver<DemoStatus>,
+) -> io::Result<()> {
     loop {
-        print_menu();
-        io::stdout().flush()?;
+        terminal.draw(|f| ui(f, app))?;
 
-        let choice = get_input("Enter your choice (0-4): ");
-
-        match choice.as_str() {
-            "0" => {
-                println!("\n👋 Goodbye!");
-                break;
-            }
-            "1" => {
-                // Send Notification (client message via send)
-                let title = get_input("Title: ");
-                let message = get_input("Message: ");
-
-                let payload = shared::message::NotificationPayload::info(&title, &message);
-                let msg = BusMessage::notification(&payload);
-                msg_client.send(&msg).await?;
-                println!("✅ Sent: Notification '{}'\n", title);
-            }
-            "2" => {
-                // Server Command (server broadcast via publish)
-                let command_str = get_input("Command (ping/config_update/restart): ");
-                let args_str = get_input("Args (json, optional): ");
-                let args: serde_json::Value =
-                    serde_json::from_str(&args_str).unwrap_or(serde_json::json!({}));
-
-                let command = match command_str.to_lowercase().as_str() {
-                    "ping" => shared::message::ServerCommand::Ping,
-                    "restart" => shared::message::ServerCommand::Restart {
-                        delay_seconds: args.get("delay").and_then(|v| v.as_u64()).unwrap_or(5)
-                            as u32,
-                        reason: args
-                            .get("reason")
-                            .and_then(|v| v.as_str())
-                            .map(String::from),
-                    },
-                    "config_update" | _ => shared::message::ServerCommand::ConfigUpdate {
-                        key: args
-                            .get("key")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("demo.key")
-                            .to_string(),
-                        value: args
-                            .get("value")
-                            .cloned()
-                            .unwrap_or(serde_json::json!("demo_value")),
-                    },
-                };
-
-                let payload = shared::message::ServerCommandPayload { command };
-                let msg = BusMessage::server_command(&payload);
-                state.get_message_bus().publish(msg).await?;
-                println!("✅ Sent: Server Command '{}'\n", command_str);
-            }
-            "3" => {
-                // Custom JSON (raw message)
-                let json_data = get_input("JSON Data: ");
-
-                let payload = shared::message::NotificationPayload::info("Custom", &json_data);
-                let msg = BusMessage::notification(&payload);
-                msg_client.send(&msg).await?;
-                println!("✅ Sent: Custom Data as Notification\n");
-            }
-            "4" => {
-                // Activate Server (Real Auth Server)
-                println!("\n🔐 Activating Server (Real Auth Server)...");
-
-                let auth_url = get_input("Auth Server URL (default: http://localhost:3001): ");
-                let auth_url = if auth_url.is_empty() {
-                    "http://localhost:3001".to_string()
-                } else {
-                    auth_url
-                };
-
-                let mut username = get_input("Username (default: admin): ");
-                if username.is_empty() {
-                    username = "admin".to_string();
-                }
-
-                let mut password = get_input("Password (default: admin123): ");
-                if password.is_empty() {
-                    password = "admin123".to_string();
-                }
-
-                let mut tenant_id = get_input("Tenant ID (default: tenant-01): ");
-                if tenant_id.is_empty() {
-                    tenant_id = "tenant-01".to_string();
-                }
-
-                let mut edge_id = get_input("Edge Server ID (default: edge-01): ");
-                if edge_id.is_empty() {
-                    edge_id = "edge-01".to_string();
-                }
-
-                println!("   Connecting to Auth Server...");
-
-                // Use the internal provisioning service
-                let provisioning = state.provisioning_service(auth_url);
-
-                match provisioning
-                    .activate(&username, &password, &tenant_id, &edge_id)
-                    .await
-                {
-                    Ok(_) => {
-                        println!("\n✨ Activation Successful! ✨");
-                        println!("Tenant: {}", tenant_id);
-                        println!("Edge ID: {}", edge_id);
-                        // The server state automatically reloads certificates, so we don't strictly need to restart for the demo to work
-                        println!("\n✅ Server state updated with new certificates.");
+        // If still loading, wait for initialization or tick
+        if app.is_loading {
+            tokio::select! {
+                state_res = rx.recv() => {
+                    if let Some(state) = state_res {
+                         app.msg_client = Some(MessageClient::memory(&state.message_bus()));
+                         app.server_state = Some(state);
+                         app.is_loading = false;
+                         tracing::info!("✅ Server Initialized and Ready!");
+                         // Force a manual log to verify visibility
+                         tracing::info!("Press 'e' to edit commands, 'q' to quit");
                     }
-                    Err(e) => {
-                        println!("❌ Activation failed: {}", e);
+                }
+                _ = tokio::time::sleep(Duration::from_millis(100)) => {
+                    // Just a tick to keep UI refreshing if needed
+                }
+            }
+            continue;
+        }
+
+        // Handle status updates and input
+        let timeout = Duration::from_millis(100);
+        if event::poll(timeout)? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    match app.input_mode {
+                        InputMode::Normal => match key.code {
+                            KeyCode::Char('e') => {
+                                app.input_mode = InputMode::Editing;
+                            }
+                            KeyCode::Char('q') | KeyCode::Esc => {
+                                return Ok(());
+                            }
+                            _ => {}
+                        },
+                        InputMode::Editing => match key.code {
+                            KeyCode::Enter => {
+                                let input_str: String = app.input.value().into();
+                                if !input_str.is_empty() {
+                                    handle_command(app, &input_str).await;
+                                    app.input.reset();
+                                }
+                                // Stay in editing mode for convenience, or switch back?
+                                // Let's stay in editing mode like a terminal
+                            }
+                            KeyCode::Esc => {
+                                app.input_mode = InputMode::Normal;
+                            }
+                            _ => {
+                                app.input.handle_event(&Event::Key(key));
+                            }
+                        },
                     }
                 }
             }
-            _ => println!("❌ Invalid choice, please try again.\n"),
+        }
+
+        // Poll for status updates (non-blocking)
+        if let Ok(status) = status_rx.try_recv() {
+            app.status = status;
         }
     }
-    Ok(())
 }
 
-fn print_menu() {
-    println!("\nAvailable Actions:");
-    println!("1. Send Notification");
-    println!("2. Server Command");
-    println!("3. Custom JSON (wrapped in Notification)");
-    println!("4. Activate Server (Real Auth Server)");
-    println!("0. Exit");
+async fn handle_command(app: &mut App, cmd: &str) {
+    let parts: Vec<&str> = cmd.split_whitespace().collect();
+    if parts.is_empty() {
+        return;
+    }
+
+    match parts[0] {
+        "/help" => {
+            tracing::info!("Available commands:");
+            tracing::info!("  /notify <title> <msg>    - Send notification (Broadcast)");
+            tracing::info!("  /sync <res> <id> <act>   - Send sync signal (Broadcast)");
+            tracing::info!("  /activate <user> <pass>  - Activate server with Auth Server");
+            tracing::info!("  /ping                    - Send ping command (Broadcast)");
+            tracing::info!("  /clear                   - Clear logs");
+            tracing::info!("  /quit                    - Exit");
+        }
+        "/quit" => {
+            // We can't easily exit main loop from here without return value,
+            // but we can log instruction
+            tracing::warn!("Press Esc then 'q' to quit application");
+        }
+        "/clear" => {
+            // tui-logger doesn't easily support clearing, but we can emit a separator
+            tracing::info!("--- LOGS CLEARED (Virtual) ---");
+        }
+        "/activate" => {
+            if parts.len() < 3 {
+                tracing::error!("Usage: /activate <username> <password>");
+                return;
+            }
+            let username = parts[1].to_string();
+            let password = parts[2].to_string();
+
+            if let Some(state) = &app.server_state {
+                tracing::info!("Starting activation for user: {}", username);
+                // Hardcoded for demo purposes, matches the config in main()
+                let auth_url = "http://127.0.0.1:3001".to_string();
+
+                let state_clone = state.clone();
+                tokio::spawn(async move {
+                    let service = state_clone.provisioning_service(auth_url);
+                    match service.activate(&username, &password).await {
+                        Ok(_) => tracing::info!("✅ Activation successful! Server is now ready."),
+                        Err(e) => tracing::error!("❌ Activation failed: {}", e),
+                    }
+                });
+            } else {
+                tracing::error!("Server not ready");
+            }
+        }
+        "/notify" => {
+            if parts.len() < 3 {
+                tracing::error!("Usage: /notify <title> <message>");
+                return;
+            }
+            let title = parts[1];
+            let msg_content = parts[2..].join(" ");
+
+            if let Some(state) = &app.server_state {
+                let payload = shared::message::NotificationPayload::info(title, &msg_content);
+                let msg = BusMessage::notification(&payload);
+
+                // Broadcast to all clients
+                if let Err(e) = state.message_bus().publish(msg).await {
+                    tracing::error!("Failed to broadcast: {}", e);
+                } else {
+                    tracing::info!("✅ Broadcasted Notification: {} - {}", title, msg_content);
+                }
+            } else {
+                tracing::error!("Server not ready");
+            }
+        }
+        "/ping" => {
+            if let Some(state) = &app.server_state {
+                let cmd = shared::message::ServerCommand::Ping;
+                let payload = shared::message::ServerCommandPayload { command: cmd };
+                let msg = BusMessage::server_command(&payload);
+
+                // Broadcast Ping (Simulate Upstream -> Edge -> Clients)
+                if let Err(e) = state.message_bus().publish(msg).await {
+                    tracing::error!("Failed to broadcast Ping: {}", e);
+                } else {
+                    tracing::info!("✅ Broadcasted Ping Command");
+                }
+            } else {
+                tracing::error!("Server not ready");
+            }
+        }
+        "/sync" => {
+            if parts.len() < 4 {
+                tracing::error!("Usage: /sync <resource> <id> <action>");
+                return;
+            }
+            let resource = parts[1].to_string();
+            let id = parts[2].to_string();
+            let action = parts[3].to_string();
+
+            if let Some(state) = &app.server_state {
+                let payload = shared::message::SyncPayload {
+                    resource: resource.clone(),
+                    id: Some(id.clone()),
+                    action: action.clone(),
+                };
+                let msg = BusMessage::sync(&payload);
+
+                // Broadcast Sync (Server -> All Clients)
+                if let Err(e) = state.message_bus().publish(msg).await {
+                    tracing::error!("Failed to broadcast Sync: {}", e);
+                } else {
+                    tracing::info!("✅ Broadcasted Sync: {} {} {}", resource, id, action);
+                }
+            } else {
+                tracing::error!("Server not ready");
+            }
+        }
+        _ => {
+            tracing::warn!("Unknown command: {}", parts[0]);
+        }
+    }
 }
 
-fn get_input(prompt: &str) -> String {
-    print!("{}", prompt);
-    io::stdout().flush().unwrap();
-    let mut buffer = String::new();
-    io::stdin().read_line(&mut buffer).unwrap();
-    buffer.trim().to_string()
+fn ui(f: &mut Frame, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // Header
+            Constraint::Min(1),    // Main Content (Logs + Status)
+            Constraint::Length(3), // Input
+        ])
+        .split(f.area());
+
+    // Split Main Content into Logs (Left) and Status (Right)
+    let main_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(70), // Logs
+            Constraint::Percentage(30), // Status
+        ])
+        .split(chunks[1]);
+
+    // Header
+    let title = Paragraph::new(vec![Line::from(vec![
+        Span::raw(" 🦀 Crab Edge Server "),
+        Span::styled(" Interactive Demo ", Style::default().fg(Color::Yellow)),
+        Span::raw(" | "),
+        if app.is_loading {
+            Span::styled(
+                " INITIALIZING... ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD | Modifier::RAPID_BLINK),
+            )
+        } else {
+            Span::styled(
+                " Running ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            )
+        },
+    ])])
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan)),
+    );
+    f.render_widget(title, chunks[0]);
+
+    // Logs (TuiLoggerWidget)
+    let tui_sm = TuiLoggerWidget::default()
+        .block(
+            Block::default()
+                .title(" Logs ")
+                .border_style(
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::DIM),
+                )
+                .borders(Borders::ALL),
+        )
+        .output_separator('|')
+        .output_timestamp(Some("%H:%M:%S".to_string()))
+        .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
+        .output_target(false)
+        .output_file(false)
+        .output_line(false)
+        .style(Style::default().fg(Color::White));
+    f.render_widget(tui_sm, main_chunks[0]);
+
+    // Status Panel
+    let status_block = Block::default()
+        .title(" Status ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let active_style = if app.status.is_active {
+        Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::Red)
+    };
+
+    let status_text = vec![
+        Line::from(vec![
+            Span::raw("Activation: "),
+            Span::styled(
+                if app.status.is_active {
+                    "Active"
+                } else {
+                    "Inactive"
+                },
+                active_style,
+            ),
+        ]),
+        Line::from(vec![Span::raw("")]),
+        Line::from(vec![
+            Span::raw("Tenant ID: "),
+            Span::styled(&app.status.tenant_id, Style::default().fg(Color::Yellow)),
+        ]),
+        Line::from(vec![
+            Span::raw("Device ID: "),
+            Span::styled(&app.status.device_id, Style::default().fg(Color::Yellow)),
+        ]),
+        Line::from(vec![Span::raw("")]),
+        Line::from(vec![
+            Span::raw("Plan: "),
+            Span::styled(&app.status.plan, Style::default().fg(Color::Blue)),
+        ]),
+        Line::from(vec![
+            Span::raw("Sub Status: "),
+            Span::styled(&app.status.sub_status, Style::default().fg(Color::Blue)),
+        ]),
+        Line::from(vec![
+            Span::raw("Expires: "),
+            Span::styled(&app.status.expires_at, Style::default().fg(Color::Magenta)),
+        ]),
+    ];
+
+    let status_paragraph = Paragraph::new(status_text)
+        .block(status_block)
+        .wrap(Wrap { trim: true });
+
+    f.render_widget(status_paragraph, main_chunks[1]);
+
+    // Input
+    let input_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Command Input (Type /help) ");
+
+    let style = match app.input_mode {
+        InputMode::Normal => Style::default().fg(Color::Gray),
+        InputMode::Editing => Style::default().fg(Color::Yellow),
+    };
+
+    let width = chunks[2].width.max(3) - 3;
+    let scroll = app.input.visual_scroll(width as usize);
+    let input = Paragraph::new(app.input.value())
+        .style(style)
+        .scroll((0, scroll as u16))
+        .block(input_block);
+    f.render_widget(input, chunks[2]);
+
+    // Cursor
+    if app.input_mode == InputMode::Editing {
+        f.set_cursor_position((
+            chunks[2].x + ((app.input.visual_cursor().max(scroll) - scroll) as u16) + 1,
+            chunks[2].y + 1,
+        ));
+    }
+
+    // Help hint
+    if app.input_mode == InputMode::Normal {
+        let help_text = Paragraph::new("Press 'e' to edit, 'q' to quit")
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Right);
+        f.render_widget(help_text, chunks[0]); // Overlay on header or create footer?
+        // Let's put it in the header right side
+    }
 }

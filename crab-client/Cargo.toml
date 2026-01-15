@@ -29,12 +29,20 @@ axum.workspace = true
 # Async trait for defining traits
 async-trait.workspace = true
 
+# UUID
+uuid.workspace = true
+
 # TLS support
 tokio-rustls = "0.26.4"
 rustls = "0.23.36"
 rustls-pki-types = "1"
 webpki-roots = "0.26"
 
+# Tracing
+tracing = "0.1"
+
+# Other utilities
+crab-cert = { path = "../crab-cert" }
 
 [[example]]
 name = "message_client"
@@ -74,4 +82,11 @@ version = "2"
 
 [dev-dependencies.rustls-webpki]
 version = "0.102"
+
+[dev-dependencies]
+ratatui = "0.29.0"
+crossterm = "0.28.1"
+tui-input = "0.11.0"
+tui-logger = { version = "0.14.3", features = ["tracing-support"] }
+log = "0.4"
 

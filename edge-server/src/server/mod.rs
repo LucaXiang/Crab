@@ -1,20 +1,17 @@
 pub mod auth;
 mod config;
-pub mod credential;
 mod error;
 pub mod middleware;
-pub mod provisioning;
+pub mod services;
 mod state;
-
-use std::net::SocketAddr;
 
 pub use auth::{CurrentUser, JwtConfig, JwtService};
 pub use config::Config;
 pub use error::Result;
-pub use provisioning::ProvisioningService;
+pub use services::ProvisioningService;
+pub use services::credential;
+pub use services::provisioning;
 pub use state::ServerState;
-
-use crate::routes::build_app;
 
 pub struct Server {
     config: Config,
@@ -29,7 +26,7 @@ impl Server {
         }
     }
 
-    /// Create server with existing state (for sharing with oneshot)
+    /// 使用现有状态创建服务器 (用于与 oneshot 共享)
     pub fn with_state(config: Config, state: ServerState) -> Self {
         Self {
             config,
@@ -38,30 +35,25 @@ impl Server {
     }
 
     pub async fn run(&self) -> Result<()> {
-        // Create application state if not provided
+        // 如果未提供，则创建应用状态
         let state = match &self.state {
             Some(s) => s.clone(),
-            None => {
-                let s = ServerState::initialize(&self.config).await;
-                // If we initialized the state, we must start the background tasks
-                s.start_background_tasks().await;
-                s
-            }
+            None => ServerState::initialize(&self.config).await,
         };
 
-        // Build fully configured app with all middleware, then apply state
-        let app = build_app(&state).with_state(state.clone());
-        let addr = SocketAddr::from(([0, 0, 0, 0], self.config.http_port));
+        // 启动后台任务 (消息总线等)
+        // 统一在此处启动，确保无论 state 是外部传入还是内部创建，后台任务都会运行
+        state.start_background_tasks().await;
 
-        // Loop to handle activation and potential re-activation
+        // Note: https_service().initialize() is already called in ServerState::initialize()
+        // so we don't need to call it again here.
+
+        // 处理激活和潜在重新激活的循环
         loop {
-            tracing::info!("Waiting for activation to start HTTPS server...");
-
-            // 1. Wait for Activation
+            // 1. 等待激活
             state.wait_for_activation().await;
-            tracing::info!("Activation signal received! Initializing HTTPS server...");
 
-            // 2. Load mTLS Certificates
+            // 2. 加载 mTLS 证书
             let tls_config = match state.load_tls_config() {
                 Ok(Some(config)) => config,
                 Ok(None) => {
@@ -85,13 +77,13 @@ impl Server {
                 }
             };
 
-            // 3. Start Services
+            // 3. 启动服务
             self.print_activation_banner(&state).await;
             tracing::info!("🔒 mTLS certificates loaded. Starting services...");
 
-            // --- Unified Start of Services ---
+            // --- 统一启动服务 ---
 
-            // A. Start TCP Message Bus Server
+            // A. 启动 TCP 消息总线服务器
             let tcp_tls_config = tls_config.clone();
             let bus = state.message_bus().clone();
             tokio::spawn(async move {
@@ -101,23 +93,14 @@ impl Server {
                 }
             });
 
-            // B. Start HTTPS Server
-            tracing::info!("Starting HTTPS server...");
+            // B. 启动 HTTPS 服务器
             let rustls_config = axum_server::tls_rustls::RustlsConfig::from_config(tls_config);
-            let handle = axum_server::Handle::new();
-            let shutdown_future = shutdown_signal();
-            let handle_clone = handle.clone();
 
-            tokio::spawn(async move {
-                shutdown_future.await;
-                handle_clone.graceful_shutdown(Some(std::time::Duration::from_secs(10)));
-            });
+            state.print_activated_banner_content().await;
 
-            tracing::info!("🚀 Starting HTTPS server on {}", addr);
-
-            axum_server::bind_rustls(addr, rustls_config)
-                .handle(handle)
-                .serve(app.into_make_service())
+            state
+                .https_service()
+                .start_server(rustls_config, shutdown_signal())
                 .await
                 .map_err(|e| {
                     crate::server::error::ServerError::Internal(anyhow::anyhow!(
@@ -141,39 +124,71 @@ impl Server {
             .tenant_id
             .unwrap_or_else(|| "Unknown".to_string());
         let edge_id = activation.edge_id.unwrap_or_else(|| "Unknown".to_string());
+
+        // Truncate long IDs for better display
+        let display_edge_id = if edge_id.len() > 20 {
+            format!("{}...", &edge_id[..17])
+        } else {
+            edge_id
+        };
+
         let cert_fingerprint = activation
             .cert_fingerprint
             .unwrap_or_else(|| "Unknown".to_string());
-        let cert_expiry = activation
-            .cert_expires_at
-            .map(|d| d.to_rfc3339())
-            .unwrap_or_else(|| "Unknown".to_string());
+        let display_fingerprint = if cert_fingerprint.len() > 20 {
+            format!("{}...", &cert_fingerprint[..17])
+        } else {
+            cert_fingerprint
+        };
 
-        let addr = SocketAddr::from(([0, 0, 0, 0], self.config.http_port));
+        let sub_info = {
+            let cache = state.activation_service().credential_cache.read().await;
+            if let Some(cred) = &*cache {
+                if let Some(sub) = &cred.subscription {
+                    format!("{:?} ({:?})", sub.plan, sub.status)
+                } else {
+                    "No Subscription".to_string()
+                }
+            } else {
+                "No Subscription".to_string()
+            }
+        };
 
-        println!("\n");
-        println!("╔════════════════════════════════════════════════════════════════════════════╗");
-        println!("║                   🦀 Crab Edge Server - Activated 🚀                       ║");
-        println!("╠════════════════════════════════════════════════════════════════════════════╣");
-        println!("║ 🏢 Tenant ID       : {:<53} ║", tenant_id);
-        println!("║ 🆔 Edge ID         : {:<53} ║", edge_id);
-        println!("╠════════════════════════════════════════════════════════════════════════════╣");
-        println!("║ 🔒 Certificate     : {:<53} ║", cert_fingerprint);
-        println!("║ 📅 Expires At      : {:<53} ║", cert_expiry);
-        println!("╠════════════════════════════════════════════════════════════════════════════╣");
-        println!("║ 🌐 HTTPS Listener  : https://{:<45} ║", addr);
-        println!(
-            "║ 📨 TCP Listener    : 0.0.0.0:{:<45} ║",
+        tracing::info!("");
+        tracing::info!(
+            "╔════════════════════════════════════════════════════════════════════════════╗"
+        );
+        tracing::info!(
+            "║                   🦀 Crab Edge Server - Activated 🚀                       ║"
+        );
+        tracing::info!(
+            "╠════════════════════════════════════════════════════════════════════════════╣"
+        );
+        tracing::info!("║ 🏢 Tenant ID       : {:<46} ║", tenant_id);
+        tracing::info!("║ 🆔 Edge ID         : {:<46} ║", display_edge_id);
+        tracing::info!("║ 📜 Cert Fingerprint: {:<46} ║", display_fingerprint);
+        tracing::info!("║ 📦 Subscription    : {:<46} ║", sub_info);
+        tracing::info!(
+            "╠════════════════════════════════════════════════════════════════════════════╣"
+        );
+        tracing::info!(
+            "║ 🌐 HTTPS Listener  : https://0.0.0.0:{:<30} ║",
+            self.config.http_port
+        );
+        tracing::info!(
+            "║ 📨 TCP Listener    : 0.0.0.0:{:<37} ║",
             self.config.message_tcp_port
         );
-        println!("╚════════════════════════════════════════════════════════════════════════════╝");
-        println!("\n");
+        tracing::info!(
+            "╚════════════════════════════════════════════════════════════════════════════╝"
+        );
+        tracing::info!("");
     }
 }
 
-/// Graceful shutdown handler
+/// 优雅停机处理器
 ///
-/// Listens for SIGTERM (Kubernetes) and Ctrl+C signals
+/// 监听 SIGTERM (Kubernetes) 和 Ctrl+C 信号
 async fn shutdown_signal() {
     use tokio::signal;
 

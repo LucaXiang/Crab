@@ -27,16 +27,11 @@ fn init_crypto() {
 fn test_pki_hierarchy_flow() {
     init_crypto();
     // 1. 创建 Root CA (根证书)
-    // 注意：在真实生产系统中，Root CA 是硬编码在二进制文件中的 (trust anchor)。
-    // 这里我们从文件系统加载生成的 Root CA 证书和私钥，以便在测试中进行签发操作。
-    // 该文件必须与 `lib.rs` 中硬编码的 `ROOT_CA_PEM` 内容一致，否则 `verify_chain_against_root` 会失败。
-    let root_cert_pem =
-        std::fs::read_to_string("certs/root_ca.pem").expect("Failed to read root cert");
-    let root_key_pem =
-        std::fs::read_to_string("certs/root_key.pem").expect("Failed to read root key");
+    // 动态生成 Root CA 用于测试，不再依赖文件系统中的静态证书
+    let root_profile = CaProfile::root("Crab Test Root CA");
+    let root_ca = CertificateAuthority::new_root(root_profile).expect("Failed to create Root CA");
 
-    let root_ca =
-        CertificateAuthority::load(&root_cert_pem, &root_key_pem).expect("Failed to load Root CA");
+    let root_cert_pem = root_ca.cert_pem();
 
     // 2. 创建 Tenant CA (中间证书 - 租户级)
     // 模拟为特定租户颁发的中间 CA，用于隔离不同租户的证书签发权限。
@@ -46,7 +41,12 @@ fn test_pki_hierarchy_flow() {
 
     // 3. 创建 Edge Server Cert (终端证书 - 服务端)
     // 由 Tenant CA 签发给边缘服务器，包含 IP 地址等 SAN 信息。
-    let server_profile = CertProfile::new_server("edge-server", vec!["192.168.1.100".to_string()]);
+    let server_profile = CertProfile::new_server(
+        "edge-server",
+        vec!["192.168.1.100".to_string()],
+        None,
+        "device-server-001".to_string(),
+    );
     let (server_cert_pem, _server_key_pem) = tenant_ca
         .issue_cert(&server_profile)
         .expect("Failed to issue server cert");
@@ -62,7 +62,8 @@ fn test_pki_hierarchy_flow() {
     // 使用硬编码的 Root CA 验证整个证书链。
     // `verify_chain_against_root` 内部使用了 `include_str!("../certs/root_ca.pem")` 加载的根证书。
     // 因为我们上面加载的 `root_ca` 就是来源于同一个文件，所以验证应该通过。
-    verify_chain_against_root(&chain_pem).expect("Failed to verify server chain against root");
+    verify_chain_against_root(&chain_pem, &root_cert_pem)
+        .expect("Failed to verify server chain against root");
 
     println!("Server chain verification passed!");
 
@@ -92,7 +93,8 @@ fn test_pki_hierarchy_flow() {
 
     // 8. 验证 Tenant CA 本身的签名
     // 直接检查 Tenant CA 是否确实由 Root CA 签发，这是一个底层的签名验证操作。
-    verify_ca_signature(tenant_ca.cert_pem()).expect("Failed to verify Tenant CA signature");
+    verify_ca_signature(tenant_ca.cert_pem(), &root_cert_pem)
+        .expect("Failed to verify Tenant CA signature");
     println!("Tenant CA signature verified!");
 }
 
@@ -106,12 +108,9 @@ fn test_pki_hierarchy_flow() {
 fn test_skip_hostname_verifier() {
     init_crypto();
     // 1. 加载 Root CA
-    let root_cert_pem =
-        std::fs::read_to_string("certs/root_ca.pem").expect("Failed to read root cert");
-    let root_key_pem =
-        std::fs::read_to_string("certs/root_key.pem").expect("Failed to read root key");
-    let root_ca =
-        CertificateAuthority::load(&root_cert_pem, &root_key_pem).expect("Failed to load Root CA");
+    let root_profile = CaProfile::root("Crab Test Root CA");
+    let root_ca = CertificateAuthority::new_root(root_profile).expect("Failed to create Root CA");
+    let root_cert_pem = root_ca.cert_pem();
 
     // 2. 创建 Tenant CA (中间证书)
     let tenant_profile = CaProfile::intermediate("Tenant CA 002", "Crab Tenant 002");
@@ -120,7 +119,12 @@ fn test_skip_hostname_verifier() {
 
     // 3. 签发 Server Cert (指定了特定 IP)
     // 注意：证书中绑定的 IP 是 "10.0.0.5"
-    let server_profile = CertProfile::new_server("edge-server", vec!["10.0.0.5".to_string()]);
+    let server_profile = CertProfile::new_server(
+        "edge-server",
+        vec!["10.0.0.5".to_string()],
+        None,
+        "device-server-002".to_string(),
+    );
     let (server_cert_pem, _server_key_pem) = tenant_ca
         .issue_cert(&server_profile)
         .expect("Failed to issue server cert");

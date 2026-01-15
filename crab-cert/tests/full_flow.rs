@@ -30,7 +30,12 @@ fn test_certificate_chain() {
 
     // 3. Issue Leaf Certificate from Intermediate
     println!("Issuing Leaf Certificate...");
-    let leaf_profile = CertProfile::new_server("leaf.local", vec!["leaf.local".to_string()]);
+    let leaf_profile = CertProfile::new_server(
+        "leaf.local",
+        vec!["leaf.local".to_string()],
+        None,
+        "leaf-device".to_string(),
+    );
     let (leaf_cert_pem, _leaf_key_pem) = intermediate_ca
         .issue_cert(&leaf_profile)
         .expect("Failed to issue leaf cert");
@@ -64,7 +69,12 @@ fn test_ca_load() {
     let loaded_ca = CertificateAuthority::load(cert_pem, &key_pem).expect("Failed to load CA");
 
     // 3. Verify loaded CA can issue certificates
-    let server_profile = CertProfile::new_server("loaded.local", vec!["loaded.local".to_string()]);
+    let server_profile = CertProfile::new_server(
+        "loaded.local",
+        vec!["loaded.local".to_string()],
+        None,
+        "loaded-device".to_string(),
+    );
     let (server_cert, _) = loaded_ca
         .issue_cert(&server_profile)
         .expect("Failed to issue cert from loaded CA");
@@ -103,7 +113,12 @@ fn test_file_io() {
     assert_eq!(ca.key_pem(), loaded_ca.key_pem());
 
     // 3. Issue cert and test metadata from file
-    let server_profile = CertProfile::new_server("file-io.local", vec!["file-io.local".into()]);
+    let server_profile = CertProfile::new_server(
+        "file-io.local",
+        vec!["file-io.local".into()],
+        None,
+        "file-io-device".to_string(),
+    );
     let (cert_pem, _) = loaded_ca
         .issue_cert(&server_profile)
         .expect("Failed to issue cert");
@@ -136,6 +151,8 @@ fn test_certificate_lifecycle() {
     let server_profile = CertProfile::new_server(
         "localhost",
         vec!["localhost".to_string(), "127.0.0.1".to_string()],
+        None,
+        "localhost-device".to_string(),
     );
     let (server_cert_pem, server_key_pem) = ca
         .issue_cert(&server_profile)
@@ -145,12 +162,11 @@ fn test_certificate_lifecycle() {
     println!("Issuing Client Certificate...");
     let tenant_id = "tenant-test-001";
     let device_id = "device-test-999";
-    let hardware_id = "hw-test-888";
     let client_profile = CertProfile::new_client(
         "client-device",
         Some(tenant_id.to_string()),
         Some(device_id.to_string()),
-        Some(hardware_id.to_string()),
+        Some("My Client Terminal".to_string()),
     );
     let (client_cert_pem, client_key_pem) = ca
         .issue_cert(&client_profile)
@@ -163,7 +179,7 @@ fn test_certificate_lifecycle() {
     assert_eq!(metadata.common_name.as_deref(), Some("client-device"));
     assert_eq!(metadata.tenant_id.as_deref(), Some(tenant_id));
     assert_eq!(metadata.device_id.as_deref(), Some(device_id));
-    assert_eq!(metadata.hardware_id.as_deref(), Some(hardware_id));
+    assert_eq!(metadata.client_name.as_deref(), Some("My Client Terminal"));
 
     // Verify serial number
     println!("Serial Number: {}", metadata.serial_number);

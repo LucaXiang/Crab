@@ -1,6 +1,6 @@
-//! Authentication Middleware
+//! 认证中间件
 //!
-//! Provides Axum middleware for JWT authentication and authorization
+//! 为 JWT 认证和授权提供 Axum 中间件
 
 use axum::{
     extract::{Request, State},
@@ -13,10 +13,10 @@ use crate::security_log;
 use crate::server::ServerState;
 use crate::server::auth::{CurrentUser, JwtService};
 
-/// Require authentication middleware
+/// 需要认证中间件
 ///
-/// This middleware extracts and validates the JWT token from the Authorization header.
-/// If valid, it adds the CurrentUser to the request extensions.
+/// 此中间件从 Authorization 头中提取并验证 JWT 令牌。
+/// 如果有效，将 CurrentUser 添加到请求扩展中。
 pub async fn require_auth(
     State(state): State<ServerState>,
     mut req: Request,
@@ -24,18 +24,18 @@ pub async fn require_auth(
 ) -> Result<Response, AppError> {
     let path = req.uri().path();
 
-    // Allow OPTIONS requests for CORS preflight (skip auth)
+    // 允许 CORS 预检的 OPTIONS 请求 (跳过认证)
     if req.method() == http::Method::OPTIONS {
         tracing::info!("[require_auth] OPTIONS request, skipping");
         return Ok(next.run(req).await);
     }
 
-    // Skip auth for non-API routes (let them return 404 normally)
+    // 非 API 路由跳过认证 (让它们正常返回 404)
     if !path.starts_with("/api/") {
         return Ok(next.run(req).await);
     }
 
-    // Skip auth for public API routes
+    // 公共 API 路由跳过认证
     let is_public_api_route = path == "/api/auth/login" || path == "/api/message/emit";
     if is_public_api_route {
         tracing::info!("[require_auth] Public API route, skipping auth: {}", path);
@@ -57,7 +57,7 @@ pub async fn require_auth(
         }
     };
 
-    // Validate token
+    // 验证令牌
     match jwt_service.validate_token(token) {
         Ok(claims) => {
             let user = CurrentUser::from(claims);
@@ -83,7 +83,7 @@ pub async fn require_auth(
     }
 }
 
-/// Require specific permission middleware
+/// 需要特定权限中间件
 pub async fn require_permission(
     permission: &'static str,
 ) -> impl Fn(
@@ -117,7 +117,7 @@ pub async fn require_permission(
     }
 }
 
-/// Require admin role middleware
+/// 需要管理员角色中间件
 pub async fn require_admin(req: Request, next: Next) -> Result<Response, AppError> {
     tracing::info!("[require_admin] Called for path: {}", req.uri().path());
     let user = req
@@ -138,7 +138,7 @@ pub async fn require_admin(req: Request, next: Next) -> Result<Response, AppErro
     Ok(next.run(req).await)
 }
 
-/// Extension trait to get CurrentUser from request
+/// 从请求中获取 CurrentUser 的扩展特征
 pub trait CurrentUserExt {
     fn current_user(&self) -> Result<&CurrentUser, AppError>;
 }

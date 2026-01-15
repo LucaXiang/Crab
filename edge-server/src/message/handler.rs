@@ -1,13 +1,12 @@
-//! Message Handler for server-side message processing
+//! 服务端消息处理器
 //!
-//! The MessageHandler subscribes to the message bus and processes
-//! messages for business logic purposes (logging, database updates, etc.)
+//! MessageHandler 订阅消息总线并处理业务逻辑相关的消息（如日志记录、数据库更新等）。
 //!
-//! Features:
-//! - ACID transaction support
-//! - Automatic retries with exponential backoff
-//! - Idempotency checks
-//! - Dead letter queue for failed messages
+//! 功能特性：
+//! - ACID 事务支持
+//! - 指数退避的自动重试机制
+//! - 幂等性检查
+//! - 失败消息的死信队列
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -20,16 +19,15 @@ use crate::message::{BusMessage, EventType};
 
 use crate::server::ServerState;
 
-/// Server-side message handler with ACID guarantees
+/// 具备 ACID 保证的服务端消息处理器
 ///
-/// This handler runs in the background and processes all messages
-/// published to the bus for server-side business logic.
+/// 该处理器在后台运行，处理发布到总线的所有消息，执行服务端业务逻辑。
 ///
-/// Features:
-/// - Pluggable processors for different message types
-/// - Automatic retries with exponential backoff
-/// - Dead letter queue for permanently failed messages
-/// - Idempotency support
+/// 特性：
+/// - 针对不同消息类型的可插拔处理器
+/// - 指数退避自动重试
+/// - 永久失败消息的死信队列
+/// - 幂等性支持
 pub struct MessageHandler {
     receiver: broadcast::Receiver<BusMessage>,
     broadcast_tx: Option<broadcast::Sender<BusMessage>>,
@@ -38,7 +36,7 @@ pub struct MessageHandler {
 }
 
 impl MessageHandler {
-    /// Create a new message handler
+    /// 创建新的消息处理器
     pub fn new(
         receiver: broadcast::Receiver<BusMessage>,
         shutdown_token: CancellationToken,
@@ -51,20 +49,20 @@ impl MessageHandler {
         }
     }
 
-    /// Set the broadcast sender (for sending messages after processing)
+    /// 设置广播发送端 (用于处理后发送消息)
     pub fn with_broadcast_tx(mut self, tx: broadcast::Sender<BusMessage>) -> Self {
         self.broadcast_tx = Some(tx);
         self
     }
 
-    /// Register a processor for a specific event type
+    /// 为特定事件类型注册处理器
     pub fn register_processor(mut self, processor: Arc<dyn MessageProcessor>) -> Self {
         let event_type = processor.event_type();
         self.processors.insert(event_type, processor);
         self
     }
 
-    /// Create a handler with default processors
+    /// 创建带有默认处理器的处理器实例
     pub fn with_default_processors(
         receiver: broadcast::Receiver<BusMessage>,
         shutdown_token: CancellationToken,
@@ -74,24 +72,25 @@ impl MessageHandler {
 
         Self::new(receiver, shutdown_token)
             .register_processor(Arc::new(NotificationProcessor))
-            .register_processor(Arc::new(ServerCommandProcessor::new(state)))
+            .register_processor(Arc::new(ServerCommandProcessor::new(state.clone())))
+            .register_processor(Arc::new(RequestCommandProcessor::new(state)))
     }
 
-    /// Start processing messages
+    /// 启动消息处理
     ///
-    /// This is a long-running task that should be spawned in the background.
+    /// 这是一个长运行任务，应该在后台生成 (spawn)。
     pub async fn run(mut self) {
         tracing::info!("🎯 Message handler started");
 
         loop {
             tokio::select! {
-                // Listen for shutdown signal
+                // 监听关闭信号
                 _ = self.shutdown_token.cancelled() => {
                     tracing::info!("Message handler shutting down");
                     break;
                 }
 
-                // Receive messages from bus
+                // 从总线接收消息
                 msg_result = self.receiver.recv() => {
                     match msg_result {
                         Ok(msg) => {
@@ -114,32 +113,22 @@ impl MessageHandler {
         tracing::info!("Message handler stopped");
     }
 
-    /// Handle a single message with retry logic
+    /// 带有重试逻辑的消息处理
     async fn handle_message(&mut self, msg: &BusMessage) -> Result<(), Box<dyn std::error::Error>> {
         let event_type = msg.event_type;
 
-        // Check if we have a processor for this event type
+        // 检查是否有注册该事件类型的处理器
         if let Some(processor) = self.processors.get(&event_type) {
             self.process_with_retry(msg, processor.clone()).await?;
         } else {
-            // Fallback to legacy handling for unregistered types
+            // 对未注册类型的降级处理
             self.handle_legacy(msg).await?;
         }
 
         Ok(())
     }
 
-    /// Broadcast a message to all subscribers
-    #[allow(dead_code)]
-    async fn broadcast_message(&self, msg: BusMessage) {
-        if let Some(ref tx) = self.broadcast_tx
-            && let Err(e) = tx.send(msg)
-        {
-            tracing::warn!("Failed to broadcast message: {}", e);
-        }
-    }
-
-    /// Process message with automatic retry
+    /// 自动重试的消息处理流程
     async fn process_with_retry(
         &self,
         msg: &BusMessage,
@@ -154,12 +143,29 @@ impl MessageHandler {
                 Ok(result) => match result {
                     ProcessResult::Success {
                         message: success_msg,
+                        payload,
                     } => {
                         tracing::info!(
                             event_type = ?msg.event_type,
                             result = %success_msg,
                             "Message processed successfully"
                         );
+
+                        // If message is from a client, send Ack/Result
+                        if let (Some(source), Some(broadcast_tx)) = (&msg.source, &self.broadcast_tx) {
+                            let response_payload =
+                                shared::message::ResponsePayload::success(success_msg, payload);
+
+                            let mut ack_msg = BusMessage::response(&response_payload);
+                            ack_msg.correlation_id = Some(msg.request_id);
+                            ack_msg.target = Some(source.clone());
+
+                            // Send result (MessageBus will handle unicast routing based on target)
+                            if let Err(e) = broadcast_tx.send(ack_msg) {
+                                tracing::warn!("Failed to send Ack: {}", e);
+                            }
+                        }
+
                         return Ok(());
                     }
                     ProcessResult::Skipped { reason } => {
@@ -177,6 +183,23 @@ impl MessageHandler {
                             "Message processing failed permanently"
                         );
                         self.send_to_dead_letter_queue(msg, &reason).await;
+
+                        // Send error notification to client
+                        if let Some(source) = &msg.source {
+                            if let Some(broadcast_tx) = &self.broadcast_tx {
+                                let response_payload =
+                                    shared::message::ResponsePayload::error(reason.clone(), None);
+
+                                let mut ack_msg = BusMessage::response(&response_payload);
+                                ack_msg.correlation_id = Some(msg.request_id);
+                                ack_msg.target = Some(source.clone());
+
+                                if let Err(e) = broadcast_tx.send(ack_msg) {
+                                    tracing::warn!("Failed to send Error Ack: {}", e);
+                                }
+                            }
+                        }
+
                         return Err(AppError::internal(format!("Processing failed: {}", reason)));
                     }
                     ProcessResult::Retry {
@@ -198,7 +221,7 @@ impl MessageHandler {
                             )));
                         }
 
-                        // Exponential backoff
+                        // 指数退避
                         let delay = base_delay * 2_u64.pow(retry_count - 1);
                         tracing::warn!(
                             event_type = ?msg.event_type,
@@ -236,7 +259,7 @@ impl MessageHandler {
         }
     }
 
-    /// Send failed message to dead letter queue
+    /// 发送失败消息到死信队列
     async fn send_to_dead_letter_queue(&self, msg: &BusMessage, reason: &str) {
         tracing::error!(
             event_type = ?msg.event_type,
@@ -254,7 +277,7 @@ impl MessageHandler {
         // alert_service.send("Message processing failed", msg).await?;
     }
 
-    /// Legacy handling for unregistered message types
+    /// 未注册消息类型的遗留处理逻辑
     async fn handle_legacy(&self, msg: &BusMessage) -> Result<(), Box<dyn std::error::Error>> {
         tracing::warn!(
             event_type = ?msg.event_type,

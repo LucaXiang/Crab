@@ -19,6 +19,7 @@ use crab_cert::{
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     println!("🦀 Crab mTLS 证书管理演示\n");
 
     // ============================================================================================
@@ -81,16 +82,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "127.0.0.1".to_string(),
             "192.168.1.100".to_string(),
         ],
+        Some(tenant_id.to_string()),
+        server_hardware_id,
     );
     // server_profile.common_name = "edge-server".to_string(); // 已由 new_server 设置
     // server_profile.organization = "Tasty Crab Restaurant".to_string(); // 默认为 "Crab Tenant"
     server_profile.organization = "Tasty Crab Restaurant".to_string();
     server_profile.validity_days = 365; // 1 year
-
-    // 绑定身份和硬件信息
-    server_profile.tenant_id = Some(tenant_id.to_string());
-    server_profile.device_id = Some("device-server-01".to_string());
-    server_profile.hardware_id = Some(server_hardware_id);
 
     // Tenant CA 签发 Server 证书
     let (server_cert_pem, _server_key_pem) = tenant_ca.issue_cert(&server_profile)?;
@@ -99,7 +97,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 验证元数据
     let server_meta = CertMetadata::from_pem(&server_cert_pem)?;
     println!("   绑定的 Tenant ID：{:?}", server_meta.tenant_id);
-    println!("   绑定的硬件 ID：{:?}", server_meta.hardware_id);
+    println!("   绑定的硬件 ID (Device ID)：{:?}", server_meta.device_id);
 
     // ============================================================================================
     // 步骤 4：签发 Client 证书 (L3 Client 证书)
@@ -110,7 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "pos-ipad-01",
         Some(tenant_id.to_string()),
         Some("device-pos-01".to_string()),
-        None,
+        Some("iPad Front Desk".to_string()),
     );
     client_profile.organization = "Tasty Crab Restaurant".to_string();
     client_profile.validity_days = 90; // 移动设备的有效期较短
@@ -119,6 +117,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (client_cert_pem, _client_key_pem) = tenant_ca.issue_cert(&client_profile)?;
     println!("✅ 客户端证书已签发");
+
+    // 验证客户端元数据
+    let client_meta = CertMetadata::from_pem(&client_cert_pem)?;
+    println!("   客户端元数据：");
+    println!("   - 设备 ID (UID): {:?}", client_meta.device_id);
+    println!("   - 终端名称: {:?}", client_meta.client_name);
 
     // ============================================================================================
     // 步骤 5：验证模拟

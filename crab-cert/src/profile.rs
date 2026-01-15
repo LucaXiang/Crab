@@ -15,7 +15,7 @@ pub enum KeyType {
 // OIDs for internal usage
 pub const OID_TENANT_ID: &[u64] = &[1, 3, 6, 1, 4, 1, 99999, 1];
 pub const OID_DEVICE_ID: &[u64] = &[1, 3, 6, 1, 4, 1, 99999, 2];
-pub const OID_HARDWARE_ID: &[u64] = &[1, 3, 6, 1, 4, 1, 99999, 4];
+pub const OID_CLIENT_NAME: &[u64] = &[1, 3, 6, 1, 4, 1, 99999, 5];
 #[allow(dead_code)]
 pub const OID_CRAB_PROTOCOL: &[u64] = &[1, 3, 6, 1, 4, 1, 99999, 3];
 
@@ -72,12 +72,17 @@ pub struct CertProfile {
     pub is_server: bool,
     pub tenant_id: Option<String>,
     pub device_id: Option<String>,
-    pub hardware_id: Option<String>,
+    pub client_name: Option<String>,
     pub key_type: KeyType,
 }
 
 impl CertProfile {
-    pub fn new_server(common_name: &str, sans: Vec<String>) -> Self {
+    pub fn new_server(
+        common_name: &str,
+        sans: Vec<String>,
+        tenant_id: Option<String>,
+        device_id: String,
+    ) -> Self {
         Self {
             common_name: common_name.to_string(),
             organization: "Crab Tenant".to_string(),
@@ -85,9 +90,9 @@ impl CertProfile {
             validity_days: 365, // 1 year for LAN cert
             is_client: false,
             is_server: true,
-            tenant_id: None,
-            device_id: None,
-            hardware_id: None,
+            tenant_id,
+            device_id: Some(device_id),
+            client_name: None,
             key_type: KeyType::default(),
         }
     }
@@ -96,7 +101,7 @@ impl CertProfile {
         common_name: &str,
         tenant_id: Option<String>,
         device_id: Option<String>,
-        hardware_id: Option<String>,
+        client_name: Option<String>,
     ) -> Self {
         Self {
             common_name: common_name.to_string(),
@@ -107,7 +112,7 @@ impl CertProfile {
             is_server: false,
             tenant_id,
             device_id,
-            hardware_id,
+            client_name,
             key_type: KeyType::default(),
         }
     }
@@ -122,7 +127,7 @@ impl CertProfile {
             is_server: false,
             tenant_id: None,
             device_id: None,
-            hardware_id: None,
+            client_name: None,
             key_type: KeyType::default(),
         }
     }
@@ -148,6 +153,36 @@ pub(crate) fn create_ca_params(profile: &CaProfile) -> CertificateParams {
     params.not_after = now + Duration::days(profile.validity_days as i64);
 
     params
+}
+
+fn encode_utf8_string(s: &str) -> Vec<u8> {
+    let bytes = s.as_bytes();
+    let len = bytes.len();
+    let mut encoded = Vec::new();
+
+    // Tag for UTF8String is 0x0C
+    encoded.push(0x0C);
+
+    // Length
+    if len < 128 {
+        encoded.push(len as u8);
+    } else {
+        // Calculate number of bytes needed for length
+        let mut len_bytes = Vec::new();
+        let mut l = len;
+        while l > 0 {
+            len_bytes.push((l & 0xFF) as u8);
+            l >>= 8;
+        }
+        len_bytes.reverse();
+
+        encoded.push(0x80 | len_bytes.len() as u8);
+        encoded.extend(len_bytes);
+    }
+
+    // Value
+    encoded.extend_from_slice(bytes);
+    encoded
 }
 
 pub(crate) fn create_cert_params(profile: &CertProfile) -> CertificateParams {
@@ -177,22 +212,22 @@ pub(crate) fn create_cert_params(profile: &CertProfile) -> CertificateParams {
 
     // Custom Extensions
     if let Some(tenant_id) = &profile.tenant_id {
-        let mut ext =
-            CustomExtension::from_oid_content(OID_TENANT_ID, tenant_id.as_bytes().to_vec());
+        let content = encode_utf8_string(tenant_id);
+        let mut ext = CustomExtension::from_oid_content(OID_TENANT_ID, content);
         ext.set_criticality(false);
         params.custom_extensions.push(ext);
     }
 
     if let Some(device_id) = &profile.device_id {
-        let mut ext =
-            CustomExtension::from_oid_content(OID_DEVICE_ID, device_id.as_bytes().to_vec());
+        let content = encode_utf8_string(device_id);
+        let mut ext = CustomExtension::from_oid_content(OID_DEVICE_ID, content);
         ext.set_criticality(false);
         params.custom_extensions.push(ext);
     }
 
-    if let Some(hardware_id) = &profile.hardware_id {
-        let mut ext =
-            CustomExtension::from_oid_content(OID_HARDWARE_ID, hardware_id.as_bytes().to_vec());
+    if let Some(client_name) = &profile.client_name {
+        let content = encode_utf8_string(client_name);
+        let mut ext = CustomExtension::from_oid_content(OID_CLIENT_NAME, content);
         ext.set_criticality(false);
         params.custom_extensions.push(ext);
     }

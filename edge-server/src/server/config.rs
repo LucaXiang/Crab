@@ -11,6 +11,7 @@ pub struct Config {
     pub environment: String,
 
     // New SaaS-specific configuration
+    pub auth_server_url: String,
     pub max_connections: u32,
     pub request_timeout_ms: u64,
     pub shutdown_timeout_ms: u64,
@@ -36,6 +37,8 @@ impl Config {
             environment: std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".into()),
 
             // New SaaS features
+            auth_server_url: std::env::var("AUTH_SERVER_URL")
+                .unwrap_or_else(|_| "http://localhost:3001".into()),
             max_connections: std::env::var("MAX_CONNECTIONS")
                 .ok()
                 .and_then(|p| p.parse().ok())

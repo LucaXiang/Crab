@@ -1,26 +1,28 @@
-//! Transport layer abstraction for message bus
+//! 消息总线传输层抽象
 //!
-//! Provides a pluggable transport layer architecture:
+//! 提供可插拔的传输层架构：
 //! ```text
 //! ┌─────────────────────────────────────────┐
-//! │           MessageBus                     │
+//! │           MessageBus (消息总线)           │
 //! │  ┌───────────────────────────────────┐  │
 //! │  │  broadcast::Sender<BusMessage>    │  │
 //! │  └───────────────────────────────────┘  │
 //! └────────────────┬────────────────────────┘
 //!                  │
 //!         ┌────────┴────────┐
-//!         │ Transport Trait │  ◄── 可插拔
+//!         │ Transport Trait │  ◄── 可插拔接口
 //!         └────────┬────────┘
 //!                  │
 //!     ┌────────────┼────────────┐
 //!     ▼            ▼            ▼
 //! TcpTransport  TlsTransport  MemoryTransport
-//! (TCP)        (TLS)          (同进程)
+//! (TCP 协议)    (TLS 加密)    (同进程通信)
 //! ```
 
 // use async_trait::async_trait;
 use async_trait::async_trait;
+use crab_cert::CertMetadata;
+use dashmap::DashMap;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf, split};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
@@ -29,28 +31,35 @@ use tokio::sync::Mutex;
 use tokio::sync::broadcast;
 use tokio_rustls::{TlsAcceptor, server::TlsStream};
 use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
 pub mod handler;
 pub mod processor;
 
 pub use handler::MessageHandler;
 pub use processor::{MessageProcessor, ProcessResult};
-pub use shared::message::{BusMessage, EventType, NotificationPayload, ServerCommandPayload};
+pub use shared::message::{
+    BusMessage, EventType, NotificationPayload, RequestCommandPayload, ServerCommandPayload,
+    SyncPayload,
+};
 
 use crate::common::AppError;
 
-// ========== Transport Trait ==========
+// ========== Transport 传输层特征 ==========
 
 #[async_trait]
-pub trait Transport: Send + Sync {
+pub trait Transport: Send + Sync + std::fmt::Debug {
     async fn read_message(&self) -> Result<BusMessage, AppError>;
     async fn write_message(&self, msg: &BusMessage) -> Result<(), AppError>;
     async fn close(&self) -> Result<(), AppError>;
+    fn peer_identity(&self) -> Option<String> {
+        None
+    }
 }
 
-// Helper functions
+// 辅助函数
 async fn read_from_stream<R: AsyncReadExt + Unpin>(reader: &mut R) -> Result<BusMessage, AppError> {
-    // Read event type (1 byte)
+    // 读取事件类型 (1 字节)
     let mut type_buf = [0u8; 1];
     reader
         .read_exact(&mut type_buf)
@@ -60,7 +69,28 @@ async fn read_from_stream<R: AsyncReadExt + Unpin>(reader: &mut R) -> Result<Bus
     let event_type =
         EventType::try_from(type_buf[0]).map_err(|_| AppError::invalid("Invalid event type"))?;
 
-    // Read payload length (4 bytes)
+    // 读取 Request ID (16 字节)
+    let mut uuid_buf = [0u8; 16];
+    reader
+        .read_exact(&mut uuid_buf)
+        .await
+        .map_err(|e| AppError::internal(format!("Read UUID failed: {}", e)))?;
+    let request_id = Uuid::from_bytes(uuid_buf);
+
+    // 读取 Correlation ID (16 字节)
+    let mut correlation_buf = [0u8; 16];
+    reader
+        .read_exact(&mut correlation_buf)
+        .await
+        .map_err(|e| AppError::internal(format!("Read Correlation UUID failed: {}", e)))?;
+    let correlation_id_raw = Uuid::from_bytes(correlation_buf);
+    let correlation_id = if correlation_id_raw.is_nil() {
+        None
+    } else {
+        Some(correlation_id_raw)
+    };
+
+    // 读取载荷长度 (4 字节)
     let mut len_buf = [0u8; 4];
     reader
         .read_exact(&mut len_buf)
@@ -69,14 +99,21 @@ async fn read_from_stream<R: AsyncReadExt + Unpin>(reader: &mut R) -> Result<Bus
 
     let len = u32::from_le_bytes(len_buf) as usize;
 
-    // Read payload
+    // 读取载荷内容
     let mut payload = vec![0u8; len];
     reader
         .read_exact(&mut payload)
         .await
         .map_err(|e| AppError::internal(format!("Read payload failed: {}", e)))?;
 
-    Ok(BusMessage::new(event_type, payload))
+    Ok(BusMessage {
+        request_id,
+        event_type,
+        source: None,
+        correlation_id,
+        target: None,
+        payload,
+    })
 }
 
 async fn write_to_stream<W: AsyncWriteExt + Unpin>(
@@ -85,6 +122,12 @@ async fn write_to_stream<W: AsyncWriteExt + Unpin>(
 ) -> Result<(), AppError> {
     let mut data = Vec::new();
     data.push(msg.event_type as u8);
+    data.extend_from_slice(msg.request_id.as_bytes());
+
+    // Write correlation_id (16 bytes) - using 0 if None
+    let correlation_bytes = msg.correlation_id.unwrap_or(Uuid::nil()).into_bytes();
+    data.extend_from_slice(&correlation_bytes);
+
     data.extend_from_slice(&(msg.payload.len() as u32).to_le_bytes());
     data.extend_from_slice(&msg.payload);
 
@@ -95,9 +138,9 @@ async fn write_to_stream<W: AsyncWriteExt + Unpin>(
     Ok(())
 }
 
-// ========== TCP Transport ==========
+// ========== TCP 传输层实现 ==========
 
-/// TCP transport implementation
+/// TCP 传输实现
 #[derive(Debug, Clone)]
 pub struct TcpTransport {
     reader: Arc<Mutex<OwnedReadHalf>>,
@@ -170,14 +213,30 @@ impl Transport for TcpTransport {
 pub struct TlsTransport {
     reader: Arc<Mutex<ReadHalf<TlsStream<TcpStream>>>>,
     writer: Arc<Mutex<WriteHalf<TlsStream<TcpStream>>>>,
+    peer_identity: Option<String>,
 }
 
 impl TlsTransport {
     pub fn new(stream: TlsStream<TcpStream>) -> Self {
+        // Extract identity from TLS session
+        let (_, connection) = stream.get_ref();
+        let peer_identity = if let Some(certs) = connection.peer_certificates() {
+            if let Some(cert) = certs.first() {
+                CertMetadata::from_der(cert.as_ref())
+                    .ok()
+                    .and_then(|m| m.client_name.or(m.common_name))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         let (reader, writer) = split(stream);
         Self {
             reader: Arc::new(Mutex::new(reader)),
             writer: Arc::new(Mutex::new(writer)),
+            peer_identity,
         }
     }
 }
@@ -201,6 +260,10 @@ impl Transport for TlsTransport {
             .await
             .map_err(|e| AppError::internal(format!("TLS close failed: {}", e)))?;
         Ok(())
+    }
+
+    fn peer_identity(&self) -> Option<String> {
+        self.peer_identity.clone()
     }
 }
 
@@ -305,6 +368,8 @@ pub struct MessageBus {
     server_tx: broadcast::Sender<BusMessage>,
     config: TransportConfig,
     shutdown_token: CancellationToken,
+    /// Connected clients (Client ID -> Transport)
+    clients: Arc<DashMap<String, Arc<dyn Transport>>>,
 }
 
 impl MessageBus {
@@ -323,6 +388,7 @@ impl MessageBus {
             server_tx,
             config,
             shutdown_token: CancellationToken::new(),
+            clients: Arc::new(DashMap::new()),
         }
     }
 
@@ -355,6 +421,21 @@ impl MessageBus {
             .send(msg)
             .map_err(|e| AppError::internal(e.to_string()))?;
         Ok(())
+    }
+
+    /// Send a message to a specific client
+    pub async fn send_to_client(&self, client_id: &str, msg: BusMessage) -> Result<(), AppError> {
+        if let Some(transport) = self.clients.get(client_id) {
+            transport.write_message(&msg).await.map_err(|e| {
+                AppError::internal(format!("Failed to send to client {}: {}", client_id, e))
+            })?;
+            Ok(())
+        } else {
+            Err(AppError::not_found(format!(
+                "Client {} not connected",
+                client_id
+            )))
+        }
     }
 
     /// Subscribe to receive messages FROM CLIENTS (server use only)
@@ -423,6 +504,7 @@ impl MessageBus {
         let server_tx = self.server_tx.clone();
         let client_tx = self.client_tx.clone();
         let shutdown_token = self.shutdown_token.clone();
+        let clients = self.clients.clone();
 
         // Prepare TLS acceptor: prefer override (from activation), then config
         let final_tls_config = tls_config_override.or(self.config.tls_config.clone());
@@ -456,6 +538,7 @@ impl MessageBus {
                             let server_tx = server_tx.clone();
                             let client_tx = client_tx.clone();
                             let shutdown_token = shutdown_token.clone();
+                            let clients = clients.clone();
 
                             tokio::spawn(async move {
                                 let transport: Arc<dyn Transport> = if let Some(acceptor) = tls_acceptor {
@@ -473,9 +556,102 @@ impl MessageBus {
                                     Arc::new(TcpTransport::from_stream(stream))
                                 };
 
+                                // 🤝 握手与版本检查
+                                // 强制客户端发送的第一条消息必须是 Handshake
+                                tracing::debug!("Waiting for handshake from {}", addr);
+                                let client_id = match transport.read_message().await {
+                                    Ok(msg) if msg.event_type == EventType::Handshake => {
+                                        match msg.parse_payload::<shared::message::HandshakePayload>() {
+                                            Ok(payload) => {
+                                                if payload.version != shared::message::PROTOCOL_VERSION {
+                                                    tracing::warn!(
+                                                        "❌ Client {} protocol version mismatch: expected {}, got {}",
+                                                        addr, shared::message::PROTOCOL_VERSION, payload.version
+                                                    );
+
+                                                    // Send error notification to client
+                                                    let error_msg = format!(
+                                                        "Protocol version mismatch: server={}, client={}. Please update your client.",
+                                                        shared::message::PROTOCOL_VERSION,
+                                                        payload.version
+                                                    );
+                                                    let notification = shared::message::NotificationPayload::error(
+                                                        "Handshake Failed",
+                                                        error_msg
+                                                    );
+                                                    let msg = BusMessage::notification(&notification);
+
+                                                    if let Err(e) = transport.write_message(&msg).await {
+                                                        tracing::error!("Failed to send handshake error to {}: {}", addr, e);
+                                                    }
+
+                                                    // Give client some time to receive the message before closing
+                                                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                                                    return;
+                                                }
+
+                                                // 🔐 Identity Verification (if mTLS is active)
+                                                if let Some(peer_id) = transport.peer_identity() {
+                                                    if let Some(client_name) = &payload.client_name {
+                                                        if &peer_id != client_name {
+                                                            tracing::warn!(
+                                                                "❌ Client {} identity mismatch: TLS cert says '{}', handshake says '{}'",
+                                                                addr, peer_id, client_name
+                                                            );
+
+                                                            let error_msg = format!(
+                                                                "Identity verification failed: Certificate subject='{}' does not match Handshake client_name='{}'.",
+                                                                peer_id, client_name
+                                                            );
+                                                            let notification = shared::message::NotificationPayload::error(
+                                                                "Handshake Failed",
+                                                                error_msg
+                                                            );
+                                                            let msg = BusMessage::notification(&notification);
+                                                            let _ = transport.write_message(&msg).await;
+                                                            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                                                            return;
+                                                        } else {
+                                                            tracing::info!("✅ Client {} identity verified via mTLS: {}", addr, peer_id);
+                                                        }
+                                                    }
+                                                }
+
+                                                let cid = payload.client_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+                                                tracing::info!(
+                                                    "✅ Client {} handshake success (v{}, client: {:?}, id: {})",
+                                                    addr, payload.version, payload.client_name, cid
+                                                );
+                                                cid
+                                            }
+                                            Err(e) => {
+                                                tracing::warn!("❌ Client {} sent invalid handshake payload: {}", addr, e);
+                                                return;
+                                            }
+                                        }
+                                    }
+                                    Ok(msg) => {
+                                        tracing::warn!(
+                                            "❌ Client {} failed to handshake: expected Handshake, got {}",
+                                            addr, msg.event_type
+                                        );
+                                        return;
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!("❌ Client {} handshake error: {}", addr, e);
+                                        return;
+                                    }
+                                };
+
+                                // Register client
+                                clients.insert(client_id.clone(), transport.clone());
+                                tracing::info!("Client registered: {}", client_id);
+
                                 let mut rx = server_tx.subscribe();
                                 let transport_clone = transport.clone();
                                 let client_shutdown = shutdown_token.clone();
+                                let client_id_clone = client_id.clone();
+                                let clients_clone = clients.clone();
 
                                 // Spawn task to forward messages to this client (server → client)
                                 tokio::spawn(async move {
@@ -491,6 +667,14 @@ impl MessageBus {
                                             msg_result = rx.recv() => {
                                                 match msg_result {
                                                     Ok(msg) => {
+                                                        // Unicast Filtering:
+                                                        // If message has a target, only send if it matches this client.
+                                                        if let Some(target) = &msg.target {
+                                                            if target != &client_id_clone {
+                                                                continue;
+                                                            }
+                                                        }
+
                                                         if let Err(e) = transport_clone.write_message(&msg).await {
                                                             tracing::info!("Client {} disconnected: {}", addr, e);
                                                             break;
@@ -504,6 +688,9 @@ impl MessageBus {
                                             }
                                         }
                                     }
+                                    // Clean up on disconnect
+                                    clients_clone.remove(&client_id_clone);
+                                    tracing::info!("Client disconnected: {}", client_id_clone);
                                 });
 
                                 // Read messages from client (client → server)
@@ -517,7 +704,21 @@ impl MessageBus {
                                         // Read message from client
                                         read_result = transport.read_message() => {
                                             match read_result {
-                                                Ok(msg) => {
+                                                Ok(mut msg) => {
+                                                    // Inject client ID (Source Tracking)
+                                                    msg.source = Some(client_id.clone());
+
+                                                    // 🛡️ 安全检查：严禁客户端发送 ServerCommand
+                                                    // ServerCommand 仅允许由 Upstream 通过受信任通道发送
+                                                    if msg.event_type == EventType::ServerCommand {
+                                                        tracing::warn!(
+                                                            target: "security",
+                                                            client_addr = %addr,
+                                                            "⚠️ Security Alert: Client attempted to send ServerCommand. Dropping message."
+                                                        );
+                                                        continue;
+                                                    }
+
                                                     // Publish to client_tx so server handlers receive it
                                                     // Messages will be filtered by should_broadcast() in filter.rs
                                                     if let Err(e) = client_tx_clone.send(msg) {

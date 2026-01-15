@@ -1,13 +1,33 @@
-use crate::crypto::verify;
+use crate::CertificateAuthority;
 use crate::error::{CertError, Result};
+use std::path::Path;
 
-/// Hardcoded Root CA Certificate (PEM)
-/// This is the trust anchor for the entire system.
-pub const ROOT_CA_PEM: &str = include_str!("../certs/root_ca.pem");
+/// Load or create the Root CA.
+///
+/// This is used by the Auth Server to manage the system trust anchor.
+/// If the Root CA exists in the given directory, it is loaded.
+/// Otherwise, a new Root CA is generated and saved.
+pub fn get_or_create_root_ca(dir: &Path) -> Result<CertificateAuthority> {
+    // Try to load
+    let cert_path = dir.join("root_ca.crt");
+    let key_path = dir.join("root_ca.key");
 
-/// Verify a CA certificate against the hardcoded Root CA.
+    if cert_path.exists() && key_path.exists() {
+        return CertificateAuthority::load_from_file(&cert_path, &key_path);
+    }
+
+    // Generate new
+    let profile = crate::CaProfile::root("Crab Root CA");
+    let ca = CertificateAuthority::new_root(profile)?;
+    ca.save(dir, "root_ca")?;
+
+    Ok(ca)
+}
+
+/// Verify a CA certificate against a Root CA.
+///
 /// This checks the signature of the `ca_cert` using the Root CA's public key.
-pub fn verify_ca_signature(ca_cert_pem: &str) -> Result<()> {
+pub fn verify_ca_signature(ca_cert_pem: &str, root_ca_pem: &str) -> Result<()> {
     // 1. Parse CA Cert PEM to get DER
     let (_, pem) = x509_parser::pem::parse_x509_pem(ca_cert_pem.as_bytes())
         .map_err(|e| CertError::VerificationFailed(format!("PEM parse error: {}", e)))?;
@@ -25,7 +45,7 @@ pub fn verify_ca_signature(ca_cert_pem: &str) -> Result<()> {
     let signature = cert.signature_value.as_ref(); // returns &[u8]
 
     // 4. Verify
-    verify(ROOT_CA_PEM, tbs_bytes, signature)?;
+    crate::crypto::verify(root_ca_pem, tbs_bytes, signature)?;
 
     Ok(())
 }
@@ -90,8 +110,8 @@ fn extract_tbs_bytes(der: &[u8]) -> Result<&[u8]> {
     Ok(&content[0..tbs_total_len])
 }
 
-/// Verify a certificate chain against the hardcoded Root CA.
-/// This is a convenience wrapper around `adapter::verify_server_cert` using the hardcoded Root.
-pub fn verify_chain_against_root(chain_pem: &str) -> Result<()> {
-    crate::adapter::verify_server_cert(chain_pem, ROOT_CA_PEM)
+/// Verify a certificate chain against a Root CA.
+/// This is a convenience wrapper around `adapter::verify_server_cert` using the provided Root.
+pub fn verify_chain_against_root(chain_pem: &str, root_ca_pem: &str) -> Result<()> {
+    crate::adapter::verify_server_cert(chain_pem, root_ca_pem)
 }

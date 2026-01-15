@@ -20,13 +20,13 @@ async fn main() {
     }
 
     let state = Arc::new(state::AppState {
-        cert_store: state::CertStore::new(work_dir.clone()),
+        auth_storage: state::AuthStorage::new(work_dir.clone()),
         user_store: state::UserStore::new(),
         jwt_secret: "crab-auth-secret-key-2024".to_string(),
     });
 
     // Ensure Root CA exists on startup
-    if let Err(e) = state.cert_store.get_or_create_root_ca() {
+    if let Err(e) = state.auth_storage.get_or_create_root_ca() {
         tracing::error!("Failed to initialize Root CA: {}", e);
         return;
     }

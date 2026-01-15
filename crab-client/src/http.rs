@@ -15,8 +15,16 @@ pub struct HttpClient {
 impl HttpClient {
     /// Create a new HTTP client from configuration
     pub fn new(config: &ClientConfig) -> Self {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(
+            "x-client-version",
+            reqwest::header::HeaderValue::from_static(env!("CARGO_PKG_VERSION")),
+        );
+
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(config.timeout))
+            .user_agent(concat!("crab-client/", env!("CARGO_PKG_VERSION")))
+            .default_headers(headers)
             .build()
             .expect("Failed to build HTTP client");
 

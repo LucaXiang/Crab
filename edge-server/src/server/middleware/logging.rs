@@ -1,6 +1,6 @@
-//! Request Logging Middleware
+//! 请求日志中间件
 //!
-//! Logs all incoming HTTP requests with timing, user info, and status codes
+//! 记录所有进入的 HTTP 请求，包含时间、用户信息和状态码
 
 use axum::{
     extract::{MatchedPath, Request},
@@ -10,22 +10,19 @@ use axum::{
 use std::time::Instant;
 use tracing::{info, warn};
 
-/// Request logging middleware
+/// 请求日志中间件
 ///
-/// Logs request start and completion with the following info:
-/// - Request ID (x-request-id from tower-http)
-/// - HTTP method and path
-/// - User agent
-/// - Authenticated user (if available)
-/// - Response status code
-/// - Request latency in milliseconds
-pub async fn logging_middleware(
-    req: Request,
-    next: Next,
-) -> Response {
+/// 记录请求开始和结束，包含以下信息：
+/// - 请求 ID (x-request-id)
+/// - HTTP 方法和路径
+/// - 用户代理 (User Agent)
+/// - 认证用户 (如果存在)
+/// - 响应状态码
+/// - 请求延迟 (毫秒)
+pub async fn logging_middleware(req: Request, next: Next) -> Response {
     let start = Instant::now();
 
-    // Get request ID from header, or generate one if not present
+    // 从请求头获取 Request ID，如果不存在则生成一个
     let request_id = req
         .headers()
         .get("x-request-id")
@@ -47,7 +44,13 @@ pub async fn logging_middleware(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("unknown");
 
-    // Extract user information if authenticated
+    let client_version = req
+        .headers()
+        .get("x-client-version")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("unknown");
+
+    // 如果已认证，提取用户信息
     let user_info = req
         .extensions()
         .get::<crate::server::auth::CurrentUser>()
@@ -58,6 +61,7 @@ pub async fn logging_middleware(
         method = %method,
         path = %path,
         user_agent = %user_agent,
+        client_version = %client_version,
         user = ?user_info,
         "Request started"
     );
@@ -67,7 +71,7 @@ pub async fn logging_middleware(
     let latency = start.elapsed();
     let status = response.status();
 
-    // Log with different levels based on status code
+    // 根据状态码使用不同级别记录日志
     if status.is_server_error() {
         warn!(
             request_id = %request_id,

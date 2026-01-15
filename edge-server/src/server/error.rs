@@ -8,22 +8,22 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ServerError {
-    #[error("Resource not found")]
+    #[error("资源未找到")]
     NotFound,
 
-    #[error("Validation error: {0}")]
+    #[error("验证错误: {0}")]
     Validation(String),
 
-    #[error("Unauthorized")]
+    #[error("未授权")]
     Unauthorized,
 
-    #[error("Forbidden")]
+    #[error("禁止访问")]
     Forbidden,
 
-    #[error("Conflict: {0}")]
+    #[error("冲突: {0}")]
     Conflict(String),
 
-    #[error("Internal server error")]
+    #[error("内部服务器错误")]
     Internal(#[from] anyhow::Error),
 }
 
@@ -48,7 +48,7 @@ impl IntoResponse for ServerError {
             ServerError::Forbidden => (StatusCode::FORBIDDEN, "forbidden", self.to_string()),
             ServerError::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg.clone()),
             ServerError::Internal(err) => {
-                // Log internal errors but don't expose details
+                // 记录内部错误但不暴露详细信息
                 tracing::error!(error = ?err, "Internal server error");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -68,5 +68,5 @@ impl IntoResponse for ServerError {
     }
 }
 
-/// Result type alias for handlers
+/// 处理器的 Result 类型别名
 pub type Result<T> = std::result::Result<T, ServerError>;

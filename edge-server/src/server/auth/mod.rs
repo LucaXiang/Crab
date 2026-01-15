@@ -1,6 +1,6 @@
-//! Authentication and Authorization Module
+//! 认证与授权模块
 //!
-//! Handles JWT token generation/validation, permissions, and auth middleware
+//! 处理 JWT 令牌生成/验证、权限和认证中间件
 
 mod jwt;
 mod permissions;

@@ -1,3 +1,8 @@
+//! HTTP 路由和应用构造
+//!
+//! 该模块集中管理所有 HTTP 路由定义、中间件配置和请求处理逻辑。
+//! 支持标准 REST API 和 Oneshot (内存中) 路由调用。
+
 use axum::Router;
 use axum::middleware as axum_middleware;
 use http::{HeaderName, HeaderValue};
@@ -21,7 +26,7 @@ pub mod upload;
 pub mod router_ext;
 pub use router_ext::{OneshotResult, OneshotRouter};
 
-/// Custom request ID generator
+/// 自定义请求 ID 生成器
 #[derive(Clone)]
 struct XRequestId;
 
@@ -32,46 +37,49 @@ impl MakeRequestId for XRequestId {
     }
 }
 
-/// Build a router with all routes registered (no middleware, no state)
+/// 构建包含所有已注册路由的路由器 (无中间件，无状态)
+///
+/// 用于组合各个模块的路由。
 pub fn build_router() -> Router<ServerState> {
     Router::new()
-        // Audit API - authentication required
+        // 审计 API - 需要认证
         .merge(audit::router())
-        // Admin API - admin permission required
+        // 管理 API - 需要管理员权限
         .merge(role::router())
-        // Auth API - authentication required
+        // 认证 API - 需要认证 (部分端点例外)
         .merge(auth::router())
-        // Upload API - authentication required
+        // 上传 API - 需要认证
         .merge(upload::router())
-        // Health API - public route
+        // 健康检查 API - 公开路由
         .merge(health::router())
 }
 
-/// Build a fully configured application with all middleware and state
+/// 构建配置完整的应用程序，包含所有中间件和状态
 ///
-/// This is used by both the HTTP server and oneshot calls
+/// 同时用于 HTTP 服务器和 Oneshot (内存直接调用) 场景。
+/// 确保所有入口点都经过相同的中间件链处理。
 pub fn build_app(state: &ServerState) -> Router<ServerState> {
     build_router()
-        // ========== Tower HTTP Middleware ==========
-        // CORS - Handle cross-origin requests
+        // ========== Tower HTTP 中间件 ==========
+        // CORS - 处理跨域请求
         .layer(CorsLayer::permissive())
-        // Compression - Gzip compress responses
+        // 压缩 - Gzip 压缩响应
         .layer(CompressionLayer::new())
-        // Request logging - outermost, executed first
+        // 请求日志 - 最外层，最先执行
         .layer(axum_middleware::from_fn(middleware::logging_middleware))
-        // Trace - Request tracing (logs at INFO level)
+        // 追踪 - 请求追踪 (INFO 级别日志)
         .layer(TraceLayer::new_for_http())
-        // ========== Application Middleware ==========
-        // Request ID - Generate unique ID for each request
+        // ========== 应用程序中间件 ==========
+        // 请求 ID - 为每个请求生成唯一 ID
         .layer(SetRequestIdLayer::new(
             HeaderName::from_static("x-request-id"),
             XRequestId,
         ))
-        // Propagate request ID to response
+        // 将请求 ID 传播到响应头
         .layer(PropagateRequestIdLayer::new(HeaderName::from_static(
             "x-request-id",
         )))
-        // Get user context (JWT authentication) - executes before routes, injects CurrentUser
+        // 获取用户上下文 (JWT 认证) - 在路由之前执行，注入 CurrentUser
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             crate::server::auth::require_auth,

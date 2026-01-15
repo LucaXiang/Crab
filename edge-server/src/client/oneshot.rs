@@ -113,6 +113,7 @@ impl Oneshot {
     ) -> Result<T, AppError> {
         let response = self
             .state
+            .https
             .oneshot(request)
             .await
             .map_err(|e| AppError::internal(e.to_string()))?;

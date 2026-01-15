@@ -15,4 +15,4 @@ pub use error::{CertError, Result};
 pub use machine::generate_hardware_id;
 pub use metadata::CertMetadata;
 pub use profile::{CaProfile, CertProfile, KeyType};
-pub use trust::{ROOT_CA_PEM, verify_ca_signature, verify_chain_against_root};
+pub use trust::{get_or_create_root_ca, verify_ca_signature, verify_chain_against_root};

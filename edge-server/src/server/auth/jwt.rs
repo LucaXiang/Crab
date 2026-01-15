@@ -1,23 +1,23 @@
-//! JWT Token Service
+//! JWT 令牌服务
 //!
-//! Handles JWT token generation, validation, and parsing.
+//! 处理 JWT 令牌的生成、验证和解析。
 
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use chrono::{Duration, Utc};
 use jsonwebtoken::errors::ErrorKind;
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use chrono::{Duration, Utc};
 
-/// JWT Configuration
+/// JWT 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JwtConfig {
-    /// JWT secret key (should be at least 32 bytes)
+    /// JWT 密钥 (应至少 32 字节)
     pub secret: String,
-    /// Token expiration time in minutes
+    /// 令牌过期时间 (分钟)
     pub expiration_minutes: i64,
-    /// Token issuer
+    /// 令牌签发者
     pub issuer: String,
-    /// Token audience
+    /// 令牌受众
     pub audience: String,
 }
 
@@ -26,7 +26,9 @@ impl Default for JwtConfig {
         let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| {
             #[cfg(debug_assertions)]
             {
-                tracing::warn!("⚠️  JWT_SECRET not set! Using insecure default key. DO NOT USE IN PRODUCTION!");
+                tracing::warn!(
+                    "⚠️  JWT_SECRET not set! Using insecure default key. DO NOT USE IN PRODUCTION!"
+                );
                 "dev-secret-key-change-in-production-min-32-chars-long".to_string()
             }
             #[cfg(not(debug_assertions))]
@@ -34,61 +36,59 @@ impl Default for JwtConfig {
                 panic!("🚨 FATAL: JWT_SECRET environment variable is not set!");
             }
         });
-        
+
         Self {
             secret,
             expiration_minutes: std::env::var("JWT_EXPIRATION_MINUTES")
                 .ok()
                 .and_then(|s| s.parse().ok())
-                .unwrap_or(1440), // 24 hours default
-            issuer: std::env::var("JWT_ISSUER")
-                .unwrap_or_else(|_| "edge-server".to_string()),
-            audience: std::env::var("JWT_AUDIENCE")
-                .unwrap_or_else(|_| "edge-clients".to_string()),
+                .unwrap_or(1440), // 默认 24 小时
+            issuer: std::env::var("JWT_ISSUER").unwrap_or_else(|_| "edge-server".to_string()),
+            audience: std::env::var("JWT_AUDIENCE").unwrap_or_else(|_| "edge-clients".to_string()),
         }
     }
 }
 
-/// JWT Claims stored in the token
+/// 存储在令牌中的 JWT Claims
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    /// User ID
+    /// 用户 ID (Subject)
     pub sub: String,
-    /// Username
+    /// 用户名
     pub username: String,
-    /// Role name
+    /// 角色名称
     pub role: String,
-    /// Permissions (comma-separated)
+    /// 权限列表 (逗号分隔)
     pub permissions: String,
-    /// Token type
+    /// 令牌类型
     pub token_type: String,
-    /// Expiration timestamp
+    /// 过期时间戳
     pub exp: i64,
-    /// Issued at timestamp
+    /// 签发时间戳
     pub iat: i64,
-    /// Issuer
+    /// 签发者
     pub iss: String,
-    /// Audience
+    /// 受众
     pub aud: String,
 }
 
-/// JWT Errors
+/// JWT 错误
 #[derive(Error, Debug)]
 pub enum JwtError {
-    #[error("Invalid token: {0}")]
+    #[error("无效令牌: {0}")]
     InvalidToken(String),
 
-    #[error("Token expired")]
+    #[error("令牌已过期")]
     ExpiredToken,
 
-    #[error("Invalid signature")]
+    #[error("无效签名")]
     InvalidSignature,
 
-    #[error("Token generation failed: {0}")]
+    #[error("令牌生成失败: {0}")]
     GenerationFailed(String),
 }
 
-/// JWT Token Service
+/// JWT 令牌服务
 #[derive(Debug, Clone)]
 pub struct JwtService {
     pub config: JwtConfig,
@@ -97,26 +97,29 @@ pub struct JwtService {
 }
 
 impl JwtService {
-    /// Create a new JWT service with default config
+    /// 使用默认配置创建新的 JWT 服务
     pub fn new() -> Self {
         Self::with_config(JwtConfig::default())
     }
 
-    /// Create a new JWT service with custom config
+    /// 使用指定配置创建新的 JWT 服务
     pub fn with_config(config: JwtConfig) -> Self {
+        let encoding_key = EncodingKey::from_secret(config.secret.as_bytes());
+        let decoding_key = DecodingKey::from_secret(config.secret.as_bytes());
+
         Self {
-            encoding_key: EncodingKey::from_secret(config.secret.as_bytes()),
-            decoding_key: DecodingKey::from_secret(config.secret.as_bytes()),
             config,
+            encoding_key,
+            decoding_key,
         }
     }
 
-    /// Generate a JWT token
+    /// 为用户生成新令牌
     pub fn generate_token(
         &self,
-        user_id: impl Into<String>,
-        username: impl Into<String>,
-        role: impl Into<String>,
+        user_id: &str,
+        username: &str,
+        role: &str,
         permissions: &[String],
     ) -> Result<String, JwtError> {
         let now = Utc::now();
@@ -125,9 +128,9 @@ impl JwtService {
         let permissions_str = permissions.join(",");
 
         let claims = Claims {
-            sub: user_id.into(),
-            username: username.into(),
-            role: role.into(),
+            sub: user_id.to_string(),
+            username: username.to_string(),
+            role: role.to_string(),
             permissions: permissions_str,
             token_type: "access".to_string(),
             exp: expiration.timestamp(),
@@ -140,28 +143,29 @@ impl JwtService {
             .map_err(|e| JwtError::GenerationFailed(e.to_string()))
     }
 
-    /// Validate and decode a JWT token
+    /// 验证并解码令牌
     pub fn validate_token(&self, token: &str) -> Result<Claims, JwtError> {
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.set_issuer(&[&self.config.issuer]);
         validation.set_audience(&[&self.config.audience]);
+        validation.set_issuer(&[&self.config.issuer]);
 
-        let token_data = decode::<Claims>(token, &self.decoding_key, &validation)
-            .map_err(|e| match e.kind() {
+        let token_data = decode::<Claims>(token, &self.decoding_key, &validation).map_err(|e| {
+            match e.kind() {
                 ErrorKind::ExpiredSignature => JwtError::ExpiredToken,
                 ErrorKind::InvalidSignature => JwtError::InvalidSignature,
                 _ => JwtError::InvalidToken(e.to_string()),
-            })?;
+            }
+        })?;
 
         Ok(token_data.claims)
     }
 
-    /// Extract token from Authorization header
+    /// 从 Authorization 头提取令牌
     pub fn extract_from_header(header: &str) -> Option<&str> {
         header.strip_prefix("Bearer ")
     }
 
-    /// Get remaining time until expiration in seconds
+    /// 获取距离过期的剩余秒数
     pub fn get_expiration_seconds(&self, claims: &Claims) -> i64 {
         let now = Utc::now().timestamp();
         (claims.exp - now).max(0)
@@ -188,7 +192,11 @@ impl From<Claims> for CurrentUser {
         let permissions = if claims.permissions.is_empty() {
             vec![]
         } else {
-            claims.permissions.split(',').map(|s| s.to_string()).collect()
+            claims
+                .permissions
+                .split(',')
+                .map(|s| s.to_string())
+                .collect()
         };
 
         Self {

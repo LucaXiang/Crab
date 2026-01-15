@@ -1,30 +1,64 @@
-//! Interactive Message Client Example with mTLS support
+//! Interactive Message Client Example with mTLS support (TUI Enhanced)
 //!
 //! Demonstrates an interactive MessageClient that can:
 //! 1. Authenticate with Auth Server to get mTLS certificates
 //! 2. Connect to Edge Server using mTLS
-//! 3. Send/Receive messages
+//! 3. Send/Receive messages via TUI
 //!
 //! Run: cargo run --example message_client
 
 use crab_client::{BusMessage, MessageClient};
+use crossterm::{
+    event::{self, Event, KeyCode, KeyEventKind},
+    execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+};
+use ratatui::{prelude::*, widgets::*};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme};
-use std::io::{self, Write};
+use std::io::{self, Stdout, Write};
 use std::sync::Arc;
-use webpki;
+use std::time::Duration;
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+use tui_input::Input;
+use tui_input::backend::crossterm::EventHandler;
+use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
+
+#[derive(Default)]
+struct App {
+    input: Input,
+    input_mode: InputMode,
+    client: Option<MessageClient>,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+enum InputMode {
+    #[default]
+    Normal,
+    Editing,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Install default crypto provider (ring)
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install rustls crypto provider");
+    let _ = rustls::crypto::ring::default_provider().install_default();
 
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+    // Initialize TUI Logger with Tracing
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    tracing_subscriber::registry()
+        .with(tui_logger::tracing_subscriber_layer())
+        .with(env_filter)
         .init();
+
+    // Also init log crate adapter just in case dependencies use log crate
+    tui_logger::init_logger(log::LevelFilter::Info).ok();
+    tui_logger::set_default_level(log::LevelFilter::Info);
+
+    // --- CLI Phase (Startup Wizard) ---
+    // We use println! here which bypasses the tui-logger (which captures tracing/log macros)
+    // So the user sees these prompts in the standard terminal before TUI starts.
 
     println!("\n🦀 Interactive Message Client (mTLS)");
     println!("=====================================\n");
@@ -58,13 +92,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .as_str()
         .ok_or("No token in login response")?
         .to_string();
+    let tenant_id = login_data["tenant_id"]
+        .as_str()
+        .ok_or("No tenant_id in login response")?
+        .to_string();
 
-    println!("✅ Login successful! Token received.");
+    println!("✅ Login successful! Token received for Tenant: {}", tenant_id);
 
     // 2. Request Certificate
     println!("\n📜 Requesting Client Certificate...");
-    let tenant_id = get_input_with_default("Tenant ID", "tenant-01");
-    let common_name = get_input_with_default("Common Name", "client-01");
+    
+    // Auto-detect Device ID
+    let device_id = crab_cert::generate_hardware_id();
+    println!("Using Device ID: {}", device_id);
+
+    // Auto-generate Common Name
+    let common_name = format!("client-{}", username);
+    println!("Requesting cert for: {}", common_name);
 
     let issue_res = http_client
         .post(format!("{}/api/cert/issue", auth_url))
@@ -72,7 +116,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .json(&serde_json::json!({
             "tenant_id": tenant_id,
             "common_name": common_name,
-            "is_server": false
+            "is_server": false,
+            "device_id": device_id
         }))
         .send()
         .await?;
@@ -98,153 +143,328 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cert_reader = std::io::Cursor::new(cert_pem);
     let certs: Vec<CertificateDer> =
         rustls_pemfile::certs(&mut cert_reader).collect::<Result<_, _>>()?;
+    let cert = certs.into_iter().next().ok_or("No cert found")?;
 
     let mut key_reader = std::io::Cursor::new(key_pem);
     let key = rustls_pemfile::private_key(&mut key_reader)?.ok_or("No private key found")?;
 
-    // Load Tenant CA as Root
-    let mut roots = RootCertStore::empty();
+    // Load Tenant CA
+    let mut root_store = RootCertStore::empty();
     let mut ca_reader = std::io::Cursor::new(tenant_ca_pem);
     for cert in rustls_pemfile::certs(&mut ca_reader) {
-        roots.add(cert?)?;
+        root_store.add(cert?)?;
     }
 
-    // Custom Verifier that skips hostname check
-    // This allows connecting via IP (e.g. 192.168.1.x) while still verifying the chain against Tenant CA.
-    let verifier = Arc::new(SkipHostnameVerifier::new(Arc::new(roots)));
+    // Custom verifier to skip hostname verification for localhost demo
+    #[derive(Debug)]
+    struct SkipHostnameVerifier;
+    impl ServerCertVerifier for SkipHostnameVerifier {
+        fn verify_server_cert(
+            &self,
+            _end_entity: &CertificateDer<'_>,
+            _intermediates: &[CertificateDer<'_>],
+            _server_name: &ServerName<'_>,
+            _ocsp_response: &[u8],
+            _now: UnixTime,
+        ) -> Result<ServerCertVerified, rustls::Error> {
+            Ok(ServerCertVerified::assertion())
+        }
 
+        fn verify_tls12_signature(
+            &self,
+            _message: &[u8],
+            _cert: &CertificateDer<'_>,
+            _dss: &DigitallySignedStruct,
+        ) -> Result<HandshakeSignatureValid, rustls::Error> {
+            Ok(HandshakeSignatureValid::assertion())
+        }
+
+        fn verify_tls13_signature(
+            &self,
+            _message: &[u8],
+            _cert: &CertificateDer<'_>,
+            _dss: &DigitallySignedStruct,
+        ) -> Result<HandshakeSignatureValid, rustls::Error> {
+            Ok(HandshakeSignatureValid::assertion())
+        }
+
+        fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+            vec![
+                SignatureScheme::RSA_PSS_SHA256,
+                SignatureScheme::RSA_PKCS1_SHA256,
+                SignatureScheme::ECDSA_NISTP256_SHA256,
+            ]
+        }
+    }
+
+    // Build TLS config
+    // We need to use dangerous() builder to set custom verifier
     let tls_config = ClientConfig::builder()
         .dangerous()
-        .with_custom_certificate_verifier(verifier)
-        .with_client_auth_cert(certs, key)?;
+        .with_custom_certificate_verifier(Arc::new(SkipHostnameVerifier))
+        .with_client_auth_cert(vec![cert], key)?;
 
-    println!("✅ mTLS Configuration ready.");
+    println!("✅ mTLS configured.");
+    println!("🚀 Connecting to Edge Server at {}...", edge_addr);
 
-    // 4. Connect to Edge Server
-    println!("\n📡 Connecting to Edge Server at {} (mTLS)...", edge_addr);
+    // 4. Connect
+    let domain = "localhost"; // Matches cert CN usually, but we skip verify
+    let client = MessageClient::connect_tls(&edge_addr, domain, tls_config, "tui-client").await?;
+    println!("✅ Connected successfully!");
 
-    let client = MessageClient::connect_tls(
-        &edge_addr,
-        "edge-server", // This matches the Server Cert CN (though ignored by verifier)
-        tls_config,
-    )
-    .await?;
+    // Wait a moment for user to see success
+    std::thread::sleep(std::time::Duration::from_secs(1));
 
-    println!("✅ Connected successfully to Edge Server via mTLS!\n");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+    // --- TUI Phase ---
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
 
-    // ... Interactive loop (same as before) ...
-    interactive_loop(client).await
-}
+    let mut app = App::default();
+    app.client = Some(client);
 
-async fn interactive_loop(client: MessageClient) -> Result<(), Box<dyn std::error::Error>> {
-    // Spawn a task to receive and display messages
-    let recv_client = client.clone();
+    tracing::info!("✅ Client Ready. Type /help for commands.");
+
+    // Start background receiver for TUI logging
+    let client_clone = app.client.as_ref().unwrap().clone();
     tokio::spawn(async move {
         loop {
-            match recv_client.recv().await {
+            match client_clone.recv().await {
                 Ok(msg) => {
-                    print_received_message(&msg);
+                    tracing::info!("📨 [RECV] {:?} | ID: {}", msg.event_type, msg.request_id);
+                    if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
+                        tracing::info!("   Data: {}", payload);
+                    }
                 }
                 Err(e) => {
-                    eprintln!("\n❌ Connection error: {}", e);
-                    break;
+                    tracing::error!("❌ Disconnected/Error: {}", e);
+                    // Simple retry delay or break
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 }
             }
         }
     });
 
-    // Interactive menu loop
-    loop {
-        print_menu();
-        io::stdout().flush()?;
+    let res = run_app(&mut terminal, &mut app).await;
 
-        let choice = get_input("Enter choice (0-3): ");
+    // Restore terminal
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
 
-        match choice.as_str() {
-            "0" => {
-                println!("\n👋 Goodbye!");
-                break;
-            }
-            "1" => {
-                // System notification
-                let title = get_input("Notification title: ");
-                let body = get_input("Notification body: ");
-
-                let payload = shared::message::NotificationPayload::info(title, body);
-                let msg = BusMessage::notification(&payload);
-                client.send(&msg).await?;
-            }
-            "2" => {
-                // Server command
-                let command_str = get_input("Command (ping/config_update/restart): ");
-
-                let command = match command_str.to_lowercase().as_str() {
-                    "ping" => shared::message::ServerCommand::Ping,
-                    "restart" => shared::message::ServerCommand::Restart {
-                        delay_seconds: 5,
-                        reason: Some("client".to_string()),
-                    },
-                    "config_update" | _ => shared::message::ServerCommand::ConfigUpdate {
-                        key: "client.config".to_string(),
-                        value: serde_json::json!("client_value"),
-                    },
-                };
-
-                let payload = shared::message::ServerCommandPayload { command };
-                let msg = BusMessage::server_command(&payload);
-                client.send(&msg).await?;
-            }
-            "3" => {
-                // Custom JSON
-                println!("Enter custom JSON payload:");
-                let json_str = get_input("JSON: ");
-
-                match serde_json::from_str::<serde_json::Value>(&json_str) {
-                    Ok(_value) => {
-                        let payload = shared::message::NotificationPayload::info(
-                            "Custom".to_string(),
-                            json_str,
-                        );
-                        let msg = BusMessage::notification(&payload);
-                        client.send(&msg).await?;
-                    }
-                    Err(e) => println!("❌ Invalid JSON: {}", e),
-                }
-            }
-            _ => println!("❌ Invalid choice"),
-        }
+    if let Err(err) = res {
+        println!("Error: {:?}", err);
     }
 
     Ok(())
 }
 
-fn print_received_message(msg: &BusMessage) {
-    println!("\n📨 Received: [{}]", msg.event_type);
+async fn run_app(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    app: &mut App,
+) -> io::Result<()> {
+    loop {
+        terminal.draw(|f| ui(f, app))?;
 
-    match msg.parse_payload::<serde_json::Value>() {
-        Ok(payload) => {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&payload).unwrap_or_default()
-            );
-        }
-        Err(_) => {
-            println!("(Raw payload: {} bytes)", msg.payload.len());
+        if event::poll(Duration::from_millis(100))? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    match app.input_mode {
+                        InputMode::Normal => match key.code {
+                            KeyCode::Char('e') => {
+                                app.input_mode = InputMode::Editing;
+                            }
+                            KeyCode::Char('q') | KeyCode::Esc => {
+                                return Ok(());
+                            }
+                            _ => {}
+                        },
+                        InputMode::Editing => match key.code {
+                            KeyCode::Enter => {
+                                let input_str: String = app.input.value().into();
+                                if !input_str.is_empty() {
+                                    handle_command(app, &input_str).await;
+                                    app.input.reset();
+                                }
+                            }
+                            KeyCode::Esc => {
+                                app.input_mode = InputMode::Normal;
+                            }
+                            _ => {
+                                app.input.handle_event(&Event::Key(key));
+                            }
+                        },
+                    }
+                }
+            }
         }
     }
-    print!("\n> "); // Restore prompt
-    let _ = io::stdout().flush();
 }
 
-fn print_menu() {
-    println!("\nAvailable Actions:");
-    println!("1. Send Notification");
-    println!("2. Server Command");
-    println!("3. Custom JSON");
-    println!("0. Exit");
+async fn handle_command(app: &mut App, cmd: &str) {
+    let parts: Vec<&str> = cmd.split_whitespace().collect();
+    if parts.is_empty() {
+        return;
+    }
+
+    match parts[0] {
+        "/help" => {
+            tracing::info!("Commands:");
+            tracing::info!("  /notify <title> <msg>  - Send notification");
+            tracing::info!("  /req <cmd> [args]      - Send request command");
+            tracing::info!("  /ping                  - Send ping (as ServerCommand)");
+            tracing::info!("  /quit                  - Exit");
+        }
+        "/quit" => {
+            tracing::warn!("Press Esc then 'q' to quit");
+        }
+        "/notify" => {
+            if parts.len() < 3 {
+                tracing::error!("Usage: /notify <title> <message>");
+                return;
+            }
+            let title = parts[1];
+            let msg_content = parts[2..].join(" ");
+
+            if let Some(client) = &app.client {
+                let payload = shared::message::NotificationPayload::info(title, &msg_content);
+                let msg = BusMessage::notification(&payload);
+                if let Err(e) = client.send(&msg).await {
+                    tracing::error!("Failed to send: {}", e);
+                } else {
+                    tracing::info!("✅ Sent Notification: {} - {}", title, msg_content);
+                }
+            }
+        }
+        "/req" => {
+            if parts.len() < 2 {
+                tracing::error!("Usage: /req <command> [args_json]");
+                return;
+            }
+            let command = parts[1];
+            let args_str = if parts.len() > 2 {
+                parts[2..].join(" ")
+            } else {
+                "{}".to_string()
+            };
+            let args: serde_json::Value =
+                serde_json::from_str(&args_str).unwrap_or(serde_json::json!({}));
+
+            if let Some(client) = &app.client {
+                let payload = shared::message::RequestCommandPayload {
+                    action: command.to_string(),
+                    params: Some(args),
+                };
+                let msg = BusMessage::request_command(&payload);
+                if let Err(e) = client.send(&msg).await {
+                    tracing::error!("Failed to send Request: {}", e);
+                } else {
+                    tracing::info!("✅ Sent Request: {}", command);
+                }
+            }
+        }
+        "/ping" => {
+            if let Some(client) = &app.client {
+                // Ping should be a RequestCommand so server can reply
+                let payload = shared::message::RequestCommandPayload {
+                    action: "ping".to_string(),
+                    params: None,
+                };
+                let msg = BusMessage::request_command(&payload);
+                if let Err(e) = client.send(&msg).await {
+                    tracing::error!("Failed to send Ping: {}", e);
+                } else {
+                    tracing::info!("✅ Sent Ping Request");
+                }
+            }
+        }
+        _ => {
+            tracing::warn!("Unknown command: {}", parts[0]);
+        }
+    }
 }
 
+fn ui(f: &mut Frame, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // Header
+            Constraint::Min(1),    // Logs
+            Constraint::Length(3), // Input
+        ])
+        .split(f.area());
+
+    // Header
+    let title = Paragraph::new(vec![Line::from(vec![
+        Span::raw(" 🦀 Crab Message Client "),
+        Span::styled(" mTLS Secured ", Style::default().fg(Color::Green)),
+    ])])
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan)),
+    );
+    f.render_widget(title, chunks[0]);
+
+    // Logs
+    let tui_sm = TuiLoggerWidget::default()
+        .block(
+            Block::default()
+                .title(" Messages ")
+                .border_style(
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::DIM),
+                )
+                .borders(Borders::ALL),
+        )
+        .output_separator('|')
+        .output_timestamp(Some("%H:%M:%S".to_string()))
+        .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
+        .output_target(false)
+        .output_file(false)
+        .output_line(false)
+        .style(Style::default().fg(Color::White));
+    f.render_widget(tui_sm, chunks[1]);
+
+    // Input
+    let input_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Command Input (Type /help) ");
+
+    let style = match app.input_mode {
+        InputMode::Normal => Style::default().fg(Color::Gray),
+        InputMode::Editing => Style::default().fg(Color::Yellow),
+    };
+
+    let width = chunks[2].width.max(3) - 3;
+    let scroll = app.input.visual_scroll(width as usize);
+    let input = Paragraph::new(app.input.value())
+        .style(style)
+        .scroll((0, scroll as u16))
+        .block(input_block);
+    f.render_widget(input, chunks[2]);
+
+    // Cursor
+    if app.input_mode == InputMode::Editing {
+        f.set_cursor_position((
+            chunks[2].x + ((app.input.visual_cursor().max(scroll) - scroll) as u16) + 1,
+            chunks[2].y + 1,
+        ));
+    }
+
+    // Help
+    if app.input_mode == InputMode::Normal {
+        let help_text = Paragraph::new("Press 'e' to edit, 'q' to quit")
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Right);
+        f.render_widget(help_text, chunks[0]);
+    }
+}
+
+// Helper functions for CLI input
 fn get_input(prompt: &str) -> String {
     print!("{}", prompt);
     io::stdout().flush().unwrap();
@@ -263,78 +483,5 @@ fn get_input_with_default(prompt: &str, default: &str) -> String {
         default.to_string()
     } else {
         input.to_string()
-    }
-}
-
-#[derive(Debug)]
-struct SkipHostnameVerifier {
-    roots: Arc<RootCertStore>,
-    inner: Arc<dyn ServerCertVerifier>,
-}
-
-impl SkipHostnameVerifier {
-    fn new(roots: Arc<RootCertStore>) -> Self {
-        let inner = rustls::client::WebPkiServerVerifier::builder(roots.clone())
-            .build()
-            .unwrap();
-        Self { roots, inner }
-    }
-}
-
-impl ServerCertVerifier for SkipHostnameVerifier {
-    fn verify_server_cert(
-        &self,
-        end_entity: &CertificateDer<'_>,
-        intermediates: &[CertificateDer<'_>],
-        _server_name: &ServerName<'_>,
-        _ocsp_response: &[u8],
-        now: UnixTime,
-    ) -> Result<ServerCertVerified, rustls::Error> {
-        let cert = webpki::EndEntityCert::try_from(end_entity).map_err(|e| {
-            rustls::Error::InvalidCertificate(rustls::CertificateError::Other(rustls::OtherError(
-                Arc::new(e),
-            )))
-        })?;
-
-        // Use verify_for_usage instead of verify_is_valid_tls_server_cert
-        // Pass anchors directly from RootCertStore (Vec<TrustAnchor>)
-        cert.verify_for_usage(
-            &webpki::ALL_VERIFICATION_ALGS,
-            &self.roots.roots,
-            intermediates,
-            now,
-            webpki::KeyUsage::server_auth(),
-            None, // No CRLs
-            None, // No revocation policy?
-        )
-        .map_err(|e| {
-            rustls::Error::InvalidCertificate(rustls::CertificateError::Other(rustls::OtherError(
-                Arc::new(e),
-            )))
-        })?;
-
-        Ok(ServerCertVerified::assertion())
-    }
-
-    fn verify_tls12_signature(
-        &self,
-        message: &[u8],
-        cert: &CertificateDer<'_>,
-        dss: &DigitallySignedStruct,
-    ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        self.inner.verify_tls12_signature(message, cert, dss)
-    }
-
-    fn verify_tls13_signature(
-        &self,
-        message: &[u8],
-        cert: &CertificateDer<'_>,
-        dss: &DigitallySignedStruct,
-    ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        self.inner.verify_tls13_signature(message, cert, dss)
-    }
-
-    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-        self.inner.supported_verify_schemes()
     }
 }

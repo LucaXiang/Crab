@@ -13,6 +13,9 @@ pub enum MessageError {
     #[error("Connection failed: {0}")]
     Connection(String),
 
+    #[error("Request timed out: {0}")]
+    Timeout(String),
+
     #[error("Invalid message format: {0}")]
     InvalidMessage(String),
 }

@@ -17,3 +17,4 @@ tower-http = { workspace = true, features = ["cors", "trace"] }
 base64 = "0.22"
 jsonwebtoken.workspace = true
 chrono.workspace = true
+uuid = { workspace = true, features = ["v4"] }
