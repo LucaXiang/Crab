@@ -20,6 +20,7 @@
 //! use edge_server::{CrabClient, ServerState};
 //!
 //! let state = ServerState::initialize(&config).await;
+//! state.start_background_tasks().await;
 //! let client = CrabClient::new(state);
 //! let user = client.me().await?;
 //! ```
@@ -99,6 +100,7 @@ pub trait CrabClient: Send + Sync + Clone + 'static {
 ///
 /// ```ignore
 /// let state = ServerState::initialize(&config).await;
+/// state.start_background_tasks().await;
 /// let client = ClientInner::<Oneshot>::new(state);
 /// let user = client.me().await?;
 /// ```

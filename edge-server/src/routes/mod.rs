@@ -15,7 +15,6 @@ use crate::server::middleware;
 pub mod audit;
 pub mod auth;
 pub mod health;
-pub mod message;
 pub mod role;
 pub mod upload;
 
@@ -46,8 +45,6 @@ pub fn build_router() -> Router<ServerState> {
         .merge(upload::router())
         // Health API - public route
         .merge(health::router())
-        // Message bus API - for testing
-        .merge(message::router())
 }
 
 /// Build a fully configured application with all middleware and state

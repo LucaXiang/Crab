@@ -15,7 +15,16 @@ use std::io::{self, Write};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
+    // Install default crypto provider to avoid panic
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .ok();
+
+    // Set default log level to info/debug if not set
+    let env_filter = std::env::var("RUST_LOG")
+        .unwrap_or_else(|_| "info,edge_server=debug,surrealdb=warn".to_string());
+
+    tracing_subscriber::fmt().with_env_filter(env_filter).init();
 
     println!("\n🦀 Interactive Edge Server Demo");
     println!("================================\n");
@@ -24,17 +33,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = "./temp_interactive_demo";
     std::fs::create_dir_all(temp_dir).ok();
 
-    // 1. Start edge-server
-    println!("1️⃣  Starting edge-server...");
+    // 1. Initialize edge-server state
+    tracing::info!("1️⃣  Initializing edge-server state...");
     let mut config = Config::with_overrides(temp_dir, 3000, 8081);
     config.environment = "development".to_string();
     config.jwt.secret = "demo-secret".to_string();
 
     let state: ServerState = ServerState::initialize(&config).await;
-    println!("✅ Edge-server started! (HTTP: 3000, TCP: 8081)\n");
+    state.start_background_tasks().await;
+
+    // Check activation status and print banner
+    state.print_activation_banner().await;
+
+    // Start TCP Server if activated and certs exist
+    if let Ok(Some(tls_config)) = state.load_tls_config() {
+        let bus = state.get_message_bus();
+        let tcp_tls_config = tls_config.clone();
+        tokio::spawn(async move {
+            tracing::info!("Starting Message Bus TCP server...");
+            if let Err(e) = bus.start_tcp_server(Some(tcp_tls_config)).await {
+                tracing::error!("Message bus TCP server error: {}", e);
+            }
+        });
+    } else {
+        tracing::warn!("TCP Server not started (Not activated or missing certs)");
+    }
 
     // 2. Start event receiver that listens to BOTH client and server messages
-    println!("2️⃣  Starting event receiver...");
+    tracing::info!("2️⃣  Starting event receiver...");
     let bus = state.get_message_bus();
 
     // Create two receivers: one for client messages, one for server broadcasts
@@ -42,23 +68,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut server_rx = bus.subscribe();
 
     tokio::spawn(async move {
-        println!("📨 Event receiver started (listening to clients + server)\n");
+        tracing::info!("📨 Event receiver started (listening to clients + server)");
         loop {
             tokio::select! {
                 // Receive messages FROM CLIENTS (interactive_demo sends via publish)
                 msg_result = client_rx.recv() => {
                     match msg_result {
                         Ok(msg) => {
-                            match msg.event_type {
-                                edge_server::message::EventType::OrderIntent => {
-                                    println!("📝 [来自客户端] ORDER INTENT | 订单操作请求");
-                                }
-                                _ => {
-                                    println!("📨 [来自客户端] {:?}", msg.event_type);
-                                }
+                            {
+                                tracing::info!("📨 [来自客户端] {:?}", msg.event_type);
                             }
                             if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
-                                println!("   Data: {}\n", payload);
+                                tracing::info!("   Data: {}", payload);
                             }
                         }
                         Err(_) => break,
@@ -69,24 +90,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     match msg_result {
                         Ok(msg) => {
                             match msg.event_type {
-                                edge_server::message::EventType::OrderSync => {
-                                    println!("🔄 [服务端广播] ORDER SYNC | 订单状态同步");
-                                }
-                                edge_server::message::EventType::DataSync => {
-                                    println!("💾 [服务端广播] DATA SYNC | 数据同步");
-                                }
                                 edge_server::message::EventType::Notification => {
-                                    println!("📢 [服务端广播] NOTIFICATION | 系统通知");
+                                    tracing::info!("📢 [服务端广播] NOTIFICATION | 系统通知");
                                 }
                                 edge_server::message::EventType::ServerCommand => {
-                                    println!("🎮 [服务端广播] SERVER COMMAND | 服务器指令");
-                                }
-                                _ => {
-                                    println!("📡 [服务端广播] {:?}", msg.event_type);
+                                    tracing::info!("🎮 [服务端广播] SERVER COMMAND | 服务器指令");
                                 }
                             }
                             if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
-                                println!("   Data: {}\n", payload);
+                                tracing::info!("   Data: {}", payload);
                             }
                         }
                         Err(_) => break,
@@ -96,17 +108,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    println!("3️⃣  Receiver started!\n");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+    tracing::info!("3️⃣  Receiver started!");
+
+    // Give the receiver a moment to print its startup message
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     // 3. Interactive command line
     interactive_cli(state).await?;
 
-    println!("\n👋 Demo complete!");
-    println!("Cleaning up...");
+    tracing::info!("👋 Demo complete!");
+    tracing::info!("Cleaning up...");
 
-    // Cleanup
-    std::fs::remove_dir_all(temp_dir).ok();
+    // Cleanup - DISABLED to allow persistence testing
+    // std::fs::remove_dir_all(temp_dir).ok();
 
     Ok(())
 }
@@ -119,7 +135,7 @@ async fn interactive_cli(state: ServerState) -> Result<(), Box<dyn std::error::E
         print_menu();
         io::stdout().flush()?;
 
-        let choice = get_input("Enter your choice (0-8): ");
+        let choice = get_input("Enter your choice (0-4): ");
 
         match choice.as_str() {
             "0" => {
@@ -127,174 +143,130 @@ async fn interactive_cli(state: ServerState) -> Result<(), Box<dyn std::error::E
                 break;
             }
             "1" => {
-                // Add dish to table (client message via send)
-                let table_id = get_input("Table ID (e.g., T01): ");
-                let dish_name = get_input("Dish name: ");
-                let quantity = get_input("Quantity: ").parse::<u32>().unwrap_or(1);
+                // Send Notification (client message via send)
+                let title = get_input("Title: ");
+                let message = get_input("Message: ");
 
-                let payload = shared::message::OrderIntentPayload::add_dish(
-                    shared::message::TableId::new_unchecked(table_id.clone()),
-                    vec![shared::message::DishItem::simple(&dish_name, quantity)],
-                    Some(shared::message::OperatorId::new("demo_user")),
-                );
-                let msg = BusMessage::order_intent(&payload);
+                let payload = shared::message::NotificationPayload::info(&title, &message);
+                let msg = BusMessage::notification(&payload);
                 msg_client.send(&msg).await?;
-                println!("✅ Sent: Add dish to {}\n", table_id);
+                println!("✅ Sent: Notification '{}'\n", title);
             }
             "2" => {
-                // Payment request (client message via send)
-                let table_id = get_input("Table ID: ");
-                let _amount = get_input("Amount (cents): ").parse::<u64>().unwrap_or(0);
-                let method = get_input("Payment method (cash/card/wechat/alipay): ");
-
-                let payment_method = match method.to_lowercase().as_str() {
-                    "cash" => shared::message::PaymentMethod::Cash,
-                    "card" => shared::message::PaymentMethod::Card,
-                    "wechat" => shared::message::PaymentMethod::Wechat,
-                    "alipay" => shared::message::PaymentMethod::Alipay,
-                    _ => shared::message::PaymentMethod::Cash,
-                };
-
-                let payload = shared::message::OrderIntentPayload::checkout(
-                    shared::message::TableId::new_unchecked(table_id.clone()),
-                    shared::message::OrderId::new_unchecked("ORD_DEMO"),
-                    payment_method,
-                    Some(shared::message::OperatorId::new("demo_user")),
-                );
-                let msg = BusMessage::order_intent(&payload);
-                msg_client.send(&msg).await?;
-                println!("✅ Sent: Payment for {}\n", table_id);
-            }
-            "3" => {
-                // Checkout (client message via send)
-                let table_id = get_input("Table ID: ");
-
-                let payload = shared::message::OrderIntentPayload::checkout(
-                    shared::message::TableId::new_unchecked(table_id.clone()),
-                    shared::message::OrderId::new_unchecked("ORD_DEMO"),
-                    shared::message::PaymentMethod::Cash,
-                    Some(shared::message::OperatorId::new("demo_user")),
-                );
-                let msg = BusMessage::order_intent(&payload);
-                msg_client.send(&msg).await?;
-                println!("✅ Sent: Checkout for {}\n", table_id);
-            }
-            "4" => {
-                // Dish price update (server broadcast via publish)
-                let dish_id = get_input("Dish ID: ");
-                let new_price = get_input("New price (cents): ").parse::<u64>().unwrap_or(0);
-
-                let payload = shared::message::DataSyncPayload::DishPrice {
-                    dish_id: shared::message::DishId::new(dish_id.clone()),
-                    old_price: 0,
-                    new_price,
-                };
-                let msg = BusMessage::data_sync(&payload);
-                state.get_message_bus().publish(msg).await?;
-                println!("✅ Sent: Price update for {}\n", dish_id);
-            }
-            "5" => {
-                // Dish sold out (server broadcast via publish)
-                let dish_id = get_input("Dish ID: ");
-
-                let payload = shared::message::DataSyncPayload::DishSoldOut {
-                    dish_id: shared::message::DishId::new(dish_id.clone()),
-                    available: false,
-                };
-                let msg = BusMessage::data_sync(&payload);
-                state.get_message_bus().publish(msg).await?;
-                println!("✅ Sent: Marked {} as sold out\n", dish_id);
-            }
-            "6" => {
-                // System notification (server broadcast via publish)
-                let title = get_input("Notification title: ");
-                let body = get_input("Notification body: ");
-
-                let payload = shared::message::NotificationPayload::info(title, body);
-                let msg = BusMessage::notification(&payload);
-                state.get_message_bus().publish(msg).await?;
-                println!("✅ Sent: Notification\n");
-            }
-            "7" => {
-                // Server command (server broadcast via publish)
+                // Server Command (server broadcast via publish)
                 let command_str = get_input("Command (ping/config_update/restart): ");
-                let key = get_input("Key (for config_update, optional): ");
+                let args_str = get_input("Args (json, optional): ");
+                let args: serde_json::Value =
+                    serde_json::from_str(&args_str).unwrap_or(serde_json::json!({}));
 
                 let command = match command_str.to_lowercase().as_str() {
                     "ping" => shared::message::ServerCommand::Ping,
                     "restart" => shared::message::ServerCommand::Restart {
-                        delay_seconds: 5,
-                        reason: Some("demo".to_string()),
+                        delay_seconds: args.get("delay").and_then(|v| v.as_u64()).unwrap_or(5)
+                            as u32,
+                        reason: args
+                            .get("reason")
+                            .and_then(|v| v.as_str())
+                            .map(String::from),
                     },
                     "config_update" | _ => shared::message::ServerCommand::ConfigUpdate {
-                        key: if key.is_empty() {
-                            "demo.key".to_string()
-                        } else {
-                            key
-                        },
-                        value: serde_json::json!("demo_value"),
+                        key: args
+                            .get("key")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("demo.key")
+                            .to_string(),
+                        value: args
+                            .get("value")
+                            .cloned()
+                            .unwrap_or(serde_json::json!("demo_value")),
                     },
                 };
 
                 let payload = shared::message::ServerCommandPayload { command };
                 let msg = BusMessage::server_command(&payload);
                 state.get_message_bus().publish(msg).await?;
-                println!("✅ Sent: Server command: {}\n", command_str);
+                println!("✅ Sent: Server Command '{}'\n", command_str);
             }
-            "8" => {
-                // Custom notification (simplified)
-                println!("Send custom notification:");
-                let title = get_input("Title: ");
-                let message = get_input("Message: ");
-                let level = get_input("Level (info/warning/error): ");
+            "3" => {
+                // Custom JSON (raw message)
+                let json_data = get_input("JSON Data: ");
 
-                let notification_level = match level.to_lowercase().as_str() {
-                    "warning" => shared::message::NotificationLevel::Warning,
-                    "error" => shared::message::NotificationLevel::Error,
-                    _ => shared::message::NotificationLevel::Info,
-                };
-
-                let payload = shared::message::NotificationPayload {
-                    title,
-                    message,
-                    level: notification_level,
-                    category: shared::message::NotificationCategory::System,
-                    data: None,
-                };
-
+                let payload = shared::message::NotificationPayload::info("Custom", &json_data);
                 let msg = BusMessage::notification(&payload);
-                state.get_message_bus().publish(msg).await?;
-                println!("✅ Sent: Custom notification\n");
+                msg_client.send(&msg).await?;
+                println!("✅ Sent: Custom Data as Notification\n");
             }
-            _ => {
-                println!("❌ Invalid choice. Please try again.\n");
+            "4" => {
+                // Activate Server (Real Auth Server)
+                println!("\n🔐 Activating Server (Real Auth Server)...");
+
+                let auth_url = get_input("Auth Server URL (default: http://localhost:3001): ");
+                let auth_url = if auth_url.is_empty() {
+                    "http://localhost:3001".to_string()
+                } else {
+                    auth_url
+                };
+
+                let mut username = get_input("Username (default: admin): ");
+                if username.is_empty() {
+                    username = "admin".to_string();
+                }
+
+                let mut password = get_input("Password (default: admin123): ");
+                if password.is_empty() {
+                    password = "admin123".to_string();
+                }
+
+                let mut tenant_id = get_input("Tenant ID (default: tenant-01): ");
+                if tenant_id.is_empty() {
+                    tenant_id = "tenant-01".to_string();
+                }
+
+                let mut edge_id = get_input("Edge Server ID (default: edge-01): ");
+                if edge_id.is_empty() {
+                    edge_id = "edge-01".to_string();
+                }
+
+                println!("   Connecting to Auth Server...");
+
+                // Use the internal provisioning service
+                let provisioning = state.provisioning_service(auth_url);
+
+                match provisioning
+                    .activate(&username, &password, &tenant_id, &edge_id)
+                    .await
+                {
+                    Ok(_) => {
+                        println!("\n✨ Activation Successful! ✨");
+                        println!("Tenant: {}", tenant_id);
+                        println!("Edge ID: {}", edge_id);
+                        // The server state automatically reloads certificates, so we don't strictly need to restart for the demo to work
+                        println!("\n✅ Server state updated with new certificates.");
+                    }
+                    Err(e) => {
+                        println!("❌ Activation failed: {}", e);
+                    }
+                }
             }
+            _ => println!("❌ Invalid choice, please try again.\n"),
         }
-
-        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
     }
-
     Ok(())
 }
 
 fn print_menu() {
-    println!("📋 Select an action:");
-    println!("  1. 📝 Add dish to table");
-    println!("  2. 💰 Payment request");
-    println!("  3. 🧾 Checkout");
-    println!("  4. 💾 Update dish price");
-    println!("  5. ❌ Mark dish sold out");
-    println!("  6. 📢 System notification");
-    println!("  7. 🎮 Server command");
-    println!("  8. 🔧 Custom JSON");
-    println!("  0. ❌ Exit");
-    println!();
+    println!("\nAvailable Actions:");
+    println!("1. Send Notification");
+    println!("2. Server Command");
+    println!("3. Custom JSON (wrapped in Notification)");
+    println!("4. Activate Server (Real Auth Server)");
+    println!("0. Exit");
 }
 
 fn get_input(prompt: &str) -> String {
     print!("{}", prompt);
     io::stdout().flush().unwrap();
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
-    input.trim().to_string()
+    let mut buffer = String::new();
+    io::stdin().read_line(&mut buffer).unwrap();
+    buffer.trim().to_string()
 }

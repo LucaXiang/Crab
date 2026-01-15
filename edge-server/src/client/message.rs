@@ -11,7 +11,8 @@
 //! use edge_server::MessageClient;
 //!
 //! let client = MessageClient::connect("127.0.0.1:8081").await?;
-//! let msg = BusMessage::table_intent("add_dish", serde_json::json!({...}));
+//! let payload = shared::message::NotificationPayload::info("Test", "Hello");
+//! let msg = BusMessage::notification(&payload);
 //! client.send(&msg).await?;
 //! let received = client.recv().await?;
 //! ```
@@ -22,8 +23,10 @@
 //! use edge_server::{MessageClient, ServerState};
 //!
 //! let state = ServerState::initialize(&config).await;
+//! state.start_background_tasks().await; // Start message processing
 //! let client = MessageClient::memory(&state.get_message_bus());
-//! let msg = BusMessage::table_intent("add_dish", serde_json::json!({...}));
+//! let payload = shared::message::NotificationPayload::info("Test", "Hello");
+//! let msg = BusMessage::notification(&payload);
 //! client.send(&msg).await?;
 //! let received = client.recv().await?;
 //! ```
@@ -104,25 +107,23 @@ mod tests {
         let client = MessageClient::memory(&bus);
 
         // Send a message
-        let payload = shared::message::OrderIntentPayload {
-            table_id: shared::message::TableId::new_unchecked("T01"),
-            order_id: None,
-            operator: None,
-            action: shared::message::OrderAction::AddDish { dishes: vec![] },
-        };
-        let msg = BusMessage::order_intent(&payload);
+        let payload = shared::message::NotificationPayload::info("Test", "Hello");
+        let msg = BusMessage::notification(&payload);
         client.send(&msg).await.unwrap();
 
         // Verify server received it
         let received_by_server = server_rx.recv().await.unwrap();
-        assert_eq!(received_by_server.event_type, crate::EventType::OrderIntent);
+        assert_eq!(
+            received_by_server.event_type,
+            crate::EventType::Notification
+        );
 
         // Simulate server broadcasting the message back
         bus.publish(msg).await.unwrap();
 
         // Receive it
         let received = client.recv().await.unwrap();
-        assert_eq!(received.event_type, crate::EventType::OrderIntent);
+        assert_eq!(received.event_type, crate::EventType::Notification);
     }
 
     #[tokio::test]

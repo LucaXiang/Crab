@@ -51,7 +51,7 @@ impl MessageHandler {
         }
     }
 
-    /// Set the broadcast sender (for sending TableSync after processing)
+    /// Set the broadcast sender (for sending messages after processing)
     pub fn with_broadcast_tx(mut self, tx: broadcast::Sender<BusMessage>) -> Self {
         self.broadcast_tx = Some(tx);
         self
@@ -73,8 +73,6 @@ impl MessageHandler {
         use crate::message::processor::*;
 
         Self::new(receiver, shutdown_token)
-            .register_processor(Arc::new(OrderIntentProcessor))
-            .register_processor(Arc::new(DataSyncProcessor))
             .register_processor(Arc::new(NotificationProcessor))
             .register_processor(Arc::new(ServerCommandProcessor::new(state)))
     }
@@ -123,11 +121,6 @@ impl MessageHandler {
         // Check if we have a processor for this event type
         if let Some(processor) = self.processors.get(&event_type) {
             self.process_with_retry(msg, processor.clone()).await?;
-
-            // After successfully processing, handle broadcasting
-            if event_type == EventType::OrderIntent {
-                self.broadcast_order_sync(msg).await;
-            }
         } else {
             // Fallback to legacy handling for unregistered types
             self.handle_legacy(msg).await?;
@@ -143,37 +136,6 @@ impl MessageHandler {
             && let Err(e) = tx.send(msg)
         {
             tracing::warn!("Failed to broadcast message: {}", e);
-        }
-    }
-
-    /// Broadcast OrderSync after processing OrderIntent
-    async fn broadcast_order_sync(&self, original_msg: &BusMessage) {
-        if let Some(ref tx) = self.broadcast_tx {
-            // Parse the original intent to extract relevant info
-            if let Ok(intent_payload) = original_msg.parse_payload::<shared::message::OrderIntentPayload>() {
-                // Create a OrderSync message reflecting the result
-                let sync_payload = shared::message::OrderSyncPayload {
-                    action: intent_payload.action.clone(),
-                    table_id: intent_payload.table_id.clone(),
-                    order_id: intent_payload.order_id.clone(),
-                    status: shared::message::OrderStatus::Confirmed,
-                    source: intent_payload
-                        .operator
-                        .unwrap_or_else(|| shared::message::OperatorId::new("server")),
-                    data: None,
-                };
-
-                let sync_msg = BusMessage::order_sync(&sync_payload);
-
-                if let Err(e) = tx.send(sync_msg) {
-                    tracing::warn!("Failed to broadcast OrderSync: {}", e);
-                } else {
-                    tracing::info!(
-                        table_id = %intent_payload.table_id,
-                        "Broadcasted OrderSync"
-                    );
-                }
-            }
         }
     }
 
@@ -294,21 +256,10 @@ impl MessageHandler {
 
     /// Legacy handling for unregistered message types
     async fn handle_legacy(&self, msg: &BusMessage) -> Result<(), Box<dyn std::error::Error>> {
-        // OrderSync 不需要服务端处理，只是广播给客户端
-        match msg.event_type {
-            EventType::OrderSync => {
-                tracing::debug!(
-                    event_type = ?msg.event_type,
-                    "OrderSync is broadcast-only, no server processing needed"
-                );
-            }
-            _ => {
-                tracing::warn!(
-                    event_type = ?msg.event_type,
-                    "No processor registered for event type"
-                );
-            }
-        }
+        tracing::warn!(
+            event_type = ?msg.event_type,
+            "No processor registered for event type"
+        );
         Ok(())
     }
 }

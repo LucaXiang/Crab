@@ -129,7 +129,7 @@ async fn issue_cert(
     } else {
         // 2. Create Tenant CA if needed
         let profile = CaProfile::intermediate(
-            &format!("Tenant CA {}", req.tenant_id),
+            &req.tenant_id,
             &format!("Tenant {}", req.tenant_id),
         );
         let ca = CertificateAuthority::new_intermediate(profile, &root_ca).unwrap();

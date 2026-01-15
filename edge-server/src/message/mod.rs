@@ -35,10 +35,7 @@ pub mod processor;
 
 pub use handler::MessageHandler;
 pub use processor::{MessageProcessor, ProcessResult};
-pub use shared::message::{
-    BusMessage, EventType, NotificationPayload, OrderIntentPayload, OrderSyncPayload,
-    ServerCommandPayload,
-};
+pub use shared::message::{BusMessage, EventType, NotificationPayload, ServerCommandPayload};
 
 use crate::common::AppError;
 
@@ -48,6 +45,7 @@ use crate::common::AppError;
 pub trait Transport: Send + Sync {
     async fn read_message(&self) -> Result<BusMessage, AppError>;
     async fn write_message(&self, msg: &BusMessage) -> Result<(), AppError>;
+    async fn close(&self) -> Result<(), AppError>;
 }
 
 // Helper functions
@@ -137,9 +135,11 @@ impl TcpTransport {
     }
 
     pub async fn close(&self) -> Result<(), AppError> {
-        // Drop the reader and writer locks to close the connection
-        drop(self.reader.lock().await);
-        drop(self.writer.lock().await);
+        let mut writer = self.writer.lock().await;
+        writer
+            .shutdown()
+            .await
+            .map_err(|e| AppError::internal(format!("TCP close failed: {}", e)))?;
         Ok(())
     }
 }
@@ -152,6 +152,15 @@ impl Transport for TcpTransport {
 
     async fn write_message(&self, msg: &BusMessage) -> Result<(), AppError> {
         self.write_message(msg).await
+    }
+
+    async fn close(&self) -> Result<(), AppError> {
+        let mut writer = self.writer.lock().await;
+        writer
+            .shutdown()
+            .await
+            .map_err(|e| AppError::internal(format!("TCP close failed: {}", e)))?;
+        Ok(())
     }
 }
 
@@ -183,6 +192,15 @@ impl Transport for TlsTransport {
     async fn write_message(&self, msg: &BusMessage) -> Result<(), AppError> {
         let mut writer = self.writer.lock().await;
         write_to_stream(&mut *writer, msg).await
+    }
+
+    async fn close(&self) -> Result<(), AppError> {
+        let mut writer = self.writer.lock().await;
+        writer
+            .shutdown()
+            .await
+            .map_err(|e| AppError::internal(format!("TLS close failed: {}", e)))?;
+        Ok(())
     }
 }
 
@@ -501,8 +519,7 @@ impl MessageBus {
                                             match read_result {
                                                 Ok(msg) => {
                                                     // Publish to client_tx so server handlers receive it
-                                                    // TableIntent messages will NOT be broadcast back to clients
-                                                    // (see should_broadcast() in filter.rs)
+                                                    // Messages will be filtered by should_broadcast() in filter.rs
                                                     if let Err(e) = client_tx_clone.send(msg) {
                                                         tracing::warn!("Failed to publish client message: {}", e);
                                                     }
@@ -515,6 +532,8 @@ impl MessageBus {
                                         }
                                     }
                                 }
+                                // Ensure connection is closed gracefully
+                                let _ = transport.close().await;
                             });
                         }
                         Err(e) => {
@@ -562,19 +581,14 @@ mod tests {
         let t1 = bus.memory_transport();
         let t2 = bus.memory_transport();
 
-        use shared::message::{DataSyncPayload, DishId};
-        let payload = DataSyncPayload::DishPrice {
-            dish_id: DishId::new("D001"),
-            old_price: 100,
-            new_price: 200,
-        };
-        let msg = BusMessage::data_sync(&payload);
+        let payload = NotificationPayload::warning("System", "Shutting down");
+        let msg = BusMessage::notification(&payload);
         bus.publish(msg.clone()).await.unwrap();
 
         let r1 = t1.read_message().await.unwrap();
         let r2 = t2.read_message().await.unwrap();
 
-        assert_eq!(r1.event_type, EventType::DataSync);
-        assert_eq!(r2.event_type, EventType::DataSync);
+        assert_eq!(r1.event_type, EventType::Notification);
+        assert_eq!(r2.event_type, EventType::Notification);
     }
 }

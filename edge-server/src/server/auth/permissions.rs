@@ -31,28 +31,23 @@ pub const ALL_PERMISSIONS: &[&str] = &[
 /// Default role permissions
 pub const DEFAULT_ADMIN_PERMISSIONS: &[&str] = &["all"];
 
-pub const DEFAULT_USER_PERMISSIONS: &[&str] = &[
-    "products:read",
-    "categories:read",
-    "orders:read",
-    "orders:write",
-];
+pub const DEFAULT_USER_PERMISSIONS: &[&str] = &["products:read", "categories:read"];
 
 pub const DEFAULT_MANAGER_PERMISSIONS: &[&str] = &[
     "products:read",
     "products:write",
     "categories:read",
     "categories:write",
-    "orders:read",
-    "orders:write",
-    "orders:cancel",
     "users:read",
 ];
 
 /// Get permissions for a role name
 pub fn get_default_permissions(role_name: &str) -> Vec<String> {
     match role_name {
-        "admin" => DEFAULT_ADMIN_PERMISSIONS.iter().map(|s| s.to_string()).collect(),
+        "admin" => DEFAULT_ADMIN_PERMISSIONS
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
         "manager" => DEFAULT_MANAGER_PERMISSIONS
             .iter()
             .map(|s| s.to_string())

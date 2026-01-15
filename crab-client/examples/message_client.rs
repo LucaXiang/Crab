@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=====================================\n");
 
     let auth_url = get_input_with_default("Auth Server URL", "http://localhost:3001");
-    let edge_addr = get_input_with_default("Edge Server Address", "127.0.0.1:8082");
+    let edge_addr = get_input_with_default("Edge Server Address", "127.0.0.1:8081");
 
     // 1. Authenticate
     println!("\n🔑 Authentication required");
@@ -63,8 +63,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 2. Request Certificate
     println!("\n📜 Requesting Client Certificate...");
-    let tenant_id = get_input_with_default("Tenant ID", "tenant-123");
-    let common_name = get_input_with_default("Common Name", "pos-device-1");
+    let tenant_id = get_input_with_default("Tenant ID", "tenant-01");
+    let common_name = get_input_with_default("Common Name", "client-01");
 
     let issue_res = http_client
         .post(format!("{}/api/cert/issue", auth_url))
@@ -159,7 +159,7 @@ async fn interactive_loop(client: MessageClient) -> Result<(), Box<dyn std::erro
         print_menu();
         io::stdout().flush()?;
 
-        let choice = get_input("Enter choice (0-8): ");
+        let choice = get_input("Enter choice (0-3): ");
 
         match choice.as_str() {
             "0" => {
@@ -167,80 +167,6 @@ async fn interactive_loop(client: MessageClient) -> Result<(), Box<dyn std::erro
                 break;
             }
             "1" => {
-                // Add dish to table
-                let table_id = get_input("Table ID (e.g., T01): ");
-                let dish_name = get_input("Dish name: ");
-                let quantity = get_input("Quantity: ").parse::<u32>().unwrap_or(1);
-
-                let payload = shared::message::OrderIntentPayload::add_dish(
-                    shared::message::TableId::new_unchecked(table_id),
-                    vec![shared::message::DishItem::simple(&dish_name, quantity)],
-                    Some(shared::message::OperatorId::new("client_user")),
-                );
-                let msg = BusMessage::order_intent(&payload);
-                client.send(&msg).await?;
-            }
-            "2" => {
-                // Payment request
-                let table_id = get_input("Table ID: ");
-                let _amount = get_input("Amount (cents): ").parse::<u64>().unwrap_or(0);
-                let method = get_input("Payment method (cash/card/wechat/alipay): ");
-
-                let payment_method = match method.to_lowercase().as_str() {
-                    "cash" => shared::message::PaymentMethod::Cash,
-                    "card" => shared::message::PaymentMethod::Card,
-                    "wechat" => shared::message::PaymentMethod::Wechat,
-                    "alipay" => shared::message::PaymentMethod::Alipay,
-                    _ => shared::message::PaymentMethod::Cash,
-                };
-
-                let payload = shared::message::OrderIntentPayload::checkout(
-                    shared::message::TableId::new_unchecked(table_id.clone()),
-                    shared::message::OrderId::new_unchecked("ORD_CLIENT"),
-                    payment_method,
-                    Some(shared::message::OperatorId::new("client_user")),
-                );
-                let msg = BusMessage::order_intent(&payload);
-                client.send(&msg).await?;
-            }
-            "3" => {
-                // Checkout
-                let table_id = get_input("Table ID: ");
-
-                let payload = shared::message::OrderIntentPayload::checkout(
-                    shared::message::TableId::new_unchecked(table_id),
-                    shared::message::OrderId::new_unchecked("ORD_CLIENT"),
-                    shared::message::PaymentMethod::Cash,
-                    Some(shared::message::OperatorId::new("client_user")),
-                );
-                let msg = BusMessage::order_intent(&payload);
-                client.send(&msg).await?;
-            }
-            "4" => {
-                // Dish price update
-                let dish_id = get_input("Dish ID: ");
-                let new_price = get_input("New price (cents): ").parse::<u64>().unwrap_or(0);
-
-                let payload = shared::message::DataSyncPayload::DishPrice {
-                    dish_id: shared::message::DishId::new(dish_id),
-                    old_price: 0,
-                    new_price,
-                };
-                let msg = BusMessage::data_sync(&payload);
-                client.send(&msg).await?;
-            }
-            "5" => {
-                // Dish sold out
-                let dish_id = get_input("Dish ID: ");
-
-                let payload = shared::message::DataSyncPayload::DishSoldOut {
-                    dish_id: shared::message::DishId::new(dish_id),
-                    available: false,
-                };
-                let msg = BusMessage::data_sync(&payload);
-                client.send(&msg).await?;
-            }
-            "6" => {
                 // System notification
                 let title = get_input("Notification title: ");
                 let body = get_input("Notification body: ");
@@ -249,7 +175,7 @@ async fn interactive_loop(client: MessageClient) -> Result<(), Box<dyn std::erro
                 let msg = BusMessage::notification(&payload);
                 client.send(&msg).await?;
             }
-            "7" => {
+            "2" => {
                 // Server command
                 let command_str = get_input("Command (ping/config_update/restart): ");
 
@@ -269,39 +195,18 @@ async fn interactive_loop(client: MessageClient) -> Result<(), Box<dyn std::erro
                 let msg = BusMessage::server_command(&payload);
                 client.send(&msg).await?;
             }
-            "8" => {
+            "3" => {
                 // Custom JSON
                 println!("Enter custom JSON payload:");
                 let json_str = get_input("JSON: ");
 
                 match serde_json::from_str::<serde_json::Value>(&json_str) {
-                    Ok(value) => {
-                        let msg_type = value
-                            .get("type")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("notification");
-                        let msg = match msg_type {
-                            "order_intent" => {
-                                let table_id = value
-                                    .get("table_id")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("T01");
-
-                                let payload = shared::message::OrderIntentPayload::add_dish(
-                                    shared::message::TableId::new_unchecked(table_id),
-                                    vec![shared::message::DishItem::simple("custom_dish", 1)],
-                                    Some(shared::message::OperatorId::new("client_user")),
-                                );
-                                BusMessage::order_intent(&payload)
-                            }
-                            _ => {
-                                let payload = shared::message::NotificationPayload::info(
-                                    "Custom".to_string(),
-                                    json_str,
-                                );
-                                BusMessage::notification(&payload)
-                            }
-                        };
+                    Ok(_value) => {
+                        let payload = shared::message::NotificationPayload::info(
+                            "Custom".to_string(),
+                            json_str,
+                        );
+                        let msg = BusMessage::notification(&payload);
                         client.send(&msg).await?;
                     }
                     Err(e) => println!("❌ Invalid JSON: {}", e),
@@ -334,14 +239,9 @@ fn print_received_message(msg: &BusMessage) {
 
 fn print_menu() {
     println!("\nAvailable Actions:");
-    println!("1. Add Dish (OrderIntent)");
-    println!("2. Payment (OrderIntent)");
-    println!("3. Checkout (OrderIntent)");
-    println!("4. Update Dish Price (DataSync)");
-    println!("5. Set Dish Sold Out (DataSync)");
-    println!("6. Send Notification");
-    println!("7. Server Command");
-    println!("8. Custom JSON");
+    println!("1. Send Notification");
+    println!("2. Server Command");
+    println!("3. Custom JSON");
     println!("0. Exit");
 }
 

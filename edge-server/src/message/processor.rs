@@ -3,7 +3,6 @@
 //! Provides a pluggable architecture for message processing with ACID guarantees.
 
 use async_trait::async_trait;
-use serde_json::Value;
 use std::sync::Arc;
 
 use crate::common::AppError;
@@ -74,158 +73,6 @@ pub trait MessageProcessor: Send + Sync {
     }
 }
 
-/// Order intent processor - handles client requests and updates order state
-///
-/// 处理客户端请求，维护服务端订单状态，然后广播 OrderSync
-pub struct OrderIntentProcessor;
-
-#[async_trait]
-impl MessageProcessor for OrderIntentProcessor {
-    fn event_type(&self) -> EventType {
-        EventType::OrderIntent
-    }
-
-    async fn process(&self, msg: &BusMessage) -> Result<ProcessResult, AppError> {
-        let payload: Value = msg
-            .parse_payload()
-            .map_err(|e| AppError::invalid(format!("Invalid payload: {}", e)))?;
-
-        let action = payload["action"].as_str().unwrap_or("unknown");
-        let _data = &payload["data"];
-
-        tracing::info!(
-            event = "order_intent",
-            action = %action,
-            "Processing order intent"
-        );
-
-        // TODO: ACID 事务处理订单状态
-        //
-        // let mut tx = db.begin().await?;
-        //
-        // // 1. 幂等性检查
-        // if self.is_duplicate(msg).await? {
-        //     return Ok(ProcessResult::Skipped {
-        //         reason: "Duplicate intent".to_string(),
-        //     });
-        // }
-        //
-        // // 2. 根据 action 处理不同的业务逻辑
-        // match action {
-        //     "add_dish" => {
-        //         // 验证菜品
-        //         let dishes = validate_dishes(&data["dishes"]).await?;
-        //         // 更新订单
-        //         let order = db.add_dishes_to_order(table_id, dishes, &tx).await?;
-        //         // 广播状态
-        //         broadcast_table_sync("dish_added", order, &tx).await?;
-        //     }
-        //     "payment" => {
-        //         // 处理付款
-        //         let payment = process_payment(&data, &tx).await?;
-        //         // 广播状态
-        //         broadcast_table_sync("payment_completed", payment, &tx).await?;
-        //     }
-        //     "checkout" => {
-        //         // 结账
-        //         let checkout = finalize_order(table_id, &tx).await?;
-        //         // 广播状态
-        //         broadcast_table_sync("order_closed", checkout, &tx).await?;
-        //     }
-        //     _ => return Ok(ProcessResult::Failed {
-        //         reason: format!("Unknown action: {}", action),
-        //     }),
-        // }
-        //
-        // // 3. 标记消息已处理
-        // db.mark_processed(msg_id, &tx).await?;
-        //
-        // // 4. 提交事务
-        // tx.commit().await?;
-
-        Ok(ProcessResult::Success {
-            message: format!("Table intent processed: {}", action),
-        })
-    }
-
-    fn max_retries(&self) -> u32 {
-        5 // 订单操作重试 5 次
-    }
-
-    fn retry_delay_ms(&self) -> u64 {
-        2000 // 2 秒后重试
-    }
-}
-
-/// Data sync processor - handles base data updates
-///
-/// 处理菜品原型数据更新（价格、名称、图片、状态等）
-pub struct DataSyncProcessor;
-
-#[async_trait]
-impl MessageProcessor for DataSyncProcessor {
-    fn event_type(&self) -> EventType {
-        EventType::DataSync
-    }
-
-    async fn process(&self, msg: &BusMessage) -> Result<ProcessResult, AppError> {
-        let payload: Value = msg
-            .parse_payload()
-            .map_err(|e| AppError::invalid(format!("Invalid payload: {}", e)))?;
-
-        let sync_type = payload["sync_type"].as_str().unwrap_or("unknown");
-        let _data = &payload["data"];
-
-        tracing::info!(
-            event = "data_sync",
-            sync_type = %sync_type,
-            "Processing data sync"
-        );
-
-        // TODO: ACID 事务处理数据更新
-        //
-        // let mut tx = db.begin().await?;
-        //
-        // match sync_type {
-        //     "dish_price" => {
-        //         // 更新菜品价格
-        //         let dish_id = data["dish_id"].as_str().ok_or(AppError::invalid("Missing dish_id".into()))?;
-        //         let new_price = data["new_price"].as_u64().ok_or(AppError::invalid("Missing new_price".into()))?;
-        //         db.update_dish_price(dish_id, new_price, &tx).await?;
-        //
-        //         // 记录价格历史
-        //         db.insert_price_history(dish_id, old_price, new_price, &tx).await?;
-        //     }
-        //     "dish_sold_out" => {
-        //         // 菜品沽清
-        //         let dish_id = data["dish_id"].as_str().ok_or(AppError::invalid("Missing dish_id".into()))?;
-        //         db.set_dish_available(dish_id, false, &tx).await?;
-        //     }
-        //     "dish_added" => {
-        //         // 新菜品上架
-        //         db.insert_dish(data, &tx).await?;
-        //     }
-        //     _ => return Ok(ProcessResult::Failed {
-        //         reason: format!("Unknown sync type: {}", sync_type),
-        //     }),
-        // }
-        //
-        // // 标记已处理
-        // db.mark_processed(msg_id, &tx).await?;
-        //
-        // // 提交事务
-        // tx.commit().await?;
-
-        Ok(ProcessResult::Success {
-            message: format!("Data sync processed: {}", sync_type),
-        })
-    }
-
-    fn max_retries(&self) -> u32 {
-        3 // 数据同步重试 3 次
-    }
-}
-
 /// Notification processor - handles system notifications
 pub struct NotificationProcessor;
 
@@ -236,27 +83,25 @@ impl MessageProcessor for NotificationProcessor {
     }
 
     async fn process(&self, msg: &BusMessage) -> Result<ProcessResult, AppError> {
-        let payload: Value = msg
+        let payload: shared::message::NotificationPayload = msg
             .parse_payload()
             .map_err(|e| AppError::invalid(format!("Invalid payload: {}", e)))?;
 
-        let title = payload["title"].as_str().unwrap_or("(no title)");
-        let body = payload["body"].as_str().unwrap_or("(no body)");
-
         tracing::info!(
             event = "notification",
-            title = %title,
-            body = %body,
+            title = %payload.title,
+            message = %payload.message,
+            level = %payload.level,
             "Processing notification"
         );
 
-        // TODO: 通知逻辑
-        // - 记录日志
-        // - 发送推送
-        // - 邮件/短信通知
+        // TODO: Notification logic
+        // - Log to database
+        // - Push notification
+        // - Email/SMS
 
         Ok(ProcessResult::Success {
-            message: format!("Notification processed: {}", title),
+            message: format!("Notification processed: {}", payload.title),
         })
     }
 }
@@ -313,11 +158,44 @@ impl MessageProcessor for ServerCommandProcessor {
                     });
                 }
 
-                // Calculate certificate fingerprint using SHA256
-                use sha2::{Sha256, Digest};
-                let mut hasher = Sha256::new();
-                hasher.update(edge_cert_pem.as_bytes());
-                let cert_fingerprint = hex::encode(hasher.finalize());
+                // Calculate certificate fingerprint and extract device_id using crab-cert
+                let (cert_fingerprint, cert_device_id) =
+                    match crab_cert::CertMetadata::from_pem(&edge_cert_pem) {
+                        Ok(meta) => (meta.fingerprint_sha256, meta.device_id),
+                        Err(e) => {
+                            tracing::error!("Failed to parse certificate: {}", e);
+                            return Ok(ProcessResult::Failed {
+                                reason: format!("Failed to parse certificate: {}", e),
+                            });
+                        }
+                    };
+
+                // Generate local hardware ID
+                let local_device_id = crab_cert::generate_hardware_id();
+
+                // Verify device ID if present in cert
+                if let Some(ref cert_id) = cert_device_id {
+                    if cert_id != &local_device_id {
+                        tracing::error!(
+                            "Device ID mismatch! Cert: {}, Local: {}",
+                            cert_id,
+                            local_device_id
+                        );
+                        return Ok(ProcessResult::Failed {
+                            reason: format!(
+                                "Device ID mismatch: Cert={}, Local={}",
+                                cert_id, local_device_id
+                            ),
+                        });
+                    }
+                } else {
+                    tracing::warn!(
+                        "Certificate missing Device ID. Proceeding with local ID: {}",
+                        local_device_id
+                    );
+                }
+
+                let device_id = cert_device_id.unwrap_or(local_device_id);
 
                 // Update activation state in database
                 match self
@@ -327,6 +205,7 @@ impl MessageProcessor for ServerCommandProcessor {
                         &tenant_name,
                         &edge_id,
                         &edge_name,
+                        &device_id,
                         &cert_fingerprint,
                     )
                     .await
@@ -345,23 +224,14 @@ impl MessageProcessor for ServerCommandProcessor {
                     }
                 }
             }
-            shared::message::ServerCommand::Ping => {
-                Ok(ProcessResult::Success {
-                    message: "Pong".to_string(),
-                })
-            }
+            shared::message::ServerCommand::Ping => Ok(ProcessResult::Success {
+                message: "Pong".to_string(),
+            }),
             shared::message::ServerCommand::ConfigUpdate { key, value } => {
                 tracing::info!("Received ConfigUpdate: {} = {:?}", key, value);
                 // TODO: Implement config update logic
                 Ok(ProcessResult::Skipped {
                     reason: "Config update not implemented yet".to_string(),
-                })
-            }
-            shared::message::ServerCommand::SyncData { data_type, force } => {
-                tracing::info!("Received SyncData: {:?}, force={}", data_type, force);
-                // TODO: Implement data sync logic
-                Ok(ProcessResult::Skipped {
-                    reason: "Data sync not implemented yet".to_string(),
                 })
             }
             shared::message::ServerCommand::Restart {

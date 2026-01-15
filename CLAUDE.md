@@ -5,7 +5,7 @@ Crab is a distributed restaurant management system written in Rust, featuring an
 
 ## Architecture
 - **Workspace**:
-  - `shared`: Common types, protocols, and message definitions (`OrderIntent`, `OrderSync`).
+  - `shared`: Common types, protocols, and message definitions (`Notification`, `ServerCommand`).
   - `edge-server`: The core edge node. Handles HTTP/TCP requests, database (SurrealDB), and message broadcasting.
   - `crab-client`: Unified client library supporting both Network (HTTP/TCP) and In-Process (Oneshot/Memory) communication.
 
@@ -28,11 +28,12 @@ Crab is a distributed restaurant management system written in Rust, featuring an
 
 ## Key Protocols & Patterns
 - **Message Bus**:
-  - Uses `OrderIntent` (Client -> Server) and `OrderSync` (Server -> Client) for state changes.
+  - Uses `Notification` (Server -> Client) and `ServerCommand` (Upstream -> Server) for system communication.
   - Payloads are defined in `shared::message`.
   - Supports both TCP (network) and Memory (in-process) transports.
 - **Server State**:
   - `ServerState` is initialized via `ServerState::initialize(&config).await`.
+  - Background tasks must be started explicitly via `state.start_background_tasks().await` if not using `Server::run`.
   - Do NOT use `ServerState::new(...)` directly for initialization logic; it is a pure constructor.
   - `ServerState` is designed to be clone-cheap (uses `Arc`).
 - **Client**:
