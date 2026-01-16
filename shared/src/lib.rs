@@ -3,16 +3,16 @@
 //! Common types used across multiple crates including HTTP types,
 //! error types, response structures, and utility types.
 
-pub mod response;
-pub mod error;
-pub mod request;
-pub mod types;
 pub mod client;
+pub mod error;
 pub mod message;
+pub mod request;
+pub mod response;
+pub mod types;
 
 // Re-exports
+pub use axum::{Json, body};
 pub use http;
-pub use axum::{body, Json};
 pub use serde::{Deserialize, Serialize};
 
 // Message bus re-exports (for convenient access)

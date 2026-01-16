@@ -4,10 +4,10 @@
 
 use axum::{extract::FromRequestParts, http::request::Parts};
 
-use crate::common::AppError;
+use crate::AppError;
+use crate::auth::{CurrentUser, JwtService};
+use crate::core::ServerState;
 use crate::security_log;
-use crate::server::ServerState;
-use crate::server::auth::{CurrentUser, JwtService};
 
 /// JWT Auth Extractor
 ///
@@ -35,7 +35,7 @@ impl FromRequestParts<ServerState> for CurrentUser {
             Some(header) => JwtService::extract_from_header(header)
                 .ok_or_else(|| AppError::invalid_token("Invalid authorization header"))?,
             None => {
-                security_log!(WARN, "auth_missing", uri = ?parts.uri);
+                security_log!("WARN", "auth_missing", uri = format!("{:?}", parts.uri));
                 return Err(AppError::Unauthorized);
             }
         };
@@ -59,10 +59,15 @@ impl FromRequestParts<ServerState> for CurrentUser {
                 Ok(user)
             }
             Err(e) => {
-                security_log!(WARN, "auth_failed", error = %e, uri = ?parts.uri);
+                security_log!(
+                    "WARN",
+                    "auth_failed",
+                    error = format!("{}", e),
+                    uri = format!("{:?}", parts.uri)
+                );
 
                 match e {
-                    crate::server::auth::JwtError::ExpiredToken => Err(AppError::TokenExpired),
+                    crate::auth::JwtError::ExpiredToken => Err(AppError::TokenExpired),
                     _ => Err(AppError::invalid_token("Invalid token")),
                 }
             }

@@ -1,0 +1,24 @@
+//! 服务层 - 服务器核心服务
+//!
+//! # 服务列表
+//!
+//! - [`CertService`] - mTLS 证书管理
+//! - [`ActivationService`] - 边缘激活状态管理
+//! - [`HttpsService`] - HTTPS 服务器
+//! - [`MessageBusService`] - 消息总线服务
+//! - [`ProvisioningService`] - 边缘预配服务
+
+pub mod activation;
+pub mod cert;
+pub mod credential;
+pub mod https;
+pub mod message_bus;
+pub mod provisioning;
+
+pub use activation::ActivationService;
+pub use activation::ActivationStatus;
+pub use cert::CertService;
+pub use credential::{Credential, Subscription};
+pub use https::HttpsService;
+pub use message_bus::MessageBusService;
+pub use provisioning::ProvisioningService;

@@ -98,23 +98,20 @@ impl MessageClient {
     }
 
     /// Connect via TCP
-    pub async fn connect(addr: &str, client_name: &str) -> Result<Self, MessageError> {
-        let transport = TcpTransport::connect(addr).await?;
-        let client_transport = ClientTransport::Tcp(transport);
+    pub async fn connect(
+        addr: &str,
+        client_name: &str,
+        ca_cert: &str,
+        client_cert: &str,
+        client_key: &str,
+    ) -> Result<Self, MessageError> {
+        let config = ClientConfig::new("dummy://localhost").with_tls(
+            ca_cert.to_string(),
+            client_cert.to_string(),
+            client_key.to_string(),
+        );
 
-        // 🤝 Perform Handshake
-        let payload = HandshakePayload {
-            version: shared::message::PROTOCOL_VERSION,
-            client_name: Some(client_name.to_string()),
-            client_version: Some(env!("CARGO_PKG_VERSION").to_string()),
-            client_id: None, // Let server generate
-        };
-
-        client_transport
-            .write_message(&BusMessage::handshake(&payload))
-            .await?;
-
-        Ok(Self::new(client_transport))
+        Self::connect_tls(addr, "localhost", config, client_name).await
     }
 
     /// Connect via TLS

@@ -2,12 +2,13 @@
 //!
 //! Provides image upload endpoints for authenticated users.
 
+mod handler;
+
 use axum::{Router, body::Bytes, extract::Path, response::IntoResponse, routing::post};
 use http::header;
 use std::path::PathBuf;
 
-use crate::handler;
-use crate::server::ServerState;
+use crate::core::ServerState;
 
 /// Upload file response
 enum UploadFileResponse {
@@ -68,7 +69,7 @@ async fn serve_uploaded_file(Path(filename): Path<String>) -> UploadFileResponse
 pub fn router() -> Router<ServerState> {
     Router::new()
         // Upload image API - authentication required
-        .route("/api/image/upload", post(handler::upload::upload))
+        .route("/api/image/upload", post(handler::upload))
         // Serve uploaded images - public access
         .route(
             "/api/image/{filename}",

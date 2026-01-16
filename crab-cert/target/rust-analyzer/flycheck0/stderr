@@ -1,0 +1,169 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+   6.041185583s  INFO prepare_target{force=false package_id=crab-auth v0.1.0 (/Users/xzy/workspace/crab/crab-auth) target="crab-auth"}: cargo::core::compiler::fingerprint: stale: changed "/Users/xzy/workspace/crab/crab-cert/src/machine.rs"
+   6.041195416s  INFO prepare_target{force=false package_id=crab-auth v0.1.0 (/Users/xzy/workspace/crab/crab-auth) target="crab-auth"}: cargo::core::compiler::fingerprint:           (vs) "/Users/xzy/workspace/crab/target/debug/.fingerprint/crab-cert-170f00ce6768cafc/dep-lib-crab_cert"
+   6.041197750s  INFO prepare_target{force=false package_id=crab-auth v0.1.0 (/Users/xzy/workspace/crab/crab-auth) target="crab-auth"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 1768583494, nanos: 148159622 } < FileTime { seconds: 1768587388, nanos: 282136053 }
+   6.045214666s  INFO prepare_target{force=false package_id=crab-auth v0.1.0 (/Users/xzy/workspace/crab/crab-auth) target="crab-auth"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-auth v0.1.0 (/Users/xzy/workspace/crab/crab-auth)/Check { test: false }/TargetInner { name: "crab-auth", doc: true, ..: with_path("/Users/xzy/workspace/crab/crab-auth/src/main.rs", Edition2024) }
+   6.045222750s  INFO prepare_target{force=false package_id=crab-auth v0.1.0 (/Users/xzy/workspace/crab/crab-auth) target="crab-auth"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "crab_cert" })
+   6.052067583s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="crab_cert"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("crab_cert", ["lib"], "/Users/xzy/workspace/crab/crab-cert/src/lib.rs", Edition2024) }
+   6.052075291s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="crab_cert"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "/Users/xzy/workspace/crab/target/debug/.fingerprint/crab-cert-170f00ce6768cafc/dep-lib-crab_cert", reference_mtime: FileTime { seconds: 1768583494, nanos: 148159622 }, stale: "/Users/xzy/workspace/crab/crab-cert/src/machine.rs", stale_mtime: FileTime { seconds: 1768587388, nanos: 282136053 } }))
+   6.061465916s  INFO prepare_target{force=false package_id=crab-auth v0.1.0 (/Users/xzy/workspace/crab/crab-auth) target="crab-auth"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-auth v0.1.0 (/Users/xzy/workspace/crab/crab-auth)/Check { test: true }/TargetInner { name: "crab-auth", doc: true, ..: with_path("/Users/xzy/workspace/crab/crab-auth/src/main.rs", Edition2024) }
+   6.061475750s  INFO prepare_target{force=false package_id=crab-auth v0.1.0 (/Users/xzy/workspace/crab/crab-auth) target="crab-auth"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "crab_cert" })
+   6.062537083s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="crab_cert"}: cargo::core::compiler::fingerprint: stale: changed "/Users/xzy/workspace/crab/crab-cert/src/machine.rs"
+   6.062540291s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="crab_cert"}: cargo::core::compiler::fingerprint:           (vs) "/Users/xzy/workspace/crab/target/debug/.fingerprint/crab-cert-978de2f5ec639f5e/dep-test-lib-crab_cert"
+   6.062541458s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="crab_cert"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 1768583494, nanos: 148156497 } < FileTime { seconds: 1768587388, nanos: 282136053 }
+   6.062668750s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="crab_cert"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("crab_cert", ["lib"], "/Users/xzy/workspace/crab/crab-cert/src/lib.rs", Edition2024) }
+   6.062673208s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="crab_cert"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "/Users/xzy/workspace/crab/target/debug/.fingerprint/crab-cert-978de2f5ec639f5e/dep-test-lib-crab_cert", reference_mtime: FileTime { seconds: 1768583494, nanos: 148156497 }, stale: "/Users/xzy/workspace/crab/crab-cert/src/machine.rs", stale_mtime: FileTime { seconds: 1768587388, nanos: 282136053 } }))
+   6.063624708s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="crypto_ops"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert)/Check { test: true }/TargetInner { kind: "test", name: "crypto_ops", benched: false, ..: with_path("/Users/xzy/workspace/crab/crab-cert/tests/crypto_ops.rs", Edition2024) }
+   6.063628458s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="crypto_ops"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "crab_cert" })
+   6.064137250s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="full_flow"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert)/Check { test: true }/TargetInner { kind: "test", name: "full_flow", benched: false, ..: with_path("/Users/xzy/workspace/crab/crab-cert/tests/full_flow.rs", Edition2024) }
+   6.064140750s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="full_flow"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "crab_cert" })
+   6.064624083s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="pki_hierarchy"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert)/Check { test: true }/TargetInner { kind: "test", name: "pki_hierarchy", benched: false, ..: with_path("/Users/xzy/workspace/crab/crab-cert/tests/pki_hierarchy.rs", Edition2024) }
+   6.064627250s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="pki_hierarchy"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "crab_cert" })
+   6.065112208s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="mtls_demo"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert)/Check { test: false }/TargetInner { kind: "example", name: "mtls_demo", tested: false, benched: false, ..: with_path("/Users/xzy/workspace/crab/crab-cert/examples/mtls_demo.rs", Edition2024) }
+   6.065115416s  INFO prepare_target{force=false package_id=crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert) target="mtls_demo"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "crab_cert" })
+   6.067601666s  INFO prepare_target{force=false package_id=crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client) target="crab_client"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("crab_client", ["lib"], "/Users/xzy/workspace/crab/crab-client/src/lib.rs", Edition2024) }
+   6.067605416s  INFO prepare_target{force=false package_id=crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client) target="crab_client"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "crab_cert" })
+   6.073620541s  INFO prepare_target{force=false package_id=crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client) target="crab_client"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("crab_client", ["lib"], "/Users/xzy/workspace/crab/crab-client/src/lib.rs", Edition2024) }
+   6.073624750s  INFO prepare_target{force=false package_id=crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client) target="crab_client"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "crab_cert" })
+   6.077593041s  INFO prepare_target{force=false package_id=crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client) target="crab-client"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client)/Check { test: false }/TargetInner { name: "crab-client", doc: true, ..: with_path("/Users/xzy/workspace/crab/crab-client/src/main.rs", Edition2024) }
+   6.077601500s  INFO prepare_target{force=false package_id=crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client) target="crab-client"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "crab_client" })
+   6.078423750s  INFO prepare_target{force=false package_id=crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client) target="crab-client"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client)/Check { test: true }/TargetInner { name: "crab-client", doc: true, ..: with_path("/Users/xzy/workspace/crab/crab-client/src/main.rs", Edition2024) }
+   6.078427916s  INFO prepare_target{force=false package_id=crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client) target="crab-client"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "crab_client" })
+   6.079280583s  INFO prepare_target{force=false package_id=crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client) target="message_client"}: cargo::core::compiler::fingerprint: fingerprint dirty for crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client)/Check { test: false }/TargetInner { kind: "example", name: "message_client", tested: false, benched: false, ..: with_path("/Users/xzy/workspace/crab/crab-client/examples/message_client.rs", Edition2024) }
+   6.079284833s  INFO prepare_target{force=false package_id=crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client) target="message_client"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "crab_client" })
+   6.099479208s  INFO prepare_target{force=false package_id=edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server) target="edge_server"}: cargo::core::compiler::fingerprint: fingerprint error for edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("edge_server", ["lib"], "/Users/xzy/workspace/crab/edge-server/src/lib.rs", Edition2024) }
+   6.099491375s  INFO prepare_target{force=false package_id=edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server) target="edge_server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/xzy/workspace/crab/target/debug/.fingerprint/edge-server-aca7aa2906d65e4f/lib-edge_server`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   6.120359250s  INFO prepare_target{force=false package_id=edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server) target="edge_server"}: cargo::core::compiler::fingerprint: fingerprint error for edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("edge_server", ["lib"], "/Users/xzy/workspace/crab/edge-server/src/lib.rs", Edition2024) }
+   6.120369541s  INFO prepare_target{force=false package_id=edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server) target="edge_server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/xzy/workspace/crab/target/debug/.fingerprint/edge-server-91f073c74d22e327/test-lib-edge_server`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   6.121790833s  INFO prepare_target{force=false package_id=edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server) target="edge-server"}: cargo::core::compiler::fingerprint: fingerprint error for edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server)/Check { test: false }/TargetInner { name: "edge-server", doc: true, ..: with_path("/Users/xzy/workspace/crab/edge-server/src/main.rs", Edition2024) }
+   6.121795583s  INFO prepare_target{force=false package_id=edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server) target="edge-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/xzy/workspace/crab/target/debug/.fingerprint/edge-server-ac3d209861c46253/bin-edge-server`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   6.122878666s  INFO prepare_target{force=false package_id=edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server) target="edge-server"}: cargo::core::compiler::fingerprint: fingerprint error for edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server)/Check { test: true }/TargetInner { name: "edge-server", doc: true, ..: with_path("/Users/xzy/workspace/crab/edge-server/src/main.rs", Edition2024) }
+   6.122881833s  INFO prepare_target{force=false package_id=edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server) target="edge-server"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/xzy/workspace/crab/target/debug/.fingerprint/edge-server-aa6ffb000f33dce9/test-bin-edge-server`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   6.124357291s  INFO prepare_target{force=false package_id=edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server) target="interactive_demo"}: cargo::core::compiler::fingerprint: fingerprint error for edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server)/Check { test: false }/TargetInner { kind: "example", name: "interactive_demo", tested: false, benched: false, ..: with_path("/Users/xzy/workspace/crab/edge-server/examples/interactive_demo.rs", Edition2024) }
+   6.124360375s  INFO prepare_target{force=false package_id=edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server) target="interactive_demo"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/xzy/workspace/crab/target/debug/.fingerprint/edge-server-b2720f593d709297/example-interactive_demo`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+    Checking crab-cert v0.1.0 (/Users/xzy/workspace/crab/crab-cert)
+    Checking crab-client v0.1.0 (/Users/xzy/workspace/crab/crab-client)
+    Checking edge-server v0.1.0 (/Users/xzy/workspace/crab/edge-server)
+    Checking crab-auth v0.1.0 (/Users/xzy/workspace/crab/crab-auth)
+error: could not compile `edge-server` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `edge-server` (lib test) due to 3 previous errors

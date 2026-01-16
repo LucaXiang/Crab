@@ -2,7 +2,7 @@
 //!
 //! Standardized API response structures for the entire framework
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Standard API response code
 pub const API_CODE_SUCCESS: &str = "E0000";
@@ -79,7 +79,10 @@ impl<T> ApiResponse<T> {
     }
 }
 
-impl<T> Default for ApiResponse<T> where T: Default {
+impl<T> Default for ApiResponse<T>
+where
+    T: Default,
+{
     fn default() -> Self {
         Self {
             code: API_CODE_SUCCESS.to_string(),

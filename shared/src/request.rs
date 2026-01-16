@@ -26,10 +26,7 @@ impl RequestContext {
             .cloned()
             .unwrap_or_else(Uuid::new_v4);
 
-        let remote_addr = req
-            .extensions()
-            .get::<std::net::SocketAddr>()
-            .copied();
+        let remote_addr = req.extensions().get::<std::net::SocketAddr>().copied();
 
         Self {
             request_id,

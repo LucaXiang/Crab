@@ -6,15 +6,15 @@
 use axum::Json;
 use axum::extract::{Extension, Multipart, State};
 use image::DynamicImage;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::{fs, io::Cursor};
 use uuid::Uuid;
 
 use crate::audit_log;
-use crate::common::{AppError, AppResponse, ok};
-use crate::server::{CurrentUser, ServerState};
+use crate::utils::AppResponse;
+use crate::{AppError, CurrentUser, ServerState};
 
 /// Maximum file size (5MB)
 const MAX_FILE_SIZE: usize = 5 * 1024 * 1024;
@@ -222,7 +222,7 @@ pub async fn upload(
             url,
         };
 
-        return Ok(ok(response));
+        return Ok(crate::ok!(response));
     }
 
     // Generate unique filename for new file
@@ -262,62 +262,5 @@ pub async fn upload(
         url,
     };
 
-    Ok(ok(response))
-}
-
-/// Get image info handler
-pub async fn get_image_info(
-    Extension(_current_user): Extension<CurrentUser>,
-    Json(request): Json<GetImageRequest>,
-) -> Result<Json<AppResponse<ImageInfoResponse>>, AppError> {
-    let file_path = PathBuf::from(&request.path);
-
-    // Validate path is within uploads directory
-    if !file_path.starts_with("uploads") {
-        return Err(AppError::forbidden("Invalid file path".to_string()));
-    }
-
-    if !file_path.exists() {
-        return Err(AppError::not_found("Image not found".to_string()));
-    }
-
-    // Get file metadata
-    let metadata = fs::metadata(&file_path)
-        .map_err(|e| AppError::internal(format!("Failed to read file: {}", e)))?;
-
-    let img = image::open(&file_path)
-        .map_err(|e| AppError::internal(format!("Failed to open image: {}", e)))?;
-
-    let response = ImageInfoResponse {
-        file_id: request.file_id,
-        filename: file_path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("")
-            .to_string(),
-        size: metadata.len() as usize,
-        width: img.width(),
-        height: img.height(),
-        format: "jpg".to_string(),
-    };
-
-    Ok(ok(response))
-}
-
-/// Request to get image info
-#[derive(Debug, Deserialize)]
-pub struct GetImageRequest {
-    pub file_id: String,
-    pub path: String,
-}
-
-/// Image information response
-#[derive(Debug, Serialize)]
-pub struct ImageInfoResponse {
-    pub file_id: String,
-    pub filename: String,
-    pub size: usize,
-    pub width: u32,
-    pub height: u32,
-    pub format: String,
+    Ok(crate::ok!(response))
 }

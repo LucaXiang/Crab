@@ -1,8 +1,8 @@
 //! Employee Model
 
+use super::RoleId;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
-use super::RoleId;
 
 /// Employee ID type
 pub type EmployeeId = Thing;
@@ -42,8 +42,8 @@ impl Employee {
     /// Verify password using argon2
     pub fn verify_password(&self, password: &str) -> Result<bool, argon2::password_hash::Error> {
         use argon2::{
-            password_hash::{PasswordHash, PasswordVerifier},
             Argon2,
+            password_hash::{PasswordHash, PasswordVerifier},
         };
 
         let parsed_hash = PasswordHash::new(&self.hash_pass)?;
@@ -55,8 +55,8 @@ impl Employee {
     /// Hash password using argon2
     pub fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
         use argon2::{
-            password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
             Argon2,
+            password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
         };
 
         let salt = SaltString::generate(&mut OsRng);
