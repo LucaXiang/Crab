@@ -1,3 +1,4 @@
+use crate::ClientType;
 use crate::message::MessageError;
 use crate::message::transport::{MemoryTransport, TcpTransport, TlsTransport, Transport};
 use rustls::ClientConfig;
@@ -53,6 +54,116 @@ impl ClientTransport {
 }
 
 impl MessageClient {
+    /// Create a message client from a ClientConfig
+    pub async fn from_config(config: &crate::ClientConfig) -> Result<Self, MessageError> {
+        match config.client_type {
+            ClientType::Http => {
+                // HTTP client type is not supported for message client
+                Err(MessageError::Connection(
+                    "Message client does not support HTTP client type".to_string(),
+                ))
+            }
+            ClientType::Message => {
+                if let Some(ref tcp_addr) = config.message_tcp_addr {
+                    // Check if we need TLS configuration
+                    let client_transport = if let Some(ref ca_cert_pem) = config.tls_ca_cert {
+                        // Optional: Validate certificate chain if root CA is provided
+                        if let Some(ref root_ca_pem) = config.tls_root_ca_cert {
+                            tracing::info!("Validating certificate chain: Root CA -> Tenant CA");
+                            match crab_cert::verify_chain_against_root(ca_cert_pem, root_ca_pem) {
+                                Ok(_) => tracing::info!("✅ Certificate chain validation passed"),
+                                Err(e) => {
+                                    tracing::warn!("⚠️ Certificate chain validation failed: {}", e);
+                                    // Continue anyway for backward compatibility
+                                }
+                            }
+                        }
+
+                        let mut ca_reader = std::io::Cursor::new(ca_cert_pem);
+                        let ca_certs: Vec<rustls::pki_types::CertificateDer> =
+                            rustls_pemfile::certs(&mut ca_reader)
+                                .collect::<Result<Vec<_>, _>>()
+                                .unwrap_or_else(|e| {
+                                    tracing::warn!("Failed to parse CA certificates: {}", e);
+                                    Vec::new()
+                                });
+
+                        let mut root_store = rustls::RootCertStore::empty();
+                        for cert in ca_certs {
+                            root_store.add(cert).unwrap_or_else(|e| {
+                                tracing::warn!("Failed to add CA certificate: {}", e);
+                            });
+                        }
+
+                        let verifier =
+                            std::sync::Arc::new(crab_cert::SkipHostnameVerifier::new(root_store));
+
+                        let config_builder = rustls::ClientConfig::builder()
+                            .dangerous()
+                            .with_custom_certificate_verifier(verifier);
+
+                        let tls_config = if let (Some(cert_pem), Some(key_pem)) =
+                            (&config.tls_client_cert, &config.tls_client_key)
+                        {
+                            let mut cert_reader = std::io::Cursor::new(cert_pem);
+                            let certs: Vec<rustls::pki_types::CertificateDer> =
+                                rustls_pemfile::certs(&mut cert_reader)
+                                    .collect::<Result<Vec<_>, _>>()
+                                    .unwrap_or_else(|e| {
+                                        tracing::warn!(
+                                            "Failed to parse client certificates: {}",
+                                            e
+                                        );
+                                        Vec::new()
+                                    });
+
+                            let mut key_reader = std::io::Cursor::new(key_pem);
+                            let key = rustls_pemfile::private_key(&mut key_reader)
+                                .unwrap_or_else(|e| {
+                                    tracing::warn!("Failed to parse client key: {}", e);
+                                    panic!("Failed to parse client key");
+                                })
+                                .expect("Client key must be present");
+
+                            config_builder
+                                .with_client_auth_cert(certs, key)
+                                .expect("Failed to set client auth")
+                        } else {
+                            config_builder.with_no_client_auth()
+                        };
+
+                        // Connect via TLS
+                        let transport =
+                            TlsTransport::connect(tcp_addr, "localhost", tls_config).await?;
+                        ClientTransport::Tls(transport)
+                    } else {
+                        // Plain TCP connection
+                        let transport = TcpTransport::connect(tcp_addr).await?;
+                        ClientTransport::Tcp(transport)
+                    };
+
+                    // 🤝 Perform Handshake
+                    let payload = HandshakePayload {
+                        version: shared::message::PROTOCOL_VERSION,
+                        client_name: Some("crab-client".to_string()),
+                        client_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                        client_id: None, // Let server generate
+                    };
+
+                    client_transport
+                        .write_message(&BusMessage::handshake(&payload))
+                        .await?;
+
+                    Ok(Self::new(client_transport))
+                } else {
+                    Err(MessageError::Connection(
+                        "Message client requires tcp_addr configuration".to_string(),
+                    ))
+                }
+            }
+        }
+    }
+
     fn new(transport: ClientTransport) -> Self {
         let (event_tx, _) = broadcast::channel(1024);
         let pending_requests: Arc<Mutex<HashMap<Uuid, oneshot::Sender<BusMessage>>>> =
@@ -87,7 +198,7 @@ impl MessageClient {
                     }
                     Err(e) => {
                         tracing::error!("Transport read error: {}", e);
-                        // TODO: Implement reconnection logic or propagate error
+                        // 连接断开，客户端需重新 connect
                         break;
                     }
                 }
@@ -98,20 +209,23 @@ impl MessageClient {
     }
 
     /// Connect via TCP
-    pub async fn connect(
-        addr: &str,
-        client_name: &str,
-        ca_cert: &str,
-        client_cert: &str,
-        client_key: &str,
-    ) -> Result<Self, MessageError> {
-        let config = ClientConfig::new("dummy://localhost").with_tls(
-            ca_cert.to_string(),
-            client_cert.to_string(),
-            client_key.to_string(),
-        );
+    pub async fn connect(addr: &str, client_name: &str) -> Result<Self, MessageError> {
+        let transport = TcpTransport::connect(addr).await?;
+        let client_transport = ClientTransport::Tcp(transport);
 
-        Self::connect_tls(addr, "localhost", config, client_name).await
+        // 🤝 Perform Handshake
+        let payload = HandshakePayload {
+            version: shared::message::PROTOCOL_VERSION,
+            client_name: Some(client_name.to_string()),
+            client_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            client_id: None, // Let server generate
+        };
+
+        client_transport
+            .write_message(&BusMessage::handshake(&payload))
+            .await?;
+
+        Ok(Self::new(client_transport))
     }
 
     /// Connect via TLS

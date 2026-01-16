@@ -4,10 +4,13 @@ A unified client library for the Crab Edge Server with support for both HTTP and
 
 ## Features
 
-- **HTTP Client**: Network-based HTTP calls to the Edge Server API
+- **HTTP Client**: Network-based HTTP calls to the Edge Server API with TLS/mTLS support
 - **Message Client**: Subscribe and publish messages via:
   - **TCP Transport**: Network-based message communication
   - **Memory Transport**: Zero-copy in-process communication
+- **Certificate Management**: 
+  - **mTLS Support**: Complete certificate chain validation (Root CA → Tenant CA → Edge Cert)
+  - **Trust Chain**: Download and verify Root CA certificates from auth server
 
 ## Quick Start
 
@@ -23,6 +26,27 @@ let config = ClientConfig {
 
 let client = HttpClient::new(config);
 let response = client.get::<ApiResponse<Health>>("/health").await?;
+```
+
+### HTTP Client with TLS/mTLS
+
+```rust
+use crab_client::{HttpClient, ClientConfig, CertCache};
+
+// Simple TLS configuration
+let config = ClientConfig {
+    base_url: "https://edge-server.com".to_string(),
+    timeout: std::time::Duration::from_secs(5),
+    tls_ca_cert: Some(ca_cert_pem.to_string()),
+    tls_client_cert: Some(client_cert_pem.to_string()),
+    tls_client_key: Some(client_key_pem.to_string()),
+    // Optional: Root CA for complete chain validation
+    tls_root_ca_cert: Some(root_ca_pem.to_string()),
+    ..Default::default()
+};
+
+let client = HttpClient::new(&config);
+// Certificate chain validation happens automatically
 ```
 
 ### Message Client - TCP Mode

@@ -30,35 +30,59 @@ impl HttpClient {
 
         // Configure mTLS if certificates are provided
         if let Some(ca_cert_pem) = &config.tls_ca_cert {
-            // 1. Load Root CA
-            let mut root_store = rustls::RootCertStore::empty();
-            let mut reader = std::io::BufReader::new(ca_cert_pem.as_bytes());
-            for c in rustls_pemfile::certs(&mut reader).flatten() {
-                root_store.add(c).ok();
+            // Optional: Validate certificate chain if root CA is provided
+            if let Some(root_ca_pem) = &config.tls_root_ca_cert {
+                tracing::info!("Validating certificate chain: Root CA -> Tenant CA");
+                match crab_cert::verify_chain_against_root(ca_cert_pem, root_ca_pem) {
+                    Ok(_) => tracing::info!("✅ Certificate chain validation passed"),
+                    Err(e) => {
+                        tracing::warn!("⚠️ Certificate chain validation failed: {}", e);
+                        // Continue anyway for backward compatibility
+                    }
+                }
             }
 
-            // 2. Create SkipHostnameVerifier (ignores hostname mismatch, but enforces CA signature)
+            let mut ca_reader = std::io::Cursor::new(ca_cert_pem);
+            let ca_certs: Vec<rustls::pki_types::CertificateDer> =
+                rustls_pemfile::certs(&mut ca_reader)
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("Failed to parse CA certificates: {}", e);
+                        Vec::new()
+                    });
+
+            let mut root_store = rustls::RootCertStore::empty();
+            for cert in ca_certs {
+                root_store.add(cert).unwrap_or_else(|e| {
+                    tracing::warn!("Failed to add CA certificate: {}", e);
+                });
+            }
+
             let verifier = std::sync::Arc::new(crab_cert::SkipHostnameVerifier::new(root_store));
 
-            // 3. Prepare Client Config Builder
             let config_builder = rustls::ClientConfig::builder()
                 .dangerous()
                 .with_custom_certificate_verifier(verifier);
 
-            // 4. Load Client Cert/Key if present
             let tls_config = if let (Some(cert_pem), Some(key_pem)) =
                 (&config.tls_client_cert, &config.tls_client_key)
             {
-                let certs =
-                    rustls_pemfile::certs(&mut std::io::BufReader::new(cert_pem.as_bytes()))
-                        .filter_map(|r| r.ok())
-                        .collect::<Vec<_>>();
+                let mut cert_reader = std::io::Cursor::new(cert_pem);
+                let certs: Vec<rustls::pki_types::CertificateDer> =
+                    rustls_pemfile::certs(&mut cert_reader)
+                        .collect::<Result<Vec<_>, _>>()
+                        .unwrap_or_else(|e| {
+                            tracing::warn!("Failed to parse client certificates: {}", e);
+                            Vec::new()
+                        });
 
-                let mut key_reader = std::io::BufReader::new(key_pem.as_bytes());
+                let mut key_reader = std::io::Cursor::new(key_pem);
                 let key = rustls_pemfile::private_key(&mut key_reader)
-                    .ok()
-                    .flatten()
-                    .expect("Failed to parse client key");
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("Failed to parse client key: {}", e);
+                        panic!("Failed to parse client key: {}", e);
+                    })
+                    .expect("Client key must be present");
 
                 config_builder
                     .with_client_auth_cert(certs, key)

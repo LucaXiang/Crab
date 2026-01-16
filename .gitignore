@@ -3,29 +3,55 @@
 **/*.rs.bk
 *.pdb
 
-# Cargo lock for workspace (keep for applications, ignore for libraries)
-# We keep it since edge-server is an application
-# Cargo.lock
-
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+
+# OS specific
 .DS_Store
+Thumbs.db
 
 # Environment
 .env
 .env.local
 .env.*.local
 
-# Database
+# ========== Database ==========
+# SurrealDB
+.surrealdb
 *.db
-*.sqlite
-*.rocksdb/
-database/
 
+# RocksDB files
+CURRENT
+IDENTITY
+LOCK
+LOG
+LOG.old*
+MANIFEST-*
+OPTIONS-*
+*.sst
+*.ldb
+
+# Database directories
+database/
+*.rocksdb/
+*.sqlite
+
+# ========== Certificates & Secrets ==========
+# Certificate storage
+auth_storage/
+**/certs/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+Credential.json
+
+# ========== Runtime Data ==========
 # Logs
 logs/
 *.log
@@ -38,13 +64,14 @@ data/
 tmp/
 temp/
 *.tmp
+temp_*/
 
-# SurrealDB
-.surrealdb
-
+# ========== Tools ==========
 # Claude/Serena
 .claude/
 .serena/
 
-# OS specific
-Thumbs.db
+# ========== Project Specific ==========
+# Analysis and task docs (generated)
+docs/PROJECT_ANALYSIS.md
+docs/tasks/

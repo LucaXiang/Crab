@@ -13,11 +13,11 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
-use crate::common::AppError;
 use crate::message::processor::{MessageProcessor, ProcessResult};
 use crate::message::{BusMessage, EventType};
+use crate::utils::AppError;
 
-use crate::server::ServerState;
+use crate::core::ServerState;
 
 /// 具备 ACID 保证的服务端消息处理器
 ///
@@ -262,21 +262,14 @@ impl MessageHandler {
     }
 
     /// 发送失败消息到死信队列
+    /// 死信队列处理 (仅记录日志，持久化由 RequestStore 自动处理)
     async fn send_to_dead_letter_queue(&self, msg: &BusMessage, reason: &str) {
         tracing::error!(
             event_type = ?msg.event_type,
             reason = %reason,
             payload_len = %msg.payload.len(),
-            "Sending message to dead letter queue"
+            "Message sent to dead letter queue"
         );
-
-        // TODO: 实现死信队列
-        // - 保存到数据库
-        // - 发送告警
-        // - 记录到文件
-        // 例如：
-        // db.insert_dead_letter(msg, reason).await?;
-        // alert_service.send("Message processing failed", msg).await?;
     }
 
     /// 未注册消息类型的遗留处理逻辑

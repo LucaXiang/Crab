@@ -13,61 +13,107 @@ exclude = []
 version = "0.1.0"
 edition = "2024"
 
-[workspace.dependencies]
-# Shared workspace crates
-shared = { path = "shared" }
+# ========== Release Profile Optimization ==========
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
 
-# Serialization
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = false
+
+[workspace.dependencies]
+# ========== Workspace Crates ==========
+shared = { path = "shared" }
+crab-cert = { path = "crab-cert" }
+crab-client = { path = "crab-client" }
+
+# ========== Serialization ==========
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# Error handling
+# ========== Error Handling ==========
 thiserror = "2"
 anyhow = "1"
 
-# HTTP and Web
+# ========== HTTP and Web ==========
 http = "1"
 axum = { version = "0.8", features = ["json"] }
 hyper = { version = "1", features = ["full"] }
-tower = { version = "0.5.3", features = ["limit", "timeout"] }
+tower = { version = "0.5", features = ["limit", "timeout"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip", "request-id"] }
+http-body-util = "0.1"
 
-# HTTP client
+# ========== HTTP Client ==========
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
-# Async runtime
+# ========== TLS (aws-lc-rs backend with FIPS) ==========
+# FIPS 140-3 compliant cryptography via aws-lc-rs
+aws-lc-rs = { version = "1", features = ["fips"] }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "fips"] }
+tokio-rustls = "0.26"
+rustls-pemfile = "2"
+rustls-pki-types = "1"
+rustls-webpki = "0.103"
+webpki-roots = "1.0"
+
+# ========== Async Runtime ==========
 tokio = { version = "1", features = ["full"] }
 tokio-util = "0.7"
 async-trait = "0.1"
 
-# Time and UUID
-chrono = { version = "0.4.43", features = ["serde"] }
+# ========== Time and UUID ==========
+chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
+time = { version = "0.3", features = ["macros", "parsing", "formatting"] }
 
-# Validation
+# ========== Validation ==========
 validator = { version = "0.20", features = ["derive"] }
 
-# Cryptography
+# ========== Cryptography ==========
 sha2 = "0.10"
 hex = "0.4"
 argon2 = { version = "0.5", features = ["std"] }
-jsonwebtoken = { version = "10.2.0", default-features = false, features = ["rust_crypto"] }
+jsonwebtoken = { version = "10.2", default-features = false, features = ["rust_crypto"] }
+ring = "0.17"
+rsa = "0.9"
+rand = "0.8"
 
-# Logging and tracing
+# ========== Certificate ==========
+rcgen = "0.14"
+x509-parser = "0.18"
+pem = "3.0"
+
+# ========== Logging and Tracing ==========
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
 
-# Database
-surrealdb = { version = "2.4.1", features = ["kv-rocksdb"] }
-surrealdb-migrations = "2.4.0"
+# ========== Database ==========
+surrealdb = { version = "2.4", features = ["kv-rocksdb"] }
+surrealdb-migrations = "2.4"
 
-# Other utilities
+# ========== Utilities ==========
 dotenv = "0.15"
 socketioxide = "0.18"
-http-body-util = "0.1"
 mime_guess = "2.0"
 image = { version = "0.25", features = ["jpeg", "png", "webp"] }
 include_dir = "0.7"
 symlink = "0.1"
-tempfile = "3.12"
+tempfile = "3"
+dashmap = "6.1"
+sysinfo = "0.37"
+base64 = "0.22"
+log = "0.4"
+
+# ========== HTTPS Server ==========
+axum-server = { version = "0.8", features = ["tls-rustls"] }
+
+# ========== TUI (dev/examples) ==========
+ratatui = "0.29"
+crossterm = "0.28"
+tui-input = "0.10"
+tui-logger = { version = "0.14", features = ["tracing-support"] }

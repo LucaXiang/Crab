@@ -1,6 +1,6 @@
-use crate::common::AppError;
+use crate::core::ServerState;
 use crate::message::{BusMessage, EventType};
-use crate::server::ServerState;
+use crate::utils::AppError;
 use async_trait::async_trait;
 use std::sync::Arc;
 

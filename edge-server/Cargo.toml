@@ -4,11 +4,13 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-# Workspace shared types
+# Workspace crates
 shared.workspace = true
+crab-cert.workspace = true
 
 # Web framework
 axum = { workspace = true, features = ["multipart"] }
+axum-server.workspace = true
 tower.workspace = true
 tower-http.workspace = true
 
@@ -50,6 +52,7 @@ validator.workspace = true
 # Cryptography
 sha2.workspace = true
 hex.workspace = true
+ring.workspace = true
 
 # Async runtime
 tokio.workspace = true
@@ -57,7 +60,11 @@ tokio-util.workspace = true
 async-trait.workspace = true
 
 # HTTP Client
-reqwest = { workspace = true }
+reqwest.workspace = true
+
+# TLS
+rustls.workspace = true
+tokio-rustls.workspace = true
 
 # Image processing
 image.workspace = true
@@ -67,22 +74,17 @@ mime_guess.workspace = true
 dotenv.workspace = true
 include_dir.workspace = true
 symlink.workspace = true
-crab-cert = { version = "0.1.0", path = "../crab-cert" }
-rustls = "0.23.36"
-tokio-rustls = "0.26.4"
-axum-server = { version = "0.8.0", features = ["tls-rustls"] }
-dashmap = "6.1.0"
+dashmap.workspace = true
 
 [dev-dependencies]
 # Testing
-reqwest.workspace = true
 tempfile.workspace = true
-crab-client = { path = "../crab-client" }
-ratatui = "0.29.0"
-crossterm = "0.28.1"
-tui-input = "0.11.0"
-tui-logger = { version = "0.14.3", features = ["tracing-support"] }
-log = "0.4"
-tracing-subscriber = "0.3"
+crab-client.workspace = true
 
-
+# TUI
+ratatui.workspace = true
+crossterm.workspace = true
+tui-input.workspace = true
+tui-logger.workspace = true
+log.workspace = true
+tracing-subscriber.workspace = true

@@ -7,7 +7,7 @@ pub mod error;
 pub mod http;
 pub mod message;
 
-pub use config::ClientConfig;
+pub use config::{ClientConfig, ClientType};
 pub use error::{ClientError, ClientResult};
 pub use http::HttpClient;
 

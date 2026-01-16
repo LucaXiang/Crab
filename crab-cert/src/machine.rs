@@ -1,55 +1,57 @@
 use sha2::{Digest, Sha256};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 
-/// Generate a unique and stable Hardware ID for the machine.
+/// Generate a stable Hardware ID for the machine
 ///
-/// This function aggregates various hardware characteristics to produce a SHA-256 fingerprint.
-/// It aims to be stable across reboots and OS updates, but unique to the physical hardware.
+/// This function aggregates hardware characteristics to produce a stable SHA-256 fingerprint.
+/// It aims to be stable across reboots and unique to the physical hardware.
 ///
 /// Factors considered:
-/// - CPU Brand and Vendor
-/// - Number of Physical Cores
-/// - Total Memory size
-/// - System Name (OS Type)
-///
-/// Note: This does not currently include GPU information as it requires platform-specific calls
-/// or heavier dependencies, but CPU and Memory provide a reasonable baseline for consistency.
+/// - System name and architecture
+/// - CPU brand and vendor ID  
+/// - Number of physical cores
+/// - Total memory size
 pub fn generate_hardware_id() -> String {
     let mut hasher = Sha256::new();
 
-    // Only refresh what we need to be efficient
-    let refresh_kind = RefreshKind::nothing()
-        .with_cpu(CpuRefreshKind::everything())
-        .with_memory(MemoryRefreshKind::everything());
-    let sys = System::new_with_specifics(refresh_kind);
-
-    // 1. System Name (e.g., "Darwin", "Linux", "Windows")
-    // This is unlikely to change unless the OS is completely replaced (e.g., Windows -> Linux).
+    // System name (e.g., "Darwin", "Linux", "Windows")
     if let Some(name) = System::name() {
         hasher.update(name.as_bytes());
         hasher.update(b"|");
     }
 
-    // 2. CPU Information
-    // We use the first CPU's info as representative of the package.
+    // CPU information - stable characteristics
+    let refresh_kind = RefreshKind::nothing()
+        .with_cpu(CpuRefreshKind::everything())
+        .with_memory(MemoryRefreshKind::everything());
+    let sys = System::new_with_specifics(refresh_kind);
+
+    // Use first CPU as representative
     if let Some(cpu) = sys.cpus().first() {
         hasher.update(cpu.brand().as_bytes());
         hasher.update(b"|");
         hasher.update(cpu.vendor_id().as_bytes());
         hasher.update(b"|");
     }
-    // Number of CPUs (threads)
-    hasher.update(sys.cpus().len().to_string().as_bytes());
+
+    // Number of physical cores (more stable than thread count)
+    let physical_cores = System::physical_core_count().unwrap_or(sys.cpus().len());
+    hasher.update(physical_cores.to_string().as_bytes());
     hasher.update(b"|");
 
-    // 3. Total Memory
-    // We assume total memory doesn't change frequently.
+    // Total memory - stable characteristic
     hasher.update(sys.total_memory().to_string().as_bytes());
 
-    // 4. (Optional) Network MACs could be added here, but they can be unstable (dongles, etc.)
-    // We omit them for better stability.
-
     hex::encode(hasher.finalize())
+}
+
+/// Generate a lightweight hardware fingerprint for quick verification
+///
+/// This returns the first 16 characters of the full hardware ID
+/// for rapid checks where full security isn't needed.
+pub fn generate_quick_hardware_id() -> String {
+    let hardware_id = generate_hardware_id();
+    hardware_id[..16].to_string()
 }
 
 #[cfg(test)]
@@ -60,14 +62,35 @@ mod tests {
     fn test_hardware_id_stability() {
         let id1 = generate_hardware_id();
         let id2 = generate_hardware_id();
-        assert_eq!(id1, id2, "Hardware ID should be stable");
+        assert_eq!(id1, id2, "Hardware ID should be stable across calls");
         assert_eq!(id1.len(), 64, "Hardware ID should be SHA256 hex string");
+
+        let quick_id1 = generate_quick_hardware_id();
+        let quick_id2 = generate_quick_hardware_id();
+        assert_eq!(quick_id1, quick_id2, "Quick hardware ID should be stable");
+        assert_eq!(quick_id1.len(), 16, "Quick hardware ID should be 16 chars");
     }
 
     #[test]
     fn test_hardware_id_not_empty() {
         let id = generate_hardware_id();
+        let quick_id = generate_quick_hardware_id();
+
         println!("Generated Hardware ID: {}", id);
-        assert!(!id.is_empty());
+        println!("Generated Quick Hardware ID: {}", quick_id);
+
+        assert!(!id.is_empty(), "Hardware ID should not be empty");
+        assert!(
+            !quick_id.is_empty(),
+            "Quick hardware ID should not be empty"
+        );
+        assert!(
+            id.chars().all(|c| c.is_ascii_hexdigit()),
+            "Hardware ID should be valid hex"
+        );
+        assert!(
+            quick_id.chars().all(|c| c.is_ascii_hexdigit()),
+            "Quick hardware ID should be valid hex"
+        );
     }
 }

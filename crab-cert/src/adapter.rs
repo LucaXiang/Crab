@@ -18,7 +18,7 @@ pub fn load_root_store(ca_pem: &str) -> CertResult<rustls::RootCertStore> {
         match cert {
             Ok(c) => {
                 root_store.add(c).map_err(|e| {
-                    CertError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+                    CertError::Tls(format!("Failed to add certificate to root store: {}", e))
                 })?;
             }
             Err(e) => return Err(CertError::Io(e)),

@@ -1,6 +1,14 @@
-//! HTTP client backend for CrabClient
+//! HTTP 客户端 - CrabClient 的 HTTP 后端
 //!
-//! Makes network-based HTTP calls to the Edge Server.
+//! 向 Edge Server 发起基于 HTTP 的网络调用。
+//!
+//! # 与 MessageClient 的区别
+//!
+//! | 特性 | Http | MessageClient |
+//! |------|------|---------------|
+//! | 通信方式 | REST API | TCP 消息总线 |
+//! | 实时性 | 请求-响应 | 实时推送 |
+//! | 适用场景 | CRUD 操作 | 实时通知 |
 
 use async_trait::async_trait;
 use reqwest::{Client, StatusCode as ReqwestStatusCode};
@@ -9,20 +17,35 @@ use serde::de::DeserializeOwned;
 use tokio::sync::broadcast;
 
 use super::{ApiResponse, CrabClient, CurrentUserResponse, LoginResponse};
-use crate::common::AppError;
+use crate::AppError;
 use crate::message::BusMessage;
 
-/// HTTP client backend for network calls
+/// HTTP 客户端
+///
+/// 用于向 Edge Server 发起 REST API 调用
+///
+/// # 示例
+///
+/// ```ignore
+/// let client = Http::new("https://edge-server:3000")
+///     .with_token("jwt-token");
+///
+/// let users: Vec<User> = client.get("/api/users").await?;
+/// ```
 #[derive(Debug, Clone)]
 pub struct Http {
+    /// HTTP 客户端
     client: Client,
+    /// 服务器地址
     base_url: String,
+    /// JWT 令牌
     token: Option<String>,
+    /// TCP 消息总线地址
     tcp_addr: Option<String>,
 }
 
 impl Http {
-    /// Create a new HTTP client
+    /// 创建 HTTP 客户端
     pub fn new(base_url: impl Into<String>) -> Self {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(30))
@@ -37,13 +60,13 @@ impl Http {
         }
     }
 
-    /// Set authentication token
+    /// 设置认证令牌
     pub fn with_token(mut self, token: impl Into<String>) -> Self {
         self.token = Some(token.into());
         self
     }
 
-    /// Set TCP address for message bus connections
+    /// 设置 TCP 消息总线地址
     pub fn with_tcp_addr(mut self, addr: impl Into<String>) -> Self {
         self.tcp_addr = Some(addr.into());
         self
@@ -170,20 +193,10 @@ impl CrabClient for Http {
     }
 
     fn subscribe(&self) -> Result<broadcast::Receiver<BusMessage>, AppError> {
-        // For HTTP client, connect to TCP message bus if configured
-        if self.tcp_addr.is_some() {
-            // TODO: Implement TCP connection to message bus
-            // For now, create a dummy channel that won't receive anything
-            let (tx, rx) = broadcast::channel(1024);
-            let payload = shared::message::NotificationPayload::info(
-                "Info",
-                "TCP subscription not yet implemented",
-            );
-            let _ = tx.send(BusMessage::notification(&payload));
-            return Ok(rx);
-        }
+        // HTTP 模式不支持实时消息订阅
+        // 如需实时消息，请使用 MessageClient 直连 TCP 消息总线
         Err(AppError::internal(
-            "TCP address not configured. Use with_tcp_addr()".to_string(),
+            "HTTP client does not support message subscription. Use MessageClient instead.",
         ))
     }
 }

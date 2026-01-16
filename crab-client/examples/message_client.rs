@@ -7,7 +7,7 @@
 //!
 //! Run: cargo run --example message_client
 
-use crab_client::{BusMessage, MessageClient};
+use crab_client::MessageClient;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
@@ -17,6 +17,7 @@ use ratatui::{prelude::*, widgets::*};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme};
+use shared::message::BusMessage;
 use std::io::{self, Stdout, Write};
 use std::sync::Arc;
 use std::time::Duration;
@@ -237,7 +238,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             match client_clone.recv().await {
                 Ok(msg) => {
-                    tracing::info!("📨 [RECV] {:?} | ID: {}", msg.event_type, msg.request_id);
+                    tracing::info!("📨 [RECV] {:?}", msg.event_type);
                     if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
                         tracing::info!("   Data: {}", payload);
                     }

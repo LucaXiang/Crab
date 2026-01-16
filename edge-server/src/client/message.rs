@@ -31,7 +31,7 @@
 //! let received = client.recv().await?;
 //! ```
 
-use crate::common::AppError;
+use crate::AppError;
 use crate::message::{BusMessage, MemoryTransport, TcpTransport};
 
 /// Simple message client with send/recv interface
@@ -109,20 +109,31 @@ mod tests {
         // Send a message
         let payload = shared::message::NotificationPayload::info("Test", "Hello");
         let msg = BusMessage::notification(&payload);
-        client.send(&msg).await.unwrap();
+        client
+            .send(&msg)
+            .await
+            .expect("Failed to send test message");
 
         // Verify server received it
-        let received_by_server = server_rx.recv().await.unwrap();
+        let received_by_server = server_rx
+            .recv()
+            .await
+            .expect("Failed to receive message on server side");
         assert_eq!(
             received_by_server.event_type,
             crate::EventType::Notification
         );
 
         // Simulate server broadcasting the message back
-        bus.publish(msg).await.unwrap();
+        bus.publish(msg)
+            .await
+            .expect("Failed to publish test message");
 
         // Receive it
-        let received = client.recv().await.unwrap();
+        let received = client
+            .recv()
+            .await
+            .expect("Failed to receive message on client side");
         assert_eq!(received.event_type, crate::EventType::Notification);
     }
 
@@ -130,6 +141,6 @@ mod tests {
     async fn test_message_client_close() {
         let bus = MessageBus::new();
         let client = MessageClient::memory(&bus);
-        client.close().await.unwrap();
+        client.close().await.expect("Failed to close test client");
     }
 }

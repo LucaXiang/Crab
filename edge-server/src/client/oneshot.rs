@@ -11,9 +11,9 @@ use serde::de::DeserializeOwned;
 use tokio::sync::broadcast;
 
 use super::{ApiResponse, CrabClient, CurrentUserResponse, LoginResponse};
-use crate::common::AppError;
+use crate::AppError;
+use crate::core::ServerState;
 use crate::message::BusMessage;
-use crate::server::ServerState;
 
 /// Oneshot client backend for in-process calls
 ///

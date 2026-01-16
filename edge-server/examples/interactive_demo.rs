@@ -8,10 +8,11 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use edge_server::Config;
+use edge_server::MessageClient;
+use edge_server::ServerState;
 use edge_server::message::ConnectedClient;
-use edge_server::server::ServerState;
-use edge_server::{BusMessage, MessageClient};
 use ratatui::{prelude::*, widgets::*};
+use shared::message::Message;
 use std::io::{self, Stdout};
 use std::time::Duration;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
@@ -125,25 +126,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config.auth_server_url = "http://127.0.0.1:3001".to_string();
 
         let state = ServerState::initialize(&config).await;
-        // Start background tasks immediately as we are not using Server::run to initialize state
-        // But since we are going to use Server::with_state().run(), we need to be careful not to double start
-        // NOTE: Server::run() now unconditionally calls start_background_tasks().
-        // However, the interactive demo needs MessageBus running BEFORE Server::run() is called
-        // because we create a MessageClient below and start subscribing.
-        // If we wait for Server::run(), the MessageClient might try to connect to a non-running bus (though memory transport might be fine).
-        // Actually, MemoryTransport doesn't need "start_background_tasks" to be *called* to exist,
-        // but MessageHandler needs to run to *process* messages.
-        //
-        // If we let Server::run() start it, we are fine as long as we don't block.
-        // Server::run() is spawned below.
-        //
-        // But to be safe and allow UI to work even if Server::run takes a moment,
-        // we might want to start it here. BUT Server::run will start it again.
-        //
-        // Ideally, start_background_tasks should be idempotent.
-        // For now, let's trust Server::run() to start it, and we spawn Server::run immediately.
-
-        // state.start_background_tasks().await; // <-- REMOVED to avoid double start
 
         // Send state back to UI
         if tx.send(state.clone()).await.is_err() {
@@ -172,7 +154,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 tokio::select! {
                     msg_result = client_rx.recv() => {
                         if let Ok(msg) = msg_result {
-                            tracing::info!("📨 [CLIENT] {:?} | ID: {}", msg.event_type, msg.request_id);
+                            tracing::info!("📨 [CLIENT] {:?}", msg.event_type);
                             if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
                                 tracing::info!("   Data: {}", payload);
                             }
@@ -181,12 +163,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     msg_result = server_rx.recv() => {
                         if let Ok(msg) = msg_result {
                             let prefix = match msg.event_type {
-                                edge_server::message::EventType::Notification => "📢 [NOTIFY]",
-                                edge_server::message::EventType::ServerCommand => "🎮 [CMD]",
-                                edge_server::message::EventType::Handshake => "🤝 [HANDSHAKE]",
-                                edge_server::message::EventType::RequestCommand => "⚡ [REQ]",
-                                edge_server::message::EventType::Sync => "🔄 [SYNC]",
-                                edge_server::message::EventType::Response => "🔙 [RESP]",
+                                shared::message::EventType::Notification => "📢 [NOTIFY]",
+                                shared::message::EventType::ServerCommand => "🎮 [CMD]",
+                                shared::message::EventType::Handshake => "🤝 [HANDSHAKE]",
+                                shared::message::EventType::RequestCommand => "⚡ [REQ]",
+                                shared::message::EventType::Sync => "🔄 [SYNC]",
+                                shared::message::EventType::Response => "🔙 [RESP]",
                             };
                             tracing::info!("{} {:?}", prefix, msg.event_type);
                             if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
@@ -434,10 +416,13 @@ async fn handle_command(app: &mut App, cmd: &str) {
                     if let Some(client) = target_client {
                         let payload =
                             shared::message::NotificationPayload::info(title, &msg_content);
-                        let mut msg = BusMessage::notification(&payload);
-                        msg.target = Some(client.id.clone());
+                        let msg = Message::new(shared::message::EventType::Notification, payload);
 
-                        if let Err(e) = state.message_bus().send_to_client(&client.id, msg).await {
+                        if let Err(e) = state
+                            .message_bus()
+                            .send_to_client(&client.id, msg.into_bus_message())
+                            .await
+                        {
                             tracing::error!("Failed to send to {}: {}", client_name, e);
                         } else {
                             tracing::info!(
@@ -456,10 +441,10 @@ async fn handle_command(app: &mut App, cmd: &str) {
                     let msg_content = parts[2..].join(" ");
 
                     let payload = shared::message::NotificationPayload::info(title, &msg_content);
-                    let msg = BusMessage::notification(&payload);
+                    let msg = Message::new(shared::message::EventType::Notification, payload);
 
                     // Broadcast to all clients
-                    if let Err(e) = state.message_bus().publish(msg).await {
+                    if let Err(e) = state.message_bus().publish(msg.into_bus_message()).await {
                         tracing::error!("Failed to broadcast: {}", e);
                     } else {
                         tracing::info!("✅ Broadcasted Notification: {} - {}", title, msg_content);
@@ -473,10 +458,10 @@ async fn handle_command(app: &mut App, cmd: &str) {
             if let Some(state) = &app.server_state {
                 let cmd = shared::message::ServerCommand::Ping;
                 let payload = shared::message::ServerCommandPayload { command: cmd };
-                let msg = BusMessage::server_command(&payload);
+                let msg = Message::new(shared::message::EventType::ServerCommand, payload);
 
                 // Broadcast Ping (Simulate Upstream -> Edge -> Clients)
-                if let Err(e) = state.message_bus().publish(msg).await {
+                if let Err(e) = state.message_bus().publish(msg.into_bus_message()).await {
                     tracing::error!("Failed to broadcast Ping: {}", e);
                 } else {
                     tracing::info!("✅ Broadcasted Ping Command");
@@ -500,10 +485,10 @@ async fn handle_command(app: &mut App, cmd: &str) {
                     id: Some(id.clone()),
                     action: action.clone(),
                 };
-                let msg = BusMessage::sync(&payload);
+                let msg = Message::new(shared::message::EventType::Sync, payload);
 
                 // Broadcast Sync (Server -> All Clients)
-                if let Err(e) = state.message_bus().publish(msg).await {
+                if let Err(e) = state.message_bus().publish(msg.into_bus_message()).await {
                     tracing::error!("Failed to broadcast Sync: {}", e);
                 } else {
                     tracing::info!("✅ Broadcasted Sync: {} {} {}", resource, id, action);

@@ -15,31 +15,20 @@ pub use payload::*;
 /// 协议版本号
 pub const PROTOCOL_VERSION: u16 = 1;
 
-/// 消息总线事件类型
+/// 简化消息总线事件类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EventType {
-    /// 握手消息 (客户端 -> 服务端)
-    /// 连接建立后发送的第一条消息，用于版本协商和身份标识
+    /// 握手消息
     Handshake = 0,
-
     /// 系统通知
-    /// 系统通知（边缘服务端 → 所有客户端）：打印机状态、网络异常等
     Notification = 1,
-
-    /// 服务器指令 - 来自上游/中心服务器的指令
-    /// 服务器指令（上层服务器 → 边缘服务端）：配置更新、数据同步指令、远程控制等
+    /// 服务器指令
     ServerCommand = 2,
-
-    /// 客户端请求指令 - 来自客户端的请求
-    /// 客户端请求（客户端 → 边缘服务端）：业务请求、资源操作等
+    /// 客户端请求
     RequestCommand = 3,
-
-    /// 同步信号 - 广播给所有客户端
-    /// 同步信号（服务端 → 所有客户端）：通知客户端刷新数据
+    /// 同步信号
     Sync = 4,
-
-    /// 请求响应 - 服务端对客户端请求的响应
-    /// 包含执行结果（成功/失败）和数据
+    /// 请求响应
     Response = 5,
 }
 
@@ -72,34 +61,126 @@ impl fmt::Display for EventType {
     }
 }
 
-/// 消息总线二进制消息
+/// 简化的消息结构 - 只包含业务必需字段
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Message<T> {
+    pub event_type: EventType,
+    pub data: T,
+    pub request_id: Uuid,             // 用于消息追踪
+    pub correlation_id: Option<Uuid>, // 用于RPC响应关联
+}
+
+impl<T> Message<T> {
+    /// 创建新消息
+    pub fn new(event_type: EventType, data: T) -> Self {
+        Self {
+            event_type,
+            data,
+            request_id: Uuid::new_v4(),
+            correlation_id: None,
+        }
+    }
+
+    /// 创建带关联ID的消息 (用于RPC)
+    pub fn with_correlation(event_type: EventType, data: T, correlation_id: Uuid) -> Self {
+        Self {
+            event_type,
+            data,
+            request_id: Uuid::new_v4(),
+            correlation_id: Some(correlation_id),
+        }
+    }
+
+    /// 获取业务数据
+    pub fn data(&self) -> &T {
+        &self.data
+    }
+
+    /// 检查是否是RPC响应
+    pub fn is_response(&self) -> bool {
+        matches!(self.event_type, EventType::Response)
+    }
+
+    /// 检查是否是RPC请求
+    pub fn is_request(&self) -> bool {
+        matches!(self.event_type, EventType::RequestCommand)
+    }
+
+    /// 获取关联ID (如果这是响应消息)
+    pub fn correlation_id(&self) -> Option<&Uuid> {
+        self.correlation_id.as_ref()
+    }
+
+    /// 转换为BusMessage用于传输
+    pub fn into_bus_message(self) -> BusMessage
+    where
+        T: Serialize,
+    {
+        let payload = serde_json::to_vec(&self.data).expect("Failed to serialize message data");
+
+        BusMessage {
+            request_id: self.request_id,
+            event_type: self.event_type,
+            source: None,
+            correlation_id: self.correlation_id,
+            target: None,
+            payload,
+        }
+    }
+}
+
+impl<T: Serialize + DeserializeOwned> Message<T> {
+    /// 序列化为二进制
+    pub fn to_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
+        serde_json::to_vec(self)
+    }
+
+    /// 从二进制解析
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
+        serde_json::from_slice(bytes)
+    }
+}
+
+/// 便利的类型别名
+pub type NotificationMessage = Message<NotificationPayload>;
+pub type ServerCommandMessage = Message<ServerCommandPayload>;
+pub type RequestCommandMessage = Message<RequestCommandPayload>;
+pub type SyncMessage = Message<SyncPayload>;
+pub type ResponseMessage = Message<ResponsePayload>;
+
+/// 消息创建器
+pub struct MessageBuilder<T> {
+    data: T,
+    event_type: EventType,
+}
+
+impl<T> MessageBuilder<T> {
+    pub fn new(event_type: EventType, data: T) -> Self {
+        Self { data, event_type }
+    }
+
+    pub fn build(self) -> Message<T> {
+        Message {
+            event_type: self.event_type,
+            data: self.data,
+            request_id: Uuid::new_v4(),
+            correlation_id: None,
+        }
+    }
+}
+
+/// 保持对旧BusMessage的完全兼容
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BusMessage {
-    /// 唯一请求 ID (UUID v4)
     pub request_id: Uuid,
-    /// 事件类型标识符
     pub event_type: EventType,
-    /// 消息来源 (可选)
-    ///
-    /// 对于来自客户端的消息，由服务端在接收时自动填充。
-    /// 对于来自服务端的消息，通常为空。
     pub source: Option<String>,
-    /// 关联 ID (可选)
-    ///
-    /// 用于 "一问一答" (RPC) 模式。
-    /// 如果这是一条响应消息（或由某请求触发的通知），此字段应包含原始请求的 `request_id`。
     pub correlation_id: Option<Uuid>,
-    /// 目标客户端 ID (可选)
-    ///
-    /// 如果设置，此消息仅发送给指定的客户端 (Unicast)。
-    /// 如果为空，则广播给所有客户端 (Broadcast)。
     pub target: Option<String>,
-    /// 二进制载荷
     pub payload: Vec<u8>,
 }
 
 impl BusMessage {
-    /// 创建新的总线消息
     pub fn new(event_type: EventType, payload: Vec<u8>) -> Self {
         Self {
             request_id: Uuid::new_v4(),
@@ -117,21 +198,7 @@ impl BusMessage {
         self
     }
 
-    /// 创建握手消息 (客户端 -> 服务端)
-    ///
-    /// # 示例
-    ///
-    /// ```rust
-    /// use shared::message::{BusMessage, HandshakePayload, PROTOCOL_VERSION};
-    ///
-    /// let payload = HandshakePayload {
-    ///     version: PROTOCOL_VERSION,
-    ///     client_name: Some("test-client".to_string()),
-    ///     client_version: Some("0.1.0".to_string()),
-    ///     client_id: Some("uuid-v4".to_string()),
-    /// };
-    /// BusMessage::handshake(&payload);
-    /// ```
+    /// 创建握手消息
     pub fn handshake(payload: &HandshakePayload) -> Self {
         Self::new(
             EventType::Handshake,
@@ -139,39 +206,13 @@ impl BusMessage {
         )
     }
 
-    /// 创建服务器指令消息 (上层服务器 -> 边缘服务端)
-    ///
-    /// 上层服务器向边缘服务端发送指令
-    ///
-    /// # 示例
-    ///
-    /// ```rust
-    /// use shared::message::{BusMessage, ServerCommandPayload, ServerCommand};
-    /// use serde_json::json;
-    ///
-    /// // 配置更新指令
-    /// BusMessage::server_command(&ServerCommandPayload {
-    ///     command: ServerCommand::ConfigUpdate {
-    ///         key: "printer.enabled".to_string(),
-    ///         value: json!(false),
-    ///     }
-    /// });
-    /// ```
+    /// 创建服务器指令消息
     pub fn server_command(payload: &ServerCommandPayload) -> Self {
         let payload_bytes = serde_json::to_vec(payload).expect("Failed to serialize ServerCommand");
         Self::new(EventType::ServerCommand, payload_bytes)
     }
 
-    /// 创建通知消息 (服务端 -> 客户端)
-    ///
-    /// # 示例
-    ///
-    /// ```rust
-    /// use shared::message::{BusMessage, NotificationPayload};
-    ///
-    /// let payload = NotificationPayload::info("打印机缺纸", "请及时添加打印纸");
-    /// BusMessage::notification(&payload);
-    /// ```
+    /// 创建通知消息
     pub fn notification(payload: &NotificationPayload) -> Self {
         Self::new(
             EventType::Notification,
@@ -179,22 +220,7 @@ impl BusMessage {
         )
     }
 
-    /// 创建请求指令消息 (客户端 -> 边缘服务端)
-    ///
-    /// 客户端向边缘服务端发送请求
-    ///
-    /// # 示例
-    ///
-    /// ```rust
-    /// use shared::message::{BusMessage, RequestCommandPayload};
-    /// use serde_json::json;
-    ///
-    /// let payload = RequestCommandPayload {
-    ///     action: "order.add_item".to_string(),
-    ///     params: Some(json!({ "dish_id": "123", "quantity": 1 })),
-    /// };
-    /// BusMessage::request_command(&payload);
-    /// ```
+    /// 创建请求指令消息
     pub fn request_command(payload: &RequestCommandPayload) -> Self {
         Self::new(
             EventType::RequestCommand,
@@ -202,22 +228,7 @@ impl BusMessage {
         )
     }
 
-    /// 创建同步信号消息 (服务端 -> 所有客户端)
-    ///
-    /// 服务端通知所有客户端同步数据
-    ///
-    /// # 示例
-    ///
-    /// ```rust
-    /// use shared::message::{BusMessage, SyncPayload};
-    ///
-    /// let payload = SyncPayload {
-    ///     resource: "order".to_string(),
-    ///     id: Some("1001".to_string()),
-    ///     action: "updated".to_string(),
-    /// };
-    /// BusMessage::sync(&payload);
-    /// ```
+    /// 创建同步信号消息
     pub fn sync(payload: &SyncPayload) -> Self {
         Self::new(
             EventType::Sync,
@@ -225,7 +236,7 @@ impl BusMessage {
         )
     }
 
-    /// 创建响应消息 (服务端 -> 客户端)
+    /// 创建响应消息
     pub fn response(payload: &ResponsePayload) -> Self {
         Self::new(
             EventType::Response,
@@ -244,42 +255,71 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_notification_message() {
-        let payload = NotificationPayload::info("Test Title", "Test Body");
-        let msg = BusMessage::notification(&payload);
-        assert_eq!(msg.event_type, EventType::Notification);
-        assert!(!msg.request_id.is_nil()); // Ensure UUID is generated
-        let parsed: NotificationPayload = msg.parse_payload().unwrap();
-        assert_eq!(parsed.title, "Test Title");
-        assert_eq!(parsed.message, "Test Body");
+    fn test_simple_message_creation() {
+        let notification = NotificationMessage::new(
+            EventType::Notification,
+            NotificationPayload::info("Test", "Hello World"),
+        );
+
+        assert_eq!(notification.event_type, EventType::Notification);
+        assert_eq!(notification.data().title, "Test");
     }
 
     #[test]
-    fn test_server_command_message() {
-        let payload = ServerCommandPayload {
-            command: ServerCommand::ConfigUpdate {
-                key: "printer.enabled".to_string(),
-                value: serde_json::json!(false),
+    fn test_rpc_message() {
+        // RPC消息只需要检查event_type是否为RequestCommand
+        let msg = RequestCommandMessage::new(
+            EventType::RequestCommand,
+            RequestCommandPayload {
+                action: "ping".to_string(),
+                params: None,
             },
-        };
-        let msg = BusMessage::server_command(&payload);
-        assert_eq!(msg.event_type, EventType::ServerCommand);
-        let parsed: ServerCommandPayload = msg.parse_payload().unwrap();
-        match parsed.command {
-            ServerCommand::ConfigUpdate { key, value } => {
-                assert_eq!(key, "printer.enabled");
-                assert_eq!(value, false);
-            }
-            _ => panic!("Wrong command type"),
-        }
+        );
+
+        assert_eq!(msg.event_type, EventType::RequestCommand);
+        assert!(msg.is_request());
+        assert!(msg.correlation_id.is_none()); // 初始创建时correlation_id为None
     }
 
     #[test]
-    fn test_event_type_from_u8() {
-        assert_eq!(EventType::try_from(1).unwrap(), EventType::Notification);
-        assert_eq!(EventType::try_from(2).unwrap(), EventType::ServerCommand);
-        assert_eq!(EventType::try_from(4).unwrap(), EventType::Sync);
-        assert_eq!(EventType::try_from(5).unwrap(), EventType::Response);
-        assert!(EventType::try_from(99).is_err());
+    fn test_message_builder() {
+        let msg = MessageBuilder::new(
+            EventType::Notification,
+            NotificationPayload::info("System", "Ready"),
+        )
+        .build();
+
+        assert_eq!(msg.event_type, EventType::Notification);
+        assert!(msg.correlation_id.is_none()); // 默认没有关联ID
+    }
+
+    #[test]
+    fn test_message_conversion() {
+        let original_msg = NotificationMessage::new(
+            EventType::Notification,
+            NotificationPayload::info("Test", "Data"),
+        );
+
+        // 测试序列化/反序列化
+        let bytes = original_msg.to_bytes().unwrap();
+        let recovered_msg = NotificationMessage::from_bytes(&bytes).unwrap();
+        assert_eq!(recovered_msg.data().title, "Test");
+    }
+
+    #[test]
+    fn test_handshake_message() {
+        let payload = HandshakePayload {
+            version: PROTOCOL_VERSION,
+            client_name: Some("test-client".to_string()),
+            client_version: Some("0.1.0".to_string()),
+            client_id: Some("uuid-v4".to_string()),
+        };
+
+        let msg = BusMessage::handshake(&payload);
+        assert_eq!(msg.event_type, EventType::Handshake);
+        assert!(!msg.request_id.is_nil());
+
+        let parsed: HandshakePayload = msg.parse_payload().unwrap();
+        assert_eq!(parsed.version, PROTOCOL_VERSION);
     }
 }

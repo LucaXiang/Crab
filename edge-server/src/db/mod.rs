@@ -4,7 +4,7 @@
 
 pub mod models;
 
-use crate::common::AppError;
+use crate::utils::AppError;
 use include_dir::{Dir, include_dir};
 use std::path::PathBuf;
 use surrealdb::{

@@ -38,7 +38,7 @@ pub use http::Http;
 pub use message::MessageClient;
 pub use oneshot::Oneshot;
 
-use crate::common::AppError;
+use crate::AppError;
 use crate::message::BusMessage;
 
 // Re-export shared response types
