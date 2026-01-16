@@ -6,8 +6,10 @@ Crab is a distributed restaurant management system written in Rust, featuring an
 ## Architecture
 - **Workspace**:
   - `shared`: Common types, protocols, and message definitions (`Notification`, `ServerCommand`).
-  - `edge-server`: The core edge node. Handles HTTP/TCP requests, database (SurrealDB), and message broadcasting.
+  - `edge-server`: The core edge node. Handles HTTP/TCP requests, database (SurrealDB), and message broadcasting. Supports mTLS.
   - `crab-client`: Unified client library supporting both Network (HTTP/TCP) and In-Process (Oneshot/Memory) communication.
+  - `crab-cert`: Certificate authority and PKI management library. Handles Root CA, Tenant CA, and entity certificates.
+  - `crab-auth`: Authentication server (Port 3001). Manages centralized identity and CA hierarchy.
 
 ## Build & Test Commands
 - **Build**: `cargo build --workspace`
@@ -25,16 +27,27 @@ Crab is a distributed restaurant management system written in Rust, featuring an
   ```bash
   cargo run -p crab-client --example message_client
   ```
+- **mTLS Certificate Demo**:
+  ```bash
+  cargo run -p crab-cert --example mtls_demo
+  ```
+- **Auth Server**:
+  ```bash
+  cargo run -p crab-auth
+  ```
 
 ## Key Protocols & Patterns
 - **Message Bus**:
   - Uses `Notification` (Server -> Client) and `ServerCommand` (Upstream -> Server) for system communication.
   - Payloads are defined in `shared::message`.
   - Supports both TCP (network) and Memory (in-process) transports.
+- **Security & Identity**:
+  - **mTLS**: Uses a 3-tier CA hierarchy (Root CA -> Tenant CA -> Entity Certs) for device trust.
+  - **Hardware Binding**: Certificates are bound to hardware IDs to prevent cloning.
+  - **Storage**: Certificates are stored in `auth_storage/`.
 - **Server State**:
   - `ServerState` is initialized via `ServerState::initialize(&config).await`.
   - Background tasks must be started explicitly via `state.start_background_tasks().await` if not using `Server::run`.
-  - Do NOT use `ServerState::new(...)` directly for initialization logic; it is a pure constructor.
   - `ServerState` is designed to be clone-cheap (uses `Arc`).
 - **Client**:
   - `CrabClient` trait unifies `Http` and `Oneshot` backends.

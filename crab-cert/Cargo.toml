@@ -17,6 +17,7 @@ rsa = "0.9"
 rand = "0.8"
 sysinfo = "0.37.2"
 async-trait.workspace = true
+rustls-pemfile = "2"
 
 [dev-dependencies]
 tempfile = "3"

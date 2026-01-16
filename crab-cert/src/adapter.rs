@@ -1,4 +1,3 @@
-use crate::crypto::to_rustls_certs;
 use crate::error::{CertError, Result as CertResult};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
@@ -6,33 +5,37 @@ use rustls::{DigitallySignedStruct, Error as RustlsError, SignatureScheme};
 use std::result::Result as StdResult;
 use std::sync::Arc;
 
-/// Combine cert and key into a single PEM buffer suitable for reqwest::Identity::from_pem
-pub fn to_identity_pem(cert_pem: &str, key_pem: &str) -> Vec<u8> {
-    let mut buf = Vec::new();
-    buf.extend_from_slice(cert_pem.as_bytes());
-    if !cert_pem.ends_with('\n') {
-        buf.push(b'\n');
-    }
-    buf.extend_from_slice(key_pem.as_bytes());
-    if !key_pem.ends_with('\n') {
-        buf.push(b'\n');
-    }
-    buf
+/// Combine cert and key into a single PEM string (Identity)
+pub fn to_identity_pem(cert_pem: &str, key_pem: &str) -> String {
+    format!("{}\n{}", cert_pem.trim(), key_pem.trim())
 }
 
-fn load_root_store(ca_pem: &str) -> CertResult<rustls::RootCertStore> {
+/// Load Root CA into a RootCertStore
+pub fn load_root_store(ca_pem: &str) -> CertResult<rustls::RootCertStore> {
     let mut root_store = rustls::RootCertStore::empty();
-    let ca_certs = to_rustls_certs(ca_pem)?;
-    for cert in ca_certs {
-        root_store
-            .add(cert)
-            .map_err(|e| CertError::VerificationFailed(e.to_string()))?;
+    let mut reader = std::io::BufReader::new(ca_pem.as_bytes());
+    for cert in rustls_pemfile::certs(&mut reader) {
+        match cert {
+            Ok(c) => {
+                root_store.add(c).map_err(|e| {
+                    CertError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+                })?;
+            }
+            Err(e) => return Err(CertError::Io(e)),
+        }
     }
     Ok(root_store)
 }
 
+/// Convert PEM string to Vec<CertificateDer>
+pub fn to_rustls_certs(pem: &str) -> CertResult<Vec<CertificateDer<'static>>> {
+    let mut reader = std::io::BufReader::new(pem.as_bytes());
+    rustls_pemfile::certs(&mut reader)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(CertError::Io)
+}
+
 /// A ServerCertVerifier that enforces CA signature validation but ignores hostname mismatches.
-/// This is crucial for local mTLS where IPs are dynamic and DNS is unreliable.
 #[derive(Debug)]
 pub struct SkipHostnameVerifier {
     verifier: Arc<rustls::client::WebPkiServerVerifier>,
@@ -42,7 +45,7 @@ impl SkipHostnameVerifier {
     pub fn new(root_store: rustls::RootCertStore) -> Self {
         let verifier = rustls::client::WebPkiServerVerifier::builder(Arc::new(root_store))
             .build()
-            .unwrap(); // Should not fail with valid root store
+            .unwrap();
         Self { verifier }
     }
 }
@@ -52,68 +55,49 @@ impl ServerCertVerifier for SkipHostnameVerifier {
         &self,
         end_entity: &CertificateDer<'_>,
         intermediates: &[CertificateDer<'_>],
-        _server_name: &ServerName<'_>, // Ignore this
+        _server_name: &ServerName<'_>, // Ignore the target server name (e.g., IP address)
         ocsp_response: &[u8],
         now: UnixTime,
     ) -> StdResult<ServerCertVerified, RustlsError> {
         // We delegate to WebPkiServerVerifier but we trick it by providing a dummy server name
-        // that matches what we don't care about, OR we just check the signature chain manually.
-        // Actually, WebPkiServerVerifier *always* checks hostname.
-        // So we cannot simply delegate if we want to skip hostname check.
-        // However, rustls::client::WebPkiServerVerifier does NOT expose a method to only check chain.
+        // that matches what is in the certificate. This ensures the chain is valid and signed
+        // by our trusted CA, but ignores whether we are connecting to "localhost" or "192.168.x.x".
 
-        // Wait, if we want to skip hostname verification but keep chain verification,
-        // we should use `verify_tls12_signature` and `verify_tls13_signature`?
-        // No, those are for handshake signatures.
-
-        // Correct approach: Use `WebPkiServerVerifier::verify_server_cert` but with a parsed
-        // SAN from the cert itself? No, that defeats the purpose if the cert has a random name.
-
-        // We have to implement the chain verification logic ourselves or find a way to use
-        // `rustls::client::verify_server_cert_signed_by_trust_anchor`.
-
-        // Ideally we use `rustls-platform-verifier` or similar, but here we want strict CA pinning.
-        // Let's look at how `rustls` does it.
-
-        // Ideally we should use `rustls::client::WebPkiServerVerifier` but since it enforces hostname,
-        // we might need to construct a `ServerName` that matches the certificate's CN/SAN.
-        // But the caller passed in `_server_name` which is the target IP/Domain.
-
-        // HACK: We can try to parse the `end_entity` certificate, extract the first DNSName or IPAddress,
-        // and pass THAT to the inner verifier.
-        // This effectively makes the hostname check always pass (as long as the cert is valid for *some* name).
-
+        // 1. Parse the certificate to extract ANY valid name (SAN or CN)
         let cert = x509_parser::parse_x509_certificate(end_entity.as_ref())
             .map_err(|_| RustlsError::InvalidCertificate(rustls::CertificateError::BadEncoding))?
             .1;
 
-        // Try to find a valid name in the cert to satisfy the verifier
         let mut valid_name = None;
 
-        // Check SANs
+        // Try to find a valid name in SANs
         if let Some(sans) = cert.subject_alternative_name().ok().flatten() {
             for entry in sans.value.general_names.iter() {
                 match entry {
                     x509_parser::extensions::GeneralName::DNSName(name) => {
                         if let Ok(sn) = ServerName::try_from(*name) {
-                            valid_name = Some(sn);
+                            valid_name = Some(sn.to_owned());
                             break;
                         }
                     }
                     x509_parser::extensions::GeneralName::IPAddress(ip) => {
+                        // Handle IP addresses in SAN
                         let ip_addr = match ip.len() {
-                            4 => std::net::IpAddr::V4(std::net::Ipv4Addr::new(
+                            4 => Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(
                                 ip[0], ip[1], ip[2], ip[3],
-                            )),
+                            ))),
                             16 => {
-                                let b: [u8; 16] = (*ip).try_into().unwrap();
-                                std::net::IpAddr::V6(std::net::Ipv6Addr::from(b))
+                                let octets: [u8; 16] = (*ip).try_into().unwrap();
+                                Some(std::net::IpAddr::V6(std::net::Ipv6Addr::from(octets)))
                             }
-                            _ => continue,
+                            _ => None,
                         };
-                        let sn = ServerName::from(ip_addr);
-                        valid_name = Some(sn.to_owned());
-                        break;
+
+                        if let Some(ip) = ip_addr {
+                            let sn = ServerName::from(ip);
+                            valid_name = Some(sn.to_owned());
+                            break;
+                        }
                     }
                     _ => {}
                 }
@@ -125,21 +109,28 @@ impl ServerCertVerifier for SkipHostnameVerifier {
             for rdn in cert.subject().iter_rdn() {
                 for attr in rdn.iter() {
                     if attr.attr_type() == &x509_parser::oid_registry::OID_X509_COMMON_NAME
-                        && let Ok(s) = attr.as_str()
-                        && let Ok(sn) = ServerName::try_from(s)
+                        && let Some(sn) = attr
+                            .as_str()
+                            .ok()
+                            .and_then(|s| ServerName::try_from(s).ok())
                     {
-                        valid_name = Some(sn);
+                        valid_name = Some(sn.to_owned());
                     }
+                }
+                if valid_name.is_some() {
+                    break;
                 }
             }
         }
 
-        let name_to_verify = valid_name.unwrap_or_else(|| {
-            // If we really can't find a name, we might as well use the one passed in,
-            // it will likely fail hostname check but we have no choice.
-            _server_name.to_owned()
-        });
+        // If we still can't find a name, we can't verify it against WebPKI rules anyway
+        let name_to_verify = valid_name.ok_or_else(|| {
+            RustlsError::General(
+                "No valid hostname found in certificate for verification".to_string(),
+            )
+        })?;
 
+        // 2. Delegate to WebPkiServerVerifier with the name EXTRACTED FROM THE CERT itself
         self.verifier.verify_server_cert(
             end_entity,
             intermediates,
@@ -220,4 +211,60 @@ pub fn verify_client_cert(cert_pem: &str, ca_pem: &str) -> CertResult<()> {
         .map_err(|e| CertError::VerificationFailed(e.to_string()))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{CaProfile, CertProfile, CertificateAuthority, KeyType};
+
+    #[test]
+    fn test_skip_hostname_verifier() {
+        // Install crypto provider for tests
+        let _ = rustls::crypto::ring::default_provider().install_default();
+
+        // 1. Create Root CA
+        let root_profile = CaProfile {
+            common_name: "Test Root CA".to_string(),
+            organization: "Test Org".to_string(),
+            validity_days: 1,
+            key_type: KeyType::P256,
+            ..Default::default()
+        };
+        let root_ca = CertificateAuthority::new_root(root_profile).unwrap();
+
+        let mut root_store = rustls::RootCertStore::empty();
+        for cert in to_rustls_certs(root_ca.cert_pem()).unwrap() {
+            root_store.add(cert).unwrap();
+        }
+
+        // 2. Create Server Cert with a specific name "valid.com"
+        // Corrected arguments: common_name, sans, tenant_id, device_id
+        let server_profile =
+            CertProfile::new_server("valid.com", vec![], None, "device-123".to_string());
+        let (server_cert_pem, _) = root_ca.issue_cert(&server_profile).unwrap();
+        let server_certs = to_rustls_certs(&server_cert_pem).unwrap();
+
+        // 3. Setup Verifier
+        let verifier = SkipHostnameVerifier::new(root_store);
+
+        // 4. Verify against a WRONG name "wrong.com" -> Should PASS
+        let wrong_name = ServerName::try_from("wrong.com").unwrap();
+
+        let result =
+            verifier.verify_server_cert(&server_certs[0], &[], &wrong_name, &[], UnixTime::now());
+
+        assert!(result.is_ok(), "Should pass even if hostname mismatch");
+
+        // 5. Verify invalid signature -> Should FAIL
+        // Create another random CA
+        let other_ca = CertificateAuthority::new_root(CaProfile::default()).unwrap();
+        let (fake_cert_pem, _) = other_ca.issue_cert(&server_profile).unwrap();
+        let fake_certs = to_rustls_certs(&fake_cert_pem).unwrap();
+
+        let result_fake =
+            verifier.verify_server_cert(&fake_certs[0], &[], &wrong_name, &[], UnixTime::now());
+
+        assert!(result_fake.is_err(), "Should fail if signature is invalid");
+    }
 }

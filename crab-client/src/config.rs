@@ -11,6 +11,15 @@ pub struct ClientConfig {
 
     /// Request timeout in seconds
     pub timeout: u64,
+
+    /// TLS CA certificate (PEM format)
+    pub tls_ca_cert: Option<String>,
+
+    /// TLS Client certificate (PEM format)
+    pub tls_client_cert: Option<String>,
+
+    /// TLS Client key (PEM format)
+    pub tls_client_key: Option<String>,
 }
 
 impl ClientConfig {
@@ -20,12 +29,28 @@ impl ClientConfig {
             base_url: base_url.into(),
             token: None,
             timeout: 30,
+            tls_ca_cert: None,
+            tls_client_cert: None,
+            tls_client_key: None,
         }
     }
 
     /// Set the JWT token
     pub fn with_token(mut self, token: impl Into<String>) -> Self {
         self.token = Some(token.into());
+        self
+    }
+
+    /// Set mTLS configuration
+    pub fn with_tls(
+        mut self,
+        ca_cert: impl Into<String>,
+        client_cert: impl Into<String>,
+        client_key: impl Into<String>,
+    ) -> Self {
+        self.tls_ca_cert = Some(ca_cert.into());
+        self.tls_client_cert = Some(client_cert.into());
+        self.tls_client_key = Some(client_key.into());
         self
     }
 

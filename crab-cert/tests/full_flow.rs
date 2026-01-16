@@ -200,8 +200,8 @@ fn test_certificate_lifecycle() {
 
     // Identity PEM (for Reqwest)
     let identity_pem = to_identity_pem(&client_cert_pem, &client_key_pem);
-    assert!(String::from_utf8_lossy(&identity_pem).contains("CERTIFICATE"));
-    assert!(String::from_utf8_lossy(&identity_pem).contains("PRIVATE KEY"));
+    assert!(identity_pem.contains("CERTIFICATE"));
+    assert!(identity_pem.contains("PRIVATE KEY"));
 
     // 6. Verify Server Certificate using helper
     println!("Verifying Server Certificate...");

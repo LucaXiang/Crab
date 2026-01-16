@@ -476,15 +476,6 @@ fn ui(f: &mut Frame, app: &App) {
 
 // Helper functions for CLI input
 fn get_input(prompt: &str) -> String {
-    if std::env::var("AUTOMATED_TEST").is_ok() {
-        if prompt.to_lowercase().contains("username") {
-            return "admin".to_string();
-        }
-        if prompt.to_lowercase().contains("password") {
-            return "admin123".to_string();
-        }
-        return "test-input".to_string();
-    }
     print!("{}", prompt);
     io::stdout().flush().unwrap();
     let mut input = String::new();
@@ -493,9 +484,6 @@ fn get_input(prompt: &str) -> String {
 }
 
 fn get_input_with_default(prompt: &str, default: &str) -> String {
-    if std::env::var("AUTOMATED_TEST").is_ok() {
-        return default.to_string();
-    }
     print!("{} [{}]: ", prompt, default);
     io::stdout().flush().unwrap();
     let mut input = String::new();

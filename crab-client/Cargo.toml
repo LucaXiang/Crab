@@ -8,7 +8,7 @@ edition.workspace = true
 shared.workspace = true
 
 # HTTP client
-reqwest.workspace = true
+reqwest = { workspace = true, features = ["rustls-tls"] }
 
 # Async runtime
 tokio.workspace = true
@@ -36,7 +36,8 @@ uuid.workspace = true
 tokio-rustls = "0.26.4"
 rustls = "0.23.36"
 rustls-pki-types = "1"
-webpki-roots = "0.26"
+webpki-roots = "1.0.5"
+rustls-pemfile = "2"
 
 # Tracing
 tracing = "0.1"
@@ -81,7 +82,7 @@ version = "0.4"
 version = "2"
 
 [dev-dependencies.rustls-webpki]
-version = "0.102"
+version = "0.103.8"
 
 [dev-dependencies]
 ratatui = "0.29.0"
@@ -89,4 +90,3 @@ crossterm = "0.28.1"
 tui-input = "0.11.0"
 tui-logger = { version = "0.14.3", features = ["tracing-support"] }
 log = "0.4"
-

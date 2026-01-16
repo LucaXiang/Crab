@@ -1320,6 +1320,7 @@ dependencies = [
  "ring",
  "rsa",
  "rustls",
+ "rustls-pemfile",
  "sha2",
  "sysinfo 0.37.2",
  "tempfile",
@@ -1343,11 +1344,11 @@ dependencies = [
  "http",
  "log",
  "ratatui",
- "reqwest 0.13.1",
+ "reqwest",
  "rustls",
  "rustls-pemfile",
  "rustls-pki-types",
- "rustls-webpki 0.102.8",
+ "rustls-webpki",
  "serde",
  "serde_json",
  "sha2",
@@ -1361,7 +1362,7 @@ dependencies = [
  "tui-input",
  "tui-logger",
  "uuid",
- "webpki-roots 0.26.11",
+ "webpki-roots 1.0.5",
 ]
 
 [[package]]
@@ -1903,7 +1904,7 @@ dependencies = [
  "log",
  "mime_guess",
  "ratatui",
- "reqwest 0.13.1",
+ "reqwest",
  "rustls",
  "serde",
  "serde_json",
@@ -4709,37 +4710,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "reqwest"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04e9018c9d814e5f30cc16a0f03271aeab3571e609612d9fe78c1aa8d11c2f62"
-dependencies = [
- "base64 0.22.1",
- "bytes",
- "futures-core",
- "http",
- "http-body",
- "http-body-util",
- "hyper",
- "hyper-util",
- "js-sys",
- "log",
- "percent-encoding",
- "pin-project-lite",
- "serde",
- "serde_json",
- "sync_wrapper",
- "tokio",
- "tower",
- "tower-http",
- "tower-service",
- "url",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "revision"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5062,7 +5032,7 @@ dependencies = [
  "once_cell",
  "ring",
  "rustls-pki-types",
- "rustls-webpki 0.103.8",
+ "rustls-webpki",
  "subtle",
  "zeroize",
 ]
@@ -5084,17 +5054,6 @@ checksum = "21e6f2ab2928ca4291b86736a8bd920a277a399bba1589409d72154ff87c1282"
 dependencies = [
  "web-time",
  "zeroize",
-]
-
-[[package]]
-name = "rustls-webpki"
-version = "0.102.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64ca1bc8749bd4cf37b5ce386cc146580777b4e8572c7b97baf22c83f444bee9"
-dependencies = [
- "ring",
- "rustls-pki-types",
- "untrusted",
 ]
 
 [[package]]
@@ -5741,7 +5700,7 @@ dependencies = [
  "path-clean",
  "pharos",
  "reblessive",
- "reqwest 0.12.28",
+ "reqwest",
  "revision",
  "ring",
  "rust_decimal",
@@ -5823,7 +5782,7 @@ dependencies = [
  "rayon",
  "reblessive",
  "regex",
- "reqwest 0.12.28",
+ "reqwest",
  "revision",
  "ring",
  "rmpv",

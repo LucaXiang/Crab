@@ -79,10 +79,13 @@ pub struct CertProfile {
 impl CertProfile {
     pub fn new_server(
         common_name: &str,
-        sans: Vec<String>,
+        mut sans: Vec<String>,
         tenant_id: Option<String>,
         device_id: String,
     ) -> Self {
+        if !sans.contains(&common_name.to_string()) {
+            sans.push(common_name.to_string());
+        }
         Self {
             common_name: common_name.to_string(),
             organization: "Crab Tenant".to_string(),
