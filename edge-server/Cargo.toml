@@ -57,7 +57,7 @@ tokio-util.workspace = true
 async-trait.workspace = true
 
 # HTTP Client
-reqwest = { workspace = true, features = ["rustls-tls"] }
+reqwest = { workspace = true }
 
 # Image processing
 image.workspace = true

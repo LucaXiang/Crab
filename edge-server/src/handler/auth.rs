@@ -2,13 +2,13 @@
 //!
 //! Handles login, logout, and token management
 
-use axum::{extract::State, Extension, Json};
+use axum::{Extension, Json, extract::State};
 use serde::{Deserialize, Serialize};
 
 use crate::audit_log;
-use crate::common::{ok, AppError, AppResponse};
+use crate::common::{AppError, AppResponse, ok};
 use crate::db::models::{Employee, Role};
-use crate::server::{ServerState, CurrentUser};
+use crate::server::{CurrentUser, ServerState};
 
 /// Login request payload
 #[derive(Debug, Deserialize)]
@@ -54,9 +54,8 @@ pub async fn login(
         .take(0)
         .map_err(|e| AppError::database(format!("Failed to parse employee: {}", e)))?;
 
-    let employee = employee.ok_or_else(|| {
-        AppError::validation("Invalid username or password".to_string())
-    })?;
+    let employee = employee
+        .ok_or_else(|| AppError::validation("Invalid username or password 1".to_string()))?;
 
     // Check if user is active
     if !employee.is_active {
@@ -69,7 +68,9 @@ pub async fn login(
         .map_err(|e| AppError::internal(format!("Password verification failed: {}", e)))?;
 
     if !password_valid {
-        return Err(AppError::validation("Invalid username or password".to_string()));
+        return Err(AppError::validation(
+            "Invalid username or password 2".to_string(),
+        ));
     }
 
     // Fetch role information
@@ -84,9 +85,7 @@ pub async fn login(
         .take(0)
         .map_err(|e| AppError::database(format!("Failed to parse role: {}", e)))?;
 
-    let role = role.ok_or_else(|| {
-        AppError::internal("Role not found".to_string())
-    })?;
+    let role = role.ok_or_else(|| AppError::internal("Role not found".to_string()))?;
 
     if !role.is_active {
         return Err(AppError::forbidden("Role has been disabled".to_string()));
@@ -94,7 +93,8 @@ pub async fn login(
 
     // Generate JWT token
     let jwt_service = state.get_jwt_service();
-    let user_id = employee.id
+    let user_id = employee
+        .id
         .as_ref()
         .map(|t| t.to_string())
         .unwrap_or_default();

@@ -121,7 +121,8 @@ impl Transport for TcpTransport {
     }
 
     async fn close(&self) -> Result<(), MessageError> {
-        // Dropping the Arc references will eventually close the stream
+        let mut writer = self.writer.lock().await;
+        writer.shutdown().await.map_err(MessageError::Io)?;
         Ok(())
     }
 }
@@ -242,6 +243,8 @@ impl Transport for TlsTransport {
     }
 
     async fn close(&self) -> Result<(), MessageError> {
+        let mut writer = self.writer.lock().await;
+        writer.shutdown().await.map_err(MessageError::Io)?;
         Ok(())
     }
 }

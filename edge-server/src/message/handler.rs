@@ -152,7 +152,9 @@ impl MessageHandler {
                         );
 
                         // If message is from a client, send Ack/Result
-                        if let (Some(source), Some(broadcast_tx)) = (&msg.source, &self.broadcast_tx) {
+                        if let (Some(source), Some(broadcast_tx)) =
+                            (&msg.source, &self.broadcast_tx)
+                        {
                             let response_payload =
                                 shared::message::ResponsePayload::success(success_msg, payload);
 
@@ -185,18 +187,18 @@ impl MessageHandler {
                         self.send_to_dead_letter_queue(msg, &reason).await;
 
                         // Send error notification to client
-                        if let Some(source) = &msg.source {
-                            if let Some(broadcast_tx) = &self.broadcast_tx {
-                                let response_payload =
-                                    shared::message::ResponsePayload::error(reason.clone(), None);
+                        if let (Some(source), Some(broadcast_tx)) =
+                            (&msg.source, &self.broadcast_tx)
+                        {
+                            let response_payload =
+                                shared::message::ResponsePayload::error(reason.clone(), None);
 
-                                let mut ack_msg = BusMessage::response(&response_payload);
-                                ack_msg.correlation_id = Some(msg.request_id);
-                                ack_msg.target = Some(source.clone());
+                            let mut ack_msg = BusMessage::response(&response_payload);
+                            ack_msg.correlation_id = Some(msg.request_id);
+                            ack_msg.target = Some(source.clone());
 
-                                if let Err(e) = broadcast_tx.send(ack_msg) {
-                                    tracing::warn!("Failed to send Error Ack: {}", e);
-                                }
+                            if let Err(e) = broadcast_tx.send(ack_msg) {
+                                tracing::warn!("Failed to send Error Ack: {}", e);
                             }
                         }
 

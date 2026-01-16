@@ -2,7 +2,10 @@
 //!
 //! Standardized error types that can be used across the entire framework
 
-use crate::{http::{StatusCode, Response}, response::ApiResponse};
+use crate::{
+    http::{Response, StatusCode},
+    response::ApiResponse,
+};
 use thiserror::Error;
 
 /// Standard API error codes
@@ -145,6 +148,10 @@ pub enum ApiError {
     /// Invalid request
     #[error("Invalid request: {message}")]
     Invalid { message: String },
+
+    /// Client disconnected
+    #[error("Client disconnected")]
+    ClientDisconnected,
 }
 
 impl ApiError {
@@ -152,47 +159,66 @@ impl ApiError {
 
     /// Create an Internal error
     pub fn internal(message: impl Into<String>) -> Self {
-        Self::Internal { message: message.into() }
+        Self::Internal {
+            message: message.into(),
+        }
     }
 
     /// Create a Database error
     pub fn database(message: impl Into<String>) -> Self {
-        Self::Database { message: message.into() }
+        Self::Database {
+            message: message.into(),
+        }
     }
 
     /// Create a Validation error
     pub fn validation(message: impl Into<String>) -> Self {
-        Self::Validation { message: message.into(), source: None }
+        Self::Validation {
+            message: message.into(),
+            source: None,
+        }
     }
 
     /// Create a Forbidden error
     pub fn forbidden(message: impl Into<String>) -> Self {
-        Self::Forbidden { message: message.into() }
+        Self::Forbidden {
+            message: message.into(),
+        }
     }
 
     /// Create a NotFound error
     pub fn not_found(resource: impl Into<String>) -> Self {
-        Self::NotFound { resource: resource.into() }
+        Self::NotFound {
+            resource: resource.into(),
+        }
     }
 
     /// Create a Conflict error
     pub fn conflict(resource: impl Into<String>) -> Self {
-        Self::Conflict { resource: resource.into() }
+        Self::Conflict {
+            resource: resource.into(),
+        }
     }
 
     /// Create an Invalid error
     pub fn invalid(message: impl Into<String>) -> Self {
-        Self::Invalid { message: message.into() }
+        Self::Invalid {
+            message: message.into(),
+        }
     }
 
     /// Create a BusinessRule error
     pub fn business_rule(message: impl Into<String>) -> Self {
-        Self::BusinessRule { message: message.into() }
+        Self::BusinessRule {
+            message: message.into(),
+        }
     }
 
     /// Create an InvalidToken error
     pub fn invalid_token(message: impl Into<String>) -> Self {
-        Self::InvalidToken { message: message.into() }
+        Self::InvalidToken {
+            message: message.into(),
+        }
     }
 
     // ========== Error inspection methods ==========
@@ -211,6 +237,7 @@ impl ApiError {
             Self::Database { .. } => ApiErrorCode::Database,
             Self::Internal { .. } => ApiErrorCode::Internal,
             Self::Invalid { .. } => ApiErrorCode::Invalid,
+            Self::ClientDisconnected => ApiErrorCode::Internal,
         }
     }
 
@@ -228,6 +255,7 @@ impl ApiError {
             Self::Database { message } => message.clone(),
             Self::Internal { message } => message.clone(),
             Self::Invalid { message } => message.clone(),
+            Self::ClientDisconnected => "Client disconnected".to_string(),
         }
     }
 }

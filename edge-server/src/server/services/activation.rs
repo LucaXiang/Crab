@@ -52,6 +52,10 @@ impl ActivationService {
         }
     }
 
+    pub fn auth_server_url(&self) -> &str {
+        &self.auth_server_url
+    }
+
     pub async fn wait_for_activation(
         &self,
         cert_service: &crate::server::services::cert::CertService,

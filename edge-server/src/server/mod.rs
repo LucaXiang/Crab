@@ -124,10 +124,12 @@ impl Server {
             .tenant_id
             .unwrap_or_else(|| "Unknown".to_string());
         let edge_id = activation.edge_id.unwrap_or_else(|| "Unknown".to_string());
+        let auth_server = state.activation_service().auth_server_url();
 
-        // Truncate long IDs for better display
-        let display_edge_id = if edge_id.len() > 20 {
-            format!("{}...", &edge_id[..17])
+        // Truncate long IDs for better display, but allow UUIDs (36 chars) to fit
+        // Adjusted for wider box (53 chars content width)
+        let display_edge_id = if edge_id.len() > 53 {
+            format!("{}...", &edge_id[..50])
         } else {
             edge_id
         };
@@ -135,8 +137,8 @@ impl Server {
         let cert_fingerprint = activation
             .cert_fingerprint
             .unwrap_or_else(|| "Unknown".to_string());
-        let display_fingerprint = if cert_fingerprint.len() > 20 {
-            format!("{}...", &cert_fingerprint[..17])
+        let display_fingerprint = if cert_fingerprint.len() > 53 {
+            format!("{}...", &cert_fingerprint[..50])
         } else {
             cert_fingerprint
         };
@@ -154,35 +156,38 @@ impl Server {
             }
         };
 
-        tracing::info!("");
-        tracing::info!(
-            "╔════════════════════════════════════════════════════════════════════════════╗"
-        );
-        tracing::info!(
-            "║                   🦀 Crab Edge Server - Activated 🚀                       ║"
-        );
-        tracing::info!(
-            "╠════════════════════════════════════════════════════════════════════════════╣"
-        );
-        tracing::info!("║ 🏢 Tenant ID       : {:<46} ║", tenant_id);
-        tracing::info!("║ 🆔 Edge ID         : {:<46} ║", display_edge_id);
-        tracing::info!("║ 📜 Cert Fingerprint: {:<46} ║", display_fingerprint);
-        tracing::info!("║ 📦 Subscription    : {:<46} ║", sub_info);
-        tracing::info!(
-            "╠════════════════════════════════════════════════════════════════════════════╣"
-        );
-        tracing::info!(
-            "║ 🌐 HTTPS Listener  : https://0.0.0.0:{:<30} ║",
-            self.config.http_port
-        );
-        tracing::info!(
-            "║ 📨 TCP Listener    : 0.0.0.0:{:<37} ║",
+        let work_dir = &self.config.work_dir;
+        let display_work_dir = if work_dir.len() > 53 {
+            format!("{}...", &work_dir[..50])
+        } else {
+            work_dir.clone()
+        };
+
+        let banner = format!(
+            "\n╔════════════════════════════════════════════════════════════════════════════╗\n\
+             ║                     🦀 Crab Edge Server - Activated 🚀                     ║\n\
+             ╠════════════════════════════════════════════════════════════════════════════╣\n\
+             ║ 🏢 Tenant ID       : {:<53} ║\n\
+             ║ 🆔 Device ID       : {:<53} ║\n\
+             ║ 📂 Work Dir        : {:<53} ║\n\
+             ║ 🔑 Auth Server     : {:<53} ║\n\
+             ║ 📜 Cert Fingerprint: {:<53} ║\n\
+             ║ 📦 Subscription    : {:<53} ║\n\
+             ╠════════════════════════════════════════════════════════════════════════════╣\n\
+             ║ 🌐 HTTPS Listener  : https://0.0.0.0:{:<37} ║\n\
+             ║ 📨 TCP Listener    : 0.0.0.0:{:<45} ║\n\
+             ╚════════════════════════════════════════════════════════════════════════════╝",
+            tenant_id,
+            display_edge_id,
+            display_work_dir,
+            auth_server,
+            display_fingerprint,
+            sub_info,
+            self.config.http_port,
             self.config.message_tcp_port
         );
-        tracing::info!(
-            "╚════════════════════════════════════════════════════════════════════════════╝"
-        );
-        tracing::info!("");
+
+        tracing::info!("{}", banner);
     }
 }
 

@@ -85,10 +85,6 @@ impl CertService {
         let key = crab_cert::to_rustls_key(&key_pem)
             .map_err(|e| AppError::internal(format!("Failed to parse edge key: {}", e)))?;
 
-        // Verify pair
-        let _ = verify_cert_pair(&cert_pem, &ca_pem)
-            .map_err(|e| AppError::validation(format!("Certificate verification failed: {}", e)))?;
-
         // 3. Build ServerConfig
         let config = rustls::ServerConfig::builder()
             .with_client_cert_verifier(client_auth)
@@ -150,24 +146,6 @@ impl CertService {
             .map_err(|e| AppError::validation(format!("Self-check failed: {}", e)))?;
 
         tracing::info!("✅ CertService self-check passed: Hardware ID and Chain verified.");
-        Ok(())
-    }
-
-    /// 验证硬件 ID (单独暴露的方法)
-    pub async fn verify_hardware_id(&self) -> Result<(), AppError> {
-        let (cert_pem, ca_pem) = self.read_certs()?;
-        verify_cert_pair(&cert_pem, &ca_pem)
-            .map_err(|e| AppError::validation(format!("Hardware ID verification failed: {}", e)))?;
-        Ok(())
-    }
-
-    /// 验证证书链 (单独暴露的方法)
-    pub async fn verify_certificate_chain(&self) -> Result<(), AppError> {
-        // 目前复用 verify_cert_pair，它也包含链校验
-        let (cert_pem, ca_pem) = self.read_certs()?;
-        verify_cert_pair(&cert_pem, &ca_pem).map_err(|e| {
-            AppError::validation(format!("Certificate chain verification failed: {}", e))
-        })?;
         Ok(())
     }
 

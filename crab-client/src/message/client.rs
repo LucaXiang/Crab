@@ -42,6 +42,14 @@ impl ClientTransport {
             ClientTransport::Memory(t) => t.write_message(msg).await,
         }
     }
+
+    async fn close(&self) -> Result<(), MessageError> {
+        match self {
+            ClientTransport::Tcp(t) => t.close().await,
+            ClientTransport::Tls(t) => t.close().await,
+            ClientTransport::Memory(t) => t.close().await,
+        }
+    }
 }
 
 impl MessageClient {
@@ -217,5 +225,10 @@ impl MessageClient {
         );
 
         self.request(&msg).await
+    }
+
+    /// Close the client connection
+    pub async fn close(&self) -> Result<(), MessageError> {
+        self.transport.close().await
     }
 }

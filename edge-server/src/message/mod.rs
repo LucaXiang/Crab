@@ -43,6 +43,13 @@ pub use shared::message::{
     SyncPayload,
 };
 
+#[derive(Debug, Clone)]
+pub struct ConnectedClient {
+    pub id: String,
+    pub peer_identity: Option<String>,
+    pub addr: Option<String>,
+}
+
 use crate::common::AppError;
 
 // ========== Transport 传输层特征 ==========
@@ -55,16 +62,29 @@ pub trait Transport: Send + Sync + std::fmt::Debug {
     fn peer_identity(&self) -> Option<String> {
         None
     }
+    fn peer_addr(&self) -> Option<String> {
+        None
+    }
 }
 
 // 辅助函数
 async fn read_from_stream<R: AsyncReadExt + Unpin>(reader: &mut R) -> Result<BusMessage, AppError> {
     // 读取事件类型 (1 字节)
     let mut type_buf = [0u8; 1];
-    reader
-        .read_exact(&mut type_buf)
-        .await
-        .map_err(|e| AppError::internal(format!("Read type failed: {}", e)))?;
+    match reader.read_exact(&mut type_buf).await {
+        Ok(_) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+            return Err(AppError::ClientDisconnected);
+        }
+        Err(e) => {
+            // Handle rustls "peer closed connection without sending TLS close_notify"
+            // This can happen when client closes connection abruptly
+            if e.to_string().contains("close_notify") {
+                return Err(AppError::ClientDisconnected);
+            }
+            return Err(AppError::internal(format!("Read type failed: {}", e)));
+        }
+    }
 
     let event_type =
         EventType::try_from(type_buf[0]).map_err(|_| AppError::invalid("Invalid event type"))?;
@@ -145,6 +165,7 @@ async fn write_to_stream<W: AsyncWriteExt + Unpin>(
 pub struct TcpTransport {
     reader: Arc<Mutex<OwnedReadHalf>>,
     writer: Arc<Mutex<OwnedWriteHalf>>,
+    addr: Option<String>,
 }
 
 impl TcpTransport {
@@ -152,18 +173,22 @@ impl TcpTransport {
         let stream = TcpStream::connect(addr)
             .await
             .map_err(|e| AppError::internal(format!("TCP connect failed: {}", e)))?;
+        let peer_addr = stream.peer_addr().ok().map(|a| a.to_string());
         let (reader, writer) = stream.into_split();
         Ok(Self {
             reader: Arc::new(Mutex::new(reader)),
             writer: Arc::new(Mutex::new(writer)),
+            addr: peer_addr,
         })
     }
 
     fn from_stream(stream: TcpStream) -> Self {
+        let peer_addr = stream.peer_addr().ok().map(|a| a.to_string());
         let (reader, writer) = stream.into_split();
         Self {
             reader: Arc::new(Mutex::new(reader)),
             writer: Arc::new(Mutex::new(writer)),
+            addr: peer_addr,
         }
     }
 
@@ -205,6 +230,10 @@ impl Transport for TcpTransport {
             .map_err(|e| AppError::internal(format!("TCP close failed: {}", e)))?;
         Ok(())
     }
+
+    fn peer_addr(&self) -> Option<String> {
+        self.addr.clone()
+    }
 }
 
 // ========== TLS Transport ==========
@@ -214,12 +243,15 @@ pub struct TlsTransport {
     reader: Arc<Mutex<ReadHalf<TlsStream<TcpStream>>>>,
     writer: Arc<Mutex<WriteHalf<TlsStream<TcpStream>>>>,
     peer_identity: Option<String>,
+    addr: Option<String>,
 }
 
 impl TlsTransport {
     pub fn new(stream: TlsStream<TcpStream>) -> Self {
         // Extract identity from TLS session
-        let (_, connection) = stream.get_ref();
+        let (io, connection) = stream.get_ref();
+        let peer_addr = io.peer_addr().ok().map(|a| a.to_string());
+
         let peer_identity = if let Some(certs) = connection.peer_certificates() {
             if let Some(cert) = certs.first() {
                 CertMetadata::from_der(cert.as_ref())
@@ -237,6 +269,7 @@ impl TlsTransport {
             reader: Arc::new(Mutex::new(reader)),
             writer: Arc::new(Mutex::new(writer)),
             peer_identity,
+            addr: peer_addr,
         }
     }
 }
@@ -264,6 +297,10 @@ impl Transport for TlsTransport {
 
     fn peer_identity(&self) -> Option<String> {
         self.peer_identity.clone()
+    }
+
+    fn peer_addr(&self) -> Option<String> {
+        self.addr.clone()
     }
 }
 
@@ -473,6 +510,18 @@ impl MessageBus {
         &self.shutdown_token
     }
 
+    /// Get list of connected clients
+    pub fn get_connected_clients(&self) -> Vec<ConnectedClient> {
+        self.clients
+            .iter()
+            .map(|entry| ConnectedClient {
+                id: entry.key().clone(),
+                peer_identity: entry.value().peer_identity(),
+                addr: entry.value().peer_addr(),
+            })
+            .collect()
+    }
+
     /// Gracefully shutdown the message bus
     ///
     /// This cancels all running tasks including the TCP server.
@@ -591,29 +640,27 @@ impl MessageBus {
                                                 }
 
                                                 // 🔐 Identity Verification (if mTLS is active)
-                                                if let Some(peer_id) = transport.peer_identity() {
-                                                    if let Some(client_name) = &payload.client_name {
-                                                        if &peer_id != client_name {
-                                                            tracing::warn!(
-                                                                "❌ Client {} identity mismatch: TLS cert says '{}', handshake says '{}'",
-                                                                addr, peer_id, client_name
-                                                            );
+                                                if let (Some(peer_id), Some(client_name)) = (transport.peer_identity(), &payload.client_name) {
+                                                    if &peer_id != client_name {
+                                                        tracing::warn!(
+                                                            "❌ Client {} identity mismatch: TLS cert says '{}', handshake says '{}'",
+                                                            addr, peer_id, client_name
+                                                        );
 
-                                                            let error_msg = format!(
-                                                                "Identity verification failed: Certificate subject='{}' does not match Handshake client_name='{}'.",
-                                                                peer_id, client_name
-                                                            );
-                                                            let notification = shared::message::NotificationPayload::error(
-                                                                "Handshake Failed",
-                                                                error_msg
-                                                            );
-                                                            let msg = BusMessage::notification(&notification);
-                                                            let _ = transport.write_message(&msg).await;
-                                                            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                                                            return;
-                                                        } else {
-                                                            tracing::info!("✅ Client {} identity verified via mTLS: {}", addr, peer_id);
-                                                        }
+                                                        let error_msg = format!(
+                                                            "Identity verification failed: Certificate subject='{}' does not match Handshake client_name='{}'.",
+                                                            peer_id, client_name
+                                                        );
+                                                        let notification = shared::message::NotificationPayload::error(
+                                                            "Handshake Failed",
+                                                            error_msg
+                                                        );
+                                                        let msg = BusMessage::notification(&notification);
+                                                        let _ = transport.write_message(&msg).await;
+                                                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                                                        return;
+                                                    } else {
+                                                        tracing::info!("✅ Client {} identity verified via mTLS: {}", addr, peer_id);
                                                     }
                                                 }
 
@@ -669,10 +716,8 @@ impl MessageBus {
                                                     Ok(msg) => {
                                                         // Unicast Filtering:
                                                         // If message has a target, only send if it matches this client.
-                                                        if let Some(target) = &msg.target {
-                                                            if target != &client_id_clone {
-                                                                continue;
-                                                            }
+                                                        if msg.target.as_ref().is_some_and(|target| target != &client_id_clone) {
+                                                            continue;
                                                         }
 
                                                         if let Err(e) = transport_clone.write_message(&msg).await {
@@ -726,7 +771,11 @@ impl MessageBus {
                                                     }
                                                 }
                                                 Err(e) => {
-                                                    tracing::info!("Client {} read error: {}", addr, e);
+                                                    if matches!(e, AppError::ClientDisconnected) {
+                                                        tracing::info!("Client {} disconnected", addr);
+                                                    } else {
+                                                        tracing::info!("Client {} read error: {}", addr, e);
+                                                    }
                                                     break;
                                                 }
                                             }
@@ -735,6 +784,9 @@ impl MessageBus {
                                 }
                                 // Ensure connection is closed gracefully
                                 let _ = transport.close().await;
+                                // Clean up on disconnect (if read loop exits first)
+                                clients.remove(&client_id);
+                                tracing::info!("Client removed from registry: {}", client_id);
                             });
                         }
                         Err(e) => {

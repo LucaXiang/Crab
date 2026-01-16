@@ -97,17 +97,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("No tenant_id in login response")?
         .to_string();
 
-    println!("✅ Login successful! Token received for Tenant: {}", tenant_id);
+    println!(
+        "✅ Login successful! Token received for Tenant: {}",
+        tenant_id
+    );
 
     // 2. Request Certificate
     println!("\n📜 Requesting Client Certificate...");
-    
+
     // Auto-detect Device ID
     let device_id = crab_cert::generate_hardware_id();
     println!("Using Device ID: {}", device_id);
 
-    // Auto-generate Common Name
-    let common_name = format!("client-{}", username);
+    // Custom Client Name (Common Name)
+    let default_common_name = format!("client-{}", username);
+    let common_name = get_input_with_default("Client Name (Common Name)", &default_common_name);
     println!("Requesting cert for: {}", common_name);
 
     let issue_res = http_client
@@ -115,9 +119,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({
             "tenant_id": tenant_id,
-            "common_name": common_name,
+            "common_name": &common_name,
             "is_server": false,
-            "device_id": device_id
+            "hardware_id": device_id
         }))
         .send()
         .await?;
@@ -209,7 +213,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 4. Connect
     let domain = "localhost"; // Matches cert CN usually, but we skip verify
-    let client = MessageClient::connect_tls(&edge_addr, domain, tls_config, "tui-client").await?;
+    let client = MessageClient::connect_tls(&edge_addr, domain, tls_config, &common_name).await?;
     println!("✅ Connected successfully!");
 
     // Wait a moment for user to see success
@@ -277,6 +281,9 @@ async fn run_app(
                                 app.input_mode = InputMode::Editing;
                             }
                             KeyCode::Char('q') | KeyCode::Esc => {
+                                if let Some(client) = &app.client {
+                                    let _ = client.close().await;
+                                }
                                 return Ok(());
                             }
                             _ => {}
@@ -319,6 +326,9 @@ async fn handle_command(app: &mut App, cmd: &str) {
         }
         "/quit" => {
             tracing::warn!("Press Esc then 'q' to quit");
+            if let Some(client) = &app.client {
+                let _ = client.close().await;
+            }
         }
         "/notify" => {
             if parts.len() < 3 {
@@ -466,6 +476,15 @@ fn ui(f: &mut Frame, app: &App) {
 
 // Helper functions for CLI input
 fn get_input(prompt: &str) -> String {
+    if std::env::var("AUTOMATED_TEST").is_ok() {
+        if prompt.to_lowercase().contains("username") {
+            return "admin".to_string();
+        }
+        if prompt.to_lowercase().contains("password") {
+            return "admin123".to_string();
+        }
+        return "test-input".to_string();
+    }
     print!("{}", prompt);
     io::stdout().flush().unwrap();
     let mut input = String::new();
@@ -474,6 +493,9 @@ fn get_input(prompt: &str) -> String {
 }
 
 fn get_input_with_default(prompt: &str, default: &str) -> String {
+    if std::env::var("AUTOMATED_TEST").is_ok() {
+        return default.to_string();
+    }
     print!("{} [{}]: ", prompt, default);
     io::stdout().flush().unwrap();
     let mut input = String::new();

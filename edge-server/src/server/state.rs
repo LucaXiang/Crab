@@ -3,6 +3,7 @@ use std::sync::Arc;
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
 
+use crate::db::DbService;
 use crate::server::services::{ActivationService, CertService, HttpsService, MessageBusService};
 use crate::server::{Config, JwtService};
 
@@ -44,7 +45,7 @@ impl ServerState {
         let db_path = PathBuf::from(&config.work_dir).join("crab.db");
         let db_path_str = db_path.to_string_lossy();
 
-        let db_service = crate::db::DbService::new(&db_path_str)
+        let db_service = DbService::new(&db_path_str)
             .await
             .expect("Failed to initialize database");
         let db = db_service.db;

@@ -8,6 +8,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use edge_server::Config;
+use edge_server::message::ConnectedClient;
 use edge_server::server::ServerState;
 use edge_server::{BusMessage, MessageClient};
 use ratatui::{prelude::*, widgets::*};
@@ -16,7 +17,7 @@ use std::time::Duration;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 use tui_input::Input;
 use tui_input::backend::crossterm::EventHandler;
-use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
+use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetEvent, TuiWidgetState};
 
 use tokio::sync::mpsc;
 
@@ -24,13 +25,14 @@ use tokio::sync::mpsc;
 struct DemoStatus {
     is_active: bool,
     tenant_id: String,
+    edge_id: String,
     device_id: String,
     plan: String,
     sub_status: String,
     expires_at: String,
+    clients: Vec<ConnectedClient>,
 }
 
-#[derive(Default)]
 struct App {
     /// Input field state
     input: Input,
@@ -44,6 +46,22 @@ struct App {
     is_loading: bool,
     /// Current Status
     status: DemoStatus,
+    /// Logger Widget State
+    logger_state: TuiWidgetState,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            input: Input::default(),
+            input_mode: InputMode::default(),
+            msg_client: None,
+            server_state: None,
+            is_loading: false,
+            status: DemoStatus::default(),
+            logger_state: TuiWidgetState::new(),
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -59,7 +77,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     // Initialize TUI Logger with Tracing
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,surrealdb=warn"));
 
     tracing_subscriber::registry()
         .with(tui_logger::tracing_subscriber_layer())
@@ -78,8 +97,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     // Create App state
-    let mut app = App::default();
-    app.is_loading = true;
+    let mut app = App {
+        is_loading: true,
+        ..Default::default()
+    };
 
     // Channel to receive initialized state
     let (tx, mut rx) = mpsc::channel(1);
@@ -125,50 +146,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // state.start_background_tasks().await; // <-- REMOVED to avoid double start
 
         // Send state back to UI
-        if let Err(_) = tx.send(state.clone()).await {
+        if tx.send(state.clone()).await.is_err() {
             tracing::error!("Failed to send server state to UI");
         }
-
-        // Start Status Poller
-        let poller_state = state.clone();
-        let status_tx_clone = status_tx.clone();
-        tokio::spawn(async move {
-            loop {
-                // Gather status
-                let activation_res = poller_state.activation_service().get_status().await;
-                let sub_cache = poller_state
-                    .activation_service()
-                    .credential_cache
-                    .read()
-                    .await;
-
-                let mut status = DemoStatus::default();
-                if let Ok(act) = activation_res {
-                    status.is_active = act.is_activated;
-                    status.tenant_id = act.tenant_id.unwrap_or("-".to_string());
-                    status.device_id = act.edge_id.unwrap_or("-".to_string());
-                }
-
-                if let Some(sub) = &*sub_cache {
-                    status.plan = format!("{:?}", sub.plan);
-                    status.sub_status = format!("{:?}", sub.status);
-                    status.expires_at = sub
-                        .expires_at
-                        .map(|d| d.to_rfc3339())
-                        .unwrap_or_else(|| "Never".to_string());
-                } else {
-                    status.plan = "None".to_string();
-                    status.sub_status = "None".to_string();
-                    status.expires_at = "-".to_string();
-                }
-
-                if let Err(_) = status_tx_clone.send(status).await {
-                    break;
-                }
-
-                tokio::time::sleep(Duration::from_secs(2)).await;
-            }
-        });
 
         // Lifecycle Manager: Use Server::run() instead of manual orchestration
         // This ensures we test the exact same code path as the real binary
@@ -219,7 +199,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
 
         // Send state back to UI
-        if let Err(_) = tx.send(state.clone()).await {
+        if tx.send(state.clone()).await.is_err() {
             tracing::error!("Failed to send server state to UI");
         }
 
@@ -228,29 +208,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             loop {
                 // Gather status
                 let activation_res = state.activation_service().get_status().await;
-                let sub_cache = state.activation_service().subscription_cache.read().await;
+                let cred_cache = state.activation_service().credential_cache.read().await;
 
                 let mut status = DemoStatus::default();
+                status.clients = state.message_bus().get_connected_clients();
+
                 if let Ok(act) = activation_res {
                     status.is_active = act.is_activated;
-                    status.tenant_id = act.tenant_id.unwrap_or("-".to_string());
-                    status.device_id = act.edge_id.unwrap_or("-".to_string());
                 }
 
-                if let Some(sub) = &*sub_cache {
-                    status.plan = format!("{:?}", sub.plan);
-                    status.sub_status = format!("{:?}", sub.status);
-                    status.expires_at = sub
-                        .expires_at
-                        .map(|d| d.to_rfc3339())
-                        .unwrap_or_else(|| "Never".to_string());
+                if let Some(cred) = &*cred_cache {
+                    status.tenant_id = cred.tenant_id.clone();
+                    status.edge_id = cred.server_id.clone();
+                    status.device_id = cred.device_id.clone().unwrap_or_else(|| "-".to_string());
+
+                    if let Some(sub) = &cred.subscription {
+                        status.plan = format!("{:?}", sub.plan);
+                        status.sub_status = format!("{:?}", sub.status);
+                        status.expires_at = sub
+                            .expires_at
+                            .map(|d| d.to_rfc3339())
+                            .unwrap_or_else(|| "Never".to_string());
+                    } else {
+                        status.plan = "None".to_string();
+                        status.sub_status = "No Subscription".to_string();
+                        status.expires_at = "-".to_string();
+                    }
                 } else {
+                    status.tenant_id = "-".to_string();
+                    status.edge_id = "-".to_string();
+                    status.device_id = "-".to_string();
                     status.plan = "None".to_string();
-                    status.sub_status = "None".to_string();
+                    status.sub_status = "Not Activated".to_string();
                     status.expires_at = "-".to_string();
                 }
 
-                if let Err(_) = status_tx.send(status).await {
+                if status_tx.send(status).await.is_err() {
                     break;
                 }
 
@@ -288,12 +281,12 @@ async fn run_app(
             tokio::select! {
                 state_res = rx.recv() => {
                     if let Some(state) = state_res {
-                         app.msg_client = Some(MessageClient::memory(&state.message_bus()));
+                         app.msg_client = Some(MessageClient::memory(state.message_bus()));
                          app.server_state = Some(state);
                          app.is_loading = false;
-                         tracing::info!("✅ Server Initialized and Ready!");
                          // Force a manual log to verify visibility
                          tracing::info!("Press 'e' to edit commands, 'q' to quit");
+                         tracing::info!("Use Up/Down/PgUp/PgDown to scroll logs");
                     }
                 }
                 _ = tokio::time::sleep(Duration::from_millis(100)) => {
@@ -306,37 +299,50 @@ async fn run_app(
         // Handle status updates and input
         let timeout = Duration::from_millis(100);
         if event::poll(timeout)? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match app.input_mode {
-                        InputMode::Normal => match key.code {
-                            KeyCode::Char('e') => {
-                                app.input_mode = InputMode::Editing;
-                            }
-                            KeyCode::Char('q') | KeyCode::Esc => {
-                                return Ok(());
-                            }
-                            _ => {}
-                        },
-                        InputMode::Editing => match key.code {
-                            KeyCode::Enter => {
-                                let input_str: String = app.input.value().into();
-                                if !input_str.is_empty() {
-                                    handle_command(app, &input_str).await;
-                                    app.input.reset();
+            match event::read()? {
+                Event::Key(key) => {
+                    if matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
+                        match app.input_mode {
+                            InputMode::Normal => match key.code {
+                                KeyCode::Char('e') => {
+                                    app.input_mode = InputMode::Editing;
                                 }
-                                // Stay in editing mode for convenience, or switch back?
-                                // Let's stay in editing mode like a terminal
-                            }
-                            KeyCode::Esc => {
-                                app.input_mode = InputMode::Normal;
-                            }
-                            _ => {
-                                app.input.handle_event(&Event::Key(key));
-                            }
-                        },
+                                KeyCode::Char('q') | KeyCode::Esc => {
+                                    return Ok(());
+                                }
+                                KeyCode::PageUp => {
+                                    app.logger_state.transition(TuiWidgetEvent::PrevPageKey)
+                                }
+                                KeyCode::PageDown => {
+                                    app.logger_state.transition(TuiWidgetEvent::NextPageKey)
+                                }
+                                KeyCode::Up => app.logger_state.transition(TuiWidgetEvent::UpKey),
+                                KeyCode::Down => {
+                                    app.logger_state.transition(TuiWidgetEvent::DownKey)
+                                }
+                                _ => {}
+                            },
+                            InputMode::Editing => match key.code {
+                                KeyCode::Enter => {
+                                    let input_str: String = app.input.value().into();
+                                    if !input_str.is_empty() {
+                                        handle_command(app, &input_str).await;
+                                        app.input.reset();
+                                    }
+                                    // Stay in editing mode for convenience, or switch back?
+                                    // Let's stay in editing mode like a terminal
+                                }
+                                KeyCode::Esc => {
+                                    app.input_mode = InputMode::Normal;
+                                }
+                                _ => {
+                                    app.input.handle_event(&Event::Key(key));
+                                }
+                            },
+                        }
                     }
                 }
+                _ => {}
             }
         }
 
@@ -356,12 +362,14 @@ async fn handle_command(app: &mut App, cmd: &str) {
     match parts[0] {
         "/help" => {
             tracing::info!("Available commands:");
-            tracing::info!("  /notify <title> <msg>    - Send notification (Broadcast)");
-            tracing::info!("  /sync <res> <id> <act>   - Send sync signal (Broadcast)");
-            tracing::info!("  /activate <user> <pass>  - Activate server with Auth Server");
-            tracing::info!("  /ping                    - Send ping command (Broadcast)");
-            tracing::info!("  /clear                   - Clear logs");
-            tracing::info!("  /quit                    - Exit");
+            tracing::info!(
+                "  /notify [@client] <title> <msg> - Send notification (Broadcast or Unicast)"
+            );
+            tracing::info!("  /sync <res> <id> <act>          - Send sync signal (Broadcast)");
+            tracing::info!("  /activate <user> <pass>         - Activate server with Auth Server");
+            tracing::info!("  /ping                           - Send ping command (Broadcast)");
+            tracing::info!("  /clear                          - Clear logs");
+            tracing::info!("  /quit                           - Exit");
         }
         "/quit" => {
             // We can't easily exit main loop from here without return value,
@@ -399,21 +407,63 @@ async fn handle_command(app: &mut App, cmd: &str) {
         }
         "/notify" => {
             if parts.len() < 3 {
-                tracing::error!("Usage: /notify <title> <message>");
+                tracing::error!("Usage: /notify [@client] <title> <message>");
                 return;
             }
-            let title = parts[1];
-            let msg_content = parts[2..].join(" ");
 
             if let Some(state) = &app.server_state {
-                let payload = shared::message::NotificationPayload::info(title, &msg_content);
-                let msg = BusMessage::notification(&payload);
+                let target_arg = parts[1];
 
-                // Broadcast to all clients
-                if let Err(e) = state.message_bus().publish(msg).await {
-                    tracing::error!("Failed to broadcast: {}", e);
+                if target_arg.starts_with('@') {
+                    // Unicast to specific client
+                    if parts.len() < 4 {
+                        tracing::error!("Usage: /notify @<client> <title> <message>");
+                        return;
+                    }
+
+                    let client_name = &target_arg[1..]; // Remove '@'
+                    let title = parts[2];
+                    let msg_content = parts[3..].join(" ");
+
+                    // Find client by name (peer_identity)
+                    let clients = state.message_bus().get_connected_clients();
+                    let target_client = clients
+                        .iter()
+                        .find(|c| c.peer_identity.as_deref() == Some(client_name));
+
+                    if let Some(client) = target_client {
+                        let payload =
+                            shared::message::NotificationPayload::info(title, &msg_content);
+                        let mut msg = BusMessage::notification(&payload);
+                        msg.target = Some(client.id.clone());
+
+                        if let Err(e) = state.message_bus().send_to_client(&client.id, msg).await {
+                            tracing::error!("Failed to send to {}: {}", client_name, e);
+                        } else {
+                            tracing::info!(
+                                "✅ Sent Notification to {}: {} - {}",
+                                client_name,
+                                title,
+                                msg_content
+                            );
+                        }
+                    } else {
+                        tracing::error!("❌ Client '{}' not found", client_name);
+                    }
                 } else {
-                    tracing::info!("✅ Broadcasted Notification: {} - {}", title, msg_content);
+                    // Broadcast (Original behavior)
+                    let title = parts[1];
+                    let msg_content = parts[2..].join(" ");
+
+                    let payload = shared::message::NotificationPayload::info(title, &msg_content);
+                    let msg = BusMessage::notification(&payload);
+
+                    // Broadcast to all clients
+                    if let Err(e) = state.message_bus().publish(msg).await {
+                        tracing::error!("Failed to broadcast: {}", e);
+                    } else {
+                        tracing::info!("✅ Broadcasted Notification: {} - {}", title, msg_content);
+                    }
                 }
             } else {
                 tracing::error!("Server not ready");
@@ -533,10 +583,20 @@ fn ui(f: &mut Frame, app: &App) {
         .output_target(false)
         .output_file(false)
         .output_line(false)
-        .style(Style::default().fg(Color::White));
+        .style(Style::default().fg(Color::White))
+        .state(&app.logger_state);
     f.render_widget(tui_sm, main_chunks[0]);
 
-    // Status Panel
+    // Right Side (Status + Clients)
+    let right_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(10), // Status
+            Constraint::Min(1),     // Clients
+        ])
+        .split(main_chunks[1]);
+
+    // 1. Status Panel
     let status_block = Block::default()
         .title(" Status ")
         .borders(Borders::ALL)
@@ -564,11 +624,11 @@ fn ui(f: &mut Frame, app: &App) {
         ]),
         Line::from(vec![Span::raw("")]),
         Line::from(vec![
-            Span::raw("Tenant ID: "),
+            Span::raw("Tenant: "),
             Span::styled(&app.status.tenant_id, Style::default().fg(Color::Yellow)),
         ]),
         Line::from(vec![
-            Span::raw("Device ID: "),
+            Span::raw("Device: "),
             Span::styled(&app.status.device_id, Style::default().fg(Color::Yellow)),
         ]),
         Line::from(vec![Span::raw("")]),
@@ -576,21 +636,52 @@ fn ui(f: &mut Frame, app: &App) {
             Span::raw("Plan: "),
             Span::styled(&app.status.plan, Style::default().fg(Color::Blue)),
         ]),
-        Line::from(vec![
-            Span::raw("Sub Status: "),
-            Span::styled(&app.status.sub_status, Style::default().fg(Color::Blue)),
-        ]),
-        Line::from(vec![
-            Span::raw("Expires: "),
-            Span::styled(&app.status.expires_at, Style::default().fg(Color::Magenta)),
-        ]),
     ];
 
     let status_paragraph = Paragraph::new(status_text)
         .block(status_block)
         .wrap(Wrap { trim: true });
 
-    f.render_widget(status_paragraph, main_chunks[1]);
+    f.render_widget(status_paragraph, right_chunks[0]);
+
+    // 2. Connected Clients Panel
+    let clients_block = Block::default()
+        .title(format!(" Clients ({}) ", app.status.clients.len()))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Magenta));
+
+    let client_items: Vec<ListItem> = app
+        .status
+        .clients
+        .iter()
+        .map(|c| {
+            let name = c.peer_identity.as_deref().unwrap_or("Unknown");
+            let addr = c.addr.as_deref().unwrap_or("Unknown");
+            // Shorten ID for display
+            let short_id = if c.id.len() > 8 { &c.id[..8] } else { &c.id };
+
+            let content = vec![
+                Line::from(vec![Span::styled(
+                    format!("ID: {}..", short_id),
+                    Style::default().fg(Color::Cyan),
+                )]),
+                Line::from(vec![
+                    Span::raw(" Name: "),
+                    Span::styled(name, Style::default().fg(Color::Yellow)),
+                ]),
+                Line::from(vec![
+                    Span::raw(" IP:   "),
+                    Span::styled(addr, Style::default().fg(Color::Green)),
+                ]),
+                Line::from(Span::raw(" ")),
+            ];
+
+            ListItem::new(content)
+        })
+        .collect();
+
+    let clients_list = List::new(client_items).block(clients_block);
+    f.render_widget(clients_list, right_chunks[1]);
 
     // Input
     let input_block = Block::default()

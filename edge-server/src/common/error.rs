@@ -96,7 +96,11 @@ impl IntoResponse for AppError {
             // Internal errors (500)
             AppError::internal(msg) => {
                 error!(target: "internal", error = %msg, "Internal error occurred");
-                (StatusCode::INTERNAL_SERVER_ERROR, "E9001", "Internal server error")
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "E9001",
+                    "Internal server error",
+                )
             }
 
             // Invalid request (400)

@@ -103,14 +103,6 @@ impl ProvisioningService {
         verify_cert_pair(&cert_pem, &tenant_ca_pem)
             .map_err(|e| AppError::validation(format!("Certificate verification failed: {}", e)))?;
 
-        // 解析证书获取指纹等信息，这里简单起见重新解析一次或手动构造
-        // verify_cert_pair 实际上没有返回 Credential 对象，它只是验证。
-        // 我们需要手动构建 Credential 对象。
-        // 注意：verify_cert_pair 之前的实现是返回 Credential，但我之前的修改将其改为了 Result<()>。
-        // 让我们检查一下 credential.rs 的 verify_cert_pair 签名。
-        // 刚才的 read 结果显示 verify_cert_pair 返回 Result<(), AppError>。
-        // 所以这里不能 let credential = verify_cert_pair(...);
-
         // 我们需要获取指纹。
         let metadata = crab_cert::CertMetadata::from_pem(&cert_pem)
             .map_err(|e| AppError::validation(format!("Failed to parse cert metadata: {}", e)))?;
