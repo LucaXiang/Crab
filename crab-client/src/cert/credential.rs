@@ -40,8 +40,8 @@ pub struct CredentialStorage {
 
 impl CredentialStorage {
     /// 创建凭证存储
-    pub fn new(base_path: impl Into<PathBuf>, client_name: &str) -> Self {
-        let path = base_path.into().join(client_name).join("credential.json");
+    pub fn new(base_path: impl Into<PathBuf>, filename: &str) -> Self {
+        let path = base_path.into().join(filename);
         Self { path }
     }
 

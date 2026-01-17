@@ -35,7 +35,7 @@ impl CertManager {
     /// 创建证书管理器
     pub fn new(base_path: impl Into<PathBuf>, client_name: &str) -> Self {
         let cert_path = base_path.into().join(client_name);
-        let credential_storage = CredentialStorage::new(&cert_path, client_name);
+        let credential_storage = CredentialStorage::new(&cert_path, "credential.json");
         Self {
             credential_storage,
             cert_path,
