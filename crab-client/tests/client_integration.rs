@@ -74,7 +74,7 @@ async fn test_remote_client_creation() {
 
 #[tokio::test]
 async fn test_local_client_creation() {
-    let client = CrabClient::<LocalMode>::new("http://localhost:8080");
+    let client = CrabClient::<LocalMode>::new();
     assert!(!client.is_logged_in());
     assert!(client.token().is_none());
 }

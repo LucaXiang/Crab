@@ -1,39 +1,45 @@
-//! Interactive Message Client Example with mTLS support (TUI Enhanced)
+//! Interactive Message Client Example with mTLS support
 //!
 //! Demonstrates an interactive MessageClient that can:
-//! 1. Authenticate with Auth Server to get mTLS certificates
-//! 2. Connect to Edge Server using mTLS
-//! 3. Send/Receive messages via TUI
+//! 1. Input client_name and check local credential cache
+//! 2. Authenticate with Auth Server to get mTLS certificates (if no cache)
+//! 3. Connect to Edge Server using mTLS
+//! 4. Send/Receive messages via TUI
 //!
 //! Run: cargo run --example message_client
 
-use crab_client::MessageClient;
+use crab_client::{CertManager, Credential, CredentialStorage, MessageClient, NetworkMessageClient};
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{prelude::*, widgets::*};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme};
-use shared::message::BusMessage;
 use std::io::{self, Stdout, Write};
+use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
+use tokio::sync::mpsc;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 use tui_input::Input;
 use tui_input::backend::crossterm::EventHandler;
-use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
 
 #[derive(Default)]
+#[allow(dead_code)]
 struct App {
     input: Input,
     input_mode: InputMode,
-    client: Option<MessageClient>,
+    client: Option<NetworkMessageClient>,
+    username: String,
+    connected: bool,
+    notifications: Vec<String>,
+    notify_rx: Option<mpsc::Receiver<String>>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 enum InputMode {
     #[default]
     Normal,
@@ -58,109 +64,230 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tui_logger::set_default_level(log::LevelFilter::Info);
 
     // --- CLI Phase (Startup Wizard) ---
-    // We use println! here which bypasses the tui-logger (which captures tracing/log macros)
-    // So the user sees these prompts in the standard terminal before TUI starts.
-
     println!("\n🦀 Interactive Message Client (mTLS)");
-    println!("=====================================\n");
+    println!("=====================================");
+    println!("\n⚠️  Prerequisites:");
+    println!("   1. Start Auth Server:  cargo run -p crab-auth");
+    println!("   2. Start Edge Server:  cargo run -p edge-server");
+    println!();
 
-    let auth_url = get_input_with_default("Auth Server URL", "http://localhost:3001");
+    // 1. Input client_name
+    let cert_path: PathBuf = std::env::var("CRAB_CERT_PATH")
+        .unwrap_or_else(|_| "./certs".to_string())
+        .into();
+    let default_client_name = "message-client".to_string();
+    let client_name = get_input_with_default("Client Name", &default_client_name);
+
+    println!("\n📁 Checking credential cache for '{}'...", client_name);
+
+    // 2. Check local credential cache
+    let cert_manager = CertManager::new(&cert_path, &client_name);
+    let mut username = String::new();
+    let mut token = String::new();
+    let mut tenant_id = String::new();
+
+    if cert_manager.has_credential() {
+        println!("✅ Found cached credential!");
+
+        // Load and display cached info
+        let client_cert_path = cert_path.join(&client_name);
+        let storage = CredentialStorage::new(&client_cert_path, "credential.json");
+        if let Some(cred) = storage.load() {
+            println!("   Client: {}", cred.client_name);
+            println!(
+                "   Token: {}...",
+                &cred.token[..std::cmp::min(20, cred.token.len())]
+            );
+
+            // Verify not expired (if has expiry)
+            if cred.expires_at.is_some() {
+                println!("   Has expiry date");
+            }
+
+            // Use cached token
+            token = cred.token;
+            tenant_id = cred.tenant_id;
+            username = cred.client_name.clone();
+
+            let use_cache = get_input_with_default("Use cached credential? (y/n)", "y");
+            if use_cache.to_lowercase() != "y" {
+                println!("Clearing cache and requiring re-authentication...");
+                cert_manager.logout()?;
+                token.clear();
+            }
+        }
+    } else {
+        println!("📭 No cached credential found");
+    }
+
+    let cert_url: String = "http://localhost:3001".into();
+    // 3. If no cached token, require authentication
+    if token.is_empty() {
+        // Authenticate
+        println!("\n🔑 Authentication required");
+        username = get_input("Username: ");
+        let password = get_input("Password: ");
+
+        println!("Connecting to Auth Server...");
+        let http_client = reqwest::Client::new();
+
+        let login_res = http_client
+            .post(format!("{}/api/auth/login", cert_url))
+            .json(&serde_json::json!({
+                "username": username,
+                "password": password
+            }))
+            .send()
+            .await?;
+
+        if !login_res.status().is_success() {
+            return Err(format!("Login failed: {}", login_res.text().await?).into());
+        }
+
+        let login_data: serde_json::Value = login_res.json().await?;
+        token = login_data["token"]
+            .as_str()
+            .ok_or("No token in login response")?
+            .to_string();
+        tenant_id = login_data["tenant_id"]
+            .as_str()
+            .ok_or("No tenant_id in login response")?
+            .to_string();
+
+        println!("✅ Login successful! Tenant: {}", tenant_id);
+
+        // Save credential to cache
+        println!("💾 Saving credential to cache...");
+        let client_cert_path = cert_path.join(&client_name);
+        let storage = CredentialStorage::new(&client_cert_path, "credential.json");
+        let cred = Credential {
+            client_name: client_name.clone(),
+            token: token.clone(),
+            expires_at: None,
+            tenant_id: tenant_id.clone(),
+        };
+        storage.save(&cred).ok();
+        println!("✅ Credential cached at: {:?}", storage.path());
+    }
+
     let edge_addr = get_input_with_default("Edge Server Address", "127.0.0.1:8081");
+    // Note: Edge Server cert includes "localhost" and "edge-server-{uuid}" as valid DNS names
 
-    // 1. Authenticate
-    println!("\n🔑 Authentication required");
-    let username = get_input("Username: ");
-    let password = get_input("Password: ");
+    // 4. Get certificates (from cache or request new)
+    println!("\n📜 Checking for local certificates...");
 
-    println!("Connecting to Auth Server...");
-    let http_client = reqwest::Client::new();
+    let (cert_pem, key_pem, tenant_ca_pem) = if cert_manager.has_local_certificates() {
+        println!("✅ Found local certificates!");
+        cert_manager.load_local_certificates()?
+    } else {
+        println!("📭 No local certificates found, requesting from Auth Server...");
 
-    let login_res = http_client
-        .post(format!("{}/api/auth/login", auth_url))
-        .json(&serde_json::json!({
-            "username": username,
-            "password": password
-        }))
-        .send()
-        .await?;
+        let device_id = crab_cert::generate_hardware_id();
+        println!("Using Device ID: {}", device_id);
 
-    if !login_res.status().is_success() {
-        return Err(format!("Login failed: {}", login_res.text().await?).into());
+        let common_name = client_name.clone();
+        println!("Requesting cert for: {}", common_name);
+
+        let http_client = reqwest::Client::new();
+
+        println!("Requesting certificate from Auth Server...");
+
+        let issue_res = http_client
+            .post(format!("{}/api/cert/issue", cert_url))
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&serde_json::json!({
+                "tenant_id": tenant_id,
+                "common_name": &common_name,
+                "is_server": false,
+                "device_id": device_id
+            }))
+            .send()
+            .await?;
+
+        let status = issue_res.status();
+        if !status.is_success() {
+            let error_text = issue_res.text().await;
+            return Err(format!(
+                "Cert issuance failed (HTTP {}): {}\n\n\
+                Make sure Auth Server is running on {}",
+                status,
+                error_text.unwrap_or_else(|_| "Unknown error".to_string()),
+                cert_url
+            ).into());
+        }
+
+        let cert_data: serde_json::Value = issue_res.json().await?;
+
+        // Check for error response
+        if let Some(error) = cert_data.get("error") {
+            return Err(format!("Cert issuance failed: {}", error).into());
+        }
+
+        let cert_pem = cert_data["cert"].as_str()
+            .ok_or("No cert received - Auth Server may need activation")?
+            .to_string();
+        let key_pem = cert_data["key"].as_str()
+            .ok_or("No key received")?
+            .to_string();
+        let tenant_ca_pem = cert_data["tenant_ca_cert"]
+            .as_str()
+            .ok_or("No tenant CA received")?
+            .to_string();
+
+        println!("✅ Certificate received!");
+
+        // Save certificates to local storage
+        println!("💾 Saving certificates to local storage...");
+        cert_manager.save_certificates(&cert_pem, &key_pem, &tenant_ca_pem)?;
+
+        (cert_pem, key_pem, tenant_ca_pem)
+    };
+
+    // Clone for multiple uses (TLS config and connection)
+    let cert_pem_clone = cert_pem.clone();
+    let key_pem_clone = key_pem.clone();
+    let tenant_ca_pem_clone = tenant_ca_pem.clone();
+
+    // 5. Verify device_id in certificate (hardware binding)
+    println!("🔍 Verifying certificate hardware binding...");
+    let current_device_id = crab_cert::generate_hardware_id();
+    let cert_metadata = crab_cert::CertMetadata::from_pem(&cert_pem_clone)
+        .map_err(|e| format!("Failed to parse certificate metadata: {}", e))?;
+
+    if let Some(cert_device_id) = &cert_metadata.device_id {
+        if cert_device_id != &current_device_id {
+            println!("⚠️  Certificate device_id mismatch!");
+            println!("   Certificate bound to: {}", cert_device_id);
+            println!("   Current device:       {}", current_device_id);
+            println!("   Certificate may have been copied from another machine.");
+            let force = get_input_with_default("Continue anyway?", "n");
+            if force.to_lowercase() != "y" {
+                return Err("Certificate device_id mismatch".into());
+            }
+        } else {
+            println!("✅ Device binding verified: {}", current_device_id);
+        }
+    } else {
+        println!("⚠️  Certificate has no device_id binding (may be legacy)");
     }
 
-    let login_data: serde_json::Value = login_res.json().await?;
-    let token = login_data["token"]
-        .as_str()
-        .ok_or("No token in login response")?
-        .to_string();
-    let tenant_id = login_data["tenant_id"]
-        .as_str()
-        .ok_or("No tenant_id in login response")?
-        .to_string();
-
-    println!(
-        "✅ Login successful! Token received for Tenant: {}",
-        tenant_id
-    );
-
-    // 2. Request Certificate
-    println!("\n📜 Requesting Client Certificate...");
-
-    // Auto-detect Device ID
-    let device_id = crab_cert::generate_hardware_id();
-    println!("Using Device ID: {}", device_id);
-
-    // Custom Client Name (Common Name)
-    let default_common_name = format!("client-{}", username);
-    let common_name = get_input_with_default("Client Name (Common Name)", &default_common_name);
-    println!("Requesting cert for: {}", common_name);
-
-    let issue_res = http_client
-        .post(format!("{}/api/cert/issue", auth_url))
-        .header("Authorization", format!("Bearer {}", token))
-        .json(&serde_json::json!({
-            "tenant_id": tenant_id,
-            "common_name": &common_name,
-            "is_server": false,
-            "hardware_id": device_id
-        }))
-        .send()
-        .await?;
-
-    if !issue_res.status().is_success() {
-        return Err(format!("Cert issuance failed: {}", issue_res.text().await?).into());
-    }
-
-    let cert_data: serde_json::Value = issue_res.json().await?;
-
-    let cert_pem = cert_data["cert"].as_str().ok_or("No cert received")?;
-    let key_pem = cert_data["key"].as_str().ok_or("No key received")?;
-    let tenant_ca_pem = cert_data["tenant_ca_cert"]
-        .as_str()
-        .ok_or("No tenant CA received")?;
-
-    println!("✅ Certificate received!");
-
-    // 3. Configure mTLS
+    // 5. Configure mTLS
     println!("\n🔐 Configuring mTLS...");
 
-    // Load Client Cert/Key
-    let mut cert_reader = std::io::Cursor::new(cert_pem);
+    let mut cert_reader = std::io::Cursor::new(cert_pem_clone.clone());
     let certs: Vec<CertificateDer> =
         rustls_pemfile::certs(&mut cert_reader).collect::<Result<_, _>>()?;
     let cert = certs.into_iter().next().ok_or("No cert found")?;
 
-    let mut key_reader = std::io::Cursor::new(key_pem);
+    let mut key_reader = std::io::Cursor::new(key_pem_clone.clone());
     let key = rustls_pemfile::private_key(&mut key_reader)?.ok_or("No private key found")?;
 
-    // Load Tenant CA
     let mut root_store = RootCertStore::empty();
-    let mut ca_reader = std::io::Cursor::new(tenant_ca_pem);
+    let mut ca_reader = std::io::Cursor::new(tenant_ca_pem_clone);
     for cert in rustls_pemfile::certs(&mut ca_reader) {
         root_store.add(cert?)?;
     }
 
-    // Custom verifier to skip hostname verification for localhost demo
     #[derive(Debug)]
     struct SkipHostnameVerifier;
     impl ServerCertVerifier for SkipHostnameVerifier {
@@ -202,68 +329,163 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Build TLS config
-    // We need to use dangerous() builder to set custom verifier
-    let tls_config = ClientConfig::builder()
+    let _tls_config = ClientConfig::builder()
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(SkipHostnameVerifier))
         .with_client_auth_cert(vec![cert], key)?;
 
     println!("✅ mTLS configured.");
-    println!("🚀 Connecting to Edge Server at {}...", edge_addr);
 
-    // 4. Connect
-    let domain = "localhost"; // Matches cert CN usually, but we skip verify
-    let client = MessageClient::connect_tls(&edge_addr, domain, tls_config, &common_name).await?;
-    println!("✅ Connected successfully!");
+    // 6. Connect to Edge Server using mTLS
+    println!("\n🔌 Connecting to Edge Server...");
 
-    // Wait a moment for user to see success
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    // Pass PEM bytes directly to connect_mtls (it handles parsing internally)
+    let ca_cert_pem = tenant_ca_pem.as_bytes().to_vec();
+    let client_cert_pem = cert_pem.as_bytes().to_vec();
+    let client_key_pem = key_pem.as_bytes().to_vec();
 
-    // --- TUI Phase ---
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
+    // Connect using mTLS
+    let is_connected = match NetworkMessageClient::connect_mtls(
+        &edge_addr,
+        &ca_cert_pem,
+        &client_cert_pem,
+        &client_key_pem,
+        &client_name,
+    ).await {
+        Ok(client) => {
+            println!("✅ Connected to Edge Server via mTLS!");
+            Some(client)
+        }
+        Err(e) => {
+            println!("❌ Connection failed: {}", e);
+            println!("   Make sure the Edge Server is running with mTLS enabled.");
+            None
+        }
+    };
+
+    let connected = is_connected.is_some();
+
+    if connected {
+        // 确保用户看到连接成功的消息
+        println!("\n✅ Connected to Edge Server via mTLS!");
+        println!("\nStarting TUI... (press 'e' to edit, 'q' to quit)");
+    } else {
+        println!("\n❌ Connection failed. Exiting.");
+        return Ok(());
+    }
+
+    // 只在连接成功时启动 TUI
+    if let Some(client) = is_connected {
+        if let Err(e) = run_tui(client, username.clone()).await {
+            // TUI 失败时回退到 CLI 模式
+            eprintln!("TUI 不可用 ({}), 使用 CLI 模式", e);
+            run_cli(username).await;
+        }
+    }
+
+    println!("Goodbye!");
+    Ok(())
+}
+
+async fn run_tui(
+    client: NetworkMessageClient,
+    username: String,
+) -> io::Result<()> {
+    use ratatui::backend::CrosstermBackend as TuiBackend;
+    use ratatui::Terminal;
+
+    // 初始化 TUI
+    let stdout = io::stdout();
+    let backend = TuiBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::default();
-    app.client = Some(client);
+    // 启用原始模式
+    enable_raw_mode()?;
 
-    tracing::info!("✅ Client Ready. Type /help for commands.");
+    // 创建消息 channel 用于接收通知
+    let (notify_tx, notify_rx) = mpsc::channel(32);
 
-    // Start background receiver for TUI logging
-    let client_clone = app.client.as_ref().unwrap().clone();
+    // 启动后台任务接收服务端通知
+    let client_clone = client.clone();
+    let notify_tx_clone = notify_tx.clone();
     tokio::spawn(async move {
         loop {
             match client_clone.recv().await {
                 Ok(msg) => {
-                    tracing::info!("📨 [RECV] {:?}", msg.event_type);
-                    if let Ok(payload) = msg.parse_payload::<serde_json::Value>() {
-                        tracing::info!("   Data: {}", payload);
+                    if msg.event_type == shared::message::EventType::Notification {
+                        if let Ok(payload) = msg.parse_payload::<shared::message::NotificationPayload>() {
+                            let notification = format!(
+                                "[{:?}] {}: {}",
+                                payload.category,
+                                payload.title,
+                                payload.message
+                            );
+                            let _ = notify_tx_clone.send(notification).await;
+                        }
                     }
                 }
-                Err(e) => {
-                    tracing::error!("❌ Disconnected/Error: {}", e);
-                    // Simple retry delay or break
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                }
+                Err(_) => break,
             }
         }
     });
 
-    let res = run_app(&mut terminal, &mut app).await;
+    // 创建 App
+    let mut app = App {
+        input: Input::default(),
+        input_mode: InputMode::Normal,
+        client: Some(client),
+        username,
+        connected: true,
+        notifications: Vec::new(),
+        notify_rx: Some(notify_rx),
+    };
 
-    // Restore terminal
+    // 运行 TUI
+    let result = run_app(&mut terminal, &mut app).await;
+
+    // 恢复原始模式
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
 
-    if let Err(err) = res {
-        println!("Error: {:?}", err);
+    // 恢复标准输出
+    execute!(terminal.backend_mut(), LeaveAlternateScreen).ok();
+
+    result
+}
+
+/// CLI fallback mode when TUI is not available
+async fn run_cli(username: String) {
+    println!("\n✅ Connected to Edge Server via mTLS!");
+    println!("Username: {}", username);
+    println!("\nCommands:");
+    println!("  /help      - Show help");
+    println!("  /status    - Show connection status");
+    println!("  /req <cmd> - Send request command");
+    println!("  /ping      - Ping server");
+    println!("  /quit      - Quit");
+    println!("");
+
+    let mut input = String::new();
+    loop {
+        print!("> ");
+        io::stdout().flush().ok();
+
+        match io::stdin().read_line(&mut input) {
+            Ok(0) | Err(_) => break,
+            Ok(_) => {
+                let cmd = input.trim();
+                if cmd.is_empty() {
+                    input.clear();
+                    continue;
+                }
+                if cmd == "/quit" || cmd == "q" {
+                    break;
+                }
+                println!("[INFO] Command: {}", cmd);
+                // 这里只是打印，实际命令处理需要在 TUI 中
+            }
+        }
+        input.clear();
     }
-
-    Ok(())
 }
 
 async fn run_app(
@@ -273,42 +495,49 @@ async fn run_app(
     loop {
         terminal.draw(|f| ui(f, app))?;
 
-        if event::poll(Duration::from_millis(100))? {
+        // 非阻塞接收通知
+        if let Some(ref mut rx) = app.notify_rx {
+            while let Ok(notification) = rx.try_recv() {
+                app.notifications.push(notification);
+                // 保留最多 100 条通知
+                if app.notifications.len() > 100 {
+                    app.notifications.remove(0);
+                }
+            }
+        }
+
+        // 快速检查是否有事件，非阻塞
+        if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    match app.input_mode {
-                        InputMode::Normal => match key.code {
-                            KeyCode::Char('e') => {
-                                app.input_mode = InputMode::Editing;
+                    match key.code {
+                        KeyCode::Char('q') | KeyCode::Esc if matches!(app.input_mode, InputMode::Normal) => break,
+                        KeyCode::Char('e') if matches!(app.input_mode, InputMode::Normal) => {
+                            app.input_mode = InputMode::Editing;
+                        }
+                        KeyCode::Esc if matches!(app.input_mode, InputMode::Editing) => {
+                            app.input.reset();
+                            app.input_mode = InputMode::Normal;
+                        }
+                        KeyCode::Enter if matches!(app.input_mode, InputMode::Editing) => {
+                            let input_str: String = app.input.value().into();
+                            if !input_str.is_empty() {
+                                handle_command(app, &input_str).await;
                             }
-                            KeyCode::Char('q') | KeyCode::Esc => {
-                                if let Some(client) = &app.client {
-                                    let _ = client.close().await;
-                                }
-                                return Ok(());
-                            }
-                            _ => {}
-                        },
-                        InputMode::Editing => match key.code {
-                            KeyCode::Enter => {
-                                let input_str: String = app.input.value().into();
-                                if !input_str.is_empty() {
-                                    handle_command(app, &input_str).await;
-                                    app.input.reset();
-                                }
-                            }
-                            KeyCode::Esc => {
-                                app.input_mode = InputMode::Normal;
-                            }
-                            _ => {
-                                app.input.handle_event(&Event::Key(key));
-                            }
-                        },
+                            app.input.reset();
+                            app.input_mode = InputMode::Normal;
+                        }
+                        _ if matches!(app.input_mode, InputMode::Editing) => {
+                            app.input.handle_event(&Event::Key(key));
+                        }
+                        _ => {}
                     }
                 }
             }
         }
     }
+
+    Ok(())
 }
 
 async fn handle_command(app: &mut App, cmd: &str) {
@@ -320,79 +549,85 @@ async fn handle_command(app: &mut App, cmd: &str) {
     match parts[0] {
         "/help" => {
             tracing::info!("Commands:");
-            tracing::info!("  /notify <title> <msg>  - Send notification");
-            tracing::info!("  /req <cmd> [args]      - Send request command");
-            tracing::info!("  /ping                  - Send ping (as ServerCommand)");
             tracing::info!("  /quit                  - Exit");
+            tracing::info!("  /status                - Show connection status");
+            tracing::info!("  /req <command> [args]  - Send request command");
+            tracing::info!("  /ping                  - Ping server");
         }
         "/quit" => {
-            tracing::warn!("Press Esc then 'q' to quit");
-            if let Some(client) = &app.client {
-                let _ = client.close().await;
-            }
+            tracing::info!("Press Esc then 'q' to quit");
         }
-        "/notify" => {
-            if parts.len() < 3 {
-                tracing::error!("Usage: /notify <title> <message>");
-                return;
-            }
-            let title = parts[1];
-            let msg_content = parts[2..].join(" ");
-
-            if let Some(client) = &app.client {
-                let payload = shared::message::NotificationPayload::info(title, &msg_content);
-                let msg = BusMessage::notification(&payload);
-                if let Err(e) = client.send(&msg).await {
-                    tracing::error!("Failed to send: {}", e);
+        "/status" => {
+            tracing::info!(
+                "Connection status: {}",
+                if app.connected {
+                    "Connected"
                 } else {
-                    tracing::info!("✅ Sent Notification: {} - {}", title, msg_content);
+                    "Disconnected"
                 }
-            }
+            );
         }
         "/req" => {
             if parts.len() < 2 {
-                tracing::error!("Usage: /req <command> [args_json]");
+                tracing::warn!("Usage: /req <command> [args]");
                 return;
             }
             let command = parts[1];
-            let args_str = if parts.len() > 2 {
-                parts[2..].join(" ")
-            } else {
-                "{}".to_string()
-            };
-            let args: serde_json::Value =
-                serde_json::from_str(&args_str).unwrap_or(serde_json::json!({}));
-
-            if let Some(client) = &app.client {
-                let payload = shared::message::RequestCommandPayload {
-                    action: command.to_string(),
-                    params: Some(args),
-                };
-                let msg = BusMessage::request_command(&payload);
-                if let Err(e) = client.send(&msg).await {
-                    tracing::error!("Failed to send Request: {}", e);
-                } else {
-                    tracing::info!("✅ Sent Request: {}", command);
-                }
-            }
+            let args: Vec<&str> = parts[2..].to_vec();
+            send_request(app, command, &args).await;
         }
         "/ping" => {
-            if let Some(client) = &app.client {
-                // Ping should be a RequestCommand so server can reply
-                let payload = shared::message::RequestCommandPayload {
-                    action: "ping".to_string(),
-                    params: None,
-                };
-                let msg = BusMessage::request_command(&payload);
-                if let Err(e) = client.send(&msg).await {
-                    tracing::error!("Failed to send Ping: {}", e);
-                } else {
-                    tracing::info!("✅ Sent Ping Request");
+            send_request(app, "ping", &[]).await;
+        }
+        _ => {
+            tracing::warn!(
+                "Unknown command: {}. Type /help for available commands.",
+                parts[0]
+            );
+        }
+    }
+}
+
+async fn send_request(app: &mut App, command: &str, args: &[&str]) {
+    let Some(ref client) = app.client else {
+        tracing::error!("Not connected to server");
+        return;
+    };
+
+    let params = if args.is_empty() {
+        None
+    } else {
+        Some(serde_json::json!({ "args": args }))
+    };
+
+    let request = shared::message::RequestCommandPayload {
+        action: command.to_string(),
+        params,
+    };
+
+    let msg = shared::message::BusMessage::request_command(&request);
+
+    match client.send(&msg).await {
+        Ok(()) => {
+            tracing::info!("Request sent: {}", command);
+            // 等待响应
+            match client.recv().await {
+                Ok(response) => {
+                    if let Ok(payload) = response.parse_payload::<shared::message::ResponsePayload>() {
+                        if payload.success {
+                            tracing::info!("Response: {}", payload.message);
+                        } else {
+                            tracing::error!("Error: {}", payload.message);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to receive response: {:?}", e);
                 }
             }
         }
-        _ => {
-            tracing::warn!("Unknown command: {}", parts[0]);
+        Err(e) => {
+            tracing::error!("Failed to send request: {:?}", e);
         }
     }
 }
@@ -401,16 +636,23 @@ fn ui(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Header
-            Constraint::Min(1),    // Logs
-            Constraint::Length(3), // Input
+            Constraint::Length(3),
+            Constraint::Min(1),
+            Constraint::Length(3),
         ])
         .split(f.area());
 
-    // Header
     let title = Paragraph::new(vec![Line::from(vec![
         Span::raw(" 🦀 Crab Message Client "),
-        Span::styled(" mTLS Secured ", Style::default().fg(Color::Green)),
+        Span::styled(
+            if app.connected {
+                " Connected "
+            } else {
+                " Disconnected "
+            },
+            Style::default().fg(Color::Green),
+        ),
+        Span::raw(format!(" [{}]", app.username)),
     ])])
     .block(
         Block::default()
@@ -419,11 +661,33 @@ fn ui(f: &mut Frame, app: &App) {
     );
     f.render_widget(title, chunks[0]);
 
-    // Logs
-    let tui_sm = TuiLoggerWidget::default()
+    // 显示通知列表
+    let notifications: Vec<Line> = app
+        .notifications
+        .iter()
+        .rev()
+        .take(20)
+        .map(|n| {
+            Line::from(vec![Span::styled(
+                n,
+                Style::default().fg(Color::Yellow),
+            )])
+        })
+        .collect();
+
+    let notification_list = if notifications.is_empty() {
+        vec![Line::from(vec![Span::styled(
+            " No notifications yet... ",
+            Style::default().fg(Color::DarkGray),
+        )])]
+    } else {
+        notifications
+    };
+
+    let notify_area = Paragraph::new(notification_list)
         .block(
             Block::default()
-                .title(" Messages ")
+                .title(" Notifications ")
                 .border_style(
                     Style::default()
                         .fg(Color::White)
@@ -431,16 +695,9 @@ fn ui(f: &mut Frame, app: &App) {
                 )
                 .borders(Borders::ALL),
         )
-        .output_separator('|')
-        .output_timestamp(Some("%H:%M:%S".to_string()))
-        .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
-        .output_target(false)
-        .output_file(false)
-        .output_line(false)
         .style(Style::default().fg(Color::White));
-    f.render_widget(tui_sm, chunks[1]);
+    f.render_widget(notify_area, chunks[1]);
 
-    // Input
     let input_block = Block::default()
         .borders(Borders::ALL)
         .title(" Command Input (Type /help) ");
@@ -458,7 +715,6 @@ fn ui(f: &mut Frame, app: &App) {
         .block(input_block);
     f.render_widget(input, chunks[2]);
 
-    // Cursor
     if app.input_mode == InputMode::Editing {
         f.set_cursor_position((
             chunks[2].x + ((app.input.visual_cursor().max(scroll) - scroll) as u16) + 1,
@@ -466,7 +722,6 @@ fn ui(f: &mut Frame, app: &App) {
         ));
     }
 
-    // Help
     if app.input_mode == InputMode::Normal {
         let help_text = Paragraph::new("Press 'e' to edit, 'q' to quit")
             .style(Style::default().fg(Color::DarkGray))
@@ -475,7 +730,6 @@ fn ui(f: &mut Frame, app: &App) {
     }
 }
 
-// Helper functions for CLI input
 fn get_input(prompt: &str) -> String {
     print!("{}", prompt);
     io::stdout().flush().unwrap();

@@ -10,7 +10,7 @@ pub mod error;
 pub mod message;
 
 pub use cert::{Credential, CredentialStorage, CertManager, CertError};
-pub use client::{CrabClient, RemoteMode, LocalMode, HttpClient, MessageClient};
+pub use client::{CrabClient, RemoteMode, LocalMode, HttpClient, MessageClient, NetworkMessageClient};
 pub use error::{ClientError, ClientResult};
 pub use message::MessageError;
 

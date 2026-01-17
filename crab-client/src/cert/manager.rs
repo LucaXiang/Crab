@@ -27,7 +27,6 @@ pub enum CertError {
 #[derive(Debug)]
 pub struct CertManager {
     credential_storage: CredentialStorage,
-    cert_path: PathBuf,
     client_name: String,
 }
 
@@ -38,7 +37,6 @@ impl CertManager {
         let credential_storage = CredentialStorage::new(&cert_path, "credential.json");
         Self {
             credential_storage,
-            cert_path,
             client_name: client_name.to_string(),
         }
     }
@@ -128,5 +126,66 @@ impl CertManager {
     /// 删除凭证 (登出)
     pub fn logout(&self) -> std::io::Result<()> {
         self.credential_storage.delete()
+    }
+
+    /// 获取证书存储路径
+    pub fn cert_path(&self) -> PathBuf {
+        self.credential_storage.path().parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| self.credential_storage.path().to_path_buf())
+    }
+
+    /// 保存证书到文件
+    pub fn save_certificates(
+        &self,
+        cert_pem: &str,
+        key_pem: &str,
+        ca_cert_pem: &str,
+    ) -> Result<(), CertError> {
+        let cert_dir = self.cert_path();
+
+        // 确保目录存在
+        std::fs::create_dir_all(&cert_dir)
+            .map_err(|e| CertError::Storage(e.to_string()))?;
+
+        // 保存客户端证书
+        let cert_path = cert_dir.join("entity.crt");
+        std::fs::write(&cert_path, cert_pem)
+            .map_err(|e| CertError::Storage(e.to_string()))?;
+
+        // 保存客户端私钥
+        let key_path = cert_dir.join("entity.key");
+        std::fs::write(&key_path, key_pem)
+            .map_err(|e| CertError::Storage(e.to_string()))?;
+
+        // 保存 CA 证书
+        let ca_path = cert_dir.join("tenant_ca.crt");
+        std::fs::write(&ca_path, ca_cert_pem)
+            .map_err(|e| CertError::Storage(e.to_string()))?;
+
+        tracing::info!("Certificates saved to {:?}", cert_dir);
+        Ok(())
+    }
+
+    /// 检查本地证书是否存在
+    pub fn has_local_certificates(&self) -> bool {
+        let cert_dir = self.cert_path();
+        cert_dir.join("entity.crt").exists()
+            && cert_dir.join("entity.key").exists()
+            && cert_dir.join("tenant_ca.crt").exists()
+    }
+
+    /// 加载本地证书
+    pub fn load_local_certificates(&self) -> Result<(String, String, String), CertError> {
+        let cert_dir = self.cert_path();
+
+        let cert_pem = std::fs::read_to_string(cert_dir.join("entity.crt"))
+            .map_err(|e| CertError::Storage(e.to_string()))?;
+        let key_pem = std::fs::read_to_string(cert_dir.join("entity.key"))
+            .map_err(|e| CertError::Storage(e.to_string()))?;
+        let ca_cert_pem = std::fs::read_to_string(cert_dir.join("tenant_ca.crt"))
+            .map_err(|e| CertError::Storage(e.to_string()))?;
+
+        Ok((cert_pem, key_pem, ca_cert_pem))
     }
 }

@@ -3,7 +3,7 @@
 
 pub use self::crab_client::{CrabClient, RemoteMode, LocalMode};
 pub use self::http::{HttpClient, NetworkHttpClient};
-pub use self::message::{MessageClient, NetworkMessageClient, MemoryMessageClient};
+pub use self::message::{MessageClient, NetworkMessageClient};
 
 mod crab_client;
 mod http;

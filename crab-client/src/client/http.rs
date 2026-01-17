@@ -14,7 +14,7 @@ pub trait HttpClient: Send + Sync {
     async fn post_empty<T: DeserializeOwned>(&self, path: &str) -> ClientResult<T>;
     async fn login(&self, username: &str, password: &str) -> ClientResult<LoginResponse>;
     async fn me(&self) -> ClientResult<CurrentUserResponse>;
-    async fn logout(&mut self) -> ClientResult<()>;
+    async fn logout(&mut self) -> Result<(), ClientError>;
     fn token(&self) -> Option<&str>;
 }
 
@@ -103,7 +103,7 @@ impl HttpClient for NetworkHttpClient {
         resp.data.ok_or_else(|| ClientError::InvalidResponse("Missing user data".into()))
     }
 
-    async fn logout(&mut self) -> ClientResult<()> {
+    async fn logout(&mut self) -> Result<(), ClientError> {
         self.post_empty::<ApiResponse<()>>("/api/auth/logout").await?;
         self.token = None;
         Ok(())

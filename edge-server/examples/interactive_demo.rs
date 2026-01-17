@@ -8,7 +8,6 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use edge_server::Config;
-use edge_server::MessageClient;
 use edge_server::ServerState;
 use edge_server::message::ConnectedClient;
 use ratatui::{prelude::*, widgets::*};
@@ -39,8 +38,6 @@ struct App {
     input: Input,
     /// Current input mode
     input_mode: InputMode,
-    /// Message client for sending commands
-    msg_client: Option<MessageClient>,
     /// Server state reference
     server_state: Option<ServerState>,
     /// Loading state
@@ -56,7 +53,6 @@ impl Default for App {
         Self {
             input: Input::default(),
             input_mode: InputMode::default(),
-            msg_client: None,
             server_state: None,
             is_loading: false,
             status: DemoStatus::default(),
@@ -263,7 +259,6 @@ async fn run_app(
             tokio::select! {
                 state_res = rx.recv() => {
                     if let Some(state) = state_res {
-                         app.msg_client = Some(MessageClient::memory(state.message_bus()));
                          app.server_state = Some(state);
                          app.is_loading = false;
                          // Force a manual log to verify visibility

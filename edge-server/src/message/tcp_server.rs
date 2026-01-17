@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 use shared::message::{
-    BusMessage, EventType, HandshakePayload, NotificationPayload, PROTOCOL_VERSION,
+    BusMessage, EventType, HandshakePayload, NotificationPayload, ResponsePayload, PROTOCOL_VERSION,
 };
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast;
@@ -77,7 +77,7 @@ impl MessageBus {
                 result = listener.accept() => {
                     match result {
                         Ok((stream, addr)) => {
-                            tracing::info!("Client connected: {}", addr);
+                            tracing::debug!("Client connected: {}", addr);
                             self.spawn_client_handler(stream, addr, tls_acceptor.clone());
                         }
                         Err(e) => {
@@ -135,7 +135,7 @@ async fn handle_client_connection(
     let transport: Arc<dyn Transport> = if let Some(acceptor) = tls_acceptor {
         match acceptor.accept(stream).await {
             Ok(tls_stream) => {
-                tracing::info!("🔐 Client {} TLS handshake successful", addr);
+                tracing::debug!("🔐 Client {} TLS handshake successful", addr);
                 Arc::new(TlsTransport::new(tls_stream))
             }
             Err(e) => {
@@ -152,25 +152,30 @@ async fn handle_client_connection(
 
     // Register client
     clients.insert(client_id.clone(), transport.clone());
-    tracing::info!("Client registered: {}", client_id);
+    tracing::debug!("Client registered: {}", client_id);
 
-    // Start message forwarding
+    // 创建共享的断开检测 token
+    let disconnect_token = CancellationToken::new();
+    let disconnect_token_clone = disconnect_token.clone();
+
+    // Start message forwarding (当客户端断开时，forwarder 也要停止)
     let forward_handle = spawn_server_to_client_forwarder(
         transport.clone(),
         server_tx.subscribe(),
         shutdown_token.clone(),
         client_id.clone(),
         clients.clone(),
+        disconnect_token_clone,
     );
 
-    // Read messages from client
-    read_client_messages(&transport, &client_tx, &shutdown_token, &client_id, addr).await;
+    // Read messages from client - 当检测到断开时，取消 disconnect_token
+    read_client_messages(&transport, &client_tx, &shutdown_token, &client_id, addr, disconnect_token).await;
 
     // Cleanup
     drop(forward_handle);
     let _ = transport.close().await;
     clients.remove(&client_id);
-    tracing::info!("Client removed from registry: {}", client_id);
+    tracing::debug!(client_id = %client_id, "Client removed from registry");
 
     Ok(())
 }
@@ -243,7 +248,7 @@ async fn perform_handshake(
 
             return Err(AppError::invalid("Identity verification failed"));
         } else {
-            tracing::info!("✅ Client {} identity verified via mTLS: {}", addr, peer_id);
+            tracing::debug!("✅ Client {} identity verified via mTLS: {}", addr, peer_id);
         }
     }
 
@@ -251,13 +256,32 @@ async fn perform_handshake(
         .client_id
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-    tracing::info!(
+    tracing::debug!(
         "✅ Client {} handshake success (v{}, client: {:?}, id: {})",
         addr,
         payload.version,
         payload.client_name,
         client_id
     );
+
+    // 发送 RPC 响应 (用 correlation_id 关联客户端的 request_id)
+    let response_payload = ResponsePayload::success(
+        format!("Connected as client: {}", client_id),
+        None,
+    );
+    // 用客户端的 request_id 作为 correlation_id，构造响应消息
+    let response = BusMessage {
+        request_id: Uuid::new_v4(),
+        event_type: EventType::Response,
+        source: None,
+        correlation_id: Some(msg.request_id),  // 关联客户端的 request_id
+        target: None,
+        payload: serde_json::to_vec(&response_payload)
+            .map_err(|e| AppError::internal(&format!("Failed to serialize response: {}", e)))?,
+    };
+    if let Err(e) = transport.write_message(&response).await {
+        tracing::warn!("Failed to send handshake response: {}", e);
+    }
 
     Ok(client_id)
 }
@@ -282,15 +306,19 @@ fn spawn_server_to_client_forwarder(
     shutdown_token: CancellationToken,
     client_id: String,
     clients: Arc<DashMap<String, Arc<dyn Transport>>>,
+    disconnect_token: CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
             tokio::select! {
                 _ = shutdown_token.cancelled() => {
-                    tracing::info!("Client {} forwarder shutting down", client_id);
+                    tracing::debug!("Client {} forwarder shutting down", client_id);
                     break;
                 }
-
+                _ = disconnect_token.cancelled() => {
+                    tracing::debug!(client_id = %client_id, "Client disconnected, forwarder stopping");
+                    break;
+                }
                 msg_result = rx.recv() => {
                     match msg_result {
                         Ok(msg) => {
@@ -300,7 +328,7 @@ fn spawn_server_to_client_forwarder(
                             }
 
                             if let Err(e) = transport.write_message(&msg).await {
-                                tracing::info!("Client {} disconnected: {}", client_id, e);
+                                tracing::debug!(client_id = %client_id, "Client write failed: {}", e);
                                 break;
                             }
                         }
@@ -315,7 +343,7 @@ fn spawn_server_to_client_forwarder(
 
         // Clean up on disconnect
         clients.remove(&client_id);
-        tracing::info!("Client forwarder disconnected: {}", client_id);
+        tracing::debug!(client_id = %client_id, "Client forwarder cleaned up");
     })
 }
 
@@ -326,10 +354,14 @@ async fn read_client_messages(
     shutdown_token: &CancellationToken,
     client_id: &str,
     addr: SocketAddr,
+    disconnect_token: CancellationToken,
 ) {
     loop {
         tokio::select! {
             _ = shutdown_token.cancelled() => {
+                break;
+            }
+            _ = disconnect_token.cancelled() => {
                 break;
             }
 
@@ -356,10 +388,12 @@ async fn read_client_messages(
                     }
                     Err(e) => {
                         if matches!(e, AppError::ClientDisconnected) {
-                            tracing::info!("Client {} disconnected", addr);
+                            tracing::debug!(client_id = %client_id, "Client {} disconnected", addr);
                         } else {
-                            tracing::info!("Client {} read error: {}", addr, e);
+                            tracing::debug!(client_id = %client_id, "Client {} read error: {}", addr, e);
                         }
+                        // 通知 forwarder 客户端已断开
+                        disconnect_token.cancel();
                         break;
                     }
                 }
