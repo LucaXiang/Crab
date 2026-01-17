@@ -13,7 +13,7 @@ pub mod payload;
 pub use payload::*;
 
 /// 协议版本号
-pub const PROTOCOL_VERSION: u16 = 1;
+pub const PROTOCOL_VERSION: u16 = 2;
 
 /// 简化消息总线事件类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

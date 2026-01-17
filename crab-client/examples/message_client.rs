@@ -345,7 +345,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client_key_pem = key_pem.as_bytes().to_vec();
 
     // Connect using mTLS
-    let is_connected = match NetworkMessageClient::connect_mtls(
+    let client = match NetworkMessageClient::connect_mtls(
         &edge_addr,
         &ca_cert_pem,
         &client_cert_pem,
@@ -354,34 +354,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ).await {
         Ok(client) => {
             println!("✅ Connected to Edge Server via mTLS!");
-            Some(client)
+            client
         }
         Err(e) => {
-            println!("❌ Connection failed: {}", e);
-            println!("   Make sure the Edge Server is running with mTLS enabled.");
-            None
+            eprintln!("❌ Connection failed: {}", e);
+            return Ok(());
         }
     };
-
-    let connected = is_connected.is_some();
-
-    if connected {
-        // 确保用户看到连接成功的消息
-        println!("\n✅ Connected to Edge Server via mTLS!");
-        println!("\nStarting TUI... (press 'e' to edit, 'q' to quit)");
-    } else {
-        println!("\n❌ Connection failed. Exiting.");
-        return Ok(());
-    }
-
-    // 只在连接成功时启动 TUI
-    if let Some(client) = is_connected {
-        if let Err(e) = run_tui(client, username.clone()).await {
-            // TUI 失败时回退到 CLI 模式
-            eprintln!("TUI 不可用 ({}), 使用 CLI 模式", e);
-            run_cli(username).await;
-        }
-    }
 
     println!("Goodbye!");
     Ok(())
@@ -606,23 +585,33 @@ async fn send_request(app: &mut App, command: &str, args: &[&str]) {
     };
 
     let msg = shared::message::BusMessage::request_command(&request);
+    let request_id = msg.request_id;
 
     match client.send(&msg).await {
         Ok(()) => {
             tracing::info!("Request sent: {}", command);
-            // 等待响应
-            match client.recv().await {
-                Ok(response) => {
-                    if let Ok(payload) = response.parse_payload::<shared::message::ResponsePayload>() {
-                        if payload.success {
-                            tracing::info!("Response: {}", payload.message);
-                        } else {
-                            tracing::error!("Error: {}", payload.message);
+            // 等待响应，跳过不匹配的消息
+            loop {
+                match client.recv().await {
+                    Ok(response) => {
+                        // 检查是否是当前请求的响应
+                        if response.correlation_id != Some(request_id) {
+                            tracing::debug!("Skipping unrelated message: {:?}", response.event_type);
+                            continue;
                         }
+                        if let Ok(payload) = response.parse_payload::<shared::message::ResponsePayload>() {
+                            if payload.success {
+                                tracing::info!("Response: {}", payload.message);
+                            } else {
+                                tracing::error!("Error: {}", payload.message);
+                            }
+                        }
+                        break;
                     }
-                }
-                Err(e) => {
-                    tracing::error!("Failed to receive response: {:?}", e);
+                    Err(e) => {
+                        tracing::error!("Failed to receive response: {:?}", e);
+                        break;
+                    }
                 }
             }
         }

@@ -10,9 +10,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use dashmap::DashMap;
-use shared::message::{
-    BusMessage, EventType, HandshakePayload, NotificationPayload, ResponsePayload, PROTOCOL_VERSION,
-};
+use shared::message::{BusMessage, EventType, HandshakePayload, PROTOCOL_VERSION, ResponsePayload};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast;
 use tokio_rustls::TlsAcceptor;
@@ -169,7 +167,15 @@ async fn handle_client_connection(
     );
 
     // Read messages from client - 当检测到断开时，取消 disconnect_token
-    read_client_messages(&transport, &client_tx, &shutdown_token, &client_id, addr, disconnect_token).await;
+    read_client_messages(
+        &transport,
+        &client_tx,
+        &shutdown_token,
+        &client_id,
+        addr,
+        disconnect_token,
+    )
+    .await;
 
     // Cleanup
     drop(forward_handle);
@@ -217,6 +223,7 @@ async fn perform_handshake(
 
         send_handshake_error(
             transport,
+            &msg,
             &format!(
                 "Protocol version mismatch: server={}, client={}. Please update your client.",
                 PROTOCOL_VERSION, payload.version
@@ -239,6 +246,7 @@ async fn perform_handshake(
 
             send_handshake_error(
                 transport,
+                &msg,
                 &format!(
                     "Identity verification failed: Certificate subject='{}' does not match Handshake client_name='{}'.",
                     peer_id, client_name
@@ -265,16 +273,14 @@ async fn perform_handshake(
     );
 
     // 发送 RPC 响应 (用 correlation_id 关联客户端的 request_id)
-    let response_payload = ResponsePayload::success(
-        format!("Connected as client: {}", client_id),
-        None,
-    );
+    let response_payload =
+        ResponsePayload::success(format!("Connected as client: {}", client_id), None);
     // 用客户端的 request_id 作为 correlation_id，构造响应消息
     let response = BusMessage {
         request_id: Uuid::new_v4(),
         event_type: EventType::Response,
         source: None,
-        correlation_id: Some(msg.request_id),  // 关联客户端的 request_id
+        correlation_id: Some(msg.request_id), // 关联客户端的 request_id
         target: None,
         payload: serde_json::to_vec(&response_payload)
             .map_err(|e| AppError::internal(&format!("Failed to serialize response: {}", e)))?,
@@ -287,11 +293,20 @@ async fn perform_handshake(
 }
 
 /// Send handshake error to client
-async fn send_handshake_error(transport: &Arc<dyn Transport>, message: &str) {
-    let notification = NotificationPayload::error("Handshake Failed", message);
-    let msg = BusMessage::notification(&notification);
+async fn send_handshake_error(transport: &Arc<dyn Transport>, msg: &BusMessage, message: &str) {
+    let response_payload = ResponsePayload::error(message, None);
+    let response = BusMessage {
+        request_id: Uuid::new_v4(),
+        event_type: EventType::Response,
+        source: None,
+        correlation_id: Some(msg.request_id),
+        target: None,
+        payload: serde_json::to_vec(&response_payload)
+            .map_err(|e| AppError::internal(&format!("Failed to serialize response: {}", e)))
+            .unwrap_or_default(),
+    };
 
-    if let Err(e) = transport.write_message(&msg).await {
+    if let Err(e) = transport.write_message(&response).await {
         tracing::error!("Failed to send handshake error: {}", e);
     }
 
