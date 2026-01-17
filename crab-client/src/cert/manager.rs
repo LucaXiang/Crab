@@ -24,7 +24,7 @@ pub enum CertError {
 }
 
 /// 证书管理器
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CertManager {
     credential_storage: CredentialStorage,
     client_name: String,
@@ -39,6 +39,23 @@ impl CertManager {
             credential_storage,
             client_name: client_name.to_string(),
         }
+    }
+
+    /// 获取客户端名称
+    pub fn client_name(&self) -> &str {
+        &self.client_name
+    }
+
+    /// 加载缓存的凭证（不登录）
+    pub fn load_credential(&self) -> Result<Credential, CertError> {
+        self.credential_storage.load()
+            .ok_or_else(|| CertError::NotFound)
+    }
+
+    /// 保存凭证
+    pub fn save_credential(&self, credential: &Credential) -> Result<(), CertError> {
+        self.credential_storage.save(credential)
+            .map_err(|e| CertError::Storage(e.to_string()))
     }
 
     /// 加载或请求凭证
@@ -186,6 +203,78 @@ impl CertManager {
         let ca_cert_pem = std::fs::read_to_string(cert_dir.join("tenant_ca.crt"))
             .map_err(|e| CertError::Storage(e.to_string()))?;
 
+        Ok((cert_pem, key_pem, ca_cert_pem))
+    }
+
+    /// 获取或请求证书
+    ///
+    /// 如果本地有缓存证书则直接返回，否则从 Auth Server 请求新证书
+    pub async fn get_or_request_certificates(
+        &self,
+        auth_url: &str,
+        token: &str,
+        tenant_id: &str,
+    ) -> Result<(String, String, String), CertError> {
+        // 检查本地证书
+        if self.has_local_certificates() {
+            tracing::info!("Using local certificates");
+            return self.load_local_certificates();
+        }
+
+        // 请求新证书
+        tracing::info!("Requesting certificates from {}", auth_url);
+        self.request_certificates(auth_url, token, tenant_id).await
+    }
+
+    /// 从 Auth Server 请求证书
+    pub async fn request_certificates(
+        &self,
+        auth_url: &str,
+        token: &str,
+        tenant_id: &str,
+    ) -> Result<(String, String, String), CertError> {
+        let client = reqwest::Client::new();
+        let device_id = crab_cert::generate_hardware_id();
+
+        let response = client
+            .post(format!("{}/api/cert/issue", auth_url))
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&serde_json::json!({
+                "tenant_id": tenant_id,
+                "common_name": self.client_name,
+                "is_server": false,
+                "device_id": device_id
+            }))
+            .send()
+            .await
+            .map_err(|e| CertError::Network(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(CertError::Network(
+                response.text().await.unwrap_or_else(|_| "Unknown error".to_string())
+            ));
+        }
+
+        let data: serde_json::Value = response.json().await
+            .map_err(|e| CertError::Network(e.to_string()))?;
+
+        let cert_pem = data.get("cert")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| CertError::Invalid("No cert in response".to_string()))?
+            .to_string();
+        let key_pem = data.get("key")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| CertError::Invalid("No key in response".to_string()))?
+            .to_string();
+        let ca_cert_pem = data.get("tenant_ca_cert")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| CertError::Invalid("No tenant_ca_cert in response".to_string()))?
+            .to_string();
+
+        // 保存证书
+        self.save_certificates(&cert_pem, &key_pem, &ca_cert_pem)?;
+
+        tracing::info!("Certificates requested and saved");
         Ok((cert_pem, key_pem, ca_cert_pem))
     }
 }

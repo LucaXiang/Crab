@@ -38,6 +38,11 @@ impl NetworkHttpClient {
         })
     }
 
+    /// 获取基础 URL
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
     fn auth_header(&self) -> Option<String> {
         self.token.as_ref().map(|t| format!("Bearer {}", t))
     }

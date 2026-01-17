@@ -9,14 +9,36 @@ use std::fs;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Credential {
     pub client_name: String,
-    pub token: String,
-    pub expires_at: Option<u64>, // 使用 u64 而不是 i64
+    pub token: String,              // Auth Server token (租户)
+    pub employee_token: Option<String>, // Employee token (员工)
+    pub expires_at: Option<u64>,
     pub tenant_id: String,
 }
 
 impl Credential {
     pub fn new(client_name: String, token: String, expires_at: Option<u64>, tenant_id: String) -> Self {
-        Self { client_name, token, expires_at, tenant_id }
+        Self {
+            client_name,
+            token,
+            employee_token: None,
+            expires_at,
+            tenant_id,
+        }
+    }
+
+    /// 设置员工 token
+    pub fn set_employee_token(&mut self, token: String) {
+        self.employee_token = Some(token);
+    }
+
+    /// 获取员工 token
+    pub fn employee_token(&self) -> Option<&str> {
+        self.employee_token.as_deref()
+    }
+
+    /// 清除员工 token
+    pub fn clear_employee_token(&mut self) {
+        self.employee_token = None;
     }
 
     pub fn is_expired(&self) -> bool {
@@ -33,7 +55,7 @@ impl Credential {
 }
 
 /// 凭证存储
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CredentialStorage {
     path: PathBuf,
 }

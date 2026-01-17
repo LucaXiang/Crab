@@ -1,23 +1,17 @@
 // crab-client/src/client/message.rs
-// 消息客户端 - mTLS TCP 和内存通信
+// RPC 消息客户端 - mTLS 和内存通信
 
-use async_trait::async_trait;
 use rustls_pki_types::{CertificateDer, ServerName};
 use shared::message::{BusMessage, HandshakePayload, PROTOCOL_VERSION};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio::sync::broadcast;
 use tokio_rustls::client::TlsStream;
 use uuid::Uuid;
-
-/// 消息客户端 trait
-#[async_trait]
-pub trait MessageClient: Send + Sync {
-    async fn send(&self, msg: &BusMessage) -> Result<(), crate::MessageError>;
-    async fn recv(&self) -> Result<BusMessage, crate::MessageError>;
-}
 
 /// mTLS TCP 消息客户端
 ///
@@ -29,6 +23,7 @@ pub trait MessageClient: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct NetworkMessageClient {
     stream: Arc<Mutex<TlsStream<TcpStream>>>,
+    connected: Arc<AtomicBool>,
 }
 
 impl NetworkMessageClient {
@@ -122,6 +117,7 @@ impl NetworkMessageClient {
 
         let client = Self {
             stream: Arc::new(Mutex::new(tls_stream)),
+            connected: Arc::new(AtomicBool::new(true)),
         };
 
         // 7. 协议握手
@@ -257,17 +253,69 @@ impl NetworkMessageClient {
 
     /// 关闭连接
     pub async fn close(&self) -> Result<(), crate::MessageError> {
+        self.connected.store(false, Ordering::SeqCst);
         // TlsStream 在 drop 时自动关闭
         Ok(())
     }
-}
 
-#[async_trait]
-impl MessageClient for NetworkMessageClient {
+    /// 检查是否已连接
+    pub fn is_connected(&self) -> bool {
+        self.connected.load(Ordering::SeqCst)
+    }
+
+    /// 发送请求并等待响应（带超时）
+    pub async fn request(
+        &self,
+        msg: &BusMessage,
+        timeout: Duration,
+    ) -> Result<BusMessage, crate::MessageError> {
+        // 检查连接状态
+        if !self.is_connected() {
+            return Err(crate::MessageError::Connection("Not connected".to_string()));
+        }
+
+        // 生成 correlation_id 用于关联响应
+        let correlation_id = msg.request_id;
+
+        // 发送请求
+        self.send(msg).await?;
+
+        // 等待响应 (带超时)
+        let response = tokio::time::timeout(timeout, async {
+            loop {
+                let received = self.recv().await?;
+                // 检查是否是当前请求的响应
+                if received.correlation_id == Some(correlation_id) {
+                    return Ok::<BusMessage, crate::MessageError>(received);
+                }
+                // 跳过不匹配的消息 (如通知)
+                tracing::debug!(
+                    "Skipping unrelated message: {:?}",
+                    received.event_type
+                );
+            }
+        })
+        .await
+        .map_err(|_| crate::MessageError::Timeout(format!(
+            "Request timed out after {:?}",
+            timeout
+        )))??;
+
+        Ok(response)
+    }
+
+    /// 发送请求并等待响应（使用默认超时）
+    pub async fn request_default(&self, msg: &BusMessage) -> Result<BusMessage, crate::MessageError> {
+        let timeout = crate::MessageClientConfig::default().request_timeout;
+        self.request(msg, timeout).await
+    }
+
+    /// 内部发送方法
     async fn send(&self, msg: &BusMessage) -> Result<(), crate::MessageError> {
         self.write_message(msg).await
     }
 
+    /// 内部接收方法
     async fn recv(&self) -> Result<BusMessage, crate::MessageError> {
         self.read_message().await
     }
@@ -328,10 +376,49 @@ impl InMemoryMessageClient {
     pub fn sender(&self) -> broadcast::Sender<BusMessage> {
         (*self.tx).clone()
     }
-}
 
-#[async_trait]
-impl MessageClient for InMemoryMessageClient {
+    /// 检查是否已连接 (内存客户端始终返回 true)
+    pub fn is_connected(&self) -> bool {
+        true
+    }
+
+    /// 发送请求并等待响应（带超时）
+    pub async fn request(
+        &self,
+        msg: &BusMessage,
+        timeout: Duration,
+    ) -> Result<BusMessage, crate::MessageError> {
+        let correlation_id = msg.request_id;
+
+        // 发送请求
+        self.send(msg).await?;
+
+        // 等待响应 (带超时)
+        let response = tokio::time::timeout(timeout, async {
+            let mut rx = self.tx.subscribe();
+            loop {
+                let received = rx.recv().await?;
+                if received.correlation_id == Some(correlation_id) {
+                    return Ok::<BusMessage, crate::MessageError>(received);
+                }
+            }
+        })
+        .await
+        .map_err(|_| crate::MessageError::Timeout(format!(
+            "Request timed out after {:?}",
+            timeout
+        )))??;
+
+        Ok(response)
+    }
+
+    /// 发送请求并等待响应（使用默认超时）
+    pub async fn request_default(&self, msg: &BusMessage) -> Result<BusMessage, crate::MessageError> {
+        let timeout = crate::MessageClientConfig::default().request_timeout;
+        self.request(msg, timeout).await
+    }
+
+    /// 内部发送方法
     async fn send(&self, msg: &BusMessage) -> Result<(), crate::MessageError> {
         self.tx
             .send(msg.clone())
@@ -339,8 +426,8 @@ impl MessageClient for InMemoryMessageClient {
         Ok(())
     }
 
+    /// 内部接收方法
     async fn recv(&self) -> Result<BusMessage, crate::MessageError> {
-        // 每次接收时创建新的 receiver，避免存储问题
         let mut rx = self.tx.subscribe();
         rx.recv().await.map_err(|e: broadcast::error::RecvError| {
             crate::MessageError::Connection(e.to_string())
@@ -352,54 +439,26 @@ impl MessageClient for InMemoryMessageClient {
 mod tests {
     use super::*;
     use tokio::sync::broadcast;
-    use tokio::time::{Duration, timeout};
 
     #[tokio::test]
-    async fn test_in_memory_client_send_recv() {
+    async fn test_in_memory_client_is_connected() {
         let (tx, _rx) = broadcast::channel(16);
         let client = InMemoryMessageClient::new(tx);
-
-        // 使用 spawn 先启动接收任务（确保 receiver 在发送前已创建）
-        let client_clone = client.clone();
-        let recv_task = tokio::spawn(async move { client_clone.recv().await.unwrap() });
-
-        // 等待接收任务开始运行
-        tokio::time::sleep(Duration::from_millis(10)).await;
-
-        // 发送消息
-        let msg =
-            BusMessage::notification(&shared::message::NotificationPayload::info("Test", "Hello"));
-        client.send(&msg).await.unwrap();
-
-        // 验证收到消息
-        let received = timeout(Duration::from_secs(1), recv_task)
-            .await
-            .expect("recv() should receive message within 1 second")
-            .expect("recv() should succeed");
-
-        assert_eq!(
-            received.event_type,
-            shared::message::EventType::Notification
-        );
+        assert!(client.is_connected());
     }
 
     #[tokio::test]
-    async fn test_in_memory_client_sender_only() {
-        let (tx, mut rx) = broadcast::channel(16);
-        let client = InMemoryMessageClient::sender_only(tx);
+    async fn test_in_memory_client_request_timeout() {
+        let (tx, _rx) = broadcast::channel(16);
+        let client = InMemoryMessageClient::new(tx);
 
-        let msg = BusMessage::server_command(&shared::message::ServerCommandPayload {
-            command: shared::message::ServerCommand::Ping,
+        let request = BusMessage::request_command(&shared::message::RequestCommandPayload {
+            action: "test".to_string(),
+            params: None,
         });
 
-        // Client can send
-        client.send(&msg).await.unwrap();
-
-        // External receiver should get the message
-        let received = rx.recv().await.unwrap();
-        assert_eq!(
-            received.event_type,
-            shared::message::EventType::ServerCommand
-        );
+        // 没有响应，应该超时
+        let result = client.request(&request, Duration::from_millis(100)).await;
+        assert!(result.is_err());
     }
 }

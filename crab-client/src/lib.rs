@@ -10,10 +10,12 @@ pub mod error;
 pub mod message;
 
 pub use cert::{Credential, CredentialStorage, CertManager, CertError};
-pub use client::{CrabClient, RemoteMode, LocalMode, HttpClient, MessageClient, NetworkMessageClient};
+pub use client::{
+    CrabClient, RemoteMode, LocalMode, HttpClient, NetworkMessageClient,
+    InMemoryMessageClient, MessageClientConfig,
+};
 pub use error::{ClientError, ClientResult};
-pub use message::MessageError;
+pub use message::{MessageError, MessageResult, BusMessage, EventType};
 
 // Re-export shared types
 pub use shared::client::{ApiResponse, CurrentUserResponse, LoginResponse, UserInfo};
-pub use shared::message::BusMessage;
