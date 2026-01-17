@@ -75,3 +75,4 @@ temp_*/
 # Analysis and task docs (generated)
 docs/PROJECT_ANALYSIS.md
 docs/tasks/
+.worktrees/
