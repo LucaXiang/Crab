@@ -1,0 +1,115 @@
+// crab-client/src/client/http.rs
+// HTTP 客户端 - 网络通信
+
+use async_trait::async_trait;
+use crate::{ApiResponse, ClientError, ClientResult, CurrentUserResponse, LoginResponse};
+use reqwest::{Client, StatusCode};
+use serde::de::DeserializeOwned;
+
+/// HTTP 客户端 trait
+#[async_trait]
+pub trait HttpClient: Send + Sync {
+    async fn get<T: DeserializeOwned>(&self, path: &str) -> ClientResult<T>;
+    async fn post<T: DeserializeOwned, B: serde::Serialize + std::marker::Sync>(&self, path: &str, body: &B) -> ClientResult<T>;
+    async fn post_empty<T: DeserializeOwned>(&self, path: &str) -> ClientResult<T>;
+    async fn login(&self, username: &str, password: &str) -> ClientResult<LoginResponse>;
+    async fn me(&self) -> ClientResult<CurrentUserResponse>;
+    async fn logout(&mut self) -> ClientResult<()>;
+    fn token(&self) -> Option<&str>;
+}
+
+/// 网络 HTTP 客户端
+#[derive(Debug, Clone)]
+pub struct NetworkHttpClient {
+    client: Client,
+    base_url: String,
+    token: Option<String>,
+}
+
+impl NetworkHttpClient {
+    pub fn new(base_url: &str) -> Result<Self, ClientError> {
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()?;
+        Ok(Self {
+            client,
+            base_url: base_url.trim_end_matches('/').to_string(),
+            token: None,
+        })
+    }
+
+    fn auth_header(&self) -> Option<String> {
+        self.token.as_ref().map(|t| format!("Bearer {}", t))
+    }
+
+    async fn handle_response<T: DeserializeOwned>(&self, response: reqwest::Response) -> ClientResult<T> {
+        let status = response.status();
+        if !status.is_success() {
+            let text = response.text().await?;
+            return match status {
+                StatusCode::UNAUTHORIZED => Err(ClientError::Unauthorized),
+                StatusCode::FORBIDDEN => Err(ClientError::Forbidden(text)),
+                StatusCode::NOT_FOUND => Err(ClientError::NotFound(text)),
+                StatusCode::BAD_REQUEST => Err(ClientError::Validation(text)),
+                _ => Err(ClientError::Internal(text)),
+            };
+        }
+        Ok(response.json().await?)
+    }
+}
+
+#[async_trait]
+impl HttpClient for NetworkHttpClient {
+    async fn get<T: DeserializeOwned>(&self, path: &str) -> ClientResult<T> {
+        let url = format!("{}/{}", self.base_url, path);
+        let mut req = self.client.get(&url);
+        if let Some(auth) = self.auth_header() {
+            req = req.header(reqwest::header::AUTHORIZATION, auth);
+        }
+        let response = req.send().await?;
+        self.handle_response(response).await
+    }
+
+    async fn post<T: DeserializeOwned, B: serde::Serialize + std::marker::Sync>(&self, path: &str, body: &B) -> ClientResult<T> {
+        let url = format!("{}/{}", self.base_url, path);
+        let mut req = self.client.post(&url).json(body);
+        if let Some(auth) = self.auth_header() {
+            req = req.header(reqwest::header::AUTHORIZATION, auth);
+        }
+        let response = req.send().await?;
+        self.handle_response(response).await
+    }
+
+    async fn post_empty<T: DeserializeOwned>(&self, path: &str) -> ClientResult<T> {
+        let url = format!("{}/{}", self.base_url, path);
+        let mut req = self.client.post(&url);
+        if let Some(auth) = self.auth_header() {
+            req = req.header(reqwest::header::AUTHORIZATION, auth);
+        }
+        let response = req.send().await?;
+        self.handle_response(response).await
+    }
+
+    async fn login(&self, username: &str, password: &str) -> ClientResult<LoginResponse> {
+        #[derive(serde::Serialize)]
+        struct LoginRequest { username: String, password: String }
+        let req = LoginRequest { username: username.to_string(), password: password.to_string() };
+        let resp: ApiResponse<LoginResponse> = self.post("/api/auth/login", &req).await?;
+        resp.data.ok_or_else(|| ClientError::InvalidResponse("Missing login data".into()))
+    }
+
+    async fn me(&self) -> ClientResult<CurrentUserResponse> {
+        let resp: ApiResponse<CurrentUserResponse> = self.get("/api/auth/me").await?;
+        resp.data.ok_or_else(|| ClientError::InvalidResponse("Missing user data".into()))
+    }
+
+    async fn logout(&mut self) -> ClientResult<()> {
+        self.post_empty::<ApiResponse<()>>("/api/auth/logout").await?;
+        self.token = None;
+        Ok(())
+    }
+
+    fn token(&self) -> Option<&str> {
+        self.token.as_deref()
+    }
+}

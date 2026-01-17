@@ -1,42 +1,57 @@
-//! Client error types
+// crab-client/src/error.rs
+// 错误类型定义
 
 use thiserror::Error;
 
-/// Client error type
 #[derive(Debug, Error)]
 pub enum ClientError {
-    /// HTTP request failed
-    #[error("HTTP error: {0}")]
-    Http(#[from] reqwest::Error),
+    #[error("Authentication failed: {0}")]
+    AuthFailed(String),
 
-    /// Invalid response format
-    #[error("Invalid response: {0}")]
-    InvalidResponse(String),
+    #[error("Network error: {0}")]
+    Network(String),
 
-    /// Authentication required
-    #[error("Authentication required")]
+    #[error("Certificate error: {0}")]
+    Certificate(String),
+
+    #[error("Unauthorized")]
     Unauthorized,
 
-    /// Permission denied
-    #[error("Permission denied: {0}")]
+    #[error("Forbidden: {0}")]
     Forbidden(String),
 
-    /// Resource not found
     #[error("Not found: {0}")]
     NotFound(String),
 
-    /// Validation error
     #[error("Validation error: {0}")]
     Validation(String),
 
-    /// Internal error
+    #[error("Invalid response: {0}")]
+    InvalidResponse(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 
-    /// Serialization error
-    #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
+    #[error("Timeout: {0}")]
+    Timeout(String),
 }
 
-/// Result type for client operations
+impl From<reqwest::Error> for ClientError {
+    fn from(e: reqwest::Error) -> Self {
+        ClientError::Network(e.to_string())
+    }
+}
+
+impl From<std::io::Error> for ClientError {
+    fn from(e: std::io::Error) -> Self {
+        ClientError::Internal(e.to_string())
+    }
+}
+
+impl From<serde_json::Error> for ClientError {
+    fn from(e: serde_json::Error) -> Self {
+        ClientError::InvalidResponse(e.to_string())
+    }
+}
+
 pub type ClientResult<T> = Result<T, ClientError>;

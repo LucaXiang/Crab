@@ -1,7 +1,6 @@
-pub mod client;
-pub mod transport;
+// crab-client/src/message/mod.rs
+// 消息模块
 
-pub use client::MessageClient;
 pub use shared::message::{BusMessage, EventType};
 
 /// Error type for message client operations
