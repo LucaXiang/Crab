@@ -1,11 +1,23 @@
 //! Client-related types shared between server and client
 //!
-//! Common response types used in API communication.
+//! Common request/response types used in API communication.
+//! These types are shared between edge-server and crab-client.
 
 use serde::{Deserialize, Serialize};
 
 // Re-export ApiResponse from response module
 pub use crate::response::ApiResponse;
+
+// =============================================================================
+// Auth API DTOs
+// =============================================================================
+
+/// Login request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}
 
 /// Login response data
 #[derive(Debug, Clone, Serialize, Deserialize)]

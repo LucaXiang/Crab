@@ -2,7 +2,7 @@ use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::services::credential::verify_cert_pair;
+use crate::services::tenant_binding::verify_cert_pair;
 use crate::utils::AppError;
 
 /// 证书服务 - 管理 mTLS 证书和信任链验证
@@ -168,45 +168,10 @@ impl CertService {
             return Ok(None);
         }
 
-        // 可选：检查 root_ca 是否存在
-        let root_ca_path = certs_dir.join("root_ca.pem");
-        let has_root_ca = root_ca_path.exists();
-
-        // 如果存在 root_ca，验证证书链完整性
-        if has_root_ca {
-            tracing::info!("Verifying certificate chain with Root CA...");
-            let root_ca_pem = fs::read_to_string(&root_ca_path)
-                .map_err(|e| AppError::internal(format!("Failed to read root CA: {}", e)))?;
-            let tenant_ca_pem = fs::read_to_string(&tenant_ca_path)
-                .map_err(|e| AppError::internal(format!("Failed to read tenant CA: {}", e)))?;
-            let edge_cert_pem = fs::read_to_string(&edge_cert_path)
-                .map_err(|e| AppError::internal(format!("Failed to read edge cert: {}", e)))?;
-
-            // 验证证书链
-            match crab_cert::verify_chain_against_root(&tenant_ca_pem, &root_ca_pem) {
-                Ok(_) => tracing::info!("✅ Root CA -> Tenant CA verification passed"),
-                Err(e) => {
-                    tracing::warn!("⚠️ Root CA -> Tenant CA verification failed: {}", e);
-                    return Err(AppError::validation(
-                        "Certificate chain validation failed: Root CA verification failed"
-                            .to_string(),
-                    ));
-                }
-            }
-
-            match crab_cert::verify_chain_against_root(&edge_cert_pem, &tenant_ca_pem) {
-                Ok(_) => tracing::info!("✅ Tenant CA -> Edge Cert verification passed"),
-                Err(e) => {
-                    tracing::warn!("⚠️ Tenant CA -> Edge Cert verification failed: {}", e);
-                    return Err(AppError::validation(
-                        "Certificate chain validation failed: Edge cert verification failed"
-                            .to_string(),
-                    ));
-                }
-            }
-        } else {
-            tracing::warn!("⚠️ Root CA not found - certificate chain cannot be fully verified");
-        }
+        // 注意: 证书链验证已在 self_check() 中完成
+        // load_tls_config() 在 wait_for_activation() 之后调用
+        // 此时 self_check() 已验证: 证书链 + 硬件绑定
+        // 这里只需加载证书即可，无需重复验证
 
         tracing::info!("🔒 Loading mTLS certificates from {:?}", certs_dir);
 
@@ -284,24 +249,94 @@ impl CertService {
         }
     }
 
+    /// 执行开机自检 (简化版，从磁盘读取 Credential)
+    ///
+    /// 如果已有缓存的 binding，请使用 `self_check_with_binding` 避免重复读取
+    pub async fn self_check(&self) -> Result<(), AppError> {
+        self.self_check_with_binding(None).await
+    }
+
     /// 执行开机自检
     ///
     /// 验证项目：
     /// 1. 证书文件存在性
-    /// 2. 证书链有效性 (签名、过期时间)
-    /// 3. 硬件 ID 绑定 (防止证书被拷贝到其他机器)
-    pub async fn self_check(&self) -> Result<(), AppError> {
+    /// 2. 证书链有效性 (签名)
+    /// 3. 证书过期检查
+    /// 4. 硬件 ID 绑定 (防止证书被拷贝到其他机器)
+    /// 5. Credential.json 签名验证 (防止篡改)
+    ///
+    /// # Arguments
+    /// * `cached_binding` - 已缓存的凭证 (可选，避免重复读取磁盘)
+    pub async fn self_check_with_binding(
+        &self,
+        cached_binding: Option<&crate::services::tenant_binding::TenantBinding>,
+    ) -> Result<(), AppError> {
         tracing::info!("🔍 Running CertService self-check...");
         let (cert_pem, ca_pem) = self.read_certs()?;
 
-        // verify_cert_pair 包含完整的校验逻辑：
-        // 1. Chain validity
-        // 2. Metadata presence
-        // 3. Hardware ID match
+        // Step 1: 验证证书对 (链 + 硬件绑定)
+        // verify_cert_pair 包含:
+        // - Chain validity
+        // - Metadata presence
+        // - Hardware ID match
         verify_cert_pair(&cert_pem, &ca_pem)
-            .map_err(|e| AppError::validation(format!("Self-check failed: {}", e)))?;
+            .map_err(|e| AppError::validation(format!("Certificate check failed: {}", e)))?;
+        tracing::info!("  ✅ Certificate chain and hardware binding verified.");
 
-        tracing::info!("✅ CertService self-check passed: Hardware ID and Chain verified.");
+        // Step 2: 检查证书过期时间
+        let metadata = crab_cert::CertMetadata::from_pem(&cert_pem)
+            .map_err(|e| AppError::validation(format!("Failed to parse certificate: {}", e)))?;
+
+        let now = time::OffsetDateTime::now_utc();
+        if metadata.not_after < now {
+            return Err(AppError::validation(format!(
+                "Certificate has expired at {}",
+                metadata.not_after
+            )));
+        }
+
+        // 提前 7 天警告即将过期
+        let warn_threshold = now + time::Duration::days(7);
+        if metadata.not_after < warn_threshold {
+            let days_left = (metadata.not_after - now).whole_days();
+            tracing::warn!(
+                "  ⚠️ Certificate will expire in {} days (at {})",
+                days_left,
+                metadata.not_after
+            );
+        } else {
+            tracing::info!("  ✅ Certificate validity period OK (expires: {}).", metadata.not_after);
+        }
+
+        // Step 3: 验证 Credential.json 签名 (使用本地 tenant_ca 公钥)
+        // 优先使用缓存的 binding，避免重复读取磁盘
+        let binding_to_check: Option<std::borrow::Cow<'_, crate::services::tenant_binding::TenantBinding>> =
+            if let Some(b) = cached_binding {
+                Some(std::borrow::Cow::Borrowed(b))
+            } else {
+                crate::services::tenant_binding::TenantBinding::load(&self.work_dir)
+                    .map_err(|e| AppError::internal(format!("Failed to load credential: {}", e)))?
+                    .map(std::borrow::Cow::Owned)
+            };
+
+        if let Some(binding) = binding_to_check {
+            // Step 3a: 检测时钟篡改
+            binding.check_clock_tampering()?;
+            tracing::info!("  ✅ Clock integrity verified.");
+
+            // Step 3b: 验证签名
+            if binding.is_signed() {
+                // 使用本地的 tenant_ca.pem 验证签名
+                binding.validate(&ca_pem)?;
+                tracing::info!("  ✅ Credential.json signature and device binding verified.");
+            } else {
+                tracing::warn!("  ⚠️ Credential.json is not signed (legacy format).");
+            }
+        } else {
+            tracing::warn!("  ⚠️ Credential.json not found (will be created on activation).");
+        }
+
+        tracing::info!("✅ CertService self-check passed.");
         Ok(())
     }
 

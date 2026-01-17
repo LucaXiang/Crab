@@ -23,7 +23,7 @@ use serde::Serialize;
 use std::time::SystemTime;
 
 use crate::core::ServerState;
-use crate::services::credential::Subscription;
+use crate::services::tenant_binding::Subscription;
 
 /// 健康检查路由 - 公共路由 (无需认证)
 pub fn router() -> Router<ServerState> {
@@ -109,8 +109,6 @@ impl CheckResult {
     }
 }
 
-
-
 // 服务器启动时间 (懒加载静态变量)
 static START_TIME: std::sync::OnceLock<SystemTime> = std::sync::OnceLock::new();
 
@@ -121,8 +119,6 @@ fn get_uptime_seconds() -> u64 {
         .map(|d| d.as_secs())
         .unwrap_or(0)
 }
-
-
 
 /// 基础健康检查
 ///
@@ -176,5 +172,3 @@ pub async fn detailed_health(State(state): State<ServerState>) -> Json<DetailedH
         },
     })
 }
-
-

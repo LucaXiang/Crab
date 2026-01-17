@@ -39,18 +39,27 @@ impl Server {
 
         #[allow(clippy::never_loop)]
         loop {
-            // Wait for activation
-            // We must call this even if activated to perform boot self-checks (cert chain, environment)
+            // Wait for activation (includes self-check)
+            // This blocks until:
+            // 1. Server is activated (credential exists)
+            // 2. Self-check passes (cert chain, hardware binding, credential signature, expiration)
             state.wait_for_activation().await;
 
             // Load TLS Config
+            // If this fails after self-check passed, something is seriously wrong
+            // (e.g., key file corrupted after self-check but before load)
             let tls_config = match state.load_tls_config() {
                 Ok(Some(cfg)) => cfg,
-                _ => {
-                    tracing::error!(
-                        "TLS config unavailable after activation check. Retrying in 5s..."
-                    );
-                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                Ok(None) => {
+                    // Certificates don't exist - enter unbound state
+                    tracing::error!("❌ TLS certificates not found after activation!");
+                    state.enter_unbound_state().await;
+                    continue;
+                }
+                Err(e) => {
+                    // Failed to load/parse certificates - enter unbound state
+                    tracing::error!("❌ Failed to load TLS config: {}. Entering unbound state.", e);
+                    state.enter_unbound_state().await;
                     continue;
                 }
             };

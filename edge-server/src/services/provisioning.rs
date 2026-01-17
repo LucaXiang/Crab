@@ -1,24 +1,13 @@
 //! 供应服务
 //!
 //! 处理与认证服务器的交互，以进行供应和激活。
+//! 使用 shared::activation 的标准激活响应格式。
 
 use crate::core::ServerState;
-use crate::services::credential::{Credential, verify_cert_pair};
+use crate::services::tenant_binding::{TenantBinding, verify_cert_pair};
 use crate::utils::AppError;
-use serde::Deserialize;
 use serde_json::json;
-
-#[derive(Deserialize)]
-struct ActivationResponse {
-    success: bool,
-    error: Option<String>,
-    server_id: Option<String>,
-    tenant_id: Option<String>,
-    cert: Option<String>,
-    key: Option<String>,
-    #[serde(rename = "tenant_ca_cert")]
-    tenant_ca_pem: Option<String>,
-}
+use shared::activation::ActivationResponse;
 
 pub struct ProvisioningService {
     state: ServerState,
@@ -35,15 +24,18 @@ impl ProvisioningService {
         }
     }
 
-    /// 执行完整的激活流程：登录并激活 -> 颁发证书 -> 保存 -> 本地 Credential.json 激活
+    /// 执行完整的激活流程
+    ///
+    /// 1. 向 Auth Server 发送激活请求
+    /// 2. Auth Server 返回签名的 ActivationData (包含证书 + SignedBinding)
+    /// 3. 验证并保存证书
+    /// 4. 构造 TenantBinding 并激活
     pub async fn activate(&self, username: &str, password: &str) -> Result<(), AppError> {
         // 1. 获取 Hardware ID (Device ID)
-        // 这是物理设备的唯一标识，必须上传给 Auth Server 绑定
         let device_id = crab_cert::generate_hardware_id();
         tracing::info!("Using Device ID for activation: {}", device_id);
 
         // 2. 调用 /api/server/activate
-        // 该接口只需用户名密码，服务器会自动分配 ServerID 和 TenantID
         let resp = self
             .client
             .post(format!("{}/api/server/activate", self.auth_url))
@@ -65,6 +57,7 @@ impl ProvisioningService {
             )));
         }
 
+        // 3. 解析激活响应
         let resp_data: ActivationResponse = resp
             .json()
             .await
@@ -75,79 +68,48 @@ impl ProvisioningService {
             return Err(AppError::validation(format!("Activation failed: {}", msg)));
         }
 
-        // 3. 首先下载 Root CA (必须先获取信任锚点)
-        tracing::info!("Downloading Root CA from auth server...");
-        let root_ca_pem = self
-            .state
-            .cert_service()
-            .download_root_ca(&self.auth_url)
-            .await
-            .map_err(|e| AppError::internal(format!("Failed to download root CA: {}", e)))?;
+        let data = resp_data
+            .data
+            .ok_or_else(|| AppError::validation("Missing activation data"))?;
 
-        // 4. 解析证书响应
-        let server_id = resp_data
-            .server_id
-            .ok_or_else(|| AppError::validation("Missing server_id"))?;
-        let tenant_id = resp_data
-            .tenant_id
-            .ok_or_else(|| AppError::validation("Missing tenant_id"))?;
-        let cert_pem = resp_data
-            .cert
-            .ok_or_else(|| AppError::validation("Missing cert"))?;
-        let key_pem = resp_data
-            .key
-            .ok_or_else(|| AppError::validation("Missing key"))?;
-        let tenant_ca_pem = resp_data
-            .tenant_ca_pem
-            .ok_or_else(|| AppError::validation("Missing tenant_ca_cert"))?;
-
-        // 5. 验证证书链完整性
+        // 4. 验证证书链完整性
         tracing::info!("Verifying certificate chain: Root CA -> Tenant CA -> Edge Cert");
         self.state
             .cert_service()
-            .verify_certificate_chain(&root_ca_pem, &tenant_ca_pem, &cert_pem)
+            .verify_certificate_chain(&data.root_ca_cert, &data.tenant_ca_cert, &data.entity_cert)
             .await
             .map_err(|e| {
                 AppError::validation(format!("Certificate chain verification failed: {}", e))
             })?;
 
-        tracing::info!(
-            "✅ Activation successful. Assigned ServerID: {}, TenantID: {}",
-            server_id,
-            tenant_id
-        );
-
-        // 4. 验证证书链
-        // 这里只是验证，不生成 Credential 对象，因为我们需要构造完整的 Credential
-        verify_cert_pair(&cert_pem, &tenant_ca_pem)
+        // 5. 验证证书 + 硬件绑定
+        verify_cert_pair(&data.entity_cert, &data.tenant_ca_cert)
             .map_err(|e| AppError::validation(format!("Certificate verification failed: {}", e)))?;
 
-        // 我们需要获取指纹。
-        let metadata = crab_cert::CertMetadata::from_pem(&cert_pem)
-            .map_err(|e| AppError::validation(format!("Failed to parse cert metadata: {}", e)))?;
+        // 6. 验证 SignedBinding 签名
+        data.binding
+            .verify_signature(&data.tenant_ca_cert)
+            .map_err(|e| AppError::validation(format!("Binding signature invalid: {}", e)))?;
 
-        // 检查 Server ID 是否匹配
-        let cn = metadata.common_name.as_deref().unwrap_or("");
-        if cn != server_id {
-            return Err(AppError::validation(format!(
-                "Server ID mismatch: expected {}, got CN={}",
-                server_id, cn
-            )));
-        }
+        tracing::info!(
+            "✅ Activation successful. Assigned ServerID: {}, TenantID: {}",
+            data.entity_id,
+            data.tenant_id
+        );
 
-        // 5. 保存证书 (包含 Root CA)
+        // 7. 保存证书
         self.state
-            .save_certificates(&root_ca_pem, &tenant_ca_pem, &cert_pem, &key_pem)
+            .save_certificates(
+                &data.root_ca_cert,
+                &data.tenant_ca_cert,
+                &data.entity_cert,
+                &data.entity_key,
+            )
             .await
             .map_err(|e| AppError::internal(format!("Failed to save certificates: {}", e)))?;
 
-        // 6. 构造并保存 Credential
-        let credential = Credential::new(
-            tenant_id.to_string(),
-            server_id.to_string(),
-            Some(device_id),
-            metadata.fingerprint_sha256,
-        );
+        // 8. 构造 TenantBinding 并激活
+        let credential = TenantBinding::from_signed(data.binding);
 
         // 通过 ActivationService 激活（保存 Credential.json 并通知）
         self.state.activation_service().activate(credential).await?;

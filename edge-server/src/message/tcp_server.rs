@@ -162,7 +162,6 @@ async fn handle_client_connection(
         server_tx.subscribe(),
         shutdown_token.clone(),
         client_id.clone(),
-        clients.clone(),
         disconnect_token_clone,
     );
 
@@ -275,16 +274,7 @@ async fn perform_handshake(
     // 发送 RPC 响应 (用 correlation_id 关联客户端的 request_id)
     let response_payload =
         ResponsePayload::success(format!("Connected as client: {}", client_id), None);
-    // 用客户端的 request_id 作为 correlation_id，构造响应消息
-    let response = BusMessage {
-        request_id: Uuid::new_v4(),
-        event_type: EventType::Response,
-        source: None,
-        correlation_id: Some(msg.request_id), // 关联客户端的 request_id
-        target: None,
-        payload: serde_json::to_vec(&response_payload)
-            .map_err(|e| AppError::internal(&format!("Failed to serialize response: {}", e)))?,
-    };
+    let response = BusMessage::response(&response_payload).with_correlation_id(msg.request_id);
     if let Err(e) = transport.write_message(&response).await {
         tracing::warn!("Failed to send handshake response: {}", e);
     }
@@ -292,26 +282,20 @@ async fn perform_handshake(
     Ok(client_id)
 }
 
+/// Delay before closing connection after sending error (allows client to receive the message)
+const HANDSHAKE_ERROR_DELAY_MS: u64 = 100;
+
 /// Send handshake error to client
 async fn send_handshake_error(transport: &Arc<dyn Transport>, msg: &BusMessage, message: &str) {
     let response_payload = ResponsePayload::error(message, None);
-    let response = BusMessage {
-        request_id: Uuid::new_v4(),
-        event_type: EventType::Response,
-        source: None,
-        correlation_id: Some(msg.request_id),
-        target: None,
-        payload: serde_json::to_vec(&response_payload)
-            .map_err(|e| AppError::internal(&format!("Failed to serialize response: {}", e)))
-            .unwrap_or_default(),
-    };
+    let response = BusMessage::response(&response_payload).with_correlation_id(msg.request_id);
 
     if let Err(e) = transport.write_message(&response).await {
         tracing::error!("Failed to send handshake error: {}", e);
     }
 
     // Give client some time to receive the message before closing
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(HANDSHAKE_ERROR_DELAY_MS)).await;
 }
 
 /// Spawn task to forward messages from server to client
@@ -320,7 +304,6 @@ fn spawn_server_to_client_forwarder(
     mut rx: broadcast::Receiver<BusMessage>,
     shutdown_token: CancellationToken,
     client_id: String,
-    clients: Arc<DashMap<String, Arc<dyn Transport>>>,
     disconnect_token: CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
@@ -356,9 +339,7 @@ fn spawn_server_to_client_forwarder(
             }
         }
 
-        // Clean up on disconnect
-        clients.remove(&client_id);
-        tracing::debug!(client_id = %client_id, "Client forwarder cleaned up");
+        tracing::debug!(client_id = %client_id, "Client forwarder stopped");
     })
 }
 
@@ -374,9 +355,6 @@ async fn read_client_messages(
     loop {
         tokio::select! {
             _ = shutdown_token.cancelled() => {
-                break;
-            }
-            _ = disconnect_token.cancelled() => {
                 break;
             }
 

@@ -106,8 +106,10 @@ mod tests {
     async fn test_in_memory_rpc() {
         use crate::InMemoryMessageClient;
 
-        let (tx, _rx) = broadcast::channel(16);
-        let client = InMemoryMessageClient::new(tx);
+        // 创建双向通道: client -> server 和 server -> client
+        let (client_tx, _) = broadcast::channel(16);
+        let (server_tx, _) = broadcast::channel(16);
+        let client = InMemoryMessageClient::new(client_tx, server_tx);
 
         let request = BusMessage::request_command(
             &shared::message::RequestCommandPayload {

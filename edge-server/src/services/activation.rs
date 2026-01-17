@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::services::credential::{Credential, Subscription};
+use crate::services::tenant_binding::{TenantBinding, Subscription, SubscriptionStatus, PlanType};
 use crate::utils::AppError;
 
 /// 激活服务 - 管理边缘节点激活状态
@@ -33,7 +33,7 @@ pub struct ActivationService {
     /// 证书目录
     cert_dir: PathBuf,
     /// 凭证缓存 (内存)
-    pub credential_cache: Arc<RwLock<Option<Credential>>>,
+    pub credential_cache: Arc<RwLock<Option<TenantBinding>>>,
 }
 
 /// 激活状态 (用于 API 查询)
@@ -57,13 +57,13 @@ impl ActivationService {
     /// 启动时从磁盘加载凭证缓存
     pub fn new(auth_server_url: String, cert_dir: PathBuf) -> Self {
         // Load credential from disk to memory cache on startup
-        let credential_cache = match Credential::load(&cert_dir) {
+        let credential_cache = match TenantBinding::load(&cert_dir) {
             Ok(cred) => {
                 if let Some(c) = &cred {
                     tracing::info!(
                         "Loaded cached credential for tenant={}, edge={}",
-                        c.tenant_id,
-                        c.server_id
+                        c.binding.tenant_id,
+                        c.binding.entity_id
                     );
                 }
                 Arc::new(RwLock::new(cred))
@@ -91,74 +91,91 @@ impl ActivationService {
     ///
     /// # 行为
     ///
-    /// - 已激活：立即返回
-    /// - 未激活：阻塞等待 notify.notified()
+    /// - 已激活且自检通过：立即返回
+    /// - 未激活或自检失败：进入等待循环，直到激活成功
+    ///
+    /// # 容错设计
+    ///
+    /// 证书或 Credential.json 被篡改/损坏时：
+    /// 1. 不会 panic
+    /// 2. 清理损坏的文件
+    /// 3. 进入未绑定状态
+    /// 4. 等待重新激活
     pub async fn wait_for_activation(&self, cert_service: &crate::services::cert::CertService) {
-        // 1. Check activation status
-        if !self.is_activated().await {
-            tracing::info!("Waiting for activation signal...");
-            self.notify.notified().await;
-            tracing::info!("Activation signal received!");
-        }
-
-        // 2. Perform boot self-check
-        tracing::info!("Performing boot self-check...");
-        if let Err(e) = cert_service.self_check().await {
-            tracing::warn!(
-                "Boot self-check failed: {}. Will continue with degraded operation.",
-                e
-            );
-
-            // 清理损坏的证书，程序继续运行
-            if let Err(cleanup_error) = cert_service.cleanup_certificates().await {
-                tracing::warn!("Failed to cleanup certificates: {}", cleanup_error);
-            }
-
-            // 清空缓存，强制重新激活
-            {
-                let mut cache = self.credential_cache.write().await;
-                *cache = None;
-            }
-
-            tracing::warn!(
-                "Certificate validation failed. Continuing operation - will download fresh certificates when needed."
-            );
-            tracing::error!("Please check certificate validity and hardware binding.");
-
-            // 等待重新激活
-            self.notify.notified().await;
-            tracing::info!("Reactivation signal received!");
-
-            // 重新执行自检
-            tracing::info!("Performing reactivation self-check...");
-            if let Err(recheck_error) = cert_service.self_check().await {
-                tracing::error!(
-                    "Reactivation self-check failed: {}. Will wait again.",
-                    recheck_error
-                );
-                // 再次清空缓存并等待
-                {
-                    let mut cache = self.credential_cache.write().await;
-                    *cache = None;
-                }
+        loop {
+            // 1. Check activation status
+            if !self.is_activated().await {
+                tracing::info!("⏳ Server not activated. Waiting for activation signal...");
                 self.notify.notified().await;
-            } else {
-                tracing::info!("Reactivation self-check passed!");
+                tracing::info!("📡 Activation signal received!");
             }
-        } else {
-            tracing::info!("Boot self-check passed!");
+
+            // 2. Perform self-check (cert chain + hardware binding + credential signature + clock)
+            //    使用缓存的 credential，避免重复读取磁盘
+            tracing::info!("🔍 Performing self-check...");
+            let cached_binding = self.credential_cache.read().await.clone(); // clone 后立即释放读锁
+            match cert_service.self_check_with_binding(cached_binding.as_ref()).await {
+                Ok(()) => {
+                    tracing::info!("✅ Self-check passed!");
+
+                    // 3. Update last_verified_at timestamp (防止时钟篡改)
+                    self.update_last_verified_at().await;
+
+                    break; // Exit loop, continue to start server
+                }
+                Err(e) => {
+                    tracing::error!("❌ Self-check failed: {}", e);
+
+                    // 进入未绑定状态
+                    self.enter_unbound_state(cert_service).await;
+
+                    tracing::warn!(
+                        "🔄 Server entered unbound state. Waiting for reactivation..."
+                    );
+                    // Loop continues, will wait for activation again
+                }
+            }
         }
 
-        // 3. Initial Subscription Sync
-        // Integrated from perform_initial_subscription_check as per user request
+        // 3. Initial Subscription Sync (only after successful self-check)
         self.sync_subscription().await;
+    }
+
+    /// 进入未绑定状态 (公开接口)
+    ///
+    /// 供 ServerState 在 TLS 加载失败时调用
+    pub async fn enter_unbound_state_public(&self, cert_service: &crate::services::cert::CertService) {
+        self.enter_unbound_state(cert_service).await;
+    }
+
+    /// 进入未绑定状态
+    ///
+    /// 清理所有可能损坏的数据，准备重新激活
+    async fn enter_unbound_state(&self, cert_service: &crate::services::cert::CertService) {
+        // 1. 清理损坏的证书文件
+        if let Err(e) = cert_service.cleanup_certificates().await {
+            tracing::warn!("Failed to cleanup certificates: {}", e);
+        }
+
+        // 2. 删除可能损坏的 Credential.json
+        if let Err(e) = TenantBinding::delete(&self.cert_dir) {
+            tracing::warn!("Failed to delete credential file: {}", e);
+        }
+
+        // 3. 清空内存缓存
+        {
+            let mut cache = self.credential_cache.write().await;
+            *cache = None;
+        }
+
+        tracing::info!("🧹 Cleanup completed. Ready for reactivation.");
     }
 
     pub async fn is_activated(&self) -> bool {
         self.credential_cache.read().await.is_some()
     }
 
-    pub async fn get_credential(&self) -> Result<Option<Credential>, AppError> {
+    pub async fn get_credential(&self) -> Result<Option<TenantBinding>, AppError> {
         let cache = self.credential_cache.read().await;
         Ok(cache.clone())
     }
@@ -168,21 +185,21 @@ impl ActivationService {
         match credential {
             Some(cred) => Ok(ActivationStatus {
                 is_activated: true,
-                tenant_id: Some(cred.tenant_id),
-                edge_id: Some(cred.server_id),
-                cert_fingerprint: Some(cred.fingerprint),
+                tenant_id: Some(cred.binding.tenant_id.clone()),
+                edge_id: Some(cred.binding.entity_id.clone()),
+                cert_fingerprint: Some(cred.binding.fingerprint.clone()),
                 cert_expires_at: None,
             }),
             None => Ok(ActivationStatus::default()),
         }
     }
 
-    pub async fn activate(&self, credential: Credential) -> Result<(), AppError> {
+    pub async fn activate(&self, credential: TenantBinding) -> Result<(), AppError> {
         tracing::info!(
-            "Attempting to activate edge server: tenant={}, edge={}, device={:?}",
-            credential.tenant_id,
-            credential.server_id,
-            credential.device_id
+            "Attempting to activate edge server: tenant={}, edge={}, device={}",
+            credential.binding.tenant_id,
+            credential.binding.entity_id,
+            credential.binding.device_id
         );
 
         // 1. Save to disk
@@ -205,7 +222,7 @@ impl ActivationService {
         tracing::warn!("⚠️ Deactivating server and resetting state");
 
         // 1. Delete from disk
-        Credential::delete(&self.cert_dir)
+        TenantBinding::delete(&self.cert_dir)
             .map_err(|e| AppError::internal(format!("Failed to delete credential: {}", e)))?;
 
         // 2. Clear memory cache
@@ -219,6 +236,80 @@ impl ActivationService {
 
     pub async fn deactivate_and_reset(&self) -> Result<(), AppError> {
         self.deactivate().await
+    }
+
+    /// 刷新 binding 时间戳
+    ///
+    /// 在自检成功后调用，向 Auth Server 请求刷新 binding。
+    /// 新的 binding 包含更新的 last_verified_at 和新签名。
+    async fn update_last_verified_at(&self) {
+        let mut cache = self.credential_cache.write().await;
+        let credential = match cache.as_ref() {
+            Some(c) => c,
+            None => return,
+        };
+
+        // 调用 Auth Server 刷新 binding
+        let client = reqwest::Client::new();
+        let resp = match client
+            .post(format!("{}/api/binding/refresh", self.auth_server_url))
+            .json(&serde_json::json!({ "binding": credential.binding }))
+            .timeout(std::time::Duration::from_secs(10))
+            .send()
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!("Failed to refresh binding (offline?): {}", e);
+                return;
+            }
+        };
+
+        if !resp.status().is_success() {
+            tracing::warn!("Auth Server returned error for binding refresh: {}", resp.status());
+            return;
+        }
+
+        // 解析响应
+        #[derive(serde::Deserialize)]
+        struct RefreshResponse {
+            success: bool,
+            binding: Option<shared::activation::SignedBinding>,
+            error: Option<String>,
+        }
+
+        let data: RefreshResponse = match resp.json().await {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::error!("Failed to parse refresh response: {}", e);
+                return;
+            }
+        };
+
+        if !data.success {
+            tracing::warn!("Binding refresh failed: {}", data.error.unwrap_or_default());
+            return;
+        }
+
+        let new_binding = match data.binding {
+            Some(b) => b,
+            None => {
+                tracing::error!("Refresh response missing binding");
+                return;
+            }
+        };
+
+        // 更新内存缓存
+        if let Some(ref mut cred) = *cache {
+            cred.update_binding(new_binding);
+
+            // 保存到磁盘
+            if let Err(e) = cred.save(&self.cert_dir) {
+                tracing::error!("Failed to save refreshed binding: {}", e);
+            } else {
+                tracing::debug!("Binding refreshed successfully (last_verified_at updated)");
+            }
+        }
     }
 
     /// Sync subscription status (Local Cache -> Remote Fetch -> Update Cache)
@@ -237,12 +328,12 @@ impl ActivationService {
 
         // Fetch subscription from remote
         if let Some(sub) = self
-            .fetch_subscription_from_auth_server(&credential.tenant_id)
+            .fetch_subscription_from_auth_server(&credential.binding.tenant_id)
             .await
         {
             tracing::info!(
                 "Subscription sync successful for tenant {}: {:?}",
-                credential.tenant_id,
+                credential.binding.tenant_id,
                 sub.status
             );
 
@@ -273,35 +364,118 @@ impl ActivationService {
         &self,
         tenant_id: &str,
     ) -> Option<Subscription> {
+        use shared::activation::SubscriptionInfo;
+
         let client = reqwest::Client::new();
-        match client
+        let resp = match client
             .post(format!("{}/api/tenant/subscription", self.auth_server_url))
             .json(&serde_json::json!({ "tenant_id": tenant_id }))
+            .timeout(std::time::Duration::from_secs(10))
             .send()
             .await
         {
-            Ok(resp) => {
-                if resp.status().is_success() {
-                    #[derive(Deserialize)]
-                    struct SubResponse {
-                        subscription: Subscription,
-                    }
-                    match resp.json::<SubResponse>().await {
-                        Ok(data) => Some(data.subscription),
-                        Err(e) => {
-                            tracing::error!("Failed to parse subscription response: {}", e);
-                            None
-                        }
-                    }
-                } else {
-                    tracing::warn!("Auth Server error: {}", resp.status());
-                    None
-                }
-            }
+            Ok(r) => r,
             Err(e) => {
                 tracing::error!("Failed to contact Auth Server: {}", e);
-                None
+                return None;
             }
+        };
+
+        if !resp.status().is_success() {
+            tracing::warn!("Auth Server error: {}", resp.status());
+            return None;
         }
+
+        // Parse response
+        #[derive(Deserialize)]
+        struct SubResponse {
+            success: bool,
+            error: Option<String>,
+            subscription: Option<SubscriptionInfo>,
+        }
+
+        let data: SubResponse = match resp.json().await {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::error!("Failed to parse subscription response: {}", e);
+                return None;
+            }
+        };
+
+        if !data.success {
+            tracing::warn!(
+                "Auth Server returned error: {}",
+                data.error.unwrap_or_default()
+            );
+            return None;
+        }
+
+        let sub_info = match data.subscription {
+            Some(s) => s,
+            None => {
+                tracing::warn!("Auth Server returned no subscription");
+                return None;
+            }
+        };
+
+        // Verify subscription signature using local tenant_ca.pem
+        let tenant_ca_path = self.cert_dir.join("certs").join("tenant_ca.pem");
+        let tenant_ca_pem = match std::fs::read_to_string(&tenant_ca_path) {
+            Ok(pem) => pem,
+            Err(e) => {
+                tracing::error!("Failed to read tenant CA for subscription verification: {}", e);
+                return None;
+            }
+        };
+
+        if let Err(e) = sub_info.validate(&tenant_ca_pem) {
+            tracing::error!("Subscription signature validation failed: {}", e);
+            return None;
+        }
+
+        tracing::debug!("Subscription signature verified successfully");
+
+        // Convert SubscriptionInfo to local Subscription
+        let status = match sub_info.status {
+            shared::activation::SubscriptionStatus::Active => SubscriptionStatus::Active,
+            shared::activation::SubscriptionStatus::Trial => SubscriptionStatus::Trial,
+            shared::activation::SubscriptionStatus::PastDue => SubscriptionStatus::PastDue,
+            shared::activation::SubscriptionStatus::Canceled => SubscriptionStatus::Canceled,
+            shared::activation::SubscriptionStatus::Unpaid => SubscriptionStatus::Unpaid,
+        };
+
+        let plan = match sub_info.plan {
+            shared::activation::PlanType::Free => PlanType::Free,
+            shared::activation::PlanType::Pro => PlanType::Pro,
+            shared::activation::PlanType::Enterprise => PlanType::Enterprise,
+        };
+
+        let starts_at = chrono::DateTime::parse_from_rfc3339(&sub_info.starts_at)
+            .map(|dt| dt.with_timezone(&chrono::Utc))
+            .unwrap_or_else(|_| chrono::Utc::now());
+
+        let expires_at = sub_info.expires_at.as_ref().and_then(|s| {
+            chrono::DateTime::parse_from_rfc3339(s)
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .ok()
+        });
+
+        let signature_valid_until =
+            chrono::DateTime::parse_from_rfc3339(&sub_info.signature_valid_until)
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .ok();
+
+        Some(Subscription {
+            id: sub_info.id,
+            tenant_id: sub_info.tenant_id,
+            status,
+            plan,
+            starts_at,
+            expires_at,
+            features: sub_info.features,
+            last_checked_at: chrono::Utc::now(),
+            signature_valid_until,
+            signature: Some(sub_info.signature),
+        })
     }
 }

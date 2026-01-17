@@ -5,7 +5,6 @@
 use std::time::Duration;
 
 use axum::{Extension, Json, extract::State};
-use serde::{Deserialize, Serialize};
 
 use crate::audit_log;
 use crate::auth::CurrentUser;
@@ -13,31 +12,11 @@ use crate::core::ServerState;
 use crate::db::models::{Employee, Role};
 use crate::{AppError, AppResponse};
 
+// Re-use shared DTOs for API consistency
+use shared::client::{LoginRequest, LoginResponse, UserInfo};
+
 /// Fixed delay for authentication to prevent timing attacks
 const AUTH_FIXED_DELAY_MS: u64 = 500;
-
-/// Login request payload
-#[derive(Debug, Deserialize)]
-pub struct LoginRequest {
-    pub username: String,
-    pub password: String,
-}
-
-/// Login response with JWT token
-#[derive(Debug, Serialize)]
-pub struct LoginResponse {
-    pub token: String,
-    pub user: UserInfo,
-}
-
-/// User information returned after login
-#[derive(Debug, Serialize)]
-pub struct UserInfo {
-    pub id: String,
-    pub username: String,
-    pub role: String,
-    pub permissions: Vec<String>,
-}
 
 /// Login handler
 ///

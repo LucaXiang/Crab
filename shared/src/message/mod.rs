@@ -198,6 +198,12 @@ impl BusMessage {
         self
     }
 
+    /// 设置关联 ID (用于 RPC 响应)
+    pub fn with_correlation_id(mut self, id: Uuid) -> Self {
+        self.correlation_id = Some(id);
+        self
+    }
+
     /// 创建握手消息
     pub fn handshake(payload: &HandshakePayload) -> Self {
         Self::new(

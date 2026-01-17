@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+# Workspace crates
+crab-cert.workspace = true
+
 # HTTP types
 http.workspace = true
 axum.workspace = true
@@ -13,6 +16,9 @@ http-body-util.workspace = true
 # Serialization
 serde.workspace = true
 serde_json.workspace = true
+
+# Encoding
+base64.workspace = true
 
 # Error handling
 thiserror.workspace = true

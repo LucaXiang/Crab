@@ -1,5 +1,6 @@
 mod adapter;
 mod ca;
+mod credential;
 mod crypto;
 mod error;
 mod machine;
@@ -11,10 +12,11 @@ pub mod trust;
 
 pub use adapter::{SkipHostnameVerifier, to_identity_pem, verify_client_cert, verify_server_cert};
 pub use ca::CertificateAuthority;
+pub use credential::{Credential, CredentialStorage};
 pub use crypto::{decrypt, encrypt, sign, to_rustls_certs, to_rustls_key, verify};
 pub use error::{CertError, Result};
 pub use machine::{generate_hardware_id, generate_quick_hardware_id};
 pub use metadata::CertMetadata;
 pub use profile::{CaProfile, CertProfile, KeyType};
-pub use server::CertService;
+pub use server::{CertService, CertStorage};
 pub use trust::{get_or_create_root_ca, verify_ca_signature, verify_chain_against_root};

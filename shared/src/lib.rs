@@ -3,6 +3,7 @@
 //! Common types used across multiple crates including HTTP types,
 //! error types, response structures, and utility types.
 
+pub mod activation;
 pub mod client;
 pub mod error;
 pub mod message;

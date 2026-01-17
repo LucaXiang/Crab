@@ -1,13 +1,22 @@
 //! Remote Message Client Example - 使用 CrabClient 进行 RPC 调用
 //!
-//! Token 说明：
-//! - Auth Server Token: 租户认证，用于下载证书（setup 时获取）
-//! - Employee Token: 员工认证，用于 HTTP API（login 时获取）
+//! 认证说明：
+//! - mTLS (租户证书): 用于 Message Bus RPC 通信，setup/reconnect 后即可使用
+//! - Employee Token: 用于 HTTP API 请求，需要 login 获取
 //!
 //! 使用流程：
 //! 1. 首次运行: client.setup(username, password, addr) - 租户登录，下载证书
-//! 2. 后续运行: client.connect(addr) - 使用缓存证书直接连接
-//! 3. 员工操作: client.login(emp_user, emp_pass) - 获取员工 token
+//! 2. 后续运行: client.reconnect(addr) - 使用缓存证书直接连接
+//!    - 自动执行自检 (证书链验证、硬件绑定、时钟篡改检测)
+//!    - 尝试刷新时间戳 (调用 Auth Server，Tenant CA 签名)
+//! 3. RPC 通信: 连接后即可发送 RPC (不需要登录!)
+//! 4. HTTP API: client.login(emp_user, emp_pass) - 获取员工 token
+//!
+//! 安全特性：
+//! - mTLS 双向认证
+//! - 硬件 ID 绑定 (防止证书拷贝)
+//! - 时钟篡改检测 (回拨 > 1h 或前进 > 30d 触发告警)
+//! - 时间戳由 Auth Server 使用 Tenant CA 签名 (防止本地伪造)
 //!
 //! 运行前请确保：
 //! 1. 启动 Auth Server: cargo run -p crab-auth
@@ -15,78 +24,98 @@
 //!
 //! 运行: cargo run -p crab-client --example remote_message
 
-use crab_client::{CrabClient, RemoteMode, BusMessage};
+use crab_client::{BusMessage, CrabClient, NetworkMessageClient};
 use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize tracing for debug output
+    tracing_subscriber::fmt::init();
+
     // === 1. 创建客户端 ===
-    // 参数: Auth URL, 证书存储路径, 客户端名称
-    let mut client = CrabClient::<RemoteMode>::new(
-        "http://127.0.0.1:3001",  // Auth Server HTTPS
-        "./certs",                 // 证书存储路径
-        "remote-client",           // 客户端名称
-    );
+    let client = CrabClient::remote()
+        .auth_server("http://127.0.0.1:3001") // Auth Server URL
+        .cert_path("./certs") // 证书存储路径
+        .client_name("remote-client") // 客户端名称
+        .build()?;
 
     // === 2. 连接消息服务器 ===
-    // 如果是首次运行，需要先用 setup() 设置一次
-    // 后续运行可直接使用 connect()
-    if !client.is_connected() {
-        println!("🔐 首次连接，设置中...");
-
-        // 首次运行时调用 setup()，之后只需 connect()
-        client.setup(
-            "admin",                  // 租户用户名
-            "password",               // 租户密码
-            "127.0.0.1:8081",         // Edge Server TCP/mTLS 地址
-        ).await?;
-
-        println!("✅ 首次设置完成！凭据和证书已缓存。");
-        println!("   下次运行可直接连接，无需重新登录。");
+    let client = if client.has_cached_credentials() {
+        // 使用缓存证书直接连接
+        // reconnect() 会自动：
+        // 1. 执行自检 (证书链验证、硬件绑定、时钟篡改检测)
+        // 2. 刷新时间戳 (调用 Auth Server，Tenant CA 签名)
+        println!("Using cached certificates (with self-check & timestamp refresh)...");
+        client.reconnect("127.0.0.1:8081").await?
     } else {
-        // 直接使用缓存的证书连接（无需密码）
-        client.connect("127.0.0.1:8081").await?;
-        println!("✅ 已使用缓存的证书连接消息服务器！");
-    }
+        // 首次运行，需要 setup
+        println!("First-time setup...");
+        client
+            .setup(
+                "admin",          // 租户用户名
+                "password",       // 租户密码
+                "127.0.0.1:8081", // Edge Server TCP/mTLS 地址
+            )
+            .await?
+    };
 
-    println!("   连接状态: {}", if client.is_connected() { "已连接" } else { "断开" });
+    println!(
+        "Connected: {}",
+        if client.is_connected() { "yes" } else { "no" }
+    );
 
-    // === 3. 员工登录 (可选，用于 HTTP API) ===
-    println!("\n👤 员工登录...");
-    let _login = client.login("employee", "emp_password").await?;
-    println!("   Token: {}...", client.token().unwrap_or("").chars().take(20).collect::<String>());
+    // === 3. RPC 调用 (只需 mTLS 连接，不需要登录!) ===
+    println!("\n=== RPC 通信 (不需要登录) ===");
 
-    // === 4. RPC 调用 ===
-    println!("\n📤 发送 ping 请求...");
-    let response = send_ping(&client).await?;
-    println!("   响应: {}", response.message);
+    let mc = client.message_client().expect("Not connected");
 
-    println!("\n📤 发送 status 请求...");
-    let response = send_status(&client).await?;
-    println!("   响应: {}", response.message);
+    println!("Sending ping request...");
+    let response = send_rpc(mc, "ping", None).await?;
+    println!("Response: {}", response.message);
+
+    println!("\nSending status request...");
+    let response = send_rpc(mc, "status", None).await?;
+    println!("Response: {}", response.message);
+
+    // === 4. 员工登录 (用于 HTTP API) ===
+    println!("\n=== HTTP API (需要登录) ===");
+    println!("Employee login...");
+    let client = client.login("employee", "emp_password").await?;
+    println!(
+        "Token: {}...",
+        client
+            .token()
+            .unwrap_or("")
+            .chars()
+            .take(20)
+            .collect::<String>()
+    );
+
+    // 登录后仍然可以发 RPC
+    let mc = client.message_client().expect("Not connected");
+    println!("\nSending echo request (still works after login)...");
+    let response = send_rpc(mc, "echo", Some(serde_json::json!({"message": "Hello!"}))).await?;
+    println!("Response: {}", response.message);
 
     // === 5. 登出 ===
-    // 只清理员工 token，证书和凭据保留缓存
-    client.logout().await;
-    println!("\n👋 已登出 (证书已缓存，下次可直接连接)");
+    let client = client.logout().await;
+    println!("\nLogged out (certificates cached for next time)");
+
+    // Optionally disconnect completely
+    let _client = client.disconnect().await;
 
     Ok(())
 }
 
-async fn send_ping(client: &CrabClient<RemoteMode>) -> Result<shared::message::ResponsePayload, crab_client::MessageError> {
+async fn send_rpc(
+    mc: &NetworkMessageClient,
+    action: &str,
+    params: Option<serde_json::Value>,
+) -> Result<shared::message::ResponsePayload, Box<dyn std::error::Error>> {
     let request = BusMessage::request_command(&shared::message::RequestCommandPayload {
-        action: "ping".to_string(),
-        params: None,
+        action: action.to_string(),
+        params,
     });
-    let response = client.request(&request).await?;
-    Ok(response.parse_payload()?)
-}
-
-async fn send_status(client: &CrabClient<RemoteMode>) -> Result<shared::message::ResponsePayload, crab_client::MessageError> {
-    let request = BusMessage::request_command(&shared::message::RequestCommandPayload {
-        action: "status".to_string(),
-        params: None,
-    });
-    let response = client.request_with_timeout(&request, Duration::from_secs(3)).await?;
+    let response = mc.request(&request, Duration::from_secs(5)).await?;
     Ok(response.parse_payload()?)
 }

@@ -17,6 +17,7 @@ tower-http.workspace = true
 # Serialization
 serde.workspace = true
 serde_json.workspace = true
+base64.workspace = true
 
 # Database
 surrealdb.workspace = true
@@ -42,6 +43,7 @@ hyper.workspace = true
 # Time and UUID
 chrono.workspace = true
 uuid.workspace = true
+time.workspace = true
 
 # WebSocket
 socketioxide.workspace = true
@@ -79,7 +81,7 @@ dashmap.workspace = true
 [dev-dependencies]
 # Testing
 tempfile.workspace = true
-crab-client.workspace = true
+crab-client = { workspace = true, features = ["in-process"] }
 
 # TUI
 ratatui.workspace = true

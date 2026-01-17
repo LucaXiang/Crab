@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 # Workspace crates
 crab-cert.workspace = true
+shared.workspace = true
 
 # Web framework
 axum.workspace = true

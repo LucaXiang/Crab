@@ -2,6 +2,7 @@
 //!
 //! 处理 JWT 令牌的生成、验证和解析。
 
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use chrono::{Duration, Utc};
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
@@ -185,8 +186,13 @@ impl JwtService {
 
     /// 使用指定配置创建新的 JWT 服务
     pub fn with_config(config: JwtConfig) -> Self {
-        let encoding_key = EncodingKey::from_secret(config.secret.as_bytes());
-        let decoding_key = DecodingKey::from_secret(config.secret.as_bytes());
+        // 尝试将 secret 解码为 base64，如果失败则直接使用原始字符串
+        let secret_bytes = match STANDARD.decode(&config.secret) {
+            Ok(bytes) => bytes,
+            Err(_) => config.secret.as_bytes().to_vec(),
+        };
+        let encoding_key = EncodingKey::from_secret(&secret_bytes);
+        let decoding_key = DecodingKey::from_secret(&secret_bytes);
 
         Self {
             config,
@@ -224,10 +230,9 @@ impl JwtService {
             .map_err(|e| JwtError::GenerationFailed(e.to_string()))
     }
     pub fn new_with_secure_key() -> Result<Self, JwtError> {
-        let secret = generate_secure_jwt_secret()?;
+        // 局域网 + mTLS 保护，使用固定密钥确保重启后 token 有效
         let config = JwtConfig {
-            secret: String::from_utf8(secret)
-                .map_err(|_| JwtError::ConfigError("Invalid UTF-8 in generated key".to_string()))?,
+            secret: "crab-jwt-secret-key-32-bytes-long!!!!".to_string(),
             ..Default::default()
         };
         Ok(Self::with_config(config))

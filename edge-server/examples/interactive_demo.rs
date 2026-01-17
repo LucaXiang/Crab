@@ -30,6 +30,10 @@ struct DemoStatus {
     plan: String,
     sub_status: String,
     expires_at: String,
+    /// 绑定签名状态
+    is_signed: bool,
+    /// 最后验证时间 (时钟篡改检测)
+    last_verified_at: String,
     clients: Vec<ConnectedClient>,
 }
 
@@ -196,9 +200,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 if let Some(cred) = &*cred_cache {
-                    status.tenant_id = cred.tenant_id.clone();
-                    status.edge_id = cred.server_id.clone();
-                    status.device_id = cred.device_id.clone().unwrap_or_else(|| "-".to_string());
+                    status.tenant_id = cred.binding.tenant_id.clone();
+                    status.edge_id = cred.binding.entity_id.clone();
+                    status.device_id = cred.binding.device_id.clone();
+                    status.is_signed = cred.is_signed();
+                    status.last_verified_at = if cred.binding.last_verified_at.is_empty() {
+                        "-".to_string()
+                    } else {
+                        // 只显示时间部分
+                        cred.binding.last_verified_at
+                            .split('T')
+                            .nth(1)
+                            .and_then(|t| t.split('+').next())
+                            .unwrap_or(&cred.binding.last_verified_at)
+                            .to_string()
+                    };
 
                     if let Some(sub) = &cred.subscription {
                         status.plan = format!("{:?}", sub.plan);
@@ -219,6 +235,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     status.plan = "None".to_string();
                     status.sub_status = "Not Activated".to_string();
                     status.expires_at = "-".to_string();
+                    status.is_signed = false;
+                    status.last_verified_at = "-".to_string();
                 }
 
                 if status_tx.send(status).await.is_err() {
@@ -590,6 +608,12 @@ fn ui(f: &mut Frame, app: &App) {
         Style::default().fg(Color::Red)
     };
 
+    let signed_style = if app.status.is_signed {
+        Style::default().fg(Color::Green)
+    } else {
+        Style::default().fg(Color::Red)
+    };
+
     let status_text = vec![
         Line::from(vec![
             Span::raw("Activation: "),
@@ -601,6 +625,15 @@ fn ui(f: &mut Frame, app: &App) {
                 },
                 active_style,
             ),
+        ]),
+        Line::from(vec![
+            Span::raw("Signed: "),
+            Span::styled(
+                if app.status.is_signed { "✓" } else { "✗" },
+                signed_style,
+            ),
+            Span::raw("  Last: "),
+            Span::styled(&app.status.last_verified_at, Style::default().fg(Color::Cyan)),
         ]),
         Line::from(vec![Span::raw("")]),
         Line::from(vec![

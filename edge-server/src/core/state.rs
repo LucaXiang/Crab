@@ -230,6 +230,15 @@ impl ServerState {
         self.activation.deactivate_and_reset().await
     }
 
+    /// 进入未绑定状态
+    ///
+    /// 当证书或配置损坏时调用，清理所有状态等待重新激活
+    pub async fn enter_unbound_state(&self) {
+        self.activation
+            .enter_unbound_state_public(&self.cert_service)
+            .await;
+    }
+
     /// 打印激活后的横幅内容 (日志)
     pub async fn print_activated_banner_content(&self) {
         let cred = self.activation.get_credential().await.unwrap_or_default();
@@ -243,12 +252,10 @@ impl ServerState {
             tracing::info!(
                 "╚══════════════════════════════════════════════════════════════════════╝"
             );
-            tracing::info!("  Server ID    : {}", c.server_id);
-            tracing::info!("  Tenant ID    : {}", c.tenant_id);
-            if let Some(device_id) = c.device_id {
-                tracing::info!("  Device ID    : {}", device_id);
-            }
-            if let Some(sub) = c.subscription {
+            tracing::info!("  Server ID    : {}", c.binding.entity_id);
+            tracing::info!("  Tenant ID    : {}", c.binding.tenant_id);
+            tracing::info!("  Device ID    : {}", c.binding.device_id);
+            if let Some(sub) = &c.subscription {
                 tracing::info!("  Subscription : {:?} ({:?})", sub.status, sub.plan);
             }
             tracing::info!(

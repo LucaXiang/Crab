@@ -52,7 +52,7 @@ impl NetworkHttpClient {
         if !status.is_success() {
             let text = response.text().await?;
             return match status {
-                StatusCode::UNAUTHORIZED => Err(ClientError::Unauthorized),
+                StatusCode::UNAUTHORIZED => Err(ClientError::Unauthorized("Unauthorized".into())),
                 StatusCode::FORBIDDEN => Err(ClientError::Forbidden(text)),
                 StatusCode::NOT_FOUND => Err(ClientError::NotFound(text)),
                 StatusCode::BAD_REQUEST => Err(ClientError::Validation(text)),
@@ -96,8 +96,7 @@ impl HttpClient for NetworkHttpClient {
     }
 
     async fn login(&self, username: &str, password: &str) -> ClientResult<LoginResponse> {
-        #[derive(serde::Serialize)]
-        struct LoginRequest { username: String, password: String }
+        use shared::client::LoginRequest;
         let req = LoginRequest { username: username.to_string(), password: password.to_string() };
         let resp: ApiResponse<LoginResponse> = self.post("/api/auth/login", &req).await?;
         resp.data.ok_or_else(|| ClientError::InvalidResponse("Missing login data".into()))

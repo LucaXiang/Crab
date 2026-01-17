@@ -3,13 +3,13 @@
 
 use rustls_pki_types::{CertificateDer, ServerName};
 use shared::message::{BusMessage, HandshakePayload, PROTOCOL_VERSION};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
-use tokio::sync::Mutex;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, oneshot, Mutex};
 use tokio_rustls::client::TlsStream;
 use uuid::Uuid;
 
@@ -20,10 +20,20 @@ use uuid::Uuid;
 /// 2. TLS 握手 (使用客户端证书)
 /// 3. 协议握手 (Handshake)
 /// 4. 消息收发
+///
+/// 架构:
+/// - 后台任务持续读取消息
+/// - RPC 响应通过 pending_requests 路由给等待者
+/// - 非响应消息广播给所有订阅者
 #[derive(Debug, Clone)]
 pub struct NetworkMessageClient {
-    stream: Arc<Mutex<TlsStream<TcpStream>>>,
+    /// 写入流 (发送请求)
+    write_stream: Arc<Mutex<WriteHalf<TlsStream<TcpStream>>>>,
     connected: Arc<AtomicBool>,
+    /// 非响应消息广播通道 (通知、同步信号等)
+    notification_tx: broadcast::Sender<BusMessage>,
+    /// 等待响应的 RPC 请求 (correlation_id -> response sender)
+    pending_requests: Arc<Mutex<HashMap<Uuid, oneshot::Sender<BusMessage>>>>,
 }
 
 impl NetworkMessageClient {
@@ -45,7 +55,11 @@ impl NetworkMessageClient {
         client_key_pem: &[u8],
         client_name: &str,
     ) -> Result<Self, crate::MessageError> {
+        use tokio::io::split;
         use tokio_rustls::TlsConnector;
+
+        // 0. 安装 aws-lc-rs CryptoProvider (FIPS 140-3)
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
         // 1. 解析 CA 证书链 (支持多个证书)
         let mut ca_reader = std::io::Cursor::new(ca_cert_pem);
@@ -96,7 +110,7 @@ impl NetworkMessageClient {
             .with_custom_certificate_verifier(Arc::new(verifier))
             .with_client_auth_cert(client_cert_chain, private_key)
             .map_err(|e| {
-                crate::MessageError::Connection(format!("Failed to build TLS config: {}", e))
+                crate::MessageError::Connection(format!("Failed to configure TLS: {}", e))
             })?;
 
         // 5. 建立 TCP 连接
@@ -104,9 +118,8 @@ impl NetworkMessageClient {
             .await
             .map_err(|e| crate::MessageError::Connection(format!("TCP connect failed: {}", e)))?;
 
-        // 6. TLS 握手 (使用任意 server_name，因为 SkipHostnameVerifier 会从证书中提取名称)
+        // 6. TLS 握手
         let connector = TlsConnector::from(Arc::new(tls_config));
-        // 任意 server_name 都可以，SkipHostnameVerifier 会从证书 SANs 中提取实际名称
         let domain = ServerName::try_from("edge-server")
             .map_err(|e| crate::MessageError::Connection(format!("Invalid domain: {}", e)))?;
 
@@ -115,12 +128,31 @@ impl NetworkMessageClient {
             .await
             .map_err(|e| crate::MessageError::Connection(format!("TLS handshake failed: {}", e)))?;
 
+        // 7. 分离读写流
+        let (read_half, write_half) = split(tls_stream);
+
+        // 8. 创建通道
+        let (notification_tx, _) = broadcast::channel(64);
+        let pending_requests: Arc<Mutex<HashMap<Uuid, oneshot::Sender<BusMessage>>>> =
+            Arc::new(Mutex::new(HashMap::new()));
+        let connected = Arc::new(AtomicBool::new(true));
+
+        // 9. 启动后台读取任务
+        let reader_pending = pending_requests.clone();
+        let reader_notify_tx = notification_tx.clone();
+        let reader_connected = connected.clone();
+        tokio::spawn(async move {
+            Self::reader_task(read_half, reader_pending, reader_notify_tx, reader_connected).await;
+        });
+
         let client = Self {
-            stream: Arc::new(Mutex::new(tls_stream)),
-            connected: Arc::new(AtomicBool::new(true)),
+            write_stream: Arc::new(Mutex::new(write_half)),
+            connected,
+            notification_tx,
+            pending_requests,
         };
 
-        // 7. 协议握手
+        // 10. 协议握手
         tracing::info!("Starting protocol handshake...");
         client.perform_handshake(client_name).await?;
         tracing::info!("Protocol handshake completed!");
@@ -128,81 +160,55 @@ impl NetworkMessageClient {
         Ok(client)
     }
 
-    /// 执行协议握手
-    async fn perform_handshake(&self, client_name: &str) -> Result<(), crate::MessageError> {
-        let handshake = BusMessage::handshake(&HandshakePayload {
-            version: PROTOCOL_VERSION,
-            client_name: Some(client_name.to_string()),
-            client_version: Some(env!("CARGO_PKG_VERSION").to_string()),
-            client_id: Some(Uuid::new_v4().to_string()),
-        });
+    /// 后台读取任务
+    async fn reader_task(
+        mut read_half: ReadHalf<TlsStream<TcpStream>>,
+        pending_requests: Arc<Mutex<HashMap<Uuid, oneshot::Sender<BusMessage>>>>,
+        notification_tx: broadcast::Sender<BusMessage>,
+        connected: Arc<AtomicBool>,
+    ) {
+        loop {
+            if !connected.load(Ordering::SeqCst) {
+                tracing::debug!("Reader task: connection closed");
+                break;
+            }
 
-        tracing::debug!("Sending handshake message...");
-        self.write_message(&handshake).await?;
-        tracing::debug!("Handshake message sent, waiting for response...");
-
-        // 等待服务器响应 (RPC 响应)
-        let response = self.read_message().await?;
-        tracing::debug!("Received response: event_type={}", response.event_type);
-
-        // 检查是否是响应消息
-        if response.event_type == shared::message::EventType::Response {
-            if let Ok(payload) = response.parse_payload::<shared::message::ResponsePayload>() {
-                if !payload.success {
-                    return Err(crate::MessageError::Connection(format!(
-                        "Handshake failed: {}",
-                        payload.message
-                    )));
+            match Self::read_message_from(&mut read_half).await {
+                Ok(msg) => {
+                    // 检查是否是 RPC 响应
+                    if let Some(correlation_id) = msg.correlation_id {
+                        let mut pending = pending_requests.lock().await;
+                        if let Some(tx) = pending.remove(&correlation_id) {
+                            // 发送给等待的 RPC 调用者
+                            let _ = tx.send(msg);
+                            continue;
+                        }
+                    }
+                    // 非响应消息，广播给订阅者
+                    let _ = notification_tx.send(msg);
                 }
-                tracing::debug!("Handshake successful: {}", payload.message);
+                Err(e) => {
+                    tracing::debug!("Reader task error: {}", e);
+                    connected.store(false, Ordering::SeqCst);
+                    break;
+                }
             }
         }
-
-        Ok(())
+        tracing::debug!("Reader task exited");
     }
 
-    /// 写入消息
-    async fn write_message(&self, msg: &BusMessage) -> Result<(), crate::MessageError> {
-        let mut guard = self.stream.lock().await;
-        let stream = &mut *guard;
-
-        // 序列化消息
-        let mut data = Vec::new();
-        data.push(msg.event_type as u8);
-        data.extend_from_slice(msg.request_id.as_bytes());
-
-        // correlation_id (16 bytes) - nil UUID if None
-        let correlation_bytes = msg.correlation_id.unwrap_or(Uuid::nil()).into_bytes();
-        data.extend_from_slice(&correlation_bytes);
-
-        data.extend_from_slice(&(msg.payload.len() as u32).to_le_bytes());
-        data.extend_from_slice(&msg.payload);
-
-        stream
-            .write_all(&data)
-            .await
-            .map_err(|e| crate::MessageError::Connection(format!("Write failed: {}", e)))?;
-
-        Ok(())
-    }
-
-    /// 读取消息
-    async fn read_message(&self) -> Result<BusMessage, crate::MessageError> {
-        use shared::message::EventType;
-        tracing::debug!("read_message: acquiring stream lock...");
-        let mut guard = self.stream.lock().await;
-        let stream = &mut *guard;
-        tracing::debug!("read_message: stream lock acquired");
-
+    /// 从读取流读取一条消息
+    async fn read_message_from(
+        stream: &mut ReadHalf<TlsStream<TcpStream>>,
+    ) -> Result<BusMessage, crate::MessageError> {
         // 读取事件类型 (1 字节)
-        tracing::debug!("read_message: reading event type...");
         let type_buf = &mut [0u8; 1];
         stream
             .read_exact(type_buf)
             .await
             .map_err(|e| crate::MessageError::Connection(format!("Read type failed: {}", e)))?;
 
-        let event_type = EventType::try_from(type_buf[0])
+        let event_type = shared::EventType::try_from(type_buf[0])
             .map_err(|_| crate::MessageError::InvalidMessage("Invalid event type".to_string()))?;
 
         // 读取 Request ID (16 字节)
@@ -251,10 +257,78 @@ impl NetworkMessageClient {
         })
     }
 
+    /// 执行协议握手
+    async fn perform_handshake(&self, client_name: &str) -> Result<(), crate::MessageError> {
+        let handshake = BusMessage::handshake(&HandshakePayload {
+            version: PROTOCOL_VERSION,
+            client_name: Some(client_name.to_string()),
+            client_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            client_id: Some(Uuid::new_v4().to_string()),
+        });
+
+        // 发送握手消息
+        tracing::debug!("Sending handshake message...");
+        self.write_message(&handshake).await?;
+        tracing::debug!("Handshake message sent, waiting for response...");
+
+        // 等待服务器响应 (使用 RPC 机制)
+        let response = self
+            .request_internal(&handshake, Duration::from_secs(10))
+            .await?;
+
+        // 检查是否是响应消息
+        if response.event_type == shared::message::EventType::Response {
+            if let Ok(payload) = response.parse_payload::<shared::message::ResponsePayload>() {
+                if !payload.success {
+                    return Err(crate::MessageError::Connection(format!(
+                        "Handshake failed: {}",
+                        payload.message
+                    )));
+                }
+                tracing::debug!("Handshake successful: {}", payload.message);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 写入消息
+    async fn write_message(&self, msg: &BusMessage) -> Result<(), crate::MessageError> {
+        let mut stream = self.write_stream.lock().await;
+
+        // 序列化消息
+        let mut data = Vec::new();
+        data.push(msg.event_type as u8);
+        data.extend_from_slice(msg.request_id.as_bytes());
+
+        // Correlation ID (16 bytes, nil if None)
+        let correlation_bytes = msg
+            .correlation_id
+            .unwrap_or(Uuid::nil())
+            .as_bytes()
+            .to_vec();
+        data.extend_from_slice(&correlation_bytes);
+
+        // Payload length (4 bytes) + payload
+        let payload_len = msg.payload.len() as u32;
+        data.extend_from_slice(&payload_len.to_le_bytes());
+        data.extend_from_slice(&msg.payload);
+
+        stream
+            .write_all(&data)
+            .await
+            .map_err(|e| crate::MessageError::Connection(format!("Write failed: {}", e)))?;
+        stream
+            .flush()
+            .await
+            .map_err(|e| crate::MessageError::Connection(format!("Flush failed: {}", e)))?;
+
+        Ok(())
+    }
+
     /// 关闭连接
     pub async fn close(&self) -> Result<(), crate::MessageError> {
         self.connected.store(false, Ordering::SeqCst);
-        // TlsStream 在 drop 时自动关闭
         Ok(())
     }
 
@@ -263,126 +337,181 @@ impl NetworkMessageClient {
         self.connected.load(Ordering::SeqCst)
     }
 
+    /// 订阅非响应消息 (通知、同步信号等)
+    ///
+    /// 返回一个 broadcast receiver，调用者可以在后台任务中循环接收消息。
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let mut rx = client.subscribe();
+    /// tokio::spawn(async move {
+    ///     while let Ok(msg) = rx.recv().await {
+    ///         match msg.event_type {
+    ///             EventType::Notification => { /* handle */ }
+    ///             EventType::Sync => { /* handle */ }
+    ///             _ => {}
+    ///         }
+    ///     }
+    /// });
+    /// ```
+    pub fn subscribe(&self) -> broadcast::Receiver<BusMessage> {
+        self.notification_tx.subscribe()
+    }
+
+    /// 内部 RPC 请求 (用于握手等内部操作)
+    async fn request_internal(
+        &self,
+        msg: &BusMessage,
+        timeout: Duration,
+    ) -> Result<BusMessage, crate::MessageError> {
+        let correlation_id = msg.request_id;
+
+        // 创建响应通道
+        let (tx, rx) = oneshot::channel();
+
+        // 注册到 pending_requests
+        {
+            let mut pending = self.pending_requests.lock().await;
+            pending.insert(correlation_id, tx);
+        }
+
+        // 等待响应 (消息已由调用者发送)
+        let result = tokio::time::timeout(timeout, rx).await;
+
+        // 清理
+        {
+            let mut pending = self.pending_requests.lock().await;
+            pending.remove(&correlation_id);
+        }
+
+        match result {
+            Ok(Ok(response)) => Ok(response),
+            Ok(Err(_)) => Err(crate::MessageError::Connection(
+                "Response channel closed".to_string(),
+            )),
+            Err(_) => Err(crate::MessageError::Timeout(format!(
+                "Request timed out after {:?}",
+                timeout
+            ))),
+        }
+    }
+
     /// 发送请求并等待响应（带超时）
     pub async fn request(
         &self,
         msg: &BusMessage,
         timeout: Duration,
     ) -> Result<BusMessage, crate::MessageError> {
-        // 检查连接状态
         if !self.is_connected() {
             return Err(crate::MessageError::Connection("Not connected".to_string()));
         }
 
-        // 生成 correlation_id 用于关联响应
         let correlation_id = msg.request_id;
 
+        // 创建响应通道
+        let (tx, rx) = oneshot::channel();
+
+        // 注册到 pending_requests
+        {
+            let mut pending = self.pending_requests.lock().await;
+            pending.insert(correlation_id, tx);
+        }
+
         // 发送请求
-        self.send(msg).await?;
+        if let Err(e) = self.write_message(msg).await {
+            // 清理
+            let mut pending = self.pending_requests.lock().await;
+            pending.remove(&correlation_id);
+            return Err(e);
+        }
 
-        // 等待响应 (带超时)
-        let response = tokio::time::timeout(timeout, async {
-            loop {
-                let received = self.recv().await?;
-                // 检查是否是当前请求的响应
-                if received.correlation_id == Some(correlation_id) {
-                    return Ok::<BusMessage, crate::MessageError>(received);
-                }
-                // 跳过不匹配的消息 (如通知)
-                tracing::debug!(
-                    "Skipping unrelated message: {:?}",
-                    received.event_type
-                );
-            }
-        })
-        .await
-        .map_err(|_| crate::MessageError::Timeout(format!(
-            "Request timed out after {:?}",
-            timeout
-        )))??;
+        // 等待响应
+        let result = tokio::time::timeout(timeout, rx).await;
 
-        Ok(response)
+        // 清理
+        {
+            let mut pending = self.pending_requests.lock().await;
+            pending.remove(&correlation_id);
+        }
+
+        match result {
+            Ok(Ok(response)) => Ok(response),
+            Ok(Err(_)) => Err(crate::MessageError::Connection(
+                "Response channel closed".to_string(),
+            )),
+            Err(_) => Err(crate::MessageError::Timeout(format!(
+                "Request timed out after {:?}",
+                timeout
+            ))),
+        }
     }
 
     /// 发送请求并等待响应（使用默认超时）
     pub async fn request_default(&self, msg: &BusMessage) -> Result<BusMessage, crate::MessageError> {
         let timeout = crate::MessageClientConfig::default().request_timeout;
         self.request(msg, timeout).await
-    }
-
-    /// 内部发送方法
-    async fn send(&self, msg: &BusMessage) -> Result<(), crate::MessageError> {
-        self.write_message(msg).await
-    }
-
-    /// 内部接收方法
-    async fn recv(&self) -> Result<BusMessage, crate::MessageError> {
-        self.read_message().await
     }
 }
 
 /// 内存消息客户端 (同进程通信)
 ///
-/// 使用 broadcast 通道实现：
-/// - send() -> broadcast::Sender::send()
-/// - recv() -> broadcast::Receiver::recv()
+/// 使用双向 broadcast 通道实现，适用于同进程的服务器-客户端通信。
+///
+/// 通道说明:
+/// - `client_tx`: 客户端 → 服务器 (发送请求)
+/// - `server_tx`: 服务器 → 客户端 (接收广播/响应)
 ///
 /// # Example
-/// ```rust
+///
+/// ```ignore
 /// use tokio::sync::broadcast;
-/// use crab_client::{MessageClient, InMemoryMessageClient};
+/// use crab_client::InMemoryMessageClient;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, _rx) = broadcast::channel(16);
-///     let client = InMemoryMessageClient::new(tx);
+/// // 创建双向通道
+/// let (client_tx, _) = broadcast::channel(16);
+/// let (server_tx, _) = broadcast::channel(16);
 ///
-///     // 发送消息
-///     let msg = shared::message::BusMessage::notification(
-///         &shared::message::NotificationPayload::info("test", "hello"),
-///     );
-///     client.send(&msg).await.unwrap();
+/// // 创建客户端
+/// let client = InMemoryMessageClient::new(client_tx.clone(), server_tx.clone());
 ///
-///     // 接收消息
-///     let received = client.recv().await.unwrap();
-/// }
+/// // 服务器端接收请求
+/// let mut server_rx = client_tx.subscribe();
+/// // 客户端接收响应
+/// let mut client_rx = server_tx.subscribe();
 /// ```
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct InMemoryMessageClient {
-    tx: Arc<broadcast::Sender<BusMessage>>,
+    /// 客户端 → 服务器
+    client_tx: broadcast::Sender<BusMessage>,
+    /// 服务器 → 客户端
+    server_tx: broadcast::Sender<BusMessage>,
 }
 
-#[allow(dead_code)]
 impl InMemoryMessageClient {
-    /// 创建连接到 MessageBus 的内存客户端
+    /// 创建内存消息客户端
+    pub fn new(
+        client_tx: broadcast::Sender<BusMessage>,
+        server_tx: broadcast::Sender<BusMessage>,
+    ) -> Self {
+        Self { client_tx, server_tx }
+    }
+
+    /// 创建内存消息客户端 (只需服务器 → 客户端通道)
     ///
-    /// # Arguments
-    /// * `sender` - MessageBus.server_tx 的克隆
-    pub fn new(sender: broadcast::Sender<BusMessage>) -> Self {
-        Self {
-            tx: Arc::new(sender),
-        }
+    /// 适用于只需要接收广播的场景
+    #[allow(dead_code)]
+    pub fn new_receiver(server_tx: broadcast::Sender<BusMessage>) -> Self {
+        let (client_tx, _) = broadcast::channel(16);
+        Self { client_tx, server_tx }
     }
 
-    /// 创建仅发送的客户端 (不接收消息)
-    pub fn sender_only(sender: broadcast::Sender<BusMessage>) -> Self {
-        Self {
-            tx: Arc::new(sender),
-        }
-    }
-
-    /// 获取发送端供其他客户端使用
-    pub fn sender(&self) -> broadcast::Sender<BusMessage> {
-        (*self.tx).clone()
-    }
-
-    /// 检查是否已连接 (内存客户端始终返回 true)
+    /// 检查是否已连接 (内存客户端始终连接)
     pub fn is_connected(&self) -> bool {
         true
     }
 
-    /// 发送请求并等待响应（带超时）
+    /// 发送请求并等待响应
     pub async fn request(
         &self,
         msg: &BusMessage,
@@ -390,26 +519,47 @@ impl InMemoryMessageClient {
     ) -> Result<BusMessage, crate::MessageError> {
         let correlation_id = msg.request_id;
 
-        // 发送请求
-        self.send(msg).await?;
+        // 订阅响应通道
+        let mut rx = self.server_tx.subscribe();
 
-        // 等待响应 (带超时)
+        // 发送请求
+        self.client_tx
+            .send(msg.clone())
+            .map_err(|e| crate::MessageError::Connection(e.to_string()))?;
+
+        // 等待响应
         let response = tokio::time::timeout(timeout, async {
-            let mut rx = self.tx.subscribe();
             loop {
-                let received = rx.recv().await?;
+                let received = rx.recv().await.map_err(|e: broadcast::error::RecvError| {
+                    crate::MessageError::Connection(e.to_string())
+                })?;
                 if received.correlation_id == Some(correlation_id) {
                     return Ok::<BusMessage, crate::MessageError>(received);
                 }
             }
         })
         .await
-        .map_err(|_| crate::MessageError::Timeout(format!(
-            "Request timed out after {:?}",
-            timeout
-        )))??;
+        .map_err(|_| {
+            crate::MessageError::Timeout(format!("Request timed out after {:?}", timeout))
+        })??;
 
         Ok(response)
+    }
+
+    /// 发送消息 (不等待响应)
+    pub fn send(&self, msg: &BusMessage) -> Result<(), crate::MessageError> {
+        self.client_tx
+            .send(msg.clone())
+            .map_err(|e| crate::MessageError::Connection(e.to_string()))?;
+        Ok(())
+    }
+
+    /// 接收一条服务器消息
+    pub async fn recv(&self) -> Result<BusMessage, crate::MessageError> {
+        let mut rx = self.server_tx.subscribe();
+        rx.recv().await.map_err(|e: broadcast::error::RecvError| {
+            crate::MessageError::Connection(e.to_string())
+        })
     }
 
     /// 发送请求并等待响应（使用默认超时）
@@ -418,20 +568,22 @@ impl InMemoryMessageClient {
         self.request(msg, timeout).await
     }
 
-    /// 内部发送方法
-    async fn send(&self, msg: &BusMessage) -> Result<(), crate::MessageError> {
-        self.tx
-            .send(msg.clone())
-            .map_err(|e| crate::MessageError::Connection(e.to_string()))?;
-        Ok(())
+    /// 订阅服务器消息
+    ///
+    /// 返回一个 broadcast receiver，调用者可以在后台任务中循环接收消息。
+    pub fn subscribe(&self) -> broadcast::Receiver<BusMessage> {
+        self.server_tx.subscribe()
     }
 
-    /// 内部接收方法
-    async fn recv(&self) -> Result<BusMessage, crate::MessageError> {
-        let mut rx = self.tx.subscribe();
-        rx.recv().await.map_err(|e: broadcast::error::RecvError| {
-            crate::MessageError::Connection(e.to_string())
-        })
+    /// 创建内存消息客户端 (别名方法)
+    ///
+    /// 等同于 `new()`，保持向后兼容
+    #[allow(dead_code)]
+    pub fn with_channels(
+        client_tx: broadcast::Sender<BusMessage>,
+        server_tx: broadcast::Sender<BusMessage>,
+    ) -> Self {
+        Self::new(client_tx, server_tx)
     }
 }
 
@@ -443,14 +595,15 @@ mod tests {
     #[tokio::test]
     async fn test_in_memory_client_is_connected() {
         let (tx, _rx) = broadcast::channel(16);
-        let client = InMemoryMessageClient::new(tx);
+        let client = InMemoryMessageClient::new(tx.clone(), tx);
         assert!(client.is_connected());
     }
 
     #[tokio::test]
     async fn test_in_memory_client_request_timeout() {
-        let (tx, _rx) = broadcast::channel(16);
-        let client = InMemoryMessageClient::new(tx);
+        let (client_tx, _) = broadcast::channel(16);
+        let (server_tx, _) = broadcast::channel(16);
+        let client = InMemoryMessageClient::new(client_tx, server_tx);
 
         let request = BusMessage::request_command(&shared::message::RequestCommandPayload {
             action: "test".to_string(),
