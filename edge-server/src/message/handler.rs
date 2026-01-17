@@ -1,12 +1,7 @@
 //! 服务端消息处理器
 //!
-//! MessageHandler 订阅消息总线并处理业务逻辑相关的消息（如日志记录、数据库更新等）。
-//!
-//! 功能特性：
-//! - ACID 事务支持
-//! - 指数退避的自动重试机制
-//! - 幂等性检查
-//! - 失败消息的死信队列
+//! MessageHandler 订阅消息总线并处理业务逻辑相关的消息。
+//! 针对 1-3 客户端场景简化设计，移除重试和死信队列。
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,15 +14,10 @@ use crate::utils::AppError;
 
 use crate::core::ServerState;
 
-/// 具备 ACID 保证的服务端消息处理器
+/// 服务端消息处理器
 ///
 /// 该处理器在后台运行，处理发布到总线的所有消息，执行服务端业务逻辑。
-///
-/// 特性：
-/// - 针对不同消息类型的可插拔处理器
-/// - 指数退避自动重试
-/// - 永久失败消息的死信队列
-/// - 幂等性支持
+/// 针对 1-3 客户端场景简化，失败时仅记录日志。
 pub struct MessageHandler {
     receiver: broadcast::Receiver<BusMessage>,
     broadcast_tx: Option<broadcast::Sender<BusMessage>>,
@@ -113,163 +103,92 @@ impl MessageHandler {
         tracing::info!("Message handler stopped");
     }
 
-    /// 带有重试逻辑的消息处理
+    /// 消息处理 (简化版，无重试)
     async fn handle_message(&mut self, msg: &BusMessage) -> Result<(), Box<dyn std::error::Error>> {
         let event_type = msg.event_type;
 
         // 检查是否有注册该事件类型的处理器
         if let Some(processor) = self.processors.get(&event_type) {
-            self.process_with_retry(msg, processor.clone()).await?;
+            self.process_message(msg, processor.clone()).await?;
         } else {
-            // 对未注册类型的降级处理
             self.handle_legacy(msg).await?;
         }
 
         Ok(())
     }
 
-    /// 自动重试的消息处理流程
-    async fn process_with_retry(
+    /// 简化的消息处理 (无重试，失败仅记录日志)
+    async fn process_message(
         &self,
         msg: &BusMessage,
         processor: Arc<dyn MessageProcessor>,
     ) -> Result<(), AppError> {
-        let max_retries = processor.max_retries();
-        let base_delay = processor.retry_delay_ms();
-        let mut retry_count = 0;
+        match processor.process(msg).await {
+            Ok(result) => match result {
+                ProcessResult::Success {
+                    message: success_msg,
+                    payload,
+                } => {
+                    tracing::debug!(
+                        event_type = ?msg.event_type,
+                        result = %success_msg,
+                        "Message processed"
+                    );
 
-        loop {
-            match processor.process(msg).await {
-                Ok(result) => match result {
-                    ProcessResult::Success {
-                        message: success_msg,
-                        payload,
-                    } => {
-                        tracing::info!(
-                            event_type = ?msg.event_type,
-                            result = %success_msg,
-                            "Message processed successfully"
-                        );
+                    // 发送响应给客户端
+                    if let (Some(source), Some(broadcast_tx)) = (&msg.source, &self.broadcast_tx) {
+                        let response_payload =
+                            shared::message::ResponsePayload::success(success_msg, payload);
 
-                        // If message is from a client, send Ack/Result
-                        if let (Some(source), Some(broadcast_tx)) =
-                            (&msg.source, &self.broadcast_tx)
-                        {
-                            let response_payload =
-                                shared::message::ResponsePayload::success(success_msg, payload);
+                        let mut ack_msg = BusMessage::response(&response_payload);
+                        ack_msg.correlation_id = Some(msg.request_id);
+                        ack_msg.target = Some(source.clone());
 
-                            let mut ack_msg = BusMessage::response(&response_payload);
-                            ack_msg.correlation_id = Some(msg.request_id);
-                            ack_msg.target = Some(source.clone());
-
-                            // Send result (MessageBus will handle unicast routing based on target)
-                            if let Err(e) = broadcast_tx.send(ack_msg) {
-                                tracing::warn!("Failed to send Ack: {}", e);
-                            }
+                        if let Err(e) = broadcast_tx.send(ack_msg) {
+                            tracing::warn!("Failed to send response: {}", e);
                         }
-
-                        return Ok(());
                     }
-                    ProcessResult::Skipped { reason } => {
-                        tracing::info!(
-                            event_type = ?msg.event_type,
-                            reason = %reason,
-                            "Message skipped"
-                        );
-                        return Ok(());
+                    Ok(())
+                }
+                ProcessResult::Skipped { reason } => {
+                    tracing::debug!(event_type = ?msg.event_type, reason = %reason, "Skipped");
+                    Ok(())
+                }
+                ProcessResult::Failed { reason } => {
+                    tracing::error!(
+                        event_type = ?msg.event_type,
+                        reason = %reason,
+                        "Processing failed"
+                    );
+
+                    // 发送错误响应
+                    if let (Some(source), Some(broadcast_tx)) = (&msg.source, &self.broadcast_tx) {
+                        let response_payload =
+                            shared::message::ResponsePayload::error(reason.clone(), None);
+
+                        let mut ack_msg = BusMessage::response(&response_payload);
+                        ack_msg.correlation_id = Some(msg.request_id);
+                        ack_msg.target = Some(source.clone());
+
+                        let _ = broadcast_tx.send(ack_msg);
                     }
-                    ProcessResult::Failed { reason } => {
-                        tracing::error!(
-                            event_type = ?msg.event_type,
-                            reason = %reason,
-                            "Message processing failed permanently"
-                        );
-                        self.send_to_dead_letter_queue(msg, &reason).await;
-
-                        // Send error notification to client
-                        if let (Some(source), Some(broadcast_tx)) =
-                            (&msg.source, &self.broadcast_tx)
-                        {
-                            let response_payload =
-                                shared::message::ResponsePayload::error(reason.clone(), None);
-
-                            let mut ack_msg = BusMessage::response(&response_payload);
-                            ack_msg.correlation_id = Some(msg.request_id);
-                            ack_msg.target = Some(source.clone());
-
-                            if let Err(e) = broadcast_tx.send(ack_msg) {
-                                tracing::warn!("Failed to send Error Ack: {}", e);
-                            }
-                        }
-
-                        return Err(AppError::internal(format!("Processing failed: {}", reason)));
-                    }
-                    ProcessResult::Retry {
-                        reason,
-                        retry_count: _,
-                    } => {
-                        retry_count += 1;
-                        if retry_count > max_retries {
-                            tracing::error!(
-                                event_type = ?msg.event_type,
-                                retry_count = %retry_count,
-                                reason = %reason,
-                                "Max retries exceeded"
-                            );
-                            self.send_to_dead_letter_queue(msg, &reason).await;
-                            return Err(AppError::internal(format!(
-                                "Max retries exceeded: {}",
-                                reason
-                            )));
-                        }
-
-                        // 指数退避
-                        let delay = base_delay * 2_u64.pow(retry_count - 1);
-                        tracing::warn!(
-                            event_type = ?msg.event_type,
-                            retry_count = %retry_count,
-                            delay_ms = %delay,
-                            reason = %reason,
-                            "Retrying message processing"
-                        );
-                        tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
-                    }
-                },
-                Err(e) => {
-                    retry_count += 1;
-                    if retry_count > max_retries {
-                        tracing::error!(
-                            event_type = ?msg.event_type,
-                            error = %e,
-                            "Processing error, max retries exceeded"
-                        );
-                        self.send_to_dead_letter_queue(msg, &e.to_string()).await;
-                        return Err(e);
-                    }
-
-                    let delay = base_delay * 2_u64.pow(retry_count - 1);
+                    Err(AppError::internal(format!("Processing failed: {}", reason)))
+                }
+                ProcessResult::Retry { reason, .. } => {
+                    // 简化版不重试，直接记录为失败
                     tracing::warn!(
                         event_type = ?msg.event_type,
-                        retry_count = %retry_count,
-                        delay_ms = %delay,
-                        error = %e,
-                        "Processing error, retrying"
+                        reason = %reason,
+                        "Retry requested but disabled, logging as warning"
                     );
-                    tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
+                    Ok(())
                 }
+            },
+            Err(e) => {
+                tracing::error!(event_type = ?msg.event_type, error = %e, "Processing error");
+                Err(e)
             }
         }
-    }
-
-    /// 发送失败消息到死信队列
-    /// 死信队列处理 (仅记录日志，持久化由 RequestStore 自动处理)
-    async fn send_to_dead_letter_queue(&self, msg: &BusMessage, reason: &str) {
-        tracing::error!(
-            event_type = ?msg.event_type,
-            reason = %reason,
-            payload_len = %msg.payload.len(),
-            "Message sent to dead letter queue"
-        );
     }
 
     /// 未注册消息类型的遗留处理逻辑

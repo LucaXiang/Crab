@@ -1341,6 +1341,7 @@ dependencies = [
  "rustls",
  "rustls-pemfile",
  "rustls-pki-types",
+ "rustls-webpki",
  "serde",
  "serde_json",
  "sha2",
@@ -1348,6 +1349,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.17",
  "time",
+ "tokio-rustls",
  "tracing",
  "x509-parser",
 ]
@@ -1380,6 +1382,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-util",
+ "tower",
  "tracing",
  "tracing-subscriber",
  "tui-input",

@@ -3,7 +3,13 @@ name = "crab-client"
 version.workspace = true
 edition.workspace = true
 
+[features]
+default = []
+in-process = ["tower"]
+
 [dependencies]
+# Tower (optional, for in-process client)
+tower = { workspace = true, optional = true }
 # Workspace crates
 shared.workspace = true
 crab-cert.workspace = true

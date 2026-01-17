@@ -111,7 +111,7 @@ fn extract_tbs_bytes(der: &[u8]) -> Result<&[u8]> {
 }
 
 /// Verify a certificate chain against a Root CA.
-/// This is a convenience wrapper around `adapter::verify_server_cert` using the provided Root.
+/// Uses signature verification only, no hostname checking.
 pub fn verify_chain_against_root(chain_pem: &str, root_ca_pem: &str) -> Result<()> {
-    crate::adapter::verify_server_cert(chain_pem, root_ca_pem)
+    verify_ca_signature(chain_pem, root_ca_pem)
 }

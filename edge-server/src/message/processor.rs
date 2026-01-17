@@ -33,16 +33,6 @@ pub trait MessageProcessor: Send + Sync {
 
     /// 处理消息
     async fn process(&self, msg: &BusMessage) -> Result<ProcessResult, AppError>;
-
-    /// 最大重试次数 (默认: 3)
-    fn max_retries(&self) -> u32 {
-        3
-    }
-
-    /// 重试延迟 (毫秒, 默认: 1000)
-    fn retry_delay_ms(&self) -> u64 {
-        1000
-    }
 }
 
 /// 通知消息处理器

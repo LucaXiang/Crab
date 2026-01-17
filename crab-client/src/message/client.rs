@@ -95,6 +95,13 @@ impl MessageClient {
                             });
                         }
 
+                        // 检查root store是否为空
+                        if root_store.len() == 0 {
+                            return Err(MessageError::Connection(
+                                "No valid CA certificates found".to_string(),
+                            ));
+                        }
+
                         let verifier =
                             std::sync::Arc::new(crab_cert::SkipHostnameVerifier::new(root_store));
 

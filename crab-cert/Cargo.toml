@@ -13,6 +13,8 @@ pem.workspace = true
 rustls.workspace = true
 rustls-pemfile.workspace = true
 rustls-pki-types.workspace = true
+tokio-rustls.workspace = true
+rustls-webpki.workspace = true
 
 # Cryptography
 sha2.workspace = true

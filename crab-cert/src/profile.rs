@@ -143,12 +143,18 @@ pub(crate) fn create_ca_params(profile: &CaProfile) -> CertificateParams {
     dn.push(DnType::OrganizationName, &profile.organization);
     params.distinguished_name = dn;
 
-    params.is_ca = IsCa::Ca(BasicConstraints::Constrained(profile.path_len.unwrap_or(0)));
-    params.key_usages = vec![
-        KeyUsagePurpose::KeyCertSign,
-        KeyUsagePurpose::CrlSign,
-        KeyUsagePurpose::DigitalSignature,
-    ];
+    // Set CA flag based on profile type - only intermediate/root CAs should be CA
+    // 简单修复：所有终端证书设为非CA，CA证书按需处理
+    let is_leaf_cert = profile.common_name.starts_with("edge-")
+        || profile.common_name.starts_with("server-")
+        || profile.common_name.starts_with("client-");
+
+    params.is_ca = if is_leaf_cert {
+        IsCa::NoCa
+    } else {
+        IsCa::Ca(BasicConstraints::Unconstrained)
+    };
+    params.key_usages = vec![KeyUsagePurpose::DigitalSignature];
 
     // Set validity
     let now = OffsetDateTime::now_utc();

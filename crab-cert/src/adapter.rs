@@ -14,16 +14,29 @@ pub fn to_identity_pem(cert_pem: &str, key_pem: &str) -> String {
 pub fn load_root_store(ca_pem: &str) -> CertResult<rustls::RootCertStore> {
     let mut root_store = rustls::RootCertStore::empty();
     let mut reader = std::io::BufReader::new(ca_pem.as_bytes());
+
+    let mut cert_count = 0;
     for cert in rustls_pemfile::certs(&mut reader) {
         match cert {
             Ok(c) => {
                 root_store.add(c).map_err(|e| {
                     CertError::Tls(format!("Failed to add certificate to root store: {}", e))
                 })?;
+                cert_count += 1;
             }
-            Err(e) => return Err(CertError::Io(e)),
+            Err(e) => {
+                tracing::warn!("Failed to parse certificate from PEM: {}", e);
+                return Err(CertError::Io(e));
+            }
         }
     }
+
+    if cert_count == 0 {
+        return Err(CertError::ValidationFailed(
+            "No valid certificates found in PEM data".to_string(),
+        ));
+    }
+
     Ok(root_store)
 }
 
@@ -45,7 +58,7 @@ impl SkipHostnameVerifier {
     pub fn new(root_store: rustls::RootCertStore) -> Self {
         let verifier = rustls::client::WebPkiServerVerifier::builder(Arc::new(root_store))
             .build()
-            .unwrap();
+            .expect("Failed to create WebPkiServerVerifier - root store must contain at least one certificate");
         Self { verifier }
     }
 }
@@ -175,8 +188,8 @@ pub fn verify_server_cert(cert_pem: &str, ca_pem: &str) -> CertResult<()> {
         ));
     }
 
-    // Dummy server name, will be ignored/replaced by SkipHostnameVerifier
-    let server_name = ServerName::try_from("example.com").unwrap();
+    // Use localhost as placeholder - SkipHostnameVerifier will ignore hostname verification
+    let server_name = ServerName::try_from("localhost").expect("localhost is valid");
 
     verifier
         .verify_server_cert(
@@ -221,7 +234,7 @@ mod tests {
     #[test]
     fn test_skip_hostname_verifier() {
         // Install crypto provider for tests
-        let _ = rustls::crypto::ring::default_provider().install_default();
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
         // 1. Create Root CA
         let root_profile = CaProfile {
@@ -231,11 +244,16 @@ mod tests {
             key_type: KeyType::P256,
             ..Default::default()
         };
-        let root_ca = CertificateAuthority::new_root(root_profile).unwrap();
-
+        let root_ca =
+            CertificateAuthority::new_root(root_profile).expect("Failed to create root CA");
         let mut root_store = rustls::RootCertStore::empty();
-        for cert in to_rustls_certs(root_ca.cert_pem()).unwrap() {
-            root_store.add(cert).unwrap();
+
+        let certs =
+            to_rustls_certs(root_ca.cert_pem()).expect("Failed to parse root CA certificates");
+        for cert in certs {
+            root_store
+                .add(cert)
+                .expect("Failed to add root CA certificate to store");
         }
 
         // 2. Create Server Cert with a specific name "valid.com"

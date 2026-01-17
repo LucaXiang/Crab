@@ -43,14 +43,6 @@ pub struct Config {
     pub request_timeout_ms: u64,
     /// 关闭超时时间 (毫秒)
     pub shutdown_timeout_ms: u64,
-    /// 是否启用多租户支持
-    pub enable_multi_tenant: bool,
-    /// 是否启用资源配额
-    pub enable_resource_quota: bool,
-    /// 是否启用审计日志
-    pub enable_audit_log: bool,
-    /// 是否启用指标监控
-    pub enable_metrics: bool,
 }
 
 impl Config {
@@ -86,22 +78,6 @@ impl Config {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(10000),
-            enable_multi_tenant: std::env::var("ENABLE_MULTI_TENANT")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(true),
-            enable_resource_quota: std::env::var("ENABLE_RESOURCE_QUOTA")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(true),
-            enable_audit_log: std::env::var("ENABLE_AUDIT_LOG")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(true),
-            enable_metrics: std::env::var("ENABLE_METRICS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(true),
         }
     }
 

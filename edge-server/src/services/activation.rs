@@ -104,14 +104,14 @@ impl ActivationService {
         // 2. Perform boot self-check
         tracing::info!("Performing boot self-check...");
         if let Err(e) = cert_service.self_check().await {
-            tracing::error!(
-                "Boot self-check failed: {}. Cleaning up certificates and waiting for reactivation.",
+            tracing::warn!(
+                "Boot self-check failed: {}. Will continue with degraded operation.",
                 e
             );
 
-            // 清理旧的证书文件
+            // 清理损坏的证书，程序继续运行
             if let Err(cleanup_error) = cert_service.cleanup_certificates().await {
-                tracing::error!("Failed to cleanup certificates: {}", cleanup_error);
+                tracing::warn!("Failed to cleanup certificates: {}", cleanup_error);
             }
 
             // 清空缓存，强制重新激活
@@ -120,8 +120,8 @@ impl ActivationService {
                 *cache = None;
             }
 
-            tracing::error!(
-                "Certificate validation failed. Server is now waiting for reactivation."
+            tracing::warn!(
+                "Certificate validation failed. Continuing operation - will download fresh certificates when needed."
             );
             tracing::error!("Please check certificate validity and hardware binding.");
 

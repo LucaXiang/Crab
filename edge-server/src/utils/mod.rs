@@ -4,9 +4,8 @@
 //!
 //! - [`AppError`] - 应用错误类型
 //! - [`AppResponse`] - API 响应结构
-//! - 日志、审计等工具
+//! - 日志等工具
 
-pub mod audit;
 pub mod logger;
 pub mod result;
 pub mod types;

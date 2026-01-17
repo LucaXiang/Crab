@@ -53,21 +53,30 @@ impl CertService {
             )));
         }
 
-        let root_ca_pem = resp
-            .text()
+        // 解析JSON响应，提取PEM内容
+        let json_response: serde_json::Value = resp
+            .json()
             .await
-            .map_err(|e| AppError::internal(format!("Failed to read root CA: {}", e)))?;
+            .map_err(|e| AppError::internal(format!("Failed to parse root CA JSON: {}", e)))?;
+
+        // 提取root_ca_cert字段
+        let root_ca_pem = json_response
+            .get("root_ca_cert")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AppError::internal("Response missing root_ca_cert field".to_string()))?;
 
         // 验证 Root CA 格式
         if !root_ca_pem.contains("BEGIN CERTIFICATE") {
-            return Err(AppError::validation("Invalid root CA format"));
+            return Err(AppError::validation(
+                "Invalid root CA format in JSON response",
+            ));
         }
 
         // 保存 Root CA
-        self.save_root_ca(&root_ca_pem).await?;
+        self.save_root_ca(root_ca_pem).await?;
 
         tracing::info!("✅ Root CA downloaded and saved successfully");
-        Ok(root_ca_pem)
+        Ok(root_ca_pem.to_string())
     }
 
     /// 验证证书链 (Root CA -> Tenant CA -> Edge Cert)

@@ -1,6 +1,4 @@
-//! 健康检查和指标路由
-//!
-//! 为 SaaS 部署提供全面的健康监控。
+//! 健康检查路由
 //!
 //! # 路由列表
 //!
@@ -8,7 +6,6 @@
 //! |------|------|------|------|
 //! | /health | GET | 简单健康检查 | 无 |
 //! | /health/detailed | GET | 详细健康检查 | 无 |
-//! | /metrics | GET | Prometheus 指标 | 无 |
 //!
 //! # 响应示例
 //!
@@ -23,7 +20,7 @@
 
 use axum::{Json, Router, extract::State, routing::get};
 use serde::Serialize;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 use crate::core::ServerState;
 use crate::services::credential::Subscription;
@@ -33,7 +30,6 @@ pub fn router() -> Router<ServerState> {
     Router::new()
         .route("/health", get(health))
         .route("/health/detailed", get(detailed_health))
-        .route("/metrics", get(metrics))
 }
 
 /// 简单健康检查响应
@@ -113,25 +109,7 @@ impl CheckResult {
     }
 }
 
-#[derive(Serialize)]
-pub struct MetricsResponse {
-    timestamp: u64,
-    server: ServerMetrics,
-    connections: ConnectionMetrics,
-}
 
-#[derive(Serialize)]
-pub struct ServerMetrics {
-    version: &'static str,
-    uptime_seconds: u64,
-    environment: String,
-}
-
-#[derive(Serialize)]
-pub struct ConnectionMetrics {
-    active_connections: u32,
-    message_bus_subscribers: u32,
-}
 
 // 服务器启动时间 (懒加载静态变量)
 static START_TIME: std::sync::OnceLock<SystemTime> = std::sync::OnceLock::new();
@@ -144,12 +122,7 @@ fn get_uptime_seconds() -> u64 {
         .unwrap_or(0)
 }
 
-fn current_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
+
 
 /// 基础健康检查
 ///
@@ -204,22 +177,4 @@ pub async fn detailed_health(State(state): State<ServerState>) -> Json<DetailedH
     })
 }
 
-/// 兼容 Prometheus 的指标端点
-pub async fn metrics(State(state): State<ServerState>) -> Json<MetricsResponse> {
-    // 获取消息总线订阅者数量
-    let bus = state.message_bus();
-    let subscriber_count = bus.sender().receiver_count() as u32;
 
-    Json(MetricsResponse {
-        timestamp: current_timestamp(),
-        server: ServerMetrics {
-            version: env!("CARGO_PKG_VERSION"),
-            uptime_seconds: get_uptime_seconds(),
-            environment: "edge".to_string(), // 边缘节点
-        },
-        connections: ConnectionMetrics {
-            active_connections: 0, // 边缘场景简化
-            message_bus_subscribers: subscriber_count,
-        },
-    })
-}

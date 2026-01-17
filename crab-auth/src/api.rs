@@ -201,7 +201,7 @@ async fn issue_cert(
         "cert": full_cert_chain, // Contains Leaf + Intermediate (for Server)
         "key": key,
         "tenant_ca_cert": tenant_ca.cert_pem(), // For verifying clients (Trust Anchor)
-        "root_ca_cert": root_ca.cert_pem(),      // Global Trust Anchor
+        "root_ca_cert": root_ca.cert_pem(),      // Global Trust Anchor (PEM format)
         "identity_token": identity_token         // Long-lived token for verification
     }))
 }

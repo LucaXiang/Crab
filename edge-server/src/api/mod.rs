@@ -6,9 +6,7 @@
 //! - [`auth`] - 认证相关接口
 //! - [`role`] - 角色管理接口
 //! - [`upload`] - 文件上传接口
-//! - [`audit`] - 审计日志接口
 
-pub mod audit;
 pub mod auth;
 pub mod health;
 pub mod role;

@@ -20,13 +20,11 @@
 //! ├── api/           # HTTP 路由和处理器
 //! ├── utils/         # 工具函数
 //! ├── db/            # 数据库层
-//! ├── client/        # 客户端 SDK
 //! └── message/       # 消息总线
 //! ```
 
 pub mod api;
 pub mod auth;
-pub mod client;
 pub mod core;
 pub mod db;
 pub mod message;
@@ -35,8 +33,6 @@ pub mod utils;
 
 // Re-export 公共类型
 pub use auth::{CurrentUser, JwtService};
-pub use client::{ClientInner, CrabClient, MessageClient, Oneshot};
-pub use client::{CurrentUserResponse, LoginResponse, UserInfo};
 pub use core::{Config, Server, ServerState};
 pub use message::{BusMessage, EventType};
 pub use utils::AppError as AppErrorType;
@@ -67,28 +63,10 @@ macro_rules! ok {
     };
 }
 
-// Audit logging macro - 3参数版本: category, action, target_id
+// Audit logging macro - 空操作 (1-3 客户端场景不需要审计)
 #[macro_export]
 macro_rules! audit_log {
-    ($category:expr, $action:expr, $target_id:expr) => {
-        tracing::info!(
-            target: "audit",
-            category = $category,
-            action = $action,
-            target_id = $target_id,
-            "Audit log"
-        );
-    };
-    ($category:expr, $action:expr, $target_id:expr, $description:expr) => {
-        tracing::info!(
-            target: "audit",
-            category = $category,
-            action = $action,
-            target_id = $target_id,
-            description = $description,
-            "Audit log"
-        );
-    };
+    ($($arg:tt)*) => {};
 }
 
 // Security logging macro - 支持 tracing 格式说明符

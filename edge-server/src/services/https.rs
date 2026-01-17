@@ -14,7 +14,6 @@ pub fn build_app() -> Router<ServerState> {
         .merge(crate::api::auth::router())
         .merge(crate::api::health::router())
         .merge(crate::api::role::router())
-        .merge(crate::api::audit::router())
         .merge(crate::api::upload::router())
     // 认证中间件在 individual routes 中通过 .layer() 添加
 }

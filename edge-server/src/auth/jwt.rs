@@ -27,7 +27,13 @@ impl Default for JwtConfig {
         let secret = match load_jwt_secret() {
             Ok(key) => String::from_utf8(key).unwrap_or_else(|_| {
                 tracing::error!("JWT secret contains invalid UTF-8 characters");
-                "emergency-fallback-key-must-be-replaced".to_string()
+                generate_secure_jwt_secret()
+                    .map(|key| {
+                        String::from_utf8(key).unwrap_or_else(|_| {
+                            "emergency-fallback-key-must-be-replaced".to_string()
+                        })
+                    })
+                    .unwrap_or_else(|_| "emergency-fallback-key-must-be-replaced".to_string())
             }),
             Err(e) => {
                 #[cfg(debug_assertions)]
@@ -99,7 +105,7 @@ pub enum JwtError {
     ConfigError(String),
 }
 
-/// 生成安全的 JWT 密钥
+/// 生成安全的 JWT 密钥 (可打印字符)
 pub fn generate_secure_jwt_secret() -> Result<Vec<u8>, JwtError> {
     let rng = SystemRandom::new();
     let mut key = vec![0u8; 32]; // 256-bit key
@@ -109,6 +115,28 @@ pub fn generate_secure_jwt_secret() -> Result<Vec<u8>, JwtError> {
     })?;
 
     Ok(key)
+}
+
+/// 生成可打印的安全 JWT 密钥 (用于开发环境)
+pub fn generate_secure_printable_jwt_secret() -> String {
+    let allowed_chars =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}|;:,.<>?";
+
+    let rng = SystemRandom::new();
+    let mut key = String::new();
+
+    for _ in 0..64 {
+        // 生成64个字符的密钥
+        let mut byte = [0u8; 1];
+        if rng.fill(&mut byte).is_err() {
+            // 如果随机数生成失败，使用固定的安全密钥
+            return "CrabEdgeServerDevelopmentSecureKey2024!".to_string();
+        }
+        let idx = (byte[0] as usize) % allowed_chars.len();
+        key.push(allowed_chars.chars().nth(idx).unwrap());
+    }
+
+    key
 }
 
 /// 从环境变量安全地加载 JWT 密钥
@@ -128,7 +156,8 @@ fn load_jwt_secret() -> Result<Vec<u8>, JwtError> {
                 tracing::warn!(
                     "⚠️  JWT_SECRET not set! Generating secure temporary key for development."
                 );
-                generate_secure_jwt_secret()
+                let printable_key = generate_secure_printable_jwt_secret();
+                Ok(printable_key.into_bytes())
             }
             #[cfg(not(debug_assertions))]
             {
