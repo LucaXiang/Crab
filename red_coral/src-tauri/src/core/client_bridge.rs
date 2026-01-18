@@ -605,6 +605,38 @@ impl ClientBridge {
 
         tracing::info!(edge_url = %edge_url, message_addr = %message_addr, "Client mode connected");
 
+        // 启动消息广播订阅 (转发给前端)
+        if let Some(handle) = &self.app_handle {
+            if let Some(mc) = connected_client.message_client() {
+                let mut rx = mc.subscribe();
+                let handle_clone = handle.clone();
+
+                tokio::spawn(async move {
+                    loop {
+                        match rx.recv().await {
+                            Ok(msg) => {
+                                // NetworkMessageClient returns BusMessage
+                                // Convert to ServerMessageEvent using From impl
+                                let event = crate::events::ServerMessageEvent::from(msg);
+                                if let Err(e) = handle_clone.emit("server-message", &event) {
+                                    tracing::warn!("Failed to emit server message: {}", e);
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                tracing::warn!("Client message listener lagged {} messages", n);
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                tracing::debug!("Client message channel closed");
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                tracing::info!("Client message listener started");
+            }
+        }
+
         // 保存 Remote client 到 ClientMode::Client
         *mode_guard = ClientMode::Client {
             client: Some(RemoteClientState::Connected(connected_client)),
