@@ -6,6 +6,7 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use tauri::Emitter;
 use thiserror::Error;
 use tokio::sync::RwLock;
 
@@ -491,6 +492,34 @@ impl ClientBridge {
         let message_bus = state_arc.message_bus();
         let client_tx = message_bus.sender_to_server().clone();
         let server_tx = message_bus.sender().clone();
+
+        // 启动消息广播订阅 (转发给前端)
+        if let Some(handle) = &self.app_handle {
+            let mut server_rx = message_bus.subscribe();
+            let handle_clone = handle.clone();
+
+            tokio::spawn(async move {
+                loop {
+                    match server_rx.recv().await {
+                        Ok(msg) => {
+                            let event = crate::events::ServerMessageEvent::from(msg);
+                            if let Err(e) = handle_clone.emit("server-message", &event) {
+                                tracing::warn!("Failed to emit server message: {}", e);
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            tracing::warn!("Server message listener lagged {} messages", n);
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                            tracing::debug!("Server message channel closed");
+                            break;
+                        }
+                    }
+                }
+            });
+
+            tracing::info!("Server message listener started");
+        }
 
         // 创建 CrabClient<Local>
         let client = CrabClient::local()
