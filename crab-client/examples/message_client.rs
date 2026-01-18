@@ -12,12 +12,14 @@
 //!
 //! 运行: cargo run -p crab-client --example message_client
 
+use crab_client::{
+    Authenticated, BusMessage, CertManager, Connected, CrabClient, NetworkMessageClient, Remote,
+};
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use crab_client::{BusMessage, CertManager, CrabClient, NetworkMessageClient, Remote, Connected, Authenticated};
 use ratatui::{prelude::*, widgets::*};
 use std::io::{self, Stdout};
 use std::sync::Arc;
@@ -126,7 +128,9 @@ fn spawn_notification_listener(client: &NetworkMessageClient) {
                     // 根据消息类型显示不同的日志
                     match msg.event_type {
                         shared::EventType::Notification => {
-                            if let Ok(payload) = msg.parse_payload::<shared::message::NotificationPayload>() {
+                            if let Ok(payload) =
+                                msg.parse_payload::<shared::message::NotificationPayload>()
+                            {
                                 tracing::info!("📢 [{:?}] {}", payload.level, payload.message);
                                 if let Some(data) = payload.data {
                                     tracing::debug!("   Data: {}", data);
@@ -161,8 +165,7 @@ fn spawn_notification_listener(client: &NetworkMessageClient) {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize TUI Logger
-    let env_filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     tracing_subscriber::registry()
         .with(tui_logger::tracing_subscriber_layer())
@@ -253,6 +256,48 @@ fn format_timestamp(ts: u64) -> String {
         .single()
         .map(|dt| dt.format("%H:%M:%S").to_string())
         .unwrap_or_else(|| ts.to_string())
+}
+
+/// 确保客户端处于 Connected 状态，如果未连接则自动重连
+async fn ensure_connected(state: &Arc<RwLock<ClientState>>) -> bool {
+    let mut write_state = state.write().await;
+
+    // 如果已经是 Connected 或 Authenticated 状态，直接返回
+    match &*write_state {
+        ClientState::Connected(_) | ClientState::Authenticated(_) => return true,
+        ClientState::Disconnected => {}
+    }
+
+    tracing::info!("Auto reconnecting...");
+
+    // 重建客户端并重连
+    let new_client = match CrabClient::remote()
+        .auth_server(AUTH_SERVER)
+        .edge_server(EDGE_HTTPS)
+        .cert_path(CERT_PATH)
+        .client_name(CLIENT_NAME)
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("Failed to rebuild client: {}", e);
+            *write_state = ClientState::Disconnected;
+            return false;
+        }
+    };
+
+    match new_client.reconnect(MESSAGE_ADDR).await {
+        Ok(connected) => {
+            tracing::info!("Auto reconnected successfully!");
+            *write_state = ClientState::Connected(connected);
+            true
+        }
+        Err(e) => {
+            tracing::error!("Auto reconnect failed: {}", e);
+            *write_state = ClientState::Disconnected;
+            false
+        }
+    }
 }
 
 async fn run_app(
@@ -372,6 +417,7 @@ async fn handle_command(
 
             let client = match CrabClient::remote()
                 .auth_server(AUTH_SERVER)
+                .edge_server(EDGE_HTTPS)
                 .cert_path(CERT_PATH)
                 .client_name(CLIENT_NAME)
                 .build()
@@ -410,6 +456,7 @@ async fn handle_command(
 
             let client = match CrabClient::remote()
                 .auth_server(AUTH_SERVER)
+                .edge_server(EDGE_HTTPS)
                 .cert_path(CERT_PATH)
                 .client_name(CLIENT_NAME)
                 .build()
@@ -479,6 +526,12 @@ async fn handle_command(
             let username = parts[1];
             let password = parts[2];
 
+            // 自动确保已连接
+            if !ensure_connected(&client_state).await {
+                tracing::error!("Failed to connect. Please check credentials and certificates.");
+                return;
+            }
+
             let mut state = client_state.write().await;
             match std::mem::take(&mut *state) {
                 ClientState::Connected(client) => {
@@ -489,40 +542,15 @@ async fn handle_command(
                             tracing::info!("Login successful!");
                             app.phase = ClientPhase::Authenticated;
                             app.status.has_token = true;
-                            app.status.token_preview = token.chars().take(16).collect::<String>() + "...";
+                            app.status.token_preview =
+                                token.chars().take(16).collect::<String>() + "...";
                             *state = ClientState::Authenticated(authenticated);
                         }
                         Err(e) => {
                             tracing::error!("Login failed: {}", e);
-                            // mTLS 连接仍然有效，保持 Connected 状态
-                            // 需要重新构建 client (因为 login 消费了 self)
-                            tracing::info!("Rebuilding connection...");
-                            let new_client = match CrabClient::remote()
-                                .auth_server(AUTH_SERVER)
-                                .cert_path(CERT_PATH)
-                                .client_name(CLIENT_NAME)
-                                .build()
-                            {
-                                Ok(c) => c,
-                                Err(e) => {
-                                    tracing::error!("Failed to rebuild client: {}", e);
-                                    *state = ClientState::Disconnected;
-                                    app.phase = ClientPhase::Disconnected;
-                                    app.status.is_connected = false;
-                                    return;
-                                }
-                            };
-                            match new_client.reconnect(MESSAGE_ADDR).await {
-                                Ok(connected) => {
-                                    *state = ClientState::Connected(connected);
-                                    // 保持 Connected 状态
-                                }
-                                Err(e) => {
-                                    tracing::error!("Failed to reconnect: {}", e);
-                                    *state = ClientState::Disconnected;
-                                    app.phase = ClientPhase::Disconnected;
-                                    app.status.is_connected = false;
-                                }
+                            // 自动重连并保持 Connected 状态
+                            if ensure_connected(&client_state).await {
+                                tracing::info!("Reconnected. Please try login again.");
                             }
                         }
                     }
@@ -532,7 +560,7 @@ async fn handle_command(
                     *state = ClientState::Authenticated(client);
                 }
                 ClientState::Disconnected => {
-                    tracing::error!("Not connected. Use /reconnect first.");
+                    tracing::error!("Not connected.");
                     *state = ClientState::Disconnected;
                 }
             }
@@ -711,7 +739,10 @@ async fn handle_command(
         }
 
         _ => {
-            tracing::warn!("Unknown command: {}. Type /help for available commands.", parts[0]);
+            tracing::warn!(
+                "Unknown command: {}. Type /help for available commands.",
+                parts[0]
+            );
         }
     }
 }
@@ -730,7 +761,10 @@ async fn send_rpc(
         params,
     });
 
-    match message_client.request(&request, Duration::from_secs(5)).await {
+    match message_client
+        .request(&request, Duration::from_secs(5))
+        .await
+    {
         Ok(response) => {
             match response.parse_payload::<shared::message::ResponsePayload>() {
                 Ok(payload) => {
@@ -759,9 +793,9 @@ fn ui(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Header
-            Constraint::Min(1),     // Main (Logs + Status)
-            Constraint::Length(3),  // Input
+            Constraint::Length(3), // Header
+            Constraint::Min(1),    // Main (Logs + Status)
+            Constraint::Length(3), // Input
         ])
         .split(f.area());
 
@@ -783,11 +817,24 @@ fn ui(f: &mut Frame, app: &App) {
 
     let title = Paragraph::new(vec![Line::from(vec![
         Span::raw(" "),
-        Span::styled("Crab Message Client", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Crab Message Client",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::raw(" | "),
-        Span::styled(phase_text.0, Style::default().fg(phase_text.1).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            phase_text.0,
+            Style::default()
+                .fg(phase_text.1)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::raw(" | "),
-        Span::styled(format!("RPC: {}", app.status.rpc_count), Style::default().fg(Color::Magenta)),
+        Span::styled(
+            format!("RPC: {}", app.status.rpc_count),
+            Style::default().fg(Color::Magenta),
+        ),
     ])])
     .block(
         Block::default()
@@ -802,7 +849,11 @@ fn ui(f: &mut Frame, app: &App) {
             Block::default()
                 .title(" Logs ")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::White).add_modifier(Modifier::DIM)),
+                .border_style(
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::DIM),
+                ),
         )
         .output_separator('|')
         .output_timestamp(Some("%H:%M:%S".to_string()))
@@ -818,9 +869,9 @@ fn ui(f: &mut Frame, app: &App) {
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(6),  // Connection
-            Constraint::Length(9),  // Credential
-            Constraint::Min(1),     // Certificate & RPC
+            Constraint::Length(6), // Connection
+            Constraint::Length(9), // Credential
+            Constraint::Min(1),    // Certificate & RPC
         ])
         .split(main_chunks[1]);
 
@@ -840,7 +891,11 @@ fn ui(f: &mut Frame, app: &App) {
         Line::from(vec![
             Span::raw("Status: "),
             Span::styled(
-                if app.status.is_connected { "Connected" } else { "Disconnected" },
+                if app.status.is_connected {
+                    "Connected"
+                } else {
+                    "Disconnected"
+                },
                 conn_style,
             ),
         ]),
@@ -882,11 +937,26 @@ fn ui(f: &mut Frame, app: &App) {
     let cred_text = vec![
         Line::from(vec![
             Span::raw("Cached: "),
-            Span::styled(if app.status.has_credential { "Yes" } else { "No" }, cred_style),
+            Span::styled(
+                if app.status.has_credential {
+                    "Yes"
+                } else {
+                    "No"
+                },
+                cred_style,
+            ),
             Span::raw("  Certs: "),
             Span::styled(
-                if app.status.has_certificates { "Yes" } else { "No" },
-                if app.status.has_certificates { Style::default().fg(Color::Green) } else { Style::default().fg(Color::Red) },
+                if app.status.has_certificates {
+                    "Yes"
+                } else {
+                    "No"
+                },
+                if app.status.has_certificates {
+                    Style::default().fg(Color::Green)
+                } else {
+                    Style::default().fg(Color::Red)
+                },
             ),
         ]),
         Line::from(vec![
@@ -904,7 +974,10 @@ fn ui(f: &mut Frame, app: &App) {
         ]),
         Line::from(vec![
             Span::raw("Last:   "),
-            Span::styled(&app.status.last_verified_at, Style::default().fg(Color::Cyan)),
+            Span::styled(
+                &app.status.last_verified_at,
+                Style::default().fg(Color::Cyan),
+            ),
         ]),
     ];
     f.render_widget(Paragraph::new(cred_text).block(cred_block), right_chunks[1]);
@@ -913,8 +986,8 @@ fn ui(f: &mut Frame, app: &App) {
     let bottom_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(4),  // Certificate
-            Constraint::Min(1),     // RPC
+            Constraint::Length(4), // Certificate
+            Constraint::Min(1),    // RPC
         ])
         .split(right_chunks[2]);
 
@@ -923,13 +996,17 @@ fn ui(f: &mut Frame, app: &App) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Blue));
 
-    let cert_text = vec![
-        Line::from(vec![
-            Span::raw("Expires: "),
-            Span::styled(&app.status.cert_expires_at, Style::default().fg(Color::Yellow)),
-        ]),
-    ];
-    f.render_widget(Paragraph::new(cert_text).block(cert_block), bottom_chunks[0]);
+    let cert_text = vec![Line::from(vec![
+        Span::raw("Expires: "),
+        Span::styled(
+            &app.status.cert_expires_at,
+            Style::default().fg(Color::Yellow),
+        ),
+    ])];
+    f.render_widget(
+        Paragraph::new(cert_text).block(cert_block),
+        bottom_chunks[0],
+    );
 
     // RPC Status
     let rpc_block = Block::default()
@@ -937,7 +1014,9 @@ fn ui(f: &mut Frame, app: &App) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Green));
 
-    let rpc_style = if app.status.last_rpc_result == "OK" || app.status.last_rpc_result.starts_with("HTTP 2") {
+    let rpc_style = if app.status.last_rpc_result == "OK"
+        || app.status.last_rpc_result.starts_with("HTTP 2")
+    {
         Style::default().fg(Color::Green)
     } else if app.status.last_rpc_result.contains("Error") || app.status.last_rpc_result == "FAIL" {
         Style::default().fg(Color::Red)
@@ -945,15 +1024,17 @@ fn ui(f: &mut Frame, app: &App) {
         Style::default().fg(Color::Yellow)
     };
 
-    let rpc_text = vec![
-        Line::from(vec![
-            Span::raw("Result: "),
-            Span::styled(
-                if app.status.last_rpc_result.is_empty() { "-" } else { &app.status.last_rpc_result },
-                rpc_style,
-            ),
-        ]),
-    ];
+    let rpc_text = vec![Line::from(vec![
+        Span::raw("Result: "),
+        Span::styled(
+            if app.status.last_rpc_result.is_empty() {
+                "-"
+            } else {
+                &app.status.last_rpc_result
+            },
+            rpc_style,
+        ),
+    ])];
     f.render_widget(Paragraph::new(rpc_text).block(rpc_block), bottom_chunks[1]);
 
     // Input

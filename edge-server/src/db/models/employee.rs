@@ -38,6 +38,23 @@ impl From<Employee> for EmployeeResponse {
     }
 }
 
+/// Create employee payload
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmployeeCreate {
+    pub username: String,
+    pub password: String,
+    pub role: RoleId,
+}
+
+/// Update employee payload
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmployeeUpdate {
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub role: Option<RoleId>,
+    pub is_active: Option<bool>,
+}
+
 impl Employee {
     /// Verify password using argon2
     pub fn verify_password(&self, password: &str) -> Result<bool, argon2::password_hash::Error> {

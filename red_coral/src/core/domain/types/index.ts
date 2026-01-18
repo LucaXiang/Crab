@@ -12,8 +12,8 @@ export interface CartItem {
   id: string;
   instanceId?: string;
   originalInstanceId?: string;
-  productId: number;
-  specificationId?: number;
+  productId: string;  // SurrealDB string ID
+  specificationId?: string;  // SurrealDB string ID
   name: string;
   price: number;
   originalPrice?: number;
@@ -24,7 +24,7 @@ export interface CartItem {
   selectedSpecification?: {
     id: string;
     name: string;
-    receiptName?: string;
+    receipt_name?: string;
     price?: number;
   };
   _removed?: boolean;
@@ -36,15 +36,15 @@ export interface CartItem {
 }
 
 export interface ItemAttributeSelection {
-  attribute_id: number;
-  option_id: number;
+  attribute_id: string;  // SurrealDB string ID (attr_id)
+  option_idx: number;    // Index into attribute.options array
   name: string;
   value: string;
   price_modifier?: number;
   // Frontend display fields
   attribute_name?: string;
   attribute_receipt_name?: string | null;
-  kitchen_printer_id?: number | null;
+  kitchen_printer?: string | null;  // SurrealDB string ID
   receipt_name?: string | null;
   option_name?: string;  // Added for option name display
 }
@@ -102,7 +102,7 @@ export interface HeldOrder {
 
 export interface TimelineEvent {
   id?: string;
-  type: 'ITEM_ADDED' | 'ITEM_REMOVED' | 'QUANTITY_CHANGED' | 'NOTE_ADDED' | 'ORDER_CREATED' | 'PAYMENT_ADDED' | 'STATUS_CHANGED';
+  type: 'ITEM_ADDED' | 'ITEM_REMOVED' | 'QUANTITY_CHANGED' | 'NOTE_ADDED' | 'ORDER_CREATED' | 'PAYMENT_ADDED' | 'STATUS_CHANGED' | 'PAYMENT' | 'ORDER_SPLIT' | 'TABLE_OPENED' | 'ITEMS_ADDED' | 'ITEM_MODIFIED' | 'ITEM_RESTORED' | 'PAYMENT_CANCELLED' | 'ORDER_COMPLETED' | 'ORDER_VOIDED' | 'ORDER_RESTORED' | 'ORDER_SURCHARGE_EXEMPT_SET' | 'ORDER_MERGED' | 'ORDER_MOVED' | 'ORDER_MOVED_OUT' | 'ORDER_MERGED_OUT' | 'TABLE_REASSIGNED' | 'ORDER_INFO_UPDATED';
   timestamp: number;
   data: Record<string, unknown>;
   userId?: number;
@@ -110,7 +110,7 @@ export interface TimelineEvent {
   summary?: string;
 }
 
-export type CheckoutMode = 'retail' | 'dine-in' | 'takeout';
+export type CheckoutMode = 'retail' | 'dine-in' | 'takeout' | 'SELECT';
 export type DetailTab = 'items' | 'payments' | 'timeline';
 export interface PendingCashTx {
   id: string;
@@ -168,7 +168,9 @@ export const Permission = {
   MANAGE_ATTRIBUTES: 'manage_attributes' as Permission,
   MANAGE_SETTINGS: 'manage_settings' as Permission,
   PRINT_RECEIPTS: 'print_receipts' as Permission,
+  REPRINT_RECEIPT: 'reprint_receipt' as Permission,
   REFUND: 'refund' as Permission,
   DISCOUNT: 'discount' as Permission,
   CANCEL_ITEM: 'cancel_item' as Permission,
+  OPEN_CASH_DRAWER: 'open_cash_drawer' as Permission,
 } as const;

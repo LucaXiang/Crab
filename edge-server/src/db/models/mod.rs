@@ -1,7 +1,49 @@
 //! Database Models
 
+// Auth
 pub mod employee;
 pub mod role;
 
-pub use employee::{Employee, EmployeeId};
+// Product Domain
+pub mod tag;
+pub mod kitchen_printer;
+pub mod category;
+pub mod product;
+pub mod product_specification;
+pub mod attribute;
+
+// Location
+pub mod zone;
+pub mod dining_table;
+
+// Pricing
+pub mod price_rule;
+
+// Orders
+pub mod order;
+
+// System
+pub mod system_state;
+
+// Re-exports
+pub use employee::{Employee, EmployeeId, EmployeeCreate, EmployeeUpdate, EmployeeResponse};
 pub use role::{Role, RoleId};
+pub use tag::{Tag, TagCreate, TagUpdate};
+pub use kitchen_printer::{KitchenPrinter, KitchenPrinterCreate, KitchenPrinterUpdate};
+pub use category::{Category, CategoryCreate, CategoryUpdate};
+pub use product::{Product, ProductCreate, ProductUpdate};
+pub use product_specification::{ProductSpecification, ProductSpecificationCreate, ProductSpecificationUpdate};
+pub use attribute::{Attribute, AttributeOption, AttributeCreate, AttributeUpdate, HasAttribute};
+pub use zone::{Zone, ZoneCreate, ZoneUpdate};
+pub use dining_table::{DiningTable, DiningTableCreate, DiningTableUpdate};
+pub use price_rule::{
+    PriceRule, PriceRuleCreate, PriceRuleUpdate,
+    RuleType, ProductScope, AdjustmentType, TimeMode, ScheduleConfig,
+};
+pub use order::{
+    Order, OrderCreate, OrderStatus,
+    OrderItem, OrderItemAttribute, OrderPayment,
+    OrderEvent, OrderEventType, HasEvent,
+    OrderAddItem, OrderAddPayment,
+};
+pub use system_state::{SystemState, SystemStateUpdate};

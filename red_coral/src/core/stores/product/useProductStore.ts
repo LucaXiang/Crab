@@ -181,7 +181,7 @@ export const useProductStore = create<ProductStore>((set, get) => ({
     keysToInvalidate.forEach((key) => _productCache.delete(key));
 
     // Only add to current list if product belongs to current category
-    const categoryId = product.category_id;
+    const categoryId = product.category;
     if ((categoryId !== null && String(categoryId) === selectedCategory) || selectedCategory === 'all') {
       set((state) => ({
         products: [product, ...state.products]

@@ -1,16 +1,13 @@
+import { ItemAttributeSelection } from '@/core/domain/types';
+
 export interface GroupedAttribute {
   attributeName: string;
   optionNames: string[];
   totalPrice: number;
 }
 
-export interface ItemAttributeSelection {
-  attributeId: number;
-  optionId: number;
-  name: string;
-  value: string;
-  priceModifier?: number;
-}
+// Re-export for backward compatibility
+export type { ItemAttributeSelection };
 
 export const groupOptionsByAttribute = (options: ItemAttributeSelection[]): GroupedAttribute[] => {
   const groups: GroupedAttribute[] = [];
@@ -26,7 +23,7 @@ export const groupOptionsByAttribute = (options: ItemAttributeSelection[]): Grou
       groups.push(group);
     }
     group.optionNames.push(opt.value);
-    group.totalPrice += opt.priceModifier || 0;
+    group.totalPrice += opt.price_modifier || 0;
   });
 
   return groups;

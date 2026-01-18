@@ -75,10 +75,11 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
   // Calculate options modifier locally since we have all the data
   const optionsModifier = useMemo(() => {
     let mod = 0;
-    selections.forEach((ids, attrId) => {
+    selections.forEach((idxs, attrId) => {
       const opts = allOptions.get(attrId) || [];
-      ids.forEach(id => {
-        const opt = opts.find(o => String(o.id) === id);
+      idxs.forEach(idxStr => {
+        const idx = parseInt(idxStr, 10);
+        const opt = opts[idx];
         if (opt) mod += opt.price_modifier;
       });
     });
@@ -157,11 +158,6 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                                 {spec.is_default && !isSelected && (
                                   <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full border border-white" title={t('common.default')} />
                                 )}
-                                {spec.receipt_name && (
-                                  <div className="text-[10px] text-gray-400 truncate w-full mb-0.5">
-                                    {spec.receipt_name}
-                                  </div>
-                                )}
                                 <div className={`text-sm font-bold ${isSelected ? 'text-orange-600' : 'text-gray-700'}`}>
                                   {formatCurrency(spec.price)}
                                 </div>
@@ -181,30 +177,32 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
 
                   {/* Attribute Selectors */}
                   {hasAttributes && attributes.map((attr) => {
-                    const options = allOptions.get(attr.id) || [];
-                    const selectedOptionIds = selections.get(attr.id) || [];
-                    const binding = bindings?.find(b => b.attributeId === attr.id);
-                    
+                    const attrId = String(attr.id);
+                    const options = allOptions.get(attrId) || [];
+                    const selectedOptionIds = selections.get(attrId) || [];
+                    // binding.out is the attribute ID in HasAttribute relation
+                    const binding = bindings?.find(b => b.out === attr.id);
+
                     // Logic to find defaults for display (visual cues in AttributeSelector)
-                    // Handle both plural (new) and singular (legacy) default fields
-                    const legacyDefaultId = (binding as any)?.defaultOptionId;
-                    let defaultOptionIds = binding?.defaultOptionIds || (legacyDefaultId ? [legacyDefaultId] : []);
+                    // default_option_idx is an index into the options array
+                    const bindingDefaultIdx = binding?.default_option_idx;
+                    let defaultOptionIds = (bindingDefaultIdx !== null && bindingDefaultIdx !== undefined && bindingDefaultIdx >= 0) ? [String(bindingDefaultIdx)] : [];
 
                     // If no product-specific defaults, fallback to attribute-level defaults
                     if (defaultOptionIds.length === 0) {
                       defaultOptionIds = options
-                        .filter(opt => opt.isDefault)
-                        .map(opt => opt.id);
+                        .filter(opt => opt.is_default)
+                        .map((_, idx) => String(idx));
                     }
 
                     return (
-                      <div key={attr.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                      <div key={attrId} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
                         <AttributeSelector
                           attribute={attr}
                           options={options}
                           selectedOptionIds={selectedOptionIds}
                           defaultOptionIds={defaultOptionIds}
-                          onSelect={(optionIds) => onAttributeSelect(attr.id, optionIds)}
+                          onSelect={(optionIds) => onAttributeSelect(attrId, optionIds)}
                         />
                       </div>
                     );

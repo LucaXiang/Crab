@@ -1,21 +1,52 @@
+use crate::auth::require_auth;
 use crate::core::{Config, ServerState};
-use axum::Router;
+use axum::{middleware, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use tower::Service;
+use tower_http::compression::CompressionLayer;
+use tower_http::cors::CorsLayer;
 
 pub type OneshotResult =
     Result<http::Response<axum::body::Body>, Box<dyn std::error::Error + Send + Sync>>;
 
+/// HTTP 请求日志中间件
+async fn log_request(request: http::Request<axum::body::Body>, next: middleware::Next) -> http::Response<axum::body::Body> {
+    let method = request.method().clone();
+    let uri = request.uri().clone();
+
+    let response = next.run(request).await;
+
+    let status = response.status();
+
+    tracing::info!(target: "http_access", "{} {} {}", method, uri, status);
+
+    response
+}
+
 /// Build the Axum router (without state)
 pub fn build_app() -> Router<ServerState> {
     Router::new()
+        // Core APIs
         .merge(crate::api::auth::router())
         .merge(crate::api::health::router())
         .merge(crate::api::role::router())
         .merge(crate::api::upload::router())
-    // 认证中间件在 individual routes 中通过 .layer() 添加
+        // Data model APIs
+        .merge(crate::api::tags::router())
+        .merge(crate::api::categories::router())
+        .merge(crate::api::products::router())
+        .merge(crate::api::attributes::router())
+        .merge(crate::api::zones::router())
+        .merge(crate::api::tables::router())
+        .merge(crate::api::price_rules::router())
+        .merge(crate::api::kitchen_printers::router())
+        .merge(crate::api::employees::router())
+        .merge(crate::api::orders::router())
+        .merge(crate::api::system_state::router())
+        // JWT 认证中间件 - 在 Router 级别应用，require_auth 内部会跳过公共路由
+        .layer(axum::middleware::from_fn(require_auth))
 }
 
 #[derive(Clone, Debug)]
@@ -36,7 +67,14 @@ impl HttpsService {
     /// This should be called after ServerState is fully initialized.
     pub fn initialize(&self, state: ServerState) {
         // Build the app with state and cache it
-        let app = build_app().with_state(state);
+        let app = build_app()
+            .with_state(state)
+            // Tower HTTP 中间件
+            .layer(CorsLayer::permissive())
+            .layer(CompressionLayer::new())
+            // HTTP 请求日志中间件
+            .layer(middleware::from_fn(log_request));
+
         let mut router = self.router.write().expect("Failed to lock router");
         *router = Some(app);
     }

@@ -131,9 +131,12 @@ export const POSScreen: React.FC = () => {
 	const performanceMode = useSettingsStore((state) => state.performanceMode);
 
   // Product Options Modal State
+  // Note: Product type from backend doesn't have price - it's on ProductSpecification
+  // We include a computed basePrice from root spec
   const [optionsModalOpen, setOptionsModalOpen] = useState(false);
   const [selectedProductForOptions, setSelectedProductForOptions] = useState<{
     product: Product;
+    basePrice: number;  // Computed from root spec
     startRect?: DOMRect;
     attributes: AttributeTemplate[];
     options: Map<string, AttributeOption[]>;
@@ -248,18 +251,25 @@ export const POSScreen: React.FC = () => {
         const hasMultiSpec = product.has_multi_spec || false;
         if (hasMultiSpec) {
           try {
-            const specsResponse = await api.listProductSpecs(Number(product.id));
+            const specsResponse = await api.listProductSpecs(product.id);
             specifications = specsResponse.data?.specs || [];
           } catch (error) {
             console.error('Failed to fetch specifications:', error);
           }
         }
 
+        // Get base price from root/default spec or first spec
+        const rootSpec = specifications.find((s: any) => s.is_root || s.isRoot)
+          || specifications.find((s: any) => s.is_default || s.isDefault)
+          || specifications[0];
+        const basePrice = rootSpec?.price ?? (product as any).price ?? 0;
+
         // CASE 1: Force Detail View (e.g. Image Click)
         // If skipQuickAdd is true, we ALWAYS open the modal, regardless of whether attributes/specs exist.
         if (skipQuickAdd) {
             setSelectedProductForOptions({
                 product,
+                basePrice,
                 startRect,
                 attributes: attributes as unknown as AttributeTemplate[],
                 options: optionsMap,
@@ -292,6 +302,7 @@ export const POSScreen: React.FC = () => {
             if (!selectedDefaultSpec) {
                 setSelectedProductForOptions({
                     product,
+                    basePrice,
                     startRect,
                     attributes: attributes as unknown as AttributeTemplate[],
                     options: optionsMap,
@@ -331,8 +342,8 @@ export const POSScreen: React.FC = () => {
               const option = options[0];
               if (option) {
                 quickAddOptions.push({
-                  attribute_id: attr.id,
-                  option_id: option.id,
+                  attribute_id: String(attr.id),
+                  option_idx: 0,  // First option index
                   name: attr.name,
                   value: option.name,
                   price_modifier: option.price_modifier ?? 0,
@@ -370,6 +381,7 @@ export const POSScreen: React.FC = () => {
           // Cannot quick add -> Open Modal
           setSelectedProductForOptions({
             product,
+            basePrice,
             startRect,
             attributes: attributes as unknown as AttributeTemplate[],
             options: optionsMap,
@@ -642,7 +654,7 @@ export const POSScreen: React.FC = () => {
             setSelectedProductForOptions(null);
           }}
           productName={selectedProductForOptions.product.name}
-          basePrice={selectedProductForOptions.product.price}
+          basePrice={selectedProductForOptions.basePrice}
           attributes={selectedProductForOptions.attributes}
           allOptions={selectedProductForOptions.options}
           bindings={selectedProductForOptions.bindings}

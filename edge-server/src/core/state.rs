@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use shared::message::{BusMessage, SyncPayload};
 
 use crate::auth::JwtService;
 use crate::core::Config;
@@ -159,6 +160,31 @@ impl ServerState {
     /// 获取消息总线
     pub fn message_bus(&self) -> &Arc<crate::message::MessageBus> {
         self.message_bus.bus()
+    }
+
+    /// 广播同步消息
+    ///
+    /// 向所有连接的客户端广播资源变更通知
+    ///
+    /// # 参数
+    /// - `resource`: 资源类型 (如 "tag", "product", "category")
+    /// - `id`: 资源 ID (可选)
+    /// - `action`: 变更类型 ("created", "updated", "deleted")
+    /// - `data`: 资源数据 (deleted 时为 None)
+    pub async fn broadcast_sync<T: serde::Serialize>(
+        &self,
+        resource: &str,
+        id: Option<&str>,
+        action: &str,
+        data: Option<&T>,
+    ) {
+        let payload = SyncPayload {
+            resource: resource.to_string(),
+            id: id.map(|s| s.to_string()),
+            action: action.to_string(),
+            data: data.and_then(|d| serde_json::to_value(d).ok()),
+        };
+        let _ = self.message_bus().publish(BusMessage::sync(&payload)).await;
     }
 
     /// 获取激活服务

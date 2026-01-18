@@ -53,9 +53,9 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     const item = order.items[index];
     const instanceId = item.instanceId || `item-${index}`;
 
-    // Ensure we have a user ID if logged in
+    // Ensure we have a user ID if logged in (convert to string)
     const finalOptions = {
-      userId: options?.userId || currentUser?.id
+      userId: options?.userId || (currentUser?.id ? String(currentUser.id) : undefined)
     };
 
     // 1. Update global store (persistence)
@@ -98,9 +98,9 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     const instanceId = item.instanceId || `item-${index}`;
     const paidQty = order.paidItemQuantities?.[instanceId] || 0;
 
-    // Ensure we have a user ID if logged in
+    // Ensure we have a user ID if logged in (convert to string)
     const finalOptions = {
-      userId: options?.userId || currentUser?.id
+      userId: options?.userId || (currentUser?.id ? String(currentUser.id) : undefined)
     };
 
     // Case 1: Partially paid item - Remove unpaid portion

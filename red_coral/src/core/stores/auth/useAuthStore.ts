@@ -65,7 +65,6 @@ export const useAuthStore = create<AuthStore>()(
               uuid: userData.uuid,
               username: userData.username,
               display_name: userData.display_name,
-              password_hash: '', // 不从 API 获取密码哈希
               role_id: userData.role_id,
               avatar: userData.avatar,
               is_active: true,

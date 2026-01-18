@@ -25,16 +25,24 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
   const [tempItems, setTempItems] = useState<CartItem[]>([]);
 
   // Convert store Product to domain Product for display
-  // Note: useProducts from legacy store returns Product with categoryId
-  const domainProducts: Product[] = useMemo(() => {
-    return products.map((p): Product => ({
-      id: p.id,
+  // Note: useProducts from legacy store may have different field names (camelCase vs snake_case)
+  // Product type from backend doesn't have price - it's on ProductSpecification
+  // Use a local interface that matches what ProductCard expects
+  interface ProductForDisplay {
+    id: string;
+    name: string;
+    price?: number;
+    image?: string | null;
+    category?: string | null;
+  }
+  const domainProducts: ProductForDisplay[] = useMemo(() => {
+    return products.map((p): ProductForDisplay => ({
+      id: String(p.id),
       name: p.name,
-      price: p.price,
-      image: p.image || '',
-      category: p.categoryId || '',
-      externalId: (p as any).externalId ?? 0,
-      taxRate: 0,
+      image: p.image,
+      category: (p as any).category ?? (p as any).categoryId ?? null,
+      // Legacy store may have price computed from root spec
+      price: (p as any).price ?? 0,
     }));
   }, [products]);
 
@@ -61,19 +69,16 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     return result;
   }, [domainProducts, selectedCategoryId, searchQuery, categories]);
 
-  const handleAddProduct = (product: Product) => {
+  const handleAddProduct = (product: ProductForDisplay) => {
     // Convert domain Product to CartItem
     const newItem: CartItem = {
-      id: product.id,
+      id: String(product.id),
+      productId: String(product.id),
       name: product.name,
-      price: product.price,
-      image: product.image || '',
-      category: product.category,
+      price: product.price ?? 0,
       quantity: 1,
       instanceId: uuidv4(),
       selectedOptions: [],
-      taxRate: product.taxRate,
-      externalId: product.externalId,
     };
 
     setTempItems(prev => {
@@ -184,7 +189,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
                   {filteredProducts.map(product => (
                     <ProductCard
                       key={product.id}
-                      product={product}
+                      product={product as any}
                       onAdd={() => handleAddProduct(product)}
                     />
                   ))}

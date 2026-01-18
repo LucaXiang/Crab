@@ -14,9 +14,9 @@ interface KitchenPrinterStore {
   // Actions
   loadKitchenPrinters: () => Promise<void>;
   createKitchenPrinter: (params: { name: string; connectionType: string; connectionInfo: string; printerName?: string; description?: string }) => Promise<void>;
-  updateKitchenPrinter: (params: { id: number; name?: string; connectionType?: string; connectionInfo?: string; printerName?: string; description?: string }) => Promise<void>;
-  deleteKitchenPrinter: (id: number) => Promise<void>;
-  getKitchenPrinter: (id: number) => KitchenPrinter | undefined;
+  updateKitchenPrinter: (params: { id: string; name?: string; connectionType?: string; connectionInfo?: string; printerName?: string; description?: string }) => Promise<void>;
+  deleteKitchenPrinter: (id: string) => Promise<void>;
+  getKitchenPrinter: (id: string) => KitchenPrinter | undefined;
 }
 
 export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => ({
@@ -55,7 +55,8 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
   updateKitchenPrinter: async (params) => {
     set({ isLoading: true, error: null });
     try {
-      await api.updatePrinter(params.id, {
+      // API expects number ID - convert string to number for legacy API
+      await api.updatePrinter(parseInt(params.id, 10), {
         name: params.name || '',
         printer_name: params.printerName || '',
         description: params.description || '',
@@ -71,7 +72,8 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
   deleteKitchenPrinter: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      await api.deletePrinter(id);
+      // API expects number ID - convert string to number for legacy API
+      await api.deletePrinter(parseInt(id, 10));
       await get().loadKitchenPrinters();
     } catch (error) {
       logger.error('Failed to delete kitchen printer', error);

@@ -78,8 +78,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     // Initialize TUI Logger with Tracing
-    let env_filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,surrealdb=warn"));
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info,surrealdb=warn,http_access=trace"));
 
     tracing_subscriber::registry()
         .with(tui_logger::tracing_subscriber_layer())
@@ -120,7 +120,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::debug!("Data directory: {}", temp_dir);
 
         // 1. Start edge-server
-        let mut config = Config::with_overrides(temp_dir, 3000, 8081);
+        let mut config = Config::with_overrides(temp_dir, 9625, 9626);
         config.environment = "production".to_string();
         config.jwt.secret = "demo-secret".to_string();
         config.auth_server_url = "http://127.0.0.1:3001".to_string();
@@ -208,7 +208,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "-".to_string()
                     } else {
                         // 只显示时间部分
-                        cred.binding.last_verified_at
+                        cred.binding
+                            .last_verified_at
                             .split('T')
                             .nth(1)
                             .and_then(|t| t.split('+').next())
@@ -497,6 +498,7 @@ async fn handle_command(app: &mut App, cmd: &str) {
                     resource: resource.clone(),
                     id: Some(id.clone()),
                     action: action.clone(),
+                    data: None, // Demo 不发送实际数据
                 };
                 let msg = Message::new(shared::message::EventType::Sync, payload);
 
@@ -628,12 +630,12 @@ fn ui(f: &mut Frame, app: &App) {
         ]),
         Line::from(vec![
             Span::raw("Signed: "),
-            Span::styled(
-                if app.status.is_signed { "✓" } else { "✗" },
-                signed_style,
-            ),
+            Span::styled(if app.status.is_signed { "✓" } else { "✗" }, signed_style),
             Span::raw("  Last: "),
-            Span::styled(&app.status.last_verified_at, Style::default().fg(Color::Cyan)),
+            Span::styled(
+                &app.status.last_verified_at,
+                Style::default().fg(Color::Cyan),
+            ),
         ]),
         Line::from(vec![Span::raw("")]),
         Line::from(vec![

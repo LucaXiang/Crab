@@ -152,6 +152,29 @@ impl HttpClient for OneshotHttpClient {
         self.execute(request).await
     }
 
+    async fn put<T: DeserializeOwned, B: serde::Serialize + Sync>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> ClientResult<T> {
+        let request = self.build_request_with_body(http::Method::PUT, path, body).await?;
+        self.execute(request).await
+    }
+
+    async fn delete<T: DeserializeOwned>(&self, path: &str) -> ClientResult<T> {
+        let request = self.build_request(http::Method::DELETE, path).await;
+        self.execute(request).await
+    }
+
+    async fn delete_with_body<T: DeserializeOwned, B: serde::Serialize + Sync>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> ClientResult<T> {
+        let request = self.build_request_with_body(http::Method::DELETE, path, body).await?;
+        self.execute(request).await
+    }
+
     async fn login(&self, username: &str, password: &str) -> ClientResult<LoginResponse> {
         use shared::client::LoginRequest;
         

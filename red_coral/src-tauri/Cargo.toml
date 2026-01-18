@@ -75,6 +75,7 @@ log.workspace = true
 
 # ========== Red Coral Specific ==========
 rust_decimal = { version = "1.36", features = ["std", "serde-float"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
 bcrypt = "0.15"
 mimalloc = "0.1.48"

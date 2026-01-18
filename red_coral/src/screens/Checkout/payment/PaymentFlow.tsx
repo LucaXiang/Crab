@@ -450,7 +450,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                       </div>
                       {item.selectedOptions && item.selectedOptions.length > 0 && (
                         <div className="text-sm text-gray-500">
-                          {item.selectedOptions.map(opt => opt.optionName).join(', ')}
+                          {item.selectedOptions.map(opt => opt.option_name || opt.value).join(', ')}
                         </div>
                       )}
                       <div className="text-gray-500">{formatCurrency(item.price || 0)}</div>

@@ -71,10 +71,10 @@ function areOptionsEqual(
   if (!o1 || !o2) return false;
   if (o1.length !== o2.length) return false;
 
-  const sorted1 = [...o1].sort((a, b) => `${a.attributeId}-${a.optionId}`.localeCompare(`${b.attributeId}-${b.optionId}`));
-  const sorted2 = [...o2].sort((a, b) => `${a.attributeId}-${a.optionId}`.localeCompare(`${b.attributeId}-${b.optionId}`));
+  const sorted1 = [...o1].sort((a, b) => `${a.attribute_id}-${a.option_idx}`.localeCompare(`${b.attribute_id}-${b.option_idx}`));
+  const sorted2 = [...o2].sort((a, b) => `${a.attribute_id}-${a.option_idx}`.localeCompare(`${b.attribute_id}-${b.option_idx}`));
 
-  return sorted1.every((opt1, i) => opt1.attributeId === sorted2[i]?.attributeId && opt1.optionId === sorted2[i]?.optionId && opt1.priceModifier === sorted2[i]?.priceModifier);
+  return sorted1.every((opt1, i) => opt1.attribute_id === sorted2[i]?.attribute_id && opt1.option_idx === sorted2[i]?.option_idx && opt1.price_modifier === sorted2[i]?.price_modifier);
 }
 
 export function mergeItemsIntoList(currentItems: CartItem[], incomingItems: CartItem[]): CartItem[] {

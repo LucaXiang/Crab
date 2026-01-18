@@ -7,10 +7,19 @@ import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useLongPress } from '@/hooks/useLongPress';
 import { formatCurrency } from '@/utils/currency';
 
+/**
+ * Extended Product type with computed fields from ProductSpecification
+ * These fields are populated by the product store from the root spec
+ */
+export interface ProductWithPrice extends Product {
+  price?: number;      // From root spec
+  externalId?: number | string; // From root spec external_id
+}
+
 interface ProductCardProps {
-  product: Product;
-  onAdd: (product: Product, startRect?: DOMRect, skipQuickAdd?: boolean) => void;
-  onLongPress?: (product: Product) => void;
+  product: ProductWithPrice;
+  onAdd: (product: ProductWithPrice, startRect?: DOMRect, skipQuickAdd?: boolean) => void;
+  onLongPress?: (product: ProductWithPrice) => void;
   priority?: boolean;
 }
 
@@ -100,7 +109,7 @@ export const ProductCard = React.memo<ProductCardProps>(
           {/* Footer: Price & Tags */}
           <div className="flex items-end mt-1 w-full">
             <span className="ml-auto text-base font-bold text-rose-500 leading-none transition-transform group-active:scale-110 origin-right duration-200">
-              {formatCurrency(product.price)}
+              {formatCurrency(product.price ?? 0)}
             </span>
           </div>
         </div>
@@ -114,7 +123,7 @@ export const ProductCard = React.memo<ProductCardProps>(
   (prevProps, nextProps) => {
     return (
       prevProps.product.id === nextProps.product.id &&
-      prevProps.product.price === nextProps.product.price &&
+      (prevProps.product.price ?? 0) === (nextProps.product.price ?? 0) &&
       prevProps.product.name === nextProps.product.name &&
       prevProps.product.image === nextProps.product.image &&
       prevProps.priority === nextProps.priority

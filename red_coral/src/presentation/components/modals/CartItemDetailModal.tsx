@@ -40,7 +40,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
         try {
             const [attrData, specsResponse] = await Promise.all([
                 api.fetchProductAttributes(String(item.id)),
-                api.listProductSpecs(Number(item.id))
+                api.listProductSpecs(item.id)
             ]);
 
             if (!mounted) return;
@@ -92,7 +92,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
             item.selectedOptions?.forEach(sel => {
                 const attrKey = String(sel.attribute_id);
                 const current = initialSelections.get(attrKey) || [];
-                initialSelections.set(attrKey, [...current, String(sel.option_id)]);
+                initialSelections.set(attrKey, [...current, String(sel.option_idx)]);
             });
 
             // 2. If no selection for an attribute (and we have defaults), maybe fill?
@@ -150,7 +150,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
   const handleSave = () => {
     // Validate required attributes
     for (const attr of attributes) {
-        if (attr.type_?.includes('REQUIRED')) {
+        if (attr.attr_type?.includes('REQUIRED')) {
             const selected = selections.get(String(attr.id)) || [];
             if (selected.length === 0) {
                 toast.error(t('pos.attributeRequired', { name: attr.name }) || `Please select ${attr.name}`);
@@ -161,17 +161,18 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
 
     // Build selected options array
     const selectedOptions: ItemAttributeSelection[] = [];
-    selections.forEach((optionIds, attributeId) => {
+    selections.forEach((optionIdxs, attributeId) => {
         const attr = attributes.find(a => String(a.id) === attributeId);
         const options = allOptions.get(attributeId) || [];
 
         if (attr) {
-            optionIds.forEach(id => {
-                const opt = options.find(o => String(o.id) === id);
+            optionIdxs.forEach(idxStr => {
+                const idx = parseInt(idxStr, 10);
+                const opt = options[idx];
                 if (opt) {
                     selectedOptions.push({
-                        attribute_id: attr.id,
-                        option_id: opt.id,
+                        attribute_id: String(attr.id),
+                        option_idx: idx,
                         name: attr.name,
                         value: opt.name,
                         price_modifier: opt.price_modifier
@@ -184,16 +185,15 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     // Final safety check
     const finalQty = Math.max(1, quantity);
     const finalDisc = Math.min(100, Math.max(0, discount));
-    
+
     // Resolve specification object
-    let selectedSpecification: { id: string; name: string; receipt_name?: string } | undefined;
+    let selectedSpecification: { id: string; name: string; } | undefined;
     if (selectedSpecId) {
         const spec = specifications.find(s => String(s.id) === selectedSpecId);
         if (spec) {
             selectedSpecification = {
                 id: String(spec.id),
                 name: spec.is_root && !spec.name ? t('settings.product.specification.label.default') : spec.name,
-                receipt_name: spec.receipt_name
             };
         }
     }

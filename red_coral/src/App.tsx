@@ -16,22 +16,47 @@ import { POSScreen } from '@/screens/POS';
 import { SetupScreen } from '@/screens/Setup';
 import { TenantSelectScreen } from '@/screens/TenantSelect';
 
-// Initial route component that handles first-run detection
+// Initial route component that handles first-run detection and mode auto-start
 const InitialRoute: React.FC = () => {
-  const { isFirstRun, tenants, fetchTenants, checkFirstRun, getCurrentTenant } = useBridgeStore();
+  const {
+    isFirstRun,
+    tenants,
+    fetchTenants,
+    checkFirstRun,
+    getCurrentTenant,
+    fetchModeInfo,
+    startServerMode,
+  } = useBridgeStore();
   const [isChecking, setIsChecking] = useState(true);
   const [hasCurrentTenant, setHasCurrentTenant] = useState(false);
 
   useEffect(() => {
     const init = async () => {
-      await checkFirstRun();
+      const isFirst = await checkFirstRun();
       await fetchTenants();
       const current = await getCurrentTenant();
       setHasCurrentTenant(!!current);
+
+      // If not first run and has tenants, auto-start Server mode
+      // (Since we only support Server mode for now)
+      if (!isFirst && current) {
+        await fetchModeInfo();
+        const info = useBridgeStore.getState().modeInfo;
+        if (info?.mode === 'Disconnected') {
+          console.log('Auto-starting Server mode...');
+          try {
+            await startServerMode();
+            await fetchModeInfo();
+          } catch (err) {
+            console.error('Failed to auto-start Server mode:', err);
+          }
+        }
+      }
+
       setIsChecking(false);
     };
     init();
-  }, [checkFirstRun, fetchTenants, getCurrentTenant]);
+  }, [checkFirstRun, fetchTenants, getCurrentTenant, fetchModeInfo, startServerMode]);
 
   if (isChecking) {
     return (

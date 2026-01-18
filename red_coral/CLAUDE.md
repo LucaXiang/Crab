@@ -1,250 +1,142 @@
-# RedCoral POS - Project Guide
+# CLAUDE.md
 
-A full-stack Point of Sale (POS) application built with Tauri, React, TypeScript, and Rust.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+RedCoral POS - A full-stack Point of Sale application built with Tauri, React, TypeScript, and Rust. Part of the Crab distributed restaurant management system.
 
 ## Tech Stack
 
-- **Frontend**: React 19, TypeScript 5.8, Vite 6
-- **State Management**: Zustand 5
-- **Desktop Runtime**: Tauri 2.9 (Rust backend with SQLite)
-- **Styling**: TailwindCSS 4
-- **Charts**: Recharts
-- **Database**: SQLite (via sqlx in Rust)
+- **Frontend**: React 19, TypeScript 5.8, Vite 6, Zustand 5, TailwindCSS 4
+- **Desktop Runtime**: Tauri 2.9 (Rust backend)
+- **Database**: SurrealDB (embedded, via edge-server)
+- **Backend Integration**: Uses `edge-server` and `crab-client` workspace crates
 
 ## Project Structure
 
 ```
 red_coral/
-├── src/
-│   ├── core/                    # Core domain logic and types
-│   │   ├── domain/
-│   │   │   ├── types/          # TypeScript type definitions (must match Rust)
-│   │   │   │   ├── index.ts    # Main re-export
-│   │   │   │   ├── product.ts  # Product, Category types
-│   │   │   │   ├── cart.ts     # CartItem, HeldOrder types
-│   │   │   │   ├── table.ts    # Table, Zone, KitchenPrinter types
-│   │   │   │   ├── attribute.ts# Attribute system types
-│   │   │   │   ├── auth.ts     # User, Role, Permission types
-│   │   │   │   ├── statistics.ts # Statistics types (must match Rust)
-│   │   │   │   └── payment.ts  # Payment types
-│   │   │   └── events/         # Event sourcing types
-│   │   ├── services/           # Business logic
-│   │   │   ├── order/          # Order processing, event sourcing
-│   │   │   └── pricing/        # Price calculations
-│   │   └── stores/             # Zustand stores (core/legacy)
-│   │       ├── auth/
-│   │       ├── cart/
-│   │       ├── order/
-│   │       ├── product/
-│   │       ├── settings/
-│   │       └── ui/
-│   ├── infrastructure/         # External integrations
-│   │   ├── api/                # API calls to Rust backend
-│   │   ├── dataSource/         # Data source abstraction
-│   │   ├── i18n/               # Internationalization
-│   │   ├── persistence/        # Data persistence
-│   │   └── print/              # Printing services
-│   ├── presentation/           # UI components (new architecture)
-│   │   ├── components/
-│   │   │   ├── auth/           # Authentication components
-│   │   │   ├── cart/           # Cart components
-│   │   │   ├── form/           # Form components
-│   │   │   ├── modals/         # Modal components
-│   │   │   ├── shared/         # Shared components
-│   │   │   └── ui/             # UI primitives
-│   │   └── Toast.tsx
-│   ├── screens/                # Page components
-│   │   ├── Checkout/           # Checkout flow
-│   │   ├── History/            # Order history
-│   │   ├── Login/              # Authentication
-│   │   ├── POS/                # Main POS interface
-│   │   ├── Settings/           # System settings
-│   │   ├── Statistics/         # Reports & analytics
-│   │   ├── TableSelection/     # Table management
-│   │   └── Unauthorized.tsx
-│   ├── hooks/                  # React hooks
-│   ├── stores/                 # Legacy Zustand stores
-│   ├── services/               # Legacy services
-│   ├── types/                  # Legacy types
-│   ├── utils/                  # Utility functions
-│   │   ├── currency/           # Currency calculations (Decimal.js)
-│   │   ├── formatting/         # Formatting utilities
-│   │   └── pricing/            # Pricing engine
-│   ├── App.tsx
-│   └── main.tsx
+├── src/                        # React frontend
+│   ├── core/                   # Core domain (types, stores, services)
+│   │   ├── domain/types/       # TypeScript types (must match Rust)
+│   │   └── stores/             # Zustand stores (auth, cart, bridge, etc.)
+│   ├── screens/                # Page components (Login, POS, Setup, etc.)
+│   ├── presentation/           # UI components
+│   ├── utils/currency/         # Money calculations (Decimal.js)
+│   └── App.tsx                 # Routes and app shell
 ├── src-tauri/                  # Rust backend
 │   ├── src/
-│   │   ├── api/                # Tauri commands
-│   │   │   ├── attributes/     # Attribute management
-│   │   │   ├── categories/     # Category CRUD
-│   │   │   ├── data.rs         # Data operations
-│   │   │   ├── kitchen_printers.rs
-│   │   │   ├── orders/         # Order operations
-│   │   │   ├── price_adjustments.rs
-│   │   │   ├── printers.rs
-│   │   │   ├── products.rs     # Product CRUD
-│   │   │   ├── specifications.rs
-│   │   │   ├── statistics.rs   # Statistics API
-│   │   │   ├── system.rs
-│   │   │   ├── tables.rs
-│   │   │   ├── users.rs
-│   │   │   └── zones.rs
-│   │   ├── core/
-│   │   │   ├── db.rs           # Database connection
-│   │   │   ├── state.rs        # App state
-│   │   │   └── types.rs        # Rust type definitions
-│   │   ├── lib.rs
-│   │   ├── main.rs
-│   │   └── utils/
-│   │       ├── escpos_text.rs
-│   │       ├── label_printer.rs
-│   │       ├── printing.rs
-│   │       ├── query_builder.rs
-│   │       └── receipt_renderer.rs
+│   │   ├── commands/           # Tauri commands (auth, mode, tenant, etc.)
+│   │   ├── core/               # ClientBridge, TenantManager, config
+│   │   └── lib.rs              # Command registration
 │   └── Cargo.toml
-├── dist/                       # Built frontend
-├── node_modules/
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-└── tauri.conf.json
+└── package.json
 ```
+
+This app uses workspace crates from parent `/Users/xzy/workspace/crab/`:
+- `edge-server` - Embedded server with SurrealDB, JWT auth, message bus
+- `crab-client` - Unified client (Local/Remote) with typestate pattern
+- `shared` - Common types and protocols
 
 ## Key Concepts
 
+### ClientBridge Architecture (Server/Client Modes)
+
+The app runs in two modes managed by `ClientBridge` (`src-tauri/src/core/client_bridge.rs`):
+
+- **Server Mode**: Runs embedded `edge-server` with In-Process communication (LocalClient)
+- **Client Mode**: Connects to remote edge-server via mTLS (RemoteClient)
+
+```
+App Startup → ClientBridge (Disconnected)
+           → TenantManager loads certificates
+           → User selects mode → Server/Client
+           → CrabClient (Local/Remote) → edge-server APIs
+```
+
+Key files:
+- `src-tauri/src/core/client_bridge.rs` - Mode management, CrabClient state transitions
+- `src-tauri/src/core/tenant_manager.rs` - Multi-tenant certificate management
+- `src/core/stores/bridge/useBridgeStore.ts` - Frontend state for mode/auth
+
 ### Type Alignment (Frontend ↔ Backend)
 
-**Critical**: TypeScript types in `src/core/domain/types/` must match Rust types in `src-tauri/src/core/types.rs` and `src-tauri/src/api/`.
+**Critical**: TypeScript types must match Rust types exactly.
 
 When modifying types:
 1. Update Rust types first (in `.rs` files)
 2. Update TypeScript types to match
 3. Run `npx tsc --noEmit` to verify
 
-**Statistics types** are particularly important:
-- Rust: `src-tauri/src/api/statistics.rs` defines `OverviewStats`, `RevenueTrendPoint`, `CategorySale`, `TopProduct`, etc.
-- TypeScript: `src/core/domain/types/statistics.ts` must match field names exactly
-
-Example mismatch to avoid:
-```typescript
-// Rust returns:
-{ time: "09:00", value: 150.50 }
-
-// TypeScript should expect:
-interface RevenueTrendPoint {
-  time: string;   // NOT "timestamp"
-  value: number;  // NOT "revenue"
-}
-```
-
-### Event Sourcing
-
-Orders use an event sourcing pattern:
-- Events stored in `timeline` array of `HeldOrder`
-- Event types defined in `src/core/domain/events/`
-- Reducer in `src/core/services/order/eventReducer.ts`
+Key type locations:
+- Rust: `src-tauri/src/core/`, `edge-server/src/api/`, `shared/src/`
+- TypeScript: `src/core/domain/types/`
 
 ### Currency Handling
 
-Always use `Currency` utility from `src/utils/currency/currency.ts` for financial calculations:
+Always use `Currency` utility for financial calculations:
 
 ```typescript
 import { Currency } from '@/utils/currency';
-
 const total = Currency.add(itemPrice, surcharge);
 const final = Currency.floor2(total);
 ```
 
-Never use native JavaScript numbers for money calculations.
-
 ### State Management
 
-Two patterns coexist:
-1. **Legacy**: Direct stores in `src/stores/`
-2. **New**: React hooks wrapping stores in `src/core/stores/`
-
-When modifying state, prefer the new architecture pattern.
+Two patterns coexist (prefer new architecture):
+- **Legacy**: Direct stores in `src/stores/`
+- **New**: React hooks wrapping stores in `src/core/stores/`
 
 ## Common Commands
 
 ```bash
 # Development
-npm run dev              # Frontend dev server
-npm run tauri:dev        # Full app with Tauri
+npm run tauri:dev        # Full app with Tauri (use this)
+npm run dev              # Frontend only (vite dev server)
 
 # Build
-npm run build            # Build frontend
 npm run tauri:build      # Build Tauri app
+npm run build            # Build frontend only
 
 # Type checking
 npx tsc --noEmit         # TypeScript check
-npx ts-prune             # Find unused code
 
 # Testing
-npm run test             # Run tests
+npm run test             # Run vitest tests
+npm run deadcode         # Find unused exports (ts-prune)
 ```
 
-## Architecture Decisions
+## App Data Location
 
-### Why Tauri + Rust?
-- Low memory footprint compared to Electron
-- Native SQLite access
-- Direct hardware control (printers, cash drawers)
+User data stored at: `~/Library/Application Support/com.xzy.pos/redcoral/`
+- `config.json` - Mode and tenant configuration
+- `tenants/` - Per-tenant certificate storage
+- `database/` - Local database files
 
-### Why Recharts?
-- Built for React
-- Good TypeScript support
-- Lightweight compared to Chart.js
+## Authentication Flow
 
-### Why Zustand?
-- Simple API
-- No context provider wrapping hell
-- Works well with TypeScript
+1. **Setup** (`/setup`) - First-run tenant activation via Auth Server
+2. **Login** (`/login`) - Employee login (uses CrabClient.login())
+3. **POS** (`/pos`) - Protected route, requires authenticated session
 
-## Database Schema Notes
+Routes in `App.tsx`:
+- `InitialRoute` - Checks first-run, auto-starts Server mode if tenant exists
+- `ProtectedRoute` - Wraps authenticated routes
 
-The SQLite database (managed by Rust/sqlx) includes:
-- `products` table with JSON attributes column
-- `orders` table with timeline events
-- `order_items` with price tracking
-- `payments` table for payment records
+## Adding Tauri Commands
 
-Migrations are managed via `src-tauri/migrations/` directory.
+1. Add command in `src-tauri/src/commands/`
+2. Register in `src-tauri/src/lib.rs` invoke_handler
+3. Call from frontend: `invoke<ReturnType>('command_name', { args })`
 
-## Debugging Tips
-
-1. **Frontend**: Open browser DevTools (F12)
-2. **Tauri**: Enable devtools in `tauri.conf.json`
-3. **Rust**: Use `println!` for logging, view in Tauri logs
-
-## i18n
-
-Translations in `src/services/i18n/locales/`:
-
-```typescript
-// Usage
-import { useI18n } from '@/hooks/useI18n';
-
-const { t } = useI18n();
-t('statistics.revenue');  // Key format: "section.key"
-```
-
-## Adding New Features
-
-1. Define Rust types in `src-tauri/src/api/`
-2. Add Tauri command in Rust
-3. Create TypeScript types in `src/core/domain/types/`
-4. Add API wrapper in `src/infrastructure/api/`
-5. Create React components in appropriate directory
-6. Update routes in `App.tsx`
-
-## Important Files to Know
+## Important Files
 
 | File | Purpose |
 |------|---------|
-| `src/core/domain/types/index.ts` | Central type re-exports |
-| `src/core/services/order/eventReducer.ts` | Order state machine |
+| `src-tauri/src/core/client_bridge.rs` | Server/Client mode management |
+| `src-tauri/src/core/tenant_manager.rs` | Multi-tenant certificates |
+| `src/core/stores/bridge/useBridgeStore.ts` | Frontend bridge state |
 | `src/utils/currency/currency.ts` | Money calculations |
-| `src/services/printService.ts` | Receipt/kitchen printing |
-| `src/core/stores/order/useOrderStore.ts` | Order state |
-| `src/core/stores/product/useProductStore.ts` | Product catalog |
+| `src/App.tsx` | Routes and initial flow |

@@ -18,20 +18,20 @@ function areOptionsEqual(
   if (!o1 || !o2) return false;
   if (o1.length !== o2.length) return false;
 
-  // Sort both arrays by attributeId + optionId for comparison
+  // Sort both arrays by attribute_id + option_idx for comparison
   const sorted1 = [...o1].sort((a, b) =>
-    `${a.attributeId}-${a.optionId}`.localeCompare(`${b.attributeId}-${b.optionId}`)
+    `${a.attribute_id}-${a.option_idx}`.localeCompare(`${b.attribute_id}-${b.option_idx}`)
   );
   const sorted2 = [...o2].sort((a, b) =>
-    `${a.attributeId}-${a.optionId}`.localeCompare(`${b.attributeId}-${b.optionId}`)
+    `${a.attribute_id}-${a.option_idx}`.localeCompare(`${b.attribute_id}-${b.option_idx}`)
   );
 
   return sorted1.every((opt1, index) => {
     const opt2 = sorted2[index];
     return (
-      opt1.attributeId === opt2.attributeId &&
-      opt1.optionId === opt2.optionId &&
-      opt1.priceModifier === opt2.priceModifier
+      opt1.attribute_id === opt2.attribute_id &&
+      opt1.option_idx === opt2.option_idx &&
+      opt1.price_modifier === opt2.price_modifier
     );
   });
 }
@@ -105,13 +105,14 @@ export const useCartStore = create<CartStore>((set, get) => ({
         return { cart: newCart };
       }
 
-      // Use specification price if available, otherwise use product price
-      const effectivePrice = selectedSpecification?.price !== undefined ? selectedSpecification.price : (product.price ?? 0);
+      // Use specification price if available, otherwise use product price (from root spec or passed in)
+      const productPrice = (product as any).price ?? 0;
+      const effectivePrice = selectedSpecification?.price !== undefined ? selectedSpecification.price : productPrice;
 
       return {
         cart: [...state.cart, {
           id: String(product.id),
-          productId: product.id,
+          productId: String(product.id),  // SurrealDB string ID
           name: product.name,
           quantity: quantity,
           price: effectivePrice,

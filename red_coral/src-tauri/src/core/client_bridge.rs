@@ -126,8 +126,7 @@ impl AppConfig {
     pub fn load(path: &std::path::Path) -> Result<Self, BridgeError> {
         if path.exists() {
             let content = std::fs::read_to_string(path)?;
-            serde_json::from_str(&content)
-                .map_err(|e| BridgeError::Config(e.to_string()))
+            serde_json::from_str(&content).map_err(|e| BridgeError::Config(e.to_string()))
         } else {
             Ok(Self::default())
         }
@@ -135,8 +134,8 @@ impl AppConfig {
 
     /// 保存配置到文件
     pub fn save(&self, path: &std::path::Path) -> Result<(), BridgeError> {
-        let content = serde_json::to_string_pretty(self)
-            .map_err(|e| BridgeError::Config(e.to_string()))?;
+        let content =
+            serde_json::to_string_pretty(self).map_err(|e| BridgeError::Config(e.to_string()))?;
         std::fs::write(path, content)?;
         Ok(())
     }
@@ -159,6 +158,13 @@ enum LocalClientState {
     Authenticated(CrabClient<Local, Authenticated>),
 }
 
+/// Client 模式的客户端状态 (参考 message_client 示例)
+#[allow(dead_code)]
+enum RemoteClientState {
+    Connected(CrabClient<Remote, Connected>),
+    Authenticated(CrabClient<Remote, Authenticated>),
+}
+
 /// 客户端模式枚举
 #[allow(dead_code)]
 enum ClientMode {
@@ -169,8 +175,9 @@ enum ClientMode {
     },
     /// Client 模式: 连接远程 edge-server
     Client {
-        client: CrabClient<Remote, Authenticated>,
+        client: Option<RemoteClientState>,
         edge_url: String,
+        message_addr: String,
     },
     /// 未连接状态
     Disconnected,
@@ -228,8 +235,14 @@ impl ClientBridge {
 
         let (mode, is_connected, is_authenticated) = match &*mode_guard {
             ClientMode::Disconnected => (ModeType::Disconnected, false, false),
-            ClientMode::Server { .. } => (ModeType::Server, true, true),
-            ClientMode::Client { .. } => (ModeType::Client, true, true),
+            ClientMode::Server { client, .. } => {
+                let is_auth = matches!(client, Some(LocalClientState::Authenticated(_)));
+                (ModeType::Server, true, is_auth)
+            }
+            ClientMode::Client { client, .. } => {
+                let is_auth = matches!(client, Some(RemoteClientState::Authenticated(_)));
+                (ModeType::Client, client.is_some(), is_auth)
+            }
         };
 
         ModeInfo {
@@ -273,7 +286,9 @@ impl ClientBridge {
         state_arc.start_background_tasks().await;
 
         // 获取 Router 和消息通道
-        let router = state_arc.https_service().router()
+        let router = state_arc
+            .https_service()
+            .router()
             .ok_or_else(|| BridgeError::Server("Router not initialized".to_string()))?;
 
         let message_bus = state_arc.message_bus();
@@ -289,7 +304,10 @@ impl ClientBridge {
         // 连接客户端
         let connected_client = client.connect().await?;
 
-        tracing::info!(port = server_config.http_port, "Server mode initialized with In-Process client");
+        tracing::info!(
+            port = server_config.http_port,
+            "Server mode initialized with In-Process client"
+        );
 
         *mode_guard = ClientMode::Server {
             server_state: state_arc,
@@ -308,6 +326,8 @@ impl ClientBridge {
     }
 
     /// 以 Client 模式连接
+    ///
+    /// 参考 crab-client/examples/message_client.rs 的 /reconnect 命令
     pub async fn start_client_mode(
         &self,
         edge_url: &str,
@@ -326,31 +346,46 @@ impl ClientBridge {
         }
 
         let tenant_manager = self.tenant_manager.read().await;
-        let cert_manager = tenant_manager.current_cert_manager()
+        let cert_manager = tenant_manager
+            .current_cert_manager()
             .ok_or(TenantError::NoTenantSelected)?;
 
         let config = self.config.read().await;
-        let auth_url = config.client_config.as_ref()
+        let auth_url = config
+            .client_config
+            .as_ref()
             .map(|c| c.auth_url.clone())
             .unwrap_or_else(|| "https://auth.example.com".to_string());
+        drop(config);
 
-        // 创建 CrabClient<Remote>
+        // 检查是否有缓存的证书
+        if !cert_manager.has_local_certificates() {
+            return Err(BridgeError::Config(
+                "No cached certificates. Please activate tenant first.".into(),
+            ));
+        }
+
+        // 创建 CrabClient<Remote> - 参考 message_client 示例
         let client = CrabClient::remote()
             .auth_server(&auth_url)
+            .edge_server(edge_url) // 需要设置 edge_server 用于 HTTP API
             .cert_path(cert_manager.cert_path())
             .client_name(tenant_manager.client_name())
             .build()?;
 
-        // 使用缓存的证书重连
-        let _connected_client = client.reconnect(message_addr).await?;
+        // 使用缓存的证书重连 (包含 self-check 和 timestamp refresh)
+        let connected_client = client.reconnect(message_addr).await?;
 
-        tracing::info!(edge_url = %edge_url, "Client mode connected");
+        tracing::info!(edge_url = %edge_url, message_addr = %message_addr, "Client mode connected");
 
-        // 暂时保存为 Disconnected，因为还没有登录
-        *mode_guard = ClientMode::Disconnected;
+        // 保存 Remote client 到 ClientMode::Client
+        *mode_guard = ClientMode::Client {
+            client: Some(RemoteClientState::Connected(connected_client)),
+            edge_url: edge_url.to_string(),
+            message_addr: message_addr.to_string(),
+        };
 
         // 更新配置
-        drop(config);
         {
             let mut config = self.config.write().await;
             config.current_mode = ModeType::Client;
@@ -388,6 +423,11 @@ impl ClientBridge {
         &self.tenant_manager
     }
 
+    /// 获取服务器模式配置
+    pub async fn get_server_config(&self) -> ServerModeConfig {
+        self.config.read().await.server_config.clone()
+    }
+
     // ============ 员工认证 ============
 
     /// 员工登录 (使用 CrabClient)
@@ -401,10 +441,12 @@ impl ClientBridge {
         let mut mode_guard = self.mode.write().await;
 
         match &mut *mode_guard {
-            ClientMode::Server { server_state: _, client } => {
+            ClientMode::Server {
+                server_state: _,
+                client,
+            } => {
                 // 取出当前 client
-                let current_client = client.take()
-                    .ok_or(BridgeError::NotInitialized)?;
+                let current_client = client.take().ok_or(BridgeError::NotInitialized)?;
 
                 match current_client {
                     LocalClientState::Connected(connected) => {
@@ -412,13 +454,12 @@ impl ClientBridge {
                         match connected.login(username, password).await {
                             Ok(authenticated) => {
                                 // 获取用户信息 - 使用 me() 和 token() 方法
-                                let user_info = authenticated.me().cloned()
-                                    .ok_or_else(|| BridgeError::Client(
-                                        crab_client::ClientError::Auth("No user info after login".into())
-                                    ))?;
-                                let token = authenticated.token()
-                                    .unwrap_or_default()
-                                    .to_string();
+                                let user_info = authenticated.me().cloned().ok_or_else(|| {
+                                    BridgeError::Client(crab_client::ClientError::Auth(
+                                        "No user info after login".into(),
+                                    ))
+                                })?;
+                                let token = authenticated.token().unwrap_or_default().to_string();
 
                                 // 创建会话
                                 let session = super::session_cache::EmployeeSession {
@@ -452,13 +493,12 @@ impl ClientBridge {
                         match connected.login(username, password).await {
                             Ok(authenticated) => {
                                 // 使用 me() 和 token() 方法获取会话数据
-                                let user_info = authenticated.me().cloned()
-                                    .ok_or_else(|| BridgeError::Client(
-                                        crab_client::ClientError::Auth("No user info after login".into())
-                                    ))?;
-                                let token = authenticated.token()
-                                    .unwrap_or_default()
-                                    .to_string();
+                                let user_info = authenticated.me().cloned().ok_or_else(|| {
+                                    BridgeError::Client(crab_client::ClientError::Auth(
+                                        "No user info after login".into(),
+                                    ))
+                                })?;
+                                let token = authenticated.token().unwrap_or_default().to_string();
 
                                 let session = super::session_cache::EmployeeSession {
                                     username: username.to_string(),
@@ -484,23 +524,80 @@ impl ClientBridge {
                     }
                 }
             }
-            ClientMode::Client { .. } => {
-                // Client 模式使用 TenantManager 的 HTTP 登录
-                let mut tenant_manager = self.tenant_manager.write().await;
-                let config = self.config.read().await;
-                let edge_url = config.client_config.as_ref()
-                    .map(|c| c.edge_url.clone())
-                    .unwrap_or_else(|| "https://localhost:9625".to_string());
-                drop(config);
+            ClientMode::Client { client, .. } => {
+                // Client 模式使用 CrabClient 登录 (参考 message_client 示例)
+                let current_client = client.take().ok_or(BridgeError::NotInitialized)?;
 
-                tenant_manager
-                    .login_online(username, password, &edge_url)
-                    .await
-                    .map_err(BridgeError::Tenant)
+                match current_client {
+                    RemoteClientState::Connected(connected) => {
+                        match connected.login(username, password).await {
+                            Ok(authenticated) => {
+                                let user_info = authenticated.me().cloned().ok_or_else(|| {
+                                    BridgeError::Client(crab_client::ClientError::Auth(
+                                        "No user info after login".into(),
+                                    ))
+                                })?;
+                                let token = authenticated.token().unwrap_or_default().to_string();
+
+                                let session = super::session_cache::EmployeeSession {
+                                    username: username.to_string(),
+                                    token,
+                                    user_info,
+                                    login_mode: super::session_cache::LoginMode::Online,
+                                    expires_at: None,
+                                    logged_in_at: std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap()
+                                        .as_secs(),
+                                };
+
+                                *client = Some(RemoteClientState::Authenticated(authenticated));
+                                tracing::info!(username = %username, "Employee logged in via CrabClient (remote)");
+                                Ok(session)
+                            }
+                            Err(e) => {
+                                *client = None;
+                                Err(BridgeError::Client(e))
+                            }
+                        }
+                    }
+                    RemoteClientState::Authenticated(auth) => {
+                        // 已登录，先登出再重新登录
+                        let connected = auth.logout().await;
+                        match connected.login(username, password).await {
+                            Ok(authenticated) => {
+                                let user_info = authenticated.me().cloned().ok_or_else(|| {
+                                    BridgeError::Client(crab_client::ClientError::Auth(
+                                        "No user info after login".into(),
+                                    ))
+                                })?;
+                                let token = authenticated.token().unwrap_or_default().to_string();
+
+                                let session = super::session_cache::EmployeeSession {
+                                    username: username.to_string(),
+                                    token,
+                                    user_info,
+                                    login_mode: super::session_cache::LoginMode::Online,
+                                    expires_at: None,
+                                    logged_in_at: std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap()
+                                        .as_secs(),
+                                };
+
+                                *client = Some(RemoteClientState::Authenticated(authenticated));
+                                tracing::info!(username = %username, "Employee re-logged in via CrabClient (remote)");
+                                Ok(session)
+                            }
+                            Err(e) => {
+                                *client = None;
+                                Err(BridgeError::Client(e))
+                            }
+                        }
+                    }
+                }
             }
-            ClientMode::Disconnected => {
-                Err(BridgeError::NotInitialized)
-            }
+            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
         }
     }
 
@@ -509,7 +606,10 @@ impl ClientBridge {
         let mut mode_guard = self.mode.write().await;
 
         match &mut *mode_guard {
-            ClientMode::Server { server_state: _, client } => {
+            ClientMode::Server {
+                server_state: _,
+                client,
+            } => {
                 if let Some(current_client) = client.take() {
                     match current_client {
                         LocalClientState::Authenticated(auth) => {
@@ -523,9 +623,19 @@ impl ClientBridge {
                     }
                 }
             }
-            ClientMode::Client { .. } => {
-                let mut tenant_manager = self.tenant_manager.write().await;
-                tenant_manager.logout()?;
+            ClientMode::Client { client, .. } => {
+                if let Some(current_client) = client.take() {
+                    match current_client {
+                        RemoteClientState::Authenticated(auth) => {
+                            let connected = auth.logout().await;
+                            *client = Some(RemoteClientState::Connected(connected));
+                            tracing::info!("Employee logged out (remote)");
+                        }
+                        RemoteClientState::Connected(c) => {
+                            *client = Some(RemoteClientState::Connected(c));
+                        }
+                    }
+                }
             }
             ClientMode::Disconnected => {}
         }
@@ -537,9 +647,8 @@ impl ClientBridge {
 
     /// 通用 GET 请求 (使用 CrabClient)
     ///
-    /// 此方法会根据当前模式选择合适的客户端：
-    /// - Server 模式: 使用 In-Process 客户端
-    /// - Client 模式: 使用 mTLS 远程客户端 (TODO)
+    /// Server 模式: 使用 In-Process 客户端
+    /// Client 模式: 使用 mTLS edge_http_client
     pub async fn get<T>(&self, path: &str) -> Result<T, BridgeError>
     where
         T: serde::de::DeserializeOwned,
@@ -547,25 +656,41 @@ impl ClientBridge {
         let mode_guard = self.mode.read().await;
 
         match &*mode_guard {
-            ClientMode::Server { client, .. } => {
-                match client {
-                    Some(LocalClientState::Authenticated(auth)) => {
-                        auth.get(path)
-                            .await
-                            .map_err(BridgeError::Client)
-                    }
-                    _ => {
-                        Err(BridgeError::NotAuthenticated)
-                    }
+            ClientMode::Server { client, .. } => match client {
+                Some(LocalClientState::Authenticated(auth)) => {
+                    auth.get(path).await.map_err(BridgeError::Client)
                 }
-            }
-            ClientMode::Client { .. } => {
-                // TODO: 使用 Remote client 的 HTTP API
-                Err(BridgeError::NotImplemented("Remote GET not implemented".into()))
-            }
-            ClientMode::Disconnected => {
-                Err(BridgeError::NotInitialized)
-            }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Client {
+                client, edge_url, ..
+            } => match client {
+                Some(RemoteClientState::Authenticated(auth)) => {
+                    let http = auth
+                        .edge_http_client()
+                        .ok_or_else(|| BridgeError::NotInitialized)?;
+                    let token = auth.token().ok_or_else(|| BridgeError::NotAuthenticated)?;
+                    let url = format!("{}{}", edge_url, path);
+
+                    let resp = http
+                        .get(&url)
+                        .header("Authorization", format!("Bearer {}", token))
+                        .send()
+                        .await
+                        .map_err(|e| BridgeError::Server(e.to_string()))?;
+
+                    if !resp.status().is_success() {
+                        let text = resp.text().await.unwrap_or_default();
+                        return Err(BridgeError::Server(text));
+                    }
+
+                    resp.json::<T>()
+                        .await
+                        .map_err(|e| BridgeError::Server(e.to_string()))
+                }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
         }
     }
 
@@ -578,25 +703,185 @@ impl ClientBridge {
         let mode_guard = self.mode.read().await;
 
         match &*mode_guard {
-            ClientMode::Server { client, .. } => {
-                match client {
-                    Some(LocalClientState::Authenticated(auth)) => {
-                        auth.post(path, body)
-                            .await
-                            .map_err(BridgeError::Client)
-                    }
-                    _ => {
-                        Err(BridgeError::NotAuthenticated)
-                    }
+            ClientMode::Server { client, .. } => match client {
+                Some(LocalClientState::Authenticated(auth)) => {
+                    auth.post(path, body).await.map_err(BridgeError::Client)
                 }
-            }
-            ClientMode::Client { .. } => {
-                // TODO: 使用 Remote client 的 HTTP API
-                Err(BridgeError::NotImplemented("Remote POST not implemented".into()))
-            }
-            ClientMode::Disconnected => {
-                Err(BridgeError::NotInitialized)
-            }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Client {
+                client, edge_url, ..
+            } => match client {
+                Some(RemoteClientState::Authenticated(auth)) => {
+                    let http = auth
+                        .edge_http_client()
+                        .ok_or_else(|| BridgeError::NotInitialized)?;
+                    let token = auth.token().ok_or_else(|| BridgeError::NotAuthenticated)?;
+                    let url = format!("{}{}", edge_url, path);
+
+                    let resp = http
+                        .post(&url)
+                        .header("Authorization", format!("Bearer {}", token))
+                        .json(body)
+                        .send()
+                        .await
+                        .map_err(|e| BridgeError::Server(e.to_string()))?;
+
+                    if !resp.status().is_success() {
+                        let text = resp.text().await.unwrap_or_default();
+                        return Err(BridgeError::Server(text));
+                    }
+
+                    resp.json::<T>()
+                        .await
+                        .map_err(|e| BridgeError::Server(e.to_string()))
+                }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
+        }
+    }
+
+    /// 通用 PUT 请求 (使用 CrabClient)
+    pub async fn put<T, B>(&self, path: &str, body: &B) -> Result<T, BridgeError>
+    where
+        T: serde::de::DeserializeOwned,
+        B: serde::Serialize + Sync,
+    {
+        let mode_guard = self.mode.read().await;
+
+        match &*mode_guard {
+            ClientMode::Server { client, .. } => match client {
+                Some(LocalClientState::Authenticated(auth)) => {
+                    auth.put(path, body).await.map_err(BridgeError::Client)
+                }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Client {
+                client, edge_url, ..
+            } => match client {
+                Some(RemoteClientState::Authenticated(auth)) => {
+                    let http = auth
+                        .edge_http_client()
+                        .ok_or_else(|| BridgeError::NotInitialized)?;
+                    let token = auth.token().ok_or_else(|| BridgeError::NotAuthenticated)?;
+                    let url = format!("{}{}", edge_url, path);
+
+                    let resp = http
+                        .put(&url)
+                        .header("Authorization", format!("Bearer {}", token))
+                        .json(body)
+                        .send()
+                        .await
+                        .map_err(|e| BridgeError::Server(e.to_string()))?;
+
+                    if !resp.status().is_success() {
+                        let text = resp.text().await.unwrap_or_default();
+                        return Err(BridgeError::Server(text));
+                    }
+
+                    resp.json::<T>()
+                        .await
+                        .map_err(|e| BridgeError::Server(e.to_string()))
+                }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
+        }
+    }
+
+    /// 通用 DELETE 请求 (使用 CrabClient)
+    pub async fn delete<T>(&self, path: &str) -> Result<T, BridgeError>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let mode_guard = self.mode.read().await;
+
+        match &*mode_guard {
+            ClientMode::Server { client, .. } => match client {
+                Some(LocalClientState::Authenticated(auth)) => {
+                    auth.delete(path).await.map_err(BridgeError::Client)
+                }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Client {
+                client, edge_url, ..
+            } => match client {
+                Some(RemoteClientState::Authenticated(auth)) => {
+                    let http = auth
+                        .edge_http_client()
+                        .ok_or_else(|| BridgeError::NotInitialized)?;
+                    let token = auth.token().ok_or_else(|| BridgeError::NotAuthenticated)?;
+                    let url = format!("{}{}", edge_url, path);
+
+                    let resp = http
+                        .delete(&url)
+                        .header("Authorization", format!("Bearer {}", token))
+                        .send()
+                        .await
+                        .map_err(|e| BridgeError::Server(e.to_string()))?;
+
+                    if !resp.status().is_success() {
+                        let text = resp.text().await.unwrap_or_default();
+                        return Err(BridgeError::Server(text));
+                    }
+
+                    resp.json::<T>()
+                        .await
+                        .map_err(|e| BridgeError::Server(e.to_string()))
+                }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
+        }
+    }
+
+    /// 通用 DELETE 请求 (带 body)
+    pub async fn delete_with_body<T, B>(&self, path: &str, body: &B) -> Result<T, BridgeError>
+    where
+        T: serde::de::DeserializeOwned,
+        B: serde::Serialize + Sync,
+    {
+        let mode_guard = self.mode.read().await;
+
+        match &*mode_guard {
+            ClientMode::Server { client, .. } => match client {
+                Some(LocalClientState::Authenticated(auth)) => auth
+                    .delete_with_body(path, body)
+                    .await
+                    .map_err(BridgeError::Client),
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Client {
+                client, edge_url, ..
+            } => match client {
+                Some(RemoteClientState::Authenticated(auth)) => {
+                    let http = auth
+                        .edge_http_client()
+                        .ok_or_else(|| BridgeError::NotInitialized)?;
+                    let token = auth.token().ok_or_else(|| BridgeError::NotAuthenticated)?;
+                    let url = format!("{}{}", edge_url, path);
+
+                    let resp = http
+                        .delete(&url)
+                        .header("Authorization", format!("Bearer {}", token))
+                        .json(body)
+                        .send()
+                        .await
+                        .map_err(|e| BridgeError::Server(e.to_string()))?;
+
+                    if !resp.status().is_success() {
+                        let text = resp.text().await.unwrap_or_default();
+                        return Err(BridgeError::Server(text));
+                    }
+
+                    resp.json::<T>()
+                        .await
+                        .map_err(|e| BridgeError::Server(e.to_string()))
+                }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
         }
     }
 }

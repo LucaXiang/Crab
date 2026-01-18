@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { User, Lock, AlertCircle, ChevronRight, Store, Terminal, Power, Wifi, WifiOff, Building2 } from 'lucide-react';
+import { User, Lock, AlertCircle, ChevronRight, Store, Terminal, Power, WifiOff, Building2, Server, Monitor } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useBridgeStore, type LoginMode } from '@/core/stores/bridge';
@@ -22,6 +22,8 @@ export const LoginScreen: React.FC = () => {
     loginEmployee,
     loginAuto,
     fetchModeInfo,
+    fetchTenants,
+    checkFirstRun,
     isLoading,
   } = useBridgeStore();
 
@@ -30,6 +32,26 @@ export const LoginScreen: React.FC = () => {
   const [error, setError] = useState('');
   const [loginMode, setLoginMode] = useState<LoginMode | null>(null);
   const [focusedField, setFocusedField] = useState<'username' | 'password' | null>(null);
+
+  // Tenant check state
+  const [isCheckingTenants, setIsCheckingTenants] = useState(true);
+
+  // Check if we should be here - redirect to setup if no tenants
+  useEffect(() => {
+    const checkTenants = async () => {
+      const isFirst = await checkFirstRun();
+      await fetchTenants();
+      const currentTenants = useBridgeStore.getState().tenants;
+
+      // If no tenants, redirect to setup
+      if (isFirst || currentTenants.length === 0) {
+        navigate('/setup', { replace: true });
+        return;
+      }
+      setIsCheckingTenants(false);
+    };
+    checkTenants();
+  }, [checkFirstRun, fetchTenants, navigate]);
 
   // Fetch mode info on mount
   useEffect(() => {
@@ -70,6 +92,18 @@ export const LoginScreen: React.FC = () => {
       if (response.success && response.session) {
         setLoginMode(response.mode);
 
+        // Helper to map role name to ID (legacy support)
+        const getRoleId = (roleName: string) => {
+           switch(roleName) {
+               case 'admin': return 1;
+               case 'manager': return 2;
+               case 'user': return 3;
+               default: return 0;
+           }
+        };
+        
+        const roleName = response.session.user_info.role;
+
         // Update auth store for ProtectedRoute compatibility
         // Adapt from shared::client::UserInfo to legacy User format
         setAuthUser({
@@ -77,8 +111,8 @@ export const LoginScreen: React.FC = () => {
           uuid: response.session.user_info.id,
           username: response.session.user_info.username,
           display_name: response.session.user_info.username, // Fallback to username
-          password_hash: '',
-          role_id: 0, // Role info now in permissions array
+          role_id: getRoleId(roleName), // Map role string to ID
+          role_name: roleName,
           avatar: null,
           is_active: true,
           created_at: new Date().toISOString(),
@@ -102,6 +136,17 @@ export const LoginScreen: React.FC = () => {
     const appWindow = getCurrentWindow();
     await appWindow.close();
   };
+
+  const isDisconnected = modeInfo?.mode === 'Disconnected';
+
+  // Show loading while checking tenants
+  if (isCheckingTenants) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-4 border-[#FF5E5E]/30 border-t-[#FF5E5E] rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex font-sans overflow-hidden bg-gray-50">
@@ -171,33 +216,37 @@ export const LoginScreen: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-900">{t('app.brand.fullName')}</h1>
           </div>
 
-          {/* Tenant Info */}
-          {modeInfo?.tenant_id && (
-            <div className="flex items-center justify-between p-4 bg-gray-100 rounded-xl">
-              <div className="flex items-center gap-3">
+          {/* Mode/Tenant Info */}
+          <div className="flex items-center justify-between p-4 bg-gray-100 rounded-xl">
+            <div className="flex items-center gap-3">
+              {modeInfo?.tenant_id ? (
                 <Building2 size={20} className="text-gray-500" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{modeInfo.tenant_id}</p>
-                  <p className="text-xs text-gray-500 flex items-center gap-1">
-                    {modeInfo.mode === 'Server' ? (
-                      <><Wifi size={12} /> Server Mode</>
-                    ) : modeInfo.mode === 'Client' ? (
-                      <><Wifi size={12} /> Client Mode</>
-                    ) : (
-                      <><WifiOff size={12} /> Disconnected</>
-                    )}
-                  </p>
-                </div>
+              ) : (
+                <WifiOff size={20} className="text-orange-500" />
+              )}
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  {modeInfo?.tenant_id || 'No Mode Selected'}
+                </p>
+                <p className="text-xs text-gray-500 flex items-center gap-1">
+                  {modeInfo?.mode === 'Server' ? (
+                    <><Server size={12} className="text-green-500" /> Server Mode</>
+                  ) : modeInfo?.mode === 'Client' ? (
+                    <><Monitor size={12} className="text-blue-500" /> Client Mode</>
+                  ) : (
+                    <><WifiOff size={12} className="text-orange-500" /> Disconnected</>
+                  )}
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={handleSwitchTenant}
-                className="text-sm text-[#FF5E5E] hover:underline"
-              >
-                Switch
-              </button>
             </div>
-          )}
+            <button
+              type="button"
+              onClick={() => navigate('/setup', { replace: true })}
+              className="text-sm text-[#FF5E5E] hover:underline"
+            >
+              {isDisconnected ? 'Setup' : 'Switch'}
+            </button>
+          </div>
 
           <div className="space-y-2">
             <h2 className="text-3xl font-bold text-gray-900">

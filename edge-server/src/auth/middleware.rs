@@ -3,7 +3,7 @@
 //! 为 JWT 认证和授权提供 Axum 中间件
 
 use axum::{
-    extract::{Request, State},
+    extract::Request,
     middleware::Next,
     response::Response,
 };
@@ -32,11 +32,7 @@ use crate::security_log;
 /// | 无 Authorization 头 | 401 Unauthorized |
 /// | 令牌过期 | 401 TokenExpired |
 /// | 无效令牌 | 401 InvalidToken |
-pub async fn require_auth(
-    State(state): State<ServerState>,
-    mut req: Request,
-    next: Next,
-) -> Result<Response, AppError> {
+pub async fn require_auth(mut req: Request, next: Next) -> Result<Response, AppError> {
     let path = req.uri().path();
 
     // 允许 CORS 预检的 OPTIONS 请求 (跳过认证)
@@ -56,6 +52,13 @@ pub async fn require_auth(
         tracing::info!("[require_auth] Public API route, skipping auth: {}", path);
         return Ok(next.run(req).await);
     }
+
+    // 从扩展中获取 ServerState
+    let state = req
+        .extensions()
+        .get::<ServerState>()
+        .ok_or_else(|| AppError::internal("ServerState not found in request extensions"))?
+        .clone();
 
     let jwt_service = state.get_jwt_service();
     let auth_header = req

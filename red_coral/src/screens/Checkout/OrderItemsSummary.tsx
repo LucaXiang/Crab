@@ -255,22 +255,17 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
   };
 
   const sortItems = (aItem: CartItem, bItem: CartItem) => {
-    // 1. Category Order
-    const catA = getCategoryIndex(aItem.category);
-    const catB = getCategoryIndex(bItem.category);
-    if (catA !== catB) return catA - catB;
+    // CartItem doesn't have category/sortOrder - these are product-level properties
+    // Use productId as tie-breaker or just sort by name
 
-    // 2. Product Order (Sort Order)
-    const orderA = aItem.sortOrder ?? Number.MAX_SAFE_INTEGER;
-    const orderB = bItem.sortOrder ?? Number.MAX_SAFE_INTEGER;
-    if (orderA !== orderB) return orderA - orderB;
-
-    // 3. Fallback: External ID
-    if (aItem.externalId !== bItem.externalId) {
-      return aItem.externalId - bItem.externalId;
+    // 1. Fallback: External ID (if available)
+    const extIdA = aItem.externalId ? parseInt(String(aItem.externalId), 10) || 0 : 0;
+    const extIdB = bItem.externalId ? parseInt(String(bItem.externalId), 10) || 0 : 0;
+    if (extIdA !== extIdB) {
+      return extIdA - extIdB;
     }
 
-    // 4. Fallback: Name
+    // 2. Fallback: Name
     return aItem.name.localeCompare(bItem.name);
   };
 

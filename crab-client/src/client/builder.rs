@@ -31,6 +31,7 @@ use super::CrabClient;
 #[derive(Debug, Clone)]
 pub struct RemoteClientBuilder {
     auth_server_url: Option<String>,
+    edge_server_url: Option<String>,
     cert_path: Option<PathBuf>,
     client_name: Option<String>,
 }
@@ -46,6 +47,7 @@ impl RemoteClientBuilder {
     pub fn new() -> Self {
         Self {
             auth_server_url: None,
+            edge_server_url: None,
             cert_path: None,
             client_name: None,
         }
@@ -56,6 +58,15 @@ impl RemoteClientBuilder {
     /// This is the URL of the authentication server that issues certificates.
     pub fn auth_server(mut self, url: impl Into<String>) -> Self {
         self.auth_server_url = Some(url.into());
+        self
+    }
+
+    /// Sets the Edge Server URL for HTTPS API.
+    ///
+    /// This is the URL of the Edge Server's HTTPS endpoint (e.g., "https://192.168.1.100:3000").
+    /// Used for mTLS HTTP API calls (login, me, etc.).
+    pub fn edge_server(mut self, url: impl Into<String>) -> Self {
+        self.edge_server_url = Some(url.into());
         self
     }
 
@@ -93,6 +104,8 @@ impl RemoteClientBuilder {
             .client_name
             .ok_or_else(|| ClientError::Config("client_name is required".into()))?;
 
+        let edge_server_url = self.edge_server_url;
+
         // Create HTTP client for Auth Server communication
         let http_client = crate::client::http::NetworkHttpClient::new(&auth_server_url)
             .map_err(|e| ClientError::Config(format!("Failed to create HTTP client: {}", e)))?;
@@ -113,7 +126,7 @@ impl RemoteClientBuilder {
             session: Default::default(),
             config: ClientConfig {
                 auth_server_url: Some(auth_server_url),
-                server_url: None,
+                edge_url: edge_server_url,
                 cert_path: Some(cert_path),
                 client_name: Some(client_name),
             },
@@ -251,7 +264,7 @@ impl LocalClientBuilder {
             session: Default::default(),
             config: ClientConfig {
                 auth_server_url: None,
-                server_url: None,
+                edge_url: None,
                 cert_path: None,
                 client_name: None,
             },
@@ -268,8 +281,8 @@ impl LocalClientBuilder {
 pub struct ClientConfig {
     /// Auth Server URL (Remote mode only).
     pub auth_server_url: Option<String>,
-    /// Server URL (unused in new design).
-    pub server_url: Option<String>,
+    /// Edge Server URL for HTTPS API (e.g., "https://127.0.0.1:3000").
+    pub edge_url: Option<String>,
     /// Certificate storage path (Remote mode only).
     pub cert_path: Option<PathBuf>,
     /// Client name (Remote mode only).

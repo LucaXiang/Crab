@@ -31,7 +31,6 @@ interface SpecificationManagerProps {
 
 interface SpecForm {
   name: string;
-  receipt_name: string;
   price: string;
   external_id: string;
   is_default: boolean;
@@ -57,10 +56,9 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
 
   const [formData, setFormData] = useState<SpecForm>({
     name: '',
-    receiptName: '',
     price: '0.00',
-    externalId: '',
-    isDefault: false,
+    external_id: '',
+    is_default: false,
   });
 
   const {
@@ -97,7 +95,7 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
 
     setLoading(true);
     try {
-      const response = await api.listProductSpecs(Number(productId));
+      const response = await api.listProductSpecs(productId!);
       const specs = response.data?.specs || [];
       setSpecifications(specs);
     } catch (error) {
@@ -147,7 +145,6 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
     if (selectedId === NEW_SPEC_ID) {
       setFormData({
         name: '',
-        receipt_name: '',
         price: basePrice ? basePrice.toFixed(2) : '0.00',
         external_id: baseExternalId?.toString() || '',
         is_default: specifications.length === 0, // Auto default if first
@@ -156,7 +153,6 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
     } else if (selectedSpec) {
       setFormData({
         name: selectedSpec.name,
-        receipt_name: selectedSpec.receipt_name || '',
         price: selectedSpec.price.toFixed(2),
         external_id: selectedSpec.external_id?.toString() || '',
         is_default: selectedSpec.is_default,
@@ -183,11 +179,10 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
       if (selectedId !== NEW_SPEC_ID && selectedSpec) {
         // Update
         if (productId) {
-          await api.updateProductSpec(Number(productId), selectedSpec.id, {
+          await api.updateProductSpec(selectedSpec.id!, {
             name: formData.name.trim(),
-            receipt_name: formData.receipt_name.trim() || null,
             price: finalPrice,
-            external_id: finalExternalId || null,
+            external_id: finalExternalId ?? null,
             is_default: formData.is_default,
           });
           toast.success(t("settings.specification.message.updated"));
@@ -199,9 +194,8 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
               return {
                 ...spec,
                 name: formData.name.trim(),
-                receipt_name: formData.receipt_name.trim() || undefined,
                 price: finalPrice,
-                external_id: finalExternalId,
+                external_id: finalExternalId ?? null,
                 is_default: formData.is_default,
               };
             }
@@ -217,11 +211,11 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
       } else {
         // Create
         if (productId) {
-          await api.createProductSpec(Number(productId), {
+          await api.createProductSpec({
+            product: productId,
             name: formData.name.trim(),
-            receipt_name: formData.receipt_name.trim() || null,
             price: finalPrice,
-            external_id: finalExternalId || null,
+            external_id: finalExternalId,
             is_default: formData.is_default,
             is_root: specifications.length === 0, // First one is technically root
             display_order: specifications.length,
@@ -233,18 +227,17 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
           // Local Create
           const newSpec: ProductSpecification = {
             id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            product_id: 0,
-            uuid: '',
+            product: productId || '',
             name: formData.name.trim(),
-            receipt_name: formData.receipt_name.trim() || undefined,
             price: finalPrice,
-            external_id: finalExternalId,
+            external_id: finalExternalId ?? null,
             display_order: specifications.length,
             is_default: formData.is_default,
             is_root: specifications.length === 0,
             is_active: true,
-            created_at: '',
-            updated_at: '',
+            tags: [],
+            created_at: null,
+            updated_at: null,
           };
 
           let updatedSpecs = [...specifications, newSpec];
@@ -279,7 +272,7 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
       onConfirm: async () => {
         try {
           if (productId) {
-            await api.deleteProductSpec(Number(productId), id);
+            await api.deleteProductSpec(id);
             toast.success(t("settings.specification.message.deleted"));
             await loadSpecifications();
             if (selectedId === id) setSelectedId(NEW_SPEC_ID);
@@ -304,7 +297,7 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
 
     try {
       if (productId) {
-        await api.updateProductSpec(Number(productId), spec.id, {
+        await api.updateProductSpec(spec.id!, {
           name: spec.name,
           price: spec.price,
           is_default: newDefaultState,
@@ -493,20 +486,6 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
                   placeholder={t('settings.specification.form.externalIdPlaceholder')}
                 />
               </div>
-            </div>
-
-            {/* Receipt Name */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">
-                {t('settings.specification.form.receiptName')}
-              </label>
-              <input
-                type="text"
-                value={formData.receipt_name}
-                onChange={(e) => setFormData(prev => ({ ...prev, receipt_name: e.target.value }))}
-                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                placeholder={t('settings.specification.form.receiptNamePlaceholder')}
-              />
             </div>
 
             {/* Default Switch */}

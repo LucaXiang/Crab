@@ -12,6 +12,15 @@ use std::time::Duration;
 
 use super::common::CrabClient;
 
+/// AppResponse structure matching Edge Server's format
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppResponse<T> {
+    success: bool,
+    data: Option<T>,
+    error: Option<String>,
+}
+
 // ============================================================================
 // Disconnected State
 // ============================================================================
@@ -291,16 +300,58 @@ impl CrabClient<Remote, Connected> {
         username: &str,
         password: &str,
     ) -> Result<CrabClient<Remote, Authenticated>, ClientError> {
-        let http = self
-            .http
-            .as_mut()
-            .ok_or_else(|| ClientError::Config("HTTP client not configured".into()))?;
+        // Use mTLS HTTP client to login to Edge Server (port 3000)
+        let edge_http = self.edge_http.take().ok_or_else(|| {
+            ClientError::Connection("mTLS HTTP client not available. Are you connected?".into())
+        })?;
 
         tracing::info!("Employee login: {}", username);
-        let response = http.login(username, password).await?;
+
+        // Build login request
+        let login_req = shared::client::LoginRequest {
+            username: username.to_string(),
+            password: password.to_string(),
+        };
+
+        // Get Edge Server URL from config
+        let edge_url = self.config.edge_url.clone().ok_or_else(|| {
+            ClientError::Config("Edge Server URL not configured".into())
+        })?;
+
+        // Send login request via mTLS
+        let response = edge_http
+            .post(format!("{}/api/auth/login", edge_url))
+            .json(&login_req)
+            .send()
+            .await
+            .map_err(|e| ClientError::Connection(format!("Login request failed: {}", e)))?;
+
+        // Parse response using AppResponse format (matches Edge Server)
+        let status = response.status();
+        if !status.is_success() {
+            let text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(ClientError::Auth(text));
+        }
+
+        let resp: AppResponse<shared::client::LoginResponse> = response
+            .json()
+            .await
+            .map_err(|e| ClientError::InvalidResponse(format!("Failed to parse login response: {}", e)))?;
+
+        if !resp.success {
+            let error_msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
+            return Err(ClientError::Auth(error_msg));
+        }
+
+        let login_data = resp.data.ok_or_else(|| {
+            ClientError::InvalidResponse("Missing login data in response".into())
+        })?;
 
         // Store session data
-        self.session.set_login(response.token.clone(), response.user);
+        self.session.set_login(login_data.token.clone(), login_data.user);
+
+        // Restore edge_http for future requests
+        self.edge_http = Some(edge_http);
 
         tracing::info!("Employee logged in successfully.");
         Ok(self.transition())

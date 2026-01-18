@@ -1,4 +1,24 @@
 export * from './error';
+export * from './models';
+
+// Import types used in this file
+import type {
+  Product,
+  ProductSpecification,
+  Tag,
+  ProductAttribute,
+  CategoryAttribute,
+  Category,
+  Zone,
+  Table,
+  KitchenPrinter,
+  Attribute,
+  AttributeTemplate,
+  AttributeOption,
+  Role,
+  RolePermission,
+  PriceRule,
+} from './models';
 
 // API Response types - aligned with Rust server
 export interface ApiResponse<T> {
@@ -303,7 +323,8 @@ export interface UpdatePriceAdjustmentRequest {
 }
 
 // Attribute Template types
-export interface AttributeTemplateData extends AttributeTemplate {
+// Note: AttributeTemplateData extends AttributeTemplate but makes options optional for API responses
+export interface AttributeTemplateData extends Omit<AttributeTemplate, 'options'> {
   options?: AttributeOption[];
 }
 
@@ -495,6 +516,31 @@ export interface UpdateCategoryAttributeRequest {
   default_option_id?: number;
 }
 
+// Product Attribute types (binding between Product and Attribute)
+export interface ProductAttributeData extends ProductAttribute {
+  attribute?: Attribute;
+  options?: AttributeOption[];
+}
+
+export interface ProductAttributeListData {
+  product_attributes: ProductAttribute[];
+  total: number;
+}
+
+export interface CreateProductAttributeRequest {
+  product_id: string;
+  attribute_id: string;
+  is_required?: boolean;
+  display_order?: number;
+  default_option_idx?: number;
+}
+
+export interface UpdateProductAttributeRequest {
+  is_required?: boolean;
+  display_order?: number;
+  default_option_idx?: number;
+}
+
 // Specification Tag types
 export interface SpecificationTagData {
   specification_id: number;
@@ -528,381 +574,6 @@ export interface LivenessData {
   alive: boolean;
 }
 
-// Entity types matching the Rust project
-export interface Role {
-  id: number;
-  uuid: string;
-  name: string;
-  display_name: string;
-  description: string | null;
-  is_system: boolean;
-  created_at: string;
-  updated_at: string;
-}
 
-export interface RolePermission {
-  role_id: number;
-  permission: string;
-  created_at: string;
-}
-
-export interface User {
-  id: number;
-  uuid: string;
-  username: string;
-  display_name: string | null;
-  password_hash: string;
-  role_id: number;
-  avatar: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface KitchenPrinter {
-  id: number;
-  uuid: string;
-  name: string;
-  printer_name: string;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Category {
-  id: number;
-  uuid: string;
-  name: string;
-  sort_order: number;
-  kitchen_printer_id: number | null;
-  is_kitchen_print_enabled: boolean;
-  is_label_print_enabled: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Product {
-  id: number;
-  uuid: string;
-  name: string;
-  image: string | null;
-  category_id: number | null;
-  sort_order: number;
-  tax_rate: number;
-  has_multi_spec: boolean;
-  receipt_name: string | null;
-  kitchen_print_name: string | null;
-  kitchen_printer_id: number | null;
-  is_kitchen_print_enabled: boolean;
-  is_label_print_enabled: boolean;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  // Frontend computed field for quick access to default specification price
-  price?: number;
-}
-
-export interface ProductSpecification {
-  id: number;
-  uuid: string;
-  product_id: number;
-  name: string;
-  receipt_name: string | null;  // Added for spec receipt display
-  price: number;
-  display_order: number;
-  is_default: boolean;
-  is_active: boolean;
-  is_root: boolean;
-  external_id: number | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Tag {
-  id: number;
-  uuid: string;
-  name: string;
-  color: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface SpecificationTag {
-  specification_id: number;
-  tag_id: number;
-  created_at: string;
-}
-
-export interface AttributeTemplate {
-  id: number;
-  uuid: string;
-  name: string;
-  type_: string;
-  display_order: number;
-  is_active: boolean;
-  show_on_receipt: boolean;
-  receipt_name: string | null;
-  kitchen_printer_id: number | null;
-  is_global: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AttributeOption {
-  id: number;
-  uuid: string;
-  attribute_id: number;
-  name: string;
-  value_code: string;
-  price_modifier: number;
-  is_default: boolean;
-  display_order: number;
-  is_active: boolean;
-  receipt_name: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ProductAttribute {
-  id: number;
-  uuid: string;
-  product_id: number;
-  attribute_id: number;
-  is_required: boolean;
-  display_order: number;
-  default_option_id: number | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CategoryAttribute {
-  id: number;
-  uuid: string;
-  category_id: number;
-  attribute_id: number;
-  is_required: boolean;
-  display_order: number;
-  default_option_id: number | null;
-  created_at: string;
-  updated_at: string;
-}
-
-// Product Attribute types
-export interface ProductAttributeData {
-  id: number;
-  product_id: number;
-  attribute_id: number;
-  is_required: boolean;
-  display_order: number;
-  default_option_id: string | null;
-  created_at: number;
-}
-
-export interface ProductAttributeListData {
-  associations: ProductAttributeData[];
-  total: number;
-}
-
-export interface CreateProductAttributeRequest {
-  product_id: number;
-  attribute_id: number;
-  is_required?: boolean;
-  display_order?: number;
-  default_option_id?: string;
-}
-
-export interface UpdateProductAttributeRequest {
-  is_required?: boolean;
-  display_order?: number;
-  default_option_id?: string;
-}
-
-export interface Zone {
-  id: number;
-  uuid: string;
-  name: string;
-  description: string | null;
-  is_active: boolean;
-  surcharge_type?: 'percentage' | 'fixed';
-  surcharge_amount?: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Table {
-  id: number;
-  uuid: string;
-  name: string;
-  zone_id: number;
-  capacity: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PriceAdjustmentRule {
-  id: number;
-  uuid: string;
-  name: string;
-  display_name: string;
-  receipt_name: string;
-  description: string;
-  rule_type: PriceAdjustmentRuleType;
-  product_scope: ProductScope;
-  target_id: number;
-  zone_scope: ZoneScope;
-  adjustment_type: PriceAdjustmentType;
-  adjustment_value: number;
-  priority: number;
-  is_stackable: boolean;
-  time_mode: PriceAdjustmentTimeMode;
-  start_time: string;
-  end_time: string;
-  schedule_config_json: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Order {
-  id: number;
-  uuid: string;
-  order_number: string;
-  status: OrderStatus;
-  total_amount: number;
-  discount_amount: number;
-  tax_amount: number;
-  paid_amount: number;
-  customer_id: number | null;
-  table_id: number | null;
-  note: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface OrderEvent {
-  id: number;
-  uuid: string;
-  order_id: number;
-  status: OrderStatus;
-  note: string | null;
-  created_at: string;
-}
-
-export interface OrderItem {
-  id: number;
-  uuid: string;
-  order_id: number;
-  product_id: number;
-  specification_id: number | null;
-  name: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  note: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface OrderItemOption {
-  id: number;
-  uuid: string;
-  order_item_id: number;
-  attribute_id: number;
-  option_id: number;
-  name: string;
-  price_modifier: number;
-  created_at: string;
-}
-
-export interface Payment {
-  id: number;
-  uuid: string;
-  order_id: number;
-  amount: number;
-  payment_method: string;
-  status: string;
-  transaction_id: string | null;
-  note: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface SystemState {
-  id: number;
-  key: string;
-  value: string;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AuditLog {
-  id: number;
-  uuid: string;
-  user_id: number | null;
-  category: AuditCategory;
-  severity: AuditSeverity;
-  action: string;
-  resource: string | null;
-  resource_id: string | null;
-  details: string | null;
-  ip_address: string | null;
-  created_at: string;
-}
-
-// Enums
-export enum PriceAdjustmentRuleType {
-  Discount = 'discount',
-  Promotion = 'promotion',
-  TimeBased = 'time_based',
-  CategoryBased = 'category_based',
-}
-
-export enum ProductScope {
-  All = 'all',
-  Specific = 'specific',
-  Category = 'category',
-}
-
-export enum ZoneScope {
-  All = 0,
-  Specific = 1,
-}
-
-export enum PriceAdjustmentType {
-  Fixed = 'fixed',
-  Percentage = 'percentage',
-}
-
-export enum PriceAdjustmentTimeMode {
-  None = 'none',
-  Daily = 'daily',
-  Weekly = 'weekly',
-  Range = 'range',
-}
-
-export enum OrderStatus {
-  Pending = 'pending',
-  Confirmed = 'confirmed',
-  Preparing = 'preparing',
-  Ready = 'ready',
-  Served = 'served',
-  Completed = 'completed',
-  Cancelled = 'cancelled',
-}
-
-export enum AuditCategory {
-  Auth = 'auth',
-  User = 'user',
-  Order = 'order',
-  Product = 'product',
-  Payment = 'payment',
-  System = 'system',
-}
-
-export enum AuditSeverity {
-  Info = 'info',
-  Warning = 'warning',
-  Error = 'error',
-}
+// Note: Entity types (Product, Category, Tag, etc.) are exported from './models'
+// which contains SurrealDB-aligned types with string IDs.

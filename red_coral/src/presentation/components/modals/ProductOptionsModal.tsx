@@ -19,7 +19,7 @@ interface ProductOptionsModalProps {
     quantity: number,
     discount: number,
     authorizer?: { id: string; username: string },
-    selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number }
+    selectedSpecification?: { id: string; name: string; receipt_name?: string; price?: number }
   ) => void;
 }
 
@@ -67,19 +67,20 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
 
       attributes.forEach((attr) => {
         const options = allOptions.get(String(attr.id)) || [];
-        const binding = bindings?.find(b => b.attribute_id === attr.id);
+        // binding.out is the attribute ID in HasAttribute relation
+        const binding = bindings?.find(b => b.out === attr.id);
 
         let initialIds: string[] = [];
 
-        // Handle default option from binding
-        const bindingDefaultId = binding?.default_option_id;
+        // Handle default option from binding (default_option_idx is index-based)
+        const bindingDefaultIdx = binding?.default_option_idx;
 
         // Priority 1: Product-specific default from binding
-        if (bindingDefaultId && bindingDefaultId > 0) {
+        if (bindingDefaultIdx !== null && bindingDefaultIdx !== undefined && bindingDefaultIdx >= 0) {
            // Filter to ensure default option actually exists and is active
-           const exists = options.some(opt => opt.id === bindingDefaultId && opt.is_active);
-           if (exists) {
-             initialIds = [String(bindingDefaultId)];
+           const opt = options[bindingDefaultIdx];
+           if (opt && opt.is_active) {
+             initialIds = [String(bindingDefaultIdx)];
            }
         }
 
@@ -87,11 +88,12 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
         if (initialIds.length === 0) {
            initialIds = options
              .filter(opt => opt.is_default && opt.is_active)
-             .map(opt => String(opt.id));
+             .map((_, idx) => String(idx));
         }
 
         // Enforce Single Choice constraints
-        if (attr.type_.startsWith('SINGLE') && initialIds.length > 1) {
+        const isSingleChoice = attr.attr_type.startsWith('SINGLE') || attr.attr_type === 'single_select';
+        if (isSingleChoice && initialIds.length > 1) {
            initialIds = [initialIds[0]];
         }
 
@@ -119,7 +121,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
 
     // Validate required attributes
     for (const attr of attributes) {
-      if (attr.type_.includes('REQUIRED')) {
+      if (attr.attr_type.includes('REQUIRED')) {
         const selected = selections.get(String(attr.id)) || [];
         if (selected.length === 0) {
           toast.error(t('pos.attributeRequired', { name: attr.name }));
@@ -131,38 +133,40 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
     // Build ItemAttributeSelection array
     const result: ItemAttributeSelection[] = [];
 
-    selections.forEach((optionIds, attributeId) => {
+    selections.forEach((optionIdxs, attributeId) => {
       const attr = attributes.find(a => String(a.id) === attributeId);
       if (!attr) return;
 
-      const options = allOptions.get(Number(attributeId)) || [];
+      const options = allOptions.get(attributeId) || [];
 
-      optionIds.forEach((optionId) => {
-        const option = options.find(o => o.id === Number(optionId));
+      optionIdxs.forEach((optionIdxStr) => {
+        const optionIdx = parseInt(optionIdxStr, 10);
+        const option = options[optionIdx];
         if (!option) return;
 
         result.push({
-          attribute_id: attr.id,
+          attribute_id: String(attr.id),
+          option_idx: optionIdx,
+          name: attr.name,
+          value: option.name,
+          price_modifier: option.price_modifier,
           attribute_name: attr.name,
           attribute_receipt_name: attr.receipt_name,
-          kitchen_printer_id: attr.kitchen_printer_id,
-          option_id: option.id,
+          kitchen_printer: attr.kitchen_printer,
           option_name: option.name,
           receipt_name: option.receipt_name,
-          price_modifier: option.price_modifier,
         });
       });
     });
 
     // Get selected specification details
-    let selectedSpec: { id: number; name: string; receiptName?: string | null; price?: number } | undefined;
+    let selectedSpec: { id: string; name: string; receipt_name?: string | null; price?: number } | undefined;
     if (hasMultiSpec && selectedSpecId && specifications) {
-      const spec = specifications.find(s => s.id === Number(selectedSpecId));
+      const spec = specifications.find(s => String(s.id) === selectedSpecId);
       if (spec) {
         selectedSpec = {
-          id: spec.id,
+          id: String(spec.id),
           name: spec.is_root && !spec.name ? t('settings.product.specification.label.default') : spec.name,
-          receiptName: spec.receipt_name,
           price: spec.price,
         };
       }
@@ -173,7 +177,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
 
   // Calculate current price (specification price or base price)
   const currentPrice = hasMultiSpec && selectedSpecId && specifications
-    ? specifications.find(s => s.id === Number(selectedSpecId))?.price || basePrice
+    ? specifications.find(s => String(s.id) === selectedSpecId)?.price || basePrice
     : basePrice;
 
   return (

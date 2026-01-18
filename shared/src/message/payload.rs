@@ -149,6 +149,9 @@ pub struct SyncPayload {
     pub id: Option<String>,
     /// 变更类型 (例如: "created", "updated", "deleted")
     pub action: String,
+    /// 资源数据 (可选，deleted 时为 None)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<serde_json::Value>,
 }
 
 /// 通用响应载荷 (服务端 -> 客户端)

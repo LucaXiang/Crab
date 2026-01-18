@@ -186,6 +186,9 @@ impl TenantManager {
         let session_cache = SessionCache::new(&tenant_path);
         self.session_caches.insert(tenant_id.clone(), session_cache);
 
+        // 7. 自动切换到新激活的租户
+        self.switch_tenant(&tenant_id)?;
+
         tracing::info!(tenant_id = %tenant_id, "Tenant activated successfully");
 
         Ok(tenant_id)

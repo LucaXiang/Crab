@@ -61,11 +61,11 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ id, product }
           className="w-full h-full object-cover pointer-events-none group-hover:scale-105 transition-transform duration-500 ease-out"
           onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
         />
-        {/* External ID Tag - Bottom Left Black/White */}
+        {/* Sort Order Tag - Bottom Left Black/White */}
         <div className="absolute bottom-1 left-1 z-10">
            <div className="bg-black/80 backdrop-blur-[1px] px-1.5 py-0.5 rounded shadow-sm min-w-[20px] flex items-center justify-center">
              <span className="text-[10px] text-white font-medium font-mono leading-none">
-               {product.externalId}
+               {product.sort_order}
              </span>
            </div>
         </div>
@@ -233,7 +233,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
                           <div className="absolute bottom-1 left-1 z-10">
                              <div className="bg-black/80 backdrop-blur-[1px] px-1.5 py-0.5 rounded shadow-sm min-w-[20px] flex items-center justify-center">
                                <span className="text-[10px] text-white font-medium font-mono leading-none">
-                                 {p.externalId}
+                                 {p.sort_order}
                                </span>
                              </div>
                           </div>

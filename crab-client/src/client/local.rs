@@ -216,6 +216,44 @@ impl CrabClient<Local, Authenticated> {
         http.post(path, body).await
     }
 
+    /// Sends a PUT request to the specified path with a JSON body.
+    pub async fn put<T: DeserializeOwned, B: Serialize + Sync>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> ClientResult<T> {
+        let http = self
+            .oneshot_http
+            .as_ref()
+            .ok_or_else(|| ClientError::Config("HTTP client not configured".into()))?;
+
+        http.put(path, body).await
+    }
+
+    /// Sends a DELETE request to the specified path.
+    pub async fn delete<T: DeserializeOwned>(&self, path: &str) -> ClientResult<T> {
+        let http = self
+            .oneshot_http
+            .as_ref()
+            .ok_or_else(|| ClientError::Config("HTTP client not configured".into()))?;
+
+        http.delete(path).await
+    }
+
+    /// Sends a DELETE request with a JSON body.
+    pub async fn delete_with_body<T: DeserializeOwned, B: Serialize + Sync>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> ClientResult<T> {
+        let http = self
+            .oneshot_http
+            .as_ref()
+            .ok_or_else(|| ClientError::Config("HTTP client not configured".into()))?;
+
+        http.delete_with_body(path, body).await
+    }
+
     /// Sends an RPC request via the message bus and waits for a response.
     ///
     /// # Example

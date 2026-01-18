@@ -346,8 +346,8 @@ export const useBridgeStore = create<BridgeStore>()(
     }),
     {
       name: 'bridge-storage',
-      partialize: (state) => ({
-        isFirstRun: state.isFirstRun,
+      partialize: () => ({
+        // Don't persist isFirstRun - it should always come from backend
         // Don't persist session - fetch from backend on startup
       }),
     }

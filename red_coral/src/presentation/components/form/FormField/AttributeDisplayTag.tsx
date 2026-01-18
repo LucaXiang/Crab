@@ -25,13 +25,18 @@ export const AttributeDisplayTag: React.FC<AttributeDisplayTagProps> = ({
   const { getOptionsByAttributeId } = useAttributeStore();
 
   const defaultOptions = useMemo(() => {
-    if (defaultOptionIds.length === 0) return [];
+    if (defaultOptionIds.length === 0 || !attribute.id) return [];
 
-    const allOptions = getOptionsByAttributeId(attribute.id);
+    // attribute.id is string, getOptionsByAttributeId expects number (legacy API)
+    // For now, try parsing as number or use the attribute's embedded options
+    const allOptions = attribute.options || [];
     return defaultOptionIds
-      .map((id) => allOptions.find(o => o.id === Number(id)))
+      .map((idx) => {
+        const index = typeof idx === 'number' ? idx : parseInt(String(idx), 10);
+        return allOptions[index];
+      })
       .filter(Boolean);
-  }, [attribute.id, defaultOptionIds, getOptionsByAttributeId]);
+  }, [attribute.id, attribute.options, defaultOptionIds]);
 
   return (
     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-700 rounded-lg text-sm border border-teal-100">

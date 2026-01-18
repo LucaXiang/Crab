@@ -3,6 +3,7 @@
 //! Handles SurrealDB connection and provides database service
 
 pub mod models;
+pub mod repository;
 
 use crate::utils::AppError;
 use include_dir::{Dir, include_dir};
