@@ -120,7 +120,7 @@ impl ServerState {
         // 2. Initialize Services
         let activation = ActivationService::new(
             config.auth_server_url.clone(),
-            PathBuf::from(&config.work_dir).join("auth_storage"),
+            config.auth_storage_dir(),
         );
         let cert_service = CertService::new(PathBuf::from(&config.work_dir));
         let message_bus = MessageBusService::new(config);

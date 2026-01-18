@@ -16,7 +16,7 @@ use shared::models::{
     Product, ProductCreate, ProductUpdate,
     ProductSpecification, ProductSpecificationCreate, ProductSpecificationUpdate,
     // Attributes
-    Attribute, AttributeCreate, AttributeUpdate,
+    Attribute, AttributeCreate, AttributeUpdate, HasAttribute,
     // Kitchen Printers
     KitchenPrinter, KitchenPrinterCreate, KitchenPrinterUpdate,
 };
@@ -341,4 +341,73 @@ pub async fn update_product_attribute_binding(
 ) -> Result<serde_json::Value, String> {
     let bridge = bridge.read().await;
     bridge.put(&format!("/api/has-attribute/{}", id), &data).await.map_err(|e| e.to_string())
+}
+
+// ============ Category Attributes (Bindings) ============
+
+/// List attributes for a category
+#[tauri::command]
+pub async fn list_category_attributes(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    category_id: String,
+) -> Result<Vec<Attribute>, String> {
+    let bridge = bridge.read().await;
+    bridge.get(&format!("/api/categories/{}/attributes", category_id)).await.map_err(|e| e.to_string())
+}
+
+/// Payload for binding attribute to category
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct BindCategoryAttributePayload {
+    pub is_required: Option<bool>,
+    pub display_order: Option<i32>,
+    pub default_option_idx: Option<i32>,
+}
+
+/// Bind attribute to category
+#[tauri::command]
+pub async fn bind_category_attribute(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    category_id: String,
+    attr_id: String,
+    payload: BindCategoryAttributePayload,
+) -> Result<HasAttribute, String> {
+    let bridge = bridge.read().await;
+    bridge.post(
+        &format!("/api/categories/{}/attributes/{}", category_id, attr_id),
+        &payload,
+    ).await.map_err(|e| e.to_string())
+}
+
+/// Unbind attribute from category
+#[tauri::command]
+pub async fn unbind_category_attribute(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    category_id: String,
+    attr_id: String,
+) -> Result<bool, String> {
+    let bridge = bridge.read().await;
+    bridge.delete(&format!("/api/categories/{}/attributes/{}", category_id, attr_id)).await.map_err(|e| e.to_string())
+}
+
+/// Payload for batch sort order update
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct CategorySortOrderUpdate {
+    pub id: String,
+    pub sort_order: i32,
+}
+
+/// Response for batch update operation
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct BatchUpdateResponse {
+    pub updated: usize,
+}
+
+/// Batch update category sort order
+#[tauri::command]
+pub async fn batch_update_category_sort_order(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    updates: Vec<CategorySortOrderUpdate>,
+) -> Result<BatchUpdateResponse, String> {
+    let bridge = bridge.read().await;
+    bridge.put("/api/categories/sort-order", &updates).await.map_err(|e| e.to_string())
 }

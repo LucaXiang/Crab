@@ -201,6 +201,11 @@ pub async fn run() {
             commands::bind_product_attribute,
             commands::unbind_product_attribute,
             commands::update_product_attribute_binding,
+            // Category-Attribute binding commands
+            commands::list_category_attributes,
+            commands::bind_category_attribute,
+            commands::unbind_category_attribute,
+            commands::batch_update_category_sort_order,
             // Location commands
             commands::list_zones,
             commands::get_zone,
