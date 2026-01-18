@@ -19,6 +19,7 @@ pub use shared;
 
 pub mod commands;
 pub mod core;
+pub mod events;
 
 use core::ClientBridge;
 
