@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
+use dashmap::DashMap;
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
 use shared::message::{BusMessage, SyncPayload};
@@ -11,6 +12,51 @@ use crate::db::DbService;
 use crate::services::{
     ActivationService, CertService, HttpsService, MessageBusService, ProvisioningService,
 };
+
+/// 资源版本管理器
+///
+/// 使用 DashMap 实现无锁并发的版本号管理。
+/// 每种资源类型维护独立的版本号，支持原子递增。
+///
+/// # 使用场景
+///
+/// 用于 broadcast_sync 时自动生成递增的版本号，
+/// 确保客户端可以通过版本号判断数据新旧。
+#[derive(Debug)]
+pub struct ResourceVersions {
+    versions: DashMap<String, u64>,
+}
+
+impl ResourceVersions {
+    /// 创建空的版本管理器
+    pub fn new() -> Self {
+        Self {
+            versions: DashMap::new(),
+        }
+    }
+
+    /// 递增指定资源的版本号并返回新值
+    ///
+    /// 如果资源不存在，从 0 开始递增（返回 1）
+    pub fn increment(&self, resource: &str) -> u64 {
+        let mut entry = self.versions.entry(resource.to_string()).or_insert(0);
+        *entry += 1;
+        *entry
+    }
+
+    /// 获取指定资源的当前版本号
+    ///
+    /// 如果资源不存在，返回 0
+    pub fn get(&self, resource: &str) -> u64 {
+        self.versions.get(resource).map(|v| *v).unwrap_or(0)
+    }
+}
+
+impl Default for ResourceVersions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// 服务器状态 - 持有所有服务的单例引用
 ///
@@ -28,6 +74,7 @@ use crate::services::{
 /// | message_bus | MessageBusService | 消息总线服务 |
 /// | https | HttpsService | HTTPS 服务 |
 /// | jwt_service | Arc<JwtService> | JWT 认证服务 |
+/// | resource_versions | Arc<ResourceVersions> | 资源版本管理 |
 ///
 /// # 使用示例
 ///
@@ -59,6 +106,8 @@ pub struct ServerState {
     pub https: HttpsService,
     /// JWT 认证服务 (Arc 共享所有权)
     pub jwt_service: Arc<JwtService>,
+    /// 资源版本管理器 (用于 broadcast_sync 自动递增版本号)
+    pub resource_versions: Arc<ResourceVersions>,
 }
 
 impl ServerState {
@@ -73,6 +122,7 @@ impl ServerState {
         message_bus: MessageBusService,
         https: HttpsService,
         jwt_service: Arc<JwtService>,
+        resource_versions: Arc<ResourceVersions>,
     ) -> Self {
         Self {
             config,
@@ -82,6 +132,7 @@ impl ServerState {
             message_bus,
             https,
             jwt_service,
+            resource_versions,
         }
     }
 
@@ -126,6 +177,7 @@ impl ServerState {
         let message_bus = MessageBusService::new(config);
         let https = HttpsService::new(config.clone());
         let jwt_service = Arc::new(JwtService::default());
+        let resource_versions = Arc::new(ResourceVersions::new());
 
         let state = Self::new(
             config.clone(),
@@ -135,6 +187,7 @@ impl ServerState {
             message_bus,
             https.clone(),
             jwt_service,
+            resource_versions,
         );
 
         // 3. Late initialization for HttpsService (needs state)
@@ -176,21 +229,22 @@ impl ServerState {
 
     /// 广播同步消息
     ///
-    /// 向所有连接的客户端广播资源变更通知
+    /// 向所有连接的客户端广播资源变更通知。
+    /// 版本号由 ResourceVersions 自动递增管理。
     ///
     /// # 参数
     /// - `resource`: 资源类型 (如 "tag", "product", "category")
-    /// - `id`: 资源 ID (可选)
     /// - `action`: 变更类型 ("created", "updated", "deleted")
+    /// - `id`: 资源 ID
     /// - `data`: 资源数据 (deleted 时为 None)
     pub async fn broadcast_sync<T: serde::Serialize>(
         &self,
         resource: &str,
-        version: u64,
         action: &str,
         id: &str,
         data: Option<&T>,
     ) {
+        let version = self.resource_versions.increment(resource);
         let payload = SyncPayload {
             resource: resource.to_string(),
             version,
