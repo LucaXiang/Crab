@@ -9,6 +9,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { ToastContainer } from '@/presentation/components/Toast';
 import { ProtectedRoute } from '@/presentation/components/ProtectedRoute';
 import { PermissionEscalationProvider } from '@/presentation/components/auth/PermissionEscalationProvider';
+import { NotificationProvider } from '@/presentation/components/notifications';
 
 // Screens
 import { LoginScreen } from '@/screens/Login';
@@ -239,11 +240,12 @@ const App: React.FC = () => {
 
   return (
     <BrowserRouter>
-      {/* Global Toast Container */}
-      <ToastContainer />
-      <PermissionEscalationProvider />
+      <NotificationProvider>
+        {/* Global Toast Container */}
+        <ToastContainer />
+        <PermissionEscalationProvider />
 
-      <Routes>
+        <Routes>
         {/* Setup Routes */}
         <Route path="/setup" element={<SetupScreen />} />
         <Route path="/tenant-select" element={<TenantSelectScreen />} />
@@ -264,7 +266,8 @@ const App: React.FC = () => {
         {/* Default Route - handles first-run detection */}
         <Route path="/" element={<InitialRoute />} />
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+        </Routes>
+      </NotificationProvider>
     </BrowserRouter>
   );
 };
