@@ -146,6 +146,7 @@ pub async fn run() {
             commands::start_server_mode,
             commands::start_client_mode,
             commands::stop_mode,
+            commands::reconnect,
             commands::get_app_config,
             // Tenant commands
             commands::list_tenants,

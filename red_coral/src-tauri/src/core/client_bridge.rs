@@ -694,6 +694,11 @@ impl ClientBridge {
         self.config.read().await.server_config.clone()
     }
 
+    /// 获取客户端模式配置
+    pub async fn get_client_config(&self) -> Option<ClientModeConfig> {
+        self.config.read().await.client_config.clone()
+    }
+
     // ============ 员工认证 ============
 
     /// 员工登录 (使用 CrabClient)

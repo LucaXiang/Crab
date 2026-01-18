@@ -68,6 +68,50 @@ pub async fn check_first_run(
     Ok(tenant_manager.list_tenants().is_empty())
 }
 
+/// 重新连接 (仅 Client 模式)
+#[tauri::command]
+pub async fn reconnect(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+) -> Result<(), String> {
+    // Clone the Arc to work with it independently
+    let bridge_arc = (*bridge).clone();
+
+    // First, read mode info and client config
+    let client_config = {
+        let bridge = bridge_arc.read().await;
+        let mode_info = bridge.get_mode_info().await;
+
+        if mode_info.mode != ModeType::Client {
+            return Err("Reconnect is only available in Client mode".into());
+        }
+
+        // Get client config from the stored AppConfig
+        bridge.get_client_config().await
+    };
+
+    // Extract client config details
+    let client_config = client_config
+        .ok_or("No client configuration found")?;
+
+    // Now stop and restart
+    {
+        let bridge = bridge_arc.read().await;
+        bridge.stop().await.map_err(|e| e.to_string())?;
+    }
+
+    // Restart client mode
+    {
+        let bridge = bridge_arc.read().await;
+        bridge
+            .start_client_mode(&client_config.edge_url, &client_config.message_addr)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    tracing::info!("Client mode reconnected successfully");
+    Ok(())
+}
+
 /// 获取应用配置 (用于前端显示/编辑)
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct AppConfigResponse {
