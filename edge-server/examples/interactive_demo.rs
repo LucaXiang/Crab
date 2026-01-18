@@ -496,8 +496,9 @@ async fn handle_command(app: &mut App, cmd: &str) {
             if let Some(state) = &app.server_state {
                 let payload = shared::message::SyncPayload {
                     resource: resource.clone(),
-                    id: Some(id.clone()),
+                    version: 1, // Demo uses static version
                     action: action.clone(),
+                    id: id.clone(),
                     data: None, // Demo 不发送实际数据
                 };
                 let msg = Message::new(shared::message::EventType::Sync, payload);
