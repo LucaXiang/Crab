@@ -169,6 +169,11 @@ pub async fn run() {
             commands::create_kitchen_printer,
             commands::update_kitchen_printer,
             commands::delete_kitchen_printer,
+            // Product-Attribute binding commands
+            commands::list_product_attributes,
+            commands::bind_product_attribute,
+            commands::unbind_product_attribute,
+            commands::update_product_attribute_binding,
             // Location commands
             commands::list_zones,
             commands::get_zone,
