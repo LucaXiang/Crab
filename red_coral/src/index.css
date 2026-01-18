@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'LXGW WenKai GB';
+  src: url('/src/assets/LXGWWenKaiGB-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@theme {
+  --font-sans: "LXGW WenKai GB", "Consolas", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+:root {
+  font-family: 'LXGW WenKai GB', "Consolas", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  /* Enable font smoothing for better rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Global bold text */
+  font-weight: bold;
+  /* Disable scrolling on body to create an app-like feel */
+  overflow: hidden;
+  /* Prevent rubber-banding/overscroll effects */
+  overscroll-behavior: none;
+  touch-action: pan-x pan-y;
+}
+
+/* Custom scrollbar for webkit */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Performance Mode Styles */
+body.performance-mode,
+body.performance-mode * {
+  /* Force system fonts on ALL elements to override component-specific fonts */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+  
+  /* Revert to default subpixel antialiasing */
+  -webkit-font-smoothing: auto !important;
+  -moz-osx-font-smoothing: auto !important;
+  text-rendering: optimizeLegibility !important;
+}
+
+/* Disable animations and transitions */
+body.performance-mode *,
+body.performance-mode *::before,
+body.performance-mode *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* Remove shadows */
+body.performance-mode .shadow-2xl,
+body.performance-mode .shadow-xl,
+body.performance-mode .shadow-lg,
+body.performance-mode .shadow-md,
+body.performance-mode .shadow-sm,
+body.performance-mode .shadow {
+  box-shadow: none !important;
+  border: 1px solid #e5e7eb !important; /* Add a subtle border to replace shadow */
+}
+
+/* Disable scale effects on hover */
+body.performance-mode .hover\:scale-\[1\.02\]:hover,
+body.performance-mode .hover\:scale-105:hover,
+body.performance-mode .hover\:scale-110:hover,
+body.performance-mode .active\:scale-95:active {
+  transform: none !important;
+}
+
+/* Simplify blur effects */
+body.performance-mode .backdrop-blur-sm,
+body.performance-mode .backdrop-blur-md,
+body.performance-mode .backdrop-blur-lg {
+  backdrop-filter: none !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* High contrast selection */
+body.performance-mode .ring-2,
+body.performance-mode .focus\:ring-2:focus {
+  box-shadow: none !important;
+  outline: 2px solid #3b82f6 !important; /* Fallback outline */
+}
+

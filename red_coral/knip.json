@@ -1,0 +1,11 @@
+{
+  "project": [
+    "src/**/*.{ts,tsx,js,jsx}",
+    "*.{js,cjs,mjs}"
+  ],
+  "ignore": [
+    "**/src-tauri/target/**",
+    "analyze_locales.cjs",
+    "check_i18n.cjs"
+  ]
+}

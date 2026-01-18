@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>RedCoral POS</title>
+    <style>
+      html, body, #root {
+        height: 100%;
+        width: 100%;
+      }
+      body {
+        /* Disable scrolling on body to create an app-like feel */
+        overflow: hidden; 
+      }
+      /* Custom scrollbar for webkit */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.2);
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 h-full w-full overflow-hidden text-gray-800 select-none">
+    <div id="root" class="h-full w-full"></div>
+    <script>
+      // Disable right-click context menu globally
+      document.addEventListener('contextmenu', event => event.preventDefault());
+    </script>
+  <script type="module" src="/src/index.tsx"></script>
+</body>
+</html>
