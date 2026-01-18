@@ -100,15 +100,25 @@ pub async fn run() {
 
             tracing::info!(work_dir = %work_dir.display(), "RedCoral POS starting...");
 
-            // 3. Initialize ClientBridge
+            // 3. Initialize ClientBridge with AppHandle for event emission
             let client_name = format!("redcoral-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("unknown"));
-            let bridge = ClientBridge::new(&work_dir, &client_name)
+            let bridge = ClientBridge::with_app_handle(&work_dir, &client_name, Some(app.handle().clone()))
                 .map_err(|e| format!("Failed to initialize ClientBridge: {}", e))?;
 
             let bridge = Arc::new(RwLock::new(bridge));
+
+            // Auto-restore session in background
+            let bridge_for_task = bridge.clone();
+            tauri::async_runtime::spawn(async move {
+                let bridge = bridge_for_task.read().await;
+                if let Err(e) = bridge.restore_last_session().await {
+                    tracing::error!("Failed to restore session: {}", e);
+                }
+            });
+
             app.manage(bridge);
 
-            tracing::info!("ClientBridge initialized, mode: Disconnected");
+            tracing::info!("ClientBridge initialized, restoring session...");
 
             Ok(())
         })

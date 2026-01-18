@@ -172,6 +172,7 @@ enum ClientMode {
     Server {
         server_state: Arc<ServerState>,
         client: Option<LocalClientState>,
+        server_task: tokio::task::JoinHandle<()>,
     },
     /// Client 模式: 连接远程 edge-server
     Client {
@@ -196,11 +197,22 @@ pub struct ClientBridge {
     /// 基础数据目录
     #[allow(dead_code)]
     base_path: PathBuf,
+    /// Tauri AppHandle for emitting events (optional for testing)
+    app_handle: Option<tauri::AppHandle>,
 }
 
 impl ClientBridge {
-    /// 创建新的 ClientBridge
+    /// 创建新的 ClientBridge (convenience wrapper without AppHandle)
     pub fn new(base_path: impl Into<PathBuf>, client_name: &str) -> Result<Self, BridgeError> {
+        Self::with_app_handle(base_path, client_name, None)
+    }
+
+    /// 创建新的 ClientBridge with optional AppHandle for emitting Tauri events
+    pub fn with_app_handle(
+        base_path: impl Into<PathBuf>,
+        client_name: &str,
+        app_handle: Option<tauri::AppHandle>,
+    ) -> Result<Self, BridgeError> {
         let base_path = base_path.into();
         std::fs::create_dir_all(&base_path)?;
 
@@ -217,7 +229,13 @@ impl ClientBridge {
             config: RwLock::new(config),
             config_path,
             base_path,
+            app_handle,
         })
+    }
+
+    /// Set the app handle after initialization
+    pub fn set_app_handle(&mut self, handle: tauri::AppHandle) {
+        self.app_handle = Some(handle);
     }
 
     /// 保存当前配置
@@ -226,28 +244,180 @@ impl ClientBridge {
         config.save(&self.config_path)
     }
 
+    // ============ 租户管理辅助 ============
+
+    /// 切换当前租户并保存配置
+    pub async fn switch_tenant(&self, tenant_id: &str) -> Result<(), BridgeError> {
+        // Check if we need to restart server
+        let is_server_mode = {
+            let mode = self.mode.read().await;
+            matches!(*mode, ClientMode::Server { .. })
+        };
+
+        // If server mode, stop it first to release resources/locks
+        if is_server_mode {
+            tracing::info!("Stopping server to switch tenant...");
+            self.stop().await?;
+        }
+
+        // 1. 切换内存状态
+        {
+            let mut tm = self.tenant_manager.write().await;
+            tm.switch_tenant(tenant_id)?;
+        }
+
+        // 2. 更新并保存配置
+        {
+            let mut config = self.config.write().await;
+            config.current_tenant = Some(tenant_id.to_string());
+            config.save(&self.config_path)?;
+        }
+
+        // If it was server mode, restart it with new tenant data
+        if is_server_mode {
+            tracing::info!("Restarting server with new tenant...");
+            self.start_server_mode().await?;
+        }
+
+        tracing::info!(tenant_id = %tenant_id, "Switched tenant and saved config");
+        Ok(())
+    }
+
+    /// 激活设备并自动切换租户，保存配置
+    pub async fn handle_activation(
+        &self,
+        auth_url: &str,
+        username: &str,
+        password: &str,
+    ) -> Result<String, BridgeError> {
+        // 1. 调用 TenantManager 激活
+        let tenant_id = {
+            let mut tm = self.tenant_manager.write().await;
+            tm.activate_device(auth_url, username, password).await?
+        };
+
+        // 2. 更新已知租户列表和当前租户
+        {
+            let mut config = self.config.write().await;
+            if !config.known_tenants.contains(&tenant_id) {
+                config.known_tenants.push(tenant_id.clone());
+            }
+            config.current_tenant = Some(tenant_id.clone());
+            config.save(&self.config_path)?;
+        }
+
+        tracing::info!(tenant_id = %tenant_id, "Device activated and config saved");
+        Ok(tenant_id)
+    }
+
     // ============ 模式管理 ============
+
+    /// 恢复上次的会话状态 (启动时调用)
+    pub async fn restore_last_session(&self) -> Result<(), BridgeError> {
+        let config = self.config.read().await;
+        let mode = config.current_mode;
+        let client_config = config.client_config.clone();
+        let current_tenant = config.current_tenant.clone();
+        drop(config);
+
+        // 恢复租户选择
+        if let Some(tenant_id) = current_tenant {
+            tracing::info!("Restoring tenant selection: {}", tenant_id);
+            let mut tm = self.tenant_manager.write().await;
+            if let Err(e) = tm.switch_tenant(&tenant_id) {
+                tracing::warn!("Failed to restore tenant {}: {}", tenant_id, e);
+            }
+        }
+
+        match mode {
+            ModeType::Server => {
+                tracing::info!("Restoring Server mode...");
+                if let Err(e) = self.start_server_mode().await {
+                    tracing::error!("Failed to restore Server mode: {}", e);
+                    // Fallback to disconnected?
+                    // We shouldn't change config here to avoid overwriting user preference on transient errors
+                    return Err(e);
+                }
+            }
+            ModeType::Client => {
+                if let Some(cfg) = client_config {
+                    tracing::info!("Restoring Client mode...");
+                    if let Err(e) = self
+                        .start_client_mode(&cfg.edge_url, &cfg.message_addr)
+                        .await
+                    {
+                        tracing::error!("Failed to restore Client mode: {}", e);
+                        return Err(e);
+                    }
+                } else {
+                    tracing::warn!("Client mode configured but missing client_config");
+                }
+            }
+            ModeType::Disconnected => {
+                tracing::info!("Starting in Disconnected mode");
+            }
+        }
+        Ok(())
+    }
 
     /// 获取当前模式信息
     pub async fn get_mode_info(&self) -> ModeInfo {
         let mode_guard = self.mode.read().await;
         let tenant_manager = self.tenant_manager.read().await;
 
-        let (mode, is_connected, is_authenticated) = match &*mode_guard {
-            ClientMode::Disconnected => (ModeType::Disconnected, false, false),
+        let (mode, is_connected, is_authenticated, client_check_info) = match &*mode_guard {
+            ClientMode::Disconnected => (ModeType::Disconnected, false, false, None),
             ClientMode::Server { client, .. } => {
                 let is_auth = matches!(client, Some(LocalClientState::Authenticated(_)));
-                (ModeType::Server, true, is_auth)
+                // Server mode is always considered connected to itself
+                (ModeType::Server, true, is_auth, None)
             }
-            ClientMode::Client { client, .. } => {
+            ClientMode::Client {
+                client, edge_url, ..
+            } => {
                 let is_auth = matches!(client, Some(RemoteClientState::Authenticated(_)));
-                (ModeType::Client, client.is_some(), is_auth)
+                // Extract info needed for health check
+                let check_info = if let Some(state) = client {
+                    let http = match state {
+                        RemoteClientState::Connected(c) => c.edge_http_client().cloned(),
+                        RemoteClientState::Authenticated(c) => c.edge_http_client().cloned(),
+                    };
+                    Some((edge_url.clone(), http))
+                } else {
+                    None
+                };
+                (ModeType::Client, false, is_auth, check_info)
             }
+        };
+
+        // Release lock before async network call
+        drop(mode_guard);
+
+        // Perform real network health check for Client mode
+        let final_is_connected = if mode == ModeType::Client {
+            if let Some((url, Some(http))) = client_check_info {
+                match http
+                    .get(format!("{}/health", url))
+                    .timeout(std::time::Duration::from_secs(2))
+                    .send()
+                    .await
+                {
+                    Ok(resp) => resp.status().is_success(),
+                    Err(e) => {
+                        tracing::warn!("Health check failed: {}", e);
+                        false
+                    }
+                }
+            } else {
+                false
+            }
+        } else {
+            is_connected
         };
 
         ModeInfo {
             mode,
-            is_connected,
+            is_connected: final_is_connected,
             is_authenticated,
             tenant_id: tenant_manager.current_tenant_id().map(|s| s.to_string()),
             username: tenant_manager.current_session().map(|s| s.username.clone()),
@@ -271,21 +441,48 @@ impl ClientBridge {
         let config = self.config.read().await;
         let server_config = &config.server_config;
 
+        // 获取当前租户目录作为工作目录
+        let tenant_manager = self.tenant_manager.read().await;
+        let work_dir = if let Some(path) = tenant_manager.current_tenant_path() {
+            tracing::info!("Using tenant directory for server: {:?}", path);
+            path.to_string_lossy().to_string()
+        } else {
+            tracing::warn!(
+                "No active tenant, falling back to default data dir: {:?}",
+                server_config.data_dir
+            );
+            server_config.data_dir.to_string_lossy().to_string()
+        };
+        drop(tenant_manager);
+
         // 创建 EdgeServer 配置
         let edge_config = edge_server::Config::builder()
-            .work_dir(server_config.data_dir.to_string_lossy().to_string())
+            .work_dir(work_dir)
             .http_port(server_config.http_port)
             .message_tcp_port(server_config.message_port)
             .build();
 
         // 初始化 ServerState
         let server_state = ServerState::initialize(&edge_config).await;
+        // 注意: initialize 会调用 start_background_tasks (在 Server::run 中也会调用，但多调用一次无害，或者我们可以依靠 Server::run)
+        // 但我们需要 state_arc 来初始化本地客户端
+
+        // 关键修改: 使用 edge_server::Server::run 来启动完整的服务器 (HTTP + TCP + Background Tasks)
+        // 这样可以支持外部客户端连接 (如收银机)
+        let server_instance =
+            edge_server::Server::with_state(edge_config.clone(), server_state.clone());
+
+        let server_task = tokio::spawn(async move {
+            tracing::info!("🚀 Starting Edge Server background task...");
+            if let Err(e) = server_instance.run().await {
+                tracing::error!("❌ Server run error: {}", e);
+            }
+        });
+
         let state_arc = Arc::new(server_state);
 
-        // 启动后台任务
-        state_arc.start_background_tasks().await;
-
         // 获取 Router 和消息通道
+        // 注意: Server::run 会启动 HTTPS 服务，但我们本地 UI 仍然可以使用 router 直接通信 (In-Process)
         let router = state_arc
             .https_service()
             .router()
@@ -306,12 +503,13 @@ impl ClientBridge {
 
         tracing::info!(
             port = server_config.http_port,
-            "Server mode initialized with In-Process client"
+            "Server mode initialized with In-Process client and Background Server"
         );
 
         *mode_guard = ClientMode::Server {
             server_state: state_arc,
             client: Some(LocalClientState::Connected(connected_client)),
+            server_task,
         };
 
         // 更新配置
@@ -403,6 +601,13 @@ impl ClientBridge {
     /// 停止当前模式
     pub async fn stop(&self) -> Result<(), BridgeError> {
         let mut mode_guard = self.mode.write().await;
+
+        // 如果是 Server 模式，中止后台任务
+        if let ClientMode::Server { server_task, .. } = &*mode_guard {
+            server_task.abort();
+            tracing::info!("Server background task aborted");
+        }
+
         *mode_guard = ClientMode::Disconnected;
 
         {
@@ -444,6 +649,7 @@ impl ClientBridge {
             ClientMode::Server {
                 server_state: _,
                 client,
+                ..
             } => {
                 // 取出当前 client
                 let current_client = client.take().ok_or(BridgeError::NotInitialized)?;
@@ -609,6 +815,7 @@ impl ClientBridge {
             ClientMode::Server {
                 server_state: _,
                 client,
+                ..
             } => {
                 if let Some(current_client) = client.take() {
                     match current_client {
