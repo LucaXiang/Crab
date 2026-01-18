@@ -36,6 +36,10 @@ impl FormatTime for LocalTimer {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
+    // Install default crypto provider for rustls
+    // This is required to prevent panic: "Could not automatically determine the process-level CryptoProvider"
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     tauri::Builder::default()
         .setup(|app| {
             // 1. Initialize logging system
@@ -134,6 +138,91 @@ pub async fn run() {
             // Auth commands (ClientBridge-based - unified)
             commands::login_employee,
             commands::logout_employee,
+            // Data commands
+            commands::list_tags,
+            commands::get_tag,
+            commands::create_tag,
+            commands::update_tag,
+            commands::delete_tag,
+            commands::list_categories,
+            commands::get_category,
+            commands::create_category,
+            commands::update_category,
+            commands::delete_category,
+            commands::list_products,
+            commands::get_product,
+            commands::create_product,
+            commands::update_product,
+            commands::delete_product,
+            commands::list_specs,
+            commands::get_spec,
+            commands::create_spec,
+            commands::update_spec,
+            commands::delete_spec,
+            commands::list_attributes,
+            commands::get_attribute,
+            commands::create_attribute,
+            commands::update_attribute,
+            commands::delete_attribute,
+            commands::list_kitchen_printers,
+            commands::get_kitchen_printer,
+            commands::create_kitchen_printer,
+            commands::update_kitchen_printer,
+            commands::delete_kitchen_printer,
+            // Location commands
+            commands::list_zones,
+            commands::get_zone,
+            commands::create_zone,
+            commands::update_zone,
+            commands::delete_zone,
+            commands::list_tables,
+            commands::list_tables_by_zone,
+            commands::get_table,
+            commands::create_table,
+            commands::update_table,
+            commands::delete_table,
+            // Order commands
+            commands::list_orders,
+            commands::list_open_orders,
+            commands::get_order,
+            commands::get_order_by_receipt,
+            commands::get_last_order,
+            commands::verify_order_chain,
+            commands::create_order,
+            commands::add_order_item,
+            commands::remove_order_item,
+            commands::add_order_payment,
+            commands::update_order_totals,
+            commands::update_order_status,
+            commands::update_order_hash,
+            commands::get_order_events,
+            commands::add_order_event,
+            // System commands
+            commands::get_system_state,
+            commands::update_system_state,
+            commands::init_genesis,
+            commands::update_last_order,
+            commands::update_sync_state,
+            commands::get_pending_sync_orders,
+            commands::list_employees,
+            commands::list_all_employees,
+            commands::get_employee,
+            commands::create_employee,
+            commands::update_employee,
+            commands::delete_employee,
+            commands::list_price_rules,
+            commands::list_active_price_rules,
+            commands::get_price_rule,
+            commands::create_price_rule,
+            commands::update_price_rule,
+            commands::delete_price_rule,
+            // Roles commands
+            commands::list_roles,
+            commands::get_role,
+            commands::create_role,
+            commands::update_role,
+            commands::delete_role,
+            commands::get_role_permissions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
