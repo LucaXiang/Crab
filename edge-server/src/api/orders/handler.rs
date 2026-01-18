@@ -100,7 +100,7 @@ pub async fn create(
 
     let id = order.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
     state
-        .broadcast_sync(RESOURCE, 1, "created", &id, Some(&order))
+        .broadcast_sync(RESOURCE, "created", &id, Some(&order))
         .await;
 
     Ok(Json(order))
@@ -119,7 +119,7 @@ pub async fn add_item(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, 1, "item_added", &id, Some(&order))
+        .broadcast_sync(RESOURCE, "item_added", &id, Some(&order))
         .await;
 
     Ok(Json(order))
@@ -144,7 +144,7 @@ pub async fn remove_item(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, 1, "item_removed", &id, Some(&order))
+        .broadcast_sync(RESOURCE, "item_removed", &id, Some(&order))
         .await;
 
     Ok(Json(order))
@@ -163,7 +163,7 @@ pub async fn add_payment(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, 1, "payment_added", &id, Some(&order))
+        .broadcast_sync(RESOURCE, "payment_added", &id, Some(&order))
         .await;
 
     Ok(Json(order))
@@ -195,7 +195,7 @@ pub async fn update_totals(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, 1, "totals_updated", &id, Some(&order))
+        .broadcast_sync(RESOURCE, "totals_updated", &id, Some(&order))
         .await;
 
     Ok(Json(order))
@@ -220,7 +220,7 @@ pub async fn update_status(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, 1, "status_updated", &id, Some(&order))
+        .broadcast_sync(RESOURCE, "status_updated", &id, Some(&order))
         .await;
 
     Ok(Json(order))
@@ -246,7 +246,7 @@ pub async fn update_hash(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, 1, "hash_updated", &id, Some(&order))
+        .broadcast_sync(RESOURCE, "hash_updated", &id, Some(&order))
         .await;
 
     Ok(Json(order))
@@ -280,7 +280,7 @@ pub async fn add_event(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, 1, "event_added", &id, Some(&event))
+        .broadcast_sync(RESOURCE, "event_added", &id, Some(&event))
         .await;
 
     Ok(Json(event))

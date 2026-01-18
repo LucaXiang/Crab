@@ -45,7 +45,7 @@ pub async fn create(
 
     // 广播同步通知
     let id = tag.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
-    state.broadcast_sync(RESOURCE, 1, "created", &id, Some(&tag)).await;
+    state.broadcast_sync(RESOURCE, "created", &id, Some(&tag)).await;
 
     Ok(Json(tag))
 }
@@ -60,7 +60,7 @@ pub async fn update(
     let tag = repo.update(&id, payload).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE, 1, "updated", &id, Some(&tag)).await;
+    state.broadcast_sync(RESOURCE, "updated", &id, Some(&tag)).await;
 
     Ok(Json(tag))
 }
@@ -75,7 +75,7 @@ pub async fn delete(
 
     // 广播同步通知
     if result {
-        state.broadcast_sync::<()>(RESOURCE, 1, "deleted", &id, None).await;
+        state.broadcast_sync::<()>(RESOURCE, "deleted", &id, None).await;
     }
 
     Ok(Json(result))

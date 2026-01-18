@@ -54,7 +54,7 @@ pub async fn create(
     // 广播同步通知
     let id = category.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
     state
-        .broadcast_sync(RESOURCE, 1, "created", &id, Some(&category))
+        .broadcast_sync(RESOURCE, "created", &id, Some(&category))
         .await;
 
     Ok(Json(category.into()))
@@ -74,7 +74,7 @@ pub async fn update(
 
     // 广播同步通知
     state
-        .broadcast_sync(RESOURCE, 1, "updated", &id, Some(&category))
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&category))
         .await;
 
     Ok(Json(category.into()))
@@ -94,7 +94,7 @@ pub async fn delete(
     // 广播同步通知
     if result {
         state
-            .broadcast_sync::<()>(RESOURCE, 1, "deleted", &id, None)
+            .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
             .await;
     }
 
@@ -149,7 +149,7 @@ pub async fn batch_update_sort_order(
 
     // 广播同步通知
     state
-        .broadcast_sync::<()>(RESOURCE, 1, "updated", "batch", None)
+        .broadcast_sync::<()>(RESOURCE, "updated", "batch", None)
         .await;
 
     Ok(Json(BatchUpdateResponse {
@@ -204,7 +204,6 @@ pub async fn bind_category_attribute(
     state
         .broadcast_sync(
             "category_attribute",
-            1,
             "created",
             &format!("{}:{}", category_id, attr_id),
             Some(&binding),
@@ -230,7 +229,6 @@ pub async fn unbind_category_attribute(
         state
             .broadcast_sync::<()>(
                 "category_attribute",
-                1,
                 "deleted",
                 &format!("{}:{}", category_id, attr_id),
                 None,

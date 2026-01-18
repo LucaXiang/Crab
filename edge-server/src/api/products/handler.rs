@@ -87,7 +87,7 @@ pub async fn create(
 
     // 广播同步通知
     let id = product.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
-    state.broadcast_sync(RESOURCE_PRODUCT, 1, "created", &id, Some(&product)).await;
+    state.broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&product)).await;
 
     Ok(Json(product))
 }
@@ -102,7 +102,7 @@ pub async fn update(
     let product = repo.update(&id, payload).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE_PRODUCT, 1, "updated", &id, Some(&product)).await;
+    state.broadcast_sync(RESOURCE_PRODUCT, "updated", &id, Some(&product)).await;
 
     Ok(Json(product))
 }
@@ -117,7 +117,7 @@ pub async fn delete(
 
     // 广播同步通知
     if result {
-        state.broadcast_sync::<()>(RESOURCE_PRODUCT, 1, "deleted", &id, None).await;
+        state.broadcast_sync::<()>(RESOURCE_PRODUCT, "deleted", &id, None).await;
     }
 
     Ok(Json(result))
@@ -151,7 +151,7 @@ pub async fn create_spec(
 
     // 广播同步通知
     let id = spec.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
-    state.broadcast_sync(RESOURCE_SPEC, 1, "created", &id, Some(&spec)).await;
+    state.broadcast_sync(RESOURCE_SPEC, "created", &id, Some(&spec)).await;
 
     Ok(Json(spec))
 }
@@ -166,7 +166,7 @@ pub async fn update_spec(
     let spec = repo.update(&id, payload).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE_SPEC, 1, "updated", &id, Some(&spec)).await;
+    state.broadcast_sync(RESOURCE_SPEC, "updated", &id, Some(&spec)).await;
 
     Ok(Json(spec))
 }
@@ -181,7 +181,7 @@ pub async fn delete_spec(
 
     // 广播同步通知
     if result {
-        state.broadcast_sync::<()>(RESOURCE_SPEC, 1, "deleted", &id, None).await;
+        state.broadcast_sync::<()>(RESOURCE_SPEC, "deleted", &id, None).await;
     }
 
     Ok(Json(result))
@@ -196,7 +196,7 @@ pub async fn add_tag(
     let spec = repo.add_tag(&spec_id, &tag_id).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE_SPEC, 1, "updated", &spec_id, Some(&spec)).await;
+    state.broadcast_sync(RESOURCE_SPEC, "updated", &spec_id, Some(&spec)).await;
 
     Ok(Json(spec))
 }
@@ -210,7 +210,7 @@ pub async fn remove_tag(
     let spec = repo.remove_tag(&spec_id, &tag_id).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE_SPEC, 1, "updated", &spec_id, Some(&spec)).await;
+    state.broadcast_sync(RESOURCE_SPEC, "updated", &spec_id, Some(&spec)).await;
 
     Ok(Json(spec))
 }

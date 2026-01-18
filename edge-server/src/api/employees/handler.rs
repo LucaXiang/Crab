@@ -60,7 +60,7 @@ pub async fn create(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, 1, "created", &employee.id, Some(&employee))
+        .broadcast_sync(RESOURCE, "created", &employee.id, Some(&employee))
         .await;
 
     Ok(Json(employee))
@@ -79,7 +79,7 @@ pub async fn update(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, 1, "updated", &id, Some(&employee))
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&employee))
         .await;
 
     Ok(Json(employee))
@@ -98,7 +98,7 @@ pub async fn delete(
 
     if result {
         state
-            .broadcast_sync::<()>(RESOURCE, 1, "deleted", &id, None)
+            .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
             .await;
     }
 
