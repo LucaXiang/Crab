@@ -2,8 +2,10 @@
 
 use super::{BaseRepository, RepoError, RepoResult, make_thing};
 use crate::db::models::{Category, CategoryCreate, CategoryUpdate};
+use serde::Serialize;
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use surrealdb::sql::Thing;
 
 const TABLE: &str = "category";
 
@@ -70,11 +72,15 @@ impl CategoryRepository {
             )));
         }
 
+        let kitchen_printer = data
+            .kitchen_printer
+            .map(|id| make_thing("kitchen_printer", &id));
+
         let category = Category {
             id: None,
             name: data.name,
             sort_order: data.sort_order.unwrap_or(0),
-            kitchen_printer: data.kitchen_printer,
+            kitchen_printer,
             is_kitchen_print_enabled: data.is_kitchen_print_enabled.unwrap_or(true),
             is_label_print_enabled: data.is_label_print_enabled.unwrap_or(true),
             is_active: true,
@@ -103,7 +109,39 @@ impl CategoryRepository {
             }
         }
 
-        let updated: Option<Category> = self.base.db().update((TABLE, id)).merge(data).await?;
+        #[derive(Serialize)]
+        struct CategoryUpdateDb {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            name: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            sort_order: Option<i32>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            kitchen_printer: Option<Thing>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            is_kitchen_print_enabled: Option<bool>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            is_label_print_enabled: Option<bool>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            is_active: Option<bool>,
+        }
+
+        let update_data = CategoryUpdateDb {
+            name: data.name,
+            sort_order: data.sort_order,
+            kitchen_printer: data
+                .kitchen_printer
+                .map(|id| make_thing("kitchen_printer", &id)),
+            is_kitchen_print_enabled: data.is_kitchen_print_enabled,
+            is_label_print_enabled: data.is_label_print_enabled,
+            is_active: data.is_active,
+        };
+
+        let updated: Option<Category> = self
+            .base
+            .db()
+            .update((TABLE, id))
+            .merge(update_data)
+            .await?;
 
         updated.ok_or_else(|| RepoError::NotFound(format!("Category {} not found", id)))
     }

@@ -13,7 +13,14 @@ import {
 } from '@/core/stores/product/useAttributeStore';
 import { AttributeForm } from './forms/AttributeForm';
 import { OptionForm } from './forms/OptionForm';
-import { AttributeTemplate, AttributeOption, Permission } from '@/core/domain/types';
+import { Permission } from '@/core/domain/types';
+import type { Attribute, AttributeOption } from '@/infrastructure/api/types';
+
+// Extended option type with index for UI (matches store type)
+interface AttributeOptionWithIndex extends AttributeOption {
+  index: number;
+  attributeId: string;
+}
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { ManagementHeader, FilterBar } from './components';
 import { formatCurrency } from '@/utils/currency';
@@ -32,8 +39,8 @@ export const AttributeManagement: React.FC = React.memo(() => {
   // Modal states
   const [attributeFormOpen, setAttributeFormOpen] = useState(false);
   const [optionFormOpen, setOptionFormOpen] = useState(false);
-  const [editingAttribute, setEditingAttribute] = useState<AttributeTemplate | null>(null);
-  const [editingOption, setEditingOption] = useState<AttributeOption | null>(null);
+  const [editingAttribute, setEditingAttribute] = useState<Attribute | null>(null);
+  const [editingOption, setEditingOption] = useState<AttributeOptionWithIndex | null>(null);
   const [selectedAttributeForOption, setSelectedAttributeForOption] = useState<string | null>(null);
 
   // Search state
@@ -96,13 +103,13 @@ export const AttributeManagement: React.FC = React.memo(() => {
     setAttributeFormOpen(true);
   };
 
-  const handleEditAttribute = (attr: AttributeTemplate, e: React.MouseEvent) => {
+  const handleEditAttribute = (attr: Attribute, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingAttribute(attr);
     setAttributeFormOpen(true);
   };
 
-  const handleDeleteAttribute = (attr: AttributeTemplate, e: React.MouseEvent) => {
+  const handleDeleteAttribute = (attr: Attribute, e: React.MouseEvent) => {
     e.stopPropagation();
     setConfirmDialog({
       isOpen: true,
@@ -112,7 +119,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
-          await deleteAttribute(attr.id);
+          await deleteAttribute(String(attr.id));
           toast.success(t('settings.user.message.deleteSuccess'));
         } catch (error: any) {
           console.error('Delete attribute error:', error);
@@ -130,14 +137,14 @@ export const AttributeManagement: React.FC = React.memo(() => {
     setOptionFormOpen(true);
   };
 
-  const handleEditOption = (option: AttributeOption, e: React.MouseEvent) => {
+  const handleEditOption = (option: AttributeOptionWithIndex, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedAttributeForOption(option.attributeId);
     setEditingOption(option);
     setOptionFormOpen(true);
   };
 
-  const handleDeleteOption = (option: AttributeOption, e: React.MouseEvent) => {
+  const handleDeleteOption = (option: AttributeOptionWithIndex, e: React.MouseEvent) => {
     e.stopPropagation();
     setConfirmDialog({
       isOpen: true,
@@ -147,7 +154,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
-          await deleteOption(option.id, option.attributeId);
+          await deleteOption(option.attributeId, option.index);
           toast.success(t('settings.user.message.deleteSuccess'));
         } catch (error: any) {
           console.error('Delete option error:', error);
@@ -217,17 +224,18 @@ export const AttributeManagement: React.FC = React.memo(() => {
         ) : (
           <div className="divide-y divide-gray-100">
             {filteredAttributes.map((attr) => {
-              const isExpanded = expandedAttributes.has(attr.id);
-              const options = allOptions.get(attr.id) || [];
+              const attrId = String(attr.id);
+              const isExpanded = expandedAttributes.has(attrId);
+              const options = allOptions.get(attrId) || [];
 
               return (
                 <div
-                  key={attr.id}
+                  key={attrId}
                   className="transition-all hover:bg-teal-50/30 group"
                 >
                   {/* Attribute Header */}
                   <div
-                    onClick={() => toggleAttribute(attr.id)}
+                    onClick={() => toggleAttribute(attrId)}
                     className={`p-4 cursor-pointer transition-colors ${isExpanded ? 'bg-teal-50/50' : ''}`}
                   >
                     <div className="flex items-center justify-between">
@@ -244,9 +252,9 @@ export const AttributeManagement: React.FC = React.memo(() => {
                               {attr.name}
                             </h3>
                             <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">
-                              {getAttributeTypeLabel(attr.type)}
+                              {getAttributeTypeLabel(attr.attr_type)}
                             </span>
-                            {!attr.isActive && (
+                            {!attr.is_active && (
                               <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
                                 {t('common.inactive')}
                               </span>
@@ -262,7 +270,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                         <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                           <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>
                             <button
-                              onClick={(e) => handleAddOption(attr.id, e)}
+                              onClick={(e) => handleAddOption(attrId, e)}
                               className="p-2 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors"
                               title={t('settings.attribute.option.action.add')}
                             >
@@ -298,7 +306,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                           <span className="mb-2 block text-gray-300"><List size={24} /></span>
                           {t('settings.attribute.option.noData')}
                           <button
-                            onClick={(e) => handleAddOption(attr.id, e)}
+                            onClick={(e) => handleAddOption(attrId, e)}
                             className="mt-2 text-teal-600 hover:text-teal-700 font-medium text-xs hover:underline"
                           >
                             {t('settings.attribute.option.hint.addFirst')}
@@ -308,7 +316,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                         <div className="divide-y divide-gray-100/50">
                           {options.map((option) => (
                             <div
-                              key={option.id}
+                              key={option.index}
                               className="p-3 pl-12 hover:bg-white transition-colors group/opt relative"
                             >
                               <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-transparent group-hover/opt:bg-teal-400 transition-colors"></div>
@@ -316,30 +324,30 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-medium text-gray-700 text-sm">{option.name}</span>
-                                    {option.isDefault && (
+                                    {option.is_default && (
                                       <span className="text-[10px] uppercase tracking-wider bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded border border-teal-200/50">
                                         {t('common.default')}
                                       </span>
                                     )}
-                                    {!option.isActive && (
+                                    {!option.is_active && (
                                       <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
                                         {t('common.inactive')}
                                       </span>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
-                                    {option.valueCode && <span className="font-mono bg-gray-100 px-1 rounded text-gray-600">{option.valueCode}</span>}
+                                    {option.value_code && <span className="font-mono bg-gray-100 px-1 rounded text-gray-600">{option.value_code}</span>}
                                   <span
                                     className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
-                                      option.priceModifier > 0
+                                      option.price_modifier > 0
                                         ? 'bg-orange-50 text-orange-700 border-orange-100'
-                                        : option.priceModifier < 0
+                                        : option.price_modifier < 0
                                         ? 'bg-green-50 text-green-700 border-green-100'
                                         : 'bg-gray-50 text-gray-500 border-gray-100'
                                     }`}
                                   >
-                                    {option.priceModifier > 0 && '+'}
-                                    {formatCurrency(option.priceModifier)}
+                                    {option.price_modifier > 0 && '+'}
+                                    {formatCurrency(option.price_modifier)}
                                   </span>
                                 </div>
                                 </div>

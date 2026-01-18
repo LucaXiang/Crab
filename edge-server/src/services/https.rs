@@ -1,6 +1,6 @@
 use crate::auth::require_auth;
 use crate::core::{Config, ServerState};
-use axum::{middleware, Router};
+use axum::{Router, middleware};
 use axum_server::tls_rustls::RustlsConfig;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
@@ -12,7 +12,10 @@ pub type OneshotResult =
     Result<http::Response<axum::body::Body>, Box<dyn std::error::Error + Send + Sync>>;
 
 /// HTTP 请求日志中间件
-async fn log_request(request: http::Request<axum::body::Body>, next: middleware::Next) -> http::Response<axum::body::Body> {
+async fn log_request(
+    request: http::Request<axum::body::Body>,
+    next: middleware::Next,
+) -> http::Response<axum::body::Body> {
     let method = request.method().clone();
     let uri = request.uri().clone();
 
@@ -27,7 +30,7 @@ async fn log_request(request: http::Request<axum::body::Body>, next: middleware:
 
 /// Build the Axum router (without state)
 pub fn build_app() -> Router<ServerState> {
-    Router::new()
+    Router::<ServerState>::new()
         // Core APIs
         .merge(crate::api::auth::router())
         .merge(crate::api::health::router())
@@ -45,8 +48,6 @@ pub fn build_app() -> Router<ServerState> {
         .merge(crate::api::employees::router())
         .merge(crate::api::orders::router())
         .merge(crate::api::system_state::router())
-        // JWT 认证中间件 - 在 Router 级别应用，require_auth 内部会跳过公共路由
-        .layer(axum::middleware::from_fn(require_auth))
 }
 
 #[derive(Clone, Debug)]
@@ -68,6 +69,9 @@ impl HttpsService {
     pub fn initialize(&self, state: ServerState) {
         // Build the app with state and cache it
         let app = build_app()
+            // JWT 认证中间件 - 在 Router 级别应用，require_auth 内部会跳过公共路由
+            // 使用 from_fn_with_state 以便中间件可以访问 ServerState
+            .layer(middleware::from_fn_with_state(state.clone(), require_auth))
             .with_state(state)
             // Tower HTTP 中间件
             .layer(CorsLayer::permissive())

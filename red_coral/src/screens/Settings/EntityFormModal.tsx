@@ -71,7 +71,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           setCategories(cats);
           // Auto-select first category if none selected and creating a new product
           if (cats.length > 0 && modal.action === 'CREATE' && !formData.categoryId && !defaultCategorySet.current) {
-            setFormData({ categoryId: cats[0].id });
+            setFormData({ categoryId: cats[0].id as unknown as number });
             defaultCategorySet.current = true;
           }
         })
@@ -85,21 +85,19 @@ export const EntityFormModal: React.FC = React.memo(() => {
       const loadProductAttributes = async () => {
         try {
           const resp = await api.fetchProductAttributes(String(modal.data.id));
-          const attributeIds = resp.attributes.map(attr => attr.id);
+          const productAttributes = resp.data?.product_attributes ?? [];
+          const attributeIds = productAttributes.map((attr: { out: string }) => attr.out);
 
-          // Identify inherited attributes
-          const bindings = resp.bindings ?? [];
-          const inherited = bindings
-            .filter(b => b.id.startsWith('global-') || b.id.startsWith('cat-'))
-            .map(b => b.attributeId);
+          // Identify inherited attributes (from global or category bindings)
+          // Note: ProductAttribute.id format may indicate source
+          const inherited: string[] = [];
           setInheritedAttributeIds(inherited);
 
           // Load default options
           const defaultOptions: Record<string, string[]> = {};
-          bindings.forEach(binding => {
-            const defaults = binding.defaultOptionIds || [];
-            if (defaults.length > 0) {
-              defaultOptions[binding.attributeId] = defaults;
+          productAttributes.forEach((binding: { out: string; default_option_idx?: number | null }) => {
+            if (binding.default_option_idx !== null && binding.default_option_idx !== undefined) {
+              defaultOptions[binding.out] = [String(binding.default_option_idx)];
             }
           });
 
@@ -120,7 +118,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
     if (modal.open && modal.entity === 'CATEGORY' && modal.action === 'EDIT' && modal.data?.id) {
       const loadCategoryAttributes = async () => {
         try {
-          const resp = await api.listCategoryAttributes(modal.data.id ? Number(modal.data.id) : undefined);
+          const resp = await api.listCategoryAttributes(modal.data.id ? String(modal.data.id) : undefined);
           const catAttrs = resp.data?.category_attributes || [];
           const attributeIds = catAttrs.map((ca: any) => ca.attribute_id);
 
@@ -203,12 +201,12 @@ export const EntityFormModal: React.FC = React.memo(() => {
   const handleDelete = async () => {
     try {
       if (entity === 'TABLE') {
-        await api.deleteTable(Number(data.id));
+        await api.deleteTable(String(data.id));
         clearZoneTableCache(); // Invalidate tables cache
         toast.success(t('settings.table.action.deleted'));
       } else if (entity === 'ZONE') {
         try {
-          await api.deleteZone(Number(data.id));
+          await api.deleteZone(String(data.id));
           clearZoneTableCache(); // Invalidate zones cache
           toast.success(t('settings.zone.action.deleted'));
         } catch (e: any) {
@@ -221,7 +219,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           return;
         }
       } else if (entity === 'PRODUCT') {
-        await api.deleteProduct(Number(data.id));
+        await api.deleteProduct(String(data.id));
         // Optimistic update: remove from both Settings and ProductStore
         removeProductFromList(data.id);
         // Also remove from ProductStore cache
@@ -231,7 +229,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
         toast.success(t('settings.product.action.deleted'));
       } else if (entity === 'CATEGORY') {
         try {
-          await api.deleteCategory(Number(data.id));
+          await api.deleteCategory(String(data.id));
           clearProductCache(); // Invalidate products + categories cache
           // Refresh categories list
           const resp = await api.listCategories();
@@ -267,11 +265,11 @@ export const EntityFormModal: React.FC = React.memo(() => {
           capacity: Math.max(1, formData.capacity),
         };
         if (action === 'CREATE') {
-          await api.createTable({ name: tableData.name, zone_id: Number(tableData.zoneId), capacity: Number(tableData.capacity) });
+          await api.createTable({ name: tableData.name, zone: String(tableData.zoneId), capacity: Number(tableData.capacity) });
           clearZoneTableCache(); // Invalidate tables cache
           toast.success(t("settings.table.message.created"));
         } else {
-          await api.updateTable(Number(data.id), { name: tableData.name, capacity: Number(tableData.capacity) });
+          await api.updateTable(String(data.id), { name: tableData.name, capacity: Number(tableData.capacity) });
           clearZoneTableCache(); // Invalidate tables cache
           toast.success(t("settings.table.message.updated"));
         }
@@ -286,7 +284,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           clearZoneTableCache(); // Invalidate zones cache
           toast.success(t("settings.zone.message.created"));
         } else {
-          await api.updateZone(Number(data.id), { name: zoneData.name });
+          await api.updateZone(String(data.id), { name: zoneData.name });
           clearZoneTableCache(); // Invalidate zones cache
           toast.success(t("settings.zone.message.updated"));
         }
@@ -324,7 +322,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           };
 
         // Save the selected category for next time (lookup name by ID)
-        const category = categories.find(c => c.id === productData.categoryId);
+        const category = categories.find(c => String(c.id) === String(productData.categoryId));
         if (category) {
           setLastSelectedCategory(category.name);
         }
@@ -332,9 +330,9 @@ export const EntityFormModal: React.FC = React.memo(() => {
         let productId: string;
         if (action === 'CREATE') {
           // Send price as float (backend will convert to cents for storage)
-          const created = await api.createProduct({
+          const resp = await api.createProduct({
             name: productData.name,
-            category_id: productData.categoryId,
+            category: productData.categoryId,
             price: productData.price,
             image: productData.image,
             has_multi_spec: false,
@@ -342,20 +340,22 @@ export const EntityFormModal: React.FC = React.memo(() => {
             sort_order: productData.sortOrder || 0,
             receipt_name: productData.receiptName,
             kitchen_print_name: productData.kitchenPrintName,
-            kitchen_printer_id: productData.kitchenPrinterId,
+            kitchen_printer: productData.kitchenPrinterId,
             is_kitchen_print_enabled: productData.isKitchenPrintEnabled,
             is_label_print_enabled: productData.isLabelPrintEnabled,
-            external_id: productData.externalId,
           });
-          productId = created.id;
+          const created = resp.data?.product;
+          productId = created?.id || '';
           // Optimistic update: add to ProductStore cache
-          addProduct(created);
+          if (created) {
+            addProduct(created);
+          }
           toast.success(t("settings.product.message.created"));
         } else {
           // Send price as float (backend will convert to cents for storage)
-          await api.updateProduct(Number(data.id), {
+          await api.updateProduct(String(data.id), {
             name: productData.name,
-            category_id: productData.categoryId,
+            category: productData.categoryId,
             price: productData.price,
             image: productData.image,
             has_multi_spec: false,
@@ -363,30 +363,27 @@ export const EntityFormModal: React.FC = React.memo(() => {
             sort_order: productData.sortOrder || 0,
             receipt_name: productData.receiptName,
             kitchen_print_name: productData.kitchenPrintName,
-            kitchen_printer_id: productData.kitchenPrinterId,
+            kitchen_printer: productData.kitchenPrinterId,
             is_kitchen_print_enabled: productData.isKitchenPrintEnabled,
             is_label_print_enabled: productData.isLabelPrintEnabled,
-            external_id: productData.externalId,
           });
           productId = data.id;
           // Optimistic update: directly update both Settings and ProductStore
           updateProductInList(data.id, {
             name: productData.name,
-            price: productData.price,
-            categoryId: productData.categoryId,
+            category: String(productData.categoryId),
             image: productData.image,
-            externalId: productData.externalId,
-            receiptName: productData.receiptName,
-            sortOrder: productData.sortOrder,
-            taxRate: productData.taxRate,
-            kitchenPrinterId: productData.kitchenPrinterId,
-            kitchenPrintName: productData.kitchenPrintName,
-            isKitchenPrintEnabled: productData.isKitchenPrintEnabled,
-            isLabelPrintEnabled: productData.isLabelPrintEnabled,
-          });
+            receipt_name: productData.receiptName ?? null,
+            sort_order: productData.sortOrder ?? 0,
+            tax_rate: productData.taxRate ?? 0,
+            kitchen_printer: productData.kitchenPrinterId ? String(productData.kitchenPrinterId) : null,
+            kitchen_print_name: productData.kitchenPrintName ?? null,
+            is_kitchen_print_enabled: productData.isKitchenPrintEnabled ?? -1,
+            is_label_print_enabled: productData.isLabelPrintEnabled ?? -1,
+          } as any);
           // Also update ProductStore cache
           const { products } = productStore.getState();
-          const updatedProducts = products.map(p => p.id === data.id ? { id: data.id, ...productData } : p);
+          const updatedProducts = products.map(p => p.id === data.id ? { ...p, ...productData } : p);
           productStore.setState({ products: updatedProducts });
           toast.success(t("settings.product.message.updated"));
         }
@@ -399,8 +396,12 @@ export const EntityFormModal: React.FC = React.memo(() => {
         if (action === 'EDIT') {
           try {
             const resp = await api.fetchProductAttributes(productId);
-            // existingAttributeIds unused, removed
-            existingBindings = resp.bindings ?? [];
+            const productAttrs = resp.data?.product_attributes ?? [];
+            // Transform to expected format
+            existingBindings = productAttrs.map((pa: any) => ({
+              attributeId: pa.out,
+              id: pa.id
+            }));
           } catch (error) {
             console.error('Failed to fetch existing attributes:', error);
           }
@@ -411,14 +412,14 @@ export const EntityFormModal: React.FC = React.memo(() => {
           selectedAttributeIds,
           formData.attributeDefaultOptions || {},
           existingBindings,
-          async (attrId) => api.unbindProductAttribute(Number(productId), Number(attrId)),
+          async (attrId) => api.unbindProductAttribute(String(attrId)),
           async (attrId, defaultOptionIds, index) => {
             await api.bindProductAttribute({
-              productId,
-              attributeId: attrId,
-              isRequired: false,
-              displayOrder: index,
-              defaultOptionIds
+              product_id: productId,
+              attribute_id: attrId,
+              is_required: false,
+              display_order: index,
+              default_option_id: defaultOptionIds?.[0]
             });
           }
         );
@@ -464,22 +465,25 @@ export const EntityFormModal: React.FC = React.memo(() => {
         const isKitchenPrintEnabled = (formData.isKitchenPrintEnabled as unknown) !== false;
         const isLabelPrintEnabled = (formData.isLabelPrintEnabled as unknown) !== false;
 
+        let categoryId: string;
         if (action === 'CREATE') {
-          await api.createCategory({
+          const resp = await api.createCategory({
             name: categoryName,
             sort_order: formData.sortOrder ?? 0,
-            kitchen_printer_id: formData.kitchenPrinterId ?? undefined,
+            kitchen_printer: formData.kitchenPrinterId ? String(formData.kitchenPrinterId) : undefined,
             is_kitchen_print_enabled: isKitchenPrintEnabled,
             is_label_print_enabled: isLabelPrintEnabled
           });
+          categoryId = resp.data?.category?.id || '';
           clearProductCache(); // Invalidate products + categories cache
           refreshData(); // Trigger UI refresh
           toast.success(t('settings.category.action.createSuccess'));
         } else {
-          await api.updateCategory(Number(data.id), {
+          categoryId = String(data.id);
+          await api.updateCategory(categoryId, {
             name: categoryName,
             sort_order: formData.sortOrder ?? 0,
-            kitchen_printer_id: formData.kitchenPrinterId ?? undefined,
+            kitchen_printer: formData.kitchenPrinterId ? String(formData.kitchenPrinterId) : undefined,
             is_kitchen_print_enabled: isKitchenPrintEnabled,
             is_label_print_enabled: isLabelPrintEnabled
           });
@@ -495,12 +499,12 @@ export const EntityFormModal: React.FC = React.memo(() => {
         let existingBindings: any[] = [];
         if (action === 'EDIT') {
           try {
-            const resp = await api.listCategoryAttributes(Number(categoryName));
+            const resp = await api.listCategoryAttributes(categoryId);
             const catAttrs = resp.data?.category_attributes || [];
             // Transform to expected format for syncAttributeBindings
             existingBindings = catAttrs.map((ca: any) => ({
-              attributeId: ca.attribute_id,
-              defaultOptionId: ca.default_option_id ? String(ca.default_option_id) : undefined
+              attributeId: ca.out,
+              id: ca.id
             }));
           } catch (error) {
             console.error('Failed to fetch existing category attributes:', error);
@@ -512,14 +516,14 @@ export const EntityFormModal: React.FC = React.memo(() => {
           selectedAttributeIds,
           formData.attributeDefaultOptions || {},
           existingBindings,
-          async (attrId) => api.unbindCategoryAttribute(Number(categoryName), Number(attrId)),
+          async (attrId) => api.unbindCategoryAttribute(categoryId, String(attrId)),
           async (attrId, defaultOptionIds, index) => {
             await api.bindCategoryAttribute({
-              categoryId: categoryName,
-              attributeId: attrId,
-              isRequired: false,
-              displayOrder: index,
-              defaultOptionIds
+              category_id: categoryId,
+              attribute_id: attrId,
+              is_required: false,
+              display_order: index,
+              default_option_id: defaultOptionIds?.[0] ? Number(defaultOptionIds[0]) : undefined
             });
           }
         );
@@ -575,7 +579,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
         return (
           <TableForm
             formData={formData}
-            zones={zones}
+            zones={zones as any}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onFieldChange={setFormField as (field: string, value: any) => void}
             t={t}

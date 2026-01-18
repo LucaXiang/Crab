@@ -3,7 +3,7 @@ import { Users, Plus, Filter, Search, Shield, Calendar, Key, Lock, Check, Edit3,
 import { invoke } from '@tauri-apps/api/core';
 import { useI18n } from '@/hooks/useI18n';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
-import { Permission, User, UserRole, Role } from '@/core/domain/types';
+import { Permission, User, Role } from '@/core/domain/types';
 import { useCanManageUsers } from '@/hooks/usePermission';
 import { DataTable, Column } from '@/presentation/components/ui/DataTable';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
@@ -27,7 +27,7 @@ export const UserManagement: React.FC = React.memo(() => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | string>('all');
   const [showInactive, setShowInactive] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
   const [roles, setRoles] = useState<Role[]>([]);
@@ -62,12 +62,12 @@ export const UserManagement: React.FC = React.memo(() => {
 
     // Filter by role
     if (roleFilter !== 'all') {
-      result = result.filter((u) => u.role === roleFilter);
+      result = result.filter((u) => u.role_name === roleFilter);
     }
 
     // Filter inactive
     if (!showInactive) {
-      result = result.filter((u) => u.isActive);
+      result = result.filter((u) => u.is_active);
     }
 
     // Filter by search query
@@ -75,7 +75,7 @@ export const UserManagement: React.FC = React.memo(() => {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (u) =>
-          u.displayName.toLowerCase().includes(q) ||
+          (u.display_name || '').toLowerCase().includes(q) ||
           u.username.toLowerCase().includes(q)
       );
     }
@@ -111,12 +111,12 @@ export const UserManagement: React.FC = React.memo(() => {
       return;
     }
 
-    if (user.isActive) {
+    if (user.is_active) {
       // Disable user logic
       setConfirmDialog({
         isOpen: true,
         title: t('settings.user.action.disable'),
-        description: t('settings.user.confirm.disable', { name: user.displayName }),
+        description: t('settings.user.confirm.disable', { name: user.display_name || user.username }),
         onConfirm: async () => {
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
           try {
@@ -135,7 +135,7 @@ export const UserManagement: React.FC = React.memo(() => {
       setConfirmDialog({
         isOpen: true,
         title: t('settings.user.action.deletePermanently'),
-        description: t('settings.user.confirm.deletePermanently', { name: user.displayName }),
+        description: t('settings.user.confirm.deletePermanently', { name: user.display_name || user.username }),
         onConfirm: async () => {
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
           try {
@@ -152,22 +152,23 @@ export const UserManagement: React.FC = React.memo(() => {
     }
   };
 
-  const getRoleBadgeClass = (role: UserRole) => {
+  const getRoleBadgeClass = (role: string | undefined) => {
     const classes: Record<string, string> = {
       admin: 'bg-red-100 text-red-700',
     };
-    return classes[role] || 'bg-purple-100 text-purple-700';
+    return classes[role || ''] || 'bg-purple-100 text-purple-700';
   };
 
-  const getRoleLabel = (role: UserRole) => {
+  const getRoleLabel = (role: string | undefined) => {
+    if (!role) return '';
     // Try to find in fetched roles first
     const roleObj = roles.find(r => r.name === role);
     if (roleObj) {
         if (role === 'admin') return t('auth.roles.admin');
-        return roleObj.displayName;
+        return roleObj.display_name;
     }
 
-    const labels: Record<UserRole, string> = {
+    const labels: Record<string, string> = {
       admin: t('auth.roles.admin'),
     };
     return labels[role] || role;
@@ -189,12 +190,12 @@ export const UserManagement: React.FC = React.memo(() => {
         render: (user) => (
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-              {user.displayName.charAt(0).toUpperCase()}
+              {(user.display_name || user.username).charAt(0).toUpperCase()}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900">{user.displayName}</span>
-                {!user.isActive && (
+                <span className="font-medium text-gray-900">{user.display_name || user.username}</span>
+                {!user.is_active && (
                   <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">
                     {t('common.inactive')}
                   </span>
@@ -212,11 +213,11 @@ export const UserManagement: React.FC = React.memo(() => {
         render: (user) => (
           <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getRoleBadgeClass(
-              user.role
+              user.role_name
             )}`}
           >
             <Shield size={12} />
-            {getRoleLabel(user.role)}
+            {getRoleLabel(user.role_name)}
           </span>
         ),
       },
@@ -227,7 +228,7 @@ export const UserManagement: React.FC = React.memo(() => {
         render: (user) => (
           <div className="flex items-center gap-1.5 text-sm text-gray-600">
             <Calendar size={14} />
-            <span>{formatDate(user.createdAt)}</span>
+            <span>{formatDate(new Date(user.created_at).getTime() / 1000)}</span>
           </div>
         ),
       },
@@ -266,13 +267,13 @@ export const UserManagement: React.FC = React.memo(() => {
                       handleDeleteUser(user);
                     }}
                     className={`p-2 rounded-lg transition-colors border ${
-                      user.isActive
+                      user.is_active
                         ? 'bg-amber-50 text-amber-600 border-amber-200/50 hover:bg-amber-100'
                         : 'bg-red-50 text-red-600 border-red-200/50 hover:bg-red-100'
                     }`}
-                    title={user.isActive ? t('settings.user.action.disable') : t('settings.user.action.deletePermanently')}
+                    title={user.is_active ? t('settings.user.action.disable') : t('settings.user.action.deletePermanently')}
                   >
-                    {user.isActive ? <Ban size={14} /> : <Trash2 size={14} />}
+                    {user.is_active ? <Ban size={14} /> : <Trash2 size={14} />}
                   </button>
               )}
             </div>
@@ -423,7 +424,7 @@ export const UserManagement: React.FC = React.memo(() => {
         data={filteredUsers}
         columns={columns}
         loading={isLoading}
-        getRowKey={(user) => user.id}
+        getRowKey={(user) => String(user.id)}
         emptyText={t('settings.user.noData')}
         themeColor="blue"
       />

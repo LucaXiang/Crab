@@ -5,10 +5,12 @@ import type {
   ChangePasswordRequest,
   CurrentUserData,
   SuccessData,
+  Product,
   ProductQuery,
   ProductListData,
   CreateProductRequest,
   UpdateProductRequest,
+  Category,
   CategoryData,
   CategoryListData,
   CreateCategoryRequest,
@@ -266,15 +268,15 @@ export class ApiClient {
     return this.request('GET', `/api/products/${id}`);
   }
 
-  async createProduct(data: CreateProductRequest): Promise<ApiResponse<ProductListData['products'][0]>> {
+  async createProduct(data: CreateProductRequest): Promise<ApiResponse<{ product: Product }>> {
     return this.request('POST', '/api/products', { body: data });
   }
 
-  async updateProduct(id: number, data: UpdateProductRequest): Promise<ApiResponse<ProductListData['products'][0]>> {
+  async updateProduct(id: string | number, data: UpdateProductRequest): Promise<ApiResponse<ProductListData['products'][0]>> {
     return this.request('PUT', `/api/products/${id}`, { body: data });
   }
 
-  async deleteProduct(id: number): Promise<ApiResponse<DeleteResponse>> {
+  async deleteProduct(id: string | number): Promise<ApiResponse<DeleteResponse>> {
     return this.request('DELETE', `/api/products/${id}`);
   }
 
@@ -283,19 +285,19 @@ export class ApiClient {
   }
 
   // Product Spec endpoints
-  async listProductSpecs(productId: number): Promise<ApiResponse<ProductSpecListData>> {
+  async listProductSpecs(productId: string | number): Promise<ApiResponse<ProductSpecListData>> {
     return this.request('GET', `/api/products/${productId}/specs`);
   }
 
-  async createProductSpec(productId: number, data: CreateSpecificationRequest): Promise<ApiResponse<ProductSpecification>> {
+  async createProductSpec(productId: string | number, data: CreateSpecificationRequest): Promise<ApiResponse<ProductSpecification>> {
     return this.request('POST', `/api/products/${productId}/specs`, { body: data });
   }
 
-  async updateProductSpec(productId: number, specId: number, data: UpdateSpecificationRequest): Promise<ApiResponse<ProductSpecification>> {
+  async updateProductSpec(productId: string | number, specId: string | number, data: UpdateSpecificationRequest): Promise<ApiResponse<ProductSpecification>> {
     return this.request('PUT', `/api/products/${productId}/specs/${specId}`, { body: data });
   }
 
-  async deleteProductSpec(productId: number, specId: number): Promise<ApiResponse<DeleteResponse>> {
+  async deleteProductSpec(productId: string | number, specId: string | number): Promise<ApiResponse<DeleteResponse>> {
     return this.request('DELETE', `/api/products/${productId}/specs/${specId}`);
   }
 
@@ -304,19 +306,19 @@ export class ApiClient {
     return this.request('GET', '/api/categories');
   }
 
-  async getCategory(id: number): Promise<ApiResponse<CategoryData>> {
+  async getCategory(id: string | number): Promise<ApiResponse<CategoryData>> {
     return this.request('GET', `/api/categories/${id}`);
   }
 
-  async createCategory(data: CreateCategoryRequest): Promise<ApiResponse<CategoryData>> {
+  async createCategory(data: CreateCategoryRequest): Promise<ApiResponse<{ category: Category }>> {
     return this.request('POST', '/api/categories', { body: data });
   }
 
-  async updateCategory(id: number, data: UpdateCategoryRequest): Promise<ApiResponse<CategoryData>> {
+  async updateCategory(id: string | number, data: UpdateCategoryRequest): Promise<ApiResponse<CategoryData>> {
     return this.request('PUT', `/api/categories/${id}`, { body: data });
   }
 
-  async deleteCategory(id: number): Promise<ApiResponse<DeleteResponse>> {
+  async deleteCategory(id: string | number): Promise<ApiResponse<DeleteResponse>> {
     return this.request('DELETE', `/api/categories/${id}`);
   }
 
@@ -324,7 +326,7 @@ export class ApiClient {
     return this.request('POST', '/api/categories/bulk-delete', { body: { ids } });
   }
 
-  async batchUpdateCategorySortOrder(updates: { id: number; sort_order: number }[]): Promise<ApiResponse<DeleteResponse>> {
+  async batchUpdateCategorySortOrder(updates: { id: string | number; sort_order: number }[]): Promise<ApiResponse<DeleteResponse>> {
     return this.request('POST', '/api/categories/batch-sort-order', { body: { updates } });
   }
 
@@ -483,7 +485,7 @@ export class ApiClient {
     return this.request('GET', '/api/zones');
   }
 
-  async getZone(id: number): Promise<ApiResponse<ZoneData>> {
+  async getZone(id: string | number): Promise<ApiResponse<ZoneData>> {
     return this.request('GET', `/api/zones/${id}`);
   }
 
@@ -491,11 +493,11 @@ export class ApiClient {
     return this.request('POST', '/api/zones', { body: data });
   }
 
-  async updateZone(id: number, data: UpdateZoneRequest): Promise<ApiResponse<ZoneData>> {
+  async updateZone(id: string | number, data: UpdateZoneRequest): Promise<ApiResponse<ZoneData>> {
     return this.request('PUT', `/api/zones/${id}`, { body: data });
   }
 
-  async deleteZone(id: number): Promise<ApiResponse<DeleteResponse>> {
+  async deleteZone(id: string | number): Promise<ApiResponse<DeleteResponse>> {
     return this.request('DELETE', `/api/zones/${id}`);
   }
 
@@ -504,11 +506,11 @@ export class ApiClient {
     return this.request('GET', '/api/tables');
   }
 
-  async getTable(id: number): Promise<ApiResponse<TableData>> {
+  async getTable(id: string | number): Promise<ApiResponse<TableData>> {
     return this.request('GET', `/api/tables/${id}`);
   }
 
-  async getTablesByZone(zoneId: number): Promise<ApiResponse<TableListData>> {
+  async getTablesByZone(zoneId: string | number): Promise<ApiResponse<TableListData>> {
     return this.request('GET', `/api/zones/${zoneId}/tables`);
   }
 
@@ -516,16 +518,16 @@ export class ApiClient {
     return this.request('POST', '/api/tables', { body: data });
   }
 
-  async updateTable(id: number, data: UpdateTableRequest): Promise<ApiResponse<TableData>> {
+  async updateTable(id: string | number, data: UpdateTableRequest): Promise<ApiResponse<TableData>> {
     return this.request('PUT', `/api/tables/${id}`, { body: data });
   }
 
-  async deleteTable(id: number): Promise<ApiResponse<DeleteResponse>> {
+  async deleteTable(id: string | number): Promise<ApiResponse<DeleteResponse>> {
     return this.request('DELETE', `/api/tables/${id}`);
   }
 
   // Associations endpoints
-  async listCategoryAttributes(categoryId?: number): Promise<ApiResponse<CategoryAttributeListData>> {
+  async listCategoryAttributes(categoryId?: string | number): Promise<ApiResponse<CategoryAttributeListData>> {
     const query = categoryId ? { category_id: categoryId } : undefined;
     return this.request('GET', '/api/associations/category-attributes', { query });
   }
@@ -542,16 +544,27 @@ export class ApiClient {
     return this.request('DELETE', `/api/associations/category-attributes/${id}`);
   }
 
+  // Alias methods for category attributes (compatible with TauriApiClient naming)
+  async bindCategoryAttribute(data: CreateCategoryAttributeRequest): Promise<ApiResponse<CategoryAttributeData>> {
+    return this.createCategoryAttribute(data);
+  }
+
+  async unbindCategoryAttribute(categoryId: string | number, attributeId: string | number): Promise<ApiResponse<DeleteResponse>> {
+    // Need to find the binding ID first, or use a different approach
+    // For now, use the DELETE endpoint with category_id and attribute_id
+    return this.request('DELETE', `/api/associations/category-attributes/by-pair?category_id=${categoryId}&attribute_id=${attributeId}`);
+  }
+
   // Product Attribute endpoints
-  async listProductAttributes(productId: number): Promise<ApiResponse<ProductAttributeListData>> {
+  async listProductAttributes(productId: string | number): Promise<ApiResponse<ProductAttributeListData>> {
     return this.request('GET', `/api/products/${productId}/attributes`);
   }
 
-  async bindProductAttribute(data: { product_id: number; attribute_id: number; is_required?: boolean; display_order?: number; default_option_id?: string }): Promise<ApiResponse<ProductAttributeData>> {
+  async bindProductAttribute(data: { product_id: string | number; attribute_id: string | number; is_required?: boolean; display_order?: number; default_option_id?: string }): Promise<ApiResponse<ProductAttributeData>> {
     return this.request('POST', '/api/associations/product-attributes', { body: data });
   }
 
-  async unbindProductAttribute(id: number): Promise<ApiResponse<DeleteResponse>> {
+  async unbindProductAttribute(id: string | number): Promise<ApiResponse<DeleteResponse>> {
     return this.request('DELETE', `/api/associations/product-attributes/${id}`);
   }
 
@@ -590,9 +603,8 @@ export class ApiClient {
     return this.request('GET', `/api/products/${productId}/attributes`);
   }
 
-  async fetchProductAttributes(productId: string): Promise<{ attributes: unknown[] }> {
-    const response = await this.getProductAttributes(Number(productId));
-    return { attributes: response.data?.attributes || [] };
+  async fetchProductAttributes(productId: string | number): Promise<ApiResponse<ProductAttributeListData>> {
+    return this.listProductAttributes(Number(productId));
   }
 
   // Data Import/Export endpoints

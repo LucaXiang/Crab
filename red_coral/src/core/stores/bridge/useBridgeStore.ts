@@ -2,9 +2,15 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { invoke } from '@tauri-apps/api/core';
 
+// Import ConnectionStatus from the hook (canonical source)
+import type { ConnectionStatus } from '@/core/hooks/useConnectionStatus';
+
 // Types matching Rust definitions
 export type ModeType = 'Server' | 'Client' | 'Disconnected';
 export type LoginMode = 'Online' | 'Offline';
+
+// Re-export for consumers who import from this file
+export type { ConnectionStatus };
 
 export interface ModeInfo {
   mode: ModeType;
@@ -59,6 +65,7 @@ interface BridgeStore {
   isFirstRun: boolean;
   isLoading: boolean;
   error: string | null;
+  connectionStatus: ConnectionStatus;
 
   // Mode Actions
   fetchModeInfo: () => Promise<void>;
@@ -85,6 +92,9 @@ interface BridgeStore {
   // Auth Actions (unified - ClientBridge based)
   loginEmployee: (username: string, password: string) => Promise<LoginResponse>;
   logoutEmployee: () => Promise<void>;
+
+  // Connection Status Actions
+  setConnectionStatus: (status: ConnectionStatus) => void;
 }
 
 export const useBridgeStore = create<BridgeStore>()(
@@ -97,6 +107,7 @@ export const useBridgeStore = create<BridgeStore>()(
       isFirstRun: true,
       isLoading: false,
       error: null,
+      connectionStatus: { connected: true, reconnecting: false },
 
       // ==================== Mode Actions ====================
 
@@ -343,6 +354,12 @@ export const useBridgeStore = create<BridgeStore>()(
           console.error('Logout failed:', error);
         }
       },
+
+      // ==================== Connection Status ====================
+
+      setConnectionStatus: (status: ConnectionStatus) => {
+        set({ connectionStatus: status });
+      },
     }),
     {
       name: 'bridge-storage',
@@ -362,3 +379,17 @@ export const useTenants = () => useBridgeStore((state) => state.tenants);
 export const useCurrentSession = () => useBridgeStore((state) => state.currentSession);
 export const useBridgeLoading = () => useBridgeStore((state) => state.isLoading);
 export const useBridgeError = () => useBridgeStore((state) => state.error);
+
+/**
+ * Selector for connection status from the bridge store.
+ *
+ * Note: This differs from the `useConnectionStatus` hook in @/core/hooks:
+ * - The hook (`useConnectionStatus`) listens directly to Tauri events and manages local state
+ * - This selector (`useBridgeConnectionStatus`) reads from the global Zustand store
+ *
+ * Intended usage pattern:
+ * - A top-level component (e.g., App.tsx or ConnectionStatusProvider) should use the hook
+ *   to listen for events and call `setConnectionStatus` to update the global store
+ * - Child components can then use this selector to access the connection status
+ */
+export const useBridgeConnectionStatus = () => useBridgeStore((state) => state.connectionStatus);

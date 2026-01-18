@@ -179,7 +179,7 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
       if (selectedId !== NEW_SPEC_ID && selectedSpec) {
         // Update
         if (productId) {
-          await api.updateProductSpec(selectedSpec.id!, {
+          await api.updateProductSpec(productId!, selectedSpec.id!, {
             name: formData.name.trim(),
             price: finalPrice,
             external_id: finalExternalId ?? null,
@@ -211,11 +211,10 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
       } else {
         // Create
         if (productId) {
-          await api.createProductSpec({
-            product: productId,
+          await api.createProductSpec(productId!, {
             name: formData.name.trim(),
             price: finalPrice,
-            external_id: finalExternalId,
+            external_id: finalExternalId?.toString(),
             is_default: formData.is_default,
             is_root: specifications.length === 0, // First one is technically root
             display_order: specifications.length,
@@ -272,7 +271,7 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
       onConfirm: async () => {
         try {
           if (productId) {
-            await api.deleteProductSpec(id);
+            await api.deleteProductSpec(productId!, id);
             toast.success(t("settings.specification.message.deleted"));
             await loadSpecifications();
             if (selectedId === id) setSelectedId(NEW_SPEC_ID);
@@ -297,7 +296,7 @@ export const SpecificationManager: React.FC<SpecificationManagerProps> = ({
 
     try {
       if (productId) {
-        await api.updateProductSpec(spec.id!, {
+        await api.updateProductSpec(productId!, spec.id!, {
           name: spec.name,
           price: spec.price,
           is_default: newDefaultState,

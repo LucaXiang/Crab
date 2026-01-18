@@ -4,15 +4,24 @@
 // 需要启用 "in-process" feature
 
 use async_trait::async_trait;
-use axum::body::Body;
 use axum::Router;
+use axum::body::Body;
 use http::{Request, StatusCode};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
+
+/// Internal response wrapper for Edge Server API (which uses success/data/error format)
+#[derive(serde::Deserialize)]
+struct EdgeResponse<T> {
+    pub success: bool,
+    pub data: Option<T>,
+    pub error: Option<String>,
+}
+
 use tokio::sync::RwLock;
 use tower::ServiceExt;
 
-use crate::{ApiResponse, ClientError, ClientResult, CurrentUserResponse, LoginResponse};
+use crate::{ClientError, ClientResult, CurrentUserResponse, LoginResponse};
 
 use super::http::HttpClient;
 
@@ -64,9 +73,7 @@ impl OneshotHttpClient {
 
     /// 构建带认证头的请求
     async fn build_request(&self, method: http::Method, path: &str) -> Request<Body> {
-        let mut builder = Request::builder()
-            .method(method)
-            .uri(path);
+        let mut builder = Request::builder().method(method).uri(path);
 
         if let Some(token) = self.get_token().await {
             builder = builder.header("Authorization", format!("Bearer {}", token));
@@ -87,9 +94,7 @@ impl OneshotHttpClient {
     ) -> Result<Request<Body>, ClientError> {
         let body_bytes = serde_json::to_vec(body)?;
 
-        let mut builder = Request::builder()
-            .method(method)
-            .uri(path);
+        let mut builder = Request::builder().method(method).uri(path);
 
         if let Some(token) = self.get_token().await {
             builder = builder.header("Authorization", format!("Bearer {}", token));
@@ -143,7 +148,9 @@ impl HttpClient for OneshotHttpClient {
         path: &str,
         body: &B,
     ) -> ClientResult<T> {
-        let request = self.build_request_with_body(http::Method::POST, path, body).await?;
+        let request = self
+            .build_request_with_body(http::Method::POST, path, body)
+            .await?;
         self.execute(request).await
     }
 
@@ -157,7 +164,9 @@ impl HttpClient for OneshotHttpClient {
         path: &str,
         body: &B,
     ) -> ClientResult<T> {
-        let request = self.build_request_with_body(http::Method::PUT, path, body).await?;
+        let request = self
+            .build_request_with_body(http::Method::PUT, path, body)
+            .await?;
         self.execute(request).await
     }
 
@@ -171,31 +180,43 @@ impl HttpClient for OneshotHttpClient {
         path: &str,
         body: &B,
     ) -> ClientResult<T> {
-        let request = self.build_request_with_body(http::Method::DELETE, path, body).await?;
+        let request = self
+            .build_request_with_body(http::Method::DELETE, path, body)
+            .await?;
         self.execute(request).await
     }
 
     async fn login(&self, username: &str, password: &str) -> ClientResult<LoginResponse> {
         use shared::client::LoginRequest;
-        
+
         let req = LoginRequest {
             username: username.to_string(),
             password: password.to_string(),
         };
 
-        let resp: ApiResponse<LoginResponse> = self.post("/api/auth/login", &req).await?;
+        let resp: EdgeResponse<LoginResponse> = self.post("/api/auth/login", &req).await?;
+        if !resp.success {
+            return Err(ClientError::Auth(
+                resp.error.unwrap_or_else(|| "Unknown error".into()),
+            ));
+        }
         resp.data
             .ok_or_else(|| ClientError::InvalidResponse("Missing login data".into()))
     }
 
     async fn me(&self) -> ClientResult<CurrentUserResponse> {
-        let resp: ApiResponse<CurrentUserResponse> = self.get("/api/auth/me").await?;
+        let resp: EdgeResponse<CurrentUserResponse> = self.get("/api/auth/me").await?;
+        if !resp.success {
+            return Err(ClientError::Auth(
+                resp.error.unwrap_or_else(|| "Unknown error".into()),
+            ));
+        }
         resp.data
             .ok_or_else(|| ClientError::InvalidResponse("Missing user data".into()))
     }
 
     async fn logout(&mut self) -> Result<(), ClientError> {
-        self.post_empty::<ApiResponse<()>>("/api/auth/logout").await?;
+        let _resp: EdgeResponse<()> = self.post_empty("/api/auth/logout").await?;
         self.set_token(None).await;
         Ok(())
     }

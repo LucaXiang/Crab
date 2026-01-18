@@ -3,7 +3,7 @@ import { X, User as UserIcon, Mail, Shield, Eye, EyeOff } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useI18n } from '../../../hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
-import { User, UserRole, Role } from '@/core/domain/types';
+import { User, Role } from '@/core/domain/types';
 import { useAuthStore, useCurrentUser } from '@/core/stores/auth/useAuthStore';
 
 interface UserFormModalProps {
@@ -28,7 +28,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
     username: '',
     password: '',
     displayName: '',
-    role: '' as UserRole,
+    role: '' as string,
     isActive: true,
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -56,8 +56,8 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       setFormData({
         username: editingUser.username,
         password: '', // Don't populate password for editing
-        displayName: editingUser.display_name,
-        role: editingUser.role_id,
+        displayName: editingUser.display_name || '',
+        role: String(editingUser.role_id),
         isActive: editingUser.is_active,
       });
     } else if (roles.length > 0) {
@@ -101,18 +101,12 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         toast.success(t("settings.user.message.updateSuccess"));
       } else {
         // Create user
-        if (!currentUser) {
-          throw new Error('No current user');
-        }
-        await createUser(
-          {
-            username: formData.username,
-            password: formData.password,
-            displayName: formData.displayName,
-            role: formData.role,
-          },
-          currentUser.id
-        );
+        await createUser({
+          username: formData.username,
+          password: formData.password,
+          displayName: formData.displayName,
+          role: formData.role,
+        });
         toast.success(t("settings.user.message.createSuccess"));
       }
       onSuccess();
@@ -237,7 +231,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
             </label>
             <select
               value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               disabled={editingUser?.username === 'admin'}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >

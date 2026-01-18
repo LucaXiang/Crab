@@ -110,11 +110,13 @@ impl TenantManager {
 
         // 创建 CertManager
         let cert_manager = CertManager::new(&tenant_path, &self.client_name);
-        self.cert_managers.insert(tenant_id.to_string(), cert_manager);
+        self.cert_managers
+            .insert(tenant_id.to_string(), cert_manager);
 
         // 加载 SessionCache
         let session_cache = SessionCache::load(&tenant_path)?;
-        self.session_caches.insert(tenant_id.to_string(), session_cache);
+        self.session_caches
+            .insert(tenant_id.to_string(), session_cache);
 
         Ok(())
     }
@@ -125,71 +127,120 @@ impl TenantManager {
     pub fn list_tenants(&self) -> Vec<TenantInfo> {
         self.cert_managers
             .iter()
-            .map(|(tenant_id, cert_manager): (&String, &CertManager)| TenantInfo {
-                tenant_id: tenant_id.clone(),
-                tenant_name: None, // TODO: Load from credential
-                has_certificates: cert_manager.has_local_certificates(),
-                last_used: None, // TODO: Track last used time
-            })
+            .map(
+                |(tenant_id, cert_manager): (&String, &CertManager)| TenantInfo {
+                    tenant_id: tenant_id.clone(),
+                    tenant_name: None, // TODO: Load from credential
+                    has_certificates: cert_manager.has_local_certificates(),
+                    last_used: None, // TODO: Track last used time
+                },
+            )
             .collect()
     }
 
-    /// 添加新租户 (设备激活)
+    /// 激活设备 (获取 Edge Server 证书)
     ///
-    /// # Arguments
-    /// * `auth_url` - Auth Server URL
-    /// * `username` - 租户用户名
-    /// * `password` - 租户密码
-    ///
-    /// # Returns
-    /// 返回新激活的 tenant_id
-    pub async fn activate_tenant(
+    /// 这是一个 "Server Activation" 流程，获取的证书可用于：
+    /// 1. 运行 Edge Server (作为 Server Identity)
+    /// 2. 连接其他节点 (作为 Client Identity)
+    pub async fn activate_device(
         &mut self,
         auth_url: &str,
         username: &str,
         password: &str,
     ) -> Result<String, TenantError> {
-        // 1. 创建临时的 CertManager 用于登录
-        let temp_path = self.base_path.join("_temp");
-        std::fs::create_dir_all(&temp_path)?;
+        // 1. 生成 Hardware ID
+        let device_id = crab_cert::generate_hardware_id();
+        tracing::info!("Activating device with ID: {}", device_id);
 
-        let temp_cert_manager = CertManager::new(&temp_path, &self.client_name);
+        // 2. 调用 Auth Server 激活接口
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(format!("{}/api/server/activate", auth_url))
+            .json(&serde_json::json!({
+                "username": username,
+                "password": password,
+                "device_id": device_id,
+            }))
+            .send()
+            .await
+            .map_err(|e| TenantError::Network(e.to_string()))?;
 
-        // 2. 登录获取 credential
-        let credential = temp_cert_manager
-            .login(auth_url, username, password)
-            .await?;
-
-        let tenant_id = credential.tenant_id.clone();
-
-        // 3. 请求证书
-        let (cert_pem, key_pem, ca_cert_pem) = temp_cert_manager
-            .request_certificates(auth_url, credential.token(), &tenant_id)
-            .await?;
-
-        // 4. 移动到正确的租户目录
-        let tenant_path = self.base_path.join(&tenant_id);
-        if tenant_path.exists() {
-            // 租户已存在，更新证书
-            std::fs::remove_dir_all(&tenant_path)?;
+        if !resp.status().is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(TenantError::AuthFailed(format!(
+                "Activation failed: {}",
+                text
+            )));
         }
-        std::fs::rename(&temp_path, &tenant_path)?;
 
-        // 5. 创建正式的 CertManager 并保存证书
-        let cert_manager = CertManager::new(&tenant_path, &self.client_name);
-        cert_manager.save_certificates(&cert_pem, &key_pem, &ca_cert_pem)?;
-        cert_manager.save_credential(&credential)?;
+        // 3. 解析响应
+        let resp_data: shared::activation::ActivationResponse = resp
+            .json()
+            .await
+            .map_err(|e| TenantError::Network(format!("Invalid response: {}", e)))?;
 
-        self.cert_managers.insert(tenant_id.clone(), cert_manager);
+        if !resp_data.success {
+            let msg = resp_data.error.as_deref().unwrap_or("Unknown error");
+            return Err(TenantError::AuthFailed(msg.to_string()));
+        }
 
-        // 6. 创建 SessionCache
-        let session_cache = SessionCache::new(&tenant_path);
-        self.session_caches.insert(tenant_id.clone(), session_cache);
+        let data = resp_data
+            .data
+            .ok_or_else(|| TenantError::AuthFailed("Missing activation data".to_string()))?;
 
-        // 7. 自动切换到新激活的租户
+        let tenant_id = data.tenant_id.clone();
+
+        // 4. 准备租户目录
+        let tenant_path = self.base_path.join(&tenant_id);
+        let certs_path = tenant_path.join("certs");
+        let auth_path = tenant_path.join("auth_storage");
+
+        std::fs::create_dir_all(&certs_path)?;
+        std::fs::create_dir_all(&auth_path)?;
+
+        // 5. 验证证书链 (简化版，完整验证由 edge-server 启动时进行)
+        // 这里主要确保我们拿到了看起来正确的东西
+
+        // 6. 保存证书 (使用 edge-server 兼容的文件名)
+        std::fs::write(certs_path.join("root_ca.pem"), &data.root_ca_cert)?;
+        std::fs::write(certs_path.join("tenant_ca.pem"), &data.tenant_ca_cert)?;
+        std::fs::write(certs_path.join("edge_cert.pem"), &data.entity_cert)?;
+        std::fs::write(certs_path.join("edge_key.pem"), &data.entity_key)?;
+
+        // 兼容 crab-client 的文件名 (用于 Client Mode)
+        // 也可以使用软链接，但为了 Windows 兼容性，复制一份
+        std::fs::write(certs_path.join("cert.pem"), &data.entity_cert)?;
+        std::fs::write(certs_path.join("key.pem"), &data.entity_key)?;
+        std::fs::write(certs_path.join("ca.pem"), &data.tenant_ca_cert)?;
+
+        // 7. 保存 Credential (用于 activation check)
+        // 保存为 Credential.json 到 auth_storage (注意首字母大写，与 edge-server 保持一致)
+        let credential_path = auth_path.join("Credential.json");
+        // 需要包装在 TenantBinding 中，因为 edge-server 期望 {"binding": {...}, "subscription": ...}
+        let tenant_binding =
+            edge_server::services::tenant_binding::TenantBinding::from_signed(data.binding.clone());
+        let credential_json = serde_json::to_string_pretty(&tenant_binding).map_err(|e| {
+            TenantError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+        })?;
+        std::fs::write(credential_path, credential_json)?;
+
+        // 8. 更新内存状态
+        // 我们创建一个 CertManager 指向这个目录，以便兼容现有逻辑
+        // 注意：CertManager 默认期望在 base_path/client_name 下
+        // 这里我们稍微 hack 一下，直接指向 tenant_path
+        // 但 CertManager::new 接受 base_path 和 client_name，然后 join。
+        // 所以我们传 tenant_path 的父目录? 不行，结构不一样。
+
+        // 我们需要手动构建 CertManager 或更新 TenantInfo
+        // 这里暂时不更新 self.cert_managers，因为我们改变了目录结构
+        // 而是重新加载
+        self.load_tenant(&tenant_id)?;
+
+        // 9. 自动切换
         self.switch_tenant(&tenant_id)?;
 
-        tracing::info!(tenant_id = %tenant_id, "Tenant activated successfully");
+        tracing::info!(tenant_id = %tenant_id, "Device activated successfully");
 
         Ok(tenant_id)
     }
@@ -241,11 +292,15 @@ impl TenantManager {
         password: &str,
         edge_url: &str,
     ) -> Result<EmployeeSession, TenantError> {
-        let tenant_id = self.current_tenant.as_ref()
+        let tenant_id = self
+            .current_tenant
+            .as_ref()
             .ok_or(TenantError::NoTenantSelected)?
             .clone();
 
-        let cert_manager = self.cert_managers.get(&tenant_id)
+        let cert_manager = self
+            .cert_managers
+            .get(&tenant_id)
             .ok_or_else(|| TenantError::NotFound(tenant_id.clone()))?;
 
         // 构建 mTLS HTTP 客户端
@@ -263,7 +318,10 @@ impl TenantManager {
             .map_err(|e: reqwest::Error| TenantError::Network(e.to_string()))?;
 
         if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(TenantError::AuthFailed(error_text));
         }
 
@@ -288,11 +346,14 @@ impl TenantManager {
 
         if !login_resp.success {
             return Err(TenantError::AuthFailed(
-                login_resp.error.unwrap_or_else(|| "Unknown error".to_string())
+                login_resp
+                    .error
+                    .unwrap_or_else(|| "Unknown error".to_string()),
             ));
         }
 
-        let data = login_resp.data
+        let data = login_resp
+            .data
             .ok_or_else(|| TenantError::AuthFailed("Missing login data".to_string()))?;
 
         // 创建会话
@@ -326,11 +387,15 @@ impl TenantManager {
         username: &str,
         password: &str,
     ) -> Result<EmployeeSession, TenantError> {
-        let tenant_id = self.current_tenant.as_ref()
+        let tenant_id = self
+            .current_tenant
+            .as_ref()
             .ok_or(TenantError::NoTenantSelected)?
             .clone();
 
-        let cache = self.session_caches.get(&tenant_id)
+        let cache = self
+            .session_caches
+            .get(&tenant_id)
             .ok_or_else(|| TenantError::NotFound(tenant_id.clone()))?;
 
         // 验证离线凭据
@@ -403,8 +468,16 @@ impl TenantManager {
 
     /// 获取当前租户的 CertManager
     pub fn current_cert_manager(&self) -> Option<&CertManager> {
-        self.current_tenant.as_ref()
+        self.current_tenant
+            .as_ref()
             .and_then(|id| self.cert_managers.get(id))
+    }
+
+    /// 获取当前租户目录
+    pub fn current_tenant_path(&self) -> Option<PathBuf> {
+        self.current_tenant
+            .as_ref()
+            .map(|id| self.base_path.join(id))
     }
 
     /// 获取客户端名称

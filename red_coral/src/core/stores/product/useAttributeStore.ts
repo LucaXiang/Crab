@@ -1,29 +1,17 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
+import type { Attribute, AttributeOption } from '@/infrastructure/api/types';
+
+// Extended option type with index for UI purposes
+interface AttributeOptionWithIndex extends AttributeOption {
+  index: number;
+  attributeId: string;
+}
 
 interface AttributeStore {
-  // State
-  attributes: Array<{
-    id: number;
-    name: string;
-    type: string;
-    displayOrder: number;
-    isActive: boolean;
-    showOnReceipt: boolean;
-    receiptName?: string;
-    kitchenPrinterId?: number;
-  }>;
-  options: Map<string, Array<{
-    id: number;
-    attributeId: number;
-    name: string;
-    receiptName?: string;
-    valueCode?: string;
-    priceModifier: number;
-    isDefault: boolean;
-    displayOrder: number;
-    isActive: boolean;
-  }>>;
+  // State - using API types directly
+  attributes: Attribute[];
+  options: Map<string, AttributeOptionWithIndex[]>;
   isLoading: boolean;
   error: string | null;
   selectedAttributeId: string | null;
@@ -35,72 +23,63 @@ interface AttributeStore {
   loadAttributes: () => Promise<void>;
   createAttribute: (params: {
     name: string;
-    type: string;
-    displayOrder?: number;
-    isActive?: boolean;
-    showOnReceipt?: boolean;
-    receiptName?: string;
-    kitchenPrinterId?: number;
+    attr_type: string;
+    display_order?: number;
+    is_active?: boolean;
+    show_on_receipt?: boolean;
+    receipt_name?: string;
+    kitchen_printer?: string;
   }) => Promise<void>;
   updateAttribute: (params: {
-    id: number;
+    id: string;
     name?: string;
-    type?: string;
-    displayOrder?: number;
-    isActive?: boolean;
-    showOnReceipt?: boolean;
-    receiptName?: string;
-    kitchenPrinterId?: number;
+    attr_type?: string;
+    display_order?: number;
+    is_active?: boolean;
+    show_on_receipt?: boolean;
+    receipt_name?: string;
+    kitchen_printer?: string;
   }) => Promise<void>;
   deleteAttribute: (id: string) => Promise<void>;
   loadOptions: (attributeId: string) => Promise<void>;
   createOption: (params: {
-    attributeId: number;
+    attributeId: string;
     name: string;
-    valueCode: string;
-    priceModifier?: number;
-    isDefault?: boolean;
-    displayOrder?: number;
-    isActive?: boolean;
-    receiptName?: string;
+    value_code?: string;
+    price_modifier?: number;
+    is_default?: boolean;
+    display_order?: number;
+    is_active?: boolean;
+    receipt_name?: string;
   }) => Promise<void>;
   updateOption: (params: {
-    id: number;
+    attributeId: string;
+    index: number;
     name?: string;
-    valueCode?: string;
-    priceModifier?: number;
-    isDefault?: boolean;
-    displayOrder?: number;
-    isActive?: boolean;
-    receiptName?: string;
+    value_code?: string;
+    price_modifier?: number;
+    is_default?: boolean;
+    display_order?: number;
+    is_active?: boolean;
+    receipt_name?: string;
   }) => Promise<void>;
-  deleteOption: (id: string) => Promise<void>;
+  deleteOption: (attributeId: string, index: number) => Promise<void>;
   reorderOptions: (attributeId: string, ids: string[]) => Promise<void>;
   bindProductAttribute: (params: {
-    productId: number;
-    attributeId: number;
-    isRequired?: boolean;
-    displayOrder?: number;
-    defaultOptionId?: number;
+    productId: string;
+    attributeId: string;
+    is_required?: boolean;
+    display_order?: number;
+    default_option_idx?: number;
   }) => Promise<void>;
   unbindProductAttribute: (productId: string, attributeId: string) => Promise<void>;
 
   // Helper method to get options by attribute ID
-  getOptionsByAttributeId: (attributeId: number) => Array<{
-    id: number;
-    attributeId: number;
-    name: string;
-    receiptName?: string;
-    valueCode?: string;
-    priceModifier: number;
-    isDefault: boolean;
-    displayOrder: number;
-    isActive: boolean;
-  }>;
+  getOptionsByAttributeId: (attributeId: string) => AttributeOptionWithIndex[];
 }
 
 // Create store with helper functions outside to avoid recreation
-const createAttributeStore = (set: any, get: any) => ({
+const createAttributeStore = (set: any, get: any): AttributeStore => ({
   attributes: [],
   options: new Map(),
   isLoading: false,
@@ -120,7 +99,7 @@ const createAttributeStore = (set: any, get: any) => ({
     }
   },
 
-  createAttribute: async (params: any) => {
+  createAttribute: async (_params: any) => {
     set({ isLoading: true, error: null });
     try {
       throw new Error('Not implemented: Use HTTP API instead');
@@ -129,7 +108,7 @@ const createAttributeStore = (set: any, get: any) => ({
     }
   },
 
-  updateAttribute: async (params: any) => {
+  updateAttribute: async (_params: any) => {
     set({ isLoading: true, error: null });
     try {
       throw new Error('Not implemented: Use HTTP API instead');
@@ -138,7 +117,7 @@ const createAttributeStore = (set: any, get: any) => ({
     }
   },
 
-  deleteAttribute: async (id: string) => {
+  deleteAttribute: async (_id: string) => {
     set({ isLoading: true, error: null });
     try {
       throw new Error('Not implemented: Use HTTP API instead');
@@ -147,7 +126,7 @@ const createAttributeStore = (set: any, get: any) => ({
     }
   },
 
-  loadOptions: async (attributeId: string) => {
+  loadOptions: async (_attributeId: string) => {
     set({ isLoading: true, error: null });
     try {
       throw new Error('Not implemented: Use HTTP API instead');
@@ -156,7 +135,7 @@ const createAttributeStore = (set: any, get: any) => ({
     }
   },
 
-  createOption: async (params: any) => {
+  createOption: async (_params: any) => {
     set({ isLoading: true, error: null });
     try {
       throw new Error('Not implemented: Use HTTP API instead');
@@ -165,7 +144,7 @@ const createAttributeStore = (set: any, get: any) => ({
     }
   },
 
-  updateOption: async (params: any) => {
+  updateOption: async (_params: any) => {
     set({ isLoading: true, error: null });
     try {
       throw new Error('Not implemented: Use HTTP API instead');
@@ -174,7 +153,7 @@ const createAttributeStore = (set: any, get: any) => ({
     }
   },
 
-  deleteOption: async (id: string) => {
+  deleteOption: async (_attributeId: string, _index: number) => {
     set({ isLoading: true, error: null });
     try {
       throw new Error('Not implemented: Use HTTP API instead');
@@ -183,7 +162,7 @@ const createAttributeStore = (set: any, get: any) => ({
     }
   },
 
-  reorderOptions: async (attributeId: string, ids: string[]) => {
+  reorderOptions: async (_attributeId: string, _ids: string[]) => {
     set({ isLoading: true, error: null });
     try {
       throw new Error('Not implemented: Use HTTP API instead');
@@ -192,7 +171,7 @@ const createAttributeStore = (set: any, get: any) => ({
     }
   },
 
-  bindProductAttribute: async (params: any) => {
+  bindProductAttribute: async (_params: any) => {
     set({ isLoading: true, error: null });
     try {
       throw new Error('Not implemented: Use HTTP API instead');
@@ -201,7 +180,7 @@ const createAttributeStore = (set: any, get: any) => ({
     }
   },
 
-  unbindProductAttribute: async (productId: string, attributeId: string) => {
+  unbindProductAttribute: async (_productId: string, _attributeId: string) => {
     set({ isLoading: true, error: null });
     try {
       throw new Error('Not implemented: Use HTTP API instead');
@@ -210,8 +189,8 @@ const createAttributeStore = (set: any, get: any) => ({
     }
   },
 
-  getOptionsByAttributeId: (attributeId: number) => {
-    return get().options.get(String(attributeId)) || [];
+  getOptionsByAttributeId: (attributeId: string): AttributeOptionWithIndex[] => {
+    return get().options.get(attributeId) || [];
   },
 });
 
@@ -264,8 +243,8 @@ export const useOptionActions = () =>
 // Stable helper object - same reference every render
 export const attributeHelpers = {
   getAttributeById: getAttributeByIdHelper,
-  getOptionsByAttributeId: (attributeId: number) => {
-    const opts = attributeStore.getState().options.get(String(attributeId)) || [];
+  getOptionsByAttributeId: (attributeId: string) => {
+    const opts = attributeStore.getState().options.get(attributeId) || [];
     return opts;
   },
 };

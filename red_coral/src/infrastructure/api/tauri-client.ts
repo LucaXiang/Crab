@@ -130,7 +130,7 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ category: Category }>>('get_category', { id });
   }
 
-  async createCategory(data: { name: string; sort_order?: number }): Promise<ApiResponse<{ category: Category }>> {
+  async createCategory(data: Record<string, unknown>): Promise<ApiResponse<{ category: Category }>> {
     return invokeCommand<ApiResponse<{ category: Category }>>('create_category', { data });
   }
 
@@ -168,6 +168,14 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_product', { id });
   }
 
+  async bulkDeleteProducts(ids: number[]): Promise<ApiResponse<{ deleted: boolean }>> {
+    // Delete products one by one (bulk delete may not be implemented in backend)
+    for (const id of ids) {
+      await this.deleteProduct(String(id));
+    }
+    return { data: { deleted: true } } as ApiResponse<{ deleted: boolean }>;
+  }
+
   // ============ Product Specifications ============
 
   async listProductSpecs(productId: string | number): Promise<ApiResponse<ProductSpecListData>> {
@@ -202,8 +210,8 @@ export class TauriApiClient {
 
   // ============ Category Attributes ============
 
-  async listCategoryAttributes(categoryId?: string): Promise<ApiResponse<{ category_attributes: unknown[] }>> {
-    return invokeCommand<ApiResponse<{ category_attributes: unknown[] }>>('list_category_attributes', { category_id: categoryId });
+  async listCategoryAttributes(categoryId?: string | number): Promise<ApiResponse<{ category_attributes: unknown[] }>> {
+    return invokeCommand<ApiResponse<{ category_attributes: unknown[] }>>('list_category_attributes', { category_id: categoryId ? String(categoryId) : undefined });
   }
 
   async bindCategoryAttribute(data: Record<string, unknown>): Promise<ApiResponse<{ binding: unknown }>> {
@@ -250,12 +258,12 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ zone: Zone }>>('create_zone', { data });
   }
 
-  async updateZone(id: string, data: { name?: string; description?: string; is_active?: boolean }): Promise<ApiResponse<{ zone: Zone }>> {
-    return invokeCommand<ApiResponse<{ zone: Zone }>>('update_zone', { id, data });
+  async updateZone(id: string | number, data: { name?: string; description?: string; is_active?: boolean }): Promise<ApiResponse<{ zone: Zone }>> {
+    return invokeCommand<ApiResponse<{ zone: Zone }>>('update_zone', { id: String(id), data });
   }
 
-  async deleteZone(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_zone', { id });
+  async deleteZone(id: string | number): Promise<ApiResponse<{ deleted: boolean }>> {
+    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_zone', { id: String(id) });
   }
 
   // ============ Tables ============
@@ -276,12 +284,12 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ table: Table }>>('create_table', { data });
   }
 
-  async updateTable(id: string, data: { name?: string; zone?: string; capacity?: number; is_active?: boolean }): Promise<ApiResponse<{ table: Table }>> {
-    return invokeCommand<ApiResponse<{ table: Table }>>('update_table', { id, data });
+  async updateTable(id: string | number, data: { name?: string; zone?: string; capacity?: number; is_active?: boolean }): Promise<ApiResponse<{ table: Table }>> {
+    return invokeCommand<ApiResponse<{ table: Table }>>('update_table', { id: String(id), data });
   }
 
-  async deleteTable(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_table', { id });
+  async deleteTable(id: string | number): Promise<ApiResponse<{ deleted: boolean }>> {
+    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_table', { id: String(id) });
   }
 
   // ============ Kitchen Printers ============

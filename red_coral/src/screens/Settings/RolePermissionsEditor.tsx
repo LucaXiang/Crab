@@ -216,9 +216,12 @@ export const RolePermissionsEditor: React.FC = () => {
   };
 
   const getRoleDisplayName = (role: Role) => {
-    if (role.name === 'admin') return t('auth.roles.admin') || role.displayName;
-    return role.displayName;
+    if (role.name === 'admin') return t('auth.roles.admin') || role.display_name;
+    return role.display_name;
   };
+
+  // System roles are protected and cannot be deleted
+  const isSystemRole = (role: Role) => role.name === 'admin';
 
   const permissionGroups = getPermissionGroups();
 
@@ -255,11 +258,11 @@ export const RolePermissionsEditor: React.FC = () => {
                 </span>
               </div>
               
-              {!role.isSystem && (
+              {!isSystemRole(role) && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setConfirmDelete({ isOpen: true, roleId: role.id, roleName: role.displayName });
+                    setConfirmDelete({ isOpen: true, roleId: role.id, roleName: role.display_name });
                   }}
                   className={`p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all ${
                     selectedRole?.id === role.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
@@ -268,7 +271,7 @@ export const RolePermissionsEditor: React.FC = () => {
                   <Trash2 size={14} />
                 </button>
               )}
-              {role.isSystem && (
+              {isSystemRole(role) && (
                 <Shield size={14} className="text-gray-300" />
               )}
             </div>

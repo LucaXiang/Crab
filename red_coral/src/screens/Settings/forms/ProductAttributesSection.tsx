@@ -81,9 +81,9 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
     return [];
   };
 
-  const activeAttributes = attributes.filter(attr => attr.isActive);
-  const selectedAttributes = activeAttributes.filter(attr => selectedAttributeIds.includes(attr.id));
-  const unselectedAttributes = activeAttributes.filter(attr => !selectedAttributeIds.includes(attr.id));
+  const activeAttributes = attributes.filter(attr => attr.is_active);
+  const selectedAttributes = activeAttributes.filter(attr => selectedAttributeIds.includes(String(attr.id)));
+  const unselectedAttributes = activeAttributes.filter(attr => !selectedAttributeIds.includes(String(attr.id)));
 
   const filteredUnselected = unselectedAttributes.filter(attr => 
     attr.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -137,8 +137,8 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
               ) : (
                 filteredUnselected.map(attr => (
                   <button
-                    key={attr.id}
-                    onClick={() => handleAddAttribute(attr.id)}
+                    key={String(attr.id)}
+                    onClick={() => handleAddAttribute(String(attr.id))}
                     className="w-full text-left px-3 py-2 rounded-lg hover:bg-teal-50 hover:text-teal-700 text-sm text-gray-700 flex items-center justify-between group transition-colors"
                   >
                     <span>{attr.name}</span>
@@ -166,32 +166,33 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
            </div>
         ) : (
           selectedAttributes.map((attr) => {
-            const isMulti = attr.type.startsWith('MULTI');
-            const defaultOptions = getDefaultOptions(attr.id);
-            const options = optionsMap.get(attr.id) || [];
+            const attrId = String(attr.id);
+            const isMulti = (attr.attr_type || '').startsWith('MULTI');
+            const defaultOptions = getDefaultOptions(attrId);
+            const options = optionsMap.get(attrId) || [];
             const hasDefault = defaultOptions.length > 0;
 
             return (
-              <div key={attr.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden group hover:border-teal-200 hover:shadow-md transition-all duration-200">
+              <div key={attrId} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden group hover:border-teal-200 hover:shadow-md transition-all duration-200">
                 {/* Header */}
                 <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-gray-800">{attr.name}</span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                      attr.type.includes('REQUIRED') 
-                        ? 'bg-red-50 text-red-600 border-red-100' 
+                      (attr.attr_type || '').includes('REQUIRED')
+                        ? 'bg-red-50 text-red-600 border-red-100'
                         : 'bg-blue-50 text-blue-600 border-blue-100'
                     }`}>
-                      {getAttributeTypeLabel(attr.type)}
+                      {getAttributeTypeLabel(attr.attr_type)}
                     </span>
                   </div>
-                  {inheritedAttributeIds.includes(attr.id) ? (
+                  {inheritedAttributeIds.includes(attrId) ? (
                     <div className="text-gray-400 p-1" title={t('settings.product.attribute.inherited')}>
                       <Lock size={16} />
                     </div>
                   ) : (
-                    <button 
-                      onClick={() => handleRemoveAttribute(attr.id)}
+                    <button
+                      onClick={() => handleRemoveAttribute(attrId)}
                       className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50 opacity-0 group-hover:opacity-100"
                       title={t('common.remove')}
                     >
@@ -207,37 +208,39 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                   ) : (
                     <div className="flex flex-wrap gap-2 max-h-[220px] overflow-y-auto custom-scrollbar content-start">
                       {options.map((opt) => {
-                        const isSelected = defaultOptions.includes(opt.id);
+                        // Use index as option identifier since AttributeOption doesn't have id
+                        const optionKey = String(opt.index);
+                        const isSelected = defaultOptions.includes(optionKey);
                         return (
                           <button
-                            key={opt.id}
+                            key={optionKey}
                             onClick={() => {
                               if (!onDefaultOptionChange) return;
                               let newDefaults: string[];
                               if (isMulti) {
                                 // Multi-select toggle
                                 newDefaults = isSelected
-                                  ? defaultOptions.filter(id => id !== opt.id)
-                                  : [...defaultOptions, opt.id];
+                                  ? defaultOptions.filter(id => id !== optionKey)
+                                  : [...defaultOptions, optionKey];
                               } else {
                                 // Single-select toggle (click selected to unselect)
-                                newDefaults = isSelected ? [] : [opt.id];
+                                newDefaults = isSelected ? [] : [optionKey];
                               }
-                              onDefaultOptionChange(attr.id, newDefaults);
+                              onDefaultOptionChange(attrId, newDefaults);
                             }}
                             className={`
                               relative px-3 py-1.5 rounded-lg text-sm border font-medium transition-all duration-200 flex items-center gap-1.5
-                              ${isSelected 
-                                ? 'bg-teal-500 text-white border-teal-600 shadow-sm ring-2 ring-teal-200 ring-offset-1' 
+                              ${isSelected
+                                ? 'bg-teal-500 text-white border-teal-600 shadow-sm ring-2 ring-teal-200 ring-offset-1'
                                 : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:bg-teal-50'
                               }
                             `}
                           >
                             {isSelected && <Check size={12} strokeWidth={3} />}
                             {opt.name}
-                            {opt.priceModifier !== 0 && (
+                            {opt.price_modifier !== 0 && (
                               <span className={`text-[10px] ml-0.5 ${isSelected ? 'text-teal-100' : 'text-gray-400'}`}>
-                                {opt.priceModifier > 0 ? '+' : ''}{opt.priceModifier}
+                                {opt.price_modifier > 0 ? '+' : ''}{opt.price_modifier}
                               </span>
                             )}
                           </button>

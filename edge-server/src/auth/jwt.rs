@@ -155,10 +155,10 @@ fn load_jwt_secret() -> Result<Vec<u8>, JwtError> {
             #[cfg(debug_assertions)]
             {
                 tracing::warn!(
-                    "⚠️  JWT_SECRET not set! Generating secure temporary key for development."
+                    "⚠️  JWT_SECRET not set! Using fixed development key for stability."
                 );
-                let printable_key = generate_secure_printable_jwt_secret();
-                Ok(printable_key.into_bytes())
+                // Use fixed key for development to avoid token invalidation on restart
+                Ok("CrabEdgeServerDevelopmentSecureKey2024!".as_bytes().to_vec())
             }
             #[cfg(not(debug_assertions))]
             {

@@ -2,3 +2,4 @@
  * Core Hooks - React hooks for Tauri integration
  */
 export * from './useServerMessages';
+export * from './useConnectionStatus';

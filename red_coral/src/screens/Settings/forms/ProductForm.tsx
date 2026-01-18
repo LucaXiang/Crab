@@ -255,8 +255,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         {t('settings.product.print.effectiveState')}: {
                           (() => {
                             if (!isGlobalKitchenEnabled) return (t('common.disabledGlobal'));
-                            const cat = categories.find(c => c.id === formData.categoryId);
-                            const isEnabled = cat ? (cat.isKitchenPrintEnabled !== false) : true;
+                            const cat = categories.find(c => String(c.id) === String(formData.categoryId));
+                            const isEnabled = cat ? (cat.is_kitchen_print_enabled !== false) : true;
                             return isEnabled ? (t('common.enabled')) : (t('common.disabled'));
                           })()
                         }
@@ -321,8 +321,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         {t('settings.product.print.effectiveState')}: {
                           (() => {
                             if (!isGlobalLabelEnabled) return (t('common.disabledGlobal'));
-                            const cat = categories.find(c => c.id === formData.categoryId);
-                            const isEnabled = cat ? (cat.isLabelPrintEnabled !== false) : true;
+                            const cat = categories.find(c => String(c.id) === String(formData.categoryId));
+                            const isEnabled = cat ? (cat.is_label_print_enabled !== false) : true;
                             return isEnabled ? (t('common.enabled')) : (t('common.disabled'));
                           })()
                         }

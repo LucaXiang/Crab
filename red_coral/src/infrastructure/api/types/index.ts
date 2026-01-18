@@ -240,6 +240,7 @@ export interface CreateCategoryRequest {
   name: string;
   sort_order?: number;
   kitchen_printer_id?: number;
+  kitchen_printer?: string;
   is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
 }
@@ -248,6 +249,7 @@ export interface UpdateCategoryRequest {
   name?: string;
   sort_order?: number;
   kitchen_printer_id?: number;
+  kitchen_printer?: string;
   is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
 }
@@ -481,7 +483,8 @@ export interface TableListData {
 
 export interface CreateTableRequest {
   name: string;
-  zone_id: number;
+  zone_id?: number;
+  zone?: string;
   capacity?: number;
 }
 
@@ -503,8 +506,8 @@ export interface CategoryAttributeListData {
 }
 
 export interface CreateCategoryAttributeRequest {
-  category_id: number;
-  attribute_id: number;
+  category_id: string | number;
+  attribute_id: string | number;
   is_required?: boolean;
   display_order?: number;
   default_option_id?: number;

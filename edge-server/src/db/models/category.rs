@@ -44,7 +44,8 @@ impl Category {
 pub struct CategoryCreate {
     pub name: String,
     pub sort_order: Option<i32>,
-    pub kitchen_printer: Option<Thing>,
+    /// Kitchen printer ID (string)
+    pub kitchen_printer: Option<String>,
     pub is_kitchen_print_enabled: Option<bool>,
     pub is_label_print_enabled: Option<bool>,
 }
@@ -53,7 +54,7 @@ pub struct CategoryCreate {
 pub struct CategoryUpdate {
     pub name: Option<String>,
     pub sort_order: Option<i32>,
-    pub kitchen_printer: Option<Thing>,
+    pub kitchen_printer: Option<String>,
     pub is_kitchen_print_enabled: Option<bool>,
     pub is_label_print_enabled: Option<bool>,
     pub is_active: Option<bool>,

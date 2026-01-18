@@ -330,9 +330,9 @@ const KitchenPrinterList = ({ systemPrinters }: { systemPrinters: string[] }) =>
               </div>
               
               <div className="bg-gray-50 rounded-lg px-3 py-2 flex items-center gap-2 text-xs border border-gray-100">
-                <Printer size={12} className={kp.printerName ? "text-gray-500" : "text-red-400"} />
-                <span className={`font-medium ${kp.printerName ? "text-gray-700" : "text-red-500"}`}>
-                  {kp.printerName || (t('settings.printer.message.noPrinter'))}
+                <Printer size={12} className={kp.printer_name ? "text-gray-500" : "text-red-400"} />
+                <span className={`font-medium ${kp.printer_name ? "text-gray-700" : "text-red-500"}`}>
+                  {kp.printer_name || (t('settings.printer.message.noPrinter'))}
                 </span>
               </div>
             </div>

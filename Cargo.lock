@@ -6245,6 +6245,7 @@ dependencies = [
  "bcrypt",
  "chrono",
  "clap",
+ "crab-cert",
  "crab-client",
  "dotenvy",
  "edge-server",

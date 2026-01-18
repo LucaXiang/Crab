@@ -4,8 +4,8 @@ export async function syncAttributeBindings(
   selectedAttributeIds: string[],
   attributeDefaultOptions: Record<string, string | string[]>,
   existingBindings: any[],
-  unbindFn: (attributeId: string) => Promise<void>,
-  bindFn: (attributeId: string, defaultOptionIds: string[], displayOrder: number) => Promise<void>
+  unbindFn: (attributeId: string) => Promise<unknown>,
+  bindFn: (attributeId: string, defaultOptionIds: string[], displayOrder: number) => Promise<unknown>
 ) {
   const existingAttributeIds = existingBindings.map(b => b.attributeId);
 

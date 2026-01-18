@@ -2,17 +2,58 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '../../../hooks/useI18n';
 import { useOptionActions, attributeHelpers } from '@/core/stores/product/useAttributeStore';
-import { AttributeOption } from '@/core/domain/types';
+import type { AttributeOption } from '@/infrastructure/api/types';
 import { FormField, inputClass } from './FormField';
 import { useFormInitialization } from '../../../hooks/useFormInitialization';
 import { usePriceInput } from '../../../hooks/usePriceInput';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 
+// Extended option type with index for UI (matches store type)
+interface AttributeOptionWithIndex extends AttributeOption {
+  index: number;
+  attributeId: string;
+}
+
+// Form state uses camelCase internally
+interface OptionFormData {
+  name: string;
+  receiptName: string;
+  valueCode: string;
+  priceModifier: number;
+  isDefault: boolean;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+// Map AttributeOption (snake_case) to form data (camelCase)
+const mapToFormData = (opt: AttributeOptionWithIndex | null): OptionFormData => {
+  if (!opt) {
+    return {
+      name: '',
+      receiptName: '',
+      valueCode: '',
+      priceModifier: 0,
+      isDefault: false,
+      displayOrder: 0,
+      isActive: true,
+    };
+  }
+  return {
+    name: opt.name,
+    receiptName: opt.receipt_name || '',
+    valueCode: opt.value_code || '',
+    priceModifier: opt.price_modifier,
+    isDefault: opt.is_default,
+    displayOrder: opt.display_order,
+    isActive: opt.is_active,
+  };
+};
+
 interface OptionFormProps {
   isOpen: boolean;
   onClose: () => void;
   attributeId: string;
-  editingOption: AttributeOption | null;
+  editingOption: AttributeOptionWithIndex | null;
 }
 
 export const OptionForm: React.FC<OptionFormProps> = React.memo(({
@@ -28,18 +69,10 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
   const getAttributeById = attributeHelpers.getAttributeById;
   const getOptionsByAttributeId = attributeHelpers.getOptionsByAttributeId;
 
-  // Use form initialization hook
-  const [formData, setFormData] = useFormInitialization(
-    editingOption,
-    {
-      name: '',
-      receiptName: '',
-      valueCode: '',
-      priceModifier: 0,
-      isDefault: false,
-      displayOrder: 0,
-      isActive: true,
-    },
+  // Use form initialization hook with mapped data
+  const [formData, setFormData] = useFormInitialization<OptionFormData>(
+    editingOption ? mapToFormData(editingOption) : null,
+    mapToFormData(null),
     [isOpen]
   );
 
@@ -70,13 +103,13 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
         // Logic to ensure only one default option for Single Choice attributes
         if (data.isDefault) {
           const attribute = getAttributeById(attributeId);
-          if (attribute && (attribute.type === 'SINGLE_REQUIRED' || attribute.type === 'SINGLE_OPTIONAL')) {
+          if (attribute && (attribute.attr_type === 'SINGLE_REQUIRED' || attribute.attr_type === 'SINGLE_OPTIONAL')) {
             const existingOptions = getOptionsByAttributeId(attributeId);
-            const otherDefaults = existingOptions.filter(opt => opt.isDefault);
+            const otherDefaults = existingOptions.filter(opt => opt.is_default);
 
             if (otherDefaults.length > 0) {
               await Promise.all(otherDefaults.map(other =>
-                updateOption({ id: other.id, isDefault: false })
+                updateOption({ attributeId, index: other.index, is_default: false })
               ));
             }
           }
@@ -85,11 +118,11 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
         await createOption({
           attributeId,
           name: data.name.trim(),
-          receiptName: data.receiptName?.trim() || undefined,
-          valueCode: data.valueCode?.trim() || undefined,
-          priceModifier: data.priceModifier,
-          isDefault: data.isDefault,
-          displayOrder: data.displayOrder,
+          receipt_name: data.receiptName?.trim() || undefined,
+          value_code: data.valueCode?.trim() || undefined,
+          price_modifier: data.priceModifier,
+          is_default: data.isDefault,
+          display_order: data.displayOrder,
         });
       },
       onUpdate: async (data) => {
@@ -99,29 +132,30 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
         // Logic to ensure only one default option for Single Choice attributes
         if (data.isDefault) {
           const attribute = getAttributeById(attributeId);
-          if (attribute && (attribute.type === 'SINGLE_REQUIRED' || attribute.type === 'SINGLE_OPTIONAL')) {
+          if (attribute && (attribute.attr_type === 'SINGLE_REQUIRED' || attribute.attr_type === 'SINGLE_OPTIONAL')) {
             const existingOptions = getOptionsByAttributeId(attributeId);
             const otherDefaults = existingOptions.filter(opt =>
-              opt.isDefault && opt.id !== editingOption!.id
+              opt.is_default && opt.index !== editingOption!.index
             );
 
             if (otherDefaults.length > 0) {
               await Promise.all(otherDefaults.map(other =>
-                updateOption({ id: other.id, isDefault: false })
+                updateOption({ attributeId, index: other.index, is_default: false })
               ));
             }
           }
         }
 
         await updateOption({
-          id: editingOption!.id,
+          attributeId,
+          index: editingOption!.index,
           name: data.name.trim(),
-          receiptName: data.receiptName?.trim() || undefined,
-          valueCode: data.valueCode?.trim() || undefined,
-          priceModifier: data.priceModifier,
-          isDefault: data.isDefault,
-          displayOrder: data.displayOrder,
-          isActive: data.isActive,
+          receipt_name: data.receiptName?.trim() || undefined,
+          value_code: data.valueCode?.trim() || undefined,
+          price_modifier: data.priceModifier,
+          is_default: data.isDefault,
+          display_order: data.displayOrder,
+          is_active: data.isActive,
         });
       },
       onSuccess: onClose,

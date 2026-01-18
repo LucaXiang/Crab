@@ -216,36 +216,72 @@ export const LoginScreen: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-900">{t('app.brand.fullName')}</h1>
           </div>
 
-          {/* Mode/Tenant Info */}
-          <div className="flex items-center justify-between p-4 bg-gray-100 rounded-xl">
-            <div className="flex items-center gap-3">
-              {modeInfo?.tenant_id ? (
-                <Building2 size={20} className="text-gray-500" />
-              ) : (
-                <WifiOff size={20} className="text-orange-500" />
-              )}
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  {modeInfo?.tenant_id || 'No Mode Selected'}
-                </p>
-                <p className="text-xs text-gray-500 flex items-center gap-1">
+          {/* Mode/Tenant Info Card */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+            {/* Header: Tenant Info */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 rounded-xl ${
+                  modeInfo?.tenant_id ? 'bg-orange-50 text-[#FF5E5E]' : 'bg-gray-50 text-gray-400'
+                }`}>
+                  {modeInfo?.tenant_id ? <Building2 size={24} /> : <WifiOff size={24} />}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">
+                    {modeInfo?.tenant_id || 'No Tenant Selected'}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {modeInfo?.tenant_id ? 'Active Workspace' : 'Please select a workspace'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/setup', { replace: true })}
+                className="px-3 py-1.5 text-xs font-medium text-[#FF5E5E] bg-[#FF5E5E]/10 hover:bg-[#FF5E5E]/20 rounded-lg transition-colors"
+              >
+                {isDisconnected ? 'Setup' : 'Switch'}
+              </button>
+            </div>
+
+            {/* Status Grid */}
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-50">
+              {/* Mode Status */}
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-500 mb-1">Current Mode</p>
+                <div className="flex items-center gap-2">
                   {modeInfo?.mode === 'Server' ? (
-                    <><Server size={12} className="text-green-500" /> Server Mode</>
+                    <Server size={16} className="text-green-600" />
                   ) : modeInfo?.mode === 'Client' ? (
-                    <><Monitor size={12} className="text-blue-500" /> Client Mode</>
+                    <Monitor size={16} className="text-blue-600" />
                   ) : (
-                    <><WifiOff size={12} className="text-orange-500" /> Disconnected</>
+                    <WifiOff size={16} className="text-gray-400" />
                   )}
-                </p>
+                  <span className={`text-sm font-medium ${
+                    modeInfo?.mode === 'Server' ? 'text-green-700' :
+                    modeInfo?.mode === 'Client' ? 'text-blue-700' :
+                    'text-gray-600'
+                  }`}>
+                    {modeInfo?.mode || 'Disconnected'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Connection Status */}
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-500 mb-1">Connection</p>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    modeInfo?.is_connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                  }`} />
+                  <span className={`text-sm font-medium ${
+                    modeInfo?.is_connected ? 'text-green-700' : 'text-red-700'
+                  }`}>
+                    {modeInfo?.is_connected ? 'Online' : 'Offline'}
+                  </span>
+                </div>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => navigate('/setup', { replace: true })}
-              className="text-sm text-[#FF5E5E] hover:underline"
-            >
-              {isDisconnected ? 'Setup' : 'Switch'}
-            </button>
           </div>
 
           <div className="space-y-2">

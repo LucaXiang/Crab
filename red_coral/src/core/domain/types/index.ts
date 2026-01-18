@@ -167,6 +167,7 @@ export const Permission = {
   MANAGE_PRINTERS: 'manage_printers' as Permission,
   MANAGE_ATTRIBUTES: 'manage_attributes' as Permission,
   MANAGE_SETTINGS: 'manage_settings' as Permission,
+  SYSTEM_SETTINGS: 'system_settings' as Permission,
   PRINT_RECEIPTS: 'print_receipts' as Permission,
   REPRINT_RECEIPT: 'reprint_receipt' as Permission,
   REFUND: 'refund' as Permission,

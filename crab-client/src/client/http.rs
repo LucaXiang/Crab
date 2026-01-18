@@ -1,10 +1,18 @@
 // crab-client/src/client/http.rs
 // HTTP 客户端 - 网络通信
 
-use crate::{ApiResponse, ClientError, ClientResult, CurrentUserResponse, LoginResponse};
+use crate::{ClientError, ClientResult, CurrentUserResponse, LoginResponse};
 use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
 use serde::de::DeserializeOwned;
+
+/// Internal response wrapper for Edge Server API (which uses success/data/error format)
+#[derive(serde::Deserialize)]
+struct EdgeResponse<T> {
+    pub success: bool,
+    pub data: Option<T>,
+    pub error: Option<String>,
+}
 
 /// HTTP 客户端 trait
 #[async_trait]
@@ -161,20 +169,29 @@ impl HttpClient for NetworkHttpClient {
             username: username.to_string(),
             password: password.to_string(),
         };
-        let resp: ApiResponse<LoginResponse> = self.post("/api/auth/login", &req).await?;
+        let resp: EdgeResponse<LoginResponse> = self.post("/api/auth/login", &req).await?;
+        if !resp.success {
+            return Err(ClientError::Auth(
+                resp.error.unwrap_or_else(|| "Unknown error".into()),
+            ));
+        }
         resp.data
             .ok_or_else(|| ClientError::InvalidResponse("Missing login data".into()))
     }
 
     async fn me(&self) -> ClientResult<CurrentUserResponse> {
-        let resp: ApiResponse<CurrentUserResponse> = self.get("/api/auth/me").await?;
+        let resp: EdgeResponse<CurrentUserResponse> = self.get("/api/auth/me").await?;
+        if !resp.success {
+            return Err(ClientError::Auth(
+                resp.error.unwrap_or_else(|| "Unknown error".into()),
+            ));
+        }
         resp.data
             .ok_or_else(|| ClientError::InvalidResponse("Missing user data".into()))
     }
 
     async fn logout(&mut self) -> Result<(), ClientError> {
-        self.post_empty::<ApiResponse<()>>("/api/auth/logout")
-            .await?;
+        let _resp: EdgeResponse<()> = self.post_empty("/api/auth/logout").await?;
         self.token = None;
         Ok(())
     }

@@ -2,17 +2,55 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '../../../hooks/useI18n';
 import { useAttributeActions } from '@/core/stores/product/useAttributeStore';
-import { AttributeTemplate } from '@/core/domain/types';
+import type { Attribute } from '@/infrastructure/api/types';
 import { FormField, inputClass } from './FormField';
 import { useFormInitialization } from '../../../hooks/useFormInitialization';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { SelectField } from '@/presentation/components/form/FormField/SelectField';
 import { KitchenPrinterSelector } from '@/presentation/components/form/FormField/KitchenPrinterSelector';
 
+// Form state uses camelCase internally, converted to snake_case on submit
+interface AttributeFormData {
+  name: string;
+  receiptName: string;
+  type: 'SINGLE_REQUIRED' | 'SINGLE_OPTIONAL' | 'MULTI_REQUIRED' | 'MULTI_OPTIONAL';
+  displayOrder: number;
+  isActive: boolean;
+  showOnReceipt: boolean;
+  kitchenPrinterId: string | null;
+  isGlobal: boolean;
+}
+
+// Map Attribute (snake_case) to form data (camelCase)
+const mapToFormData = (attr: Attribute | null): AttributeFormData => {
+  if (!attr) {
+    return {
+      name: '',
+      receiptName: '',
+      type: 'SINGLE_REQUIRED',
+      displayOrder: 0,
+      isActive: true,
+      showOnReceipt: false,
+      kitchenPrinterId: null,
+      isGlobal: false,
+    };
+  }
+  return {
+    name: attr.name,
+    receiptName: attr.receipt_name || '',
+    type: (attr.attr_type || 'SINGLE_REQUIRED') as AttributeFormData['type'],
+    displayOrder: attr.display_order,
+    isActive: attr.is_active,
+    showOnReceipt: attr.show_on_receipt,
+    kitchenPrinterId: attr.kitchen_printer,
+    isGlobal: attr.is_global,
+  };
+};
+
 interface AttributeFormProps {
   isOpen: boolean;
   onClose: () => void;
-  editingAttribute: AttributeTemplate | null;
+  editingAttribute: Attribute | null;
 }
 
 export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
@@ -23,19 +61,10 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
   const { t } = useI18n();
   const { createAttribute, updateAttribute } = useAttributeActions();
 
-  // Use form initialization hook
-  const [formData, setFormData] = useFormInitialization(
-    editingAttribute,
-    {
-      name: '',
-      receiptName: '',
-      type: 'SINGLE_REQUIRED' as 'SINGLE_REQUIRED' | 'SINGLE_OPTIONAL' | 'MULTI_REQUIRED' | 'MULTI_OPTIONAL',
-      displayOrder: 0,
-      isActive: true,
-      showOnReceipt: false,
-      kitchenPrinterId: null as number | null,
-      isGlobal: false,
-    },
+  // Use form initialization hook with mapped data
+  const [formData, setFormData] = useFormInitialization<AttributeFormData>(
+    editingAttribute ? mapToFormData(editingAttribute) : null,
+    mapToFormData(null),
     [isOpen]
   );
 
@@ -53,25 +82,23 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
       onCreate: async (data) => {
         await createAttribute({
           name: data.name.trim(),
-          type: data.type,
-          displayOrder: data.displayOrder,
-          showOnReceipt: data.showOnReceipt,
-          receiptName: data.receiptName?.trim() || undefined,
-          kitchenPrinterId: data.kitchenPrinterId,
-          isGlobal: data.isGlobal,
+          attr_type: data.type,
+          display_order: data.displayOrder,
+          show_on_receipt: data.showOnReceipt,
+          receipt_name: data.receiptName?.trim() || undefined,
+          kitchen_printer: data.kitchenPrinterId || undefined,
         });
       },
       onUpdate: async (data) => {
         await updateAttribute({
-          id: editingAttribute!.id,
+          id: String(editingAttribute!.id),
           name: data.name.trim(),
-          type: data.type,
-          displayOrder: data.displayOrder,
-          isActive: data.isActive,
-          showOnReceipt: data.showOnReceipt,
-          receiptName: data.receiptName?.trim() || undefined,
-          kitchenPrinterId: data.kitchenPrinterId,
-          isGlobal: data.isGlobal,
+          attr_type: data.type,
+          display_order: data.displayOrder,
+          is_active: data.isActive,
+          show_on_receipt: data.showOnReceipt,
+          receipt_name: data.receiptName?.trim() || undefined,
+          kitchen_printer: data.kitchenPrinterId || undefined,
         });
       },
       onSuccess: onClose,

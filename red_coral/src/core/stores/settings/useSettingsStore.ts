@@ -27,8 +27,10 @@ interface Zone {
 interface Table {
   id: string;
   name: string;
-  zoneId: string;
-  capacity: number;
+  zoneId?: string;
+  zone_id?: string;
+  capacity?: number;
+  seats?: number;
 }
 
 interface Product {
