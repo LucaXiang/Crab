@@ -113,6 +113,11 @@ pub async fn run() {
         })
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            // Generic API commands
+            commands::api_get,
+            commands::api_post,
+            commands::api_put,
+            commands::api_delete,
             // Mode commands
             commands::check_first_run,
             commands::get_mode_info,
