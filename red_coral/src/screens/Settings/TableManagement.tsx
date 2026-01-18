@@ -7,9 +7,9 @@ import {
   useSettingsModal,
   useDataVersion,
 } from '@/core/stores/settings/useSettingsStore';
-import { createClient } from '@/infrastructure/api';
+import { createApiClient } from '@/infrastructure/api';
 
-const api = createClient();
+const api = createApiClient();
 import { DataTable, Column } from '@/presentation/components/ui/DataTable';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { toast } from '@/presentation/components/Toast';

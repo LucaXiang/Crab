@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { LayoutGrid, X, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { createClient } from '@/infrastructure/api';
+import { createApiClient } from '@/infrastructure/api';
 
-const api = createClient();
+const api = createApiClient();
 import { HeldOrder, Table, Zone } from '@/core/domain/types';
 import { TableFilter, TableSelectionScreenProps } from './types';
 import { TableCard } from './TableCard';

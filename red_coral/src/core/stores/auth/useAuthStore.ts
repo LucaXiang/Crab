@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { createClient, type LoginRequest } from '@/infrastructure/api';
+import { createApiClient, type LoginRequest } from '@/infrastructure/api';
 import type { User } from '@/core/domain/types';
 
 // API Client
-const api = createClient();
+const api = createApiClient();
 
 interface AuthStore {
   // State
@@ -164,7 +164,7 @@ export const useAuthStore = create<AuthStore>()(
       hasPermission: (permission: string) => {
         const { permissions, user } = get();
         // Admin always has all permissions
-        if (user?.role_id === 1) return true; // role_id 1 is typically admin
+        if (user?.role_name === 'admin' || user?.role_id === 1 || permissions.includes('*')) return true;
         return permissions.includes(permission);
       },
 
@@ -174,6 +174,16 @@ export const useAuthStore = create<AuthStore>()(
       hasRole: (role: string | string[]) => {
         const { user } = get();
         if (!user) return false;
+
+        // 优先检查 role_name
+        if (user.role_name) {
+          if (Array.isArray(role)) {
+            return role.includes(user.role_name);
+          }
+          return user.role_name === role;
+        }
+
+        // Fallback to role_id check (legacy)
         // Note: This is a simplified check. In a real app, you'd fetch role names
         // For now, we'll just check if user is admin (role_id === 1)
         if (Array.isArray(role)) {

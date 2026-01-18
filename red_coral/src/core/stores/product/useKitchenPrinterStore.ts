@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { KitchenPrinter } from '@/core/domain/types';
-import { createClient } from '@/infrastructure/api';
+import { createApiClient } from '@/infrastructure/api';
 import { logger } from '@/utils/logger';
 
-const api = createClient();
+const api = createApiClient();
 
 interface KitchenPrinterStore {
   // State

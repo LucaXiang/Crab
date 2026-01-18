@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Image as ImageIcon, Tag, Hash, FileText, Layers, MoreHorizontal, PackagePlus, Printer } from 'lucide-react';
 import { FormField, inputClass, selectClass } from './FormField';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
-import { createClient } from '@/infrastructure/api';
+import { createApiClient } from '@/infrastructure/api';
 import { AttributeSelectionModal } from './AttributeSelectionModal';
 import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions } from '@/core/stores/product/useAttributeStore';
 import { useIsKitchenPrintEnabled, useIsLabelPrintEnabled } from '@/core/stores/ui';
@@ -15,7 +15,7 @@ import { Category, ProductSpecification } from '@/core/domain/types';
 import { formatCurrency } from '@/utils/currency';
 
 // API client for fetching specs
-const api = createClient();
+const api = createApiClient();
 
 interface ProductFormProps {
   formData: {

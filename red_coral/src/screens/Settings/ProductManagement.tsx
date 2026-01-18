@@ -12,9 +12,9 @@ import {
   useSettingsStore,
 } from '@/core/stores/settings/useSettingsStore';
 import { useProductStore } from '@/core/stores/product';
-import { createClient } from '@/infrastructure/api';
+import { createApiClient } from '@/infrastructure/api';
 
-const api = createClient();
+const api = createApiClient();
 import { DataTable, Column } from '@/presentation/components/ui/DataTable';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { toast } from '@/presentation/components/Toast';

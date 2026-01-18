@@ -4,7 +4,7 @@
  */
 
 // API - Main export for HTTP RESTful API
-export { createClient, type ApiClient, ApiError, setAuthToken, clearAuthToken } from './api';
+export { createClient, createApiClient, type ApiClient, ApiError, setAuthToken, clearAuthToken } from './api';
 export * from './api/types';
 
 // i18n

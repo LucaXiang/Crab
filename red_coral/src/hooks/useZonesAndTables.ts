@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { Zone, Table } from '@/core/domain/types';
-import { createClient } from '@/infrastructure/api';
+import { createApiClient } from '@/infrastructure/api';
 import { logger } from '@/utils/logger';
 
-const api = createClient();
+const api = createApiClient();
 
 /**
  * Cache entry with timestamp for LRU eviction

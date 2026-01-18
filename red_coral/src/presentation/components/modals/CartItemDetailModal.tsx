@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { CartItem, AttributeTemplate, AttributeOption, ProductAttribute, ItemAttributeSelection, ProductSpecification } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
-import { createClient } from '@/infrastructure/api';
+import { createApiClient } from '@/infrastructure/api';
 import { toast } from '../Toast';
 
-const api = createClient();
+const api = createApiClient();
 import { ItemConfiguratorModal } from './ItemConfiguratorModal';
 
 interface CartItemDetailModalProps {
@@ -72,12 +72,12 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                         uuid: '',
                         attribute_id: attr.id,
                         name: opt.name,
-                        value_code: opt.valueCode || '',
-                        price_modifier: opt.priceModifier ?? 0,
-                        is_default: opt.isDefault ?? false,
+                        value_code: opt.value_code || '',
+                        price_modifier: opt.price_modifier ?? 0,
+                        is_default: opt.is_default ?? false,
                         display_order: 0,
-                        is_active: opt.isActive ?? true,
-                        receipt_name: opt.receiptName,
+                        is_active: opt.is_active ?? true,
+                        receipt_name: opt.receipt_name,
                         created_at: '',
                         updated_at: '',
                     })));
@@ -90,9 +90,9 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
 
             // 1. Pre-fill with existing selections
             item.selectedOptions?.forEach(sel => {
-                const attrKey = String(sel.attributeId);
+                const attrKey = String(sel.attribute_id);
                 const current = initialSelections.get(attrKey) || [];
-                initialSelections.set(attrKey, [...current, String(sel.optionId)]);
+                initialSelections.set(attrKey, [...current, String(sel.option_id)]);
             });
 
             // 2. If no selection for an attribute (and we have defaults), maybe fill?
@@ -170,11 +170,11 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                 const opt = options.find(o => String(o.id) === id);
                 if (opt) {
                     selectedOptions.push({
-                        attributeId: attr.id,
-                        optionId: opt.id,
+                        attribute_id: attr.id,
+                        option_id: opt.id,
                         name: attr.name,
                         value: opt.name,
-                        priceModifier: opt.price_modifier
+                        price_modifier: opt.price_modifier
                     });
                 }
             });
@@ -186,14 +186,14 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     const finalDisc = Math.min(100, Math.max(0, discount));
     
     // Resolve specification object
-    let selectedSpecification: { id: string; name: string; receiptName?: string } | undefined;
+    let selectedSpecification: { id: string; name: string; receipt_name?: string } | undefined;
     if (selectedSpecId) {
-        const spec = specifications.find(s => s.id === selectedSpecId);
+        const spec = specifications.find(s => String(s.id) === selectedSpecId);
         if (spec) {
             selectedSpecification = {
-                id: spec.id,
+                id: String(spec.id),
                 name: spec.is_root && !spec.name ? t('settings.product.specification.label.default') : spec.name,
-                receiptName: spec.receiptName
+                receipt_name: spec.receipt_name
             };
         }
     }

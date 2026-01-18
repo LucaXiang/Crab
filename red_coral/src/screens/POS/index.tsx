@@ -58,9 +58,9 @@ import {
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 
 // Services
-import { createClient } from '@/infrastructure/api';
+import { createApiClient } from '@/infrastructure/api';
 
-const api = createClient();
+const api = createApiClient();
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 
 // Hooks
@@ -228,12 +228,17 @@ export const POSScreen: React.FC = () => {
           if (attr.options) {
             optionsMap.set(String(attr.id), attr.options.map((opt: any) => ({
               id: opt.id,
+              uuid: '',
               name: opt.name,
-              attributeId: attr.id,
-              priceModifier: opt.price_modifier ?? 0,
-              isDefault: opt.is_default ?? false,
-              displayOrder: 0,
-              isActive: opt.isActive ?? true,
+              attribute_id: attr.id,
+              value_code: opt.value_code || '',
+              price_modifier: opt.price_modifier ?? 0,
+              is_default: opt.is_default ?? false,
+              display_order: 0,
+              is_active: opt.is_active ?? true,
+              receipt_name: opt.receipt_name || null,
+              created_at: '',
+              updated_at: '',
             })));
           }
         });
@@ -308,13 +313,13 @@ export const POSScreen: React.FC = () => {
           const quickAddOptions: ItemAttributeSelection[] = [];
 
           if (canQuickAdd) {
-            for (const attr of attributes) {
+            for (const attr of attributes as any[]) {
               const options = optionsMap.get(String(attr.id)) || [];
 
               // For now, we can't auto-select defaults without proper binding info
               // Skip attributes that don't have options
               if (options.length === 0) {
-                if (attr.type?.includes('REQUIRED')) {
+                if (attr.type?.includes('REQUIRED') || attr.type_?.includes('REQUIRED')) {
                   console.log('[QuickAdd] Failed: Required attribute has no options', { attrId: attr.id, attrName: attr.name });
                   canQuickAdd = false;
                   break;
@@ -326,11 +331,13 @@ export const POSScreen: React.FC = () => {
               const option = options[0];
               if (option) {
                 quickAddOptions.push({
-                  attributeId: attr.id,
-                  attributeName: attr.name,
-                  optionId: option.id,
-                  optionName: option.name,
-                  priceModifier: option.price_modifier ?? 0,
+                  attribute_id: attr.id,
+                  option_id: option.id,
+                  name: attr.name,
+                  value: option.name,
+                  price_modifier: option.price_modifier ?? 0,
+                  attribute_name: attr.name,
+                  option_name: option.name,
                 });
               }
             }
@@ -366,7 +373,7 @@ export const POSScreen: React.FC = () => {
             startRect,
             attributes: attributes as unknown as AttributeTemplate[],
             options: optionsMap,
-            bindings: bindings as any,
+            bindings: [],
             specifications,
             hasMultiSpec,
           });

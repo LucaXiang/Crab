@@ -4,9 +4,9 @@ import { useI18n } from '@/hooks/useI18n';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from '@/presentation/components/Toast';
-import { createClient } from '@/infrastructure/api';
+import { createApiClient } from '@/infrastructure/api';
 
-const api = createClient();
+const api = createApiClient();
 import { useProductStore } from '@/core/stores/product/useProductStore';
 import { useZoneTableStore } from '@/hooks/useZonesAndTables';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';

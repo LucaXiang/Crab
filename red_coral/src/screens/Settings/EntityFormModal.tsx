@@ -10,9 +10,9 @@ import {
   useSettingsProducts,
   useSettingsStore,
 } from '@/core/stores/settings/useSettingsStore';
-import { createClient } from '@/infrastructure/api';
+import { createApiClient } from '@/infrastructure/api';
 
-const api = createClient();
+const api = createApiClient();
 import { toast } from '@/presentation/components/Toast';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';

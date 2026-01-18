@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import { createClient, type ProductQuery } from '@/infrastructure/api';
+import { createApiClient, type ProductQuery } from '@/infrastructure/api';
 import type { Product } from '@/infrastructure/api/types';
 import { logger } from '@/utils/logger';
 
 // API Client
-const api = createClient();
+const api = createApiClient();
 
 // 类型转换：从 API Product 转换到本地 Product 类型
 function transformApiProduct(apiProduct: any): any {

@@ -9,7 +9,7 @@ import {
   Lock
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-import { createClient } from '@/infrastructure/api';
+import { createApiClient } from '@/infrastructure/api';
 import { ProductSpecification } from '@/core/domain/types';
 import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
@@ -18,7 +18,7 @@ import { usePriceInput } from '@/hooks/usePriceInput';
 import { useI18n } from '@/hooks/useI18n';
 
 // API client for specs operations
-const api = createClient();
+const api = createApiClient();
 
 interface SpecificationManagerProps {
   productId: string | null; // null = new product (temp mode)
