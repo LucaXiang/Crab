@@ -5,6 +5,7 @@ use surrealdb::engine::local::Db;
 use shared::message::{BusMessage, SyncPayload};
 
 use crate::auth::JwtService;
+use crate::core::config::migrate_legacy_structure;
 use crate::core::Config;
 use crate::db::DbService;
 use crate::services::{
@@ -87,17 +88,28 @@ impl ServerState {
     /// 初始化服务器状态
     ///
     /// 按顺序初始化：
-    /// 1. 数据库 (work_dir/crab.db)
-    /// 2. 各服务 (Activation, Cert, MessageBus, HTTPS, JWT)
-    /// 3. HTTPS 服务延迟初始化
+    /// 1. 工作目录结构 (确保目录存在，迁移旧结构)
+    /// 2. 数据库 (work_dir/database/crab.db)
+    /// 3. 各服务 (Activation, Cert, MessageBus, HTTPS, JWT)
+    /// 4. HTTPS 服务延迟初始化
     ///
     /// # Panics
     ///
     /// 数据库初始化失败时 panic
     pub async fn initialize(config: &Config) -> Self {
+        // 0. Ensure work_dir structure exists
+        config
+            .ensure_work_dir_structure()
+            .expect("Failed to create work directory structure");
+
+        // 0.1 Migrate legacy structure if needed
+        let work_dir = PathBuf::from(&config.work_dir);
+        migrate_legacy_structure(&work_dir).expect("Failed to migrate legacy directory structure");
+
         // 1. Initialize DB
-        // Use work_dir/crab.db for database path
-        let db_path = PathBuf::from(&config.work_dir).join("crab.db");
+        // Use work_dir/database/crab.db for database path
+        let db_dir = config.database_dir();
+        let db_path = db_dir.join("crab.db");
         let db_path_str = db_path.to_string_lossy();
 
         let db_service = DbService::new(&db_path_str)

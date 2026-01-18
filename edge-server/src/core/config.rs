@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use crate::auth::JwtConfig;
 
 /// 服务器配置 - 边缘节点的所有配置项
@@ -204,6 +206,60 @@ impl Config {
     pub fn is_development(&self) -> bool {
         self.environment == "development"
     }
+
+    /// 确保工作目录结构存在
+    ///
+    /// 创建标准化的目录结构:
+    /// - `certs/` - 证书目录
+    /// - `database/` - 数据库目录
+    /// - `logs/` - 日志目录
+    /// - `auth_storage/` - 认证存储目录
+    pub fn ensure_work_dir_structure(&self) -> std::io::Result<()> {
+        let base = PathBuf::from(&self.work_dir);
+        std::fs::create_dir_all(base.join("certs"))?;
+        std::fs::create_dir_all(base.join("database"))?;
+        std::fs::create_dir_all(base.join("logs"))?;
+        std::fs::create_dir_all(base.join("auth_storage"))?;
+        Ok(())
+    }
+
+    /// 获取证书目录路径
+    pub fn certs_dir(&self) -> PathBuf {
+        PathBuf::from(&self.work_dir).join("certs")
+    }
+
+    /// 获取数据库目录路径
+    pub fn database_dir(&self) -> PathBuf {
+        PathBuf::from(&self.work_dir).join("database")
+    }
+
+    /// 获取日志目录路径
+    pub fn logs_dir(&self) -> PathBuf {
+        PathBuf::from(&self.work_dir).join("logs")
+    }
+
+    /// 获取认证存储目录路径
+    pub fn auth_storage_dir(&self) -> PathBuf {
+        PathBuf::from(&self.work_dir).join("auth_storage")
+    }
+}
+
+/// 检查并迁移旧目录结构
+///
+/// 如果 `work_dir/crab.db` 存在且 `work_dir/database/crab.db` 不存在，
+/// 则将数据库迁移到新位置。
+pub fn migrate_legacy_structure(work_dir: &Path) -> std::io::Result<()> {
+    let legacy_db = work_dir.join("crab.db");
+    let new_db_dir = work_dir.join("database");
+
+    if legacy_db.exists() && !new_db_dir.join("crab.db").exists() {
+        tracing::info!("Migrating legacy database location...");
+        std::fs::create_dir_all(&new_db_dir)?;
+        std::fs::rename(&legacy_db, new_db_dir.join("crab.db"))?;
+        tracing::info!("Database migration complete");
+    }
+
+    Ok(())
 }
 
 impl Default for Config {
