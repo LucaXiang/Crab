@@ -118,17 +118,7 @@ pub async fn run() {
 
             app.manage(bridge.clone());
 
-            // Start connection monitor in background
-            let bridge_for_monitor = bridge.clone();
-            let handle_for_monitor = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                use std::time::Duration;
-                use crate::core::ConnectionMonitor;
-                let monitor = ConnectionMonitor::new(bridge_for_monitor, Duration::from_secs(30));
-                monitor.start(handle_for_monitor).await;
-            });
-
-            tracing::info!("ClientBridge initialized, connection monitor started, restoring session...");
+            tracing::info!("ClientBridge initialized, restoring session...");
 
             Ok(())
         })
