@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
-import { useBridgeStore } from '@/core/stores/bridge';
+import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
+import { useSyncListener, useConnectionRecovery } from '@/core/hooks';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
@@ -18,46 +19,42 @@ import { SetupScreen } from '@/screens/Setup';
 import { TenantSelectScreen } from '@/screens/TenantSelect';
 
 // Initial route component that handles first-run detection and mode auto-start
+// 使用新的 AppState 状态机进行路由决策
+// 参考设计文档: docs/plans/2026-01-18-application-state-machine.md
 const InitialRoute: React.FC = () => {
   const {
-    isFirstRun,
+    appState,
     tenants,
     fetchTenants,
-    checkFirstRun,
-    getCurrentTenant,
-    fetchModeInfo,
+    fetchAppState,
     startServerMode,
   } = useBridgeStore();
   const [isChecking, setIsChecking] = useState(true);
-  const [hasCurrentTenant, setHasCurrentTenant] = useState(false);
 
   useEffect(() => {
     const init = async () => {
-      const isFirst = await checkFirstRun();
+      // 1. 获取租户列表
       await fetchTenants();
-      const current = await getCurrentTenant();
-      setHasCurrentTenant(!!current);
 
-      // If not first run and has tenants, auto-start Server mode
-      // (Since we only support Server mode for now)
-      if (!isFirst && current) {
-        await fetchModeInfo();
-        const info = useBridgeStore.getState().modeInfo;
-        if (info?.mode === 'Disconnected') {
-          console.log('Auto-starting Server mode...');
-          try {
-            await startServerMode();
-            await fetchModeInfo();
-          } catch (err) {
-            console.error('Failed to auto-start Server mode:', err);
-          }
+      // 2. 获取当前应用状态
+      const state = await fetchAppState();
+
+      // 3. 如果状态表明需要自动启动 Server 模式
+      // (Uninitialized 状态且有租户 = 有证书但未启动)
+      if (state?.type === 'Uninitialized' && useBridgeStore.getState().tenants.length > 0) {
+        console.log('Auto-starting Server mode...');
+        try {
+          await startServerMode();
+          await fetchAppState(); // 刷新状态
+        } catch (err) {
+          console.error('Failed to auto-start Server mode:', err);
         }
       }
 
       setIsChecking(false);
     };
     init();
-  }, [checkFirstRun, fetchTenants, getCurrentTenant, fetchModeInfo, startServerMode]);
+  }, [fetchTenants, fetchAppState, startServerMode]);
 
   if (isChecking) {
     return (
@@ -67,22 +64,22 @@ const InitialRoute: React.FC = () => {
     );
   }
 
-  // First run - no tenants activated
-  if (isFirstRun || tenants.length === 0) {
-    return <Navigate to="/setup" replace />;
-  }
-
-  // Multiple tenants but none selected - show tenant selection
-  if (tenants.length > 1 && !hasCurrentTenant) {
+  // 多租户但未选择 - 显示租户选择页面
+  if (tenants.length > 1 && appState?.type === 'ServerNoTenant') {
     return <Navigate to="/tenant-select" replace />;
   }
 
-  // Single tenant or tenant already selected - go to login
-  return <Navigate to="/login" replace />;
+  // 使用 AppStateHelpers 确定路由
+  const targetRoute = AppStateHelpers.getRouteForState(appState);
+  return <Navigate to={targetRoute} replace />;
 };
 
 const App: React.FC = () => {
   const performanceMode = useSettingsStore((state) => state.performanceMode);
+
+  // 挂载同步相关 hooks
+  useSyncListener();
+  useConnectionRecovery();
 
   // Check for first run and clear storage if needed
   useEffect(() => {
