@@ -61,6 +61,7 @@ interface ProductStore {
   _searchDebounceId: number | null;
   extraCategories: string[]; // Custom categories added via Debug Menu
   isLoading: boolean;
+  isLoaded: boolean; // True after initial data load
   error: string | null;
   dataVersion: number; // Global version to trigger reloads
 
@@ -81,6 +82,11 @@ interface ProductStore {
   clearCategoryCache: () => void;
   clearProductCache: () => void;
   refreshData: () => void; // Force reload all data
+
+  // Sync Support
+  applySync: (action: string, id: string, data: Product | null) => void;
+  setVersion: (version: number) => void;
+  setIsLoaded: (loaded: boolean) => void;
 
   // Data Source Actions
   loadCategories: () => Promise<void>;
@@ -142,6 +148,7 @@ export const useProductStore = create<ProductStore>((set, get) => ({
   extraCategories: [],
   availableCategories: ['all'],
   isLoading: false,
+  isLoaded: false,
   error: null,
   dataVersion: 0,
   _productCache: new Map(),
@@ -227,6 +234,28 @@ export const useProductStore = create<ProductStore>((set, get) => ({
     const { products } = get();
     logger.debug(`ProductStore has ${products.length} products before refresh`, { component: 'ProductStore', action: 'refreshData' });
   },
+
+  // Sync Support
+  applySync: (action: string, id: string, data: Product | null) => {
+    set((state) => {
+      switch (action) {
+        case 'created':
+          if (!data) return state;
+          return { products: [...state.products, data] };
+        case 'updated':
+          if (!data) return state;
+          return { products: state.products.map((p) => (p.id === id ? data : p)) };
+        case 'deleted':
+          return { products: state.products.filter((p) => p.id !== id) };
+        default:
+          return state;
+      }
+    });
+  },
+
+  setVersion: (version: number) => set({ dataVersion: version }),
+
+  setIsLoaded: (loaded: boolean) => set({ isLoaded: loaded }),
 
   // Data Source Actions
   loadCategories: async () => {

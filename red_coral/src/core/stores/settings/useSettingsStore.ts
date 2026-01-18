@@ -109,8 +109,15 @@ interface SettingsStore {
 
   // Global Data Refresh
   dataVersion: number;
+  isLoaded: boolean;
   refreshData: () => void;
   refreshProductsOnly: () => void;
+
+  // Sync Support
+  applySyncZone: (action: string, id: string, data: Zone | null) => void;
+  applySyncTable: (action: string, id: string, data: Table | null) => void;
+  setDataVersion: (version: number) => void;
+  setIsLoaded: (loaded: boolean) => void;
 
   // System Settings
   performanceMode: boolean;
@@ -329,8 +336,48 @@ export const useSettingsStore = create<SettingsStore>()(
 
   // Global Data Refresh
   dataVersion: 0,
+      isLoaded: false,
       refreshData: () => set((state) => ({ dataVersion: state.dataVersion + 1 })),
       refreshProductsOnly: () => set((state) => ({ productsVersion: state.productsVersion + 1 })),
+
+      // Sync Support
+      applySyncZone: (action: string, id: string, data: Zone | null) => {
+        set((state) => {
+          switch (action) {
+            case 'created':
+              if (!data) return state;
+              return { zones: [...state.zones, data] };
+            case 'updated':
+              if (!data) return state;
+              return { zones: state.zones.map((z) => (z.id === id ? data : z)) };
+            case 'deleted':
+              return { zones: state.zones.filter((z) => z.id !== id) };
+            default:
+              return state;
+          }
+        });
+      },
+
+      applySyncTable: (action: string, id: string, data: Table | null) => {
+        set((state) => {
+          switch (action) {
+            case 'created':
+              if (!data) return state;
+              return { tables: [...state.tables, data] };
+            case 'updated':
+              if (!data) return state;
+              return { tables: state.tables.map((t) => (t.id === id ? data : t)) };
+            case 'deleted':
+              return { tables: state.tables.filter((t) => t.id !== id) };
+            default:
+              return state;
+          }
+        });
+      },
+
+      setDataVersion: (version: number) => set({ dataVersion: version }),
+
+      setIsLoaded: (loaded: boolean) => set({ isLoaded: loaded }),
 
       performanceMode: false,
       setPerformanceMode: (enabled) => set({ performanceMode: enabled }),
