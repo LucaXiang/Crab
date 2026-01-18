@@ -1,0 +1,413 @@
+import React, { useEffect, useState } from 'react';
+import { Settings, Plus, Edit, Trash2, ChevronRight, List } from 'lucide-react';
+import { useI18n } from '@/hooks/useI18n';
+import { toast } from '@/presentation/components/Toast';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { useShallow } from 'zustand/react/shallow';
+import {
+  useAttributes,
+  useAttributeLoading,
+  useAttributeActions,
+  useOptionActions,
+  useAttributeStore,
+} from '@/core/stores/product/useAttributeStore';
+import { AttributeForm } from './forms/AttributeForm';
+import { OptionForm } from './forms/OptionForm';
+import { AttributeTemplate, AttributeOption, Permission } from '@/core/domain/types';
+import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
+import { ManagementHeader, FilterBar } from './components';
+import { formatCurrency } from '@/utils/currency';
+
+export const AttributeManagement: React.FC = React.memo(() => {
+  const { t } = useI18n();
+
+  const attributes = useAttributes();
+  const isLoading = useAttributeLoading();
+  const {
+    loadAttributes,
+    deleteAttribute,
+  } = useAttributeActions();
+  const { loadOptions, deleteOption } = useOptionActions();
+
+  // Modal states
+  const [attributeFormOpen, setAttributeFormOpen] = useState(false);
+  const [optionFormOpen, setOptionFormOpen] = useState(false);
+  const [editingAttribute, setEditingAttribute] = useState<AttributeTemplate | null>(null);
+  const [editingOption, setEditingOption] = useState<AttributeOption | null>(null);
+  const [selectedAttributeForOption, setSelectedAttributeForOption] = useState<string | null>(null);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Expanded attributes (track which attributes are expanded)
+  const [expandedAttributes, setExpandedAttributes] = useState<Set<string>>(new Set());
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+  });
+
+  // Get all options for all attributes
+  const allOptions = useAttributeStore(
+    useShallow((state) => state.options)
+  );
+
+  const filteredAttributes = React.useMemo(() => {
+    if (!searchQuery.trim()) return attributes;
+    const q = searchQuery.toLowerCase();
+    return attributes.filter(attr => attr.name.toLowerCase().includes(q));
+  }, [attributes, searchQuery]);
+
+  // Load attributes on mount
+  useEffect(() => {
+    loadAttributes();
+  }, []);
+
+  // Load options for expanded attributes
+  useEffect(() => {
+    expandedAttributes.forEach((attrId) => {
+      if (!allOptions.has(attrId)) {
+        loadOptions(attrId);
+      }
+    });
+  }, [expandedAttributes]);
+
+  // Toggle attribute expansion
+  const toggleAttribute = (attributeId: string) => {
+    const newExpanded = new Set(expandedAttributes);
+    if (newExpanded.has(attributeId)) {
+      newExpanded.delete(attributeId);
+    } else {
+      newExpanded.add(attributeId);
+      // Load options if not already loaded
+      if (!allOptions.has(attributeId)) {
+        loadOptions(attributeId);
+      }
+    }
+    setExpandedAttributes(newExpanded);
+  };
+
+  // Handlers for Attributes
+  const handleAddAttribute = () => {
+    setEditingAttribute(null);
+    setAttributeFormOpen(true);
+  };
+
+  const handleEditAttribute = (attr: AttributeTemplate, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingAttribute(attr);
+    setAttributeFormOpen(true);
+  };
+
+  const handleDeleteAttribute = (attr: AttributeTemplate, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmDialog({
+      isOpen: true,
+      title: t('settings.attribute.action.delete'),
+      description:
+        t('settings.attribute.confirm.delete', { name: attr.name }),
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await deleteAttribute(attr.id);
+          toast.success(t('settings.user.message.deleteSuccess'));
+        } catch (error: any) {
+          console.error('Delete attribute error:', error);
+          toast.error(error.message || t('settings.user.message.deleteFailed'));
+        }
+      },
+    });
+  };
+
+  // Handlers for Options
+  const handleAddOption = (attributeId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedAttributeForOption(attributeId);
+    setEditingOption(null);
+    setOptionFormOpen(true);
+  };
+
+  const handleEditOption = (option: AttributeOption, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedAttributeForOption(option.attributeId);
+    setEditingOption(option);
+    setOptionFormOpen(true);
+  };
+
+  const handleDeleteOption = (option: AttributeOption, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmDialog({
+      isOpen: true,
+      title: t('settings.attribute.option.delete'),
+      description:
+        t('settings.attribute.confirm.deleteOption', { name: option.name }),
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await deleteOption(option.id, option.attributeId);
+          toast.success(t('settings.user.message.deleteSuccess'));
+        } catch (error: any) {
+          console.error('Delete option error:', error);
+          toast.error(error.message || t('settings.user.message.deleteFailed'));
+        }
+      },
+    });
+  };
+
+  const getAttributeTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      SINGLE_REQUIRED: t('settings.attribute.type.singleRequired'),
+      SINGLE_OPTIONAL: t('settings.attribute.type.singleOptional'),
+      MULTI_REQUIRED: t('settings.attribute.type.multiRequired'),
+      MULTI_OPTIONAL: t('settings.attribute.type.multiOptional'),
+    };
+    return labels[type] || type;
+  };
+
+  return (
+    <div className="space-y-5">
+      <ManagementHeader
+        icon={Settings}
+        title={t('settings.attribute.title')}
+        description={t('settings.attribute.description')}
+        addButtonText={t('settings.attribute.action.add')}
+        onAdd={handleAddAttribute}
+        themeColor="teal"
+        permission={Permission.MANAGE_ATTRIBUTES}
+      />
+
+      <FilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder={t('common.searchPlaceholder')}
+        totalCount={filteredAttributes.length}
+        countUnit={t('settings.attribute.unit')}
+        themeColor="teal"
+      />
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden min-h-[400px] shadow-sm">
+        {isLoading && attributes.length > 0 && (
+          <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-[1px]">
+            <div className="w-8 h-8 border-4 border-gray-200 border-t-teal-500 rounded-full animate-spin" />
+          </div>
+        )}
+
+        {isLoading && attributes.length === 0 ? (
+          <div className="text-gray-400 text-sm text-center py-16 flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-4 border-gray-200 border-t-teal-500 rounded-full animate-spin" />
+            <span>{t('common.loading')}</span>
+          </div>
+        ) : filteredAttributes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+              <Settings className="text-gray-300" size={32} />
+            </div>
+            <p className="text-gray-500 font-medium">
+              {searchQuery ? t('common.noResults') : t('settings.attribute.noData')}
+            </p>
+            {!searchQuery && (
+              <p className="text-sm text-gray-400 mt-1">
+                {t('settings.attribute.hint.addFirst')}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {filteredAttributes.map((attr) => {
+              const isExpanded = expandedAttributes.has(attr.id);
+              const options = allOptions.get(attr.id) || [];
+
+              return (
+                <div
+                  key={attr.id}
+                  className="transition-all hover:bg-teal-50/30 group"
+                >
+                  {/* Attribute Header */}
+                  <div
+                    onClick={() => toggleAttribute(attr.id)}
+                    className={`p-4 cursor-pointer transition-colors ${isExpanded ? 'bg-teal-50/50' : ''}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 flex-1">
+                        {/* Expand Icon */}
+                        <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
+                           <ChevronRight size={18} className={`shrink-0 ${isExpanded ? 'text-teal-500' : 'text-gray-400'}`} />
+                        </div>
+
+                        {/* Attribute Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <h3 className={`font-medium text-sm md:text-base ${isExpanded ? 'text-teal-900' : 'text-gray-900'}`}>
+                              {attr.name}
+                            </h3>
+                            <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">
+                              {getAttributeTypeLabel(attr.type)}
+                            </span>
+                            {!attr.isActive && (
+                              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                                {t('common.inactive')}
+                              </span>
+                            )}
+                            <span className="text-xs text-gray-400 flex items-center gap-1">
+                              <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+                              {options.length} {t('settings.attribute.option.title')}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>
+                            <button
+                              onClick={(e) => handleAddOption(attr.id, e)}
+                              className="p-2 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors"
+                              title={t('settings.attribute.option.action.add')}
+                            >
+                              <Plus size={16} />
+                            </button>
+                          </ProtectedGate>
+                          <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>
+                            <button
+                              onClick={(e) => handleEditAttribute(attr, e)}
+                              className="p-2 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                            >
+                              <Edit size={16} />
+                            </button>
+                          </ProtectedGate>
+                          <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>
+                            <button
+                              onClick={(e) => handleDeleteAttribute(attr, e)}
+                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </ProtectedGate>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Options List (Expanded) */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 bg-gray-50/30 shadow-inner">
+                      {options.length === 0 ? (
+                        <div className="p-8 text-sm text-gray-400 text-center flex flex-col items-center justify-center border-dashed border-2 border-gray-100 m-4 rounded-xl">
+                          <span className="mb-2 block text-gray-300"><List size={24} /></span>
+                          {t('settings.attribute.option.noData')}
+                          <button
+                            onClick={(e) => handleAddOption(attr.id, e)}
+                            className="mt-2 text-teal-600 hover:text-teal-700 font-medium text-xs hover:underline"
+                          >
+                            {t('settings.attribute.option.hint.addFirst')}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-gray-100/50">
+                          {options.map((option) => (
+                            <div
+                              key={option.id}
+                              className="p-3 pl-12 hover:bg-white transition-colors group/opt relative"
+                            >
+                              <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-transparent group-hover/opt:bg-teal-400 transition-colors"></div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium text-gray-700 text-sm">{option.name}</span>
+                                    {option.isDefault && (
+                                      <span className="text-[10px] uppercase tracking-wider bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded border border-teal-200/50">
+                                        {t('common.default')}
+                                      </span>
+                                    )}
+                                    {!option.isActive && (
+                                      <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
+                                        {t('common.inactive')}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                                    {option.valueCode && <span className="font-mono bg-gray-100 px-1 rounded text-gray-600">{option.valueCode}</span>}
+                                  <span
+                                    className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                                      option.priceModifier > 0
+                                        ? 'bg-orange-50 text-orange-700 border-orange-100'
+                                        : option.priceModifier < 0
+                                        ? 'bg-green-50 text-green-700 border-green-100'
+                                        : 'bg-gray-50 text-gray-500 border-gray-100'
+                                    }`}
+                                  >
+                                    {option.priceModifier > 0 && '+'}
+                                    {formatCurrency(option.priceModifier)}
+                                  </span>
+                                </div>
+                                </div>
+                                <div className="flex items-center gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity shrink-0">
+                                  <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>
+                                    <button
+                                      onClick={(e) => handleEditOption(option, e)}
+                                      className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                                    >
+                                      <Edit size={14} />
+                                    </button>
+                                  </ProtectedGate>
+                                  <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>
+                                    <button
+                                      onClick={(e) => handleDeleteOption(option, e)}
+                                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </ProtectedGate>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      {attributeFormOpen && (
+        <AttributeForm
+          isOpen={attributeFormOpen}
+          onClose={() => {
+            setAttributeFormOpen(false);
+            setEditingAttribute(null);
+          }}
+          editingAttribute={editingAttribute}
+        />
+      )}
+
+      {optionFormOpen && selectedAttributeForOption && (
+        <OptionForm
+          isOpen={optionFormOpen}
+          onClose={() => {
+            setOptionFormOpen(false);
+            setEditingOption(null);
+            setSelectedAttributeForOption(null);
+          }}
+          attributeId={selectedAttributeForOption}
+          editingOption={editingOption}
+        />
+      )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
+    </div>
+  );
+});

@@ -6,6 +6,7 @@ members = [
     "crab-client",
     "crab-cert",
     "crab-auth",
+    "red_coral/src-tauri",
 ]
 exclude = []
 
@@ -30,6 +31,7 @@ strip = false
 shared = { path = "shared" }
 crab-cert = { path = "crab-cert" }
 crab-client = { path = "crab-client" }
+edge-server = { path = "edge-server" }
 
 # ========== Serialization ==========
 serde = { version = "1.0", features = ["derive"] }
