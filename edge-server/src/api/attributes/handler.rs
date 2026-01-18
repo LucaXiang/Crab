@@ -53,8 +53,8 @@ pub async fn create(
     let attr = repo.create(payload).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let id = attr.id.as_ref().map(|t| t.id.to_string());
-    state.broadcast_sync(RESOURCE, id.as_deref(), "created", Some(&attr)).await;
+    let id = attr.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
+    state.broadcast_sync(RESOURCE, 1, "created", &id, Some(&attr)).await;
 
     Ok(Json(attr))
 }
@@ -69,7 +69,7 @@ pub async fn update(
     let attr = repo.update(&id, payload).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE, Some(&id), "updated", Some(&attr)).await;
+    state.broadcast_sync(RESOURCE, 1, "updated", &id, Some(&attr)).await;
 
     Ok(Json(attr))
 }
@@ -84,7 +84,7 @@ pub async fn delete(
 
     // 广播同步通知
     if result {
-        state.broadcast_sync::<()>(RESOURCE, Some(&id), "deleted", None).await;
+        state.broadcast_sync::<()>(RESOURCE, 1, "deleted", &id, None).await;
     }
 
     Ok(Json(result))
@@ -100,7 +100,7 @@ pub async fn add_option(
     let attr = repo.add_option(&id, option).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE, Some(&id), "updated", Some(&attr)).await;
+    state.broadcast_sync(RESOURCE, 1, "updated", &id, Some(&attr)).await;
 
     Ok(Json(attr))
 }
@@ -115,7 +115,7 @@ pub async fn update_option(
     let attr = repo.update_option(&id, idx, option).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE, Some(&id), "updated", Some(&attr)).await;
+    state.broadcast_sync(RESOURCE, 1, "updated", &id, Some(&attr)).await;
 
     Ok(Json(attr))
 }
@@ -129,7 +129,7 @@ pub async fn remove_option(
     let attr = repo.remove_option(&id, idx).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE, Some(&id), "updated", Some(&attr)).await;
+    state.broadcast_sync(RESOURCE, 1, "updated", &id, Some(&attr)).await;
 
     Ok(Json(attr))
 }

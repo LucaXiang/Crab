@@ -59,9 +59,8 @@ pub async fn create(
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    let id = Some(employee.id.clone());
     state
-        .broadcast_sync(RESOURCE, id.as_deref(), "created", Some(&employee))
+        .broadcast_sync(RESOURCE, 1, "created", &employee.id, Some(&employee))
         .await;
 
     Ok(Json(employee))
@@ -80,7 +79,7 @@ pub async fn update(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, Some(&id), "updated", Some(&employee))
+        .broadcast_sync(RESOURCE, 1, "updated", &id, Some(&employee))
         .await;
 
     Ok(Json(employee))
@@ -99,7 +98,7 @@ pub async fn delete(
 
     if result {
         state
-            .broadcast_sync::<()>(RESOURCE, Some(&id), "deleted", None)
+            .broadcast_sync::<()>(RESOURCE, 1, "deleted", &id, None)
             .await;
     }
 

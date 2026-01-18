@@ -186,14 +186,16 @@ impl ServerState {
     pub async fn broadcast_sync<T: serde::Serialize>(
         &self,
         resource: &str,
-        id: Option<&str>,
+        version: u64,
         action: &str,
+        id: &str,
         data: Option<&T>,
     ) {
         let payload = SyncPayload {
             resource: resource.to_string(),
-            id: id.map(|s| s.to_string()),
+            version,
             action: action.to_string(),
+            id: id.to_string(),
             data: data.and_then(|d| serde_json::to_value(d).ok()),
         };
         let _ = self.message_bus().publish(BusMessage::sync(&payload)).await;

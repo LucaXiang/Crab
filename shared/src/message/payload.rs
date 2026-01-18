@@ -139,16 +139,19 @@ pub struct RequestCommandPayload {
 ///
 /// # 示例
 /// - `resource`: "order"
-/// - `id`: "order_123" (可选)
+/// - `version`: 42
 /// - `action`: "updated"
+/// - `id`: "order_123"
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SyncPayload {
     /// 资源类型 (例如: "order", "menu", "table")
     pub resource: String,
-    /// 资源 ID (可选，若为空则可能表示整个集合变更)
-    pub id: Option<String>,
+    /// 版本号 (用于前端判断是否需要全量刷新，差距 > 5 时触发)
+    pub version: u64,
     /// 变更类型 (例如: "created", "updated", "deleted")
     pub action: String,
+    /// 资源 ID (必填，每次 Sync 都应指定具体的实体 ID)
+    pub id: String,
     /// 资源数据 (可选，deleted 时为 None)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<serde_json::Value>,

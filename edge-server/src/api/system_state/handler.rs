@@ -31,7 +31,7 @@ pub async fn update(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, Some("main"), "updated", Some(&system_state))
+        .broadcast_sync(RESOURCE, 1, "updated", "main", Some(&system_state))
         .await;
 
     Ok(Json(system_state))
@@ -55,7 +55,7 @@ pub async fn init_genesis(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, Some("main"), "genesis_initialized", Some(&system_state))
+        .broadcast_sync(RESOURCE, 1, "genesis_initialized", "main", Some(&system_state))
         .await;
 
     Ok(Json(system_state))
@@ -80,7 +80,7 @@ pub async fn update_last_order(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, Some("main"), "last_order_updated", Some(&system_state))
+        .broadcast_sync(RESOURCE, 1, "last_order_updated", "main", Some(&system_state))
         .await;
 
     Ok(Json(system_state))
@@ -105,7 +105,7 @@ pub async fn update_sync_state(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     state
-        .broadcast_sync(RESOURCE, Some("main"), "sync_state_updated", Some(&system_state))
+        .broadcast_sync(RESOURCE, 1, "sync_state_updated", "main", Some(&system_state))
         .await;
 
     Ok(Json(system_state))
