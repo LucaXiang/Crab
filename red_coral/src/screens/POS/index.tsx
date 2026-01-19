@@ -21,7 +21,7 @@ import {
 	}	from './components';
 
 // Types
-import { Product, ItemAttributeSelection, AttributeTemplate, AttributeOption } from '@/core/domain/types';
+import { Product, ItemAttributeSelection, AttributeTemplate, AttributeOption, ProductSpecification, ProductAttribute } from '@/core/domain/types';
 
 // i18n
 import { useI18n } from '@/hooks/useI18n';
@@ -141,8 +141,8 @@ export const POSScreen: React.FC = () => {
     startRect?: DOMRect;
     attributes: AttributeTemplate[];
     options: Map<string, AttributeOption[]>;
-    bindings: any[]; // ProductAttributeBinding[]
-    specifications?: any[]; // ProductSpecification[]
+    bindings: ProductAttribute[];
+    specifications?: ProductSpecification[];
     hasMultiSpec?: boolean;
   } | null>(null);
   const {
@@ -228,9 +228,9 @@ export const POSScreen: React.FC = () => {
 
         // Build options map from attributes array (unified structure)
         const optionsMap = new Map<string, AttributeOption[]>();
-        attributes.forEach((attr: any) => {
+        (attributes as Array<AttributeTemplate & { options?: AttributeOption[] }>).forEach((attr) => {
           if (attr.options) {
-            optionsMap.set(String(attr.id), attr.options.map((opt: any) => ({
+            optionsMap.set(String(attr.id), attr.options.map((opt) => ({
               id: opt.id,
               uuid: '',
               name: opt.name,
@@ -248,7 +248,7 @@ export const POSScreen: React.FC = () => {
         });
 
         // Load specifications if product has multi-spec enabled
-        let specifications: any[] = [];
+        let specifications: ProductSpecification[] = [];
         const hasMultiSpec = product.has_multi_spec || false;
         if (hasMultiSpec) {
           try {
@@ -260,10 +260,12 @@ export const POSScreen: React.FC = () => {
         }
 
         // Get base price from root/default spec or first spec
-        const rootSpec = specifications.find((s: any) => s.is_root || s.isRoot)
-          || specifications.find((s: any) => s.is_default || s.isDefault)
-          || specifications[0];
-        const basePrice = rootSpec?.price ?? (product as any).price ?? 0;
+        type SpecWithAliases = ProductSpecification & { isRoot?: boolean; isDefault?: boolean };
+        const specsWithAliases = specifications as SpecWithAliases[];
+        const rootSpec = specsWithAliases.find((s) => s.is_root || s.isRoot)
+          || specsWithAliases.find((s) => s.is_default || s.isDefault)
+          || specsWithAliases[0];
+        const basePrice = rootSpec?.price ?? (product as { price?: number }).price ?? 0;
 
         // CASE 1: Force Detail View (e.g. Image Click)
         // If skipQuickAdd is true, we ALWAYS open the modal, regardless of whether attributes/specs exist.
@@ -283,13 +285,13 @@ export const POSScreen: React.FC = () => {
         }
 
         // CASE 2: Has Multi-Spec or Attributes -> Check if we need modal
-        
-        let selectedDefaultSpec: any = undefined;
+
+        let selectedDefaultSpec: SpecWithAliases | undefined = undefined;
 
         if (hasMultiSpec) {
             // Check for default specification
             // We check for true (boolean) or 1 (integer) to be safe across serialization methods
-            selectedDefaultSpec = specifications.find((s: any) => s.isDefault === true || s.isDefault === 1);
+            selectedDefaultSpec = specsWithAliases.find((s) => s.isDefault === true || s.isDefault === 1);
 
             // If no default specification is found, we MUST open the modal
             if (!selectedDefaultSpec) {
