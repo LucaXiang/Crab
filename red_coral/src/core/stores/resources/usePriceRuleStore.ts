@@ -5,12 +5,12 @@ import type { PriceRule } from '@/core/domain/types/api';
 const api = createTauriClient();
 
 async function fetchPriceRules(): Promise<PriceRule[]> {
-  const response = await api.listPriceAdjustments();
+  const response = await api.listPriceRules();
   if (Array.isArray(response)) {
     return response as PriceRule[];
   }
   if (response.data?.rules) {
-    return response.data.rules as PriceRule[];
+    return response.data.rules;
   }
   throw new Error(response.message || 'Failed to fetch price rules');
 }

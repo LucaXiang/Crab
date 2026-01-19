@@ -11,6 +11,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   ApiResponse,
   LoginResponseData,
+  Tag,
   TagListData,
   CategoryListData,
   Category,
@@ -30,6 +31,9 @@ import type {
   RolePermissionListData,
   ProductAttribute,
   ProductAttributeListData,
+  EmployeeResponse,
+  PriceRule,
+  Role,
 } from '@/core/domain/types/api';
 
 // API Error class (与原 client.ts 保持一致)
@@ -95,6 +99,22 @@ export class TauriApiClient {
 
   async listTags(): Promise<ApiResponse<TagListData>> {
     return invokeCommand<ApiResponse<TagListData>>('list_tags');
+  }
+
+  async getTag(id: string): Promise<ApiResponse<{ tag: Tag }>> {
+    return invokeCommand<ApiResponse<{ tag: Tag }>>('get_tag', { id });
+  }
+
+  async createTag(data: { name: string; color?: string; display_order?: number }): Promise<ApiResponse<{ tag: Tag }>> {
+    return invokeCommand<ApiResponse<{ tag: Tag }>>('create_tag', { data });
+  }
+
+  async updateTag(id: string, data: { name?: string; color?: string; display_order?: number; is_active?: boolean }): Promise<ApiResponse<{ tag: Tag }>> {
+    return invokeCommand<ApiResponse<{ tag: Tag }>>('update_tag', { id, data });
+  }
+
+  async deleteTag(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
+    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_tag', { id });
   }
 
   // ============ Categories ============
@@ -205,6 +225,18 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ template: Attribute }>>('get_attribute', { id });
   }
 
+  async createAttribute(data: Record<string, unknown>): Promise<ApiResponse<{ attribute: Attribute }>> {
+    return invokeCommand<ApiResponse<{ attribute: Attribute }>>('create_attribute', { data });
+  }
+
+  async updateAttribute(id: string, data: Record<string, unknown>): Promise<ApiResponse<{ attribute: Attribute }>> {
+    return invokeCommand<ApiResponse<{ attribute: Attribute }>>('update_attribute', { id, data });
+  }
+
+  async deleteAttribute(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
+    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_attribute', { id });
+  }
+
   // ============ Zones ============
 
   async listZones(): Promise<ApiResponse<ZoneListData>> {
@@ -260,22 +292,78 @@ export class TauriApiClient {
   }
 
   // ============ Employees ============
-  // Note: CRUD operations moved to useAuthStore (uses invoke directly)
 
-  async listEmployees(): Promise<ApiResponse<{ employees: unknown[] }>> {
-    return invokeCommand<ApiResponse<{ employees: unknown[] }>>('list_employees');
+  async listEmployees(): Promise<ApiResponse<{ employees: EmployeeResponse[] }>> {
+    return invokeCommand<ApiResponse<{ employees: EmployeeResponse[] }>>('list_employees');
+  }
+
+  async getEmployee(id: string): Promise<ApiResponse<{ employee: EmployeeResponse }>> {
+    return invokeCommand<ApiResponse<{ employee: EmployeeResponse }>>('get_employee', { id });
+  }
+
+  async createEmployee(data: { username: string; password: string; role: string }): Promise<ApiResponse<{ employee: EmployeeResponse }>> {
+    return invokeCommand<ApiResponse<{ employee: EmployeeResponse }>>('create_employee', { data });
+  }
+
+  async updateEmployee(id: string, data: { password?: string; role?: string; is_active?: boolean }): Promise<ApiResponse<{ employee: EmployeeResponse }>> {
+    return invokeCommand<ApiResponse<{ employee: EmployeeResponse }>>('update_employee', { id, data });
+  }
+
+  async deleteEmployee(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
+    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_employee', { id });
   }
 
   // ============ Price Rules ============
 
-  async listPriceAdjustments(): Promise<ApiResponse<{ rules: unknown[] }>> {
-    return invokeCommand<ApiResponse<{ rules: unknown[] }>>('list_price_rules');
+  async listPriceRules(): Promise<ApiResponse<{ rules: PriceRule[] }>> {
+    return invokeCommand<ApiResponse<{ rules: PriceRule[] }>>('list_price_rules');
+  }
+
+  async listActivePriceRules(): Promise<ApiResponse<{ rules: PriceRule[] }>> {
+    return invokeCommand<ApiResponse<{ rules: PriceRule[] }>>('list_active_price_rules');
+  }
+
+  async getPriceRule(id: string): Promise<ApiResponse<{ rule: PriceRule }>> {
+    return invokeCommand<ApiResponse<{ rule: PriceRule }>>('get_price_rule', { id });
+  }
+
+  async createPriceRule(data: Record<string, unknown>): Promise<ApiResponse<{ rule: PriceRule }>> {
+    return invokeCommand<ApiResponse<{ rule: PriceRule }>>('create_price_rule', { data });
+  }
+
+  async updatePriceRule(id: string, data: Record<string, unknown>): Promise<ApiResponse<{ rule: PriceRule }>> {
+    return invokeCommand<ApiResponse<{ rule: PriceRule }>>('update_price_rule', { id, data });
+  }
+
+  async deletePriceRule(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
+    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_price_rule', { id });
+  }
+
+  /** @deprecated Use listPriceRules instead */
+  async listPriceAdjustments(): Promise<ApiResponse<{ rules: PriceRule[] }>> {
+    return this.listPriceRules();
   }
 
   // ============ Roles ============
 
   async listRoles(): Promise<ApiResponse<RoleListData>> {
     return invokeCommand<ApiResponse<RoleListData>>('list_roles');
+  }
+
+  async getRole(id: string): Promise<ApiResponse<{ role: Role }>> {
+    return invokeCommand<ApiResponse<{ role: Role }>>('get_role', { id });
+  }
+
+  async createRole(data: { name: string; display_name: string; description?: string }): Promise<ApiResponse<{ role: Role }>> {
+    return invokeCommand<ApiResponse<{ role: Role }>>('create_role', { data });
+  }
+
+  async updateRole(id: string, data: { name?: string; display_name?: string; description?: string; is_active?: boolean }): Promise<ApiResponse<{ role: Role }>> {
+    return invokeCommand<ApiResponse<{ role: Role }>>('update_role', { id, data });
+  }
+
+  async deleteRole(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
+    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_role', { id });
   }
 
   async getRolePermissions(roleId: string): Promise<ApiResponse<RolePermissionListData>> {
