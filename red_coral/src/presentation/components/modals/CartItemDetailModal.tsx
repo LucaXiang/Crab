@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { CartItem, AttributeTemplate, AttributeOption, ProductAttribute, ItemAttributeSelection, ProductSpecification } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
-import { createApiClient } from '@/infrastructure/api';
+import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '../Toast';
 
-const api = createApiClient();
+const api = createTauriClient();
 import { ItemConfiguratorModal } from './ItemConfiguratorModal';
 
 interface CartItemDetailModalProps {

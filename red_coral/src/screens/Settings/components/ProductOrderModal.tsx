@@ -4,9 +4,9 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useI18n } from '@/hooks/useI18n';
-import { createApiClient } from '@/infrastructure/api';
+import { createTauriClient } from '@/infrastructure/api';
 
-const api = createApiClient();
+const api = createTauriClient();
 import { toast } from '@/presentation/components/Toast';
 import { Product } from '@/core/domain/types';
 import DefaultImage from '@/assets/reshot.svg';
@@ -114,8 +114,11 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const resp = await api.listProducts({ category_id: Number(category), page_size: 1000 });
-      setProducts(resp.data?.products || []);
+      const resp = await api.listProducts();
+      const allProducts = resp.data?.products || [];
+      // Filter by category locally
+      const filteredProducts = allProducts.filter(p => p.category === category);
+      setProducts(filteredProducts);
     } catch (e) {
       console.error(e);
       toast.error(t('settings.loadFailed'));

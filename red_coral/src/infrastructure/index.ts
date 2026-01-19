@@ -3,8 +3,8 @@
  * Re-exports all infrastructure modules
  */
 
-// API - Main export for HTTP RESTful API
-export { createClient, createApiClient, type ApiClient, ApiError, setAuthToken, clearAuthToken } from './api';
+// API - Tauri API Client
+export { createTauriClient, TauriApiClient, ApiError } from './api';
 
 // i18n
 export * from './i18n';

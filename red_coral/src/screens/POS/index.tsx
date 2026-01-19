@@ -61,9 +61,9 @@ import {
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 
 // Services
-import { createApiClient } from '@/infrastructure/api';
+import { createTauriClient } from '@/infrastructure/api';
 
-const api = createApiClient();
+const api = createTauriClient();
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 
 // Hooks

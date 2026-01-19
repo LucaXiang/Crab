@@ -3,9 +3,9 @@ import { Tag, FolderOpen, ArrowUp, ArrowDown, List } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useSettingsModal, useDataVersion } from '@/core/stores/settings/useSettingsStore';
 import { useCategoryStore } from '@/core/stores/resources';
-import { createApiClient } from '@/infrastructure/api';
+import { createTauriClient } from '@/infrastructure/api';
 
-const api = createApiClient();
+const api = createTauriClient();
 import { DataTable, Column } from '@/presentation/components/ui/DataTable';
 import { toast } from '@/presentation/components/Toast';
 import { Permission, Category } from '@/core/domain/types';

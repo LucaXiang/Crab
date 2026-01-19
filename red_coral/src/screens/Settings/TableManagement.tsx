@@ -3,9 +3,9 @@ import { LayoutGrid, Plus, Filter, Users, Search, Map as MapIcon, MapPin } from 
 import { useI18n } from '@/hooks/useI18n';
 import { useSettingsModal, useDataVersion, useSettingsFilters } from '@/core/stores/settings/useSettingsStore';
 import { useZoneStore, useTableStore } from '@/core/stores/resources';
-import { createApiClient } from '@/infrastructure/api';
+import { createTauriClient } from '@/infrastructure/api';
 
-const api = createApiClient();
+const api = createTauriClient();
 import { DataTable, Column } from '@/presentation/components/ui/DataTable';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { toast } from '@/presentation/components/Toast';

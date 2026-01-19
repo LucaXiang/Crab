@@ -6,10 +6,10 @@ import {
   useSettingsFormMeta,
   useSettingsStore,
 } from '@/core/stores/settings/useSettingsStore';
-import { createApiClient } from '@/infrastructure/api';
+import { createTauriClient } from '@/infrastructure/api';
 import { useProductStore, useZones, useCategoryStore } from '@/core/stores/resources';
 
-const api = createApiClient();
+const api = createTauriClient();
 import { toast } from '@/presentation/components/Toast';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';

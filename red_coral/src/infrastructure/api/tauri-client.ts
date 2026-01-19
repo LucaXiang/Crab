@@ -127,7 +127,14 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ category: Category }>>('create_category', { data });
   }
 
-  async updateCategory(id: string, data: { name?: string; sort_order?: number; is_active?: boolean }): Promise<ApiResponse<{ category: Category }>> {
+  async updateCategory(id: string, data: {
+    name?: string;
+    sort_order?: number;
+    kitchen_printer?: string;
+    is_kitchen_print_enabled?: boolean;
+    is_label_print_enabled?: boolean;
+    is_active?: boolean;
+  }): Promise<ApiResponse<{ category: Category }>> {
     return invokeCommand<ApiResponse<{ category: Category }>>('update_category', { id, data });
   }
 

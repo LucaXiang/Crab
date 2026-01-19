@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, ArrowLeftRight, Percent, Users, Check, ArrowLeft, LayoutGrid, Split, Minus, Plus, CreditCard, Banknote } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { createApiClient } from '@/infrastructure/api';
+import { createTauriClient } from '@/infrastructure/api';
 
-const api = createApiClient();
+const api = createTauriClient();
 import { Table, Zone, HeldOrder, Permission } from '@/core/domain/types';
 import { useOrderEventStore } from '@/core/stores/order/useOrderEventStore';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
