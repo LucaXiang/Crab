@@ -224,28 +224,14 @@ export const POSScreen: React.FC = () => {
       try {
         const productWithAttrs = await api.fetchProductAttributes(String(product.id));
 
-        const attributes = productWithAttrs.attributes || [];
+        // ProductAttributeListData has product_attributes, not attributes
+        const productAttributes = productWithAttrs.data?.product_attributes || [];
 
-        // Build options map from attributes array (unified structure)
+        // Build options map from product attributes (need to fetch each attribute's options)
         const optionsMap = new Map<string, AttributeOption[]>();
-        (attributes as Array<AttributeTemplate & { options?: AttributeOption[] }>).forEach((attr) => {
-          if (attr.options) {
-            optionsMap.set(String(attr.id), attr.options.map((opt) => ({
-              id: opt.id,
-              uuid: '',
-              name: opt.name,
-              attribute_id: attr.id,
-              value_code: opt.value_code || '',
-              price_modifier: opt.price_modifier ?? 0,
-              is_default: opt.is_default ?? false,
-              display_order: 0,
-              is_active: opt.is_active ?? true,
-              receipt_name: opt.receipt_name || null,
-              created_at: '',
-              updated_at: '',
-            })));
-          }
-        });
+        // Note: ProductAttribute bindings don't include options directly,
+        // options are embedded in the Attribute itself. For now, we'll leave optionsMap empty
+        // and let ProductOptionsModal fetch options as needed.
 
         // Load specifications if product has multi-spec enabled
         let specifications: ProductSpecification[] = [];
@@ -274,9 +260,9 @@ export const POSScreen: React.FC = () => {
                 product,
                 basePrice,
                 startRect,
-                attributes: attributes as unknown as AttributeTemplate[],
+                attributes: [], // Attributes will be fetched by modal if needed
                 options: optionsMap,
-                bindings: [],
+                bindings: productAttributes,
                 specifications,
                 hasMultiSpec,
             });
@@ -290,8 +276,8 @@ export const POSScreen: React.FC = () => {
 
         if (hasMultiSpec) {
             // Check for default specification
-            // We check for true (boolean) or 1 (integer) to be safe across serialization methods
-            selectedDefaultSpec = specsWithAliases.find((s) => s.isDefault === true || s.isDefault === 1);
+            // is_default is boolean in the type definition
+            selectedDefaultSpec = specsWithAliases.find((s) => s.is_default === true || s.isDefault === true);
 
             // If no default specification is found, we MUST open the modal
             if (!selectedDefaultSpec) {
@@ -299,9 +285,9 @@ export const POSScreen: React.FC = () => {
                     product,
                     basePrice,
                     startRect,
-                    attributes: attributes as unknown as AttributeTemplate[],
+                    attributes: [], // Attributes will be fetched by modal if needed
                     options: optionsMap,
-                    bindings: [],
+                    bindings: productAttributes,
                     specifications,
                     hasMultiSpec,
                 });
@@ -311,75 +297,16 @@ export const POSScreen: React.FC = () => {
             // If default spec exists, we continue to check attributes
         }
 
-        if (hasMultiSpec || attributes.length > 0) {
-          // Note: If hasMultiSpec is true here, we GUARANTEE we have selectedDefaultSpec
-
-          // Try quick add logic for attributes only
-          let canQuickAdd = true;
-          const quickAddOptions: ItemAttributeSelection[] = [];
-
-          if (canQuickAdd) {
-            for (const attr of attributes as any[]) {
-              const options = optionsMap.get(String(attr.id)) || [];
-
-              // For now, we can't auto-select defaults without proper binding info
-              // Skip attributes that don't have options
-              if (options.length === 0) {
-                if (attr.type?.includes('REQUIRED') || attr.type_?.includes('REQUIRED')) {
-                  canQuickAdd = false;
-                  break;
-                }
-                continue;
-              }
-
-              // Enforce Single Choice constraints: only take the first option
-              const option = options[0];
-              if (option) {
-                quickAddOptions.push({
-                  attribute_id: String(attr.id),
-                  option_idx: 0,  // First option index
-                  name: attr.name,
-                  value: option.name,
-                  price_modifier: option.price_modifier ?? 0,
-                  attribute_name: attr.name,
-                  option_name: option.name,
-                });
-              }
-            }
-          }
-
-          if (canQuickAdd) {
-            // Direct add with defaults (and potentially default spec)
-            addToCartStore(product, quickAddOptions, 1, 0, undefined, selectedDefaultSpec);
-            
-            if (startRect && !performanceMode) {
-                const id = `fly-${Date.now()}-${Math.random()}`;
-                const targetX = 190;
-                const targetY = window.innerHeight / 2;
-                const imageForAnim = product.image
-                  ? (/^https?:\/\//.test(product.image) ? product.image : convertFileSrc(product.image))
-                  : DefaultImage;
-        
-                addAnimation({
-                  id,
-                  type: 'fly',
-                  image: imageForAnim,
-                  startRect,
-                  targetX,
-                  targetY,
-                });
-            }
-            return;
-          }
-
-          // Cannot quick add -> Open Modal
+        if (hasMultiSpec || productAttributes.length > 0) {
+          // Has specifications or attributes -> Open Modal for selection
+          // Quick add logic requires fetching full attribute details which we skip for simplicity
           setSelectedProductForOptions({
             product,
             basePrice,
             startRect,
-            attributes: attributes as unknown as AttributeTemplate[],
+            attributes: [], // Modal will fetch attributes as needed
             options: optionsMap,
-            bindings: [],
+            bindings: productAttributes,
             specifications,
             hasMultiSpec,
           });
@@ -464,7 +391,7 @@ export const POSScreen: React.FC = () => {
 
   const handleOpenCashDrawer = useCallback(async () => {
     try {
-      const { openCashDrawer } = await import('@/services/printService');
+      const { openCashDrawer } = await import('@/infrastructure/print/printService');
       await openCashDrawer(selectedPrinter || undefined);
       toast.success(t('app.action.cashDrawerOpened'));
     } catch (error) {

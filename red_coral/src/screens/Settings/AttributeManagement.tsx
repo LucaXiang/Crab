@@ -14,7 +14,7 @@ import {
 import { AttributeForm } from './forms/AttributeForm';
 import { OptionForm } from './forms/OptionForm';
 import { Permission } from '@/core/domain/types';
-import type { Attribute, AttributeOption } from '@/infrastructure/api/types';
+import type { Attribute, AttributeOption } from '@/core/domain/types/api';
 
 // Extended option type with index for UI (matches store type)
 interface AttributeOptionWithIndex extends AttributeOption {

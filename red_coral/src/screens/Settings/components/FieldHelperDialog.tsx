@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Copy } from 'lucide-react';
-import { SUPPORTED_LABEL_FIELDS } from '../../../types/labelTemplate';
+import { SUPPORTED_LABEL_FIELDS } from '@/core/domain/types/print';
 import { useI18n } from '../../../hooks/useI18n';
 
 interface FieldHelperDialogProps {

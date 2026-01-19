@@ -213,7 +213,7 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
     // Retail Label Print (Print on Complete)
     const isRetail = orderKey.startsWith('RETAIL-') || order.isRetail === true;
     if (isRetail) {
-      import('@/services/label/LabelPrintService').then(async ({ LabelPrintService }) => {
+      import('@/infrastructure/label/LabelPrintService').then(async ({ LabelPrintService }) => {
         const { isLabelPrintEnabled } = useUIStore.getState();
         if (isLabelPrintEnabled) {
           try {
@@ -266,7 +266,7 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
       const isRetail = orderKey.startsWith('RETAIL-') || orderAfterAdd?.isRetail === true;
       if (orderAfterAdd && !isRetail) {
         // Kitchen Print
-        import('@/services/printService').then(async ({ printKitchenTicketLegacy }) => {
+        import('@/infrastructure/print/printService').then(async ({ printKitchenTicketLegacy }) => {
           try {
             await printKitchenTicketLegacy(orderAfterAdd, true, false, 'dining', items);
           } catch (e) {
@@ -287,7 +287,7 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
         });
 
         // Label Print
-        import('@/services/label/LabelPrintService').then(async ({ LabelPrintService }) => {
+        import('@/infrastructure/label/LabelPrintService').then(async ({ LabelPrintService }) => {
           const { isLabelPrintEnabled } = useUIStore.getState();
           if (isLabelPrintEnabled) {
             try {

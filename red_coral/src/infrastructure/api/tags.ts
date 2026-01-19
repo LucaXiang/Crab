@@ -3,7 +3,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import type { Tag, CreateTagParams, UpdateTagParams } from '@/core/domain/types';
+import type { Tag, CreateTagRequest, UpdateTagRequest } from '@/core/domain/types';
 
 /**
  * Fetch all tags
@@ -22,14 +22,14 @@ export async function getTag(id: string): Promise<Tag> {
 /**
  * Create a new tag
  */
-export async function createTag(params: CreateTagParams): Promise<Tag> {
+export async function createTag(params: CreateTagRequest): Promise<Tag> {
   return invoke('create_tag', { ...params } as Record<string, unknown>);
 }
 
 /**
  * Update a tag
  */
-export async function updateTag(params: UpdateTagParams): Promise<Tag> {
+export async function updateTag(params: UpdateTagRequest): Promise<Tag> {
   return invoke('update_tag', { ...params } as Record<string, unknown>);
 }
 

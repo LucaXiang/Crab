@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { i18n, t as translate, Locale } from '@/services/i18n';
+import { i18n, t as translate, Locale } from '@/infrastructure/i18n';
 
 export function useI18n() {
   const [locale, setLocaleState] = useState<Locale>(i18n.getLocale());

@@ -7,7 +7,7 @@
  */
 
 import { Currency } from '../currency/currency';
-import { CartItem, ItemAttributeSelection } from '@/types';
+import { CartItem, ItemAttributeSelection } from '@/core/domain/types';
 import Decimal from 'decimal.js';
 
 /**
@@ -22,7 +22,7 @@ export function calculateOptionsModifier(
     return new Decimal(0);
   }
   return selectedOptions.reduce((total, option) => {
-    return Currency.add(total, option.priceModifier);
+    return Currency.add(total, option.price_modifier);
   }, new Decimal(0));
 }
 

@@ -19,7 +19,7 @@ export {
   type AdjustmentConfig,
 } from '@/infrastructure/apiValidator';
 
-// Re-export deprecated types for backward compatibility
+// Re-export types from new location
 export type {
   AdjustmentRuleType,
   AdjustmentType,
@@ -27,7 +27,7 @@ export type {
   AdjustmentStatus,
   CreateAdjustmentRuleParams,
   UpdateAdjustmentRuleParams,
-} from '@/types/priceAdjustment';
+} from '@/core/domain/types/pricing';
 
 // Backward compatibility aliases
 import type { AdjustmentRule as PriceAdjustmentRule } from '@/infrastructure/apiValidator';

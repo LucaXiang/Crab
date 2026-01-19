@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { X, Shield, Lock, User as UserIcon, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { User } from '@/types';
+import { User } from '@/core/domain/types';
 
 interface SupervisorAuthModalProps {
   isOpen: boolean;

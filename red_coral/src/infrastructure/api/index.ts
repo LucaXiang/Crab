@@ -19,8 +19,8 @@ import { ApiClient, createClient, setAuthToken, clearAuthToken } from './client'
 export { TauriApiClient, createTauriClient, ApiError };
 export { ApiClient, createClient, setAuthToken, clearAuthToken };
 
-// 类型导出
-export * from './types';
+// 类型导出 (从 core/domain/types/api 重导出)
+export * from '@/core/domain/types/api';
 
 // 环境检测
 export function isTauriEnvironment(): boolean {

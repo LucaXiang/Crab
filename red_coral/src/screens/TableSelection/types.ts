@@ -1,4 +1,4 @@
-import { HeldOrder, Table, CartItem, Zone } from '../../types';
+import { HeldOrder, Table, CartItem, Zone } from '@/core/domain/types';
 
 export type TableFilter = 'ALL' | 'EMPTY' | 'OCCUPIED' | 'OVERTIME' | 'PRE_PAYMENT';
 

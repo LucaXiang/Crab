@@ -8,8 +8,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { getApplicableAdjustmentRules, fetchAdjustmentRules } from '@/services/api/price_adjustments';
-import type { AdjustmentRule } from '@/types/priceAdjustment';
+import { getApplicableAdjustmentRules, fetchAdjustmentRules } from '@/infrastructure/api/price_adjustments';
+import type { AdjustmentRule } from '@/core/domain/types/pricing';
 
 // ============================================
 // 1. 商品规则缓存 Hook

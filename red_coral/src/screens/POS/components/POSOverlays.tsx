@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { createPortal } from 'react-dom';
-import { HeldOrder, CompletedOrder } from '@/types';
+import { HeldOrder, CompletedOrder } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { SectionErrorBoundary } from '@/presentation/components/SectionErrorBoundary';
 import { LoadingScreen } from '@/presentation/components/LoadingScreen';

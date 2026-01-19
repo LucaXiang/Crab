@@ -1,6 +1,6 @@
 import { createResourceStore } from '../factory/createResourceStore';
 import { invoke } from '@tauri-apps/api/core';
-import type { ProductSpecification, ApiResponse } from '@/infrastructure/api/types';
+import type { ProductSpecification, ApiResponse } from '@/core/domain/types/api';
 
 /**
  * Spec Store - 规格数据
@@ -10,7 +10,10 @@ import type { ProductSpecification, ApiResponse } from '@/infrastructure/api/typ
  */
 async function fetchSpecs(): Promise<ProductSpecification[]> {
   // 使用直接的 invoke 调用，因为 TauriApiClient.listSpecs 需要 product_id
-  const response = await invoke<ApiResponse<{ specs: ProductSpecification[] }>>('list_all_specs');
+  const response = await invoke<ProductSpecification[] | ApiResponse<{ specs: ProductSpecification[] }>>('list_all_specs');
+  if (Array.isArray(response)) {
+    return response;
+  }
   if (response.data?.specs) {
     return response.data.specs;
   }

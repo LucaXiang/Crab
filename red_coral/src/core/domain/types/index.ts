@@ -1,11 +1,22 @@
 /**
  * Domain Types
  *
- * This file re-exports types from the API infrastructure.
- * These types are aligned with the Rust crab-edge-server backend.
+ * Unified type definitions for the application.
+ * All types are organized into subdirectories by domain.
+ *
+ * Note: Some types with conflicting names exist in different submodules.
+ * Import from specific submodules when needed:
+ * - '@/core/domain/types/api' - Backend API types (matches Rust server)
+ * - '@/core/domain/types/events' - Client-side event sourcing types
+ * - '@/core/domain/types/print' - Print and label types
+ * - '@/core/domain/types/pricing' - Frontend pricing adjustment types
  */
 
-export * from '@/infrastructure/api/types';
+// API types (models, requests, responses) - primary source
+export * from './api';
+
+// Print and label types
+export * from './print';
 
 // Frontend-specific types for cart and orders
 export interface CartItem {
@@ -121,35 +132,9 @@ export interface PendingCashTx {
 export type DraftOrder = HeldOrder;
 export type CompletedOrder = HeldOrder;
 
-// Legacy type aliases for backward compatibility
-export type User = import('@/infrastructure/api/types').User;
-export type Product = import('@/infrastructure/api/types').Product;
-export type Category = import('@/infrastructure/api/types').Category;
-export type Table = import('@/infrastructure/api/types').Table;
-export type Zone = import('@/infrastructure/api/types').Zone;
-export type KitchenPrinter = import('@/infrastructure/api/types').KitchenPrinter;
-export type Tag = import('@/infrastructure/api/types').Tag;
-export type Role = import('@/infrastructure/api/types').Role;
-export type AttributeTemplate = import('@/infrastructure/api/types').AttributeTemplate;
-export type AttributeOption = import('@/infrastructure/api/types').AttributeOption;
-export type ProductSpecification = import('@/infrastructure/api/types').ProductSpecification;
-export type ProductAttribute = import('@/infrastructure/api/types').ProductAttribute;
-export type CategoryAttribute = import('@/infrastructure/api/types').CategoryAttribute;
-export type PriceAdjustmentRule = import('@/infrastructure/api/types').PriceAdjustmentRule;
-export type Order = import('@/infrastructure/api/types').Order;
-export type OrderItem = import('@/infrastructure/api/types').OrderItem;
-export type OrderEvent = import('@/infrastructure/api/types').OrderEvent;
-export type Payment = import('@/infrastructure/api/types').Payment;
+// Permission type and constants
+export type Permission = string;
 
-// Request/Response types
-export type LoginRequest = import('@/infrastructure/api/types').LoginRequest;
-export type CreateProductRequest = import('@/infrastructure/api/types').CreateProductRequest;
-export type ProductQuery = import('@/infrastructure/api/types').ProductQuery;
-export type CreateTagRequest = import('@/infrastructure/api/types').CreateTagRequest;
-export type UpdateTagRequest = import('@/infrastructure/api/types').UpdateTagRequest;
-export type Permission = string; // Simplified permission type
-
-// Permission constants
 export const Permission = {
   MANAGE_USERS: 'manage_users' as Permission,
   VOID_ORDER: 'void_order' as Permission,
@@ -174,4 +159,59 @@ export const Permission = {
   DISCOUNT: 'discount' as Permission,
   CANCEL_ITEM: 'cancel_item' as Permission,
   OPEN_CASH_DRAWER: 'open_cash_drawer' as Permission,
+  MERGE_BILL: 'merge_bill' as Permission,
+  TRANSFER_TABLE: 'transfer_table' as Permission,
 } as const;
+
+// Statistics types
+export type TimeRange = 'today' | 'week' | 'month' | 'year' | 'custom';
+export type ActiveTab = 'overview' | 'sales' | 'products' | 'categories';
+
+export interface OverviewStats {
+  todayRevenue: number;
+  todayOrders: number;
+  todayCustomers: number;
+  averageOrderValue: number;
+  cashRevenue: number;
+  cardRevenue: number;
+  otherRevenue: number;
+  voidedOrders: number;
+  voidedAmount: number;
+  totalDiscount: number;
+  avgGuestSpend: number;
+  avgDiningTime?: number;
+}
+
+// Matches Rust RevenueTrendPoint
+export interface RevenueTrendPoint {
+  time: string;
+  value: number;
+}
+
+// Matches Rust CategorySale
+export interface CategorySale {
+  name: string;
+  value: number;
+  color: string;
+}
+
+// Matches Rust TopProduct
+export interface TopProduct {
+  name: string;
+  sales: number;
+}
+
+export interface SalesReportItem {
+  orderId: number;
+  receiptNumber: string | null;
+  date: string;
+  total: number;
+  status: string;
+}
+
+export interface StatisticsResponse {
+  overview: OverviewStats;
+  revenueTrend: RevenueTrendPoint[];
+  categorySales: CategorySale[];
+  topProducts: TopProduct[];
+}

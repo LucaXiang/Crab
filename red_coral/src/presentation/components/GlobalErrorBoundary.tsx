@@ -173,17 +173,23 @@ class GlobalErrorBoundary extends Component<Props, State> {
       }
     );
 
+    // In dev mode, don't auto-reload so we can see console errors
+    if (import.meta.env.DEV) {
+      console.warn('[GlobalErrorBoundary] Dev mode: auto-reload disabled. Click reload button manually.');
+      return;
+    }
+
     const lastCrash = sessionStorage.getItem('last_crash_timestamp');
     const now = Date.now();
-    const threshold = import.meta.env.DEV ? 2000 : 10000;
-    
+    const threshold = 10000;
+
     // If last crash was > threshold ago, it's safe-ish to reload automatically
     if (!lastCrash || (now - parseInt(lastCrash) > threshold)) {
        sessionStorage.setItem('last_crash_timestamp', now.toString());
        this.setState({ autoReloading: true });
        setTimeout(() => {
          window.location.reload();
-       }, 3000); 
+       }, 3000);
     }
   }
 

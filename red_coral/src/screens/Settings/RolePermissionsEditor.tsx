@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { Shield, Save, RefreshCw, Check, Plus, Trash2, Info } from 'lucide-react';
-import { Role } from '../../types';
+import { Role } from '@/core/domain/types';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 
 // Map permissions to readable labels

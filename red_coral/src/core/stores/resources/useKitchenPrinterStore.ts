@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createTauriClient } from '@/infrastructure/api';
-import type { KitchenPrinter } from '@/infrastructure/api/types';
+import type { KitchenPrinter } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
@@ -64,7 +64,10 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
     set({ isLoading: true, error: null });
     try {
       const response = await api.listPrinters();
-      const printers = (response.data?.printers || []) as KitchenPrinterEntity[];
+      // Handle both formats: direct array or { data: { printers: [...] } }
+      const printers = Array.isArray(response)
+        ? (response as KitchenPrinterEntity[])
+        : ((response.data?.printers || []) as KitchenPrinterEntity[]);
       set({ items: printers, isLoading: false, isLoaded: true });
     } catch (e: any) {
       const errorMsg = e.message || 'Failed to fetch kitchen printers';
@@ -106,7 +109,7 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
   update: async (id, data) => {
     set({ isLoading: true, error: null });
     try {
-      await api.updatePrinter(parseInt(id, 10), {
+      await api.updatePrinter(id, {
         name: data.name || '',
         printer_name: data.printerName || '',
         description: data.description || '',
@@ -125,7 +128,7 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
   remove: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      await api.deletePrinter(parseInt(id, 10));
+      await api.deletePrinter(id);
       set((state) => ({
         items: state.items.filter((item) => item.id !== id),
         isLoading: false,
@@ -180,10 +183,6 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
     return get().getById(id);
   },
 }));
-
-// Register in store registry
-import { storeRegistry } from './registry';
-storeRegistry['kitchen_printer'] = useKitchenPrinterStore;
 
 // Convenience hooks
 export const useKitchenPrinters = () => useKitchenPrinterStore((state) => state.items);

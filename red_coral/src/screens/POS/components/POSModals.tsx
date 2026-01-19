@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import { DraftListModal } from '@/presentation/components/DraftListModal';
 import { TableSelectionScreen } from '@/screens/TableSelection';
-import { HeldOrder, DraftOrder, CartItem } from '@/types';
+import { HeldOrder, DraftOrder, CartItem } from '@/core/domain/types';
 
 interface POSModalsProps {
   // Draft Modal

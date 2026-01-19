@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zone } from '../../types';
+import { Zone } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 
 interface ZoneSidebarProps {
@@ -51,13 +51,13 @@ export const ZoneSidebar: React.FC<ZoneSidebarProps> = React.memo(
                   `}
                 >
                   <span className="text-xs truncate">{zone.name}</span>
-                  {zone.surchargeAmount && zone.surchargeAmount > 0 && (
+                  {zone.surcharge_amount && zone.surcharge_amount > 0 && (
                     <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-bold ${
                       activeZoneId === zone.id 
                         ? 'bg-white/20 text-white' 
                         : 'bg-yellow-100 text-yellow-700'
                     }`}>
-                      {zone.surchargeType === 'percentage' ? `${zone.surchargeAmount}%` : `+${zone.surchargeAmount}`}
+                      {zone.surcharge_type === 'percentage' ? `${zone.surcharge_amount}%` : `+${zone.surcharge_amount}`}
                     </span>
                   )}
                 </button>

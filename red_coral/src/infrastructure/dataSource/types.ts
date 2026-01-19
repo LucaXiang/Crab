@@ -2,7 +2,7 @@
  * DataSource Types
  */
 
-import type { Product, ProductAttribute, CategoryAttribute } from '@/infrastructure/api/types';
+import type { Product, ProductAttribute, CategoryAttribute } from '@/core/domain/types/api';
 
 /**
  * Type of data source backend

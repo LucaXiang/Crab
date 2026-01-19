@@ -50,11 +50,11 @@ export const UnauthorizedScreen: React.FC = () => {
             <div className="text-sm text-gray-500 mb-1">
               {t('auth.currentUser')}
             </div>
-            <div className="font-medium text-gray-900">{user.displayName}</div>
+            <div className="font-medium text-gray-900">{user.display_name || user.username}</div>
             <div className="text-sm text-gray-500 mt-1">
               {t('auth.user.role')}: {' '}
               <span className="inline-block px-2 py-0.5 bg-gray-100 rounded text-gray-700 text-xs font-medium uppercase">
-                {user.role}
+                {user.role_name || 'N/A'}
               </span>
             </div>
           </div>

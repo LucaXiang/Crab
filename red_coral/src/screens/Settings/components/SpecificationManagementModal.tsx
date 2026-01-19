@@ -1,7 +1,7 @@
 import React from 'react';
 import { PackagePlus, X } from 'lucide-react';
 import { SpecificationManager } from './SpecificationManager';
-import { ProductSpecification } from '@/types';
+import { ProductSpecification } from '@/core/domain/types';
 
 interface SpecificationManagementModalProps {
   isOpen: boolean;

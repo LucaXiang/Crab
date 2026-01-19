@@ -20,20 +20,21 @@ import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import DefaultImage from '../../assets/reshot.svg';
 import { formatCurrency } from '@/utils/currency';
 
+// ProductItem matches Product type from models.ts (snake_case naming)
 interface ProductItem {
   id: string;
   name: string;
-  price: number;
   category: string;
   image: string;
-  externalId: number | null;
-  receiptName?: string;
-  sortOrder?: number;
-  taxRate?: number;
-  kitchenPrinterId?: number | null;
-  kitchenPrintName?: string;
-  isKitchenPrintEnabled?: number | null;
-  isLabelPrintEnabled?: number | null;
+  receipt_name?: string | null;
+  sort_order?: number;
+  tax_rate?: number;
+  kitchen_printer?: string | null;
+  kitchen_print_name?: string | null;
+  is_kitchen_print_enabled?: number;
+  is_label_print_enabled?: number;
+  is_active?: boolean;
+  has_multi_spec?: boolean;
 }
 
 export const ProductManagement: React.FC = React.memo(() => {
@@ -141,48 +142,37 @@ export const ProductManagement: React.FC = React.memo(() => {
               />
               <div>
                 <span className="font-medium text-gray-900">{item.name}</span>
-                {item.receiptName && (
+                {item.receipt_name && (
                   <div className="text-xs text-gray-400">
-                    {item.receiptName}
+                    {item.receipt_name}
                   </div>
                 )}
                 <div className="text-xs text-gray-400 mt-0.5">
-                  ID: {item.id.slice(0, 8)} 
-                  {item.externalId && <span className="ml-2 px-1 bg-gray-100 rounded text-gray-600">Ext: {item.externalId}</span>}
+                  ID: {item.id.slice(0, 8)}
                 </div>
               </div>
             </div>
           );
         },
       },
-      {
-        key: 'price',
-        header: t('settings.product.header.price'),
-        width: '120px',
-        align: 'right',
-        render: (item) => (
-          <span className="inline-flex items-center px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm font-bold">
-            {formatCurrency(item.price)}
-          </span>
-        ),
-      },
+      // Note: Price is in ProductSpecification, not Product. Price column removed.
       {
         key: 'kitchenPrinting',
         header: t('settings.product.print.kitchenPrinting'),
         width: '220px',
         render: (item) => {
           const isDefault =
-            item.isKitchenPrintEnabled === undefined || item.isKitchenPrintEnabled === null || item.isKitchenPrintEnabled === -1;
+            item.is_kitchen_print_enabled === undefined || item.is_kitchen_print_enabled === null || item.is_kitchen_print_enabled === -1;
 
           const stateLabel = isDefault
             ? t('common.default')
-            : item.isKitchenPrintEnabled === 1
+            : item.is_kitchen_print_enabled === 1
             ? t('common.enabled')
             : t('common.disabled');
 
           const chipClass = isDefault
             ? 'bg-blue-50 text-blue-700'
-            : item.isKitchenPrintEnabled === 1
+            : item.is_kitchen_print_enabled === 1
             ? 'bg-emerald-50 text-emerald-700'
             : 'bg-gray-100 text-gray-600';
 
@@ -194,8 +184,8 @@ export const ProductManagement: React.FC = React.memo(() => {
                 {stateLabel}
               </span>
               <span className="text-gray-400">
-                {item.kitchenPrinterId
-                  ? `${t('settings.kitchenPrinter')} #${item.kitchenPrinterId}`
+                {item.kitchen_printer
+                  ? `${t('settings.kitchenPrinter')} #${item.kitchen_printer}`
                   : t('common.default')}
               </span>
             </div>
@@ -208,17 +198,17 @@ export const ProductManagement: React.FC = React.memo(() => {
         width: '120px',
         render: (item) => {
           const isDefault =
-            item.isLabelPrintEnabled === undefined || item.isLabelPrintEnabled === null || item.isLabelPrintEnabled === -1;
+            item.is_label_print_enabled === undefined || item.is_label_print_enabled === null || item.is_label_print_enabled === -1;
 
           const stateLabel = isDefault
             ? t('common.default')
-            : item.isLabelPrintEnabled === 1
+            : item.is_label_print_enabled === 1
             ? t('common.enabled')
             : t('common.disabled');
 
           const chipClass = isDefault
             ? 'bg-blue-50 text-blue-700'
-            : item.isLabelPrintEnabled === 1
+            : item.is_label_print_enabled === 1
             ? 'bg-emerald-50 text-emerald-700'
             : 'bg-gray-100 text-gray-600';
 
@@ -333,7 +323,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         pageSize={5}
         totalItems={filteredProducts.length}
         currentPage={page}
-        onPageChange={(newPage) => setPagination(newPage, total)}
+        onPageChange={(newPage) => setPagination(newPage, filteredProducts.length)}
         themeColor="orange"
       />
 

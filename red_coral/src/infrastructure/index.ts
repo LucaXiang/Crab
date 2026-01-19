@@ -5,13 +5,18 @@
 
 // API - Main export for HTTP RESTful API
 export { createClient, createApiClient, type ApiClient, ApiError, setAuthToken, clearAuthToken } from './api';
-export * from './api/types';
 
 // i18n
 export * from './i18n';
 
 // Print
 export * from './print';
+
+// Label
+export * from './label';
+
+// Data Source
+export * from './dataSource';
 
 // Persistence
 export * from './persistence';

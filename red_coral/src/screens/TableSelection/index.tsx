@@ -167,7 +167,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
     const handleTableClick = (table: Table, isOccupied: boolean, order?: HeldOrder) => {
       if (mode === 'RETRIEVE' && !isOccupied) return;
 
-      const activeZone = zones.find(z => z.id === table.zoneId);
+      const activeZone = zones.find(z => z.id === table.zone);
 
       if (isOccupied) {
         if (mode === 'HOLD') {
@@ -189,7 +189,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
       if (selectedTableForInput) {
         const isOccupied = !!getOrder(selectedTableForInput.id);
         const count = parseInt(guestInput) || (isOccupied ? 0 : 2);
-        const activeZone = zones.find(z => z.id === selectedTableForInput.zoneId);
+        const activeZone = zones.find(z => z.id === selectedTableForInput.zone);
 
         if (count > 0 || isOccupied) {
           onSelectTable(selectedTableForInput, count, enableIndividualMode, activeZone);
@@ -217,8 +217,10 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
       const zone = zones.find((z) => z.name === order.zoneName);
       return {
         id: manageTableId,
-        name: order.tableName,
-        zoneId: zone ? zone.id : undefined,
+        name: order.tableName || '',
+        zone: zone ? zone.id : '',
+        capacity: 0,
+        is_active: true,
       } as Table;
     })() : null);
 
@@ -306,16 +308,18 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
                                     table={{
                                         id: order.key,
                                         name: order.tableName || order.key,
-                                        zoneId: 'GHOST',
-                                        capacity: 0
+                                        zone: 'GHOST',
+                                        capacity: 0,
+                                        is_active: true,
                                     }}
                                     order={order}
                                     mode={mode}
                                     onClick={() => handleTableClick({
                                         id: order.key,
                                         name: order.tableName || order.key,
-                                        zoneId: 'GHOST',
-                                        capacity: 0
+                                        zone: 'GHOST',
+                                        capacity: 0,
+                                        is_active: true,
                                     }, true, order)}
                                     className="border-amber-300 bg-amber-50"
                                 />
@@ -342,7 +346,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pb-10">
                       {filteredTables.map((table) => {
                         const order = getOrder(table.id);
-                        const tableZone = zones.find(z => z.id === table.zoneId);
+                        const tableZone = zones.find(z => z.id === table.zone);
                         return (
                           <TableCard
                             key={table.id}

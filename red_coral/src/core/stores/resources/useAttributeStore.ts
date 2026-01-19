@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { createTauriClient } from '@/infrastructure/api';
-import type { Attribute, AttributeOption } from '@/infrastructure/api/types';
+import type { Attribute, AttributeOption } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
@@ -109,7 +109,10 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await api.listAttributeTemplates();
-      const attributes = (response.data?.templates || []) as AttributeEntity[];
+      // Handle both formats: direct array or { data: { templates: [...] } }
+      const attributes = Array.isArray(response)
+        ? (response as AttributeEntity[])
+        : ((response.data?.templates || []) as AttributeEntity[]);
       set({ items: attributes, isLoading: false, isLoaded: true });
     } catch (e: any) {
       const errorMsg = e.message || 'Failed to fetch attributes';
@@ -139,8 +142,9 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   loadOptions: async (attributeId) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.listAttributeOptions(attributeId);
-      const opts = (response.data?.options || []) as AttributeOption[];
+      // Options are embedded in Attribute, fetch the attribute to get its options
+      const response = await api.getAttributeTemplate(attributeId);
+      const opts = (response.data?.template?.options || []) as AttributeOption[];
       const optionsWithIndex: AttributeOptionWithIndex[] = opts.map((opt, index) => ({
         ...opt,
         index,
@@ -195,10 +199,6 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     console.warn('[Store] unbindProductAttribute not implemented - use HTTP API');
   },
 }));
-
-// Register in store registry
-import { storeRegistry } from './registry';
-storeRegistry['attribute'] = useAttributeStore;
 
 // Convenience hooks
 export const useAttributes = () => useAttributeStore((state) => state.items);

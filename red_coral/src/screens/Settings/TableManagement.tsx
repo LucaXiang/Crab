@@ -232,7 +232,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
   // Filter tables by zone
   const filteredTables = useMemo(() => {
     if (zoneFilter === 'all') return tables;
-    return tables.filter((t) => t.zone_id === zoneFilter || (t as any).zoneId === zoneFilter);
+    return tables.filter((t) => t.zone === zoneFilter);
   }, [tables, zoneFilter]);
 
   const handleBatchDelete = (items: TableItem[]) => {
@@ -420,7 +420,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
             columns={columns}
             loading={loading}
             getRowKey={(item) => item.id}
-            onEdit={canManageTables ? (item) => openModal('TABLE', 'EDIT', { ...item, zoneId: item.zone_id || item.zoneId }) : undefined}
+            onEdit={canManageTables ? (item) => openModal('TABLE', 'EDIT', item) : undefined}
             onDelete={canManageTables ? (item) => openModal('TABLE', 'DELETE', item) : undefined}
             onBatchDelete={canManageTables ? handleBatchDelete : undefined}
             emptyText={t('settings.table.noData')}

@@ -70,7 +70,7 @@ import type {
   UpdateProductAttributeRequest,
   ImportResult,
   ExportResponse,
-} from './types';
+} from '@/core/domain/types/api';
 
 // API Error class
 export class ApiError extends Error {
@@ -447,7 +447,7 @@ export class ApiClient {
     return this.request('DELETE', `/api/roles/${id}`);
   }
 
-  async getRolePermissions(roleId: number): Promise<ApiResponse<RolePermissionListData>> {
+  async getRolePermissions(roleId: string | number): Promise<ApiResponse<RolePermissionListData>> {
     return this.request('GET', `/api/roles/${roleId}/permissions`);
   }
 

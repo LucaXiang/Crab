@@ -33,7 +33,7 @@ import type {
   RolePermissionListData,
   ProductAttribute,
   ProductAttributeListData,
-} from './types';
+} from '@/core/domain/types/api';
 
 // API Error class (与原 client.ts 保持一致)
 export class ApiError extends Error {

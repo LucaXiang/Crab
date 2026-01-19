@@ -5,9 +5,8 @@ import { toast } from '@/presentation/components/Toast';
 import { Sidebar } from './components/Sidebar';
 import { Overview } from './components/Overview';
 import { SalesReport } from './components/SalesReport';
-import { TimeRange, ActiveTab } from '@/core/domain/types';
+import { TimeRange, ActiveTab, StatisticsResponse } from '@/core/domain/types';
 import { getStatistics } from '@/infrastructure/apiValidator';
-import { StatisticsResponse } from '@/core/domain/types';
 
 interface StatisticsScreenProps {
   isVisible: boolean;

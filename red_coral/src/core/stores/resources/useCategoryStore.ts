@@ -1,6 +1,6 @@
 import { createCrudResourceStore } from '../factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
-import type { Category } from '@/infrastructure/api/types';
+import type { Category } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
@@ -23,6 +23,10 @@ interface UpdateCategoryInput {
 
 async function fetchCategories(): Promise<CategoryEntity[]> {
   const response = await api.listCategories();
+  // Handle both formats: direct array or { data: { categories: [...] } }
+  if (Array.isArray(response)) {
+    return response as CategoryEntity[];
+  }
   if (response.data?.categories) {
     return response.data.categories as CategoryEntity[];
   }
@@ -47,7 +51,7 @@ async function updateCategory(id: string, data: UpdateCategoryInput): Promise<Ca
 
 async function deleteCategory(id: string): Promise<void> {
   const response = await api.deleteCategory(id);
-  if (!response.data?.deleted && response.code !== 'OK') {
+  if (!response.data?.deleted && response.error_code) {
     throw new Error(response.message || 'Failed to delete category');
   }
 }

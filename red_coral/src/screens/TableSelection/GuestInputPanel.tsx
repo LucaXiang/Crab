@@ -1,5 +1,5 @@
 import React from 'react';
-import { Table, CartItem } from '../../types';
+import { Table, CartItem } from '@/core/domain/types';
 
 // Sub-components
 import {

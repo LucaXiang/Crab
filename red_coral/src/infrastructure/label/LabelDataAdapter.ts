@@ -3,7 +3,7 @@
  * Adapts data for label printing
  */
 
-import type { LabelField } from '@/types/labelTemplate';
+import type { LabelField } from '@/core/domain/types/print';
 
 export interface LabelData {
   product?: {

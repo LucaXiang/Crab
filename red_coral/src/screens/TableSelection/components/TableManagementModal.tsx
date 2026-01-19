@@ -113,7 +113,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
 
     const handleMove = () => {
         if (!selectedTargetTable) return;
-        const targetZone = zones.find(z => z.id === selectedTargetTable.zoneId);
+        const targetZone = zones.find(z => z.id === selectedTargetTable.zone);
         eventStore.moveOrder(sourceTable.id, {
             ...selectedTargetTable,
             zoneName: targetZone?.name

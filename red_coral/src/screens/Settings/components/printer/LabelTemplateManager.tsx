@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { LayoutTemplate, Plus, Copy, Trash2, Edit2, Check } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useActiveLabelTemplateId, useUIActions } from '@/core/stores/ui/useUIStore';
-import { LabelTemplate, DEFAULT_LABEL_TEMPLATES } from '../../../../types/labelTemplate';
+import { LabelTemplate, DEFAULT_LABEL_TEMPLATES } from '@/core/domain/types/print';
 import { LabelEditorScreen } from '../LabelEditorScreen';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { toast } from '@/presentation/components/Toast';

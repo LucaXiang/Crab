@@ -1,7 +1,7 @@
 import React from 'react';
 import { Plus, LucideIcon } from 'lucide-react';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
-import { Permission } from '../../../types';
+import { Permission } from '@/core/domain/types';
 
 interface ManagementHeaderProps {
   icon: LucideIcon;

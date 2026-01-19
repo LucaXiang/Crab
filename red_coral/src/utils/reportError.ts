@@ -14,7 +14,7 @@ export async function reportError(
 ): Promise<void> {
   const err = error instanceof Error ? error : new Error(String(error));
 
-  let authState: { user?: { id?: string; username?: string; role?: string } | null } | null = null;
+  let authState: { user?: { id?: number; username?: string; role_name?: string } | null } | null = null;
   let checkoutState: { currentOrderKey?: string | null; checkoutOrder?: { key?: string; receiptNumber?: string; tableName?: string; zoneName?: string } | null } | null = null;
 
   try {
@@ -44,7 +44,7 @@ export async function reportError(
     user_action: options?.userActionOverride ?? context ?? null,
     user_id: authState?.user?.id ?? null,
     username: authState?.user?.username ?? null,
-    role: authState?.user?.role ?? null,
+    role: authState?.user?.role_name ?? null,
     order_key: activeOrderKey,
     receipt_number: receiptNumber,
     table_name: tableName,

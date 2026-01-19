@@ -16,7 +16,7 @@ export const PrinterSettings: React.FC = React.memo(() => {
     const load = async () => {
       try {
         setLoading(true);
-        const { listPrinters } = await import('../../services/printService');
+        const { listPrinters } = await import('@/infrastructure/print/printService');
         const result = await listPrinters();
         if (mounted) setPrinters(result);
       } finally {

@@ -1,11 +1,15 @@
 import { createResourceStore } from '../factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
-import type { Zone } from '@/infrastructure/api/types';
+import type { Zone } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
 async function fetchZones(): Promise<Zone[]> {
   const response = await api.listZones();
+  // Handle both formats: direct array or { data: { zones: [...] } }
+  if (Array.isArray(response)) {
+    return response;
+  }
   if (response.data?.zones) {
     return response.data.zones;
   }

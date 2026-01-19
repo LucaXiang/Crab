@@ -37,10 +37,10 @@ export function useSyncListener() {
 
       const { resource, action, id } = message.payload;
 
-      // 调用 resources store 的 applySync
+      // 调用 resources store 的 applySync（传入 id 用于去重）
       const store = storeRegistry[resource];
       if (store) {
-        store.getState().applySync();
+        store.getState().applySync(id);
       }
     });
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Clock, Receipt, Percent } from 'lucide-react';
-import { Table, HeldOrder, Zone } from '../../types';
+import { Table, HeldOrder, Zone } from '@/core/domain/types';
 
 interface TableCardProps {
   table: Table;
@@ -24,8 +24,8 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
     const isPrePayment = isOccupied && !!order?.isPrePayment;
     
     // Check for surcharge
-    const hasSurcharge = zone?.surchargeAmount && zone.surchargeAmount > 0;
-    const isPercentage = zone?.surchargeType === 'percentage';
+    const hasSurcharge = zone?.surcharge_amount && zone.surcharge_amount > 0;
+    const isPercentage = zone?.surcharge_type === 'percentage';
 
     // Timer Logic
     const [duration, setDuration] = useState<string>('');
@@ -78,7 +78,7 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
         {!isOccupied && hasSurcharge && (
           <div className="absolute top-2 right-2 flex items-center gap-0.5 px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-bold border border-yellow-200/50 shadow-sm">
             {isPercentage ? <Percent size={10} /> : <span className="text-[10px]">+</span>}
-            <span>{zone?.surchargeAmount}</span>
+            <span>{zone?.surcharge_amount}</span>
           </div>
         )}
 

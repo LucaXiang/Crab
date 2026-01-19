@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { ArrowLeft, Save, Layers, Type, Image as ImageIcon, Trash2, GripVertical, Settings, Minus, Printer, HelpCircle } from 'lucide-react';
-import { LabelTemplate, LabelField, SUPPORTED_LABEL_FIELDS } from '../../../types/labelTemplate';
-import { convertTemplateToRust } from '../../../services/print';
+import { LabelTemplate, LabelField, SUPPORTED_LABEL_FIELDS } from '@/core/domain/types/print';
+import { convertTemplateToRust } from '@/infrastructure/print';
 import { LabelTemplateEditor } from './LabelTemplateEditor';
 import { FieldPropertiesPanel } from './FieldPropertiesPanel';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';

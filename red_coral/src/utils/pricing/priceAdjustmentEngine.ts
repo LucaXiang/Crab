@@ -10,7 +10,7 @@ import { Decimal } from 'decimal.js';
 import type {
   AdjustmentRule,
   AdjustmentScope,
-} from '@/types/priceAdjustment';
+} from '@/core/domain/types/pricing';
 
 /**
  * 价格调整结果

@@ -4,7 +4,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import type { LabelPrintConfig, LabelPrintJob } from '@/types/labelTemplate';
+import type { LabelPrintConfig, LabelPrintJob } from '@/core/domain/types/print';
 import type { HeldOrder } from '@/core/domain/types';
 
 export interface LabelPrintService {

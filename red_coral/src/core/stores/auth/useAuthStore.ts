@@ -76,7 +76,8 @@ export const useAuthStore = create<AuthStore>()(
             api.setAccessToken(access_token);
 
             // 获取权限 - API 返回 RolePermission[]，提取 permission 字段
-            const rolePermissions = await api.getRolePermissions(userData.role_id);
+            // 注意：TauriApiClient 期望 string，ApiClient 期望 number，统一使用 string
+            const rolePermissions = await api.getRolePermissions(String(userData.role_id));
             const permissions = rolePermissions.data?.permissions.map(p => p.permission) || [];
 
             set({
@@ -129,7 +130,7 @@ export const useAuthStore = create<AuthStore>()(
        */
       fetchUserPermissions: async (roleId: number) => {
         try {
-          const response = await api.getRolePermissions(roleId);
+          const response = await api.getRolePermissions(String(roleId));
           // API 返回 RolePermission[]，提取 permission 字段
           const permissions = response.data?.permissions.map(p => p.permission) || [];
           set({ permissions });

@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { User, Lock, AlertCircle, ChevronRight, Store, Terminal, Power, WifiOff, Building2, Server, Monitor } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
-import { useBridgeStore, type LoginMode } from '@/core/stores/bridge';
+import { useBridgeStore, useAppState, AppStateHelpers, type LoginMode } from '@/core/stores/bridge';
 import { useI18n } from '@/hooks/useI18n';
 
 export const LoginScreen: React.FC = () => {
@@ -58,13 +58,16 @@ export const LoginScreen: React.FC = () => {
     fetchModeInfo();
   }, [fetchModeInfo]);
 
-  // Navigate when authenticated
+  // Use appState for navigation decisions (consistent with ProtectedRoute)
+  const appState = useAppState();
+
+  // Navigate when authenticated (based on appState, not local session)
   useEffect(() => {
-    if (isAuthenticated || currentSession) {
+    if (AppStateHelpers.canAccessPOS(appState)) {
       const from = (location.state as any)?.from?.pathname || '/pos';
       navigate(from, { replace: true });
     }
-  }, [isAuthenticated, currentSession, navigate, location]);
+  }, [appState, navigate, location]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

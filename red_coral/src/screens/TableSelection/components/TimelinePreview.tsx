@@ -1,7 +1,7 @@
 import React from 'react';
 import { Users, ShoppingBag, Utensils } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { CartItem } from '@/types';
+import { CartItem } from '@/core/domain/types';
 
 interface TimelinePreviewProps {
   isOccupied: boolean;

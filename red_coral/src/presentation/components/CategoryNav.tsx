@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { ChevronUp, ChevronDown } from 'lucide-react';
-import { Category } from '@/types';
+import { Category } from '@/core/domain/types';
 
 interface CategoryNavProps {
   selected: string;

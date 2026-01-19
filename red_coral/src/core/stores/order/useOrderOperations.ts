@@ -280,7 +280,7 @@ export const completeOrder = (
     const updated = store.getOrder(orderKey) || orderWithReceipt;
     const isRetail = orderKey.startsWith('RETAIL-') || (updated as any).isRetail === true;
     if (isRetail) {
-      import('@/services/printService').then(({ printKitchenTicketLegacy }) => {
+      import('@/infrastructure/print/printService').then(({ printKitchenTicketLegacy }) => {
         printKitchenTicketLegacy(updated, false, false, 'retail', updated.items || []).catch(() => {});
       });
     }

@@ -254,14 +254,3 @@ export const ADJUSTMENT_TEMPLATES: AdjustmentTemplate[] = [
   },
 ];
 
-// Backward compatibility exports (deprecated)
-export type {
-  PriceAdjustmentType as PriceAdjustmentTypeDeprecated,
-  PriceAdjustmentScope as PriceAdjustmentScopeDeprecated,
-  PriceAdjustmentStatus as PriceAdjustmentStatusDeprecated,
-  PriceAdjustmentConfig as PriceAdjustmentConfigDeprecated,
-  PriceAdjustmentRule as PriceAdjustmentRuleDeprecated,
-  CreatePriceAdjustmentRuleParams as CreatePriceAdjustmentRuleParamsDeprecated,
-  UpdatePriceAdjustmentRuleParams as UpdatePriceAdjustmentRuleParamsDeprecated,
-  PriceAdjustmentTemplate as PriceAdjustmentTemplateDeprecated,
-} from './priceAdjustment.deprecated';

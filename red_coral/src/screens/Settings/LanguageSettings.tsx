@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Languages } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import type { Locale } from '@/services/i18n';
+import type { Locale } from '@/infrastructure/i18n';
 import { toast } from '@/presentation/components/Toast';
 
 export const LanguageSettings: React.FC = React.memo(() => {

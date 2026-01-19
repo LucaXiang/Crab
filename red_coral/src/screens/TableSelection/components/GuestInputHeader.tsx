@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeft, Settings } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { Table } from '@/types';
+import { Table } from '@/core/domain/types';
 
 interface GuestInputHeaderProps {
   selectedTable: Table;

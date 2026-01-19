@@ -4,7 +4,7 @@ import { IconBtn } from '@/presentation/components/ui/IconBtn';
 import { useI18n } from '@/hooks/useI18n';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
-import { Permission } from '@/types';
+import { Permission } from '@/core/domain/types';
 
 interface ActionBarProps {
   screen: 'POS' | 'HISTORY' | 'SETTINGS' | 'STATISTICS';

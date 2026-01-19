@@ -1,11 +1,14 @@
 import { createResourceStore } from '../factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
-import type { PriceRule } from '@/infrastructure/api/types';
+import type { PriceRule } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
 async function fetchPriceRules(): Promise<PriceRule[]> {
   const response = await api.listPriceAdjustments();
+  if (Array.isArray(response)) {
+    return response as PriceRule[];
+  }
   if (response.data?.rules) {
     return response.data.rules as PriceRule[];
   }

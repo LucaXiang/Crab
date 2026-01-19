@@ -2,7 +2,7 @@ import React from 'react';
 import { PlusSquare } from 'lucide-react';
 import { ProductCard } from '@/presentation/components/ProductCard';
 import { useI18n } from '@/hooks/useI18n';
-import { Product } from '@/types';
+import { Product } from '@/core/domain/types';
 
 interface ProductGridProps {
 	  products: Product[];

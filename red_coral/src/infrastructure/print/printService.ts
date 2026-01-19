@@ -4,7 +4,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import type { ReceiptPrintConfig, KitchenTicketPrintConfig, LabelPrintConfig } from '@/types/print';
+import type { ReceiptPrintConfig, KitchenTicketPrintConfig, LabelPrintConfig } from '@/core/domain/types/print';
 
 export interface PrintService {
   // Receipt printing

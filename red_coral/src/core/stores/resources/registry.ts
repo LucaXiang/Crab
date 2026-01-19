@@ -22,7 +22,7 @@ interface RegistryStore {
   getState: () => {
     isLoaded: boolean;
     fetchAll: () => Promise<void>;
-    applySync: () => void;
+    applySync: (id: string) => void;
     clear: () => void;
   };
 }

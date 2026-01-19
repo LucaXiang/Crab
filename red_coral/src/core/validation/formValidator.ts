@@ -20,7 +20,7 @@ export const productFormSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   image: z.string().min(1, 'Image is required'),
   externalId: z.number().int().positive().optional(),
-  taxRate: z.number().min(0).max(1),
+  taxRate: z.number().int().min(0).max(100),
   kitchenPrinterId: z.number().optional().nullable(),
   kitchenPrintName: z.string().optional(),
   isKitchenPrintEnabled: z.number().min(-1).max(1).optional(),

@@ -1,6 +1,6 @@
 import { createCrudResourceStore } from '../factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
-import type { Product } from '@/infrastructure/api/types';
+import type { Product } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
@@ -39,6 +39,10 @@ interface UpdateProductInput {
 
 async function fetchProducts(): Promise<ProductEntity[]> {
   const response = await api.listProducts();
+  // Handle both formats: direct array or { data: { products: [...] } }
+  if (Array.isArray(response)) {
+    return response as ProductEntity[];
+  }
   if (response.data?.products) {
     return response.data.products as ProductEntity[];
   }
@@ -56,18 +60,18 @@ async function createProduct(data: CreateProductInput): Promise<ProductEntity> {
 async function updateProduct(id: string, data: UpdateProductInput): Promise<ProductEntity> {
   const response = await api.updateProduct(id, data as any);
   if (response.data?.product) {
-    return response.data.product as ProductEntity;
+    return response.data.product as unknown as ProductEntity;
   }
   // Some APIs return the updated product directly
   if (response.data && 'id' in response.data) {
-    return response.data as ProductEntity;
+    return response.data as unknown as ProductEntity;
   }
   throw new Error(response.message || 'Failed to update product');
 }
 
 async function deleteProduct(id: string): Promise<void> {
   const response = await api.deleteProduct(id);
-  if (!response.data?.deleted && response.code !== 'OK') {
+  if (!response.data?.deleted && response.error_code) {
     throw new Error(response.message || 'Failed to delete product');
   }
 }

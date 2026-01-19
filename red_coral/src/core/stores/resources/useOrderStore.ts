@@ -1,6 +1,6 @@
 import { createResourceStore } from '../factory/createResourceStore';
 import { invoke } from '@tauri-apps/api/core';
-import type { Order, ApiResponse } from '@/infrastructure/api/types';
+import type { Order, ApiResponse } from '@/core/domain/types/api';
 
 /**
  * Order Store - 订单数据

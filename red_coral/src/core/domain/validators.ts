@@ -109,7 +109,7 @@ export const productSchema = z.object({
   image: z.string(),
   category: z.string().min(1),
   externalId: positiveIntSchema,
-  taxRate: z.number().min(0).max(1),
+  taxRate: z.number().int().min(0).max(100),
   sortOrder: positiveIntSchema.optional(),
   kitchenPrinterId: positiveIntSchema.nullable().optional(),
   kitchenPrintName: z.string().optional(),

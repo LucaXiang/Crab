@@ -109,9 +109,9 @@ export interface LabelPrintJob {
 }
 
 /**
- * Label print configuration
+ * Template-based print configuration
  */
-export interface LabelPrintConfig {
+export interface TemplatePrintConfig {
   templateId: string;
   printerId?: number;
   quantity: number;

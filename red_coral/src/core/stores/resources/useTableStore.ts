@@ -1,11 +1,14 @@
 import { createResourceStore } from '../factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
-import type { Table } from '@/infrastructure/api/types';
+import type { Table } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
 async function fetchTables(): Promise<Table[]> {
   const response = await api.listTables();
+  if (Array.isArray(response)) {
+    return response;
+  }
   if (response.data?.tables) {
     return response.data.tables;
   }

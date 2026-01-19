@@ -35,21 +35,28 @@ const InitialRoute: React.FC = () => {
     const init = async () => {
       // 1. 获取租户列表
       await fetchTenants();
+      console.log('[InitialRoute] tenants:', useBridgeStore.getState().tenants);
 
       // 2. 获取当前应用状态
       const state = await fetchAppState();
+      console.log('[InitialRoute] initial appState:', state);
 
       // 3. 如果状态表明需要自动启动 Server 模式
       // (Uninitialized 状态且有租户 = 有证书但未启动)
       if (state?.type === 'Uninitialized' && useBridgeStore.getState().tenants.length > 0) {
+        console.log('[InitialRoute] Auto-starting Server mode...');
         try {
           await startServerMode();
-          await fetchAppState(); // 刷新状态
+          const newState = await fetchAppState(); // 刷新状态
+          console.log('[InitialRoute] appState after startServerMode:', newState);
         } catch (err) {
           console.error('Failed to auto-start Server mode:', err);
         }
       }
 
+      const finalState = useBridgeStore.getState().appState;
+      console.log('[InitialRoute] final appState:', finalState);
+      console.log('[InitialRoute] route:', AppStateHelpers.getRouteForState(finalState));
       setIsChecking(false);
     };
     init();

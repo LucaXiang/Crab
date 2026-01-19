@@ -113,10 +113,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   }, [formData.id, showSpecModal, formData.tempSpecifications]);
 
   const TAX_RATES = [
-    { value: 0.21, label: t('settings.product.form.taxRateGeneral') },
-    { value: 0.10, label: t('settings.product.form.taxRateReduced') },
-    { value: 0.04, label: t('settings.product.form.taxRateSuperReduced') },
-    { value: 0.00, label: t('settings.product.form.taxRateExempt') },
+    { value: 21, label: t('settings.product.form.taxRateGeneral') },
+    { value: 10, label: t('settings.product.form.taxRateReduced') },
+    { value: 4, label: t('settings.product.form.taxRateSuperReduced') },
+    { value: 0, label: t('settings.product.form.taxRateExempt') },
   ];
 
   // Get selected attribute objects for display
@@ -182,10 +182,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
           <SelectField
             label={t('settings.product.form.taxRate')}
-            value={formData.taxRate?.toString() || '0.1'}
+            value={formData.taxRate?.toString() || '10'}
             onChange={(value) => {
-              const val = parseFloat(value as string);
-              onFieldChange('taxRate', isNaN(val) ? 0.10 : val);
+              const val = parseInt(value as string, 10);
+              onFieldChange('taxRate', isNaN(val) ? 10 : val);
             }}
             options={TAX_RATES.map(rate => ({ value: rate.value.toString(), label: rate.label }))}
             required

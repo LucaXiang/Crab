@@ -1,11 +1,14 @@
 import { createResourceStore } from '../factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
-import type { Role } from '@/infrastructure/api/types';
+import type { Role } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
 async function fetchRoles(): Promise<Role[]> {
   const response = await api.listRoles();
+  if (Array.isArray(response)) {
+    return response;
+  }
   if (response.data?.roles) {
     return response.data.roles;
   }

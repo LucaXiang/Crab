@@ -1,4 +1,4 @@
-import { LabelField, TextAlign, VerticalAlign } from '../../../types/labelTemplate';
+import { LabelField, TextAlign, VerticalAlign } from '@/core/domain/types/print';
 import { Type, Image as ImageIcon, X, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { NumberInput } from '@/presentation/components/ui/NumberInput';
