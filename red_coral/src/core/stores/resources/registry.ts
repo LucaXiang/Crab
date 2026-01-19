@@ -30,10 +30,12 @@ interface RegistryStore {
 /**
  * 资源 Store 注册表
  *
- * 13 种资源类型:
- * - 菜单相关: product, category, tag, attribute, spec
- * - 位置相关: zone, table
- * - 人员相关: employee, role
+ * key 必须与后端 broadcast_sync 的 resource 参数完全一致！
+ *
+ * 12 种资源类型:
+ * - 菜单相关: product, category, tag, attribute, product_specification
+ * - 位置相关: zone, dining_table
+ * - 人员相关: employee, role (role 无 sync，只读)
  * - 其他: price_rule, kitchen_printer, order
  */
 export const storeRegistry: Record<string, RegistryStore> = {
@@ -41,11 +43,11 @@ export const storeRegistry: Record<string, RegistryStore> = {
   category: useCategoryStore,
   tag: useTagStore,
   attribute: useAttributeStore,
-  spec: useSpecStore,
+  product_specification: useSpecStore,  // 后端: RESOURCE_SPEC = "product_specification"
   zone: useZoneStore,
-  table: useTableStore,
+  dining_table: useTableStore,          // 后端: RESOURCE = "dining_table"
   employee: useEmployeeStore,
-  role: useRoleStore,
+  role: useRoleStore,                    // 后端无 sync (只读 API)
   price_rule: usePriceRuleStore,
   kitchen_printer: useKitchenPrinterStore,
   order: useOrderStore,
