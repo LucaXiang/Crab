@@ -14,3 +14,8 @@ export { useKitchenPrinter } from './useUIStore';
 export { useLabelPrinter } from './useUIStore';
 export { useModalStates } from './useUIStore';
 export { useUIActions } from './useUIStore';
+
+// POS UI
+export { useSelectedCategory } from './useUIStore';
+export { useSearchQuery } from './useUIStore';
+export { usePOSUIActions } from './useUIStore';

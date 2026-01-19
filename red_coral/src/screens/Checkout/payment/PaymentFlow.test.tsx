@@ -101,10 +101,10 @@ describe('PaymentFlow', () => {
   it('renders and opens cash modal when clicking cash button', async () => {
     render(<PaymentFlow order={baseOrder} onComplete={() => {}} />);
 
-    const cashButton = screen.getByRole('button', { name: /checkout.cash/i });
+    const cashButton = screen.getByRole('button', { name: /checkout\.method\.cash/i });
     fireEvent.click(cashButton);
 
-    const confirmButton = await screen.findByText('checkout.confirmPayment');
+    const confirmButton = await screen.findByText('checkout.payment.confirm');
     expect(confirmButton).toBeInTheDocument();
   });
 });

@@ -20,6 +20,10 @@ interface UIStore {
   activeLabelTemplateId: string | null;
   animations: AnimationItem[];
 
+  // POS UI State
+  selectedCategory: string; // 'all' for all categories
+  searchQuery: string;
+
   // Actions
   setScreen: (screen: ScreenMode) => void;
   setViewMode: (mode: ViewMode) => void;
@@ -34,6 +38,10 @@ interface UIStore {
   setActiveLabelTemplateId: (id: string | null) => void;
   addAnimation: (animation: AnimationItem) => void;
   removeAnimation: (id: string) => void;
+
+  // POS UI Actions
+  setSelectedCategory: (category: string) => void;
+  setSearchQuery: (query: string) => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -43,13 +51,17 @@ export const useUIStore = create<UIStore>((set) => ({
   showDebugMenu: false,
   showTableScreen: false,
   showDraftModal: false,
-  receiptPrinter: (typeof window !== 'undefined' ? (localStorage.getItem('printer_receipt') || localStorage.getItem('printerName')) : null) || null,
-  kitchenPrinter: (typeof window !== 'undefined' ? localStorage.getItem('printer_kitchen') : null) || null,
-  isKitchenPrintEnabled: (typeof window !== 'undefined' ? localStorage.getItem('kitchen_print_enabled') !== 'false' : true),
-  labelPrinter: (typeof window !== 'undefined' ? localStorage.getItem('printer_label') : null) || null,
-  isLabelPrintEnabled: (typeof window !== 'undefined' ? localStorage.getItem('label_print_enabled') !== 'false' : true),
-  activeLabelTemplateId: (typeof window !== 'undefined' ? localStorage.getItem('active_label_template_id') : null) || null,
+  receiptPrinter: (typeof window !== 'undefined' && typeof localStorage?.getItem === 'function' ? (localStorage.getItem('printer_receipt') || localStorage.getItem('printerName')) : null) || null,
+  kitchenPrinter: (typeof window !== 'undefined' && typeof localStorage?.getItem === 'function' ? localStorage.getItem('printer_kitchen') : null) || null,
+  isKitchenPrintEnabled: (typeof window !== 'undefined' && typeof localStorage?.getItem === 'function' ? localStorage.getItem('kitchen_print_enabled') !== 'false' : true),
+  labelPrinter: (typeof window !== 'undefined' && typeof localStorage?.getItem === 'function' ? localStorage.getItem('printer_label') : null) || null,
+  isLabelPrintEnabled: (typeof window !== 'undefined' && typeof localStorage?.getItem === 'function' ? localStorage.getItem('label_print_enabled') !== 'false' : true),
+  activeLabelTemplateId: (typeof window !== 'undefined' && typeof localStorage?.getItem === 'function' ? localStorage.getItem('active_label_template_id') : null) || null,
   animations: [],
+
+  // POS UI State
+  selectedCategory: 'all',
+  searchQuery: '',
 
   // Actions
   setScreen: (screen: ScreenMode) => set({ screen }),
@@ -121,7 +133,11 @@ export const useUIStore = create<UIStore>((set) => ({
   removeAnimation: (id: string) =>
     set((state) => ({
       animations: state.animations.filter(a => a.id !== id)
-    }))
+    })),
+
+  // POS UI Actions
+  setSelectedCategory: (category: string) => set({ selectedCategory: category }),
+  setSearchQuery: (query: string) => set({ searchQuery: query }),
 }));
 
 // ============ Granular Selectors (Performance Optimization) ============
@@ -136,6 +152,16 @@ export const useLabelPrinter = () => useUIStore((state) => state.labelPrinter);
 export const useIsLabelPrintEnabled = () => useUIStore((state) => state.isLabelPrintEnabled);
 export const useActiveLabelTemplateId = () => useUIStore((state) => state.activeLabelTemplateId);
 export const useAnimations = () => useUIStore((state) => state.animations);
+
+// POS UI Selectors
+export const useSelectedCategory = () => useUIStore((state) => state.selectedCategory);
+export const useSearchQuery = () => useUIStore((state) => state.searchQuery);
+export const usePOSUIActions = () => useUIStore(
+  useShallow((state) => ({
+    setSelectedCategory: state.setSelectedCategory,
+    setSearchQuery: state.setSearchQuery,
+  }))
+);
 
 export const useModalStates = () => useUIStore(
   useShallow((state) => ({

@@ -4,7 +4,19 @@ use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock;
 
-use crate::core::{ClientBridge, ClientModeConfig, ModeInfo, ModeType, ServerModeConfig};
+use crate::core::{AppState, ClientBridge, ClientModeConfig, ModeInfo, ModeType, ServerModeConfig};
+
+/// 获取应用状态 (用于前端路由守卫)
+///
+/// 返回当前应用所处的状态，前端可据此决定显示哪个页面。
+/// 参考设计文档: `docs/plans/2026-01-18-application-state-machine.md`
+#[tauri::command]
+pub async fn get_app_state(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+) -> Result<AppState, String> {
+    let bridge = bridge.read().await;
+    Ok(bridge.get_app_state().await)
+}
 
 /// 获取当前模式信息
 #[tauri::command]

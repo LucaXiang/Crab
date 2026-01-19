@@ -1,7 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '../../../hooks/useI18n';
-import { useAttributeActions } from '@/core/stores/product/useAttributeStore';
+import { useAttributeActions } from '@/core/stores/resources';
 import type { Attribute } from '@/infrastructure/api/types';
 import { FormField, inputClass } from './FormField';
 import { useFormInitialization } from '../../../hooks/useFormInitialization';

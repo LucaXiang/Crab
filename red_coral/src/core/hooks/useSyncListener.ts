@@ -1,32 +1,32 @@
 /**
- * Sync Listener Hook
+ * Sync Listener Hook - 服务器权威模型
  *
- * Listens for server-message events with Sync payloads and updates local stores.
- * Uses a threshold-based approach: small version gaps apply incremental updates,
- * large gaps trigger full data refresh.
+ * 监听 server-message 事件中的 Sync 信号，触发 Store 刷新。
+ * 使用 resources/ 下的统一 Store 架构。
  */
 
 import { listen } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
-import { useProductStore } from '@/core/stores/product/useProductStore';
-import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
-
-const SYNC_THRESHOLD = 5;
+import { storeRegistry } from '@/core/stores/resources/registry';
 
 interface SyncPayload {
   resource: string;
-  version: number;
   action: string;
   id: string;
-  data: any | null;
+  data: unknown | null;
 }
 
 interface ServerMessageEvent {
   event_type: string;
-  payload: any;
+  payload: SyncPayload;
   correlation_id: string | null;
 }
 
+/**
+ * 监听同步信号，触发 Store 刷新
+ *
+ * 服务器权威：收到 Sync 信号直接全量刷新对应资源
+ */
 export function useSyncListener() {
   useEffect(() => {
     const unlisten = listen<ServerMessageEvent>('server-message', (event) => {
@@ -35,76 +35,13 @@ export function useSyncListener() {
       // Only handle Sync type messages
       if (message.event_type !== 'Sync') return;
 
-      const syncPayload = message.payload as SyncPayload;
-      const { resource, version, action, id, data } = syncPayload;
+      const { resource, action, id } = message.payload;
+      console.log(`[Sync] Received: ${resource}.${action} (id: ${id})`);
 
-      console.log(`[Sync] Received: ${resource} ${action} ${id} (v${version})`);
-
-      // Dispatch to corresponding store based on resource type
-      switch (resource) {
-        case 'product': {
-          const store = useProductStore.getState();
-          if (!store.isLoaded) return;
-
-          const localVersion = store.dataVersion || 0;
-          const gap = version - localVersion;
-
-          if (gap <= 0) return;
-
-          if (gap <= SYNC_THRESHOLD) {
-            store.applySync(action, id, data);
-            store.setVersion(version);
-          } else {
-            console.log(`[Sync] Version gap ${gap} > ${SYNC_THRESHOLD}, full refresh for ${resource}`);
-            store.loadProducts();
-          }
-          break;
-        }
-
-        case 'zone': {
-          const store = useSettingsStore.getState();
-          if (!store.isLoaded) return;
-
-          const localVersion = store.dataVersion || 0;
-          const gap = version - localVersion;
-
-          if (gap <= 0) return;
-
-          if (gap <= SYNC_THRESHOLD) {
-            store.applySyncZone(action, id, data);
-            store.setDataVersion(version);
-          } else {
-            console.log(`[Sync] Version gap ${gap} > ${SYNC_THRESHOLD}, full refresh for ${resource}`);
-            // Trigger full data refresh via dataVersion increment
-            // Components listening to dataVersion will refetch zones
-            store.refreshData();
-          }
-          break;
-        }
-
-        case 'table': {
-          const store = useSettingsStore.getState();
-          if (!store.isLoaded) return;
-
-          const localVersion = store.dataVersion || 0;
-          const gap = version - localVersion;
-
-          if (gap <= 0) return;
-
-          if (gap <= SYNC_THRESHOLD) {
-            store.applySyncTable(action, id, data);
-            store.setDataVersion(version);
-          } else {
-            console.log(`[Sync] Version gap ${gap} > ${SYNC_THRESHOLD}, full refresh for ${resource}`);
-            // Trigger full data refresh via dataVersion increment
-            // Components listening to dataVersion will refetch tables
-            store.refreshData();
-          }
-          break;
-        }
-
-        default:
-          console.log(`[Sync] Unknown resource: ${resource}`);
+      // 调用 resources store 的 applySync
+      const store = storeRegistry[resource];
+      if (store) {
+        store.getState().applySync();
       }
     });
 

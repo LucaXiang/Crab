@@ -131,6 +131,7 @@ pub async fn run() {
             commands::api_delete,
             // Mode commands
             commands::check_first_run,
+            commands::get_app_state,
             commands::get_mode_info,
             commands::get_current_mode_type,
             commands::start_server_mode,

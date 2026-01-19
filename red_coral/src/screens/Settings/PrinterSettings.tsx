@@ -13,7 +13,7 @@ import {
   useUIActions,
   useActiveLabelTemplateId
 } from '@/core/stores/ui/useUIStore';
-import { useKitchenPrinterStore } from '@/core/stores/product/useKitchenPrinterStore';
+import { useKitchenPrinterStore } from '@/core/stores/resources';
 import {
   LabelTemplate,
   DEFAULT_LABEL_TEMPLATES,

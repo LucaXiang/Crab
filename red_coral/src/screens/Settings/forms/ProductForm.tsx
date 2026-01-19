@@ -4,7 +4,7 @@ import { FormField, inputClass, selectClass } from './FormField';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { createApiClient } from '@/infrastructure/api';
 import { AttributeSelectionModal } from './AttributeSelectionModal';
-import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions } from '@/core/stores/product/useAttributeStore';
+import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions } from '@/core/stores/resources';
 import { useIsKitchenPrintEnabled, useIsLabelPrintEnabled } from '@/core/stores/ui';
 import { usePriceInput } from '@/hooks/usePriceInput';
 import { SelectField } from '@/presentation/components/form/FormField/SelectField';

@@ -1,7 +1,7 @@
 import React from 'react';
 import { FormField } from './FormField';
 import { selectClass } from './FormField';
-import { useKitchenPrinterStore } from '@/core/stores/product/useKitchenPrinterStore';
+import { useKitchenPrinterStore } from '@/core/stores/resources';
 
 export interface KitchenPrinterSelectorProps {
   value: string | number | null | undefined;

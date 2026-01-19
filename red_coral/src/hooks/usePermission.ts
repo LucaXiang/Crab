@@ -37,37 +37,10 @@ export const useCanManageUsers = () => {
 };
 
 /**
- * Check if user can void orders
- * Manager and Admin only
- */
-export const useCanVoidOrder = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.VOID_ORDER);
-};
-
-/**
- * Check if user can restore voided orders
- * Manager and Admin only
- */
-export const useCanRestoreOrder = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.RESTORE_ORDER);
-};
-
-/**
  * Check if user can manage products (create/edit/delete)
  * Manager and Admin only
  */
 export const useCanManageProducts = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.CREATE_PRODUCT); // CREATE implies UPDATE/DELETE
-};
-
-/**
- * Check if user can create products
- * Manager and Admin only
- */
-export const useCanCreateProduct = () => {
   const { hasPermission } = usePermission();
   return hasPermission(PermissionValues.CREATE_PRODUCT);
 };
@@ -115,93 +88,4 @@ export const useCanManageZones = () => {
 export const useCanManageTables = () => {
   const { hasPermission } = usePermission();
   return hasPermission(PermissionValues.MANAGE_TABLES);
-};
-
-/**
- * Check if user can modify prices
- * All roles (admin, manager, cashier)
- */
-export const useCanModifyPrice = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.MODIFY_PRICE);
-};
-
-/**
- * Check if user can apply discounts
- * All roles (admin, manager, cashier)
- */
-export const useCanApplyDiscount = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.APPLY_DISCOUNT);
-};
-
-/**
- * Check if user can view statistics/reports
- * Manager and Admin only
- */
-export const useCanViewStatistics = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.VIEW_STATISTICS);
-};
-
-/**
- * Check if user can manage printers
- * Admin only
- */
-export const useCanManagePrinters = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.MANAGE_PRINTERS);
-};
-
-/**
- * Check if user can manage product attributes
- * Manager and Admin only
- */
-export const useCanManageAttributes = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.MANAGE_ATTRIBUTES);
-};
-
-// ==================== Role-Based Hooks ====================
-
-/**
- * Check if current user is an admin
- */
-export const useIsAdmin = () => {
-  const { hasRole } = usePermission();
-  return hasRole('admin');
-};
-
-/**
- * Check if current user is a manager
- */
-export const useIsManager = () => {
-  const { hasRole } = usePermission();
-  return hasRole('manager');
-};
-
-/**
- * Check if current user is a cashier
- */
-export const useIsCashier = () => {
-  const { hasRole } = usePermission();
-  return hasRole('cashier');
-};
-
-/**
- * Check if current user is manager or admin
- * (has elevated privileges)
- */
-export const useIsManagerOrAbove = () => {
-  const { hasRole } = usePermission();
-  return hasRole(['admin', 'manager']);
-};
-
-/**
- * Check if current user is admin or manager or cashier
- * (any authenticated user)
- */
-export const useIsAuthenticated = () => {
-  const { hasRole } = usePermission();
-  return hasRole(['admin', 'manager', 'cashier']);
 };

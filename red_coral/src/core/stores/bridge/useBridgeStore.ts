@@ -9,6 +9,100 @@ import type { ConnectionStatus } from '@/core/hooks/useConnectionStatus';
 export type ModeType = 'Server' | 'Client' | 'Disconnected';
 export type LoginMode = 'Online' | 'Offline';
 
+/**
+ * AppState - 应用状态枚举
+ *
+ * 与 Rust 定义保持一致: `src-tauri/src/core/client_bridge.rs`
+ * 参考设计文档: `docs/plans/2026-01-18-application-state-machine.md`
+ */
+export type AppState =
+  // 通用状态
+  | { type: 'Uninitialized' }
+  // Server 模式专属
+  | { type: 'ServerNoTenant' }
+  | { type: 'ServerNeedActivation' }
+  | { type: 'ServerActivating' }
+  | { type: 'ServerCheckingSubscription' }
+  | { type: 'ServerSubscriptionBlocked'; data: { reason: string } }
+  | { type: 'ServerReady' }
+  | { type: 'ServerAuthenticated' }
+  // Client 模式专属
+  | { type: 'ClientDisconnected' }
+  | { type: 'ClientNeedSetup' }
+  | { type: 'ClientConnecting' }
+  | { type: 'ClientConnected' }
+  | { type: 'ClientAuthenticated' };
+
+/**
+ * AppState 辅助函数
+ */
+export const AppStateHelpers = {
+  /** 是否可以访问 POS 主界面 */
+  canAccessPOS: (state: AppState | null): boolean => {
+    if (!state) return false;
+    return state.type === 'ServerAuthenticated' || state.type === 'ClientAuthenticated';
+  },
+
+  /** 是否需要员工登录 */
+  needsEmployeeLogin: (state: AppState | null): boolean => {
+    if (!state) return false;
+    return state.type === 'ServerReady' || state.type === 'ClientConnected';
+  },
+
+  /** 是否需要设置/激活 */
+  needsSetup: (state: AppState | null): boolean => {
+    if (!state) return true;
+    return [
+      'Uninitialized',
+      'ServerNoTenant',
+      'ServerNeedActivation',
+      'ClientDisconnected',
+      'ClientNeedSetup',
+    ].includes(state.type);
+  },
+
+  /** 是否被订阅阻止 */
+  isSubscriptionBlocked: (state: AppState | null): boolean => {
+    if (!state) return false;
+    return state.type === 'ServerSubscriptionBlocked';
+  },
+
+  /** 获取推荐路由 */
+  getRouteForState: (state: AppState | null): string => {
+    if (!state) return '/setup';
+
+    switch (state.type) {
+      // 需要设置
+      case 'Uninitialized':
+      case 'ServerNoTenant':
+      case 'ServerNeedActivation':
+      case 'ServerActivating':
+      case 'ServerCheckingSubscription':
+      case 'ClientDisconnected':
+      case 'ClientNeedSetup':
+      case 'ClientConnecting':
+        return '/setup';
+
+      // 订阅阻止
+      case 'ServerSubscriptionBlocked':
+        return '/blocked';
+
+      // 需要登录
+      case 'ServerReady':
+      case 'ClientConnected':
+        return '/login';
+
+      // 可以进入 POS
+      case 'ServerAuthenticated':
+      case 'ClientAuthenticated':
+        return '/pos';
+
+      default:
+        return '/setup';
+    }
+  },
+};
+
 // Re-export for consumers who import from this file
 export type { ConnectionStatus };
 
@@ -59,6 +153,7 @@ export interface AppConfigResponse {
 
 interface BridgeStore {
   // State
+  appState: AppState | null;
   modeInfo: ModeInfo | null;
   tenants: TenantInfo[];
   currentSession: EmployeeSession | null;
@@ -66,6 +161,9 @@ interface BridgeStore {
   isLoading: boolean;
   error: string | null;
   connectionStatus: ConnectionStatus;
+
+  // App State Actions
+  fetchAppState: () => Promise<AppState | null>;
 
   // Mode Actions
   fetchModeInfo: () => Promise<void>;
@@ -101,6 +199,7 @@ export const useBridgeStore = create<BridgeStore>()(
   persist(
     (set, get) => ({
       // Initial State
+      appState: null,
       modeInfo: null,
       tenants: [],
       currentSession: null,
@@ -108,6 +207,20 @@ export const useBridgeStore = create<BridgeStore>()(
       isLoading: false,
       error: null,
       connectionStatus: { connected: true, reconnecting: false },
+
+      // ==================== App State Actions ====================
+
+      fetchAppState: async () => {
+        try {
+          const state = await invoke<AppState>('get_app_state');
+          set({ appState: state });
+          return state;
+        } catch (error: any) {
+          console.error('Failed to fetch app state:', error);
+          set({ error: error.message || 'Failed to fetch app state' });
+          return null;
+        }
+      },
 
       // ==================== Mode Actions ====================
 
@@ -288,6 +401,8 @@ export const useBridgeStore = create<BridgeStore>()(
           });
           if (response.success && response.session) {
             set({ currentSession: response.session });
+            // 刷新 appState 以反映认证状态变化
+            await get().fetchAppState();
           }
           return response;
         } catch (error: any) {
@@ -302,6 +417,8 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           await invoke('logout');
           set({ currentSession: null });
+          // 刷新 appState 以反映登出状态
+          await get().fetchAppState();
         } catch (error: any) {
           console.error('Logout failed:', error);
         }
@@ -336,6 +453,8 @@ export const useBridgeStore = create<BridgeStore>()(
           });
           if (response.success && response.session) {
             set({ currentSession: response.session });
+            // 刷新 appState 以反映认证状态变化
+            await get().fetchAppState();
           }
           return response;
         } catch (error: any) {
@@ -350,6 +469,8 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           await invoke('logout_employee');
           set({ currentSession: null });
+          // 刷新 appState 以反映登出状态
+          await get().fetchAppState();
         } catch (error: any) {
           console.error('Logout failed:', error);
         }
@@ -373,12 +494,25 @@ export const useBridgeStore = create<BridgeStore>()(
 
 // ==================== Selectors ====================
 
+export const useAppState = () => useBridgeStore((state) => state.appState);
 export const useIsFirstRun = () => useBridgeStore((state) => state.isFirstRun);
 export const useModeInfo = () => useBridgeStore((state) => state.modeInfo);
 export const useTenants = () => useBridgeStore((state) => state.tenants);
 export const useCurrentSession = () => useBridgeStore((state) => state.currentSession);
 export const useBridgeLoading = () => useBridgeStore((state) => state.isLoading);
 export const useBridgeError = () => useBridgeStore((state) => state.error);
+
+/**
+ * 检查是否可以访问 POS
+ */
+export const useCanAccessPOS = () =>
+  useBridgeStore((state) => AppStateHelpers.canAccessPOS(state.appState));
+
+/**
+ * 获取推荐路由
+ */
+export const useRecommendedRoute = () =>
+  useBridgeStore((state) => AppStateHelpers.getRouteForState(state.appState));
 
 /**
  * Selector for connection status from the bridge store.

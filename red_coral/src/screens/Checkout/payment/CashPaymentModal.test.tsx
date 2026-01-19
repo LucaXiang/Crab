@@ -31,7 +31,7 @@ describe('CashPaymentModal', () => {
       />
     );
 
-    const confirmButton = screen.getByText('checkout.confirmPayment');
+    const confirmButton = screen.getByText('checkout.payment.confirm');
     fireEvent.click(confirmButton);
 
     expect(handleConfirm).toHaveBeenCalledTimes(1);

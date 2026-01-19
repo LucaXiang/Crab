@@ -11,7 +11,7 @@ import { toast } from '@/presentation/components/Toast';
 import { Product } from '@/core/domain/types';
 import DefaultImage from '@/assets/reshot.svg';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { useSettingsActions } from '@/core/stores/settings';
+import { useSettingsStore } from '@/core/stores/settings';
 
 interface SortableProductItemProps {
   id: string;
@@ -92,7 +92,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const { refreshData } = useSettingsActions();
+  const refreshData = useSettingsStore((s) => s.refreshData);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

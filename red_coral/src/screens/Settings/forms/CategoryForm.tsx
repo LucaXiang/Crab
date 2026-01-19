@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FormField, inputClass } from './FormField';
 import { Layers } from 'lucide-react';
-import { attributeHelpers } from '@/core/stores/product/useAttributeStore';
+import { attributeHelpers } from '@/core/stores/resources';
 import { AttributeSelectionModal } from './AttributeSelectionModal';
 import { SelectField } from '@/presentation/components/form/FormField/SelectField';
 import { KitchenPrinterSelector } from '@/presentation/components/form/FormField/KitchenPrinterSelector';

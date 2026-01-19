@@ -1,13 +1,18 @@
+/**
+ * Connection Recovery Hook - 连接恢复自动刷新
+ *
+ * 监听连接状态变化，当检测到从断开到连接的状态转换时，
+ * 刷新所有已加载的 Stores。
+ *
+ * 使用 resources/ 下的统一 Store 架构。
+ */
+
 import { useEffect, useRef } from 'react';
 import { useBridgeConnectionStatus } from '@/core/stores/bridge';
-import { useProductStore } from '@/core/stores/product/useProductStore';
-import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
+import { refreshAllLoadedStores } from '@/core/stores/resources/registry';
 
 /**
  * 连接恢复时自动刷新所有已加载的数据
- *
- * 当检测到从断开到连接的状态转换时，刷新所有已加载的 stores
- * 这是因为断连期间可能错过了很多 Sync 信号，或者服务可能重启过
  */
 export function useConnectionRecovery() {
   const connectionStatus = useBridgeConnectionStatus();
@@ -21,20 +26,4 @@ export function useConnectionRecovery() {
     }
     prevConnected.current = connectionStatus.connected;
   }, [connectionStatus.connected]);
-}
-
-function refreshAllLoadedStores() {
-  // Product store
-  const productStore = useProductStore.getState();
-  if (productStore.isLoaded) {
-    console.log('[Sync] Refreshing product store');
-    productStore.loadProducts();
-  }
-
-  // Settings store (zones and tables)
-  const settingsStore = useSettingsStore.getState();
-  if (settingsStore.isLoaded) {
-    console.log('[Sync] Refreshing settings store');
-    settingsStore.refreshData();
-  }
 }

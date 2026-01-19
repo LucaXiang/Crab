@@ -1,7 +1,13 @@
 import { persist } from 'zustand/middleware';
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import { Category } from '@/core/domain/types';
+
+/**
+ * Settings UI Store - 纯 UI 状态管理
+ *
+ * 数据获取: 使用 @/core/stores/resources (useZoneStore, useTableStore, etc.)
+ * 本 Store 仅管理: 导航、Modal、表单、筛选/分页 UI 状态
+ */
 
 type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'ATTRIBUTES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS';
 type ModalAction = 'CREATE' | 'EDIT' | 'DELETE';
@@ -17,38 +23,6 @@ interface StoreInfo {
   website?: string;
 }
 
-interface Zone {
-  id: string;
-  name: string;
-  surchargeType?: 'percentage' | 'fixed';
-  surchargeAmount?: number;
-}
-
-interface Table {
-  id: string;
-  name: string;
-  zoneId?: string;
-  zone_id?: string;
-  capacity?: number;
-  seats?: number;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  category: string;
-  externalId: number;
-  taxRate?: number;
-  receiptName?: string;
-  sortOrder?: number;
-  kitchenPrinterId?: number | null;
-  kitchenPrintName?: string;
-  isKitchenPrintEnabled?: number | null;
-  isLabelPrintEnabled?: number | null;
-}
-
 interface ModalState {
   open: boolean;
   action: ModalAction;
@@ -56,127 +30,91 @@ interface ModalState {
   data: any;
 }
 
+interface FormData {
+  tempSpecifications: any;
+  id?: string;
+  name: string;
+  receiptName?: string;
+  capacity: number;
+  zoneId: string;
+  price: number;
+  image: string;
+  categoryId?: number;
+  externalId?: number;
+  taxRate: number;
+  surchargeType: 'percentage' | 'fixed' | 'none';
+  surchargeAmount: number;
+  sortOrder?: number;
+  selectedAttributeIds?: string[];
+  attributeDefaultOptions?: Record<string, string[]>;
+  kitchenPrinterId?: number | null;
+  kitchenPrintName?: string;
+  isKitchenPrintEnabled?: number | null;
+  isLabelPrintEnabled?: number | null;
+  hasMultiSpec?: boolean;
+}
+
 interface SettingsStore {
-  // Active Category
+  // Navigation
   activeCategory: SettingsCategory;
   setActiveCategory: (category: SettingsCategory) => void;
 
-  // Store Info
+  // Store Info (persisted)
   storeInfo: StoreInfo;
   setStoreInfo: (info: StoreInfo) => void;
 
-  // Zones Data
-  zones: Zone[];
-  zonesLoading: boolean;
-  setZones: (zones: Zone[]) => void;
-  setZonesLoading: (loading: boolean) => void;
-
-  // Tables Data
-  tables: Table[];
-  tablesLoading: boolean;
+  // Filter & Pagination UI State
   selectedZoneFilter: string | 'all';
   tablesPage: number;
   tablesTotal: number;
-  setTables: (tables: Table[]) => void;
-  setTablesLoading: (loading: boolean) => void;
-  setSelectedZoneFilter: (zoneId: string | 'all') => void;
-  setTablesPagination: (page: number, total: number) => void;
-
-  // Categories Data
-  categories: Category[];
-  categoriesLoading: boolean;
-  setCategories: (categories: Category[]) => void;
-  setCategoriesLoading: (loading: boolean) => void;
-
-  // Products Data
-  products: Product[];
-  productsLoading: boolean;
   productCategoryFilter: string | 'all';
   productsPage: number;
   productsTotal: number;
-  productsVersion: number;
-  setProducts: (products: Product[]) => void;
-  setProductsLoading: (loading: boolean) => void;
+  setSelectedZoneFilter: (zoneId: string | 'all') => void;
+  setTablesPagination: (page: number, total: number) => void;
   setProductCategoryFilter: (category: string | 'all') => void;
   setProductsPagination: (page: number, total: number) => void;
-  updateProductInList: (productId: string, updates: Partial<Product>) => void;
-  removeProductFromList: (productId: string) => void;
 
   // Modal State
   modal: ModalState;
   openModal: (entity: ModalEntity, action: ModalAction, data?: any) => void;
   closeModal: () => void;
 
-  // Global Data Refresh
+  // Data Refresh Signal
   dataVersion: number;
-  isLoaded: boolean;
   refreshData: () => void;
-  refreshProductsOnly: () => void;
 
-  // Sync Support
-  applySyncZone: (action: string, id: string, data: Zone | null) => void;
-  applySyncTable: (action: string, id: string, data: Table | null) => void;
-  setDataVersion: (version: number) => void;
-  setIsLoaded: (loaded: boolean) => void;
-
-  // System Settings
+  // System Settings (persisted)
   performanceMode: boolean;
   setPerformanceMode: (enabled: boolean) => void;
   lastSelectedCategory: string;
   setLastSelectedCategory: (category: string) => void;
 
-  // Form Fields (unified for all entities)
-  formData: {
-    tempSpecifications: any;
-    id?: string; // Entity ID (for editing)
-    name: string;
-    receiptName?: string;
-    capacity: number;
-    zoneId: string;
-    price: number;
-    image: string;
-    categoryId?: number; // Product/Category ID reference
-    externalId?: number;
-    taxRate: number;
-    surchargeType: 'percentage' | 'fixed' | 'none';
-    surchargeAmount: number;
-    sortOrder?: number;
-    selectedAttributeIds?: string[];  // For product/category attribute binding
-    attributeDefaultOptions?: Record<string, string[]>; // Product/Category-level default options
-    // Kitchen Printer settings (shared by Product & Category)
-    kitchenPrinterId?: number | null;
-    kitchenPrintName?: string;
-    isKitchenPrintEnabled?: number | null;
-    isLabelPrintEnabled?: number | null;
-    // Multi-specification support (Product only)
-    hasMultiSpec?: boolean;
-  };
-  formInitialData: SettingsStore['formData'];
+  // Form State
+  formData: FormData;
+  formInitialData: FormData;
   isFormDirty: boolean;
   formErrors: Record<string, string | undefined>;
-  setFormField: <K extends keyof SettingsStore['formData']>(
-    field: K,
-    value: SettingsStore['formData'][K]
-  ) => void;
-  setFormData: (data: Partial<SettingsStore['formData']>) => void;
+  setFormField: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
+  setFormData: (data: Partial<FormData>) => void;
   resetFormData: () => void;
-  initFormData: (data: Partial<SettingsStore['formData']>) => void;
-  setAsyncFormData: (data: Partial<SettingsStore['formData']>) => void;
+  initFormData: (data: Partial<FormData>) => void;
+  setAsyncFormData: (data: Partial<FormData>) => void;
 }
 
-const initialFormData = {
+const initialFormData: FormData = {
   tempSpecifications: [],
-  id: undefined as string | undefined,
+  id: undefined,
   name: '',
   receiptName: '',
   capacity: 4,
   zoneId: '',
   price: 0,
   image: '',
-  categoryId: undefined as number | undefined,
+  categoryId: undefined,
   externalId: undefined,
   taxRate: 0.10,
-  surchargeType: 'none' as const,
+  surchargeType: 'none',
   surchargeAmount: 0,
   sortOrder: undefined,
   selectedAttributeIds: [],
@@ -199,326 +137,162 @@ function normalizeKitchenPrintTri(value: unknown): number {
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set, get) => ({
-      // Active Category
+      // Navigation
       activeCategory: 'LANG',
       setActiveCategory: (category) => set({ activeCategory: category }),
 
       // Store Info
-      storeInfo: {
-        name: 'Red Coral POS',
-        address: '',
-        nif: '',
-      },
+      storeInfo: { name: 'Red Coral POS', address: '', nif: '' },
       setStoreInfo: (info) => set({ storeInfo: info }),
 
-      // Zones Data
-  zones: [],
-  zonesLoading: false,
-  setZones: (zones) => set({ zones }),
-  setZonesLoading: (loading) => set({ zonesLoading: loading }),
+      // Filter & Pagination UI State
+      selectedZoneFilter: 'all',
+      tablesPage: 1,
+      tablesTotal: 0,
+      productCategoryFilter: 'all',
+      productsPage: 1,
+      productsTotal: 0,
+      setSelectedZoneFilter: (zoneId) => set({ selectedZoneFilter: zoneId, tablesPage: 1 }),
+      setTablesPagination: (page, total) => set({ tablesPage: page, tablesTotal: total }),
+      setProductCategoryFilter: (category) => set({ productCategoryFilter: category, productsPage: 1 }),
+      setProductsPagination: (page, total) => set({ productsPage: page, productsTotal: total }),
 
-  // Tables Data
-  tables: [],
-  tablesLoading: false,
-  selectedZoneFilter: 'all',
-  tablesPage: 1,
-  tablesTotal: 0,
-  setTables: (tables) => set({ tables }),
-  setTablesLoading: (loading) => set({ tablesLoading: loading }),
-  setSelectedZoneFilter: (zoneId) => set({ selectedZoneFilter: zoneId, tablesPage: 1 }),
-  setTablesPagination: (page, total) => set({ tablesPage: page, tablesTotal: total }),
-
-  // Categories Data
-  categories: [],
-  categoriesLoading: false,
-  setCategories: (categories) => set({ categories }),
-  setCategoriesLoading: (loading) => set({ categoriesLoading: loading }),
-
-  // Products Data
-  products: [],
-  productsLoading: false,
-  productCategoryFilter: 'all',
-  productsPage: 1,
-  productsTotal: 0,
-  productsVersion: 0,
-  setProducts: (products) => set({ products }),
-  setProductsLoading: (loading) => set({ productsLoading: loading }),
-  setProductCategoryFilter: (category) => set({ productCategoryFilter: category, productsPage: 1 }),
-  setProductsPagination: (page, total) => set({ productsPage: page, productsTotal: total }),
-  updateProductInList: (productId, updates) => set((state) => ({
-    products: state.products.map((p) => (p.id === productId ? { ...p, ...updates } : p)),
-  })),
-  removeProductFromList: (productId) => set((state) => ({
-    products: state.products.filter((p) => p.id !== productId),
-  })),
-
-  // Modal State
-  modal: {
-    open: false,
-    action: 'CREATE',
-    entity: 'TABLE',
-    data: null,
-  },
-  openModal: (entity, action, data = null) => {
-    const { zones, categories, lastSelectedCategory } = get();
-    const defaultZone = zones[0]?.id || '';
-    const defaultCategoryId = lastSelectedCategory
-      ? categories.find(c => c.name === lastSelectedCategory)?.id
-      : categories[0]?.id;
-
-    // Initialize form data based on entity and action
-    let formData = { ...initialFormData };
-
-    if (entity === 'TABLE') {
-      formData = {
-        ...formData,
-        name: data?.name || '',
-        capacity: data?.capacity ?? 4,
-        zoneId: data?.zoneId || defaultZone,
-      };
-    } else if (entity === 'ZONE') {
-      formData = {
-        ...formData,
-        name: data?.name || '',
-        surchargeType: data?.surchargeType || 'none',
-        surchargeAmount: data?.surchargeAmount || 0,
-      };
-    } else if (entity === 'PRODUCT') {
-      formData = {
-        ...formData,
-        id: data?.id,
-        name: data?.name || '',
-        receiptName: data?.receiptName || '',
-        price: data?.price ?? 0,
-        image: data?.image || '',
-        categoryId: data?.categoryId ?? defaultCategoryId,
-        externalId: data?.externalId,
-        taxRate: data?.taxRate ?? 0.10,
-        sortOrder: data?.sortOrder,
-        kitchenPrinterId: data?.kitchenPrinterId,
-        kitchenPrintName: data?.kitchenPrintName || '',
-        isKitchenPrintEnabled: normalizeKitchenPrintTri(data?.isKitchenPrintEnabled),
-        isLabelPrintEnabled: normalizeKitchenPrintTri(data?.isLabelPrintEnabled),
-        hasMultiSpec: data?.hasMultiSpec || false, // Multi-specification support
-        tempSpecifications: data?.specifications || [],
-      };
-      console.log('[SettingsStore] openModal PRODUCT', {
-        id: data?.id,
-        rawIsKitchenPrintEnabled: data?.isKitchenPrintEnabled,
-        normalizedIsKitchenPrintEnabled: formData.isKitchenPrintEnabled,
-        hasMultiSpec: formData.hasMultiSpec,
-      });
-    } else if (entity === 'CATEGORY') {
-        formData = {
-          ...formData,
-          name: data?.name || '',
-          // Support both camelCase and snake_case from API
-          kitchenPrinterId: data?.kitchenPrinterId ?? data?.kitchen_printer_id,
-          isKitchenPrintEnabled: data?.isKitchenPrintEnabled ?? data?.is_kitchen_print_enabled ?? true,
-          isLabelPrintEnabled: data?.isLabelPrintEnabled ?? data?.is_label_print_enabled ?? true,
-          selectedAttributeIds: data?.selectedAttributeIds || [],
-          attributeDefaultOptions: data?.attributeDefaultOptions || {},
-        };
-      }
-
-    set({
-      modal: { open: true, action, entity, data },
-      formData,
-      formInitialData: { ...formData },
-      isFormDirty: false,
-      formErrors: {},
-    });
-  },
-  closeModal: () =>
-    set({
+      // Modal State
       modal: { open: false, action: 'CREATE', entity: 'TABLE', data: null },
-    }),
+      openModal: (entity, action, data = null) => {
+        let formData = { ...initialFormData };
 
-  // Global Data Refresh
-  dataVersion: 0,
-      isLoaded: false,
+        if (entity === 'TABLE') {
+          formData = {
+            ...formData,
+            name: data?.name || '',
+            capacity: data?.capacity ?? 4,
+            zoneId: data?.zoneId || data?.defaultZoneId || '',
+          };
+        } else if (entity === 'ZONE') {
+          formData = {
+            ...formData,
+            name: data?.name || '',
+            surchargeType: data?.surchargeType || 'none',
+            surchargeAmount: data?.surchargeAmount || 0,
+          };
+        } else if (entity === 'PRODUCT') {
+          formData = {
+            ...formData,
+            id: data?.id,
+            name: data?.name || '',
+            receiptName: data?.receiptName || '',
+            price: data?.price ?? 0,
+            image: data?.image || '',
+            categoryId: data?.categoryId ?? data?.defaultCategoryId,
+            externalId: data?.externalId,
+            taxRate: data?.taxRate ?? 0.10,
+            sortOrder: data?.sortOrder,
+            kitchenPrinterId: data?.kitchenPrinterId,
+            kitchenPrintName: data?.kitchenPrintName || '',
+            isKitchenPrintEnabled: normalizeKitchenPrintTri(data?.isKitchenPrintEnabled),
+            isLabelPrintEnabled: normalizeKitchenPrintTri(data?.isLabelPrintEnabled),
+            hasMultiSpec: data?.hasMultiSpec || false,
+            tempSpecifications: data?.specifications || [],
+          };
+        } else if (entity === 'CATEGORY') {
+          formData = {
+            ...formData,
+            name: data?.name || '',
+            kitchenPrinterId: data?.kitchenPrinterId ?? data?.kitchen_printer_id,
+            isKitchenPrintEnabled: data?.isKitchenPrintEnabled ?? data?.is_kitchen_print_enabled ?? true,
+            isLabelPrintEnabled: data?.isLabelPrintEnabled ?? data?.is_label_print_enabled ?? true,
+            selectedAttributeIds: data?.selectedAttributeIds || [],
+            attributeDefaultOptions: data?.attributeDefaultOptions || {},
+          };
+        }
+
+        set({
+          modal: { open: true, action, entity, data },
+          formData,
+          formInitialData: { ...formData },
+          isFormDirty: false,
+          formErrors: {},
+        });
+      },
+      closeModal: () => set({ modal: { open: false, action: 'CREATE', entity: 'TABLE', data: null } }),
+
+      // Data Refresh Signal
+      dataVersion: 0,
       refreshData: () => set((state) => ({ dataVersion: state.dataVersion + 1 })),
-      refreshProductsOnly: () => set((state) => ({ productsVersion: state.productsVersion + 1 })),
 
-      // Sync Support
-      applySyncZone: (action: string, id: string, data: Zone | null) => {
-        set((state) => {
-          switch (action) {
-            case 'created':
-              if (!data) return state;
-              return { zones: [...state.zones, data] };
-            case 'updated':
-              if (!data) return state;
-              return { zones: state.zones.map((z) => (z.id === id ? data : z)) };
-            case 'deleted':
-              return { zones: state.zones.filter((z) => z.id !== id) };
-            default:
-              return state;
-          }
-        });
-      },
-
-      applySyncTable: (action: string, id: string, data: Table | null) => {
-        set((state) => {
-          switch (action) {
-            case 'created':
-              if (!data) return state;
-              return { tables: [...state.tables, data] };
-            case 'updated':
-              if (!data) return state;
-              return { tables: state.tables.map((t) => (t.id === id ? data : t)) };
-            case 'deleted':
-              return { tables: state.tables.filter((t) => t.id !== id) };
-            default:
-              return state;
-          }
-        });
-      },
-
-      setDataVersion: (version: number) => set({ dataVersion: version }),
-
-      setIsLoaded: (loaded: boolean) => set({ isLoaded: loaded }),
-
+      // System Settings
       performanceMode: false,
       setPerformanceMode: (enabled) => set({ performanceMode: enabled }),
       lastSelectedCategory: '',
       setLastSelectedCategory: (category) => set({ lastSelectedCategory: category }),
 
+      // Form State
       formData: { ...initialFormData },
       formInitialData: { ...initialFormData },
       isFormDirty: false,
       formErrors: {},
-  setFormField: (field, value) => {
-    const state = get();
-    const nextFormData = { ...state.formData, [field]: value };
-    const entity = state.modal.entity;
-    // Validation
-    const errors = validateSettingsForm(entity, nextFormData);
-    // Dirty compare by entity
-    const isDirty = computeIsDirty(entity, nextFormData, state.formInitialData);
-    set({
-      formData: nextFormData,
-      isFormDirty: isDirty,
-      formErrors: errors,
-    });
-  },
-  setFormData: (data) => {
-    const state = get();
-    const nextFormData = { ...state.formData, ...data };
-    const entity = state.modal.entity;
-    // Validation
-    const errors = validateSettingsForm(entity, nextFormData);
-    // Dirty compare by entity
-    const isDirty = computeIsDirty(entity, nextFormData, state.formInitialData);
-    set({
-      formData: nextFormData,
-      isFormDirty: isDirty,
-      formErrors: errors,
-    });
-  },
-  resetFormData: () => {
-    const { formInitialData, modal } = get();
-    const nextFormData = { ...formInitialData };
-    set({
-      formData: nextFormData,
-      isFormDirty: false,
-      formErrors: validateSettingsForm(modal.entity, nextFormData),
-    });
-  },
-  initFormData: (data) => {
-    const { modal } = get();
-    const nextFormData = { ...initialFormData, ...data };
-    set({
-      formData: nextFormData,
-      formInitialData: { ...nextFormData },
-      isFormDirty: false,
-      formErrors: validateSettingsForm(modal.entity, nextFormData),
-    });
-  },
-  setAsyncFormData: (data) => {
-    const { formData, formInitialData, modal } = get();
-    const nextFormData = { ...formData, ...data };
-    const nextInitialData = { ...formInitialData, ...data };
-    
-    // Validate
-    const errors = validateSettingsForm(modal.entity, nextFormData);
-    // Re-compute dirty state based on the new baseline
-    const isDirty = computeIsDirty(modal.entity, nextFormData, nextInitialData);
-    
-    set({
-      formData: nextFormData,
-      formInitialData: nextInitialData,
-      isFormDirty: isDirty,
-      formErrors: errors,
-    });
-  },
-  }),
-  {
-    name: 'settings-storage',
-    partialize: (state) => ({ 
-      storeInfo: state.storeInfo,
-      performanceMode: state.performanceMode,
-      lastSelectedCategory: state.lastSelectedCategory
+      setFormField: (field, value) => {
+        const state = get();
+        const nextFormData = { ...state.formData, [field]: value };
+        const errors = validateSettingsForm(state.modal.entity, nextFormData);
+        const isDirty = computeIsDirty(state.modal.entity, nextFormData, state.formInitialData);
+        set({ formData: nextFormData, isFormDirty: isDirty, formErrors: errors });
+      },
+      setFormData: (data) => {
+        const state = get();
+        const nextFormData = { ...state.formData, ...data };
+        const errors = validateSettingsForm(state.modal.entity, nextFormData);
+        const isDirty = computeIsDirty(state.modal.entity, nextFormData, state.formInitialData);
+        set({ formData: nextFormData, isFormDirty: isDirty, formErrors: errors });
+      },
+      resetFormData: () => {
+        const { formInitialData, modal } = get();
+        set({
+          formData: { ...formInitialData },
+          isFormDirty: false,
+          formErrors: validateSettingsForm(modal.entity, formInitialData),
+        });
+      },
+      initFormData: (data) => {
+        const { modal } = get();
+        const nextFormData = { ...initialFormData, ...data };
+        set({
+          formData: nextFormData,
+          formInitialData: { ...nextFormData },
+          isFormDirty: false,
+          formErrors: validateSettingsForm(modal.entity, nextFormData),
+        });
+      },
+      setAsyncFormData: (data) => {
+        const { formData, formInitialData, modal } = get();
+        const nextFormData = { ...formData, ...data };
+        const nextInitialData = { ...formInitialData, ...data };
+        const errors = validateSettingsForm(modal.entity, nextFormData);
+        const isDirty = computeIsDirty(modal.entity, nextFormData, nextInitialData);
+        set({
+          formData: nextFormData,
+          formInitialData: nextInitialData,
+          isFormDirty: isDirty,
+          formErrors: errors,
+        });
+      },
     }),
-  }
-));
+    {
+      name: 'settings-storage',
+      partialize: (state) => ({
+        storeInfo: state.storeInfo,
+        performanceMode: state.performanceMode,
+        lastSelectedCategory: state.lastSelectedCategory,
+      }),
+    }
+  )
+);
 
-// ============ Granular Selectors ============
+// ============ Selectors ============
 
 export const useSettingsCategory = () =>
   useSettingsStore((state) => state.activeCategory);
-
-export const useSettingsZones = () =>
-  useSettingsStore(
-    useShallow((state) => ({
-      zones: state.zones,
-      loading: state.zonesLoading,
-      setZones: state.setZones,
-      setLoading: state.setZonesLoading,
-    }))
-  );
-
-export const useSettingsTables = () =>
-  useSettingsStore(
-    useShallow((state) => ({
-      tables: state.tables,
-      loading: state.tablesLoading,
-      zoneFilter: state.selectedZoneFilter,
-      page: state.tablesPage,
-      total: state.tablesTotal,
-      setTables: state.setTables,
-      setLoading: state.setTablesLoading,
-      setZoneFilter: state.setSelectedZoneFilter,
-      setPagination: state.setTablesPagination,
-    }))
-  );
-
-export const useSettingsCategories = () =>
-  useSettingsStore(
-    useShallow((state) => ({
-      categories: state.categories,
-      loading: state.categoriesLoading,
-      setCategories: state.setCategories,
-      setLoading: state.setCategoriesLoading,
-    }))
-  );
-
-export const useSettingsProducts = () =>
-  useSettingsStore(
-    useShallow((state) => ({
-      products: state.products,
-      loading: state.productsLoading,
-      categoryFilter: state.productCategoryFilter,
-      page: state.productsPage,
-      total: state.productsTotal,
-      setProducts: state.setProducts,
-      setLoading: state.setProductsLoading,
-      setCategoryFilter: state.setProductCategoryFilter,
-      setPagination: state.setProductsPagination,
-      updateProductInList: state.updateProductInList,
-      removeProductFromList: state.removeProductFromList,
-    }))
-  );
 
 export const useSettingsModal = () =>
   useSettingsStore(
@@ -561,24 +335,27 @@ export const useStoreInfo = () =>
     }))
   );
 
-export const useSettingsActions = () =>
+export const useDataVersion = () => useSettingsStore((state) => state.dataVersion);
+
+export const useSettingsFilters = () =>
   useSettingsStore(
     useShallow((state) => ({
-      setActiveCategory: state.setActiveCategory,
-      setZones: state.setZones,
-      setTables: state.setTables,
-      setCategories: state.setCategories,
-      setProducts: state.setProducts,
-      refreshData: state.refreshData,
-      refreshProductsOnly: state.refreshProductsOnly,
-      setLastSelectedCategory: state.setLastSelectedCategory,
+      selectedZoneFilter: state.selectedZoneFilter,
+      tablesPage: state.tablesPage,
+      tablesTotal: state.tablesTotal,
+      productCategoryFilter: state.productCategoryFilter,
+      productsPage: state.productsPage,
+      productsTotal: state.productsTotal,
+      setSelectedZoneFilter: state.setSelectedZoneFilter,
+      setTablesPagination: state.setTablesPagination,
+      setProductCategoryFilter: state.setProductCategoryFilter,
+      setProductsPagination: state.setProductsPagination,
     }))
   );
 
-export const useDataVersion = () => useSettingsStore((state) => state.dataVersion);
+// ============ Validation Helpers ============
 
-// ============ Validation & Dirty Helpers ============
-function validateSettingsForm(entity: ModalEntity, formData: SettingsStore['formData']): Record<string, string | undefined> {
+function validateSettingsForm(entity: ModalEntity, formData: FormData): Record<string, string | undefined> {
   const errors: Record<string, string | undefined> = {};
   if (entity === 'TABLE') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.table.nameRequired';
@@ -590,49 +367,35 @@ function validateSettingsForm(entity: ModalEntity, formData: SettingsStore['form
     if (!formData.name?.trim()) errors.name = 'settings.errors.product.nameRequired';
     if (!formData.categoryId) errors.categoryId = 'settings.errors.product.categoryRequired';
     if ((formData.price ?? 0) <= 0) errors.price = 'settings.errors.product.pricePositive';
-    if (formData.externalId === undefined || formData.externalId === null) errors.externalId = 'settings.errors.product.externalIdRequired';
+    if (formData.externalId === undefined || formData.externalId === null) {
+      errors.externalId = 'settings.errors.product.externalIdRequired';
+    }
   } else if (entity === 'CATEGORY') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.category.nameRequired';
   }
   return errors;
 }
 
-function computeIsDirty(entity: ModalEntity, next: SettingsStore['formData'], initial: SettingsStore['formData']): boolean {
-  const pick = (o: SettingsStore['formData'], keys: (keyof SettingsStore['formData'])[]) =>
-    keys.map((k) => o[k]);
+function computeIsDirty(entity: ModalEntity, next: FormData, initial: FormData): boolean {
+  const pick = (o: FormData, keys: (keyof FormData)[]) => keys.map((k) => o[k]);
+
   if (entity === 'TABLE') {
-    const keys: (keyof SettingsStore['formData'])[] = ['name', 'zoneId', 'capacity'];
+    const keys: (keyof FormData)[] = ['name', 'zoneId', 'capacity'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'ZONE') {
-    const keys: (keyof SettingsStore['formData'])[] = ['name', 'surchargeType', 'surchargeAmount'];
+    const keys: (keyof FormData)[] = ['name', 'surchargeType', 'surchargeAmount'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'PRODUCT') {
-    const keys: (keyof SettingsStore['formData'])[] = [
-      'name',
-      'categoryId',
-      'price',
-      'externalId',
-      'receiptName',
-      'image',
-      'taxRate',
-      'sortOrder',
-      'kitchenPrinterId',
-      'kitchenPrintName',
-      'isKitchenPrintEnabled',
-      'isLabelPrintEnabled',
-      'hasMultiSpec',
-      'selectedAttributeIds',
-      'attributeDefaultOptions',
+    const keys: (keyof FormData)[] = [
+      'name', 'categoryId', 'price', 'externalId', 'receiptName', 'image', 'taxRate',
+      'sortOrder', 'kitchenPrinterId', 'kitchenPrintName', 'isKitchenPrintEnabled',
+      'isLabelPrintEnabled', 'hasMultiSpec', 'selectedAttributeIds', 'attributeDefaultOptions',
     ];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'CATEGORY') {
-    const keys: (keyof SettingsStore['formData'])[] = [
-      'name',
-      'kitchenPrinterId',
-      'isKitchenPrintEnabled',
-      'isLabelPrintEnabled',
-      'selectedAttributeIds',
-      'attributeDefaultOptions',
+    const keys: (keyof FormData)[] = [
+      'name', 'kitchenPrinterId', 'isKitchenPrintEnabled', 'isLabelPrintEnabled',
+      'selectedAttributeIds', 'attributeDefaultOptions',
     ];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   }

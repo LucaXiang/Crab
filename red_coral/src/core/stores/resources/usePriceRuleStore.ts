@@ -1,0 +1,26 @@
+import { createResourceStore } from '../factory/createResourceStore';
+import { createTauriClient } from '@/infrastructure/api';
+import type { PriceRule } from '@/infrastructure/api/types';
+
+const api = createTauriClient();
+
+async function fetchPriceRules(): Promise<PriceRule[]> {
+  const response = await api.listPriceAdjustments();
+  if (response.data?.rules) {
+    return response.data.rules as PriceRule[];
+  }
+  throw new Error(response.message || 'Failed to fetch price rules');
+}
+
+export const usePriceRuleStore = createResourceStore<PriceRule & { id: string }>(
+  'price_rule',
+  fetchPriceRules as () => Promise<(PriceRule & { id: string })[]>
+);
+
+// Convenience hooks
+export const usePriceRules = () => usePriceRuleStore((state) => state.items);
+export const usePriceRulesLoading = () => usePriceRuleStore((state) => state.isLoading);
+export const usePriceRuleById = (id: string) =>
+  usePriceRuleStore((state) => state.items.find((r) => r.id === id));
+export const useActivePriceRules = () =>
+  usePriceRuleStore((state) => state.items.filter((r) => r.is_active));

@@ -10,7 +10,7 @@ pub mod session_cache;
 pub mod tenant_manager;
 
 pub use client_bridge::{
-    AppConfig, BridgeError, ClientBridge, ClientModeConfig, ModeInfo, ModeType,
+    AppConfig, AppState, BridgeError, ClientBridge, ClientModeConfig, ModeInfo, ModeType,
     ServerModeConfig,
 };
 pub use session_cache::{EmployeeSession, LoginMode, SessionCache, SessionCacheError};

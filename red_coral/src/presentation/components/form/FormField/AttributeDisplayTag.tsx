@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Lock, X } from 'lucide-react';
 import { AttributeTemplate } from '@/core/domain/types';
-import { useAttributeStore } from '@/core/stores/product/useAttributeStore';
+import { useAttributeStore } from '@/core/stores/resources';
 
 export interface AttributeDisplayTagProps {
   attribute: AttributeTemplate;

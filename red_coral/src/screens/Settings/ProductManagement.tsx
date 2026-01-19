@@ -5,13 +5,11 @@ import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
 import { useCanDeleteProduct, useCanUpdateProduct } from '@/hooks/usePermission';
 import {
-  useSettingsProducts,
-  useSettingsCategories,
   useSettingsModal,
   useDataVersion,
-  useSettingsStore,
+  useSettingsFilters,
 } from '@/core/stores/settings/useSettingsStore';
-import { useProductStore } from '@/core/stores/product';
+import { useProductStore, useCategoryStore } from '@/core/stores/resources';
 import { createApiClient } from '@/infrastructure/api';
 
 const api = createApiClient();
@@ -45,25 +43,42 @@ export const ProductManagement: React.FC = React.memo(() => {
   const canDeleteProduct = useCanDeleteProduct();
   const canUpdateProduct = useCanUpdateProduct();
 
+  // Use resources stores for data
+  const productStore = useProductStore();
+  const categoryStore = useCategoryStore();
+  const products = productStore.items;
+  const categories = categoryStore.items;
+  const loading = productStore.isLoading;
+
+  // UI state from settings store
   const {
-    products,
-    loading,
-    categoryFilter,
-    page,
-    total,
-    setProducts,
-    setLoading,
-    setCategoryFilter,
-    setPagination,
-    removeProductFromList,
-  } = useSettingsProducts();
-  const { categories, setCategories } = useSettingsCategories();
+    productCategoryFilter: categoryFilter,
+    productsPage: page,
+    setProductCategoryFilter: setCategoryFilter,
+    setProductsPagination: setPagination,
+  } = useSettingsFilters();
+
   const { openModal } = useSettingsModal();
   const dataVersion = useDataVersion();
-  const productsVersion = useSettingsStore((state: { productsVersion: number }) => state.productsVersion);
-  const productStore = useProductStore((state) => state);
 
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter products by category and search
+  const filteredProducts = useMemo(() => {
+    let result = products;
+    if (categoryFilter !== 'all') {
+      result = result.filter((p: any) => p.category === categoryFilter || p.categoryId === categoryFilter);
+    }
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((p: any) =>
+        p.name?.toLowerCase().includes(query) ||
+        p.receiptName?.toLowerCase().includes(query)
+      );
+    }
+    return result;
+  }, [products, categoryFilter, searchQuery]);
+
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     title: '',
@@ -72,62 +87,15 @@ export const ProductManagement: React.FC = React.memo(() => {
   });
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const response = await api.listCategories();
-        const cats = response.data?.categories || [];
-        setCategories(cats);
+    // Load data from resources stores
+    categoryStore.fetchAll();
+    productStore.fetchAll();
+  }, [dataVersion]);
 
-        const params: any = {
-          page: page,
-          limit: 5,
-        };
-        if (categoryFilter !== 'all') params.category = categoryFilter;
-        if (searchQuery.trim()) params.search = searchQuery;
-
-        const resp = await api.listProducts({ page_size: 1000 });
-        const products = resp.data?.products || [];
-        const specs = resp.data?.specs || [];
-
-        console.log('[ProductManagement] fetchProducts resp', products.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-        })));
-        console.log('[ProductManagement] specs', specs);
-
-        // Helper to find root spec for a product (root spec stores price and external_id)
-        const findRootSpec = (productId: number) => {
-            return specs.find((s: any) => s.product_id === productId && s.is_root);
-        };
-
-        setProducts(products.map((p: any) => {
-            const rootSpec = findRootSpec(p.id);
-            return {
-                id: String(p.id),
-                name: p.name,
-                price: rootSpec?.price ?? 0,  // Price is already in euros from backend
-                category: String(p.category_id),
-                image: p.image ?? '',
-                externalId: rootSpec?.external_id ?? null,  // Get external_id from root spec
-                receiptName: p.receipt_name,
-                sortOrder: p.sort_order,
-                taxRate: p.tax_rate,
-                kitchenPrinterId: p.kitchen_printer_id,
-                kitchenPrintName: p.kitchen_print_name,
-                isKitchenPrintEnabled: p.is_kitchen_print_enabled,
-                isLabelPrintEnabled: p.is_label_print_enabled,
-            };
-        }));
-        setPagination(1, products.length);
-      } finally {
-        setLoading(false);
-      }
-    };
-    // Debounce search could be added here if needed, but for local DB it's fine
-    const timer = setTimeout(loadData, 300);
-    return () => clearTimeout(timer);
-  }, [categoryFilter, searchQuery, page, dataVersion, productsVersion]);
+  // Update pagination when filtered products change
+  useEffect(() => {
+    setPagination(page, filteredProducts.length);
+  }, [filteredProducts.length]);
 
   const handleBatchDelete = (items: ProductItem[]) => {
     setConfirmDialog({
@@ -136,23 +104,17 @@ export const ProductManagement: React.FC = React.memo(() => {
       description: t('settings.product.list.confirmBatchDelete', { count: items.length }) || `确定要删除选中的 ${items.length} 个菜品吗？此操作无法撤销。`,
       onConfirm: async () => {
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-        setLoading(true);
         try {
-          // Use bulk delete API for better performance
           const ids = items.map((item) => Number(item.id));
           await api.bulkDeleteProducts(ids);
-          // Optimistic update: remove from both Settings and ProductStore
-          items.forEach((item) => removeProductFromList(item.id));
-          // Also remove from ProductStore cache
-          const currentProducts = productStore.products;
-          const updatedProducts = currentProducts.filter((p: any) => !items.find(item => item.id === p.id));
-          useProductStore.setState({ products: updatedProducts });
+          // Optimistic update: remove from ProductStore
+          items.forEach((item) => {
+            useProductStore.getState().optimisticRemove(item.id);
+          });
           toast.success(t('settings.product.list.batchDeleteSuccess'));
         } catch (e) {
           console.error(e);
           toast.error(t('settings.product.list.batchDeleteFailed'));
-        } finally {
-          setLoading(false);
         }
       },
     });
@@ -345,7 +307,7 @@ export const ProductManagement: React.FC = React.memo(() => {
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
-                setPagination(1, total);
+                setPagination(1, filteredProducts.length);
               }}
               placeholder={t('common.searchPlaceholder')}
               className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
@@ -353,14 +315,14 @@ export const ProductManagement: React.FC = React.memo(() => {
           </div>
 
           <div className="ml-auto text-xs text-gray-400">
-            {t('common.total')} {total} {t('common.items')}
+            {t('common.total')} {filteredProducts.length} {t('common.items')}
           </div>
         </div>
       </div>
 
       {/* Data Table */}
       <DataTable
-        data={products}
+        data={filteredProducts}
         columns={columns}
         loading={loading}
         getRowKey={(item) => item.id}
@@ -375,7 +337,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         onBatchDelete={canDeleteProduct ? handleBatchDelete : undefined}
         emptyText={t('settings.product.list.noData')}
         pageSize={5}
-        totalItems={total}
+        totalItems={filteredProducts.length}
         currentPage={page}
         onPageChange={(newPage) => setPagination(newPage, total)}
         themeColor="orange"

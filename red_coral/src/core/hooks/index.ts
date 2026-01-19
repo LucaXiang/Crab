@@ -5,3 +5,4 @@ export * from './useServerMessages';
 export * from './useConnectionStatus';
 export * from './useSyncListener';
 export * from './useConnectionRecovery';
+export * from './usePreloadCoreData';

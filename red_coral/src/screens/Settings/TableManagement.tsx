@@ -1,12 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { LayoutGrid, Plus, Filter, Users, Search, Map as MapIcon, MapPin } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import {
-  useSettingsTables,
-  useSettingsZones,
-  useSettingsModal,
-  useDataVersion,
-} from '@/core/stores/settings/useSettingsStore';
+import { useSettingsModal, useDataVersion, useSettingsFilters } from '@/core/stores/settings/useSettingsStore';
+import { useZoneStore, useTableStore } from '@/core/stores/resources';
 import { createApiClient } from '@/infrastructure/api';
 
 const api = createApiClient();
@@ -24,11 +20,13 @@ interface ZoneItem {
 
 const ZoneList: React.FC = React.memo(() => {
   const { t } = useI18n();
-
-  // Permission check
   const canManageZones = useCanManageZones();
 
-  const { zones, loading, setZones, setLoading } = useSettingsZones();
+  // Use resources store for zones
+  const zoneStore = useZoneStore();
+  const zones = zoneStore.items;
+  const loading = zoneStore.isLoading;
+
   const { openModal } = useSettingsModal();
   const dataVersion = useDataVersion();
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,17 +38,7 @@ const ZoneList: React.FC = React.memo(() => {
   });
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const zsResp = await api.listZones();
-        const zs = zsResp.data?.zones || [];
-        setZones(zs);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
+    zoneStore.fetchAll();
   }, [dataVersion]);
 
   const filteredZones = useMemo(() => {
@@ -68,7 +56,6 @@ const ZoneList: React.FC = React.memo(() => {
       description: t('settings.batchDelete.confirmDeleteZones', { count: items.length }) || `确定要删除选中的 ${items.length} 个区域吗？此操作无法撤销。`,
       onConfirm: async () => {
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-        setLoading(true);
         try {
           const results = await Promise.all(
             items.map(async (item) => {
@@ -86,9 +73,7 @@ const ZoneList: React.FC = React.memo(() => {
 
           if (successCount > 0) {
             toast.success(t('settings.batchDelete.zonesSuccess', { count: successCount }) || `成功删除 ${successCount} 个区域`);
-            const zsResp = await api.listZones();
-        const zs = zsResp.data?.zones || [];
-            setZones(zs);
+            zoneStore.fetchAll();
           }
 
           if (failures.length > 0) {
@@ -102,8 +87,6 @@ const ZoneList: React.FC = React.memo(() => {
         } catch (e) {
           console.error(e);
           toast.error(t('settings.batchDelete.zonesFailed'));
-        } finally {
-          setLoading(false);
         }
       },
     });
@@ -140,7 +123,7 @@ const ZoneList: React.FC = React.memo(() => {
             <span className="text-sm font-medium">{t('common.filter')}</span>
           </div>
           <div className="h-5 w-px bg-gray-200" />
-          
+
           <div className="relative flex-1 max-w-xs">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -202,15 +185,25 @@ interface TableManagementProps {
 
 export const TableManagement: React.FC<TableManagementProps> = React.memo(({ initialTab = 'tables' }) => {
   const { t } = useI18n();
-
-  // Permission check
   const canManageTables = useCanManageTables();
-
   const [activeTab, setActiveTab] = useState<'tables' | 'zones'>(initialTab);
 
-  const { tables, loading, zoneFilter, page, total, setTables, setLoading, setZoneFilter, setPagination } =
-    useSettingsTables();
-  const { zones, setZones } = useSettingsZones();
+  // Use resources stores
+  const zoneStore = useZoneStore();
+  const tableStore = useTableStore();
+  const zones = zoneStore.items;
+  const tables = tableStore.items;
+  const loading = tableStore.isLoading;
+
+  // UI state from settings store
+  const {
+    selectedZoneFilter: zoneFilter,
+    tablesPage: page,
+    tablesTotal: total,
+    setSelectedZoneFilter: setZoneFilter,
+    setTablesPagination: setPagination,
+  } = useSettingsFilters();
+
   const { openModal } = useSettingsModal();
   const dataVersion = useDataVersion();
   const [searchQuery, setSearchQuery] = useState('');
@@ -223,25 +216,11 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
 
   useEffect(() => {
     if (activeTab === 'tables') {
-      const loadData = async () => {
-        setLoading(true);
-        try {
-          const zsResp = await api.listZones();
-          const zs = zsResp.data?.zones || [];
-          setZones(zs);
-          const tsResp = await api.listTables();
-          const ts = tsResp.data?.tables || [];
-          setTables(ts);
-          setPagination(1, ts.length);
-        } finally {
-          setLoading(false);
-        }
-      };
-      // Debounce search could be added here
-      const timer = setTimeout(loadData, 300);
-      return () => clearTimeout(timer);
+      zoneStore.fetchAll();
+      tableStore.fetchAll().then(() => {
+        setPagination(1, tableStore.items.length);
+      });
     }
-    return () => {};
   }, [zoneFilter, page, searchQuery, dataVersion, activeTab]);
 
   const zonesMap = useMemo(() => {
@@ -249,9 +228,12 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
     zones.forEach((z) => m.set(z.id, z.name));
     return m;
   }, [zones]);
-  
-  // Client-side filtering removed in favor of server-side search
-  const filteredTables = tables;
+
+  // Filter tables by zone
+  const filteredTables = useMemo(() => {
+    if (zoneFilter === 'all') return tables;
+    return tables.filter((t) => t.zone_id === zoneFilter || (t as any).zoneId === zoneFilter);
+  }, [tables, zoneFilter]);
 
   const handleBatchDelete = (items: TableItem[]) => {
     setConfirmDialog({
@@ -260,19 +242,14 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
       description: t('settings.batchDelete.confirmDeleteTables', { count: items.length }) || `确定要删除选中的 ${items.length} 个桌台吗？此操作无法撤销。`,
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        setLoading(true);
         try {
           await Promise.all(items.map((item) => api.deleteTable(Number(item.id))));
           toast.success(t('settings.batchDelete.tablesSuccess', { count: items.length }) || '批量删除成功');
-          const tsResp = await api.listTables();
-          const ts = tsResp.data?.tables || [];
-          setTables(ts);
-          setPagination(1, ts.length);
+          await tableStore.fetchAll();
+          setPagination(1, tableStore.items.length);
         } catch (e) {
           console.error(e);
           toast.error(t('settings.batchDelete.failed'));
-        } finally {
-          setLoading(false);
         }
       },
     });
@@ -310,7 +287,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
         width: '140px',
         render: (item) => (
           <span className="inline-flex items-center px-2.5 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium">
-            {zonesMap.get(item.zoneId) || item.zoneId}
+            {zonesMap.get(item.zoneId || item.zone_id || '') || item.zoneId || item.zone_id}
           </span>
         ),
       },
@@ -343,7 +320,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
           {activeTab === 'tables' ? (
             <ProtectedGate permission={Permission.MANAGE_TABLES}>
               <button
-                onClick={() => openModal('TABLE', 'CREATE')}
+                onClick={() => openModal('TABLE', 'CREATE', { defaultZoneId: zones[0]?.id })}
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-blue-600/20 hover:bg-blue-700 hover:shadow-blue-600/30 transition-all"
               >
                 <Plus size={16} />
@@ -415,7 +392,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
                   ))}
                 </select>
               </div>
-              
+
               <div className="h-5 w-px bg-gray-200 ml-2" />
               <div className="relative flex-1 max-w-xs">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -432,7 +409,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
               </div>
 
               <div className="ml-auto text-xs text-gray-400">
-                {t('common.total')} {total} {t('common.items')}
+                {t('common.total')} {filteredTables.length} {t('common.items')}
               </div>
             </div>
           </div>
@@ -443,14 +420,14 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
             columns={columns}
             loading={loading}
             getRowKey={(item) => item.id}
-            onEdit={canManageTables ? (item) => openModal('TABLE', 'EDIT', item) : undefined}
+            onEdit={canManageTables ? (item) => openModal('TABLE', 'EDIT', { ...item, zoneId: item.zone_id || item.zoneId }) : undefined}
             onDelete={canManageTables ? (item) => openModal('TABLE', 'DELETE', item) : undefined}
             onBatchDelete={canManageTables ? handleBatchDelete : undefined}
             emptyText={t('settings.table.noData')}
             pageSize={5}
-            totalItems={total}
+            totalItems={filteredTables.length}
             currentPage={page}
-            onPageChange={(newPage) => setPagination(newPage, total)}
+            onPageChange={(newPage) => setPagination(newPage, filteredTables.length)}
             themeColor="blue"
           />
         </>

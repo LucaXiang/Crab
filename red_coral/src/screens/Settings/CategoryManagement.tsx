@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Tag, FolderOpen, ArrowUp, ArrowDown, List } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { useSettingsCategories, useSettingsModal, useDataVersion } from '@/core/stores/settings/useSettingsStore';
-import { useProductActions } from '@/core/stores/product';
+import { useSettingsModal, useDataVersion } from '@/core/stores/settings/useSettingsStore';
+import { useCategoryStore } from '@/core/stores/resources';
 import { createApiClient } from '@/infrastructure/api';
 
 const api = createApiClient();
@@ -24,30 +24,31 @@ export const CategoryManagement: React.FC = React.memo(() => {
   // Permission check
   const canManageCategories = useCanManageCategories();
 
-  const { categories, loading, setCategories, setLoading } = useSettingsCategories();
+  // Use resources store for data
+  const categoryStore = useCategoryStore();
+  const storeCategories = categoryStore.items;
+  const loading = categoryStore.isLoading;
+
   const { openModal } = useSettingsModal();
   const dataVersion = useDataVersion();
-  const { clearCategoryCache, loadCategories } = useProductActions();
 
+  // Local state for ordered categories (for reordering)
+  const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [productOrderModal, setProductOrderModal] = useState<{
     isOpen: boolean;
     category: string;
   }>({ isOpen: false, category: '' });
 
+  // Load data on mount and when dataVersion changes
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const response = await api.listCategories();
-        const cats = response.data?.categories || [];
-        setCategories(cats);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
+    categoryStore.fetchAll();
   }, [dataVersion]);
+
+  // Sync local state with store
+  useEffect(() => {
+    setCategories(storeCategories);
+  }, [storeCategories]);
 
   const categoryItems: CategoryItem[] = useMemo(
     () => categories.map((cat, index) => ({ ...cat, originalIndex: index })),
@@ -79,18 +80,13 @@ export const CategoryManagement: React.FC = React.memo(() => {
       }));
       await api.batchUpdateCategorySortOrder(updates);
 
-      // Refresh categories from API to get proper data with sort_order
-      clearCategoryCache();
-      const response = await api.listCategories();
-      const cats = response.data?.categories || [];
-      setCategories(cats);
+      // Refresh categories from store
+      await categoryStore.fetchAll();
     } catch (e) {
       console.error(e);
       toast.error(t('settings.reorderFailed'));
       // Revert to server data
-      const response = await api.listCategories();
-      const cats = response.data?.categories || [];
-      setCategories(cats);
+      await categoryStore.fetchAll();
     }
   };
 

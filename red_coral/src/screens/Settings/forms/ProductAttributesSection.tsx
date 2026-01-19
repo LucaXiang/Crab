@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Sliders, Check, Layers, Plus, X, Search, AlertCircle, Lock } from 'lucide-react';
-import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions, attributeHelpers } from '@/core/stores/product/useAttributeStore';
+import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions, attributeHelpers } from '@/core/stores/resources';
 
 interface ProductAttributesSectionProps {
   selectedAttributeIds: string[];

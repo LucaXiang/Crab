@@ -6,7 +6,7 @@ import { Permission } from '@/core/domain/types';
 // Mock usePermission hook
 const mockHasPermission = vi.fn();
 
-vi.mock('../../hooks/usePermission', () => ({
+vi.mock('@/hooks/usePermission', () => ({
   usePermission: () => ({
     hasPermission: mockHasPermission,
   }),

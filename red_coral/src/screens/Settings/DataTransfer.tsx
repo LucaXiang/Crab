@@ -7,14 +7,13 @@ import { toast } from '@/presentation/components/Toast';
 import { createApiClient } from '@/infrastructure/api';
 
 const api = createApiClient();
-import { useProductStore } from '@/core/stores/product/useProductStore';
+import { useProductStore, useCategoryStore } from '@/core/stores/resources';
 import { useZoneTableStore } from '@/hooks/useZonesAndTables';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 
 export const DataTransfer: React.FC = () => {
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
-  const clearProductCache = useProductStore((state) => state.clearCache);
   const clearZoneTableCache = useZoneTableStore((state) => state.clearCache);
   const refreshData = useSettingsStore((state) => state.refreshData);
 
@@ -68,7 +67,8 @@ export const DataTransfer: React.FC = () => {
 
       // Clear all caches to force reload
       console.log('Clearing local caches...');
-      clearProductCache();
+      useProductStore.getState().fetchAll();
+      useCategoryStore.getState().fetchAll();
       clearZoneTableCache();
 
       // Increment dataVersion to trigger reload in all components

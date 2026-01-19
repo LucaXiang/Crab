@@ -11,6 +11,7 @@ use thiserror::Error;
 use tokio::sync::RwLock;
 
 use crab_client::{Authenticated, Connected, CrabClient, Local, Remote};
+use edge_server::services::tenant_binding::SubscriptionStatus;
 use edge_server::ServerState;
 
 use super::tenant_manager::{TenantError, TenantManager};
@@ -51,6 +52,75 @@ pub enum ModeType {
     Server,
     Client,
     Disconnected,
+}
+
+/// 应用状态 (统一 Server/Client 模式)
+///
+/// 用于前端路由守卫和状态展示。
+/// 参考设计文档: `docs/plans/2026-01-18-application-state-machine.md`
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", content = "data")]
+pub enum AppState {
+    // === 通用状态 ===
+    /// 未初始化
+    Uninitialized,
+
+    // === Server 模式专属 ===
+    /// Server: 无租户
+    ServerNoTenant,
+    /// Server: 需要激活 (有租户目录但证书不完整或自检失败)
+    ServerNeedActivation,
+    /// Server: 正在激活
+    ServerActivating,
+    /// Server: 已激活，验证订阅中
+    ServerCheckingSubscription,
+    /// Server: 订阅无效，阻止使用
+    ServerSubscriptionBlocked { reason: String },
+    /// Server: 服务器就绪，等待员工登录
+    ServerReady,
+    /// Server: 员工已登录
+    ServerAuthenticated,
+
+    // === Client 模式专属 ===
+    /// Client: 未连接
+    ClientDisconnected,
+    /// Client: 需要设置 (无缓存证书)
+    ClientNeedSetup,
+    /// Client: 正在连接
+    ClientConnecting,
+    /// Client: 已连接，等待员工登录
+    ClientConnected,
+    /// Client: 员工已登录
+    ClientAuthenticated,
+}
+
+impl AppState {
+    /// 是否可以访问 POS 主界面
+    pub fn can_access_pos(&self) -> bool {
+        matches!(self, AppState::ServerAuthenticated | AppState::ClientAuthenticated)
+    }
+
+    /// 是否需要员工登录
+    pub fn needs_employee_login(&self) -> bool {
+        matches!(self, AppState::ServerReady | AppState::ClientConnected)
+    }
+
+    /// 是否需要设置/激活
+    pub fn needs_setup(&self) -> bool {
+        matches!(
+            self,
+            AppState::Uninitialized
+                | AppState::ServerNoTenant
+                | AppState::ServerNeedActivation
+                | AppState::ClientDisconnected
+                | AppState::ClientNeedSetup
+        )
+    }
+
+    /// 是否被订阅阻止
+    pub fn is_subscription_blocked(&self) -> bool {
+        matches!(self, AppState::ServerSubscriptionBlocked { .. })
+    }
 }
 
 impl std::fmt::Display for ModeType {
@@ -422,6 +492,119 @@ impl ClientBridge {
             is_authenticated,
             tenant_id: tenant_manager.current_tenant_id().map(|s| s.to_string()),
             username: tenant_manager.current_session().map(|s| s.username.clone()),
+        }
+    }
+
+    /// 获取应用状态 (用于前端路由守卫)
+    ///
+    /// 根据当前模式和内部状态计算出应用所处的状态。
+    /// 参考设计文档: `docs/plans/2026-01-18-application-state-machine.md`
+    pub async fn get_app_state(&self) -> AppState {
+        let mode_guard = self.mode.read().await;
+        let tenant_manager = self.tenant_manager.read().await;
+
+        match &*mode_guard {
+            ClientMode::Disconnected => {
+                // 检查是否有租户
+                if tenant_manager.current_tenant_id().is_none() {
+                    // 无租户选择
+                    AppState::ServerNoTenant
+                } else {
+                    // 有租户但未启动任何模式
+                    let has_certs = tenant_manager
+                        .current_cert_manager()
+                        .map(|cm| cm.has_local_certificates())
+                        .unwrap_or(false);
+
+                    if has_certs {
+                        // 有证书，可能需要选择模式 (Server/Client)
+                        AppState::Uninitialized
+                    } else {
+                        // 无证书，需要激活
+                        AppState::ServerNeedActivation
+                    }
+                }
+            }
+
+            ClientMode::Server {
+                server_state,
+                client,
+                ..
+            } => {
+                // Server 模式: 检查激活状态和订阅
+                let is_activated = server_state.is_activated().await;
+
+                if !is_activated {
+                    return AppState::ServerNeedActivation;
+                }
+
+                // 检查订阅状态
+                let credential = server_state
+                    .activation_service()
+                    .get_credential()
+                    .await
+                    .ok()
+                    .flatten();
+
+                if let Some(cred) = credential {
+                    if let Some(sub) = &cred.subscription {
+                        // 检查订阅状态
+                        match sub.status {
+                            SubscriptionStatus::Active | SubscriptionStatus::Trial => {
+                                // 订阅有效，检查员工登录状态
+                                match client {
+                                    Some(LocalClientState::Authenticated(_)) => {
+                                        AppState::ServerAuthenticated
+                                    }
+                                    _ => AppState::ServerReady,
+                                }
+                            }
+                            SubscriptionStatus::PastDue => {
+                                // 宽限期，允许使用但显示警告
+                                match client {
+                                    Some(LocalClientState::Authenticated(_)) => {
+                                        AppState::ServerAuthenticated
+                                    }
+                                    _ => AppState::ServerReady,
+                                }
+                            }
+                            SubscriptionStatus::Canceled | SubscriptionStatus::Unpaid => {
+                                // 订阅无效，阻止使用
+                                AppState::ServerSubscriptionBlocked {
+                                    reason: format!("订阅状态: {:?}", sub.status),
+                                }
+                            }
+                        }
+                    } else {
+                        // 无订阅信息，检查是否正在同步
+                        AppState::ServerCheckingSubscription
+                    }
+                } else {
+                    // 无凭证，需要激活
+                    AppState::ServerNeedActivation
+                }
+            }
+
+            ClientMode::Client { client, .. } => {
+                // Client 模式: 检查连接状态和员工登录
+                match client {
+                    Some(RemoteClientState::Authenticated(_)) => AppState::ClientAuthenticated,
+                    Some(RemoteClientState::Connected(_)) => AppState::ClientConnected,
+                    None => {
+                        // 检查是否有缓存证书
+                        let has_certs = tenant_manager
+                            .current_cert_manager()
+                            .map(|cm| cm.has_local_certificates())
+                            .unwrap_or(false);
+
+                        if has_certs {
+                            AppState::ClientDisconnected
+                        } else {
+                            AppState::ClientNeedSetup
+                        }
+                    }
+                }
+            }
         }
     }
 

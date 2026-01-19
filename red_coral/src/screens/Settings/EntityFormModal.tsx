@@ -4,20 +4,16 @@ import { useI18n } from '@/hooks/useI18n';
 import {
   useSettingsModal,
   useSettingsFormMeta,
-  useSettingsZones,
-  useSettingsCategories,
-  useSettingsActions,
-  useSettingsProducts,
   useSettingsStore,
 } from '@/core/stores/settings/useSettingsStore';
 import { createApiClient } from '@/infrastructure/api';
+import { useProductStore, useZones, useCategoryStore } from '@/core/stores/resources';
 
 const api = createApiClient();
 import { toast } from '@/presentation/components/Toast';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { syncAttributeBindings } from './utils';
-import { useProductActions, useProductStore } from '@/core/stores/product/useProductStore';
 import { useZoneTableStore } from '@/hooks/useZonesAndTables';
 
 // Form Components
@@ -33,12 +29,16 @@ export const EntityFormModal: React.FC = React.memo(() => {
   const { t } = useI18n();
   const { modal, closeModal } = useSettingsModal();
   const { formData, setFormField, setFormData, setAsyncFormData, isFormDirty, formErrors } = useSettingsFormMeta();
-  const { zones } = useSettingsZones();
-  const { categories, setCategories } = useSettingsCategories();
-  const { setLastSelectedCategory, refreshData } = useSettingsActions();
-  const { updateProductInList, removeProductFromList } = useSettingsProducts();
-  const { clearProductCache, addProduct } = useProductActions();
-  const productStore = useProductStore;
+
+  // Data from resources stores
+  const zones = useZones();
+  const categoryStore = useCategoryStore();
+  const categories = categoryStore.items;
+
+  // UI actions from settings store
+  const setLastSelectedCategory = useSettingsStore((s) => s.setLastSelectedCategory);
+  const refreshData = useSettingsStore((s) => s.refreshData);
+
   const clearZoneTableCache = useZoneTableStore((state) => state.clearCache);
   const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
   const [inheritedAttributeIds, setInheritedAttributeIds] = useState<string[]>([]);
@@ -65,19 +65,17 @@ export const EntityFormModal: React.FC = React.memo(() => {
 
   useEffect(() => {
     if (modal.open && modal.entity === 'PRODUCT') {
-      api.listCategories()
-        .then(resp => {
-          const cats = resp.data?.categories || [];
-          setCategories(cats);
-          // Auto-select first category if none selected and creating a new product
-          if (cats.length > 0 && modal.action === 'CREATE' && !formData.categoryId && !defaultCategorySet.current) {
-            setFormData({ categoryId: cats[0].id as unknown as number });
-            defaultCategorySet.current = true;
-          }
-        })
-        .catch(console.error);
+      // Ensure categories are loaded
+      if (!categoryStore.isLoaded) {
+        categoryStore.fetchAll();
+      }
+      // Auto-select first category if none selected and creating a new product
+      if (categories.length > 0 && modal.action === 'CREATE' && !formData.categoryId && !defaultCategorySet.current) {
+        setFormData({ categoryId: categories[0].id as unknown as number });
+        defaultCategorySet.current = true;
+      }
     }
-  }, [modal.open, modal.entity, modal.action]);
+  }, [modal.open, modal.entity, modal.action, categories.length, categoryStore.isLoaded]);
 
   // Load product attributes when editing a product
   useEffect(() => {
@@ -220,20 +218,15 @@ export const EntityFormModal: React.FC = React.memo(() => {
         }
       } else if (entity === 'PRODUCT') {
         await api.deleteProduct(String(data.id));
-        // Optimistic update: remove from both Settings and ProductStore
-        removeProductFromList(data.id);
-        // Also remove from ProductStore cache
-        const { products } = productStore.getState();
-        const updatedProducts = products.filter(p => p.id !== data.id);
-        productStore.setState({ products: updatedProducts });
+        // Optimistic update: remove from ProductStore
+        useProductStore.getState().optimisticRemove(data.id);
         toast.success(t('settings.product.action.deleted'));
       } else if (entity === 'CATEGORY') {
         try {
           await api.deleteCategory(String(data.id));
-          clearProductCache(); // Invalidate products + categories cache
-          // Refresh categories list
-          const resp = await api.listCategories();
-          setCategories(resp.data?.categories || []);
+          // Refresh products and categories from resources stores
+          useProductStore.getState().fetchAll();
+          useCategoryStore.getState().fetchAll();
           toast.success(t('settings.category.action.deleted'));
         } catch (e: any) {
           const msg = String(e);
@@ -346,9 +339,9 @@ export const EntityFormModal: React.FC = React.memo(() => {
           });
           const created = resp.data?.product;
           productId = created?.id || '';
-          // Optimistic update: add to ProductStore cache
+          // Optimistic update: add to resources ProductStore
           if (created) {
-            addProduct(created);
+            useProductStore.getState().optimisticAdd(created as any);
           }
           toast.success(t("settings.product.message.created"));
         } else {
@@ -368,23 +361,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
             is_label_print_enabled: productData.isLabelPrintEnabled,
           });
           productId = data.id;
-          // Optimistic update: directly update both Settings and ProductStore
-          updateProductInList(data.id, {
-            name: productData.name,
-            category: String(productData.categoryId),
-            image: productData.image,
-            receipt_name: productData.receiptName ?? null,
-            sort_order: productData.sortOrder ?? 0,
-            tax_rate: productData.taxRate ?? 0,
-            kitchen_printer: productData.kitchenPrinterId ? String(productData.kitchenPrinterId) : null,
-            kitchen_print_name: productData.kitchenPrintName ?? null,
-            is_kitchen_print_enabled: productData.isKitchenPrintEnabled ?? -1,
-            is_label_print_enabled: productData.isLabelPrintEnabled ?? -1,
-          } as any);
-          // Also update ProductStore cache
-          const { products } = productStore.getState();
-          const updatedProducts = products.map(p => p.id === data.id ? { ...p, ...productData } : p);
-          productStore.setState({ products: updatedProducts });
+          // Optimistic update: update ProductStore cache
+          useProductStore.getState().optimisticUpdate(data.id, (p) => ({ ...p, ...productData as any }));
           toast.success(t("settings.product.message.updated"));
         }
 
@@ -475,7 +453,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
             is_label_print_enabled: isLabelPrintEnabled
           });
           categoryId = resp.data?.category?.id || '';
-          clearProductCache(); // Invalidate products + categories cache
+          // Trigger refresh of products store
+          useProductStore.getState().fetchAll();
           refreshData(); // Trigger UI refresh
           toast.success(t('settings.category.action.createSuccess'));
         } else {
@@ -487,7 +466,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
             is_kitchen_print_enabled: isKitchenPrintEnabled,
             is_label_print_enabled: isLabelPrintEnabled
           });
-          clearProductCache(); // Invalidate products + categories cache
+          // Trigger refresh of products store
+          useProductStore.getState().fetchAll();
           refreshData(); // Trigger UI refresh
           toast.success(t('settings.category.action.updateSuccess'));
         }

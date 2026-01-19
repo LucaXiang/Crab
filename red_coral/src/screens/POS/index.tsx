@@ -26,35 +26,38 @@ import { Product, ItemAttributeSelection, AttributeTemplate, AttributeOption } f
 // i18n
 import { useI18n } from '@/hooks/useI18n';
 
-// Stores
+// Stores - New Architecture
 import {
-	  useProducts,
-	  useCategoryData,
-	  useProductActions,
-	  useProductLoading,
-	} from '@/core/stores/product';
+  useProducts,
+  useProductsLoading,
+  useCategories,
+  useProductStore,
+  useCategoryStore,
+} from '@/core/stores/resources';
 import {
-	  useCart,
-	  useCartActions,
-	} from '@/core/stores/cart';
+  useCart,
+  useCartActions,
+} from '@/core/stores/cart';
 import {
-	  useHeldOrders,
-	  useDraftOrders,
-	  useCurrentOrderKey,
-	  useCheckoutOrder,
-	  useOrderActions,
-	} from '@/core/stores/order';
+  useHeldOrders,
+  useDraftOrders,
+  useCurrentOrderKey,
+  useCheckoutOrder,
+  useOrderActions,
+} from '@/core/stores/order';
 import {
-	  useScreen,
-	  useViewMode,
-	  useModalStates,
-	  useSelectedPrinter,
-	  useUIActions,
-	} from '@/core/stores/ui';
+  useScreen,
+  useViewMode,
+  useModalStates,
+  useSelectedPrinter,
+  useUIActions,
+  useSelectedCategory,
+  usePOSUIActions,
+} from '@/core/stores/ui';
 import {
-	  useSettingsStore,
-	  useSettingsModal,
-	} from '@/core/stores/settings';
+  useSettingsStore,
+  useSettingsModal,
+} from '@/core/stores/settings';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 
 // Services
@@ -89,17 +92,18 @@ export const POSScreen: React.FC = () => {
     }
   }, [canManageProducts, openModal, t]);
 
-  // Product Store
+  // Product Store (New Architecture)
   const products = useProducts();
-  const isProductLoading = useProductLoading();
-  const { selected: selectedCategory, categories: availableCategories } = useCategoryData();
-  const { setSelectedCategory, loadCategories, loadProducts } = useProductActions();
+  const isProductLoading = useProductsLoading();
+  const categories = useCategories();
+  const selectedCategory = useSelectedCategory();
+  const { setSelectedCategory } = usePOSUIActions();
 
-  // Only load data on first mount (optimized caching)
+  // Only load data on first mount (new architecture auto-handles sync)
   useEffect(() => {
     const initializeData = async () => {
-      await loadCategories();
-      await loadProducts();
+      await useCategoryStore.getState().fetchAll();
+      await useProductStore.getState().fetchAll();
     };
     initializeData();
   }, []); // Empty dependency array - only run on mount
@@ -606,7 +610,7 @@ export const POSScreen: React.FC = () => {
             <CategoryNav
               selected={selectedCategory}
               onSelect={setSelectedCategory}
-              categories={availableCategories}
+              categories={categories}
             />
           </div>
 

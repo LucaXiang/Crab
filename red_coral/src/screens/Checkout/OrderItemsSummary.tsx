@@ -1,6 +1,6 @@
 import React from 'react';
 import { CartItem, CheckoutMode } from '@/core/domain/types';
-import { useCategoryData } from '@/core/stores/product/useProductStore';
+import { useCategories } from '@/core/stores/resources';
 import { useLongPress } from '@/hooks/useLongPress';
 import { CheckCircle } from 'lucide-react';
 import { calculateItemFinalPrice, calculateOptionsModifier } from '@/utils/pricing';
@@ -190,7 +190,7 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
   surchargeExempt,
   paidItemQuantities
 }) => {
-  const { categories } = useCategoryData();
+  const categories = useCategories();
 
   // 1. Separate into Active (Unpaid) and Completed (Paid) lists
   const activeItems: { item: CartItem; remainingQty: number; originalIndex: number }[] = [];
@@ -250,7 +250,7 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
 
   // Sorting Logic
   const getCategoryIndex = (catName: string) => {
-    const index = categories.indexOf(catName);
+    const index = categories.findIndex(c => c.name === catName);
     return index === -1 ? 9999 : index;
   };
 

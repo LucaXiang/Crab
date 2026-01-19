@@ -6,11 +6,11 @@ import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { useShallow } from 'zustand/react/shallow';
 import {
   useAttributes,
-  useAttributeLoading,
+  useAttributesLoading,
   useAttributeActions,
   useOptionActions,
   useAttributeStore,
-} from '@/core/stores/product/useAttributeStore';
+} from '@/core/stores/resources';
 import { AttributeForm } from './forms/AttributeForm';
 import { OptionForm } from './forms/OptionForm';
 import { Permission } from '@/core/domain/types';
@@ -29,7 +29,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
   const { t } = useI18n();
 
   const attributes = useAttributes();
-  const isLoading = useAttributeLoading();
+  const isLoading = useAttributesLoading();
   const {
     loadAttributes,
     deleteAttribute,
