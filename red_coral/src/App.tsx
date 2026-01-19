@@ -42,7 +42,6 @@ const InitialRoute: React.FC = () => {
       // 3. 如果状态表明需要自动启动 Server 模式
       // (Uninitialized 状态且有租户 = 有证书但未启动)
       if (state?.type === 'Uninitialized' && useBridgeStore.getState().tenants.length > 0) {
-        console.log('Auto-starting Server mode...');
         try {
           await startServerMode();
           await fetchAppState(); // 刷新状态
@@ -85,7 +84,6 @@ const App: React.FC = () => {
   useEffect(() => {
     // Listen for the clear event from backend
     const unlistenPromise = listen('clear-local-storage', () => {
-      console.log('First run detected: clearing localStorage');
       localStorage.clear();
       sessionStorage.clear();
       // Reload to apply clean state

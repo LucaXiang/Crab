@@ -21,7 +21,6 @@ export function useConnectionRecovery() {
   useEffect(() => {
     // 检测从断开到连接的转换
     if (!prevConnected.current && connectionStatus.connected) {
-      console.log('[Sync] Connection recovered, refreshing all loaded stores');
       refreshAllLoadedStores();
     }
     prevConnected.current = connectionStatus.connected;

@@ -82,12 +82,9 @@ export const POSScreen: React.FC = () => {
   const { openModal } = useSettingsModal();
 
   const handleLongPressProduct = useCallback((product: Product) => {
-    console.log('Long press detected for product:', product.name);
     if (canManageProducts) {
-      console.log('Opening edit modal for product:', product.id);
       openModal('PRODUCT', 'EDIT', product);
     } else {
-      console.log('User does not have permission to manage products');
       toast.error(t('auth.unauthorized.message'));
     }
   }, [canManageProducts, openModal, t]);
@@ -293,14 +290,6 @@ export const POSScreen: React.FC = () => {
             // Check for default specification
             // We check for true (boolean) or 1 (integer) to be safe across serialization methods
             selectedDefaultSpec = specifications.find((s: any) => s.isDefault === true || s.isDefault === 1);
-            
-            console.log('[QuickAdd] Spec check:', { 
-              productId: product.id, 
-              hasMultiSpec, 
-              specCount: specifications.length,
-              foundDefault: !!selectedDefaultSpec,
-              defaultSpecId: selectedDefaultSpec?.id 
-            });
 
             // If no default specification is found, we MUST open the modal
             if (!selectedDefaultSpec) {
@@ -335,7 +324,6 @@ export const POSScreen: React.FC = () => {
               // Skip attributes that don't have options
               if (options.length === 0) {
                 if (attr.type?.includes('REQUIRED') || attr.type_?.includes('REQUIRED')) {
-                  console.log('[QuickAdd] Failed: Required attribute has no options', { attrId: attr.id, attrName: attr.name });
                   canQuickAdd = false;
                   break;
                 }

@@ -326,13 +326,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         columns={columns}
         loading={loading}
         getRowKey={(item) => item.id}
-        onEdit={canUpdateProduct ? (item) => {
-          console.log('[ProductManagement] onEdit item', {
-            id: item.id,
-            isKitchenPrintEnabled: (item as any).isKitchenPrintEnabled,
-          });
-          openModal('PRODUCT', 'EDIT', item);
-        } : undefined}
+        onEdit={canUpdateProduct ? (item) => openModal('PRODUCT', 'EDIT', item) : undefined}
         onDelete={canDeleteProduct ? (item) => openModal('PRODUCT', 'DELETE', item) : undefined}
         onBatchDelete={canDeleteProduct ? handleBatchDelete : undefined}
         emptyText={t('settings.product.list.noData')}

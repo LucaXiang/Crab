@@ -34,13 +34,11 @@ export function usePreloadCoreData(): boolean {
 
   useEffect(() => {
     const preload = async () => {
-      console.log('[Preload] Loading core data...');
 
       try {
         await Promise.all(
           CORE_STORES.map((store) => store.getState().fetchAll())
         );
-        console.log('[Preload] Core data ready');
         setReady(true);
       } catch (error) {
         console.error('[Preload] Failed to load core data:', error);

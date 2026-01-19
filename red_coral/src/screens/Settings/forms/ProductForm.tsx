@@ -69,7 +69,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   );
 
   useEffect(() => {
-    console.log('[ProductForm] isKitchenPrintEnabled changed', formData.isKitchenPrintEnabled);
   }, [formData.isKitchenPrintEnabled]);
 
   useEffect(() => {
@@ -239,7 +238,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       const raw = e.target.value;
                       const num = parseInt(raw, 10);
                       const next = isNaN(num) ? -1 : (num === 1 ? 1 : num === 0 ? 0 : -1);
-                      console.log('[ProductForm] select isKitchenPrintEnabled change', { raw, next });
                       onFieldChange('isKitchenPrintEnabled', next as any);
                     }}
                     className={selectClass}
@@ -305,7 +303,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       const raw = e.target.value;
                       const num = parseInt(raw, 10);
                       const next = isNaN(num) ? -1 : (num === 1 ? 1 : num === 0 ? 0 : -1);
-                      console.log('[ProductForm] select isLabelPrintEnabled change', { raw, next });
                       onFieldChange('isLabelPrintEnabled', next as any);
                     }}
                     className={selectClass}

@@ -52,52 +52,21 @@ export const DataTransfer: React.FC = () => {
         }]
       });
 
-      if (!selectedPath) {
-        console.log('Import cancelled: No file selected');
-        return;
-      }
+      if (!selectedPath) return;
 
-      console.group('Data Import Process');
-      console.log('Starting import from path:', selectedPath);
       setLoading(true);
-      
-      console.log('Invoking backend command: import_data');
       await invoke('import_data', { path: selectedPath });
-      console.log('Backend command completed successfully');
 
       // Clear all caches to force reload
-      console.log('Clearing local caches...');
       useProductStore.getState().fetchAll();
       useCategoryStore.getState().fetchAll();
       clearZoneTableCache();
 
       // Increment dataVersion to trigger reload in all components
-      console.log('Triggering data refresh...');
       refreshData();
-
-      console.log('Import process finished successfully');
-      console.groupEnd();
       toast.success(t('settings.dataTransfer.import.success'));
     } catch (error) {
-      console.group('Data Import Failed');
-      console.error('Import Error:', error);
-      console.error('Error Type:', typeof error);
-      console.error('Selected Path:', selectedPath);
-      
-      if (typeof error === 'object' && error !== null) {
-        try {
-          console.error('Error Details (JSON):', JSON.stringify(error, null, 2));
-        } catch (e) {
-          console.error('Could not stringify error object');
-        }
-        
-        // Log common properties if they exist
-        if ('message' in error) console.error('Error Message:', (error as any).message);
-        if ('code' in error) console.error('Error Code:', (error as any).code);
-        if ('stack' in error) console.error('Error Stack:', (error as any).stack);
-      }
-      console.groupEnd();
-      
+      console.error('[DataTransfer] Import failed:', error);
       toast.error(t('settings.dataTransfer.import.failed') + String(error));
     } finally {
       setLoading(false);

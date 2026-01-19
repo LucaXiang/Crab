@@ -45,13 +45,6 @@ export const EntityFormModal: React.FC = React.memo(() => {
   const defaultCategorySet = useRef(false);
 
   useEffect(() => {
-    if (modal.open && modal.entity === 'PRODUCT') {
-      console.log('[EntityFormModal] open PRODUCT modal', {
-        action: modal.action,
-        id: modal.data?.id,
-        formIsKitchenPrintEnabled: formData.isKitchenPrintEnabled,
-      });
-    }
     if (!modal.open) {
       setInheritedAttributeIds([]);
     }

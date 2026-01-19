@@ -36,7 +36,6 @@ export function useSyncListener() {
       if (message.event_type !== 'Sync') return;
 
       const { resource, action, id } = message.payload;
-      console.log(`[Sync] Received: ${resource}.${action} (id: ${id})`);
 
       // 调用 resources store 的 applySync
       const store = storeRegistry[resource];

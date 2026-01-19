@@ -67,18 +67,18 @@ export function createResourceStore<T extends { id: string }>(
       try {
         const items = await fetchFn();
         set({ items, isLoading: false, isLoaded: true });
-        console.log(`[Store] ${resourceName}: loaded ${items.length} items`);
       } catch (e: any) {
         const errorMsg = e.message || 'Failed to fetch';
         set({ error: errorMsg, isLoading: false });
-        console.error(`[Store] ${resourceName}: fetch failed -`, errorMsg);
+        if (import.meta.env.DEV) {
+          console.error(`[${resourceName}] fetch failed:`, errorMsg);
+        }
       }
     },
 
     // 服务器权威：收到 Sync 直接全量刷新
     applySync: () => {
       if (get().isLoaded) {
-        console.log(`[Store] ${resourceName}: sync triggered, refreshing...`);
         get().fetchAll();
       }
     },
@@ -120,17 +120,17 @@ export function createCrudResourceStore<
       try {
         const items = await fetchFn();
         set({ items, isLoading: false, isLoaded: true });
-        console.log(`[Store] ${resourceName}: loaded ${items.length} items`);
       } catch (e: any) {
         const errorMsg = e.message || 'Failed to fetch';
         set({ error: errorMsg, isLoading: false });
-        console.error(`[Store] ${resourceName}: fetch failed -`, errorMsg);
+        if (import.meta.env.DEV) {
+          console.error(`[${resourceName}] fetch failed:`, errorMsg);
+        }
       }
     },
 
     applySync: () => {
       if (get().isLoaded) {
-        console.log(`[Store] ${resourceName}: sync triggered, refreshing...`);
         get().fetchAll();
       }
     },
@@ -141,46 +141,26 @@ export function createCrudResourceStore<
 
     // CRUD 操作
     create: async (data) => {
-      try {
-        const newItem = await crudOps.create(data);
-        // 服务器权威：创建成功后等待 Sync 信号刷新
-        // 但为了 UI 响应，可以先乐观添加
-        set((state) => ({ items: [...state.items, newItem] }));
-        console.log(`[Store] ${resourceName}: created item ${newItem.id}`);
-        return newItem;
-      } catch (e: any) {
-        console.error(`[Store] ${resourceName}: create failed -`, e.message);
-        throw e;
-      }
+      const newItem = await crudOps.create(data);
+      set((state) => ({ items: [...state.items, newItem] }));
+      return newItem;
     },
 
     update: async (id, data) => {
-      try {
-        const updatedItem = await crudOps.update(id, data);
-        set((state) => ({
-          items: state.items.map((item) =>
-            item.id === id ? updatedItem : item
-          ),
-        }));
-        console.log(`[Store] ${resourceName}: updated item ${id}`);
-        return updatedItem;
-      } catch (e: any) {
-        console.error(`[Store] ${resourceName}: update failed -`, e.message);
-        throw e;
-      }
+      const updatedItem = await crudOps.update(id, data);
+      set((state) => ({
+        items: state.items.map((item) =>
+          item.id === id ? updatedItem : item
+        ),
+      }));
+      return updatedItem;
     },
 
     remove: async (id) => {
-      try {
-        await crudOps.remove(id);
-        set((state) => ({
-          items: state.items.filter((item) => item.id !== id),
-        }));
-        console.log(`[Store] ${resourceName}: removed item ${id}`);
-      } catch (e: any) {
-        console.error(`[Store] ${resourceName}: remove failed -`, e.message);
-        throw e;
-      }
+      await crudOps.remove(id);
+      set((state) => ({
+        items: state.items.filter((item) => item.id !== id),
+      }));
     },
 
     // 乐观更新辅助方法

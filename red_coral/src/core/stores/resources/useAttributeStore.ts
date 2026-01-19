@@ -111,7 +111,6 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       const response = await api.listAttributeTemplates();
       const attributes = (response.data?.templates || []) as AttributeEntity[];
       set({ items: attributes, isLoading: false, isLoaded: true });
-      console.log(`[Store] attribute: loaded ${attributes.length} items`);
     } catch (e: any) {
       const errorMsg = e.message || 'Failed to fetch attributes';
       set({ error: errorMsg, isLoading: false });
@@ -121,7 +120,6 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
 
   applySync: () => {
     if (get().isLoaded) {
-      console.log('[Store] attribute: sync triggered, refreshing...');
       get().fetchAll();
     }
   },
@@ -153,7 +151,6 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         newOptions.set(attributeId, optionsWithIndex);
         return { options: newOptions, isLoading: false };
       });
-      console.log(`[Store] attribute: loaded ${opts.length} options for ${attributeId}`);
     } catch (e: any) {
       console.error('[Store] attribute: loadOptions failed -', e.message);
       set({ error: e.message, isLoading: false });

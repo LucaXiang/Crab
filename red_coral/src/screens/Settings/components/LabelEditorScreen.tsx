@@ -317,7 +317,6 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                 });
                 testData[field.dataKey || field.name] = dataUri;
               }
-              console.log(`Loaded image for ${field.dataKey || field.name}:`, (testData[field.dataKey || field.name] as string)?.substring(0, 50) + '...');
             } catch (loadError) {
               console.warn(`Failed to load image for field ${field.id} (${resolvedPath}):`, loadError);
               // Continue without this image
@@ -336,9 +335,6 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           label_height_mm: (template.heightMm ?? 0) + (template.paddingMmY ?? 0), // Auto-expand paper height by offset
           override_dpi: template.renderDpi
         };
-
-        console.log("Printing test label:", ticketData);
-        console.log("Test data with generated images:", testData);
 
         // Backend command print_label_cmd(ticket: LabelTicketData) expects 'ticket' argument
         await invoke('print_label_cmd', { ticket: ticketData });

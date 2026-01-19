@@ -65,11 +65,9 @@ export function getLoadedStores(): [string, RegistryStore][] {
  */
 export async function refreshAllLoadedStores(): Promise<void> {
   const loadedStores = getLoadedStores();
-  console.log(`[Sync] Refreshing ${loadedStores.length} loaded stores`);
 
   await Promise.all(
     loadedStores.map(([name, store]) => {
-      console.log(`[Sync] Refreshing ${name} store`);
       return store.getState().fetchAll();
     })
   );
@@ -80,7 +78,6 @@ export async function refreshAllLoadedStores(): Promise<void> {
  */
 export function clearAllStores(): void {
   Object.entries(storeRegistry).forEach(([name, store]) => {
-    console.log(`[Store] Clearing ${name}`);
     store.getState().clear();
   });
 }

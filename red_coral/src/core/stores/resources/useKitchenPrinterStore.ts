@@ -66,7 +66,6 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
       const response = await api.listPrinters();
       const printers = (response.data?.printers || []) as KitchenPrinterEntity[];
       set({ items: printers, isLoading: false, isLoaded: true });
-      console.log(`[Store] kitchen_printer: loaded ${printers.length} items`);
     } catch (e: any) {
       const errorMsg = e.message || 'Failed to fetch kitchen printers';
       set({ error: errorMsg, isLoading: false });
@@ -76,7 +75,6 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
 
   applySync: () => {
     if (get().isLoaded) {
-      console.log('[Store] kitchen_printer: sync triggered, refreshing...');
       get().fetchAll();
     }
   },
@@ -97,7 +95,6 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
       const newPrinter = response.data?.printer as KitchenPrinterEntity;
       // Refresh to get latest data
       await get().fetchAll();
-      console.log(`[Store] kitchen_printer: created item`);
       return newPrinter || get().items[get().items.length - 1];
     } catch (e: any) {
       set({ error: e.message, isLoading: false });
@@ -117,7 +114,6 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
       // Refresh to get latest data
       await get().fetchAll();
       const updated = get().items.find((p) => p.id === id);
-      console.log(`[Store] kitchen_printer: updated item ${id}`);
       return updated!;
     } catch (e: any) {
       set({ error: e.message, isLoading: false });
@@ -134,7 +130,6 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
         items: state.items.filter((item) => item.id !== id),
         isLoading: false,
       }));
-      console.log(`[Store] kitchen_printer: removed item ${id}`);
     } catch (e: any) {
       set({ error: e.message, isLoading: false });
       console.error('[Store] kitchen_printer: remove failed -', e.message);
