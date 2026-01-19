@@ -109,37 +109,6 @@ export interface LabelPrintJob {
 }
 
 /**
- * Template-based print configuration
- */
-export interface TemplatePrintConfig {
-  templateId: string;
-  printerId?: number;
-  quantity: number;
-  printDelay?: number;  // Delay between prints in ms
-  cutAfterPrint?: boolean;
-}
-
-/**
- * Barcode format
- */
-export type BarcodeFormat =
-  | 'CODE128'
-  | 'CODE39'
-  | 'EAN13'
-  | 'EAN8'
-  | 'UPC'
-  | 'QRCODE';
-
-/**
- * Barcode field configuration
- */
-export interface BarcodeConfig {
-  format: BarcodeFormat;
-  includeText: boolean;
-  textPosition: 'top' | 'bottom' | 'none';
-}
-
-/**
  * Predefined label templates
  */
 export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
@@ -482,36 +451,6 @@ export interface TextStyle {
   fontWeight?: string;
   color?: string;
   fontFamily?: string;
-}
-
-export interface FieldConfig {
-  id: string;
-  type: FieldType;
-  label?: string;
-  dataKey?: string;
-  style?: TextStyle;
-  align?: TextAlign;
-  sourceType?: 'productImage' | 'qrCode' | 'barcode';
-  template?: string;
-  maintainAspectRatio?: boolean;
-  lineStyle?: 'solid' | 'dashed' | 'dotted';
-}
-
-export interface LabelFieldUI {
-  id: string;
-  type: FieldType;
-  label: string;
-  dataKey: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  style?: TextStyle;
-  align?: TextAlign;
-  sourceType?: 'productImage' | 'qrCode' | 'barcode';
-  template?: string;
-  maintainAspectRatio?: boolean;
-  lineStyle?: 'solid' | 'dashed' | 'dotted';
 }
 
 // Supported label fields for UI
