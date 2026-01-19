@@ -13,15 +13,47 @@
 
 ### 设计目标
 
-1. **显示优化** - Client 模式能正常显示图片
-2. **离线支持** - 网络断开时显示已缓存图片
-3. **上传同步** - Client 模式离线上传时，先缓存再同步
+1. **显示优化** - Client 模式能正常显示图片（绕过 mTLS 限制）
+2. **缓存加速** - 已下载的图片直接使用缓存，无需重复下载
+
+### 架构约束
+
+- **Server 模式**: edge_server 与 redcoral 同进程运行，直接访问文件系统
+- **Client 模式**: 必须在线才能操作，断网时所有操作无效
 
 ### 设计原则
 
-- **按需加载** - 图片在需要显示时才下载，不预加载
-- **永久缓存** - 下载后持久化到硬盘，不重复下载（图片基本不会改动）
-- **App 层实现** - 缓存逻辑在 Tauri App 层，CrabClient 只负责网络传输
+- **内容寻址** - 用图片内容 hash 作为唯一标识（key）
+- **按需加载** - 图片在需要显示时才下载
+- **持久缓存** - 下载后保存到磁盘，相同 hash 不重复下载
+- **后端下载** - 由 Rust 层处理 mTLS 请求，保证图片存在后返回路径
+
+---
+
+## 核心设计：Hash 作为 Key
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                      数据库                              │
+│           Product.image = "a1b2c3d4" (hash)             │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│              get_image_path(hash) -> path               │
+│                    (Tauri Command)                       │
+├─────────────────────────────────────────────────────────┤
+│ Server: a1b2c3d4 → {work_dir}/uploads/images/a1b2c3d4.jpg│
+│ Client: a1b2c3d4 → {tenant}/image_cache/images/a1b2c3d4.jpg│
+│         (如果不存在，自动从远程下载)                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+**优点：**
+1. ✅ 相同图片 = 相同 hash（内容寻址，天然去重）
+2. ✅ 数据库与存储路径解耦
+3. ✅ Client 离线上传的 hash 与 Server 一致
+4. ✅ 路径结构变更不影响数据库
 
 ---
 
@@ -30,28 +62,30 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      Frontend (React)                        │
-│  const path = await invoke('get_image_path', { url })       │
-│  <img src={convertFileSrc(path)} />                         │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │    IndexedDB (base64 缓存，快速访问)                  │    │
+│  └─────────────────────────────────────────────────────┘    │
+│  const url = await getImageUrl(hash)                        │
+│  <img src={url} />                                          │
 └──────────────────────────┬──────────────────────────────────┘
-                           │
+                           │ cache miss
 ┌──────────────────────────▼──────────────────────────────────┐
 │                 Tauri Commands (image.rs)                    │
-│  • get_image_path(url) -> local_path                        │
-│  • upload_image(file_path) -> ImageUploadResult             │
-│  • sync_image_uploads() -> SyncResult                       │
+│  • get_image_path(hash) -> local_path                       │
+│  • prefetch_images(hashes) -> PrefetchResult                │
+│  • cleanup_image_cache(active_hashes) -> CacheCleanupResult │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
 │                   ImageCacheService                          │
-│  • 缓存索引管理 (cache_index.json)                           │
-│  • 上传队列管理 (upload_queue.json)                          │
-│  • 文件存储 (image_cache/images/)                           │
+│  • hash -> local_path 映射                                  │
+│  • 自动下载缺失图片 (Client 模式)                            │
+│  • 缓存清理 (删除不再引用的图片)                             │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
 │                     ClientBridge                             │
-│  • get_bytes(path) -> Vec<u8>    (新增)                     │
-│  • upload_file(path, file)       (新增)                     │
+│  • get_bytes(path) -> Vec<u8>                               │
 └──────────────────────────┬──────────────────────────────────┘
                            │
               ┌────────────┴────────────┐
@@ -65,89 +99,58 @@
 ## 文件结构
 
 ```
+# Server 模式 (EdgeServer 存储，直接使用)
+{work_dir}/
+└── uploads/images/
+    ├── {hash1}.jpg
+    ├── {hash2}.jpg
+    └── ...
+
+# Client 模式 (本地缓存)
 ~/Library/Application Support/com.xzy.pos/redcoral/
 └── tenants/{tenant_id}/
-    ├── session_cache.json        # 已有
-    ├── current_session.json      # 已有
     └── image_cache/
-        ├── images/               # 图片文件 (持久化)
-        │   ├── {uuid}.jpg
-        │   └── ...
-        ├── cache_index.json      # 缓存索引 (持久化)
-        └── upload_queue.json     # 待上传队列 (持久化)
+        └── images/               # 缓存的图片文件
+            ├── {hash1}.jpg
+            └── ...
 ```
+
+**注意：**
+- Server 模式直接使用 EdgeServer 的图片，不重复存储
+- Client 模式才需要 `image_cache/` 目录
 
 ---
 
 ## 数据结构
 
-### 缓存索引
+### 数据库存储
 
-```rust
-// src-tauri/src/core/image_cache.rs
-
-/// 缓存条目
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CacheEntry {
-    pub local_filename: String,   // "abc.jpg"
-    pub size_bytes: u64,
-    pub cached_at: u64,           // Unix timestamp (仅用于统计)
-}
-
-/// 缓存索引
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct CacheIndex {
-    /// remote_url -> entry (e.g., "/api/image/abc.jpg" -> CacheEntry)
-    pub entries: HashMap<String, CacheEntry>,
-}
-```
-
-### 上传队列
-
-```rust
-/// 待上传项
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PendingUpload {
-    pub id: String,               // UUID
-    pub local_path: PathBuf,      // 本地缓存路径
-    pub original_filename: String,
-    pub created_at: u64,
-    pub retry_count: u32,
-    pub last_error: Option<String>,
-    pub status: UploadStatus,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum UploadStatus {
-    Pending,
-    Uploading,
-    Failed,
-}
-
-/// 上传队列
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct UploadQueue {
-    pub pending: Vec<PendingUpload>,
+```typescript
+// Product.image 存储图片的 hash（不带扩展名）
+interface Product {
+  id: string;
+  name: string;
+  image: string;  // "a1b2c3d4e5f6..." (SHA256 hash)
+  // ...
 }
 ```
 
 ### 返回类型
 
 ```rust
-/// 上传结果
+/// 预加载结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ImageUploadResult {
-    pub local_path: String,         // 本地缓存路径 (立即可用)
-    pub remote_url: Option<String>, // Server模式立即返回，Client离线时为 None
-    pub is_pending: bool,           // Client离线时为 true
-}
-
-/// 同步结果
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncResult {
+pub struct PrefetchResult {
     pub success_count: u32,
     pub failed_count: u32,
-    pub pending_count: u32,
+    pub already_cached: u32,
+}
+
+/// 缓存清理结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheCleanupResult {
+    pub removed_count: u32,
+    pub freed_bytes: u64,
 }
 ```
 
@@ -155,88 +158,117 @@ pub struct SyncResult {
 
 ## 核心流程
 
-### 图片下载（按需加载）
+### 获取图片路径 (get_image_path)
 
 ```
-前端渲染需要图片
+前端调用: invoke('get_image_path', { hash: "a1b2c3d4" })
        │
        ▼
-invoke('get_image_path', { url: "/api/image/abc.jpg" })
+ImageCacheService.get_image_path(hash)
        │
        ▼
-ImageCacheService.get_image_path()
-       │
-       ▼
-检查 cache_index ─── 有记录且文件存在 ──→ 返回本地路径
-       │
-       无记录或文件被删除
-       ▼
-bridge.get_bytes("/api/image/abc.jpg")
-       │
-       ├── Server 模式: 读取 {work_dir}/uploads/images/abc.jpg
-       └── Client 模式: mTLS GET https://edge/api/image/abc.jpg
-       │
-       ▼
-保存到 image_cache/images/abc.jpg
-       │
-       ▼
-更新 cache_index.json
-       │
-       ▼
-返回本地路径
-```
-
-### 图片上传
-
-```
-用户选择图片上传
-       │
-       ▼
-invoke('upload_image', { filePath: "/path/to/image.jpg" })
-       │
-       ▼
-ImageCacheService.upload_image()
+检查模式
        │
        ├── Server 模式:
-       │     bridge.upload_file("/api/image/upload", file)
-       │     └── 返回 { local_path, remote_url: Some(...), is_pending: false }
+       │     直接返回 {work_dir}/uploads/images/{hash}.jpg
+       │     (不检查文件是否存在，EdgeServer 保证存在)
        │
        └── Client 模式:
-             ├── 在线: 同 Server 模式
-             └── 离线:
-                   1. 复制到 image_cache/images/{uuid}.jpg
-                   2. 加入 upload_queue.json
-                   3. 返回 { local_path, remote_url: None, is_pending: true }
+             │
+             ▼
+       检查本地缓存 {tenant}/image_cache/images/{hash}.jpg
+             │
+             ├── 存在 → 返回本地路径
+             │
+             └── 不存在 → 从远程下载
+                   │
+                   ▼
+             bridge.get_bytes("/api/image/{hash}.jpg")
+                   │
+                   ▼
+             保存到本地缓存
+                   │
+                   ▼
+             返回本地路径
 ```
 
-### 上传队列同步
+### 批量预加载 (prefetch_images)
 
 ```
-触发时机: App启动 / 网络恢复 / 手动触发
+前端调用: invoke('prefetch_images', { hashes: ["a1b2", "c3d4", ...] })
        │
        ▼
-ImageCacheService.sync_pending_uploads()
+对每个 hash 并发执行 get_image_path()
        │
        ▼
-遍历 upload_queue.pending
-       │
-       ▼
-对每个 PendingUpload:
-  bridge.upload_file("/api/image/upload", local_path)
-       │
-       ├── 成功:
-       │     1. 更新 cache_index (local_path -> remote_url)
-       │     2. 从 upload_queue 移除
-       │     3. (可选) 通知前端刷新
-       │
-       └── 失败:
-             retry_count++
-             if retry_count > 3: status = Failed
+返回 PrefetchResult { success, failed, already_cached }
 ```
+
+### 缓存清理 (cleanup_image_cache)
+
+**场景：** 产品 A 图片从 "abc123" 更新为 "def456"，旧缓存 "abc123.jpg" 变成孤儿文件。
+
+```
+触发时机: 产品数据加载完成后（或定时触发）
+       │
+       ▼
+前端调用: invoke('cleanup_image_cache', { activeHashes: [...当前所有产品的 image hash] })
+       │
+       ▼
+遍历 image_cache/images/ 目录
+       │
+       ▼
+对每个 {hash}.jpg:
+       │
+       ├── hash 在 activeHashes 中 → 保留
+       │
+       └── hash 不在 activeHashes 中 → 删除
+       │
+       ▼
+返回 CacheCleanupResult { removed_count, freed_bytes }
+```
+
+**注意：** Server 模式不需要清理（EdgeServer 自行管理）。
 
 ---
 
 ## 实现细节
+
+### EdgeServer 修改：用 hash 作为文件名
+
+```rust
+// edge-server/src/api/upload/handler.rs
+
+pub async fn upload(...) -> Result<...> {
+    // 1. 处理图片 (压缩等)
+    let compressed_data = process_and_compress_image(data)?;
+
+    // 2. 计算 hash 作为文件名
+    let hash = calculate_hash(&compressed_data);
+    let filename = format!("{}.jpg", hash);
+    let file_path = images_dir.join(&filename);
+
+    // 3. 检查是否已存在 (天然去重)
+    if file_path.exists() {
+        return Ok(UploadResponse {
+            hash: hash.clone(),
+            filename,
+            url: format!("/api/image/{}.jpg", hash),
+            ...
+        });
+    }
+
+    // 4. 保存新文件
+    fs::write(&file_path, &compressed_data)?;
+
+    Ok(UploadResponse {
+        hash,
+        filename,
+        url: format!("/api/image/{}.jpg", hash),
+        ...
+    })
+}
+```
 
 ### ImageCacheService
 
@@ -244,301 +276,145 @@ ImageCacheService.sync_pending_uploads()
 // src-tauri/src/core/image_cache.rs
 
 pub struct ImageCacheService {
-    cache_dir: PathBuf,           // .../image_cache/
-    images_dir: PathBuf,          // .../image_cache/images/
-    index_path: PathBuf,          // .../image_cache/cache_index.json
-    queue_path: PathBuf,          // .../image_cache/upload_queue.json
-    index: RwLock<CacheIndex>,
-    queue: RwLock<UploadQueue>,
+    images_dir: PathBuf,  // Client 模式: {tenant}/image_cache/images/
 }
 
 impl ImageCacheService {
-    /// 从租户目录初始化
-    pub fn new(tenant_path: &Path) -> Result<Self, ImageCacheError> {
-        let cache_dir = tenant_path.join("image_cache");
-        let images_dir = cache_dir.join("images");
-        std::fs::create_dir_all(&images_dir)?;
-
-        let index_path = cache_dir.join("cache_index.json");
-        let queue_path = cache_dir.join("upload_queue.json");
-
-        let index = Self::load_index(&index_path)?;
-        let queue = Self::load_queue(&queue_path)?;
-
-        Ok(Self {
-            cache_dir,
-            images_dir,
-            index_path,
-            queue_path,
-            index: RwLock::new(index),
-            queue: RwLock::new(queue),
-        })
+    pub fn new(tenant_path: &Path) -> Self {
+        let images_dir = tenant_path.join("image_cache/images");
+        std::fs::create_dir_all(&images_dir).ok();
+        Self { images_dir }
     }
 
     /// 获取图片本地路径（核心方法）
     pub async fn get_image_path(
         &self,
-        remote_url: &str,
+        hash: &str,
         bridge: &ClientBridge,
     ) -> Result<PathBuf, ImageCacheError> {
-        // 1. 检查缓存
-        {
-            let index = self.index.read().await;
-            if let Some(entry) = index.entries.get(remote_url) {
-                let local_path = self.images_dir.join(&entry.local_filename);
-                if local_path.exists() {
-                    return Ok(local_path);
-                }
-            }
+        let mode = bridge.current_mode().await;
+
+        // Server 模式: 直接返回 EdgeServer 的图片路径
+        if mode == ModeType::Server {
+            let work_dir = bridge.get_server_work_dir().await?;
+            return Ok(work_dir.join("uploads/images").join(format!("{}.jpg", hash)));
         }
 
-        // 2. 下载
-        let bytes = bridge.get_bytes(remote_url).await
-            .map_err(|e| ImageCacheError::Download(e.to_string()))?;
+        // Client 模式: 检查本地缓存
+        let local_path = self.images_dir.join(format!("{}.jpg", hash));
+        if local_path.exists() {
+            return Ok(local_path);
+        }
 
-        // 3. 保存到本地
-        let filename = Self::extract_filename(remote_url);
-        let local_path = self.images_dir.join(&filename);
+        // Client 模式: 下载并缓存
+        let url = format!("/api/image/{}.jpg", hash);
+        let bytes = bridge.get_bytes(&url).await?;
         tokio::fs::write(&local_path, &bytes).await?;
-
-        // 4. 更新索引
-        {
-            let mut index = self.index.write().await;
-            index.entries.insert(remote_url.to_string(), CacheEntry {
-                local_filename: filename,
-                size_bytes: bytes.len() as u64,
-                cached_at: Self::now(),
-            });
-        }
-        self.save_index().await?;
 
         Ok(local_path)
     }
 
-    /// 上传图片
-    pub async fn upload_image(
+    /// 批量预加载图片
+    pub async fn prefetch_images(
         &self,
-        file_path: &Path,
+        hashes: &[String],
         bridge: &ClientBridge,
-    ) -> Result<ImageUploadResult, ImageCacheError> {
-        let mode = bridge.current_mode().await;
-        let is_online = bridge.is_network_available().await;
-
-        // Server 模式或 Client 在线: 直接上传
-        if mode == ModeType::Server || is_online {
-            let response: serde_json::Value = bridge
-                .upload_file("/api/image/upload", file_path)
-                .await
-                .map_err(|e| ImageCacheError::Upload(e.to_string()))?;
-
-            let remote_url = response["data"]["url"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
-
-            // 如果是 Client 模式，将上传的图片也缓存到本地
-            if mode == ModeType::Client {
-                let filename = Self::extract_filename(&remote_url);
-                let local_path = self.images_dir.join(&filename);
-                tokio::fs::copy(file_path, &local_path).await?;
-
-                let mut index = self.index.write().await;
-                let metadata = tokio::fs::metadata(&local_path).await?;
-                index.entries.insert(remote_url.clone(), CacheEntry {
-                    local_filename: filename.clone(),
-                    size_bytes: metadata.len(),
-                    cached_at: Self::now(),
-                });
-                drop(index);
-                self.save_index().await?;
-
-                return Ok(ImageUploadResult {
-                    local_path: local_path.to_string_lossy().to_string(),
-                    remote_url: Some(remote_url),
-                    is_pending: false,
-                });
-            }
-
-            Ok(ImageUploadResult {
-                local_path: file_path.to_string_lossy().to_string(),
-                remote_url: Some(remote_url),
-                is_pending: false,
-            })
-        } else {
-            // Client 离线: 缓存到本地，加入上传队列
-            let id = uuid::Uuid::new_v4().to_string();
-            let filename = format!("{}.jpg", id);
-            let local_path = self.images_dir.join(&filename);
-
-            tokio::fs::copy(file_path, &local_path).await?;
-
-            let pending = PendingUpload {
-                id: id.clone(),
-                local_path: local_path.clone(),
-                original_filename: file_path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("image.jpg")
-                    .to_string(),
-                created_at: Self::now(),
-                retry_count: 0,
-                last_error: None,
-                status: UploadStatus::Pending,
-            };
-
-            {
-                let mut queue = self.queue.write().await;
-                queue.pending.push(pending);
-            }
-            self.save_queue().await?;
-
-            Ok(ImageUploadResult {
-                local_path: local_path.to_string_lossy().to_string(),
-                remote_url: None,
-                is_pending: true,
-            })
+    ) -> Result<PrefetchResult, ImageCacheError> {
+        // Server 模式不需要预加载
+        if bridge.current_mode().await == ModeType::Server {
+            return Ok(PrefetchResult {
+                success_count: 0,
+                failed_count: 0,
+                already_cached: hashes.len() as u32,
+            });
         }
-    }
 
-    /// 同步待上传队列
-    pub async fn sync_pending_uploads(
-        &self,
-        bridge: &ClientBridge,
-    ) -> Result<SyncResult, ImageCacheError> {
-        let mut success_count = 0u32;
-        let mut failed_count = 0u32;
+        let mut success = 0u32;
+        let mut failed = 0u32;
+        let mut already_cached = 0u32;
 
-        loop {
-            // 获取下一个待上传项
-            let pending = {
-                let mut queue = self.queue.write().await;
-                queue.pending.iter_mut()
-                    .find(|p| matches!(p.status, UploadStatus::Pending))
-                    .map(|p| {
-                        p.status = UploadStatus::Uploading;
-                        p.clone()
-                    })
-            };
+        // 并发下载 (限制并发数)
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(4));
+        let mut handles = Vec::new();
 
-            let Some(mut item) = pending else {
-                break;
-            };
+        for hash in hashes {
+            let permit = semaphore.clone().acquire_owned().await.unwrap();
+            let hash = hash.clone();
+            let images_dir = self.images_dir.clone();
+            let bridge = bridge.clone();
 
-            // 尝试上传
-            match bridge.upload_file("/api/image/upload", &item.local_path).await {
-                Ok(response) => {
-                    let remote_url = response["data"]["url"]
-                        .as_str()
-                        .unwrap_or_default()
-                        .to_string();
+            handles.push(tokio::spawn(async move {
+                let _permit = permit;
+                let local_path = images_dir.join(format!("{}.jpg", hash));
 
-                    // 更新缓存索引
-                    {
-                        let mut index = self.index.write().await;
-                        let metadata = tokio::fs::metadata(&item.local_path).await?;
-                        index.entries.insert(remote_url.clone(), CacheEntry {
-                            local_filename: item.local_path
-                                .file_name()
-                                .and_then(|n| n.to_str())
-                                .unwrap_or_default()
-                                .to_string(),
-                            size_bytes: metadata.len(),
-                            cached_at: Self::now(),
-                        });
-                    }
-
-                    // 从队列移除
-                    {
-                        let mut queue = self.queue.write().await;
-                        queue.pending.retain(|p| p.id != item.id);
-                    }
-
-                    success_count += 1;
+                if local_path.exists() {
+                    return (hash, Ok(true)); // already cached
                 }
-                Err(e) => {
-                    item.retry_count += 1;
-                    item.last_error = Some(e.to_string());
-                    item.status = if item.retry_count >= 3 {
-                        UploadStatus::Failed
-                    } else {
-                        UploadStatus::Pending
-                    };
 
-                    // 更新队列
-                    {
-                        let mut queue = self.queue.write().await;
-                        if let Some(p) = queue.pending.iter_mut().find(|p| p.id == item.id) {
-                            *p = item;
+                let url = format!("/api/image/{}.jpg", hash);
+                match bridge.get_bytes(&url).await {
+                    Ok(bytes) => {
+                        match tokio::fs::write(&local_path, &bytes).await {
+                            Ok(_) => (hash, Ok(false)), // success
+                            Err(e) => (hash, Err(e.to_string())),
                         }
                     }
-
-                    if matches!(item.status, UploadStatus::Failed) {
-                        failed_count += 1;
-                    }
+                    Err(e) => (hash, Err(e.to_string())),
                 }
-            }
-
-            self.save_queue().await?;
+            }));
         }
 
-        let pending_count = {
-            let queue = self.queue.read().await;
-            queue.pending.iter()
-                .filter(|p| matches!(p.status, UploadStatus::Pending))
-                .count() as u32
-        };
+        for handle in handles {
+            match handle.await {
+                Ok((_, Ok(true))) => already_cached += 1,
+                Ok((_, Ok(false))) => success += 1,
+                Ok((_, Err(_))) => failed += 1,
+                Err(_) => failed += 1,
+            }
+        }
 
-        Ok(SyncResult {
-            success_count,
-            failed_count,
-            pending_count,
+        Ok(PrefetchResult {
+            success_count: success,
+            failed_count: failed,
+            already_cached,
         })
     }
 
-    // ============ 辅助方法 ============
-
-    fn extract_filename(url: &str) -> String {
-        url.trim_start_matches("/api/image/")
-            .to_string()
-    }
-
-    fn now() -> u64 {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-    }
-
-    async fn save_index(&self) -> Result<(), ImageCacheError> {
-        let index = self.index.read().await;
-        let content = serde_json::to_string_pretty(&*index)?;
-        tokio::fs::write(&self.index_path, content).await?;
-        Ok(())
-    }
-
-    async fn save_queue(&self) -> Result<(), ImageCacheError> {
-        let queue = self.queue.read().await;
-        let content = serde_json::to_string_pretty(&*queue)?;
-        tokio::fs::write(&self.queue_path, content).await?;
-        Ok(())
-    }
-
-    fn load_index(path: &Path) -> Result<CacheIndex, ImageCacheError> {
-        if path.exists() {
-            let content = std::fs::read_to_string(path)?;
-            Ok(serde_json::from_str(&content)?)
-        } else {
-            Ok(CacheIndex::default())
+    /// 清理不再引用的缓存图片
+    pub async fn cleanup_cache(
+        &self,
+        active_hashes: &[String],
+        bridge: &ClientBridge,
+    ) -> Result<CacheCleanupResult, ImageCacheError> {
+        // Server 模式不需要清理
+        if bridge.current_mode().await == ModeType::Server {
+            return Ok(CacheCleanupResult {
+                removed_count: 0,
+                freed_bytes: 0,
+            });
         }
-    }
 
-    fn load_queue(path: &Path) -> Result<UploadQueue, ImageCacheError> {
-        if path.exists() {
-            let content = std::fs::read_to_string(path)?;
-            Ok(serde_json::from_str(&content)?)
-        } else {
-            Ok(UploadQueue::default())
+        let active_set: std::collections::HashSet<_> = active_hashes.iter().collect();
+        let mut removed_count = 0u32;
+        let mut freed_bytes = 0u64;
+
+        let mut entries = tokio::fs::read_dir(&self.images_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let filename = entry.file_name().to_string_lossy().to_string();
+            if let Some(hash) = filename.strip_suffix(".jpg") {
+                if !active_set.contains(&hash.to_string()) {
+                    let metadata = entry.metadata().await?;
+                    freed_bytes += metadata.len();
+                    tokio::fs::remove_file(entry.path()).await?;
+                    removed_count += 1;
+                }
+            }
         }
+
+        Ok(CacheCleanupResult {
+            removed_count,
+            freed_bytes,
+        })
     }
 }
 ```
@@ -546,8 +422,6 @@ impl ImageCacheService {
 ### ClientBridge 新增方法
 
 ```rust
-// 在 src-tauri/src/core/client_bridge.rs 中新增
-
 impl ClientBridge {
     /// 获取原始字节数据 (图片下载)
     pub async fn get_bytes(&self, path: &str) -> Result<Vec<u8>, BridgeError> {
@@ -556,16 +430,13 @@ impl ClientBridge {
         match &*mode_guard {
             ClientMode::Server { server_state, .. } => {
                 // Server 模式: 直接读取本地文件
-                // path: "/api/image/abc.jpg" -> {work_dir}/uploads/images/abc.jpg
                 let filename = path.trim_start_matches("/api/image/");
                 let file_path = server_state
                     .work_dir()
                     .join("uploads/images")
                     .join(filename);
 
-                tokio::fs::read(&file_path)
-                    .await
-                    .map_err(BridgeError::Io)
+                tokio::fs::read(&file_path).await.map_err(BridgeError::Io)
             }
 
             ClientMode::Client { client, edge_url, .. } => {
@@ -577,93 +448,27 @@ impl ClientBridge {
                 }.ok_or(BridgeError::NotInitialized)?;
 
                 let url = format!("{}{}", edge_url, path);
-                let resp = http
-                    .get(&url)
-                    .send()
-                    .await
-                    .map_err(|e| BridgeError::Server(e.to_string()))?;
+                let resp = http.get(&url).send().await?;
 
                 if !resp.status().is_success() {
                     return Err(BridgeError::Server(format!("HTTP {}", resp.status())));
                 }
 
-                let bytes = resp
-                    .bytes()
-                    .await
-                    .map_err(|e| BridgeError::Server(e.to_string()))?;
-
-                Ok(bytes.to_vec())
+                Ok(resp.bytes().await?.to_vec())
             }
 
             ClientMode::Disconnected => Err(BridgeError::NotInitialized),
         }
     }
 
-    /// 上传文件 (multipart/form-data)
-    pub async fn upload_file(
-        &self,
-        path: &str,
-        file_path: &Path,
-    ) -> Result<serde_json::Value, BridgeError> {
+    /// 获取 Server 模式的工作目录
+    pub async fn get_server_work_dir(&self) -> Result<PathBuf, BridgeError> {
         let mode_guard = self.mode.read().await;
-
         match &*mode_guard {
-            ClientMode::Server { client, .. } => {
-                match client {
-                    Some(LocalClientState::Authenticated(auth)) => {
-                        auth.upload_file(path, file_path)
-                            .await
-                            .map_err(BridgeError::Client)
-                    }
-                    _ => Err(BridgeError::NotAuthenticated),
-                }
+            ClientMode::Server { server_state, .. } => {
+                Ok(server_state.work_dir().clone())
             }
-
-            ClientMode::Client { client, edge_url, .. } => {
-                let (http, token) = match client {
-                    Some(RemoteClientState::Authenticated(c)) => {
-                        (c.edge_http_client(), c.token())
-                    }
-                    _ => return Err(BridgeError::NotAuthenticated),
-                };
-
-                let http = http.ok_or(BridgeError::NotInitialized)?;
-                let token = token.ok_or(BridgeError::NotAuthenticated)?;
-
-                let file_bytes = tokio::fs::read(file_path)
-                    .await
-                    .map_err(BridgeError::Io)?;
-
-                let filename = file_path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("image.jpg")
-                    .to_string();
-
-                let part = reqwest::multipart::Part::bytes(file_bytes)
-                    .file_name(filename);
-                let form = reqwest::multipart::Form::new().part("file", part);
-
-                let url = format!("{}{}", edge_url, path);
-                let resp = http
-                    .post(&url)
-                    .header("Authorization", format!("Bearer {}", token))
-                    .multipart(form)
-                    .send()
-                    .await
-                    .map_err(|e| BridgeError::Server(e.to_string()))?;
-
-                if !resp.status().is_success() {
-                    let text = resp.text().await.unwrap_or_default();
-                    return Err(BridgeError::Server(text));
-                }
-
-                resp.json()
-                    .await
-                    .map_err(|e| BridgeError::Server(e.to_string()))
-            }
-
-            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
+            _ => Err(BridgeError::NotInitialized),
         }
     }
 
@@ -677,33 +482,9 @@ impl ClientBridge {
         }
     }
 
-    /// 检查网络是否可用 (Client 模式健康检查)
+    /// 检查网络是否可用
     pub async fn is_network_available(&self) -> bool {
-        let mode_guard = self.mode.read().await;
-
-        match &*mode_guard {
-            ClientMode::Server { .. } => true,
-            ClientMode::Client { client, edge_url, .. } => {
-                let http = match client {
-                    Some(RemoteClientState::Connected(c)) => c.edge_http_client(),
-                    Some(RemoteClientState::Authenticated(c)) => c.edge_http_client(),
-                    None => return false,
-                };
-
-                let Some(http) = http else { return false };
-
-                match http
-                    .get(format!("{}/health", edge_url))
-                    .timeout(std::time::Duration::from_secs(2))
-                    .send()
-                    .await
-                {
-                    Ok(resp) => resp.status().is_success(),
-                    Err(_) => false,
-                }
-            }
-            ClientMode::Disconnected => false,
-        }
+        // ... 健康检查实现
     }
 }
 ```
@@ -713,55 +494,45 @@ impl ClientBridge {
 ```rust
 // src-tauri/src/commands/image.rs
 
-use std::sync::Arc;
-use tauri::State;
-use tokio::sync::RwLock;
-
-use crate::core::client_bridge::ClientBridge;
-use crate::core::image_cache::{ImageCacheService, ImageUploadResult, SyncResult};
-
 /// 获取图片本地路径
 #[tauri::command]
 pub async fn get_image_path(
-    url: String,
+    hash: String,
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     image_cache: State<'_, Arc<ImageCacheService>>,
 ) -> Result<String, String> {
     let bridge = bridge.read().await;
-
     image_cache
-        .get_image_path(&url, &bridge)
+        .get_image_path(&hash, &bridge)
         .await
         .map(|p| p.to_string_lossy().to_string())
         .map_err(|e| e.to_string())
 }
 
-/// 上传图片
+/// 批量预加载图片
 #[tauri::command]
-pub async fn upload_image(
-    file_path: String,
+pub async fn prefetch_images(
+    hashes: Vec<String>,
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     image_cache: State<'_, Arc<ImageCacheService>>,
-) -> Result<ImageUploadResult, String> {
+) -> Result<PrefetchResult, String> {
     let bridge = bridge.read().await;
-    let path = std::path::PathBuf::from(&file_path);
-
     image_cache
-        .upload_image(&path, &bridge)
+        .prefetch_images(&hashes, &bridge)
         .await
         .map_err(|e| e.to_string())
 }
 
-/// 同步待上传的图片
+/// 清理不再引用的缓存图片
 #[tauri::command]
-pub async fn sync_image_uploads(
+pub async fn cleanup_image_cache(
+    active_hashes: Vec<String>,
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     image_cache: State<'_, Arc<ImageCacheService>>,
-) -> Result<SyncResult, String> {
+) -> Result<CacheCleanupResult, String> {
     let bridge = bridge.read().await;
-
     image_cache
-        .sync_pending_uploads(&bridge)
+        .cleanup_cache(&active_hashes, &bridge)
         .await
         .map_err(|e| e.to_string())
 }
@@ -781,78 +552,75 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import DefaultImage from '@/assets/reshot.svg';
 
 /**
- * 获取图片 URL（统一入口）
- * 自动处理 Server/Client 模式和缓存
+ * 获取图片 URL
+ * @param hash 图片 hash (从数据库读取)
  */
-export async function getImageUrl(remoteUrl: string | null | undefined): Promise<string> {
-  if (!remoteUrl) {
+export async function getImageUrl(hash: string | null | undefined): Promise<string> {
+  if (!hash) {
     return DefaultImage;
-  }
-
-  // 外部图片直接返回
-  if (/^https?:\/\//.test(remoteUrl)) {
-    return remoteUrl;
   }
 
   try {
-    const localPath = await invoke<string>('get_image_path', { url: remoteUrl });
+    const localPath = await invoke<string>('get_image_path', { hash });
     return convertFileSrc(localPath);
   } catch (error) {
-    console.error('Failed to get image:', remoteUrl, error);
+    console.error('Failed to get image:', hash, error);
     return DefaultImage;
   }
+}
+
+/**
+ * 批量预加载图片
+ */
+export async function prefetchImages(hashes: string[]): Promise<PrefetchResult> {
+  const validHashes = hashes.filter(Boolean);
+  if (validHashes.length === 0) {
+    return { success_count: 0, failed_count: 0, already_cached: 0 };
+  }
+  return invoke<PrefetchResult>('prefetch_images', { hashes: validHashes });
 }
 
 /**
  * 上传图片
  */
-export interface ImageUploadResult {
-  local_path: string;
-  remote_url: string | null;
-  is_pending: boolean;
-}
-
 export async function uploadImage(filePath: string): Promise<ImageUploadResult> {
   return invoke<ImageUploadResult>('upload_image', { filePath });
 }
+```
 
-/**
- * 同步待上传图片
- */
-export interface SyncResult {
-  success_count: number;
-  failed_count: number;
-  pending_count: number;
-}
+### React Hook
 
-export async function syncImageUploads(): Promise<SyncResult> {
-  return invoke<SyncResult>('sync_image_uploads');
+```typescript
+// src/hooks/useImageUrl.ts
+
+import { useState, useEffect } from 'react';
+import { getImageUrl } from '@/utils/image';
+import DefaultImage from '@/assets/reshot.svg';
+
+export function useImageUrl(hash: string | null | undefined) {
+  const [src, setSrc] = useState(DefaultImage);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!hash) {
+      setSrc(DefaultImage);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    getImageUrl(hash)
+      .then(setSrc)
+      .finally(() => setLoading(false));
+  }, [hash]);
+
+  return { src, loading };
 }
 ```
 
 ### 组件使用
 
 ```tsx
-// 使用 hook 封装
-import { useState, useEffect } from 'react';
-import { getImageUrl } from '@/utils/image';
-import DefaultImage from '@/assets/reshot.svg';
-
-export function useImageUrl(remoteUrl: string | null | undefined) {
-  const [src, setSrc] = useState(DefaultImage);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    getImageUrl(remoteUrl)
-      .then(setSrc)
-      .finally(() => setLoading(false));
-  }, [remoteUrl]);
-
-  return { src, loading };
-}
-
-// 组件使用
 function ProductCard({ product }: { product: Product }) {
   const { src, loading } = useImageUrl(product.image);
 
@@ -869,23 +637,55 @@ function ProductCard({ product }: { product: Product }) {
 }
 ```
 
+### 预加载优化
+
+```tsx
+// 获取产品列表后预加载图片
+function ProductList() {
+  const { products } = useProducts();
+
+  useEffect(() => {
+    if (products.length > 0) {
+      const hashes = products.map(p => p.image).filter(Boolean);
+      prefetchImages(hashes);
+    }
+  }, [products]);
+
+  return (
+    <div className="product-grid">
+      {products.map(p => <ProductCard key={p.id} product={p} />)}
+    </div>
+  );
+}
+```
+
 ---
 
-## 同步策略
+## 存储位置对比
 
-### 上传队列同步时机
+| 模式 | 图片位置 | 份数 | 说明 |
+|------|---------|------|------|
+| Server | `{work_dir}/uploads/images/{hash}.jpg` | 1 份 | EdgeServer 原有存储 |
+| Client | `{tenant}/image_cache/images/{hash}.jpg` | 1 份 | 本地缓存 |
 
-| 触发点 | 实现方式 |
-|--------|---------|
-| App 启动 | `lib.rs` setup 时调用 `sync_image_uploads` |
-| 网络恢复 | 监听网络状态变化事件 |
-| 手动触发 | 设置页面提供同步按钮 |
+**Server 模式不重复存储** - 直接返回 EdgeServer 的图片路径。
 
-### 重试策略
+---
 
-- 最大重试次数：3 次
-- 超过重试次数：标记为 `Failed`，需手动处理
-- 失败项不阻塞其他上传
+## 实现步骤
+
+1. **修改 EdgeServer** - 上传时用 hash 作为文件名（替代 UUID）
+2. **创建 `image_cache.rs`** - 实现 `ImageCacheService`
+3. **修改 `client_bridge.rs`** - 添加 `get_bytes`、`get_server_work_dir`、`current_mode`
+4. **创建 `commands/image.rs`** - 实现 Tauri commands (`get_image_path`, `prefetch_images`, `cleanup_image_cache`)
+5. **修改 `lib.rs`** - 注册 commands，初始化 `ImageCacheService`
+6. **创建前端工具**:
+   - `src/utils/image/indexedDBCache.ts` - IndexedDB 缓存操作
+   - `src/utils/image/index.ts` - `getImageUrl()` 函数
+   - `src/hooks/useImageUrl.ts` - React hook
+7. **创建连接恢复 hook** - `src/core/hooks/useConnectionRecovery.ts`
+8. **更新现有组件** - 使用新的图片加载方式
+9. **更新数据库** - Product.image 存储 hash（如需迁移）
 
 ---
 
@@ -893,19 +693,416 @@ function ProductCard({ product }: { product: Product }) {
 
 | 情况 | 处理方式 |
 |------|---------|
-| 索引有记录但文件被删除 | 重新下载并更新索引 |
+| Client 模式图片未缓存 | `get_image_path` 自动下载 |
 | 网络不可用 + 无缓存 | 返回错误，前端显示默认图片 |
-| 图片 URL 变更（极少） | 新 URL 视为新图片，下载新文件 |
-| 磁盘空间不足 | 上传/下载时返回 IO 错误 |
+| 离线上传后网络恢复 | `sync_image_uploads` 同步到服务器 |
+| 相同图片重复上传 | hash 相同，自动去重 |
 
 ---
 
-## 实现步骤
+## 多端同步问题分析
 
-1. **创建 `image_cache.rs`** - 实现 `ImageCacheService`
-2. **修改 `client_bridge.rs`** - 添加 `get_bytes`、`upload_file`、`current_mode`、`is_network_available` 方法
-3. **创建 `commands/image.rs`** - 实现 Tauri commands
-4. **修改 `lib.rs`** - 注册 commands，初始化 `ImageCacheService`
-5. **创建 `src/utils/image.ts`** - 前端工具函数
-6. **创建 `useImageUrl` hook** - 封装图片加载逻辑
-7. **更新现有组件** - 使用新的图片加载方式
+### 场景 1：Sync 事件丢失
+
+```
+时间线:
+  T1: Client 在线，Product.image = "abc123"
+  T2: Client 离线
+  T3: Server 更新 Product.image = "def456" (Sync 事件发出)
+  T4: Client 重新上线 (错过了 Sync 事件)
+```
+
+**问题：** Client 仍然显示旧图片 "abc123"
+
+**解决方案：** 重连时强制刷新产品数据
+
+```typescript
+// src/core/hooks/useConnectionRecovery.ts
+export function useConnectionRecovery() {
+  const { connectionState, prevState } = useBridgeStore();
+
+  useEffect(() => {
+    // 检测从离线恢复到在线
+    if (connectionState === 'connected' && prevState === 'disconnected') {
+      // 强制刷新所有资源
+      useProductStore.getState().fetchAll();
+      // ... 其他 stores
+    }
+  }, [connectionState, prevState]);
+}
+```
+
+### 场景 2：IndexedDB 缓存与服务器数据不一致
+
+```
+时间线:
+  T1: Client 加载 Product.image = "abc123"，缓存到 IndexedDB
+  T2: Server 更新 Product.image = "def456"
+  T3: Client 收到 Sync，产品数据更新为 image = "def456"
+  T4: 前端用 "def456" 调用 getImageUrl()
+```
+
+**这不是问题！**
+
+- 因为 hash 是内容寻址的
+- "abc123" 在 IndexedDB 里仍然是正确的（那就是 abc123 的内容）
+- "def456" 是新的 hash，IndexedDB 没有 → 会下载新图片
+- 两个缓存各自正确，互不影响
+
+### 场景 3：缓存清理导致 IndexedDB 与磁盘不一致
+
+```
+清理时序:
+  1. cleanup_image_cache() 删除磁盘上的 "abc123.jpg"
+  2. IndexedDB 还有 "abc123" 的 base64
+  3. 下次 getImageUrl("abc123") 命中 IndexedDB，返回正确图片 ✓
+```
+
+**这不是问题！** IndexedDB 有缓存就用，没有才走磁盘/网络。
+
+### 场景 4：多 Client 上传相同图片
+
+```
+  Client A 上传 photo.jpg → hash = "xyz789"
+  Client B 上传 photo.jpg → hash = "xyz789" (相同内容)
+```
+
+**自然去重！** 相同内容 = 相同 hash，EdgeServer 检测到已存在，直接返回。
+
+### 结论
+
+使用 **content hash** 作为 key 的设计天然解决了大部分同步问题：
+
+| 问题 | 是否存在 | 原因 |
+|------|---------|------|
+| 缓存显示错误图片 | ❌ 不存在 | 同一 hash 内容永远相同 |
+| 数据与图片不一致 | ❌ 不存在 | 数据变化 = hash 变化 = 重新加载 |
+| Sync 丢失 | ✅ 存在 | 需要重连时强制刷新 |
+| 多端上传冲突 | ❌ 不存在 | 相同内容 = 相同 hash |
+
+**唯一需要处理的是：Sync 事件丢失后的数据恢复。**
+
+---
+
+## 前端 IndexedDB 缓存层
+
+### 为什么需要双层缓存？
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    前端 (React)                              │
+│    ┌─────────────────────────────────────────────────┐      │
+│    │              IndexedDB 缓存                      │      │
+│    │    hash -> base64 (内存快速访问)                 │      │
+│    └──────────────────────┬──────────────────────────┘      │
+│                           │ cache miss                       │
+│                           ▼                                  │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────┐
+│                    后端 (Tauri/Rust)                         │
+│    ┌─────────────────────────────────────────────────┐      │
+│    │              文件系统缓存                         │      │
+│    │    hash.jpg (磁盘持久化)                         │      │
+│    └─────────────────────────────────────────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**优点：**
+1. ✅ IndexedDB 访问比 `invoke()` 调用快得多（无 IPC 开销）
+2. ✅ 减少文件系统 I/O
+3. ✅ 适合频繁显示的图片（如产品列表）
+
+### IndexedDB 存储结构
+
+```typescript
+// 数据库名: red_coral_image_cache
+// Store名: images
+
+interface CachedImage {
+  hash: string;        // 主键
+  data: string;        // base64 数据
+  cachedAt: number;    // 缓存时间戳
+}
+```
+
+### 图片加载流程（含 IndexedDB）
+
+```
+getImageUrl(hash)
+       │
+       ▼
+检查 IndexedDB
+       │
+       ├── 命中 → 返回 base64 data URL
+       │
+       └── 未命中 → 调用 invoke('get_image_path')
+             │
+             ▼
+       后端返回本地路径
+             │
+             ▼
+       convertFileSrc() → 显示图片
+             │
+             ▼
+       读取文件为 base64 → 存入 IndexedDB
+```
+
+### IndexedDB 实现
+
+```typescript
+// src/utils/image/indexedDBCache.ts
+
+const DB_NAME = 'red_coral_image_cache';
+const DB_VERSION = 1;
+const STORE_NAME = 'images';
+
+let dbPromise: Promise<IDBDatabase> | null = null;
+
+function openDB(): Promise<IDBDatabase> {
+  if (dbPromise) return dbPromise;
+
+  dbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'hash' });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+
+  return dbPromise;
+}
+
+export async function getCachedImage(hash: string): Promise<string | null> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.get(hash);
+
+    request.onsuccess = () => {
+      const result = request.result as CachedImage | undefined;
+      resolve(result?.data ?? null);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function setCachedImage(hash: string, data: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.put({
+      hash,
+      data,
+      cachedAt: Date.now(),
+    });
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteCachedImage(hash: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.delete(hash);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function clearAllCachedImages(): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.clear();
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+```
+
+### 更新后的 getImageUrl
+
+```typescript
+// src/utils/image/index.ts
+
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { getCachedImage, setCachedImage } from './indexedDBCache';
+import DefaultImage from '@/assets/reshot.svg';
+
+export async function getImageUrl(hash: string | null | undefined): Promise<string> {
+  if (!hash) {
+    return DefaultImage;
+  }
+
+  try {
+    // 1. 先查 IndexedDB
+    const cached = await getCachedImage(hash);
+    if (cached) {
+      return cached; // data:image/jpeg;base64,...
+    }
+
+    // 2. 调用后端获取本地路径
+    const localPath = await invoke<string>('get_image_path', { hash });
+    const fileUrl = convertFileSrc(localPath);
+
+    // 3. 后台加载并缓存到 IndexedDB（不阻塞返回）
+    cacheImageToIndexedDB(hash, fileUrl);
+
+    return fileUrl;
+  } catch (error) {
+    console.error('Failed to get image:', hash, error);
+    return DefaultImage;
+  }
+}
+
+// 后台缓存（不阻塞）
+async function cacheImageToIndexedDB(hash: string, url: string) {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const reader = new FileReader();
+
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
+      await setCachedImage(hash, base64);
+    };
+
+    reader.readAsDataURL(blob);
+  } catch (e) {
+    console.warn('Failed to cache image to IndexedDB:', hash, e);
+  }
+}
+```
+
+---
+
+## 图片同步与缓存失效
+
+### 问题：如何知道图片已更新？
+
+由于使用 **content hash 作为文件名**，同一个 hash 的内容永远不会变：
+
+- **Product A 图片 hash = "abc123"**
+- **更新 Product A 图片** → 新 hash = "def456"
+- **数据库中 Product A 的 image 字段变为 "def456"**
+
+所以：
+1. ✅ 旧 hash "abc123" 的缓存仍然有效（内容未变）
+2. ✅ 新 hash "def456" 会触发新的下载
+3. ✅ **不需要主动失效缓存**，只需用新 hash 加载
+
+### 处理 Sync 事件
+
+```typescript
+// src/core/hooks/useSyncListener.ts
+
+import { listen } from '@tauri-apps/api/event';
+import { useProductStore } from '@/core/stores/resources/useProductStore';
+
+export function useSyncListener() {
+  useEffect(() => {
+    const unlisten = listen('sync', (event) => {
+      const { table, data } = event.payload as SyncPayload;
+
+      if (table === 'products') {
+        // 重新获取产品列表
+        // 新的 image hash 会自动触发新图片加载
+        useProductStore.getState().fetchAll();
+      }
+    });
+
+    return () => { unlisten.then(fn => fn()); };
+  }, []);
+}
+```
+
+### 处理 Sync 事件丢失
+
+参见上方「多端同步问题分析 - 场景 1」的解决方案。
+
+**核心思路：** 重连时触发全量数据刷新，新的 hash 自然会触发新图片加载。
+
+---
+
+## 缓存清理策略
+
+### IndexedDB 缓存清理
+
+由于 hash 是内容寻址的，旧图片可能不再被引用：
+
+```typescript
+// src/utils/image/cacheCleanup.ts
+
+export async function cleanupUnusedImages(activeHashes: string[]) {
+  const db = await openDB();
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  const store = tx.objectStore(STORE_NAME);
+
+  // 获取所有缓存的 hash
+  const allKeys = await new Promise<string[]>((resolve, reject) => {
+    const request = store.getAllKeys();
+    request.onsuccess = () => resolve(request.result as string[]);
+    request.onerror = () => reject(request.error);
+  });
+
+  // 删除不在 activeHashes 中的缓存
+  const activeSet = new Set(activeHashes);
+  for (const key of allKeys) {
+    if (!activeSet.has(key)) {
+      store.delete(key);
+    }
+  }
+}
+
+// 使用示例：在产品列表加载后清理
+async function onProductsLoaded(products: Product[]) {
+  const activeHashes = products.map(p => p.image).filter(Boolean);
+  await cleanupUnusedImages(activeHashes);
+}
+```
+
+### 后端文件缓存清理
+
+Client 模式的 `image_cache/images/` 目录可以定期清理：
+
+```rust
+// 保留最近 30 天使用的图片
+impl ImageCacheService {
+    pub async fn cleanup_old_cache(&self, max_age_days: u32) -> Result<u32, ImageCacheError> {
+        let cutoff = SystemTime::now()
+            .duration_since(UNIX_EPOCH)?
+            .as_secs()
+            - (max_age_days as u64 * 24 * 60 * 60);
+
+        let mut removed = 0;
+        let mut entries = tokio::fs::read_dir(&self.images_dir).await?;
+
+        while let Some(entry) = entries.next_entry().await? {
+            let metadata = entry.metadata().await?;
+            if let Ok(accessed) = metadata.accessed() {
+                let accessed_ts = accessed.duration_since(UNIX_EPOCH)?.as_secs();
+                if accessed_ts < cutoff {
+                    tokio::fs::remove_file(entry.path()).await?;
+                    removed += 1;
+                }
+            }
+        }
+
+        Ok(removed)
+    }
+}

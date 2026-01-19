@@ -10,8 +10,8 @@ use crab_cert::{CaProfile, CertMetadata, CertProfile, CertificateAuthority};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use shared::activation::{
-    ActivationData, ActivationResponse, EntityType, PlanType, SignedBinding,
-    SubscriptionInfo, SubscriptionStatus,
+    ActivationData, ActivationResponse, EntityType, PlanType, SignedBinding, SubscriptionInfo,
+    SubscriptionStatus,
 };
 use std::sync::Arc;
 
@@ -208,7 +208,8 @@ async fn issue_cert(
         credential_expires_at,
         req.device_id.as_deref().unwrap_or("")
     );
-    let credential_signature = match crab_cert::sign(&tenant_ca.key_pem(), signable_data.as_bytes()) {
+    let credential_signature = match crab_cert::sign(&tenant_ca.key_pem(), signable_data.as_bytes())
+    {
         Ok(sig) => {
             use base64::Engine;
             Some(base64::engine::general_purpose::STANDARD.encode(&sig))
@@ -562,7 +563,7 @@ async fn refresh_binding(
     };
 
     // 2. Verify the current binding signature (防止伪造请求)
-    if let Err(e) = req.binding.verify_signature(&tenant_ca.cert_pem()) {
+    if let Err(e) = req.binding.verify_signature(tenant_ca.cert_pem()) {
         return Json(serde_json::json!({
             "success": false,
             "error": format!("Invalid binding signature: {}", e)

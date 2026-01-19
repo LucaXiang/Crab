@@ -51,6 +51,7 @@
     "src-tauri/target",
     "src-tauri/gen",
     "src-tauri/icons",
-    "escpos-rs"
+    "escpos-rs",
+    "i18n-tools"
   ]
 }

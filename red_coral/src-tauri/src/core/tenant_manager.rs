@@ -484,4 +484,47 @@ impl TenantManager {
     pub fn client_name(&self) -> &str {
         &self.client_name
     }
+
+    // ============ 当前活动会话持久化 ============
+
+    /// 保存当前活动会话到磁盘
+    pub fn save_current_session(&self, session: &EmployeeSession) -> Result<(), TenantError> {
+        let tenant_id = self.current_tenant.as_ref()
+            .ok_or(TenantError::NoTenantSelected)?;
+
+        let cache = self.session_caches.get(tenant_id)
+            .ok_or_else(|| TenantError::NotFound(tenant_id.clone()))?;
+
+        cache.save_current_session(session)
+            .map_err(TenantError::SessionCache)
+    }
+
+    /// 加载缓存的当前活动会话
+    pub fn load_current_session(&self) -> Result<Option<EmployeeSession>, TenantError> {
+        let tenant_id = self.current_tenant.as_ref()
+            .ok_or(TenantError::NoTenantSelected)?;
+
+        let cache = self.session_caches.get(tenant_id)
+            .ok_or_else(|| TenantError::NotFound(tenant_id.clone()))?;
+
+        cache.load_current_session()
+            .map_err(TenantError::SessionCache)
+    }
+
+    /// 清除缓存的当前活动会话
+    pub fn clear_current_session(&self) -> Result<(), TenantError> {
+        if let Some(tenant_id) = &self.current_tenant {
+            if let Some(cache) = self.session_caches.get(tenant_id) {
+                cache.clear_current_session()
+                    .map_err(TenantError::SessionCache)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// 设置当前会话 (用于恢复登录状态)
+    pub fn set_current_session(&mut self, session: EmployeeSession) {
+        tracing::info!(username = %session.username, "Session restored from cache");
+        self.current_session = Some(session);
+    }
 }

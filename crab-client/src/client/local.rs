@@ -155,6 +155,46 @@ impl CrabClient<Local, Connected> {
         tracing::info!("Disconnected from local server.");
         self.transition()
     }
+
+    /// Restores an authenticated session from cached token.
+    ///
+    /// This allows restoring a previous login session without re-authenticating
+    /// with the server. Use this when the app restarts and has a cached token.
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - The cached JWT token
+    /// * `user` - The cached user information
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// # use crab_client::CrabClient;
+    /// # use shared::client::UserInfo;
+    /// # async fn example() -> Result<(), crab_client::ClientError> {
+    /// # let client: CrabClient<crab_client::Local, crab_client::Connected> = todo!();
+    /// let token = "cached_jwt_token".to_string();
+    /// let user = UserInfo { /* ... */ };
+    /// let client = client.restore_session(token, user).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn restore_session(
+        mut self,
+        token: String,
+        user: shared::client::UserInfo,
+    ) -> Result<CrabClient<Local, Authenticated>, ClientError> {
+        // Set token in oneshot client for subsequent requests
+        if let Some(ref http) = self.oneshot_http {
+            http.set_token(Some(token.clone())).await;
+        }
+
+        // Store session data
+        self.session.set_login(token, user.clone());
+
+        tracing::info!(username = %user.username, "Session restored from cache (local)");
+        Ok(self.transition())
+    }
 }
 
 // ============================================================================

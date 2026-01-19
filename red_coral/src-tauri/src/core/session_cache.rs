@@ -66,17 +66,9 @@ struct CachedEmployee {
 }
 
 /// 会话缓存文件结构
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 struct SessionCacheFile {
     employees: HashMap<String, CachedEmployee>,
-}
-
-impl Default for SessionCacheFile {
-    fn default() -> Self {
-        Self {
-            employees: HashMap::new(),
-        }
-    }
 }
 
 /// 员工会话缓存管理器
@@ -213,5 +205,73 @@ impl SessionCache {
     /// 获取缓存的员工列表
     pub fn list_employees(&self) -> Vec<String> {
         self.data.employees.keys().cloned().collect()
+    }
+
+    // ============ 当前活动会话持久化 ============
+
+    /// 保存当前活动会话 (用于刷新后恢复登录状态)
+    pub fn save_current_session(&self, session: &EmployeeSession) -> Result<(), SessionCacheError> {
+        let path = self.file_path.parent()
+            .map(|p| p.join("current_session.json"))
+            .ok_or_else(|| SessionCacheError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Invalid session cache path"
+            )))?;
+
+        let content = serde_json::to_string_pretty(session)?;
+        std::fs::write(&path, content)?;
+        tracing::debug!(username = %session.username, "Current session saved");
+        Ok(())
+    }
+
+    /// 加载当前活动会话
+    pub fn load_current_session(&self) -> Result<Option<EmployeeSession>, SessionCacheError> {
+        let path = self.file_path.parent()
+            .map(|p| p.join("current_session.json"))
+            .ok_or_else(|| SessionCacheError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Invalid session cache path"
+            )))?;
+
+        if !path.exists() {
+            return Ok(None);
+        }
+
+        let content = std::fs::read_to_string(&path)?;
+        let session: EmployeeSession = serde_json::from_str(&content)?;
+
+        // 检查 session 是否过期 (token expires_at)
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        if let Some(expires_at) = session.expires_at {
+            if now > expires_at {
+                // Token 过期，清除缓存
+                let _ = std::fs::remove_file(&path);
+                tracing::info!(username = %session.username, "Cached session expired, cleared");
+                return Ok(None);
+            }
+        }
+
+        tracing::info!(username = %session.username, "Loaded cached session");
+        Ok(Some(session))
+    }
+
+    /// 清除当前活动会话
+    pub fn clear_current_session(&self) -> Result<(), SessionCacheError> {
+        let path = self.file_path.parent()
+            .map(|p| p.join("current_session.json"))
+            .ok_or_else(|| SessionCacheError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Invalid session cache path"
+            )))?;
+
+        if path.exists() {
+            std::fs::remove_file(&path)?;
+            tracing::debug!("Current session cleared");
+        }
+        Ok(())
     }
 }

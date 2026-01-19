@@ -1,13 +1,13 @@
+use dashmap::DashMap;
+use shared::message::{BusMessage, SyncPayload};
 use std::path::PathBuf;
 use std::sync::Arc;
-use dashmap::DashMap;
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
-use shared::message::{BusMessage, SyncPayload};
 
 use crate::auth::JwtService;
-use crate::core::config::migrate_legacy_structure;
 use crate::core::Config;
+use crate::core::config::migrate_legacy_structure;
 use crate::db::DbService;
 use crate::services::{
     ActivationService, CertService, HttpsService, MessageBusService, ProvisioningService,
@@ -169,10 +169,8 @@ impl ServerState {
         let db = db_service.db;
 
         // 2. Initialize Services
-        let activation = ActivationService::new(
-            config.auth_server_url.clone(),
-            config.auth_storage_dir(),
-        );
+        let activation =
+            ActivationService::new(config.auth_server_url.clone(), config.auth_storage_dir());
         let cert_service = CertService::new(PathBuf::from(&config.work_dir));
         let message_bus = MessageBusService::new(config);
         let https = HttpsService::new(config.clone());

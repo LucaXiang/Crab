@@ -2,15 +2,17 @@
 //!
 //! Handles image uploads from authenticated users.
 //! Supports multiple image formats (PNG, JPEG, WebP) and converts to JPG.
+//!
+//! Uses content hash (SHA256) as filename for natural deduplication.
+//! Same content = same hash = same file (no duplicates).
 
 use axum::Json;
 use axum::extract::{Extension, Multipart, State};
 use image::DynamicImage;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::{fs, io::Cursor};
-use uuid::Uuid;
 
 use crate::audit_log;
 use crate::utils::AppResponse;
@@ -25,11 +27,17 @@ const SUPPORTED_FORMATS: &[&str] = &["png", "jpg", "jpeg", "webp"];
 /// Upload response
 #[derive(Debug, Serialize)]
 pub struct UploadResponse {
-    pub file_id: String,
+    /// Content hash (SHA256) - use this as the image identifier
+    pub hash: String,
+    /// Filename on disk ({hash}.jpg)
     pub filename: String,
+    /// Original filename from upload
     pub original_name: String,
+    /// File size in bytes
     pub size: usize,
+    /// Output format (always "jpg")
     pub format: String,
+    /// URL to access the image
     pub url: String,
 }
 
@@ -38,46 +46,6 @@ fn calculate_hash(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data);
     hex::encode(hasher.finalize())
-}
-
-/// Find existing file by content hash
-fn find_file_by_hash(images_dir: &Path, hash: &str) -> Option<String> {
-    let hash_dir = images_dir.join("by_hash");
-    if !hash_dir.exists() {
-        return None;
-    }
-
-    // Hash directory uses first 2 chars as subdir (e.g., "ab/abc123...")
-    let prefix = &hash[..2];
-    let hash_path = hash_dir.join(format!("{}/{}", prefix, hash));
-
-    if hash_path.exists() {
-        // Read the symlink to get original filename
-        if let Ok(target) = fs::read_link(&hash_path) {
-            return target.file_name().map(|s| s.to_string_lossy().to_string());
-        }
-    }
-    None
-}
-
-/// Create hash-based symlink for deduplication
-fn create_hash_symlink(images_dir: &Path, hash: &str, filename: &str) -> Result<(), AppError> {
-    let hash_dir = images_dir.join("by_hash");
-    fs::create_dir_all(&hash_dir)
-        .map_err(|e| AppError::internal(format!("Failed to create hash dir: {}", e)))?;
-
-    let prefix = &hash[..2];
-    let hash_subdir = hash_dir.join(prefix);
-    fs::create_dir_all(&hash_subdir)
-        .map_err(|e| AppError::internal(format!("Failed to create hash subdir: {}", e)))?;
-
-    let hash_path = hash_subdir.join(hash);
-    let target_path = PathBuf::from("../").join(filename);
-
-    symlink::symlink_auto(&target_path, &hash_path)
-        .map_err(|e| AppError::internal(format!("Failed to create symlink: {}", e)))?;
-
-    Ok(())
 }
 
 /// JPEG quality for dish images (85% - maintains color appeal while controlling file size)
@@ -139,6 +107,10 @@ fn validate_image(data: &[u8], ext: &str) -> Result<(), AppError> {
 }
 
 /// Upload image handler
+///
+/// Uses content hash as filename for natural deduplication:
+/// - Same content → same hash → same file (no duplicates)
+/// - Database stores the hash, not the full path
 pub async fn upload(
     State(state): State<ServerState>,
     Extension(_current_user): Extension<CurrentUser>,
@@ -176,7 +148,7 @@ pub async fn upload(
         AppError::validation("No 'file' field found. Field name must be 'file'".to_string())
     })?;
 
-    let filename = original_filename
+    let original_name = original_filename
         .ok_or_else(|| AppError::validation("No filename provided in file field".to_string()))?;
 
     // Check if data is empty
@@ -185,10 +157,12 @@ pub async fn upload(
     }
 
     // Extract file extension
-    let ext = PathBuf::from(&filename)
+    let ext = PathBuf::from(&original_name)
         .extension()
         .and_then(|ext| ext.to_str().map(|s| s.to_string()))
-        .ok_or_else(|| AppError::validation(format!("Invalid file extension for: {}", filename)))?;
+        .ok_or_else(|| {
+            AppError::validation(format!("Invalid file extension for: {}", original_name))
+        })?;
 
     // Validate image
     validate_image(&data, &ext)?;
@@ -196,70 +170,57 @@ pub async fn upload(
     // Process and compress image
     let (_original_img, compressed_data) = process_and_compress_image(data, ext)?;
 
-    // Calculate hash for deduplication
-    let file_hash = calculate_hash(&compressed_data);
+    // Calculate hash as filename (content-addressable storage)
+    let hash = calculate_hash(&compressed_data);
+    let filename = format!("{}.jpg", hash);
+    let file_path = images_dir.join(&filename);
 
-    // Check if file already exists by hash
-    if let Some(existing_filename) = find_file_by_hash(&images_dir, &file_hash) {
-        tracing::info!(
-            original_name = %filename,
-            existing_file = %existing_filename,
+    // Check if file already exists (natural deduplication)
+    if file_path.exists() {
+        tracing::debug!(
+            original_name = %original_name,
+            hash = %hash,
             "Duplicate image detected, returning existing file"
         );
 
-        let file_id = existing_filename
-            .strip_suffix(".jpg")
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| Uuid::new_v4().to_string());
-
-        let url = format!("/api/image/{}", existing_filename);
         let response = UploadResponse {
-            file_id,
-            filename: existing_filename,
-            original_name: filename,
+            hash: hash.clone(),
+            filename,
+            original_name,
             size: compressed_data.len(),
             format: "jpg".to_string(),
-            url,
+            url: format!("/api/image/{}.jpg", hash),
         };
 
         return Ok(crate::ok!(response));
     }
 
-    // Generate unique filename for new file
-    let file_id = Uuid::new_v4().to_string();
-    let new_filename = format!("{}.jpg", file_id);
-    let file_path = images_dir.join(&new_filename);
-
-    // Save compressed image
+    // Save compressed image with hash as filename
     fs::write(&file_path, &compressed_data)
         .map_err(|e| AppError::internal(format!("Failed to save file: {}", e)))?;
-
-    // Create hash-based symlink for deduplication
-    create_hash_symlink(&images_dir, &file_hash, &new_filename)?;
 
     // Log audit event
     audit_log!(
         "system",
         "upload",
-        &file_id,
-        format!("Uploaded image: {} -> {}", filename, new_filename)
+        &hash,
+        format!("Uploaded image: {} -> {}", original_name, filename)
     );
 
     tracing::info!(
-        original_name = %filename,
+        original_name = %original_name,
         size = %compressed_data.len(),
-        hash = %file_hash,
+        hash = %hash,
         "Image uploaded successfully"
     );
 
-    let url = format!("/api/image/{}", new_filename);
     let response = UploadResponse {
-        file_id,
-        filename: new_filename,
-        original_name: filename,
+        hash: hash.clone(),
+        filename,
+        original_name,
         size: compressed_data.len(),
         format: "jpg".to_string(),
-        url,
+        url: format!("/api/image/{}.jpg", hash),
     };
 
     Ok(crate::ok!(response))

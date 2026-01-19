@@ -169,13 +169,12 @@ impl CrabClient<Remote, Disconnected> {
             .map_err(|e| ClientError::Certificate(e.to_string()))?;
 
         // 2. 尝试刷新时间戳 (离线时不阻止连接)
-        if let Some(http) = self.http.as_ref() {
-            if let Err(e) = cert_manager
+        if let Some(http) = self.http.as_ref()
+            && let Err(e) = cert_manager
                 .refresh_credential_timestamp(http.base_url())
                 .await
-            {
-                tracing::warn!("Failed to refresh timestamp (offline?): {}", e);
-            }
+        {
+            tracing::warn!("Failed to refresh timestamp (offline?): {}", e);
         }
 
         let (cert_pem, key_pem, ca_cert_pem) = cert_manager
@@ -314,9 +313,11 @@ impl CrabClient<Remote, Connected> {
         };
 
         // Get Edge Server URL from config
-        let edge_url = self.config.edge_url.clone().ok_or_else(|| {
-            ClientError::Config("Edge Server URL not configured".into())
-        })?;
+        let edge_url = self
+            .config
+            .edge_url
+            .clone()
+            .ok_or_else(|| ClientError::Config("Edge Server URL not configured".into()))?;
 
         // Send login request via mTLS
         let response = edge_http
@@ -329,26 +330,30 @@ impl CrabClient<Remote, Connected> {
         // Parse response using AppResponse format (matches Edge Server)
         let status = response.status();
         if !status.is_success() {
-            let text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(ClientError::Auth(text));
         }
 
-        let resp: AppResponse<shared::client::LoginResponse> = response
-            .json()
-            .await
-            .map_err(|e| ClientError::InvalidResponse(format!("Failed to parse login response: {}", e)))?;
+        let resp: AppResponse<shared::client::LoginResponse> =
+            response.json().await.map_err(|e| {
+                ClientError::InvalidResponse(format!("Failed to parse login response: {}", e))
+            })?;
 
         if !resp.success {
             let error_msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
             return Err(ClientError::Auth(error_msg));
         }
 
-        let login_data = resp.data.ok_or_else(|| {
-            ClientError::InvalidResponse("Missing login data in response".into())
-        })?;
+        let login_data = resp
+            .data
+            .ok_or_else(|| ClientError::InvalidResponse("Missing login data in response".into()))?;
 
         // Store session data
-        self.session.set_login(login_data.token.clone(), login_data.user);
+        self.session
+            .set_login(login_data.token.clone(), login_data.user);
 
         // Restore edge_http for future requests
         self.edge_http = Some(edge_http);

@@ -495,31 +495,6 @@ export interface OrderRemoveItem {
   index: number;
 }
 
-// ============ System State ============
-
-export interface SystemState {
-  id: string | null;
-  genesis_hash: string | null;
-  last_order: string | null;
-  last_order_hash: string | null;
-  synced_up_to: string | null;
-  synced_up_to_hash: string | null;
-  last_sync_time: string | null;
-  order_count: number;
-  created_at: string | null;
-  updated_at: string | null;
-}
-
-export interface SystemStateUpdate {
-  genesis_hash?: string;
-  last_order?: string;
-  last_order_hash?: string;
-  synced_up_to?: string;
-  synced_up_to_hash?: string;
-  last_sync_time?: string;
-  order_count?: number;
-}
-
 export interface InitGenesisRequest {
   genesis_hash: string;
 }

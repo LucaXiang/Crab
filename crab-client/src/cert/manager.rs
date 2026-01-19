@@ -48,9 +48,7 @@ impl CertManager {
 
     /// 加载缓存的凭证（不登录）
     pub fn load_credential(&self) -> Result<Credential, CertError> {
-        self.credential_storage
-            .load()
-            .ok_or(CertError::NotFound)
+        self.credential_storage.load().ok_or(CertError::NotFound)
     }
 
     /// 保存凭证
@@ -290,9 +288,7 @@ impl CertManager {
             .get("credential_signature")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        let credential_expires_at = data
-            .get("credential_expires_at")
-            .and_then(|v| v.as_u64());
+        let credential_expires_at = data.get("credential_expires_at").and_then(|v| v.as_u64());
 
         // 更新 credential 的 device_id、signature 和 expires_at
         if let Ok(mut credential) = self.load_credential() {
@@ -332,8 +328,9 @@ impl CertManager {
         let (cert_pem, _key_pem, ca_cert_pem) = self.load_local_certificates()?;
 
         // Step 3: 验证证书链
-        crab_cert::verify_chain_against_root(&cert_pem, &ca_cert_pem)
-            .map_err(|e| CertError::Invalid(format!("Certificate chain verification failed: {}", e)))?;
+        crab_cert::verify_chain_against_root(&cert_pem, &ca_cert_pem).map_err(|e| {
+            CertError::Invalid(format!("Certificate chain verification failed: {}", e))
+        })?;
         tracing::info!("  ✅ Certificate chain verified.");
 
         // Step 4: 解析证书元数据并验证
@@ -356,7 +353,10 @@ impl CertManager {
                 metadata.not_after
             );
         } else {
-            tracing::info!("  ✅ Certificate validity OK (expires: {}).", metadata.not_after);
+            tracing::info!(
+                "  ✅ Certificate validity OK (expires: {}).",
+                metadata.not_after
+            );
         }
 
         // Step 6: 验证硬件 ID 绑定
@@ -389,18 +389,18 @@ impl CertManager {
             // Step 7c: 验证凭证签名
             if credential.is_signed() {
                 // 使用 tenant_ca 验证凭证签名
-                credential
-                    .verify_signature(&ca_cert_pem)
-                    .map_err(|e| CertError::Invalid(format!("Credential signature invalid: {}", e)))?;
+                credential.verify_signature(&ca_cert_pem).map_err(|e| {
+                    CertError::Invalid(format!("Credential signature invalid: {}", e))
+                })?;
 
                 // 验证设备绑定
-                if let Some(cred_device_id) = &credential.device_id {
-                    if cred_device_id != &current_device_id {
-                        return Err(CertError::Invalid(format!(
-                            "Credential device ID mismatch: {} vs {}",
-                            cred_device_id, current_device_id
-                        )));
-                    }
+                if let Some(cred_device_id) = &credential.device_id
+                    && cred_device_id != &current_device_id
+                {
+                    return Err(CertError::Invalid(format!(
+                        "Credential device ID mismatch: {} vs {}",
+                        cred_device_id, current_device_id
+                    )));
                 }
                 tracing::info!("  ✅ Credential signature and device binding verified.");
             } else {

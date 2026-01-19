@@ -419,7 +419,12 @@ impl ActivationService {
         };
 
         // Verify subscription signature using local tenant_ca.pem
-        let tenant_ca_path = self.cert_dir.join("certs").join("tenant_ca.pem");
+        // Note: cert_dir is {work_dir}/auth_storage, tenant_ca is in {work_dir}/certs/
+        let tenant_ca_path = self
+            .cert_dir
+            .parent()
+            .map(|p| p.join("certs").join("tenant_ca.pem"))
+            .unwrap_or_else(|| self.cert_dir.join("certs").join("tenant_ca.pem"));
         let tenant_ca_pem = match std::fs::read_to_string(&tenant_ca_path) {
             Ok(pem) => pem,
             Err(e) => {

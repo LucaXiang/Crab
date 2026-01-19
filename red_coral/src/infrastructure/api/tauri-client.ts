@@ -418,12 +418,6 @@ export class TauriApiClient {
     return invokeCommand('add_order_payment', { order_id: orderId, payment });
   }
 
-  // ============ System ============
-
-  async getSystemState() {
-    return invokeCommand('get_system_state');
-  }
-
   // ============ Generic API (fallback) ============
 
   async apiGet<T>(path: string): Promise<T> {

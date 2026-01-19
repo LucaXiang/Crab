@@ -4,12 +4,12 @@
 use rustls_pki_types::{CertificateDer, ServerName};
 use shared::message::{BusMessage, HandshakePayload, PROTOCOL_VERSION};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
-use tokio::sync::{broadcast, oneshot, Mutex};
+use tokio::sync::{Mutex, broadcast, oneshot};
 use tokio_rustls::client::TlsStream;
 use uuid::Uuid;
 
@@ -142,7 +142,13 @@ impl NetworkMessageClient {
         let reader_notify_tx = notification_tx.clone();
         let reader_connected = connected.clone();
         tokio::spawn(async move {
-            Self::reader_task(read_half, reader_pending, reader_notify_tx, reader_connected).await;
+            Self::reader_task(
+                read_half,
+                reader_pending,
+                reader_notify_tx,
+                reader_connected,
+            )
+            .await;
         });
 
         let client = Self {
@@ -277,16 +283,16 @@ impl NetworkMessageClient {
             .await?;
 
         // 检查是否是响应消息
-        if response.event_type == shared::message::EventType::Response {
-            if let Ok(payload) = response.parse_payload::<shared::message::ResponsePayload>() {
-                if !payload.success {
-                    return Err(crate::MessageError::Connection(format!(
-                        "Handshake failed: {}",
-                        payload.message
-                    )));
-                }
-                tracing::debug!("Handshake successful: {}", payload.message);
+        if response.event_type == shared::message::EventType::Response
+            && let Ok(payload) = response.parse_payload::<shared::message::ResponsePayload>()
+        {
+            if !payload.success {
+                return Err(crate::MessageError::Connection(format!(
+                    "Handshake failed: {}",
+                    payload.message
+                )));
             }
+            tracing::debug!("Handshake successful: {}", payload.message);
         }
 
         Ok(())
@@ -448,7 +454,10 @@ impl NetworkMessageClient {
     }
 
     /// 发送请求并等待响应（使用默认超时）
-    pub async fn request_default(&self, msg: &BusMessage) -> Result<BusMessage, crate::MessageError> {
+    pub async fn request_default(
+        &self,
+        msg: &BusMessage,
+    ) -> Result<BusMessage, crate::MessageError> {
         let timeout = crate::MessageClientConfig::default().request_timeout;
         self.request(msg, timeout).await
     }
@@ -494,7 +503,10 @@ impl InMemoryMessageClient {
         client_tx: broadcast::Sender<BusMessage>,
         server_tx: broadcast::Sender<BusMessage>,
     ) -> Self {
-        Self { client_tx, server_tx }
+        Self {
+            client_tx,
+            server_tx,
+        }
     }
 
     /// 创建内存消息客户端 (只需服务器 → 客户端通道)
@@ -503,7 +515,10 @@ impl InMemoryMessageClient {
     #[allow(dead_code)]
     pub fn new_receiver(server_tx: broadcast::Sender<BusMessage>) -> Self {
         let (client_tx, _) = broadcast::channel(16);
-        Self { client_tx, server_tx }
+        Self {
+            client_tx,
+            server_tx,
+        }
     }
 
     /// 检查是否已连接 (内存客户端始终连接)
@@ -563,7 +578,10 @@ impl InMemoryMessageClient {
     }
 
     /// 发送请求并等待响应（使用默认超时）
-    pub async fn request_default(&self, msg: &BusMessage) -> Result<BusMessage, crate::MessageError> {
+    pub async fn request_default(
+        &self,
+        msg: &BusMessage,
+    ) -> Result<BusMessage, crate::MessageError> {
         let timeout = crate::MessageClientConfig::default().request_timeout;
         self.request(msg, timeout).await
     }

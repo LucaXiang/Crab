@@ -547,37 +547,37 @@ impl ClientBridge {
                     .flatten();
 
                 if let Some(cred) = credential {
-                    if let Some(sub) = &cred.subscription {
-                        // 检查订阅状态
-                        match sub.status {
-                            SubscriptionStatus::Active | SubscriptionStatus::Trial => {
-                                // 订阅有效，检查员工登录状态
-                                match client {
-                                    Some(LocalClientState::Authenticated(_)) => {
-                                        AppState::ServerAuthenticated
-                                    }
-                                    _ => AppState::ServerReady,
-                                }
+                    // 检查订阅状态（如果有）
+                    let subscription_blocked = cred.subscription.as_ref().is_some_and(|sub| {
+                        matches!(
+                            sub.status,
+                            SubscriptionStatus::Canceled | SubscriptionStatus::Unpaid
+                        )
+                    });
+
+                    if subscription_blocked {
+                        let reason = cred
+                            .subscription
+                            .as_ref()
+                            .map(|s| format!("订阅状态: {:?}", s.status))
+                            .unwrap_or_default();
+                        AppState::ServerSubscriptionBlocked { reason }
+                    } else {
+                        // 订阅有效或未知（宽限模式），检查员工登录状态
+                        // 优先检查 CrabClient 状态，如果未认证则检查缓存的 session
+                        match client {
+                            Some(LocalClientState::Authenticated(_)) => {
+                                AppState::ServerAuthenticated
                             }
-                            SubscriptionStatus::PastDue => {
-                                // 宽限期，允许使用但显示警告
-                                match client {
-                                    Some(LocalClientState::Authenticated(_)) => {
-                                        AppState::ServerAuthenticated
-                                    }
-                                    _ => AppState::ServerReady,
-                                }
-                            }
-                            SubscriptionStatus::Canceled | SubscriptionStatus::Unpaid => {
-                                // 订阅无效，阻止使用
-                                AppState::ServerSubscriptionBlocked {
-                                    reason: format!("订阅状态: {:?}", sub.status),
+                            _ => {
+                                // 检查 TenantManager 是否有缓存的会话
+                                if tenant_manager.current_session().is_some() {
+                                    AppState::ServerAuthenticated
+                                } else {
+                                    AppState::ServerReady
                                 }
                             }
                         }
-                    } else {
-                        // 无订阅信息，检查是否正在同步
-                        AppState::ServerCheckingSubscription
                     }
                 } else {
                     // 无凭证，需要激活
@@ -718,9 +718,48 @@ impl ClientBridge {
             "Server mode initialized with In-Process client and Background Server"
         );
 
+        // 尝试加载缓存的员工会话并恢复 CrabClient 认证状态
+        let tenant_manager_read = self.tenant_manager.read().await;
+        let cached_session = tenant_manager_read.load_current_session().ok().flatten();
+        drop(tenant_manager_read);
+
+        let client_state = if let Some(session) = cached_session {
+            // 使用缓存的 token 恢复认证状态
+            match connected_client
+                .restore_session(session.token.clone(), session.user_info.clone())
+                .await
+            {
+                Ok(authenticated_client) => {
+                    tracing::info!(username = %session.username, "Restored CrabClient authenticated state");
+                    // 同时更新 TenantManager 的 session
+                    let mut tenant_manager = self.tenant_manager.write().await;
+                    tenant_manager.set_current_session(session);
+                    LocalClientState::Authenticated(authenticated_client)
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to restore session: {}", e);
+                    // 恢复失败，清除缓存的 session
+                    let tenant_manager = self.tenant_manager.read().await;
+                    let _ = tenant_manager.clear_current_session();
+                    // 需要重新创建 connected client（因为 restore_session 消费了 self）
+                    let client = CrabClient::local()
+                        .with_router(state_arc.https_service().router().unwrap())
+                        .with_message_channels(
+                            state_arc.message_bus().sender_to_server().clone(),
+                            state_arc.message_bus().sender().clone(),
+                        )
+                        .build()?;
+                    LocalClientState::Connected(client.connect().await?)
+                }
+            }
+        } else {
+            tracing::debug!("No cached employee session found");
+            LocalClientState::Connected(connected_client)
+        };
+
         *mode_guard = ClientMode::Server {
             server_state: state_arc,
-            client: Some(LocalClientState::Connected(connected_client)),
+            client: Some(client_state),
             server_task,
         };
 
@@ -894,7 +933,7 @@ impl ClientBridge {
     ) -> Result<super::session_cache::EmployeeSession, BridgeError> {
         let mut mode_guard = self.mode.write().await;
 
-        match &mut *mode_guard {
+        let result = match &mut *mode_guard {
             ClientMode::Server {
                 server_state: _,
                 client,
@@ -1053,7 +1092,20 @@ impl ClientBridge {
                 }
             }
             ClientMode::Disconnected => Err(BridgeError::NotInitialized),
+        };
+
+        // 释放 mode 锁，然后保存 session
+        drop(mode_guard);
+
+        // 登录成功后保存 session 到磁盘
+        if let Ok(ref session) = result {
+            let tenant_manager = self.tenant_manager.read().await;
+            if let Err(e) = tenant_manager.save_current_session(session) {
+                tracing::warn!("Failed to persist session: {}", e);
+            }
         }
+
+        result
     }
 
     /// 员工登出
@@ -1096,6 +1148,14 @@ impl ClientBridge {
             ClientMode::Disconnected => {}
         }
 
+        // 释放 mode 锁，然后清除缓存的 session
+        drop(mode_guard);
+
+        let tenant_manager = self.tenant_manager.read().await;
+        if let Err(e) = tenant_manager.clear_current_session() {
+            tracing::warn!("Failed to clear cached session: {}", e);
+        }
+
         Ok(())
     }
 
@@ -1124,8 +1184,8 @@ impl ClientBridge {
                 Some(RemoteClientState::Authenticated(auth)) => {
                     let http = auth
                         .edge_http_client()
-                        .ok_or_else(|| BridgeError::NotInitialized)?;
-                    let token = auth.token().ok_or_else(|| BridgeError::NotAuthenticated)?;
+                        .ok_or(BridgeError::NotInitialized)?;
+                    let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
                     let url = format!("{}{}", edge_url, path);
 
                     let resp = http
@@ -1171,8 +1231,8 @@ impl ClientBridge {
                 Some(RemoteClientState::Authenticated(auth)) => {
                     let http = auth
                         .edge_http_client()
-                        .ok_or_else(|| BridgeError::NotInitialized)?;
-                    let token = auth.token().ok_or_else(|| BridgeError::NotAuthenticated)?;
+                        .ok_or(BridgeError::NotInitialized)?;
+                    let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
                     let url = format!("{}{}", edge_url, path);
 
                     let resp = http
@@ -1219,8 +1279,8 @@ impl ClientBridge {
                 Some(RemoteClientState::Authenticated(auth)) => {
                     let http = auth
                         .edge_http_client()
-                        .ok_or_else(|| BridgeError::NotInitialized)?;
-                    let token = auth.token().ok_or_else(|| BridgeError::NotAuthenticated)?;
+                        .ok_or(BridgeError::NotInitialized)?;
+                    let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
                     let url = format!("{}{}", edge_url, path);
 
                     let resp = http
@@ -1266,8 +1326,8 @@ impl ClientBridge {
                 Some(RemoteClientState::Authenticated(auth)) => {
                     let http = auth
                         .edge_http_client()
-                        .ok_or_else(|| BridgeError::NotInitialized)?;
-                    let token = auth.token().ok_or_else(|| BridgeError::NotAuthenticated)?;
+                        .ok_or(BridgeError::NotInitialized)?;
+                    let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
                     let url = format!("{}{}", edge_url, path);
 
                     let resp = http
@@ -1314,8 +1374,8 @@ impl ClientBridge {
                 Some(RemoteClientState::Authenticated(auth)) => {
                     let http = auth
                         .edge_http_client()
-                        .ok_or_else(|| BridgeError::NotInitialized)?;
-                    let token = auth.token().ok_or_else(|| BridgeError::NotAuthenticated)?;
+                        .ok_or(BridgeError::NotInitialized)?;
+                    let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
                     let url = format!("{}{}", edge_url, path);
 
                     let resp = http
