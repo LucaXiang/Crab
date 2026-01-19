@@ -151,6 +151,10 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<ProductSpecListData>>('list_specs', { product_id: String(productId) });
   }
 
+  async listAllSpecs(): Promise<ApiResponse<ProductSpecListData>> {
+    return invokeCommand<ApiResponse<ProductSpecListData>>('list_all_specs');
+  }
+
   async createProductSpec(productId: string | number, data: Record<string, unknown>): Promise<ApiResponse<{ spec: ProductSpecification }>> {
     return invokeCommand<ApiResponse<{ spec: ProductSpecification }>>('create_spec', { product_id: String(productId), data });
   }
