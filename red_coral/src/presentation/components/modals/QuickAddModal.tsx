@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { X, ShoppingBag, Plus, Trash2, Minus, Search } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatCurrency';
-import { CartItem, Product } from '@/core/domain/types';
+import { CartItem } from '@/core/domain/types';
 import { v4 as uuidv4 } from 'uuid';
-import { useCategoryData } from '@/stores/useCategoryData';
-import { useProducts } from '@/stores/useProducts';
+import { useCategories, useCategoryStore } from '@/core/stores/resources/useCategoryStore';
+import { useProducts, useProductStore } from '@/core/stores/resources/useProductStore';
 import { ProductCard } from '@/presentation/components/ProductCard';
 import clsx from 'clsx';
 import { mergeItemsIntoList } from '@/core/services/order/eventReducer';
@@ -17,17 +17,22 @@ interface QuickAddModalProps {
 
 export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm }) => {
   const { t } = useI18n();
-  const { categories } = useCategoryData();
-  const { products } = useProducts();
+
+  // Use new resources stores
+  const categories = useCategories();
+  const products = useProducts();
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [tempItems, setTempItems] = useState<CartItem[]>([]);
 
-  // Convert store Product to domain Product for display
-  // Note: useProducts from legacy store may have different field names (camelCase vs snake_case)
-  // Product type from backend doesn't have price - it's on ProductSpecification
-  // Use a local interface that matches what ProductCard expects
+  // Ensure data is loaded
+  useEffect(() => {
+    useCategoryStore.getState().fetchAll();
+    useProductStore.getState().fetchAll();
+  }, []);
+
+  // Convert store Product to display format
   interface ProductForDisplay {
     id: string;
     name: string;
@@ -36,13 +41,12 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     category?: string | null;
   }
   const domainProducts: ProductForDisplay[] = useMemo(() => {
-    return products.map((p): ProductForDisplay => ({
+    return products.map((p: any): ProductForDisplay => ({
       id: String(p.id),
       name: p.name,
       image: p.image,
-      category: (p as any).category ?? (p as any).categoryId ?? null,
-      // Legacy store may have price computed from root spec
-      price: (p as any).price ?? 0,
+      category: p.category ?? p.category_id ?? null,
+      price: p.price ?? 0,
     }));
   }, [products]);
 

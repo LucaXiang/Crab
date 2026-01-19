@@ -10,12 +10,12 @@ import {
   useTotalAmount,
   useIsCartEmpty,
   useCartActions
-} from '@/stores';
+} from '@/core/stores/cart';
 
 import {
-	  useHeldOrdersCount,
-	  useDraftOrdersCount
-	} from '@/stores';
+  useHeldOrdersCount,
+  useDraftOrdersCount
+} from '@/core/stores/order';
 import { CartList } from './cart/CartList';
 
 interface SidebarProps {
