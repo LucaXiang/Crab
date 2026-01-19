@@ -17,7 +17,8 @@ export const SetupScreen: React.FC = () => {
   const [modeChoice, setModeChoice] = useState<ModeChoice>(null);
 
   // Activation form state
-  const [authUrl, setAuthUrl] = useState('https://auth.example.com');
+  // AUTH_SERVER is hardcoded for now (development: 127.0.0.1:3001)
+  const authUrl = 'http://127.0.0.1:3001';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [activationError, setActivationError] = useState('');
@@ -140,21 +141,6 @@ export const SetupScreen: React.FC = () => {
       </div>
 
       <form onSubmit={handleActivate} className="space-y-6">
-        {/* Auth URL */}
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">
-            Auth Server URL
-          </label>
-          <input
-            type="url"
-            value={authUrl}
-            onChange={(e) => setAuthUrl(e.target.value)}
-            placeholder="https://auth.example.com"
-            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5E5E]/20 focus:border-[#FF5E5E]"
-            disabled={isLoading}
-          />
-        </div>
-
         {/* Client Mode: Edge Server Config */}
         {modeChoice === 'client' && (
           <>
