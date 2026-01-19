@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { invoke } from '@tauri-apps/api/core';
 import { createApiClient, type LoginRequest } from '@/infrastructure/api';
 import type { User } from '@/core/domain/types';
 
@@ -27,8 +28,8 @@ interface AuthStore {
 
   // User Management Actions (Admin only)
   fetchUsers: () => Promise<User[]>;
-  createUser: (data: any) => Promise<User>;
-  updateUser: (userId: number, data: any) => Promise<User>;
+  createUser: (data: { username: string; password: string; displayName?: string; role: string }) => Promise<User>;
+  updateUser: (userId: number, data: { displayName?: string; role?: string; isActive?: boolean }) => Promise<User>;
   resetPassword: (userId: number, newPassword: string) => Promise<void>;
   deleteUser: (userId: number) => Promise<void>;
 }
@@ -193,26 +194,77 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       // ==================== User Management ====================
-      // TODO: 实现用户管理 API
 
       fetchUsers: async () => {
-        throw new Error('Not implemented: Use role-based API instead');
+        const employees = await invoke<any[]>('list_employees');
+        // 转换 EmployeeResponse -> User
+        return employees.map((e: any) => ({
+          id: parseInt(e.id) || 0,
+          uuid: e.id,
+          username: e.username,
+          display_name: e.display_name || e.username,
+          role_id: parseInt(e.role) || 0,
+          role_name: e.role_name,
+          avatar: null,
+          is_active: e.is_active,
+          created_at: e.created_at || new Date().toISOString(),
+          updated_at: e.updated_at || new Date().toISOString(),
+        })) as User[];
       },
 
-      createUser: async (data: any) => {
-        throw new Error('Not implemented: Use role-based API instead');
+      createUser: async (data: { username: string; password: string; displayName?: string; role: string }) => {
+        // Note: backend doesn't support display_name yet, using username as fallback
+        const result = await invoke<any>('create_employee', {
+          data: {
+            username: data.username,
+            password: data.password,
+            role: data.role,
+          },
+        });
+        return {
+          id: parseInt(result.id) || 0,
+          uuid: result.id,
+          username: result.username,
+          display_name: data.displayName || result.username, // Use frontend value
+          role_id: parseInt(result.role) || 0,
+          avatar: null,
+          is_active: result.is_active,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as User;
       },
 
-      updateUser: async (userId: number, data: any) => {
-        throw new Error('Not implemented: Use role-based API instead');
+      updateUser: async (userId: number, data: { displayName?: string; role?: string; isActive?: boolean }) => {
+        // Note: backend doesn't support display_name yet
+        const result = await invoke<any>('update_employee', {
+          id: String(userId),
+          data: {
+            role: data.role,
+            is_active: data.isActive,
+          },
+        });
+        return {
+          id: parseInt(result.id) || userId,
+          uuid: result.id,
+          username: result.username,
+          display_name: data.displayName || result.username, // Use frontend value
+          role_id: parseInt(result.role) || 0,
+          avatar: null,
+          is_active: result.is_active,
+          created_at: result.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as User;
       },
 
       resetPassword: async (userId: number, newPassword: string) => {
-        throw new Error('Not implemented');
+        await invoke('update_employee', {
+          id: String(userId),
+          data: { password: newPassword },
+        });
       },
 
       deleteUser: async (userId: number) => {
-        throw new Error('Not implemented');
+        await invoke('delete_employee', { id: String(userId) });
       },
     }),
     {

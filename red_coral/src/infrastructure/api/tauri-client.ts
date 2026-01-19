@@ -11,9 +11,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   ApiResponse,
   LoginResponseData,
-  CurrentUserData,
   TagListData,
-  Tag,
   CategoryListData,
   Category,
   ProductListData,
@@ -29,7 +27,6 @@ import type {
   Attribute,
   AttributeTemplateListData,
   RoleListData,
-  Role,
   RolePermissionListData,
   ProductAttribute,
   ProductAttributeListData,
@@ -94,40 +91,16 @@ export class TauriApiClient {
     return invokeCommand<void>('logout_employee');
   }
 
-  async getCurrentUser(): Promise<ApiResponse<CurrentUserData>> {
-    return invokeCommand<ApiResponse<CurrentUserData>>('get_current_session');
-  }
-
   // ============ Tags ============
 
   async listTags(): Promise<ApiResponse<TagListData>> {
     return invokeCommand<ApiResponse<TagListData>>('list_tags');
   }
 
-  async getTag(id: string): Promise<ApiResponse<{ tag: Tag }>> {
-    return invokeCommand<ApiResponse<{ tag: Tag }>>('get_tag', { id });
-  }
-
-  async createTag(data: { name: string; color?: string; display_order?: number }): Promise<ApiResponse<{ tag: Tag }>> {
-    return invokeCommand<ApiResponse<{ tag: Tag }>>('create_tag', { data });
-  }
-
-  async updateTag(id: string, data: { name?: string; color?: string; display_order?: number; is_active?: boolean }): Promise<ApiResponse<{ tag: Tag }>> {
-    return invokeCommand<ApiResponse<{ tag: Tag }>>('update_tag', { id, data });
-  }
-
-  async deleteTag(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_tag', { id });
-  }
-
   // ============ Categories ============
 
   async listCategories(): Promise<ApiResponse<CategoryListData>> {
     return invokeCommand<ApiResponse<CategoryListData>>('list_categories');
-  }
-
-  async getCategory(id: string): Promise<ApiResponse<{ category: Category }>> {
-    return invokeCommand<ApiResponse<{ category: Category }>>('get_category', { id });
   }
 
   async createCategory(data: Record<string, unknown>): Promise<ApiResponse<{ category: Category }>> {
@@ -150,10 +123,6 @@ export class TauriApiClient {
 
   async listProducts(): Promise<ApiResponse<ProductListData>> {
     return invokeCommand<ApiResponse<ProductListData>>('list_products');
-  }
-
-  async getProduct(id: string): Promise<ApiResponse<{ product: Product; specifications?: ProductSpecification[]; attributes?: ProductAttribute[] }>> {
-    return invokeCommand<ApiResponse<{ product: Product; specifications?: ProductSpecification[]; attributes?: ProductAttribute[] }>>('get_product', { id });
   }
 
   async createProduct(data: Record<string, unknown>): Promise<ApiResponse<{ product: Product }>> {
@@ -232,26 +201,10 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ template: Attribute }>>('get_attribute', { id });
   }
 
-  async createAttributeTemplate(data: Record<string, unknown>): Promise<ApiResponse<{ template: Attribute }>> {
-    return invokeCommand<ApiResponse<{ template: Attribute }>>('create_attribute', { data });
-  }
-
-  async updateAttributeTemplate(id: string, data: Record<string, unknown>): Promise<ApiResponse<{ template: Attribute }>> {
-    return invokeCommand<ApiResponse<{ template: Attribute }>>('update_attribute', { id, data });
-  }
-
-  async deleteAttributeTemplate(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_attribute', { id });
-  }
-
   // ============ Zones ============
 
   async listZones(): Promise<ApiResponse<ZoneListData>> {
     return invokeCommand<ApiResponse<ZoneListData>>('list_zones');
-  }
-
-  async getZone(id: string): Promise<ApiResponse<{ zone: Zone }>> {
-    return invokeCommand<ApiResponse<{ zone: Zone }>>('get_zone', { id });
   }
 
   async createZone(data: { name: string; description?: string }): Promise<ApiResponse<{ zone: Zone }>> {
@@ -272,14 +225,6 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<TableListData>>('list_tables');
   }
 
-  async getTablesByZone(zoneId: string): Promise<ApiResponse<TableListData>> {
-    return invokeCommand<ApiResponse<TableListData>>('list_tables_by_zone', { zone_id: zoneId });
-  }
-
-  async getTable(id: string): Promise<ApiResponse<{ table: Table }>> {
-    return invokeCommand<ApiResponse<{ table: Table }>>('get_table', { id });
-  }
-
   async createTable(data: { name: string; zone: string; capacity?: number }): Promise<ApiResponse<{ table: Table }>> {
     return invokeCommand<ApiResponse<{ table: Table }>>('create_table', { data });
   }
@@ -298,10 +243,6 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<PrinterListData>>('list_kitchen_printers');
   }
 
-  async getPrinter(id: string): Promise<ApiResponse<{ printer: KitchenPrinter }>> {
-    return invokeCommand<ApiResponse<{ printer: KitchenPrinter }>>('get_kitchen_printer', { id });
-  }
-
   async createPrinter(data: { name: string; printer_name?: string; description?: string }): Promise<ApiResponse<{ printer: KitchenPrinter }>> {
     return invokeCommand<ApiResponse<{ printer: KitchenPrinter }>>('create_kitchen_printer', { data });
   }
@@ -315,25 +256,10 @@ export class TauriApiClient {
   }
 
   // ============ Employees ============
+  // Note: CRUD operations moved to useAuthStore (uses invoke directly)
 
   async listEmployees(): Promise<ApiResponse<{ employees: unknown[] }>> {
     return invokeCommand<ApiResponse<{ employees: unknown[] }>>('list_employees');
-  }
-
-  async getEmployee(id: string): Promise<ApiResponse<{ employee: unknown }>> {
-    return invokeCommand<ApiResponse<{ employee: unknown }>>('get_employee', { id });
-  }
-
-  async createEmployee(data: { username: string; password: string; role: string }): Promise<ApiResponse<{ employee: unknown }>> {
-    return invokeCommand<ApiResponse<{ employee: unknown }>>('create_employee', { data });
-  }
-
-  async updateEmployee(id: string, data: { username?: string; password?: string; role?: string; is_active?: boolean }): Promise<ApiResponse<{ employee: unknown }>> {
-    return invokeCommand<ApiResponse<{ employee: unknown }>>('update_employee', { id, data });
-  }
-
-  async deleteEmployee(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_employee', { id });
   }
 
   // ============ Price Rules ============
@@ -342,98 +268,14 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ rules: unknown[] }>>('list_price_rules');
   }
 
-  async listActivePriceAdjustments(): Promise<ApiResponse<{ rules: unknown[] }>> {
-    return invokeCommand<ApiResponse<{ rules: unknown[] }>>('list_active_price_rules');
-  }
-
-  async getPriceAdjustment(id: string): Promise<ApiResponse<{ rule: unknown }>> {
-    return invokeCommand<ApiResponse<{ rule: unknown }>>('get_price_rule', { id });
-  }
-
-  async createPriceAdjustment(data: Record<string, unknown>): Promise<ApiResponse<{ rule: unknown }>> {
-    return invokeCommand<ApiResponse<{ rule: unknown }>>('create_price_rule', { data });
-  }
-
-  async updatePriceAdjustment(id: string, data: Record<string, unknown>): Promise<ApiResponse<{ rule: unknown }>> {
-    return invokeCommand<ApiResponse<{ rule: unknown }>>('update_price_rule', { id, data });
-  }
-
-  async deletePriceAdjustment(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_price_rule', { id });
-  }
-
   // ============ Roles ============
 
   async listRoles(): Promise<ApiResponse<RoleListData>> {
     return invokeCommand<ApiResponse<RoleListData>>('list_roles');
   }
 
-  async getRole(id: string): Promise<ApiResponse<{ role: Role }>> {
-    return invokeCommand<ApiResponse<{ role: Role }>>('get_role', { id });
-  }
-
-  async createRole(data: { name: string }): Promise<ApiResponse<{ role: Role }>> {
-    return invokeCommand<ApiResponse<{ role: Role }>>('create_role', { data });
-  }
-
-  async updateRole(id: string, data: { name?: string }): Promise<ApiResponse<{ role: Role }>> {
-    return invokeCommand<ApiResponse<{ role: Role }>>('update_role', { id, data });
-  }
-
-  async deleteRole(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_role', { id });
-  }
-
   async getRolePermissions(roleId: string): Promise<ApiResponse<RolePermissionListData>> {
     return invokeCommand<ApiResponse<RolePermissionListData>>('get_role_permissions', { role_id: roleId });
-  }
-
-  // ============ Orders ============
-
-  async listOrders() {
-    return invokeCommand('list_orders');
-  }
-
-  async listOpenOrders() {
-    return invokeCommand('list_open_orders');
-  }
-
-  async getOrder(id: string) {
-    return invokeCommand('get_order', { id });
-  }
-
-  async getOrderByReceipt(receiptNumber: string) {
-    return invokeCommand('get_order_by_receipt', { receipt_number: receiptNumber });
-  }
-
-  async createOrder(data: Record<string, unknown>) {
-    return invokeCommand('create_order', { data });
-  }
-
-  async addOrderItem(orderId: string, item: Record<string, unknown>) {
-    return invokeCommand('add_order_item', { order_id: orderId, item });
-  }
-
-  async addOrderPayment(orderId: string, payment: Record<string, unknown>) {
-    return invokeCommand('add_order_payment', { order_id: orderId, payment });
-  }
-
-  // ============ Generic API (fallback) ============
-
-  async apiGet<T>(path: string): Promise<T> {
-    return invokeCommand('api_get', { path });
-  }
-
-  async apiPost<T>(path: string, body: unknown): Promise<T> {
-    return invokeCommand('api_post', { path, body });
-  }
-
-  async apiPut<T>(path: string, body: unknown): Promise<T> {
-    return invokeCommand('api_put', { path, body });
-  }
-
-  async apiDelete<T>(path: string): Promise<T> {
-    return invokeCommand('api_delete', { path });
   }
 
   // ============ Token Management ============
