@@ -6,7 +6,7 @@
  */
 
 // Tauri API Client
-export { TauriApiClient, createTauriClient, ApiError } from './tauri-client';
+export { TauriApiClient, createTauriClient, ApiError, invokeApi } from './tauri-client';
 
 // 类型导出 (从 core/domain/types/api 重导出)
 export * from '@/core/domain/types/api';

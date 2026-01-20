@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api/tauri-client';
+import type { ApiResponse } from '@/core/domain/types/api';
 
 // Import ConnectionStatus from the hook (canonical source)
 import type { ConnectionStatus } from '@/core/hooks/useConnectionStatus';
@@ -145,6 +146,11 @@ export interface LoginResponse {
   mode: LoginMode;
 }
 
+interface AuthData {
+  session: EmployeeSession | null;
+  mode: LoginMode;
+}
+
 export interface AppConfigResponse {
   current_mode: ModeType;
   current_tenant: string | null;
@@ -208,11 +214,10 @@ export const useBridgeStore = create<BridgeStore>()(
       error: null,
       connectionStatus: { connected: true, reconnecting: false },
 
-      // ==================== App State Actions ====================
-
+      // App State Actions
       fetchAppState: async () => {
         try {
-          const state = await invoke<AppState>('get_app_state');
+          const state = await invokeApi<AppState>('get_app_state');
           set({ appState: state });
           return state;
         } catch (error: any) {
@@ -222,36 +227,32 @@ export const useBridgeStore = create<BridgeStore>()(
         }
       },
 
-      // ==================== Mode Actions ====================
-
+      // Mode Actions
       fetchModeInfo: async () => {
         try {
-          const info = await invoke<ModeInfo>('get_mode_info');
+          const info = await invokeApi<ModeInfo>('get_mode_info');
           set({ modeInfo: info });
         } catch (error: any) {
           console.error('Failed to fetch mode info:', error);
-          set({ error: error.message || 'Failed to fetch mode info' });
         }
       },
 
       checkFirstRun: async () => {
         try {
-          const isFirst = await invoke<boolean>('check_first_run');
-          set({ isFirstRun: isFirst });
-          return isFirst;
-        } catch (error: any) {
+          return await invokeApi<boolean>('check_first_run');
+        } catch (error) {
           console.error('Failed to check first run:', error);
-          return true;
+          return false;
         }
       },
 
       startServerMode: async () => {
-        set({ isLoading: true, error: null });
         try {
-          await invoke('start_server_mode');
-          await get().fetchModeInfo();
+          set({ isLoading: true, error: null });
+          await invokeApi('start_server_mode');
+          await get().fetchAppState();
         } catch (error: any) {
-          set({ error: error.message || 'Failed to start server mode' });
+          set({ error: error.message });
           throw error;
         } finally {
           set({ isLoading: false });
@@ -259,12 +260,12 @@ export const useBridgeStore = create<BridgeStore>()(
       },
 
       startClientMode: async (edgeUrl: string, messageAddr: string) => {
-        set({ isLoading: true, error: null });
         try {
-          await invoke('start_client_mode', { edgeUrl, messageAddr });
-          await get().fetchModeInfo();
+          set({ isLoading: true, error: null });
+          await invokeApi('start_client_mode', { edgeUrl, messageAddr });
+          await get().fetchAppState();
         } catch (error: any) {
-          set({ error: error.message || 'Failed to start client mode' });
+          set({ error: error.message });
           throw error;
         } finally {
           set({ isLoading: false });
@@ -272,80 +273,78 @@ export const useBridgeStore = create<BridgeStore>()(
       },
 
       stopMode: async () => {
-        set({ isLoading: true, error: null });
         try {
-          await invoke('stop_mode');
-          await get().fetchModeInfo();
+          set({ isLoading: true });
+          await invokeApi('stop_mode');
+          set({ 
+            appState: { type: 'Uninitialized' },
+            modeInfo: null,
+            currentSession: null
+          });
         } catch (error: any) {
-          set({ error: error.message || 'Failed to stop mode' });
-          throw error;
+          set({ error: error.message });
         } finally {
           set({ isLoading: false });
         }
       },
 
-      // ==================== Tenant Actions ====================
-
+      // Tenant Actions
       fetchTenants: async () => {
         try {
-          const tenants = await invoke<TenantInfo[]>('list_tenants');
-          set({ tenants });
-        } catch (error: any) {
+          // TenantListData wrapper
+          const data = await invokeApi<{ tenants: TenantInfo[] }>('list_tenants');
+          set({ tenants: data.tenants });
+        } catch (error) {
           console.error('Failed to fetch tenants:', error);
-          set({ error: error.message || 'Failed to fetch tenants' });
         }
       },
 
-      activateTenant: async (authUrl: string, username: string, password: string) => {
-        set({ isLoading: true, error: null });
+      activateTenant: async (authUrl, username, password) => {
         try {
-          const tenantId = await invoke<string>('activate_tenant', {
+          set({ isLoading: true, error: null });
+          const msg = await invokeApi<string>('activate_tenant', {
             authUrl,
             username,
             password,
           });
           await get().fetchTenants();
-          set({ isFirstRun: false });
-          return tenantId;
+          await get().fetchAppState();
+          return msg;
         } catch (error: any) {
-          set({ error: error.message || 'Failed to activate tenant' });
+          set({ error: error.message });
           throw error;
         } finally {
           set({ isLoading: false });
         }
       },
 
-      switchTenant: async (tenantId: string) => {
-        set({ isLoading: true, error: null });
+      switchTenant: async (tenantId) => {
         try {
-          await invoke('switch_tenant', { tenantId });
-          await get().fetchModeInfo();
+          set({ isLoading: true });
+          await invokeApi('switch_tenant', { tenantId });
+          await get().fetchAppState();
         } catch (error: any) {
-          set({ error: error.message || 'Failed to switch tenant' });
+          set({ error: error.message });
           throw error;
         } finally {
           set({ isLoading: false });
         }
       },
 
-      removeTenant: async (tenantId: string) => {
-        set({ isLoading: true, error: null });
+      removeTenant: async (tenantId) => {
         try {
-          await invoke('remove_tenant', { tenantId });
+          await invokeApi('remove_tenant', { tenantId });
           await get().fetchTenants();
         } catch (error: any) {
-          set({ error: error.message || 'Failed to remove tenant' });
+          set({ error: error.message });
           throw error;
-        } finally {
-          set({ isLoading: false });
         }
       },
 
       getCurrentTenant: async () => {
         try {
-          return await invoke<string | null>('get_current_tenant');
-        } catch (error: any) {
-          console.error('Failed to get current tenant:', error);
+          return await invokeApi<string | null>('get_current_tenant');
+        } catch (error) {
           return null;
         }
       },
@@ -355,18 +354,22 @@ export const useBridgeStore = create<BridgeStore>()(
       loginOnline: async (username: string, password: string, edgeUrl: string) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await invoke<LoginResponse>('login_online', {
+          // AuthData wrapper
+          const data = await invokeApi<{ session: EmployeeSession | null, mode: LoginMode }>('login_online', {
             username,
             password,
             edgeUrl,
           });
-          if (response.success && response.session) {
-            set({ currentSession: response.session });
+          
+          if (data.session) {
+            set({ currentSession: data.session });
+            return { success: true, session: data.session, error: null, mode: data.mode };
+          } else {
+            return { success: false, session: null, error: 'Login failed', mode: data.mode };
           }
-          return response;
         } catch (error: any) {
-          set({ error: error.message || 'Login failed' });
-          throw error;
+          set({ error: error.message });
+          return { success: false, session: null, error: error.message, mode: 'Offline' };
         } finally {
           set({ isLoading: false });
         }
@@ -375,17 +378,20 @@ export const useBridgeStore = create<BridgeStore>()(
       loginOffline: async (username: string, password: string) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await invoke<LoginResponse>('login_offline', {
+          const data = await invokeApi<{ session: EmployeeSession | null, mode: LoginMode }>('login_offline', {
             username,
             password,
           });
-          if (response.success && response.session) {
-            set({ currentSession: response.session });
+          
+          if (data.session) {
+            set({ currentSession: data.session });
+            return { success: true, session: data.session, error: null, mode: data.mode };
+          } else {
+            return { success: false, session: null, error: 'Login failed', mode: data.mode };
           }
-          return response;
         } catch (error: any) {
-          set({ error: error.message || 'Offline login failed' });
-          throw error;
+          set({ error: error.message });
+          return { success: false, session: null, error: error.message, mode: 'Offline' };
         } finally {
           set({ isLoading: false });
         }
@@ -394,20 +400,21 @@ export const useBridgeStore = create<BridgeStore>()(
       loginAuto: async (username: string, password: string, edgeUrl: string) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await invoke<LoginResponse>('login_auto', {
+          const data = await invokeApi<{ session: EmployeeSession | null, mode: LoginMode }>('login_auto', {
             username,
             password,
             edgeUrl,
           });
-          if (response.success && response.session) {
-            set({ currentSession: response.session });
-            // 刷新 appState 以反映认证状态变化
-            await get().fetchAppState();
+          
+          if (data.session) {
+            set({ currentSession: data.session });
+            return { success: true, session: data.session, error: null, mode: data.mode };
+          } else {
+            return { success: false, session: null, error: 'Login failed', mode: data.mode };
           }
-          return response;
         } catch (error: any) {
-          set({ error: error.message || 'Auto login failed' });
-          throw error;
+          set({ error: error.message });
+          return { success: false, session: null, error: error.message, mode: 'Offline' };
         } finally {
           set({ isLoading: false });
         }
@@ -415,29 +422,28 @@ export const useBridgeStore = create<BridgeStore>()(
 
       logout: async () => {
         try {
-          await invoke('logout');
+          await invokeApi('logout');
           set({ currentSession: null });
-          // 刷新 appState 以反映登出状态
-          await get().fetchAppState();
         } catch (error: any) {
           console.error('Logout failed:', error);
+          // Force local logout anyway
+          set({ currentSession: null });
         }
       },
 
       fetchCurrentSession: async () => {
         try {
-          const session = await invoke<EmployeeSession | null>('get_current_session');
+          const session = await invokeApi<EmployeeSession | null>('get_current_session');
           set({ currentSession: session });
         } catch (error: any) {
-          console.error('Failed to fetch current session:', error);
+          console.error('Failed to fetch session:', error);
         }
       },
 
       hasOfflineCache: async (username: string) => {
         try {
-          return await invoke<boolean>('has_offline_cache', { username });
+          return await invokeApi<boolean>('has_offline_cache', { username });
         } catch (error: any) {
-          console.error('Failed to check offline cache:', error);
           return false;
         }
       },
@@ -447,16 +453,23 @@ export const useBridgeStore = create<BridgeStore>()(
       loginEmployee: async (username: string, password: string) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await invoke<LoginResponse>('login_employee', {
+          const data = await invokeApi<AuthData>('login_employee', {
             username,
             password,
           });
-          if (response.success && response.session) {
-            set({ currentSession: response.session });
+          
+          if (data.session) {
+            set({ currentSession: data.session });
             // 刷新 appState 以反映认证状态变化
             await get().fetchAppState();
           }
-          return response;
+          
+          return {
+            success: true,
+            session: data.session,
+            error: null,
+            mode: data.mode
+          };
         } catch (error: any) {
           set({ error: error.message || 'Login failed' });
           throw error;
@@ -467,7 +480,7 @@ export const useBridgeStore = create<BridgeStore>()(
 
       logoutEmployee: async () => {
         try {
-          await invoke('logout_employee');
+          await invokeApi('logout_employee');
           set({ currentSession: null });
           // 刷新 appState 以反映登出状态
           await get().fetchAppState();

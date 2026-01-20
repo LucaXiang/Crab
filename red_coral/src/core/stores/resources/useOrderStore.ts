@@ -1,5 +1,5 @@
 import { createResourceStore } from '../factory/createResourceStore';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api/tauri-client';
 import type { Order, ApiResponse } from '@/core/domain/types/api';
 
 /**
@@ -9,17 +9,9 @@ import type { Order, ApiResponse } from '@/core/domain/types/api';
  * 通常只加载 OPEN 状态的订单。
  */
 async function fetchOrders(): Promise<Order[]> {
-  // 使用直接的 invoke 调用
-  const response = await invoke<Order[] | ApiResponse<{ orders: Order[] }>>('list_orders');
-
-  // 处理两种可能的响应格式
-  if (Array.isArray(response)) {
-    return response;
-  }
-  if (response.data?.orders) {
-    return response.data.orders;
-  }
-  throw new Error('Failed to fetch orders');
+  // OrderListData wrapper
+  const data = await invokeApi<{ orders: Order[] }>('list_orders');
+  return data.orders;
 }
 
 export const useOrderStore = createResourceStore<Order & { id: string }>(

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
-import { useSyncListener, useConnectionRecovery } from '@/core/hooks';
+import { useSyncListener, useConnectionRecovery, useOrderEventListener } from '@/core/hooks';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
@@ -86,6 +86,9 @@ const App: React.FC = () => {
   // 挂载同步相关 hooks
   useSyncListener();
   useConnectionRecovery();
+
+  // 挂载订单事件监听 hook (Event Sourcing)
+  useOrderEventListener();
 
   // Check for first run and clear storage if needed
   useEffect(() => {

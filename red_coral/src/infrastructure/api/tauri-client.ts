@@ -50,7 +50,28 @@ export class ApiError extends Error {
 }
 
 /**
+ * Generic helper to invoke Tauri command and unwrap ApiResponse
+ * 
+ * Used by stores/services to get data directly or throw structured errors.
+ */
+export async function invokeApi<T>(command: string, args?: any): Promise<T> {
+  try {
+    const response = await invoke<ApiResponse<T>>(command, args);
+    if (response.error_code) {
+      throw new ApiError(response.error_code, response.message);
+    }
+    // For void success (ApiResponse<()>), data might be undefined/null
+    return response.data as T;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new ApiError('INVOKE_ERROR', message);
+  }
+}
+
+/**
  * 包装 Tauri invoke 调用，统一错误处理
+ * @deprecated Use invokeApi instead
  */
 async function invokeCommand<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {

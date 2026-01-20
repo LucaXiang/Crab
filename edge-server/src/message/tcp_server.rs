@@ -330,8 +330,39 @@ fn spawn_server_to_client_forwarder(
                                 break;
                             }
                         }
-                        Err(_) => {
-                            // Channel closed
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            // WiFi lag recovery: client fell behind, notify to resync
+                            tracing::warn!(
+                                client_id = %client_id,
+                                dropped_messages = n,
+                                "Client lagged behind, sending resync notification"
+                            );
+                            
+                            // Send a Sync message to trigger client-side full resync
+                            let resync_msg = BusMessage {
+                                event_type: EventType::Sync,
+                                request_id: Uuid::new_v4(),
+                                correlation_id: None,
+                                payload: serde_json::json!({
+                                    "reason": "lagged",
+                                    "dropped_messages": n,
+                                    "action": "full_resync"
+                                }).to_string().into_bytes(),
+                                source: Some("server".to_string()),
+                                target: Some(client_id.clone()),
+                            };
+                            
+                            if let Err(e) = transport.write_message(&resync_msg).await {
+                                tracing::debug!(client_id = %client_id, "Failed to send resync notification: {}", e);
+                                break;
+                            }
+                            
+                            // Continue listening - don't disconnect the client
+                            continue;
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            // Channel truly closed
+                            tracing::debug!(client_id = %client_id, "Broadcast channel closed");
                             break;
                         }
                     }
