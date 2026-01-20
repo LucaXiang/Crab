@@ -9,6 +9,7 @@
 
 pub mod bridge;
 pub mod error_codes;
+pub mod image_cache;
 pub mod response;
 pub mod session_cache;
 pub mod tenant_manager;

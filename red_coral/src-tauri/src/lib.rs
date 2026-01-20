@@ -264,6 +264,11 @@ pub async fn run() {
             // Backup commands
             commands::export_data,
             commands::import_data,
+            // Image cache commands
+            commands::get_image_path,
+            commands::resolve_image_paths,
+            commands::prefetch_images,
+            commands::cleanup_image_cache,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
