@@ -1,0 +1,662 @@
+//! Unified error codes for the Crab framework
+//!
+//! This module defines all error codes used across edge-server, tauri, and frontend.
+//! Error codes are organized by category:
+//! - 0xxx: General errors
+//! - 1xxx: Authentication errors
+//! - 2xxx: Permission errors
+//! - 3xxx: Tenant errors
+//! - 4xxx: Order errors
+//! - 5xxx: Payment errors
+//! - 6xxx: Product errors
+//! - 7xxx: Table errors
+//! - 8xxx: Employee errors
+//! - 9xxx: System errors
+
+use serde::{Deserialize, Serialize};
+use std::fmt;
+
+/// Unified error code enum
+///
+/// All error codes are represented as u16 values for efficient serialization
+/// and cross-language compatibility (Rust, TypeScript, etc.)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize)]
+#[serde(into = "u16", try_from = "u16")]
+#[repr(u16)]
+pub enum ErrorCode {
+    // ==================== 0xxx: General ====================
+    /// Operation completed successfully
+    Success = 0,
+    /// Unknown error
+    Unknown = 1,
+    /// Validation failed
+    ValidationFailed = 2,
+    /// Resource not found
+    NotFound = 3,
+    /// Resource already exists
+    AlreadyExists = 4,
+    /// Invalid request
+    InvalidRequest = 5,
+    /// Invalid format
+    InvalidFormat = 6,
+    /// Required field missing
+    RequiredField = 7,
+    /// Value out of range
+    ValueOutOfRange = 8,
+
+    // ==================== 1xxx: Auth ====================
+    /// User is not authenticated
+    NotAuthenticated = 1001,
+    /// Invalid credentials (username/password)
+    InvalidCredentials = 1002,
+    /// Token has expired
+    TokenExpired = 1003,
+    /// Token is invalid
+    TokenInvalid = 1004,
+    /// Session has expired
+    SessionExpired = 1005,
+    /// Account is locked
+    AccountLocked = 1006,
+    /// Account is disabled
+    AccountDisabled = 1007,
+
+    // ==================== 2xxx: Permission ====================
+    /// Permission denied
+    PermissionDenied = 2001,
+    /// Specific role required
+    RoleRequired = 2002,
+    /// Admin role required
+    AdminRequired = 2003,
+    /// Cannot modify admin user
+    CannotModifyAdmin = 2004,
+    /// Cannot delete admin user
+    CannotDeleteAdmin = 2005,
+
+    // ==================== 3xxx: Tenant ====================
+    /// Tenant not selected
+    TenantNotSelected = 3001,
+    /// Tenant not found
+    TenantNotFound = 3002,
+    /// Activation failed
+    ActivationFailed = 3003,
+    /// Certificate is invalid
+    CertificateInvalid = 3004,
+    /// License has expired
+    LicenseExpired = 3005,
+
+    // ==================== 4xxx: Order ====================
+    /// Order not found
+    OrderNotFound = 4001,
+    /// Order has already been paid
+    OrderAlreadyPaid = 4002,
+    /// Order has already been completed
+    OrderAlreadyCompleted = 4003,
+    /// Order has already been voided
+    OrderAlreadyVoided = 4004,
+    /// Order has existing payments
+    OrderHasPayments = 4005,
+    /// Order item not found
+    OrderItemNotFound = 4006,
+    /// Order is empty
+    OrderEmpty = 4007,
+
+    // ==================== 5xxx: Payment ====================
+    /// Payment processing failed
+    PaymentFailed = 5001,
+    /// Insufficient payment amount
+    PaymentInsufficientAmount = 5002,
+    /// Invalid payment method
+    PaymentInvalidMethod = 5003,
+    /// Payment has already been refunded
+    PaymentAlreadyRefunded = 5004,
+    /// Refund amount exceeds payment
+    PaymentRefundExceedsAmount = 5005,
+
+    // ==================== 6xxx: Product ====================
+    /// Product not found
+    ProductNotFound = 6001,
+    /// Product has invalid price
+    ProductInvalidPrice = 6002,
+    /// Product is out of stock
+    ProductOutOfStock = 6003,
+    /// Category not found
+    CategoryNotFound = 6101,
+    /// Category has products
+    CategoryHasProducts = 6102,
+    /// Category name already exists
+    CategoryNameExists = 6103,
+    /// Specification not found
+    SpecNotFound = 6201,
+    /// Attribute not found
+    AttributeNotFound = 6301,
+    /// Attribute binding failed
+    AttributeBindFailed = 6302,
+
+    // ==================== 7xxx: Table ====================
+    /// Table not found
+    TableNotFound = 7001,
+    /// Table is occupied
+    TableOccupied = 7002,
+    /// Table is already empty
+    TableAlreadyEmpty = 7003,
+    /// Zone not found
+    ZoneNotFound = 7101,
+    /// Zone has tables
+    ZoneHasTables = 7102,
+    /// Zone name already exists
+    ZoneNameExists = 7103,
+
+    // ==================== 8xxx: Employee ====================
+    /// Employee not found
+    EmployeeNotFound = 8001,
+    /// Employee username already exists
+    EmployeeUsernameExists = 8002,
+    /// Cannot delete self
+    EmployeeCannotDeleteSelf = 8003,
+    /// Role not found
+    RoleNotFound = 8101,
+    /// Role name already exists
+    RoleNameExists = 8102,
+    /// Role is in use
+    RoleInUse = 8103,
+
+    // ==================== 9xxx: System ====================
+    /// Internal server error
+    InternalError = 9001,
+    /// Database error
+    DatabaseError = 9002,
+    /// Network error
+    NetworkError = 9003,
+    /// Operation timeout
+    TimeoutError = 9004,
+    /// Configuration error
+    ConfigError = 9005,
+    /// Bridge not initialized
+    BridgeNotInitialized = 9101,
+    /// Bridge not connected
+    BridgeNotConnected = 9102,
+    /// Bridge connection failed
+    BridgeConnectionFailed = 9103,
+    /// Printer not available
+    PrinterNotAvailable = 9201,
+    /// Print operation failed
+    PrintFailed = 9202,
+}
+
+impl ErrorCode {
+    /// Get the numeric code value
+    #[inline]
+    pub const fn code(&self) -> u16 {
+        *self as u16
+    }
+
+    /// Check if this is a success code
+    #[inline]
+    pub const fn is_success(&self) -> bool {
+        matches!(self, ErrorCode::Success)
+    }
+
+    /// Get the developer-facing English message for this error code
+    pub const fn message(&self) -> &'static str {
+        match self {
+            // General
+            ErrorCode::Success => "Operation completed successfully",
+            ErrorCode::Unknown => "An unknown error occurred",
+            ErrorCode::ValidationFailed => "Validation failed",
+            ErrorCode::NotFound => "Resource not found",
+            ErrorCode::AlreadyExists => "Resource already exists",
+            ErrorCode::InvalidRequest => "Invalid request",
+            ErrorCode::InvalidFormat => "Invalid format",
+            ErrorCode::RequiredField => "Required field is missing",
+            ErrorCode::ValueOutOfRange => "Value is out of range",
+
+            // Auth
+            ErrorCode::NotAuthenticated => "User is not authenticated",
+            ErrorCode::InvalidCredentials => "Invalid username or password",
+            ErrorCode::TokenExpired => "Authentication token has expired",
+            ErrorCode::TokenInvalid => "Authentication token is invalid",
+            ErrorCode::SessionExpired => "Session has expired",
+            ErrorCode::AccountLocked => "Account is locked",
+            ErrorCode::AccountDisabled => "Account is disabled",
+
+            // Permission
+            ErrorCode::PermissionDenied => "Permission denied",
+            ErrorCode::RoleRequired => "Specific role is required",
+            ErrorCode::AdminRequired => "Administrator role is required",
+            ErrorCode::CannotModifyAdmin => "Cannot modify administrator user",
+            ErrorCode::CannotDeleteAdmin => "Cannot delete administrator user",
+
+            // Tenant
+            ErrorCode::TenantNotSelected => "No tenant selected",
+            ErrorCode::TenantNotFound => "Tenant not found",
+            ErrorCode::ActivationFailed => "Activation failed",
+            ErrorCode::CertificateInvalid => "Certificate is invalid",
+            ErrorCode::LicenseExpired => "License has expired",
+
+            // Order
+            ErrorCode::OrderNotFound => "Order not found",
+            ErrorCode::OrderAlreadyPaid => "Order has already been paid",
+            ErrorCode::OrderAlreadyCompleted => "Order has already been completed",
+            ErrorCode::OrderAlreadyVoided => "Order has already been voided",
+            ErrorCode::OrderHasPayments => "Order has existing payments",
+            ErrorCode::OrderItemNotFound => "Order item not found",
+            ErrorCode::OrderEmpty => "Order is empty",
+
+            // Payment
+            ErrorCode::PaymentFailed => "Payment processing failed",
+            ErrorCode::PaymentInsufficientAmount => "Insufficient payment amount",
+            ErrorCode::PaymentInvalidMethod => "Invalid payment method",
+            ErrorCode::PaymentAlreadyRefunded => "Payment has already been refunded",
+            ErrorCode::PaymentRefundExceedsAmount => "Refund amount exceeds original payment",
+
+            // Product
+            ErrorCode::ProductNotFound => "Product not found",
+            ErrorCode::ProductInvalidPrice => "Product has invalid price",
+            ErrorCode::ProductOutOfStock => "Product is out of stock",
+            ErrorCode::CategoryNotFound => "Category not found",
+            ErrorCode::CategoryHasProducts => "Category has associated products",
+            ErrorCode::CategoryNameExists => "Category name already exists",
+            ErrorCode::SpecNotFound => "Specification not found",
+            ErrorCode::AttributeNotFound => "Attribute not found",
+            ErrorCode::AttributeBindFailed => "Failed to bind attribute",
+
+            // Table
+            ErrorCode::TableNotFound => "Table not found",
+            ErrorCode::TableOccupied => "Table is occupied",
+            ErrorCode::TableAlreadyEmpty => "Table is already empty",
+            ErrorCode::ZoneNotFound => "Zone not found",
+            ErrorCode::ZoneHasTables => "Zone has associated tables",
+            ErrorCode::ZoneNameExists => "Zone name already exists",
+
+            // Employee
+            ErrorCode::EmployeeNotFound => "Employee not found",
+            ErrorCode::EmployeeUsernameExists => "Employee username already exists",
+            ErrorCode::EmployeeCannotDeleteSelf => "Cannot delete own account",
+            ErrorCode::RoleNotFound => "Role not found",
+            ErrorCode::RoleNameExists => "Role name already exists",
+            ErrorCode::RoleInUse => "Role is currently in use",
+
+            // System
+            ErrorCode::InternalError => "Internal server error",
+            ErrorCode::DatabaseError => "Database error",
+            ErrorCode::NetworkError => "Network error",
+            ErrorCode::TimeoutError => "Operation timed out",
+            ErrorCode::ConfigError => "Configuration error",
+            ErrorCode::BridgeNotInitialized => "Bridge is not initialized",
+            ErrorCode::BridgeNotConnected => "Bridge is not connected",
+            ErrorCode::BridgeConnectionFailed => "Bridge connection failed",
+            ErrorCode::PrinterNotAvailable => "Printer is not available",
+            ErrorCode::PrintFailed => "Print operation failed",
+        }
+    }
+}
+
+impl From<ErrorCode> for u16 {
+    #[inline]
+    fn from(code: ErrorCode) -> Self {
+        code.code()
+    }
+}
+
+/// Error when converting from an invalid u16 to ErrorCode
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InvalidErrorCode(pub u16);
+
+impl fmt::Display for InvalidErrorCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "invalid error code: {}", self.0)
+    }
+}
+
+impl std::error::Error for InvalidErrorCode {}
+
+impl TryFrom<u16> for ErrorCode {
+    type Error = InvalidErrorCode;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match value {
+            // General
+            0 => Ok(ErrorCode::Success),
+            1 => Ok(ErrorCode::Unknown),
+            2 => Ok(ErrorCode::ValidationFailed),
+            3 => Ok(ErrorCode::NotFound),
+            4 => Ok(ErrorCode::AlreadyExists),
+            5 => Ok(ErrorCode::InvalidRequest),
+            6 => Ok(ErrorCode::InvalidFormat),
+            7 => Ok(ErrorCode::RequiredField),
+            8 => Ok(ErrorCode::ValueOutOfRange),
+
+            // Auth
+            1001 => Ok(ErrorCode::NotAuthenticated),
+            1002 => Ok(ErrorCode::InvalidCredentials),
+            1003 => Ok(ErrorCode::TokenExpired),
+            1004 => Ok(ErrorCode::TokenInvalid),
+            1005 => Ok(ErrorCode::SessionExpired),
+            1006 => Ok(ErrorCode::AccountLocked),
+            1007 => Ok(ErrorCode::AccountDisabled),
+
+            // Permission
+            2001 => Ok(ErrorCode::PermissionDenied),
+            2002 => Ok(ErrorCode::RoleRequired),
+            2003 => Ok(ErrorCode::AdminRequired),
+            2004 => Ok(ErrorCode::CannotModifyAdmin),
+            2005 => Ok(ErrorCode::CannotDeleteAdmin),
+
+            // Tenant
+            3001 => Ok(ErrorCode::TenantNotSelected),
+            3002 => Ok(ErrorCode::TenantNotFound),
+            3003 => Ok(ErrorCode::ActivationFailed),
+            3004 => Ok(ErrorCode::CertificateInvalid),
+            3005 => Ok(ErrorCode::LicenseExpired),
+
+            // Order
+            4001 => Ok(ErrorCode::OrderNotFound),
+            4002 => Ok(ErrorCode::OrderAlreadyPaid),
+            4003 => Ok(ErrorCode::OrderAlreadyCompleted),
+            4004 => Ok(ErrorCode::OrderAlreadyVoided),
+            4005 => Ok(ErrorCode::OrderHasPayments),
+            4006 => Ok(ErrorCode::OrderItemNotFound),
+            4007 => Ok(ErrorCode::OrderEmpty),
+
+            // Payment
+            5001 => Ok(ErrorCode::PaymentFailed),
+            5002 => Ok(ErrorCode::PaymentInsufficientAmount),
+            5003 => Ok(ErrorCode::PaymentInvalidMethod),
+            5004 => Ok(ErrorCode::PaymentAlreadyRefunded),
+            5005 => Ok(ErrorCode::PaymentRefundExceedsAmount),
+
+            // Product
+            6001 => Ok(ErrorCode::ProductNotFound),
+            6002 => Ok(ErrorCode::ProductInvalidPrice),
+            6003 => Ok(ErrorCode::ProductOutOfStock),
+            6101 => Ok(ErrorCode::CategoryNotFound),
+            6102 => Ok(ErrorCode::CategoryHasProducts),
+            6103 => Ok(ErrorCode::CategoryNameExists),
+            6201 => Ok(ErrorCode::SpecNotFound),
+            6301 => Ok(ErrorCode::AttributeNotFound),
+            6302 => Ok(ErrorCode::AttributeBindFailed),
+
+            // Table
+            7001 => Ok(ErrorCode::TableNotFound),
+            7002 => Ok(ErrorCode::TableOccupied),
+            7003 => Ok(ErrorCode::TableAlreadyEmpty),
+            7101 => Ok(ErrorCode::ZoneNotFound),
+            7102 => Ok(ErrorCode::ZoneHasTables),
+            7103 => Ok(ErrorCode::ZoneNameExists),
+
+            // Employee
+            8001 => Ok(ErrorCode::EmployeeNotFound),
+            8002 => Ok(ErrorCode::EmployeeUsernameExists),
+            8003 => Ok(ErrorCode::EmployeeCannotDeleteSelf),
+            8101 => Ok(ErrorCode::RoleNotFound),
+            8102 => Ok(ErrorCode::RoleNameExists),
+            8103 => Ok(ErrorCode::RoleInUse),
+
+            // System
+            9001 => Ok(ErrorCode::InternalError),
+            9002 => Ok(ErrorCode::DatabaseError),
+            9003 => Ok(ErrorCode::NetworkError),
+            9004 => Ok(ErrorCode::TimeoutError),
+            9005 => Ok(ErrorCode::ConfigError),
+            9101 => Ok(ErrorCode::BridgeNotInitialized),
+            9102 => Ok(ErrorCode::BridgeNotConnected),
+            9103 => Ok(ErrorCode::BridgeConnectionFailed),
+            9201 => Ok(ErrorCode::PrinterNotAvailable),
+            9202 => Ok(ErrorCode::PrintFailed),
+
+            _ => Err(InvalidErrorCode(value)),
+        }
+    }
+}
+
+impl fmt::Display for ErrorCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.code())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_code_values() {
+        // General
+        assert_eq!(ErrorCode::Success.code(), 0);
+        assert_eq!(ErrorCode::Unknown.code(), 1);
+        assert_eq!(ErrorCode::ValidationFailed.code(), 2);
+        assert_eq!(ErrorCode::NotFound.code(), 3);
+        assert_eq!(ErrorCode::AlreadyExists.code(), 4);
+        assert_eq!(ErrorCode::InvalidRequest.code(), 5);
+        assert_eq!(ErrorCode::InvalidFormat.code(), 6);
+        assert_eq!(ErrorCode::RequiredField.code(), 7);
+        assert_eq!(ErrorCode::ValueOutOfRange.code(), 8);
+
+        // Auth
+        assert_eq!(ErrorCode::NotAuthenticated.code(), 1001);
+        assert_eq!(ErrorCode::InvalidCredentials.code(), 1002);
+        assert_eq!(ErrorCode::TokenExpired.code(), 1003);
+        assert_eq!(ErrorCode::TokenInvalid.code(), 1004);
+        assert_eq!(ErrorCode::SessionExpired.code(), 1005);
+        assert_eq!(ErrorCode::AccountLocked.code(), 1006);
+        assert_eq!(ErrorCode::AccountDisabled.code(), 1007);
+
+        // Permission
+        assert_eq!(ErrorCode::PermissionDenied.code(), 2001);
+        assert_eq!(ErrorCode::RoleRequired.code(), 2002);
+        assert_eq!(ErrorCode::AdminRequired.code(), 2003);
+        assert_eq!(ErrorCode::CannotModifyAdmin.code(), 2004);
+        assert_eq!(ErrorCode::CannotDeleteAdmin.code(), 2005);
+
+        // Tenant
+        assert_eq!(ErrorCode::TenantNotSelected.code(), 3001);
+        assert_eq!(ErrorCode::TenantNotFound.code(), 3002);
+        assert_eq!(ErrorCode::ActivationFailed.code(), 3003);
+        assert_eq!(ErrorCode::CertificateInvalid.code(), 3004);
+        assert_eq!(ErrorCode::LicenseExpired.code(), 3005);
+
+        // Order
+        assert_eq!(ErrorCode::OrderNotFound.code(), 4001);
+        assert_eq!(ErrorCode::OrderAlreadyPaid.code(), 4002);
+        assert_eq!(ErrorCode::OrderAlreadyCompleted.code(), 4003);
+        assert_eq!(ErrorCode::OrderAlreadyVoided.code(), 4004);
+        assert_eq!(ErrorCode::OrderHasPayments.code(), 4005);
+        assert_eq!(ErrorCode::OrderItemNotFound.code(), 4006);
+        assert_eq!(ErrorCode::OrderEmpty.code(), 4007);
+
+        // Payment
+        assert_eq!(ErrorCode::PaymentFailed.code(), 5001);
+        assert_eq!(ErrorCode::PaymentInsufficientAmount.code(), 5002);
+        assert_eq!(ErrorCode::PaymentInvalidMethod.code(), 5003);
+        assert_eq!(ErrorCode::PaymentAlreadyRefunded.code(), 5004);
+        assert_eq!(ErrorCode::PaymentRefundExceedsAmount.code(), 5005);
+
+        // Product
+        assert_eq!(ErrorCode::ProductNotFound.code(), 6001);
+        assert_eq!(ErrorCode::ProductInvalidPrice.code(), 6002);
+        assert_eq!(ErrorCode::ProductOutOfStock.code(), 6003);
+        assert_eq!(ErrorCode::CategoryNotFound.code(), 6101);
+        assert_eq!(ErrorCode::CategoryHasProducts.code(), 6102);
+        assert_eq!(ErrorCode::CategoryNameExists.code(), 6103);
+        assert_eq!(ErrorCode::SpecNotFound.code(), 6201);
+        assert_eq!(ErrorCode::AttributeNotFound.code(), 6301);
+        assert_eq!(ErrorCode::AttributeBindFailed.code(), 6302);
+
+        // Table
+        assert_eq!(ErrorCode::TableNotFound.code(), 7001);
+        assert_eq!(ErrorCode::TableOccupied.code(), 7002);
+        assert_eq!(ErrorCode::TableAlreadyEmpty.code(), 7003);
+        assert_eq!(ErrorCode::ZoneNotFound.code(), 7101);
+        assert_eq!(ErrorCode::ZoneHasTables.code(), 7102);
+        assert_eq!(ErrorCode::ZoneNameExists.code(), 7103);
+
+        // Employee
+        assert_eq!(ErrorCode::EmployeeNotFound.code(), 8001);
+        assert_eq!(ErrorCode::EmployeeUsernameExists.code(), 8002);
+        assert_eq!(ErrorCode::EmployeeCannotDeleteSelf.code(), 8003);
+        assert_eq!(ErrorCode::RoleNotFound.code(), 8101);
+        assert_eq!(ErrorCode::RoleNameExists.code(), 8102);
+        assert_eq!(ErrorCode::RoleInUse.code(), 8103);
+
+        // System
+        assert_eq!(ErrorCode::InternalError.code(), 9001);
+        assert_eq!(ErrorCode::DatabaseError.code(), 9002);
+        assert_eq!(ErrorCode::NetworkError.code(), 9003);
+        assert_eq!(ErrorCode::TimeoutError.code(), 9004);
+        assert_eq!(ErrorCode::ConfigError.code(), 9005);
+        assert_eq!(ErrorCode::BridgeNotInitialized.code(), 9101);
+        assert_eq!(ErrorCode::BridgeNotConnected.code(), 9102);
+        assert_eq!(ErrorCode::BridgeConnectionFailed.code(), 9103);
+        assert_eq!(ErrorCode::PrinterNotAvailable.code(), 9201);
+        assert_eq!(ErrorCode::PrintFailed.code(), 9202);
+    }
+
+    #[test]
+    fn test_is_success() {
+        assert!(ErrorCode::Success.is_success());
+        assert!(!ErrorCode::Unknown.is_success());
+        assert!(!ErrorCode::NotFound.is_success());
+        assert!(!ErrorCode::InternalError.is_success());
+    }
+
+    #[test]
+    fn test_try_from_valid() {
+        assert_eq!(ErrorCode::try_from(0), Ok(ErrorCode::Success));
+        assert_eq!(ErrorCode::try_from(1001), Ok(ErrorCode::NotAuthenticated));
+        assert_eq!(ErrorCode::try_from(4001), Ok(ErrorCode::OrderNotFound));
+        assert_eq!(ErrorCode::try_from(9001), Ok(ErrorCode::InternalError));
+    }
+
+    #[test]
+    fn test_try_from_invalid() {
+        assert_eq!(ErrorCode::try_from(999), Err(InvalidErrorCode(999)));
+        assert_eq!(ErrorCode::try_from(10000), Err(InvalidErrorCode(10000)));
+        assert_eq!(ErrorCode::try_from(1234), Err(InvalidErrorCode(1234)));
+    }
+
+    #[test]
+    fn test_from_error_code_to_u16() {
+        let code: u16 = ErrorCode::Success.into();
+        assert_eq!(code, 0);
+
+        let code: u16 = ErrorCode::NotAuthenticated.into();
+        assert_eq!(code, 1001);
+
+        let code: u16 = ErrorCode::InternalError.into();
+        assert_eq!(code, 9001);
+    }
+
+    #[test]
+    fn test_serialize() {
+        let code = ErrorCode::NotFound;
+        let json = serde_json::to_string(&code).unwrap();
+        assert_eq!(json, "3");
+
+        let code = ErrorCode::OrderNotFound;
+        let json = serde_json::to_string(&code).unwrap();
+        assert_eq!(json, "4001");
+
+        let code = ErrorCode::Success;
+        let json = serde_json::to_string(&code).unwrap();
+        assert_eq!(json, "0");
+    }
+
+    #[test]
+    fn test_deserialize() {
+        let code: ErrorCode = serde_json::from_str("0").unwrap();
+        assert_eq!(code, ErrorCode::Success);
+
+        let code: ErrorCode = serde_json::from_str("3").unwrap();
+        assert_eq!(code, ErrorCode::NotFound);
+
+        let code: ErrorCode = serde_json::from_str("4001").unwrap();
+        assert_eq!(code, ErrorCode::OrderNotFound);
+
+        let code: ErrorCode = serde_json::from_str("9001").unwrap();
+        assert_eq!(code, ErrorCode::InternalError);
+    }
+
+    #[test]
+    fn test_deserialize_invalid() {
+        let result: Result<ErrorCode, _> = serde_json::from_str("999");
+        assert!(result.is_err());
+
+        let result: Result<ErrorCode, _> = serde_json::from_str("10000");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_display() {
+        assert_eq!(format!("{}", ErrorCode::Success), "0");
+        assert_eq!(format!("{}", ErrorCode::NotFound), "3");
+        assert_eq!(format!("{}", ErrorCode::OrderNotFound), "4001");
+        assert_eq!(format!("{}", ErrorCode::InternalError), "9001");
+    }
+
+    #[test]
+    fn test_message() {
+        assert_eq!(ErrorCode::Success.message(), "Operation completed successfully");
+        assert_eq!(ErrorCode::NotFound.message(), "Resource not found");
+        assert_eq!(ErrorCode::OrderNotFound.message(), "Order not found");
+        assert_eq!(ErrorCode::InternalError.message(), "Internal server error");
+    }
+
+    #[test]
+    fn test_invalid_error_code_display() {
+        let err = InvalidErrorCode(999);
+        assert_eq!(format!("{}", err), "invalid error code: 999");
+    }
+
+    #[test]
+    fn test_roundtrip() {
+        // Test that serialization -> deserialization roundtrip works
+        let codes = [
+            ErrorCode::Success,
+            ErrorCode::NotAuthenticated,
+            ErrorCode::PermissionDenied,
+            ErrorCode::OrderNotFound,
+            ErrorCode::InternalError,
+        ];
+
+        for code in codes {
+            let json = serde_json::to_string(&code).unwrap();
+            let parsed: ErrorCode = serde_json::from_str(&json).unwrap();
+            assert_eq!(code, parsed);
+        }
+    }
+
+    #[test]
+    fn test_debug() {
+        // Test that Debug derive works correctly
+        let debug_str = format!("{:?}", ErrorCode::Success);
+        assert_eq!(debug_str, "Success");
+
+        let debug_str = format!("{:?}", ErrorCode::OrderNotFound);
+        assert_eq!(debug_str, "OrderNotFound");
+    }
+
+    #[test]
+    fn test_clone_copy() {
+        let code = ErrorCode::Success;
+        let cloned = code.clone();
+        let copied = code;
+
+        assert_eq!(code, cloned);
+        assert_eq!(code, copied);
+    }
+
+    #[test]
+    fn test_hash() {
+        use std::collections::HashSet;
+
+        let mut set = HashSet::new();
+        set.insert(ErrorCode::Success);
+        set.insert(ErrorCode::NotFound);
+        set.insert(ErrorCode::Success); // Duplicate
+
+        assert_eq!(set.len(), 2);
+        assert!(set.contains(&ErrorCode::Success));
+        assert!(set.contains(&ErrorCode::NotFound));
+    }
+}
