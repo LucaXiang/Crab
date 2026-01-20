@@ -97,6 +97,7 @@ tracing-appender = "0.2"
 # ========== Database ==========
 surrealdb = { version = "2.4", features = ["kv-rocksdb"] }
 surrealdb-migrations = "2.4"
+redb = "3.0"
 
 # ========== Utilities ==========
 dotenv = "0.15"

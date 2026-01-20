@@ -12,7 +12,7 @@
 //!
 //! # 模块结构
 //!
-//! ```
+//! ```text
 //! edge-server/src/
 //! ├── core/          # 配置、状态、错误
 //! ├── auth/          # JWT 认证、权限
@@ -20,7 +20,8 @@
 //! ├── api/           # HTTP 路由和处理器
 //! ├── utils/         # 工具函数
 //! ├── db/            # 数据库层
-//! └── message/       # 消息总线
+//! ├── message/       # 消息总线
+//! └── orders/        # 订单事件溯源
 //! ```
 
 pub mod api;
@@ -28,6 +29,7 @@ pub mod auth;
 pub mod core;
 pub mod db;
 pub mod message;
+pub mod orders;
 pub mod services;
 pub mod utils;
 
@@ -35,6 +37,7 @@ pub mod utils;
 pub use auth::{CurrentUser, JwtService};
 pub use core::{Config, Server, ServerState};
 pub use message::{BusMessage, EventType};
+pub use orders::{OrdersManager, OrderReducer, OrderStorage};
 pub use utils::AppError as AppErrorType;
 pub use utils::{AppResponse, AppResult};
 

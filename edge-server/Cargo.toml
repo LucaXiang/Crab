@@ -22,6 +22,7 @@ base64.workspace = true
 # Database
 surrealdb.workspace = true
 surrealdb-migrations.workspace = true
+redb.workspace = true
 
 # Logging
 tracing.workspace = true

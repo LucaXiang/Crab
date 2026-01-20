@@ -9,6 +9,7 @@ pub mod error;
 pub mod intent;
 pub mod message;
 pub mod models;
+pub mod order;
 pub mod request;
 pub mod response;
 pub mod types;

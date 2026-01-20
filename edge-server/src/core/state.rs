@@ -9,6 +9,7 @@ use crate::auth::JwtService;
 use crate::core::Config;
 use crate::core::config::migrate_legacy_structure;
 use crate::db::DbService;
+use crate::orders::OrdersManager;
 use crate::services::{
     ActivationService, CertService, HttpsService, MessageBusService, ProvisioningService,
 };
@@ -108,6 +109,8 @@ pub struct ServerState {
     pub jwt_service: Arc<JwtService>,
     /// 资源版本管理器 (用于 broadcast_sync 自动递增版本号)
     pub resource_versions: Arc<ResourceVersions>,
+    /// 订单管理器 (事件溯源)
+    pub orders_manager: Arc<OrdersManager>,
 }
 
 impl ServerState {
@@ -123,6 +126,7 @@ impl ServerState {
         https: HttpsService,
         jwt_service: Arc<JwtService>,
         resource_versions: Arc<ResourceVersions>,
+        orders_manager: Arc<OrdersManager>,
     ) -> Self {
         Self {
             config,
@@ -133,6 +137,7 @@ impl ServerState {
             https,
             jwt_service,
             resource_versions,
+            orders_manager,
         }
     }
 
@@ -177,6 +182,12 @@ impl ServerState {
         let jwt_service = Arc::new(JwtService::default());
         let resource_versions = Arc::new(ResourceVersions::new());
 
+        // 3. Initialize OrdersManager (event sourcing)
+        let orders_db_path = db_dir.join("orders.redb");
+        let orders_manager = Arc::new(
+            OrdersManager::new(&orders_db_path).expect("Failed to initialize orders manager"),
+        );
+
         let state = Self::new(
             config.clone(),
             db,
@@ -186,6 +197,7 @@ impl ServerState {
             https.clone(),
             jwt_service,
             resource_versions,
+            orders_manager,
         );
 
         // 3. Late initialization for HttpsService (needs state)
@@ -200,9 +212,49 @@ impl ServerState {
     ///
     /// 启动的任务：
     /// - 消息总线处理器 (MessageHandler)
+    /// - 订单事件转发器 (Order Event Forwarder)
     pub async fn start_background_tasks(&self) {
         // Start MessageBus background tasks
         self.message_bus.start_background_tasks(self.clone());
+
+        // Start order event forwarder (OrderEvent -> MessageBus)
+        self.start_order_event_forwarder();
+    }
+
+    /// 启动订单事件转发器
+    ///
+    /// 订阅 OrdersManager 的事件流，转发到 MessageBus 以广播给所有客户端
+    fn start_order_event_forwarder(&self) {
+        let mut event_rx = self.orders_manager.subscribe();
+        let message_bus = self.message_bus.bus().clone();
+
+        tokio::spawn(async move {
+            tracing::info!("📦 Order event forwarder started");
+            loop {
+                match event_rx.recv().await {
+                    Ok(event) => {
+                        // Convert OrderEvent to BusMessage (as Sync)
+                        let payload = SyncPayload {
+                            resource: "order_event".to_string(),
+                            version: event.sequence,
+                            action: event.event_type.to_string(),
+                            id: event.order_id.clone(),
+                            data: serde_json::to_value(&event).ok(),
+                        };
+                        if let Err(e) = message_bus.publish(BusMessage::sync(&payload)).await {
+                            tracing::warn!("Failed to forward order event: {}", e);
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("Order event forwarder lagged, skipped {} events", n);
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::info!("Order event channel closed, forwarder stopping");
+                        break;
+                    }
+                }
+            }
+        });
     }
 
     /// 获取数据库实例
@@ -266,6 +318,11 @@ impl ServerState {
     /// 获取 HTTPS 服务
     pub fn https_service(&self) -> &HttpsService {
         &self.https
+    }
+
+    /// 获取订单管理器
+    pub fn orders_manager(&self) -> &Arc<OrdersManager> {
+        &self.orders_manager
     }
 
     /// 检查是否已激活
