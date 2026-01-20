@@ -14,18 +14,32 @@ use crate::core::{
     TagListData,
 };
 use shared::models::{
-    // Tags
-    Tag, TagCreate, TagUpdate,
-    // Categories
-    Category, CategoryCreate, CategoryUpdate,
-    // Products
-    Product, ProductCreate, ProductUpdate,
-    ProductSpecification, ProductSpecificationCreate, ProductSpecificationUpdate,
     // Attributes
-    Attribute, AttributeCreate, AttributeUpdate, HasAttribute,
+    Attribute,
+    AttributeCreate,
+    AttributeUpdate,
+    // Categories
+    Category,
+    CategoryCreate,
+    CategoryUpdate,
+    HasAttribute,
     // Kitchen Printers
-    KitchenPrinter, KitchenPrinterCreate, KitchenPrinterUpdate,
+    KitchenPrinter,
+    KitchenPrinterCreate,
+    KitchenPrinterUpdate,
+    // Products
+    Product,
+    ProductCreate,
+    ProductSpecification,
+    ProductSpecificationCreate,
+    ProductSpecificationUpdate,
+    ProductUpdate,
+    // Tags
+    Tag,
+    TagCreate,
+    TagUpdate,
 };
+use urlencoding::encode;
 
 // ============ Tags ============
 
@@ -46,7 +60,10 @@ pub async fn get_tag(
     id: String,
 ) -> Result<ApiResponse<Tag>, String> {
     let bridge = bridge.read().await;
-    match bridge.get::<Tag>(&format!("/api/tags/{}", id)).await {
+    match bridge
+        .get::<Tag>(&format!("/api/tags/{}", encode(&id)))
+        .await
+    {
         Ok(tag) => Ok(ApiResponse::success(tag)),
         Err(e) => Ok(ApiResponse::error(tag::GET_FAILED, e.to_string())),
     }
@@ -71,7 +88,10 @@ pub async fn update_tag(
     data: TagUpdate,
 ) -> Result<ApiResponse<Tag>, String> {
     let bridge = bridge.read().await;
-    match bridge.put::<Tag, _>(&format!("/api/tags/{}", id), &data).await {
+    match bridge
+        .put::<Tag, _>(&format!("/api/tags/{}", encode(&id)), &data)
+        .await
+    {
         Ok(tag) => Ok(ApiResponse::success(tag)),
         Err(e) => Ok(ApiResponse::error(tag::UPDATE_FAILED, e.to_string())),
     }
@@ -83,7 +103,10 @@ pub async fn delete_tag(
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
     let bridge = bridge.read().await;
-    match bridge.delete::<bool>(&format!("/api/tags/{}", id)).await {
+    match bridge
+        .delete::<bool>(&format!("/api/tags/{}", encode(&id)))
+        .await
+    {
         Ok(_) => Ok(ApiResponse::success(DeleteData::success())),
         Err(e) => Ok(ApiResponse::error(tag::DELETE_FAILED, e.to_string())),
     }
@@ -108,7 +131,10 @@ pub async fn get_category(
     id: String,
 ) -> Result<ApiResponse<CategoryData>, String> {
     let bridge = bridge.read().await;
-    match bridge.get::<Category>(&format!("/api/categories/{}", id)).await {
+    match bridge
+        .get::<Category>(&format!("/api/categories/{}", encode(&id)))
+        .await
+    {
         Ok(cat) => Ok(ApiResponse::success(CategoryData { category: cat })),
         Err(e) => Ok(ApiResponse::error(category::GET_FAILED, e.to_string())),
     }
@@ -133,7 +159,10 @@ pub async fn update_category(
     data: CategoryUpdate,
 ) -> Result<ApiResponse<CategoryData>, String> {
     let bridge = bridge.read().await;
-    match bridge.put::<Category, _>(&format!("/api/categories/{}", id), &data).await {
+    match bridge
+        .put::<Category, _>(&format!("/api/categories/{}", encode(&id)), &data)
+        .await
+    {
         Ok(cat) => Ok(ApiResponse::success(CategoryData { category: cat })),
         Err(e) => Ok(ApiResponse::error(category::UPDATE_FAILED, e.to_string())),
     }
@@ -145,7 +174,10 @@ pub async fn delete_category(
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
     let bridge = bridge.read().await;
-    match bridge.delete::<bool>(&format!("/api/categories/{}", id)).await {
+    match bridge
+        .delete::<bool>(&format!("/api/categories/{}", encode(&id)))
+        .await
+    {
         Ok(_) => Ok(ApiResponse::success(DeleteData::success())),
         Err(e) => Ok(ApiResponse::error(category::DELETE_FAILED, e.to_string())),
     }
@@ -170,7 +202,10 @@ pub async fn get_product(
     id: String,
 ) -> Result<ApiResponse<ProductData>, String> {
     let bridge = bridge.read().await;
-    match bridge.get::<Product>(&format!("/api/products/{}", id)).await {
+    match bridge
+        .get::<Product>(&format!("/api/products/{}", encode(&id)))
+        .await
+    {
         Ok(prod) => Ok(ApiResponse::success(ProductData { product: prod })),
         Err(e) => Ok(ApiResponse::error(product::GET_FAILED, e.to_string())),
     }
@@ -195,7 +230,10 @@ pub async fn update_product(
     data: ProductUpdate,
 ) -> Result<ApiResponse<ProductData>, String> {
     let bridge = bridge.read().await;
-    match bridge.put::<Product, _>(&format!("/api/products/{}", id), &data).await {
+    match bridge
+        .put::<Product, _>(&format!("/api/products/{}", encode(&id)), &data)
+        .await
+    {
         Ok(prod) => Ok(ApiResponse::success(ProductData { product: prod })),
         Err(e) => Ok(ApiResponse::error(product::UPDATE_FAILED, e.to_string())),
     }
@@ -207,7 +245,10 @@ pub async fn delete_product(
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
     let bridge = bridge.read().await;
-    match bridge.delete::<bool>(&format!("/api/products/{}", id)).await {
+    match bridge
+        .delete::<bool>(&format!("/api/products/{}", encode(&id)))
+        .await
+    {
         Ok(_) => Ok(ApiResponse::success(DeleteData::success())),
         Err(e) => Ok(ApiResponse::error(product::DELETE_FAILED, e.to_string())),
     }
@@ -221,7 +262,10 @@ pub async fn list_specs(
     product_id: String,
 ) -> Result<ApiResponse<SpecListData>, String> {
     let bridge = bridge.read().await;
-    match bridge.get::<Vec<ProductSpecification>>(&format!("/api/specs/product/{}", product_id)).await {
+    match bridge
+        .get::<Vec<ProductSpecification>>(&format!("/api/specs/product/{}", encode(&product_id)))
+        .await
+    {
         Ok(specs) => Ok(ApiResponse::success(SpecListData { specs })),
         Err(e) => Ok(ApiResponse::error(spec::LIST_FAILED, e.to_string())),
     }
@@ -233,7 +277,10 @@ pub async fn get_spec(
     id: String,
 ) -> Result<ApiResponse<ProductSpecification>, String> {
     let bridge = bridge.read().await;
-    match bridge.get::<ProductSpecification>(&format!("/api/specs/{}", id)).await {
+    match bridge
+        .get::<ProductSpecification>(&format!("/api/specs/{}", encode(&id)))
+        .await
+    {
         Ok(s) => Ok(ApiResponse::success(s)),
         Err(e) => Ok(ApiResponse::error(spec::GET_FAILED, e.to_string())),
     }
@@ -245,7 +292,10 @@ pub async fn create_spec(
     data: ProductSpecificationCreate,
 ) -> Result<ApiResponse<ProductSpecification>, String> {
     let bridge = bridge.read().await;
-    match bridge.post::<ProductSpecification, _>("/api/specs", &data).await {
+    match bridge
+        .post::<ProductSpecification, _>("/api/specs", &data)
+        .await
+    {
         Ok(s) => Ok(ApiResponse::success(s)),
         Err(e) => Ok(ApiResponse::error(spec::CREATE_FAILED, e.to_string())),
     }
@@ -258,7 +308,10 @@ pub async fn update_spec(
     data: ProductSpecificationUpdate,
 ) -> Result<ApiResponse<ProductSpecification>, String> {
     let bridge = bridge.read().await;
-    match bridge.put::<ProductSpecification, _>(&format!("/api/specs/{}", id), &data).await {
+    match bridge
+        .put::<ProductSpecification, _>(&format!("/api/specs/{}", encode(&id)), &data)
+        .await
+    {
         Ok(s) => Ok(ApiResponse::success(s)),
         Err(e) => Ok(ApiResponse::error(spec::UPDATE_FAILED, e.to_string())),
     }
@@ -270,7 +323,10 @@ pub async fn delete_spec(
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
     let bridge = bridge.read().await;
-    match bridge.delete::<bool>(&format!("/api/specs/{}", id)).await {
+    match bridge
+        .delete::<bool>(&format!("/api/specs/{}", encode(&id)))
+        .await
+    {
         Ok(_) => Ok(ApiResponse::success(DeleteData::success())),
         Err(e) => Ok(ApiResponse::error(spec::DELETE_FAILED, e.to_string())),
     }
@@ -295,7 +351,10 @@ pub async fn get_attribute(
     id: String,
 ) -> Result<ApiResponse<AttributeData>, String> {
     let bridge = bridge.read().await;
-    match bridge.get::<Attribute>(&format!("/api/attributes/{}", id)).await {
+    match bridge
+        .get::<Attribute>(&format!("/api/attributes/{}", encode(&id)))
+        .await
+    {
         Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
         Err(e) => Ok(ApiResponse::error(attribute::GET_FAILED, e.to_string())),
     }
@@ -320,7 +379,10 @@ pub async fn update_attribute(
     data: AttributeUpdate,
 ) -> Result<ApiResponse<AttributeData>, String> {
     let bridge = bridge.read().await;
-    match bridge.put::<Attribute, _>(&format!("/api/attributes/{}", id), &data).await {
+    match bridge
+        .put::<Attribute, _>(&format!("/api/attributes/{}", encode(&id)), &data)
+        .await
+    {
         Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
         Err(e) => Ok(ApiResponse::error(attribute::UPDATE_FAILED, e.to_string())),
     }
@@ -332,7 +394,10 @@ pub async fn delete_attribute(
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
     let bridge = bridge.read().await;
-    match bridge.delete::<bool>(&format!("/api/attributes/{}", id)).await {
+    match bridge
+        .delete::<bool>(&format!("/api/attributes/{}", encode(&id)))
+        .await
+    {
         Ok(_) => Ok(ApiResponse::success(DeleteData::success())),
         Err(e) => Ok(ApiResponse::error(attribute::DELETE_FAILED, e.to_string())),
     }
@@ -345,7 +410,10 @@ pub async fn list_kitchen_printers(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<PrinterListData>, String> {
     let bridge = bridge.read().await;
-    match bridge.get::<Vec<KitchenPrinter>>("/api/kitchen-printers").await {
+    match bridge
+        .get::<Vec<KitchenPrinter>>("/api/kitchen-printers")
+        .await
+    {
         Ok(printers) => Ok(ApiResponse::success(PrinterListData { printers })),
         Err(e) => Ok(ApiResponse::error(printer::LIST_FAILED, e.to_string())),
     }
@@ -357,7 +425,10 @@ pub async fn get_kitchen_printer(
     id: String,
 ) -> Result<ApiResponse<PrinterData>, String> {
     let bridge = bridge.read().await;
-    match bridge.get::<KitchenPrinter>(&format!("/api/kitchen-printers/{}", id)).await {
+    match bridge
+        .get::<KitchenPrinter>(&format!("/api/kitchen-printers/{}", encode(&id)))
+        .await
+    {
         Ok(p) => Ok(ApiResponse::success(PrinterData { printer: p })),
         Err(e) => Ok(ApiResponse::error(printer::GET_FAILED, e.to_string())),
     }
@@ -369,7 +440,10 @@ pub async fn create_kitchen_printer(
     data: KitchenPrinterCreate,
 ) -> Result<ApiResponse<PrinterData>, String> {
     let bridge = bridge.read().await;
-    match bridge.post::<KitchenPrinter, _>("/api/kitchen-printers", &data).await {
+    match bridge
+        .post::<KitchenPrinter, _>("/api/kitchen-printers", &data)
+        .await
+    {
         Ok(p) => Ok(ApiResponse::success(PrinterData { printer: p })),
         Err(e) => Ok(ApiResponse::error(printer::CREATE_FAILED, e.to_string())),
     }
@@ -382,7 +456,10 @@ pub async fn update_kitchen_printer(
     data: KitchenPrinterUpdate,
 ) -> Result<ApiResponse<PrinterData>, String> {
     let bridge = bridge.read().await;
-    match bridge.put::<KitchenPrinter, _>(&format!("/api/kitchen-printers/{}", id), &data).await {
+    match bridge
+        .put::<KitchenPrinter, _>(&format!("/api/kitchen-printers/{}", encode(&id)), &data)
+        .await
+    {
         Ok(p) => Ok(ApiResponse::success(PrinterData { printer: p })),
         Err(e) => Ok(ApiResponse::error(printer::UPDATE_FAILED, e.to_string())),
     }
@@ -394,7 +471,10 @@ pub async fn delete_kitchen_printer(
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
     let bridge = bridge.read().await;
-    match bridge.delete::<bool>(&format!("/api/kitchen-printers/{}", id)).await {
+    match bridge
+        .delete::<bool>(&format!("/api/kitchen-printers/{}", encode(&id)))
+        .await
+    {
         Ok(_) => Ok(ApiResponse::success(DeleteData::success())),
         Err(e) => Ok(ApiResponse::error(printer::DELETE_FAILED, e.to_string())),
     }
@@ -408,7 +488,10 @@ pub async fn list_product_attributes(
     product_id: String,
 ) -> Result<ApiResponse<serde_json::Value>, String> {
     let bridge = bridge.read().await;
-    match bridge.get::<serde_json::Value>(&format!("/api/products/{}/attributes", product_id)).await {
+    match bridge
+        .get::<serde_json::Value>(&format!("/api/products/{}/attributes", encode(&product_id)))
+        .await
+    {
         Ok(attrs) => Ok(ApiResponse::success(attrs)),
         Err(e) => Ok(ApiResponse::error(attribute::LIST_FAILED, e.to_string())),
     }
@@ -420,7 +503,10 @@ pub async fn bind_product_attribute(
     data: serde_json::Value,
 ) -> Result<ApiResponse<serde_json::Value>, String> {
     let bridge = bridge.read().await;
-    match bridge.post::<serde_json::Value, _>("/api/has-attribute", &data).await {
+    match bridge
+        .post::<serde_json::Value, _>("/api/has-attribute", &data)
+        .await
+    {
         Ok(result) => Ok(ApiResponse::success(result)),
         Err(e) => Ok(ApiResponse::error(attribute::BIND_FAILED, e.to_string())),
     }
@@ -432,7 +518,10 @@ pub async fn unbind_product_attribute(
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
     let bridge = bridge.read().await;
-    match bridge.delete::<bool>(&format!("/api/has-attribute/{}", id)).await {
+    match bridge
+        .delete::<bool>(&format!("/api/has-attribute/{}", id))
+        .await
+    {
         Ok(_) => Ok(ApiResponse::success(DeleteData::success())),
         Err(e) => Ok(ApiResponse::error(attribute::UNBIND_FAILED, e.to_string())),
     }
@@ -445,7 +534,10 @@ pub async fn update_product_attribute_binding(
     data: serde_json::Value,
 ) -> Result<ApiResponse<serde_json::Value>, String> {
     let bridge = bridge.read().await;
-    match bridge.put::<serde_json::Value, _>(&format!("/api/has-attribute/{}", id), &data).await {
+    match bridge
+        .put::<serde_json::Value, _>(&format!("/api/has-attribute/{}", id), &data)
+        .await
+    {
         Ok(result) => Ok(ApiResponse::success(result)),
         Err(e) => Ok(ApiResponse::error(attribute::UPDATE_FAILED, e.to_string())),
     }
@@ -460,7 +552,10 @@ pub async fn list_category_attributes(
     category_id: String,
 ) -> Result<ApiResponse<AttributeListData>, String> {
     let bridge = bridge.read().await;
-    match bridge.get::<Vec<Attribute>>(&format!("/api/categories/{}/attributes", category_id)).await {
+    match bridge
+        .get::<Vec<Attribute>>(&format!("/api/categories/{}/attributes", category_id))
+        .await
+    {
         Ok(templates) => Ok(ApiResponse::success(AttributeListData { templates })),
         Err(e) => Ok(ApiResponse::error(attribute::LIST_FAILED, e.to_string())),
     }
@@ -483,10 +578,13 @@ pub async fn bind_category_attribute(
     payload: BindCategoryAttributePayload,
 ) -> Result<ApiResponse<HasAttribute>, String> {
     let bridge = bridge.read().await;
-    match bridge.post::<HasAttribute, _>(
-        &format!("/api/categories/{}/attributes/{}", category_id, attr_id),
-        &payload,
-    ).await {
+    match bridge
+        .post::<HasAttribute, _>(
+            &format!("/api/categories/{}/attributes/{}", category_id, attr_id),
+            &payload,
+        )
+        .await
+    {
         Ok(binding) => Ok(ApiResponse::success(binding)),
         Err(e) => Ok(ApiResponse::error(attribute::BIND_FAILED, e.to_string())),
     }
@@ -500,7 +598,13 @@ pub async fn unbind_category_attribute(
     attr_id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
     let bridge = bridge.read().await;
-    match bridge.delete::<bool>(&format!("/api/categories/{}/attributes/{}", category_id, attr_id)).await {
+    match bridge
+        .delete::<bool>(&format!(
+            "/api/categories/{}/attributes/{}",
+            category_id, attr_id
+        ))
+        .await
+    {
         Ok(_) => Ok(ApiResponse::success(DeleteData::success())),
         Err(e) => Ok(ApiResponse::error(attribute::UNBIND_FAILED, e.to_string())),
     }
@@ -526,7 +630,10 @@ pub async fn batch_update_category_sort_order(
     updates: Vec<CategorySortOrderUpdate>,
 ) -> Result<ApiResponse<BatchUpdateResponse>, String> {
     let bridge = bridge.read().await;
-    match bridge.put::<BatchUpdateResponse, _>("/api/categories/sort-order", &updates).await {
+    match bridge
+        .put::<BatchUpdateResponse, _>("/api/categories/sort-order", &updates)
+        .await
+    {
         Ok(result) => Ok(ApiResponse::success(result)),
         Err(e) => Ok(ApiResponse::error(category::UPDATE_FAILED, e.to_string())),
     }

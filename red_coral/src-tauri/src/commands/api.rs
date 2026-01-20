@@ -7,15 +7,19 @@ use tauri::State;
 use tokio::sync::RwLock;
 
 use crate::core::ClientBridge;
+use crate::core::response::ApiResponse;
 
 /// 通用 GET 请求
 #[tauri::command]
 pub async fn api_get(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     path: String,
-) -> Result<serde_json::Value, String> {
+) -> Result<ApiResponse<serde_json::Value>, String> {
     let bridge = bridge.read().await;
-    bridge.get(&path).await.map_err(|e| e.to_string())
+    match bridge.get(&path).await {
+        Ok(data) => Ok(ApiResponse::success(data)),
+        Err(e) => Ok(ApiResponse::error("API_GET_FAILED", e.to_string())),
+    }
 }
 
 /// 通用 POST 请求
@@ -24,9 +28,12 @@ pub async fn api_post(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     path: String,
     body: serde_json::Value,
-) -> Result<serde_json::Value, String> {
+) -> Result<ApiResponse<serde_json::Value>, String> {
     let bridge = bridge.read().await;
-    bridge.post(&path, &body).await.map_err(|e| e.to_string())
+    match bridge.post(&path, &body).await {
+        Ok(data) => Ok(ApiResponse::success(data)),
+        Err(e) => Ok(ApiResponse::error("API_POST_FAILED", e.to_string())),
+    }
 }
 
 /// 通用 PUT 请求
@@ -35,9 +42,12 @@ pub async fn api_put(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     path: String,
     body: serde_json::Value,
-) -> Result<serde_json::Value, String> {
+) -> Result<ApiResponse<serde_json::Value>, String> {
     let bridge = bridge.read().await;
-    bridge.put(&path, &body).await.map_err(|e| e.to_string())
+    match bridge.put(&path, &body).await {
+        Ok(data) => Ok(ApiResponse::success(data)),
+        Err(e) => Ok(ApiResponse::error("API_PUT_FAILED", e.to_string())),
+    }
 }
 
 /// 通用 DELETE 请求
@@ -45,7 +55,10 @@ pub async fn api_put(
 pub async fn api_delete(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     path: String,
-) -> Result<serde_json::Value, String> {
+) -> Result<ApiResponse<serde_json::Value>, String> {
     let bridge = bridge.read().await;
-    bridge.delete(&path).await.map_err(|e| e.to_string())
+    match bridge.delete(&path).await {
+        Ok(data) => Ok(ApiResponse::success(data)),
+        Err(e) => Ok(ApiResponse::error("API_DELETE_FAILED", e.to_string())),
+    }
 }

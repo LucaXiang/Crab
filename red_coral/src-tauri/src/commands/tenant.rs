@@ -4,16 +4,20 @@ use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock;
 
-use crate::core::{ClientBridge, TenantInfo};
+use crate::core::DeleteData;
+use crate::core::response::TenantListData;
+use crate::core::{ApiResponse, ClientBridge};
 
 /// 获取已激活的租户列表
 #[tauri::command]
 pub async fn list_tenants(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-) -> Result<Vec<TenantInfo>, String> {
+) -> Result<ApiResponse<TenantListData>, String> {
     let bridge = bridge.read().await;
     let tenant_manager = bridge.tenant_manager().read().await;
-    Ok(tenant_manager.list_tenants())
+    Ok(ApiResponse::success(TenantListData {
+        tenants: tenant_manager.list_tenants(),
+    }))
 }
 
 /// 激活新租户 (设备激活)
@@ -25,15 +29,18 @@ pub async fn activate_tenant(
     auth_url: String,
     username: String,
     password: String,
-) -> Result<String, String> {
+) -> Result<ApiResponse<String>, String> {
     let bridge = bridge.read().await;
 
     // 使用 ClientBridge 的 handle_activation 方法
     // 它会自动调用 TenantManager 激活，并更新配置 (current_tenant)
-    bridge
+    match bridge
         .handle_activation(&auth_url, &username, &password)
         .await
-        .map_err(|e| e.to_string())
+    {
+        Ok(msg) => Ok(ApiResponse::success(msg)),
+        Err(e) => Ok(ApiResponse::error("ACTIVATE_FAILED", e.to_string())),
+    }
 }
 
 /// 切换当前租户
@@ -41,15 +48,15 @@ pub async fn activate_tenant(
 pub async fn switch_tenant(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     tenant_id: String,
-) -> Result<(), String> {
+) -> Result<ApiResponse<()>, String> {
     let bridge = bridge.read().await;
 
     // 使用 ClientBridge 的 switch_tenant 方法
     // 它会自动更新 TenantManager 和 Config
-    bridge
-        .switch_tenant(&tenant_id)
-        .await
-        .map_err(|e| e.to_string())
+    match bridge.switch_tenant(&tenant_id).await {
+        Ok(_) => Ok(ApiResponse::success(())),
+        Err(e) => Ok(ApiResponse::error("SWITCH_TENANT_FAILED", e.to_string())),
+    }
 }
 
 /// 移除租户
@@ -57,21 +64,24 @@ pub async fn switch_tenant(
 pub async fn remove_tenant(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     tenant_id: String,
-) -> Result<(), String> {
+) -> Result<ApiResponse<DeleteData>, String> {
     let bridge = bridge.read().await;
     let mut tenant_manager = bridge.tenant_manager().write().await;
 
-    tenant_manager
-        .remove_tenant(&tenant_id)
-        .map_err(|e| e.to_string())
+    match tenant_manager.remove_tenant(&tenant_id) {
+        Ok(_) => Ok(ApiResponse::success(DeleteData::success())),
+        Err(e) => Ok(ApiResponse::error("REMOVE_TENANT_FAILED", e.to_string())),
+    }
 }
 
 /// 获取当前租户ID
 #[tauri::command]
 pub async fn get_current_tenant(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-) -> Result<Option<String>, String> {
+) -> Result<ApiResponse<Option<String>>, String> {
     let bridge = bridge.read().await;
     let tenant_manager = bridge.tenant_manager().read().await;
-    Ok(tenant_manager.current_tenant_id().map(|s| s.to_string()))
+    Ok(ApiResponse::success(
+        tenant_manager.current_tenant_id().map(|s| s.to_string()),
+    ))
 }

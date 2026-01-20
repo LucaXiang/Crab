@@ -7,20 +7,22 @@
 //! - ApiResponse: 统一的 API 响应格式
 //! - ErrorCodes: 标准化错误码
 
-pub mod client_bridge;
+pub mod bridge;
 pub mod error_codes;
 pub mod response;
 pub mod session_cache;
 pub mod tenant_manager;
 
-pub use client_bridge::{
+pub use bridge::{
     AppConfig, AppState, BridgeError, ClientBridge, ClientModeConfig, ModeInfo, ModeType,
     ServerModeConfig,
 };
 pub use response::{
-    ApiResponse, AttributeData, AttributeListData, CategoryData, CategoryListData, DeleteData,
-    PrinterData, PrinterListData, ProductAttributeListData, ProductData, ProductListData,
-    SpecListData, TagListData,
+    ApiResponse, AppConfigResponse, AttributeData, AttributeListData, AuthData, CategoryData,
+    CategoryListData, DeleteData, EmployeeListData, FetchOrderListResponse, OrderEventListData,
+    OrderListData, OrderSnapshotListData, PriceRuleListData, PrinterData, PrinterListData,
+    ProductAttributeListData, ProductData, ProductListData, Role, RoleListData, RolePermission,
+    RolePermissionListData, SpecListData, TableListData, TagListData, TenantListData, ZoneListData,
 };
 pub use session_cache::{EmployeeSession, LoginMode, SessionCache, SessionCacheError};
 pub use tenant_manager::{TenantError, TenantInfo, TenantManager};

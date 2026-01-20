@@ -1,0 +1,87 @@
+//! Bridge configuration types
+
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+
+use super::error::BridgeError;
+use super::types::ModeType;
+
+/// Server 模式配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerModeConfig {
+    /// HTTP 端口
+    pub http_port: u16,
+    /// 数据目录
+    pub data_dir: PathBuf,
+    /// 消息总线端口
+    pub message_port: u16,
+}
+
+impl Default for ServerModeConfig {
+    fn default() -> Self {
+        Self {
+            http_port: 9625,
+            data_dir: PathBuf::from("./data"),
+            message_port: 9626,
+        }
+    }
+}
+
+/// Client 模式配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientModeConfig {
+    /// Edge Server URL (HTTPS)
+    pub edge_url: String,
+    /// 消息总线地址
+    pub message_addr: String,
+    /// Auth Server URL
+    pub auth_url: String,
+}
+
+/// 应用配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppConfig {
+    /// 当前模式
+    pub current_mode: ModeType,
+    /// 当前租户
+    pub current_tenant: Option<String>,
+    /// Server 模式配置
+    pub server_config: ServerModeConfig,
+    /// Client 模式配置
+    pub client_config: Option<ClientModeConfig>,
+    /// 已知租户列表
+    pub known_tenants: Vec<String>,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            current_mode: ModeType::Disconnected,
+            current_tenant: None,
+            server_config: ServerModeConfig::default(),
+            client_config: None,
+            known_tenants: Vec::new(),
+        }
+    }
+}
+
+impl AppConfig {
+    /// 从文件加载配置
+    pub fn load(path: &std::path::Path) -> Result<Self, BridgeError> {
+        if path.exists() {
+            let content = std::fs::read_to_string(path)?;
+            serde_json::from_str(&content).map_err(|e| BridgeError::Config(e.to_string()))
+        } else {
+            Ok(Self::default())
+        }
+    }
+
+    /// 保存配置到文件
+    pub fn save(&self, path: &std::path::Path) -> Result<(), BridgeError> {
+        let content =
+            serde_json::to_string_pretty(self).map_err(|e| BridgeError::Config(e.to_string()))?;
+        std::fs::write(path, content)?;
+        Ok(())
+    }
+}

@@ -134,3 +134,120 @@ impl DeleteData {
 pub struct ProductAttributeListData {
     pub attributes: Vec<shared::models::HasAttribute>,
 }
+
+// ============ Zones & Tables ============
+
+/// Zones 列表
+#[derive(Debug, Clone, Serialize)]
+pub struct ZoneListData {
+    pub zones: Vec<shared::models::Zone>,
+}
+
+/// Tables 列表
+#[derive(Debug, Clone, Serialize)]
+pub struct TableListData {
+    pub tables: Vec<shared::models::DiningTable>,
+}
+
+// ============ Roles ============
+
+/// Role entity (Local definition until available in shared)
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+pub struct Role {
+    pub id: Option<String>,
+    pub name: String,
+    pub display_name: String,
+    pub description: Option<String>,
+    pub is_system: bool,
+    pub is_active: bool,
+}
+
+/// Role Permission entity
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+pub struct RolePermission {
+    pub role_id: String,
+    pub permission: String,
+}
+
+/// Roles 列表
+#[derive(Debug, Clone, Serialize)]
+pub struct RoleListData {
+    pub roles: Vec<Role>,
+}
+
+/// Role Permissions 列表
+#[derive(Debug, Clone, Serialize)]
+pub struct RolePermissionListData {
+    pub permissions: Vec<RolePermission>,
+}
+
+// ============ Auth ============
+
+/// 认证数据
+#[derive(Debug, Clone, Serialize)]
+pub struct AuthData {
+    pub session: Option<super::EmployeeSession>,
+    pub mode: super::LoginMode,
+}
+
+// ============ Orders ============
+
+/// Orders 列表
+#[derive(Debug, Clone, Serialize)]
+pub struct OrderListData {
+    pub orders: Vec<shared::models::Order>,
+}
+
+// ============ System ============
+
+/// Employees 列表
+#[derive(Debug, Clone, Serialize)]
+pub struct EmployeeListData {
+    pub employees: Vec<shared::models::EmployeeResponse>,
+}
+
+/// Price Rules 列表
+#[derive(Debug, Clone, Serialize)]
+pub struct PriceRuleListData {
+    pub rules: Vec<shared::models::PriceRule>,
+}
+
+/// Order Snapshots 列表
+#[derive(Debug, Clone, Serialize)]
+pub struct OrderSnapshotListData {
+    pub snapshots: Vec<shared::order::OrderSnapshot>,
+}
+
+/// Order Events 列表
+#[derive(Debug, Clone, Serialize)]
+pub struct OrderEventListData {
+    pub events: Vec<shared::order::OrderEvent>,
+}
+
+/// Order List Response with pagination
+#[derive(Debug, Clone, Serialize)]
+pub struct FetchOrderListResponse {
+    pub orders: Vec<shared::models::Order>,
+    pub total: i64,
+    pub page: i32,
+}
+
+// ============ Tenants ============
+
+/// Tenants 列表
+#[derive(Debug, Clone, Serialize)]
+pub struct TenantListData {
+    pub tenants: Vec<super::TenantInfo>,
+}
+
+// ============ App Config ============
+
+/// 应用配置响应
+#[derive(Debug, Clone, Serialize)]
+pub struct AppConfigResponse {
+    pub current_mode: super::ModeType,
+    pub current_tenant: Option<String>,
+    pub server_config: super::ServerModeConfig,
+    pub client_config: Option<super::ClientModeConfig>,
+    pub known_tenants: Vec<String>,
+}

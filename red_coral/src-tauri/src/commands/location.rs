@@ -5,11 +5,12 @@
 use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock;
+use urlencoding::encode;
 
-use crate::core::ClientBridge;
+use crate::core::response::{TableListData, ZoneListData};
+use crate::core::{ApiResponse, ClientBridge};
 use shared::models::{
-    Zone, ZoneCreate, ZoneUpdate,
-    DiningTable, DiningTableCreate, DiningTableUpdate,
+    DiningTable, DiningTableCreate, DiningTableUpdate, Zone, ZoneCreate, ZoneUpdate,
 };
 
 // ============ Zones ============
@@ -17,27 +18,39 @@ use shared::models::{
 #[tauri::command]
 pub async fn list_zones(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-) -> Result<Vec<Zone>, String> {
+) -> Result<ApiResponse<ZoneListData>, String> {
     let bridge = bridge.read().await;
-    bridge.get("/api/zones").await.map_err(|e| e.to_string())
+    match bridge.get::<Vec<Zone>>("/api/zones").await {
+        Ok(zones) => Ok(ApiResponse::success(ZoneListData { zones })),
+        Err(e) => Ok(ApiResponse::error("ZONE_LIST_FAILED", e.to_string())),
+    }
 }
 
 #[tauri::command]
 pub async fn get_zone(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
-) -> Result<Zone, String> {
+) -> Result<ApiResponse<Zone>, String> {
     let bridge = bridge.read().await;
-    bridge.get(&format!("/api/zones/{}", id)).await.map_err(|e| e.to_string())
+    match bridge
+        .get::<Zone>(&format!("/api/zones/{}", encode(&id)))
+        .await
+    {
+        Ok(zone) => Ok(ApiResponse::success(zone)),
+        Err(e) => Ok(ApiResponse::error("ZONE_GET_FAILED", e.to_string())),
+    }
 }
 
 #[tauri::command]
 pub async fn create_zone(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: ZoneCreate,
-) -> Result<Zone, String> {
+) -> Result<ApiResponse<Zone>, String> {
     let bridge = bridge.read().await;
-    bridge.post("/api/zones", &data).await.map_err(|e| e.to_string())
+    match bridge.post::<Zone, _>("/api/zones", &data).await {
+        Ok(zone) => Ok(ApiResponse::success(zone)),
+        Err(e) => Ok(ApiResponse::error("ZONE_CREATE_FAILED", e.to_string())),
+    }
 }
 
 #[tauri::command]
@@ -45,18 +58,32 @@ pub async fn update_zone(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
     data: ZoneUpdate,
-) -> Result<Zone, String> {
+) -> Result<ApiResponse<Zone>, String> {
     let bridge = bridge.read().await;
-    bridge.put(&format!("/api/zones/{}", id), &data).await.map_err(|e| e.to_string())
+    match bridge
+        .put::<Zone, _>(&format!("/api/zones/{}", encode(&id)), &data)
+        .await
+    {
+        Ok(zone) => Ok(ApiResponse::success(zone)),
+        Err(e) => Ok(ApiResponse::error("ZONE_UPDATE_FAILED", e.to_string())),
+    }
 }
 
 #[tauri::command]
 pub async fn delete_zone(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
-) -> Result<bool, String> {
+) -> Result<ApiResponse<crate::core::DeleteData>, String> {
     let bridge = bridge.read().await;
-    bridge.delete(&format!("/api/zones/{}", id)).await.map_err(|e| e.to_string())
+    match bridge
+        .delete::<bool>(&format!("/api/zones/{}", encode(&id)))
+        .await
+    {
+        Ok(success) => Ok(ApiResponse::success(crate::core::DeleteData {
+            deleted: success,
+        })),
+        Err(e) => Ok(ApiResponse::error("ZONE_DELETE_FAILED", e.to_string())),
+    }
 }
 
 // ============ Dining Tables ============
@@ -64,36 +91,57 @@ pub async fn delete_zone(
 #[tauri::command]
 pub async fn list_tables(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-) -> Result<Vec<DiningTable>, String> {
+) -> Result<ApiResponse<TableListData>, String> {
     let bridge = bridge.read().await;
-    bridge.get("/api/tables").await.map_err(|e| e.to_string())
+    match bridge.get::<Vec<DiningTable>>("/api/tables").await {
+        Ok(tables) => Ok(ApiResponse::success(TableListData { tables })),
+        Err(e) => Ok(ApiResponse::error("TABLE_LIST_FAILED", e.to_string())),
+    }
 }
 
 #[tauri::command]
 pub async fn list_tables_by_zone(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     zone_id: String,
-) -> Result<Vec<DiningTable>, String> {
+) -> Result<ApiResponse<TableListData>, String> {
     let bridge = bridge.read().await;
-    bridge.get(&format!("/api/tables/zone/{}", zone_id)).await.map_err(|e| e.to_string())
+    match bridge
+        .get::<Vec<DiningTable>>(&format!("/api/tables/zone/{}", encode(&zone_id)))
+        .await
+    {
+        Ok(tables) => Ok(ApiResponse::success(TableListData { tables })),
+        Err(e) => Ok(ApiResponse::error(
+            "TABLE_LIST_BY_ZONE_FAILED",
+            e.to_string(),
+        )),
+    }
 }
 
 #[tauri::command]
 pub async fn get_table(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
-) -> Result<DiningTable, String> {
+) -> Result<ApiResponse<DiningTable>, String> {
     let bridge = bridge.read().await;
-    bridge.get(&format!("/api/tables/{}", id)).await.map_err(|e| e.to_string())
+    match bridge
+        .get::<DiningTable>(&format!("/api/tables/{}", encode(&id)))
+        .await
+    {
+        Ok(table) => Ok(ApiResponse::success(table)),
+        Err(e) => Ok(ApiResponse::error("TABLE_GET_FAILED", e.to_string())),
+    }
 }
 
 #[tauri::command]
 pub async fn create_table(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: DiningTableCreate,
-) -> Result<DiningTable, String> {
+) -> Result<ApiResponse<DiningTable>, String> {
     let bridge = bridge.read().await;
-    bridge.post("/api/tables", &data).await.map_err(|e| e.to_string())
+    match bridge.post::<DiningTable, _>("/api/tables", &data).await {
+        Ok(table) => Ok(ApiResponse::success(table)),
+        Err(e) => Ok(ApiResponse::error("TABLE_CREATE_FAILED", e.to_string())),
+    }
 }
 
 #[tauri::command]
@@ -101,16 +149,30 @@ pub async fn update_table(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
     data: DiningTableUpdate,
-) -> Result<DiningTable, String> {
+) -> Result<ApiResponse<DiningTable>, String> {
     let bridge = bridge.read().await;
-    bridge.put(&format!("/api/tables/{}", id), &data).await.map_err(|e| e.to_string())
+    match bridge
+        .put::<DiningTable, _>(&format!("/api/tables/{}", encode(&id)), &data)
+        .await
+    {
+        Ok(table) => Ok(ApiResponse::success(table)),
+        Err(e) => Ok(ApiResponse::error("TABLE_UPDATE_FAILED", e.to_string())),
+    }
 }
 
 #[tauri::command]
 pub async fn delete_table(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
-) -> Result<bool, String> {
+) -> Result<ApiResponse<crate::core::DeleteData>, String> {
     let bridge = bridge.read().await;
-    bridge.delete(&format!("/api/tables/{}", id)).await.map_err(|e| e.to_string())
+    match bridge
+        .delete::<bool>(&format!("/api/tables/{}", encode(&id)))
+        .await
+    {
+        Ok(success) => Ok(ApiResponse::success(crate::core::DeleteData {
+            deleted: success,
+        })),
+        Err(e) => Ok(ApiResponse::error("TABLE_DELETE_FAILED", e.to_string())),
+    }
 }

@@ -210,6 +210,7 @@ pub async fn run() {
             commands::update_table,
             commands::delete_table,
             // Order commands
+            commands::fetch_order_list,
             commands::list_orders,
             commands::list_open_orders,
             commands::get_order,
@@ -225,6 +226,13 @@ pub async fn run() {
             commands::update_order_hash,
             commands::get_order_events,
             commands::add_order_event,
+            // Order Event Sourcing commands (new architecture)
+            commands::order_execute_command,
+            commands::order_execute,
+            commands::order_get_active_orders,
+            commands::order_get_snapshot,
+            commands::order_sync_since,
+            commands::order_get_events_since,
             // System commands
             commands::get_system_state,
             commands::update_system_state,
@@ -251,6 +259,11 @@ pub async fn run() {
             commands::update_role,
             commands::delete_role,
             commands::get_role_permissions,
+            commands::get_all_permissions,
+            commands::update_role_permissions,
+            // Backup commands
+            commands::export_data,
+            commands::import_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

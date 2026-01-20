@@ -4,256 +4,28 @@
 //! - Server 模式: 本地运行 edge-server，使用 In-Process 通信
 //! - Client 模式: 连接远程 edge-server，使用 mTLS 通信
 
+mod config;
+mod error;
+mod types;
+
+// Re-export public types
+pub use config::{AppConfig, ClientModeConfig, ServerModeConfig};
+pub use error::BridgeError;
+pub use types::{AppState, ModeInfo, ModeType};
+
+// Internal types (pub(crate) for use within this crate)
+pub(crate) use types::{ClientMode, LocalClientState, RemoteClientState};
+
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Emitter;
-use thiserror::Error;
 use tokio::sync::RwLock;
 
-use crab_client::{Authenticated, Connected, CrabClient, Local, Remote};
+use crab_client::CrabClient;
 use edge_server::services::tenant_binding::SubscriptionStatus;
-use edge_server::ServerState;
+use shared::order::{CommandResponse, OrderCommand, OrderEvent, OrderSnapshot, SyncResponse};
 
 use super::tenant_manager::{TenantError, TenantManager};
-
-#[derive(Debug, Error)]
-pub enum BridgeError {
-    #[error("Not initialized")]
-    NotInitialized,
-
-    #[error("Not authenticated")]
-    NotAuthenticated,
-
-    #[error("Not implemented: {0}")]
-    NotImplemented(String),
-
-    #[error("Already running in {0} mode")]
-    AlreadyRunning(String),
-
-    #[error("Tenant error: {0}")]
-    Tenant(#[from] TenantError),
-
-    #[error("Client error: {0}")]
-    Client(#[from] crab_client::ClientError),
-
-    #[error("Server error: {0}")]
-    Server(String),
-
-    #[error("Configuration error: {0}")]
-    Config(String),
-
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-}
-
-/// 运行模式类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum ModeType {
-    Server,
-    Client,
-    Disconnected,
-}
-
-/// 应用状态 (统一 Server/Client 模式)
-///
-/// 用于前端路由守卫和状态展示。
-/// 参考设计文档: `docs/plans/2026-01-18-application-state-machine.md`
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", content = "data")]
-pub enum AppState {
-    // === 通用状态 ===
-    /// 未初始化
-    Uninitialized,
-
-    // === Server 模式专属 ===
-    /// Server: 无租户
-    ServerNoTenant,
-    /// Server: 需要激活 (有租户目录但证书不完整或自检失败)
-    ServerNeedActivation,
-    /// Server: 正在激活
-    ServerActivating,
-    /// Server: 已激活，验证订阅中
-    ServerCheckingSubscription,
-    /// Server: 订阅无效，阻止使用
-    ServerSubscriptionBlocked { reason: String },
-    /// Server: 服务器就绪，等待员工登录
-    ServerReady,
-    /// Server: 员工已登录
-    ServerAuthenticated,
-
-    // === Client 模式专属 ===
-    /// Client: 未连接
-    ClientDisconnected,
-    /// Client: 需要设置 (无缓存证书)
-    ClientNeedSetup,
-    /// Client: 正在连接
-    ClientConnecting,
-    /// Client: 已连接，等待员工登录
-    ClientConnected,
-    /// Client: 员工已登录
-    ClientAuthenticated,
-}
-
-impl AppState {
-    /// 是否可以访问 POS 主界面
-    pub fn can_access_pos(&self) -> bool {
-        matches!(self, AppState::ServerAuthenticated | AppState::ClientAuthenticated)
-    }
-
-    /// 是否需要员工登录
-    pub fn needs_employee_login(&self) -> bool {
-        matches!(self, AppState::ServerReady | AppState::ClientConnected)
-    }
-
-    /// 是否需要设置/激活
-    pub fn needs_setup(&self) -> bool {
-        matches!(
-            self,
-            AppState::Uninitialized
-                | AppState::ServerNoTenant
-                | AppState::ServerNeedActivation
-                | AppState::ClientDisconnected
-                | AppState::ClientNeedSetup
-        )
-    }
-
-    /// 是否被订阅阻止
-    pub fn is_subscription_blocked(&self) -> bool {
-        matches!(self, AppState::ServerSubscriptionBlocked { .. })
-    }
-}
-
-impl std::fmt::Display for ModeType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ModeType::Server => write!(f, "server"),
-            ModeType::Client => write!(f, "client"),
-            ModeType::Disconnected => write!(f, "disconnected"),
-        }
-    }
-}
-
-/// Server 模式配置
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ServerModeConfig {
-    /// HTTP 端口
-    pub http_port: u16,
-    /// 数据目录
-    pub data_dir: PathBuf,
-    /// 消息总线端口
-    pub message_port: u16,
-}
-
-impl Default for ServerModeConfig {
-    fn default() -> Self {
-        Self {
-            http_port: 9625,
-            data_dir: PathBuf::from("./data"),
-            message_port: 9626,
-        }
-    }
-}
-
-/// Client 模式配置
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ClientModeConfig {
-    /// Edge Server URL (HTTPS)
-    pub edge_url: String,
-    /// 消息总线地址
-    pub message_addr: String,
-    /// Auth Server URL
-    pub auth_url: String,
-}
-
-/// 应用配置
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct AppConfig {
-    /// 当前模式
-    pub current_mode: ModeType,
-    /// 当前租户
-    pub current_tenant: Option<String>,
-    /// Server 模式配置
-    pub server_config: ServerModeConfig,
-    /// Client 模式配置
-    pub client_config: Option<ClientModeConfig>,
-    /// 已知租户列表
-    pub known_tenants: Vec<String>,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            current_mode: ModeType::Disconnected,
-            current_tenant: None,
-            server_config: ServerModeConfig::default(),
-            client_config: None,
-            known_tenants: Vec::new(),
-        }
-    }
-}
-
-impl AppConfig {
-    /// 从文件加载配置
-    pub fn load(path: &std::path::Path) -> Result<Self, BridgeError> {
-        if path.exists() {
-            let content = std::fs::read_to_string(path)?;
-            serde_json::from_str(&content).map_err(|e| BridgeError::Config(e.to_string()))
-        } else {
-            Ok(Self::default())
-        }
-    }
-
-    /// 保存配置到文件
-    pub fn save(&self, path: &std::path::Path) -> Result<(), BridgeError> {
-        let content =
-            serde_json::to_string_pretty(self).map_err(|e| BridgeError::Config(e.to_string()))?;
-        std::fs::write(path, content)?;
-        Ok(())
-    }
-}
-
-/// 模式信息 (用于前端显示)
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct ModeInfo {
-    pub mode: ModeType,
-    pub is_connected: bool,
-    pub is_authenticated: bool,
-    pub tenant_id: Option<String>,
-    pub username: Option<String>,
-}
-
-/// Server 模式的客户端状态
-#[allow(dead_code)]
-enum LocalClientState {
-    Connected(CrabClient<Local, Connected>),
-    Authenticated(CrabClient<Local, Authenticated>),
-}
-
-/// Client 模式的客户端状态 (参考 message_client 示例)
-#[allow(dead_code)]
-enum RemoteClientState {
-    Connected(CrabClient<Remote, Connected>),
-    Authenticated(CrabClient<Remote, Authenticated>),
-}
-
-/// 客户端模式枚举
-#[allow(dead_code)]
-enum ClientMode {
-    /// Server 模式: 本地运行 edge-server
-    Server {
-        server_state: Arc<ServerState>,
-        client: Option<LocalClientState>,
-        server_task: tokio::task::JoinHandle<()>,
-    },
-    /// Client 模式: 连接远程 edge-server
-    Client {
-        client: Option<RemoteClientState>,
-        edge_url: String,
-        message_addr: String,
-    },
-    /// 未连接状态
-    Disconnected,
-}
 
 /// 客户端桥接层
 pub struct ClientBridge {
@@ -405,8 +177,6 @@ impl ClientBridge {
                 tracing::info!("Restoring Server mode...");
                 if let Err(e) = self.start_server_mode().await {
                     tracing::error!("Failed to restore Server mode: {}", e);
-                    // Fallback to disconnected?
-                    // We shouldn't change config here to avoid overwriting user preference on transient errors
                     return Err(e);
                 }
             }
@@ -440,14 +210,12 @@ impl ClientBridge {
             ClientMode::Disconnected => (ModeType::Disconnected, false, false, None),
             ClientMode::Server { client, .. } => {
                 let is_auth = matches!(client, Some(LocalClientState::Authenticated(_)));
-                // Server mode is always considered connected to itself
                 (ModeType::Server, true, is_auth, None)
             }
             ClientMode::Client {
                 client, edge_url, ..
             } => {
                 let is_auth = matches!(client, Some(RemoteClientState::Authenticated(_)));
-                // Extract info needed for health check
                 let check_info = if let Some(state) = client {
                     let http = match state {
                         RemoteClientState::Connected(c) => c.edge_http_client().cloned(),
@@ -461,7 +229,6 @@ impl ClientBridge {
             }
         };
 
-        // Release lock before async network call
         drop(mode_guard);
 
         // Perform real network health check for Client mode
@@ -496,31 +263,23 @@ impl ClientBridge {
     }
 
     /// 获取应用状态 (用于前端路由守卫)
-    ///
-    /// 根据当前模式和内部状态计算出应用所处的状态。
-    /// 参考设计文档: `docs/plans/2026-01-18-application-state-machine.md`
     pub async fn get_app_state(&self) -> AppState {
         let mode_guard = self.mode.read().await;
         let tenant_manager = self.tenant_manager.read().await;
 
         match &*mode_guard {
             ClientMode::Disconnected => {
-                // 检查是否有租户
                 if tenant_manager.current_tenant_id().is_none() {
-                    // 无租户选择
                     AppState::ServerNoTenant
                 } else {
-                    // 有租户但未启动任何模式
                     let has_certs = tenant_manager
                         .current_cert_manager()
                         .map(|cm| cm.has_local_certificates())
                         .unwrap_or(false);
 
                     if has_certs {
-                        // 有证书，可能需要选择模式 (Server/Client)
                         AppState::Uninitialized
                     } else {
-                        // 无证书，需要激活
                         AppState::ServerNeedActivation
                     }
                 }
@@ -531,14 +290,12 @@ impl ClientBridge {
                 client,
                 ..
             } => {
-                // Server 模式: 检查激活状态和订阅
                 let is_activated = server_state.is_activated().await;
 
                 if !is_activated {
                     return AppState::ServerNeedActivation;
                 }
 
-                // 检查订阅状态
                 let credential = server_state
                     .activation_service()
                     .get_credential()
@@ -547,7 +304,6 @@ impl ClientBridge {
                     .flatten();
 
                 if let Some(cred) = credential {
-                    // 检查订阅状态（如果有）
                     let subscription_blocked = cred.subscription.as_ref().is_some_and(|sub| {
                         matches!(
                             sub.status,
@@ -563,14 +319,11 @@ impl ClientBridge {
                             .unwrap_or_default();
                         AppState::ServerSubscriptionBlocked { reason }
                     } else {
-                        // 订阅有效或未知（宽限模式），检查员工登录状态
-                        // 优先检查 CrabClient 状态，如果未认证则检查缓存的 session
                         match client {
                             Some(LocalClientState::Authenticated(_)) => {
                                 AppState::ServerAuthenticated
                             }
                             _ => {
-                                // 检查 TenantManager 是否有缓存的会话
                                 if tenant_manager.current_session().is_some() {
                                     AppState::ServerAuthenticated
                                 } else {
@@ -580,31 +333,26 @@ impl ClientBridge {
                         }
                     }
                 } else {
-                    // 无凭证，需要激活
                     AppState::ServerNeedActivation
                 }
             }
 
-            ClientMode::Client { client, .. } => {
-                // Client 模式: 检查连接状态和员工登录
-                match client {
-                    Some(RemoteClientState::Authenticated(_)) => AppState::ClientAuthenticated,
-                    Some(RemoteClientState::Connected(_)) => AppState::ClientConnected,
-                    None => {
-                        // 检查是否有缓存证书
-                        let has_certs = tenant_manager
-                            .current_cert_manager()
-                            .map(|cm| cm.has_local_certificates())
-                            .unwrap_or(false);
+            ClientMode::Client { client, .. } => match client {
+                Some(RemoteClientState::Authenticated(_)) => AppState::ClientAuthenticated,
+                Some(RemoteClientState::Connected(_)) => AppState::ClientConnected,
+                None => {
+                    let has_certs = tenant_manager
+                        .current_cert_manager()
+                        .map(|cm| cm.has_local_certificates())
+                        .unwrap_or(false);
 
-                        if has_certs {
-                            AppState::ClientDisconnected
-                        } else {
-                            AppState::ClientNeedSetup
-                        }
+                    if has_certs {
+                        AppState::ClientDisconnected
+                    } else {
+                        AppState::ClientNeedSetup
                     }
                 }
-            }
+            },
         }
     }
 
@@ -612,7 +360,6 @@ impl ClientBridge {
     pub async fn start_server_mode(&self) -> Result<(), BridgeError> {
         let mut mode_guard = self.mode.write().await;
 
-        // 检查当前模式
         if !matches!(&*mode_guard, ClientMode::Disconnected) {
             let current = match &*mode_guard {
                 ClientMode::Server { .. } => "server",
@@ -625,7 +372,6 @@ impl ClientBridge {
         let config = self.config.read().await;
         let server_config = &config.server_config;
 
-        // 获取当前租户目录作为工作目录
         let tenant_manager = self.tenant_manager.read().await;
         let work_dir = if let Some(path) = tenant_manager.current_tenant_path() {
             tracing::info!("Using tenant directory for server: {:?}", path);
@@ -639,20 +385,14 @@ impl ClientBridge {
         };
         drop(tenant_manager);
 
-        // 创建 EdgeServer 配置
         let edge_config = edge_server::Config::builder()
             .work_dir(work_dir)
             .http_port(server_config.http_port)
             .message_tcp_port(server_config.message_port)
             .build();
 
-        // 初始化 ServerState
-        let server_state = ServerState::initialize(&edge_config).await;
-        // 注意: initialize 会调用 start_background_tasks (在 Server::run 中也会调用，但多调用一次无害，或者我们可以依靠 Server::run)
-        // 但我们需要 state_arc 来初始化本地客户端
+        let server_state = edge_server::ServerState::initialize(&edge_config).await;
 
-        // 关键修改: 使用 edge_server::Server::run 来启动完整的服务器 (HTTP + TCP + Background Tasks)
-        // 这样可以支持外部客户端连接 (如收银机)
         let server_instance =
             edge_server::Server::with_state(edge_config.clone(), server_state.clone());
 
@@ -665,8 +405,6 @@ impl ClientBridge {
 
         let state_arc = Arc::new(server_state);
 
-        // 获取 Router 和消息通道
-        // 注意: Server::run 会启动 HTTPS 服务，但我们本地 UI 仍然可以使用 router 直接通信 (In-Process)
         let router = state_arc
             .https_service()
             .router()
@@ -685,9 +423,19 @@ impl ClientBridge {
                 loop {
                     match server_rx.recv().await {
                         Ok(msg) => {
-                            let event = crate::events::ServerMessageEvent::from(msg);
-                            if let Err(e) = handle_clone.emit("server-message", &event) {
-                                tracing::warn!("Failed to emit server message: {}", e);
+                            // Route messages to appropriate channels
+                            use crate::events::MessageRoute;
+                            match MessageRoute::from_bus_message(msg) {
+                                MessageRoute::OrderEvent(order_event) => {
+                                    if let Err(e) = handle_clone.emit("order-event", &order_event) {
+                                        tracing::warn!("Failed to emit order event: {}", e);
+                                    }
+                                }
+                                MessageRoute::ServerMessage(event) => {
+                                    if let Err(e) = handle_clone.emit("server-message", &event) {
+                                        tracing::warn!("Failed to emit server message: {}", e);
+                                    }
+                                }
                             }
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
@@ -704,13 +452,11 @@ impl ClientBridge {
             tracing::info!("Server message listener started");
         }
 
-        // 创建 CrabClient<Local>
         let client = CrabClient::local()
             .with_router(router)
             .with_message_channels(client_tx, server_tx)
             .build()?;
 
-        // 连接客户端
         let connected_client = client.connect().await?;
 
         tracing::info!(
@@ -718,30 +464,26 @@ impl ClientBridge {
             "Server mode initialized with In-Process client and Background Server"
         );
 
-        // 尝试加载缓存的员工会话并恢复 CrabClient 认证状态
+        // 尝试加载缓存的员工会话
         let tenant_manager_read = self.tenant_manager.read().await;
         let cached_session = tenant_manager_read.load_current_session().ok().flatten();
         drop(tenant_manager_read);
 
         let client_state = if let Some(session) = cached_session {
-            // 使用缓存的 token 恢复认证状态
             match connected_client
                 .restore_session(session.token.clone(), session.user_info.clone())
                 .await
             {
                 Ok(authenticated_client) => {
                     tracing::info!(username = %session.username, "Restored CrabClient authenticated state");
-                    // 同时更新 TenantManager 的 session
                     let mut tenant_manager = self.tenant_manager.write().await;
                     tenant_manager.set_current_session(session);
                     LocalClientState::Authenticated(authenticated_client)
                 }
                 Err(e) => {
                     tracing::warn!("Failed to restore session: {}", e);
-                    // 恢复失败，清除缓存的 session
                     let tenant_manager = self.tenant_manager.read().await;
                     let _ = tenant_manager.clear_current_session();
-                    // 需要重新创建 connected client（因为 restore_session 消费了 self）
                     let client = CrabClient::local()
                         .with_router(state_arc.https_service().router().unwrap())
                         .with_message_channels(
@@ -763,7 +505,6 @@ impl ClientBridge {
             server_task,
         };
 
-        // 更新配置
         drop(config);
         {
             let mut config = self.config.write().await;
@@ -775,8 +516,6 @@ impl ClientBridge {
     }
 
     /// 以 Client 模式连接
-    ///
-    /// 参考 crab-client/examples/message_client.rs 的 /reconnect 命令
     pub async fn start_client_mode(
         &self,
         edge_url: &str,
@@ -784,7 +523,6 @@ impl ClientBridge {
     ) -> Result<(), BridgeError> {
         let mut mode_guard = self.mode.write().await;
 
-        // 检查当前模式
         if !matches!(&*mode_guard, ClientMode::Disconnected) {
             let current = match &*mode_guard {
                 ClientMode::Server { .. } => "server",
@@ -807,22 +545,19 @@ impl ClientBridge {
             .unwrap_or_else(|| "https://auth.example.com".to_string());
         drop(config);
 
-        // 检查是否有缓存的证书
         if !cert_manager.has_local_certificates() {
             return Err(BridgeError::Config(
                 "No cached certificates. Please activate tenant first.".into(),
             ));
         }
 
-        // 创建 CrabClient<Remote> - 参考 message_client 示例
         let client = CrabClient::remote()
             .auth_server(&auth_url)
-            .edge_server(edge_url) // 需要设置 edge_server 用于 HTTP API
+            .edge_server(edge_url)
             .cert_path(cert_manager.cert_path())
             .client_name(tenant_manager.client_name())
             .build()?;
 
-        // 使用缓存的证书重连 (包含 self-check 和 timestamp refresh)
         let connected_client = client.reconnect(message_addr).await?;
 
         tracing::info!(edge_url = %edge_url, message_addr = %message_addr, "Client mode connected");
@@ -837,11 +572,21 @@ impl ClientBridge {
                     loop {
                         match rx.recv().await {
                             Ok(msg) => {
-                                // NetworkMessageClient returns BusMessage
-                                // Convert to ServerMessageEvent using From impl
-                                let event = crate::events::ServerMessageEvent::from(msg);
-                                if let Err(e) = handle_clone.emit("server-message", &event) {
-                                    tracing::warn!("Failed to emit server message: {}", e);
+                                use crate::events::MessageRoute;
+                                match MessageRoute::from_bus_message(msg) {
+                                    MessageRoute::OrderEvent(order_event) => {
+                                        if let Err(e) =
+                                            handle_clone.emit("order-event", &order_event)
+                                        {
+                                            tracing::warn!("Failed to emit order event: {}", e);
+                                        }
+                                    }
+                                    MessageRoute::ServerMessage(event) => {
+                                        if let Err(e) = handle_clone.emit("server-message", &event)
+                                        {
+                                            tracing::warn!("Failed to emit server message: {}", e);
+                                        }
+                                    }
                                 }
                             }
                             Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
@@ -859,14 +604,12 @@ impl ClientBridge {
             }
         }
 
-        // 保存 Remote client 到 ClientMode::Client
         *mode_guard = ClientMode::Client {
             client: Some(RemoteClientState::Connected(connected_client)),
             edge_url: edge_url.to_string(),
             message_addr: message_addr.to_string(),
         };
 
-        // 更新配置
         {
             let mut config = self.config.write().await;
             config.current_mode = ModeType::Client;
@@ -885,7 +628,6 @@ impl ClientBridge {
     pub async fn stop(&self) -> Result<(), BridgeError> {
         let mut mode_guard = self.mode.write().await;
 
-        // 如果是 Server 模式，中止后台任务
         if let ClientMode::Server { server_task, .. } = &*mode_guard {
             server_task.abort();
             tracing::info!("Server background task aborted");
@@ -924,8 +666,6 @@ impl ClientBridge {
     // ============ 员工认证 ============
 
     /// 员工登录 (使用 CrabClient)
-    ///
-    /// Server 模式下使用 In-Process 登录，Client 模式下使用 mTLS HTTP
     pub async fn login_employee(
         &self,
         username: &str,
@@ -939,15 +679,12 @@ impl ClientBridge {
                 client,
                 ..
             } => {
-                // 取出当前 client
                 let current_client = client.take().ok_or(BridgeError::NotInitialized)?;
 
                 match current_client {
                     LocalClientState::Connected(connected) => {
-                        // 执行登录
                         match connected.login(username, password).await {
                             Ok(authenticated) => {
-                                // 获取用户信息 - 使用 me() 和 token() 方法
                                 let user_info = authenticated.me().cloned().ok_or_else(|| {
                                     BridgeError::Client(crab_client::ClientError::Auth(
                                         "No user info after login".into(),
@@ -955,7 +692,6 @@ impl ClientBridge {
                                 })?;
                                 let token = authenticated.token().unwrap_or_default().to_string();
 
-                                // 创建会话
                                 let session = super::session_cache::EmployeeSession {
                                     username: username.to_string(),
                                     token,
@@ -968,25 +704,21 @@ impl ClientBridge {
                                         .as_secs(),
                                 };
 
-                                // 保存 authenticated client
                                 *client = Some(LocalClientState::Authenticated(authenticated));
 
                                 tracing::info!(username = %username, "Employee logged in via CrabClient (local)");
                                 Ok(session)
                             }
                             Err(e) => {
-                                // 登录失败，client 已被消费，设置为 None
                                 *client = None;
                                 Err(BridgeError::Client(e))
                             }
                         }
                     }
                     LocalClientState::Authenticated(auth) => {
-                        // 已经登录，先登出再重新登录
                         let connected = auth.logout().await;
                         match connected.login(username, password).await {
                             Ok(authenticated) => {
-                                // 使用 me() 和 token() 方法获取会话数据
                                 let user_info = authenticated.me().cloned().ok_or_else(|| {
                                     BridgeError::Client(crab_client::ClientError::Auth(
                                         "No user info after login".into(),
@@ -1019,7 +751,6 @@ impl ClientBridge {
                 }
             }
             ClientMode::Client { client, .. } => {
-                // Client 模式使用 CrabClient 登录 (参考 message_client 示例)
                 let current_client = client.take().ok_or(BridgeError::NotInitialized)?;
 
                 match current_client {
@@ -1056,7 +787,6 @@ impl ClientBridge {
                         }
                     }
                     RemoteClientState::Authenticated(auth) => {
-                        // 已登录，先登出再重新登录
                         let connected = auth.logout().await;
                         match connected.login(username, password).await {
                             Ok(authenticated) => {
@@ -1094,10 +824,8 @@ impl ClientBridge {
             ClientMode::Disconnected => Err(BridgeError::NotInitialized),
         };
 
-        // 释放 mode 锁，然后保存 session
         drop(mode_guard);
 
-        // 登录成功后保存 session 到磁盘
         if let Ok(ref session) = result {
             let tenant_manager = self.tenant_manager.read().await;
             if let Err(e) = tenant_manager.save_current_session(session) {
@@ -1148,7 +876,6 @@ impl ClientBridge {
             ClientMode::Disconnected => {}
         }
 
-        // 释放 mode 锁，然后清除缓存的 session
         drop(mode_guard);
 
         let tenant_manager = self.tenant_manager.read().await;
@@ -1161,10 +888,38 @@ impl ClientBridge {
 
     // ============ 统一业务 API ============
 
+    /// 处理 HTTP 响应，尝试解析 JSON 错误
+    async fn handle_http_response<T>(resp: reqwest::Response) -> Result<T, BridgeError>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+
+            // 尝试解析为 JSON 错误信息
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
+                if let Some(msg) = json.get("message").and_then(|v| v.as_str()) {
+                    return Err(BridgeError::Http(status.as_u16(), msg.to_string()));
+                }
+                if let Some(error) = json.get("error").and_then(|v| v.as_str()) {
+                    return Err(BridgeError::Http(status.as_u16(), error.to_string()));
+                }
+            }
+
+            return Err(BridgeError::Http(status.as_u16(), if text.is_empty() {
+                format!("HTTP Error: {}", status)
+            } else {
+                text
+            }));
+        }
+
+        resp.json::<T>()
+            .await
+            .map_err(|e| BridgeError::Server(e.to_string()))
+    }
+
     /// 通用 GET 请求 (使用 CrabClient)
-    ///
-    /// Server 模式: 使用 In-Process 客户端
-    /// Client 模式: 使用 mTLS edge_http_client
     pub async fn get<T>(&self, path: &str) -> Result<T, BridgeError>
     where
         T: serde::de::DeserializeOwned,
@@ -1182,9 +937,7 @@ impl ClientBridge {
                 client, edge_url, ..
             } => match client {
                 Some(RemoteClientState::Authenticated(auth)) => {
-                    let http = auth
-                        .edge_http_client()
-                        .ok_or(BridgeError::NotInitialized)?;
+                    let http = auth.edge_http_client().ok_or(BridgeError::NotInitialized)?;
                     let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
                     let url = format!("{}{}", edge_url, path);
 
@@ -1195,14 +948,7 @@ impl ClientBridge {
                         .await
                         .map_err(|e| BridgeError::Server(e.to_string()))?;
 
-                    if !resp.status().is_success() {
-                        let text = resp.text().await.unwrap_or_default();
-                        return Err(BridgeError::Server(text));
-                    }
-
-                    resp.json::<T>()
-                        .await
-                        .map_err(|e| BridgeError::Server(e.to_string()))
+                    Self::handle_http_response(resp).await
                 }
                 _ => Err(BridgeError::NotAuthenticated),
             },
@@ -1229,9 +975,7 @@ impl ClientBridge {
                 client, edge_url, ..
             } => match client {
                 Some(RemoteClientState::Authenticated(auth)) => {
-                    let http = auth
-                        .edge_http_client()
-                        .ok_or(BridgeError::NotInitialized)?;
+                    let http = auth.edge_http_client().ok_or(BridgeError::NotInitialized)?;
                     let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
                     let url = format!("{}{}", edge_url, path);
 
@@ -1243,14 +987,7 @@ impl ClientBridge {
                         .await
                         .map_err(|e| BridgeError::Server(e.to_string()))?;
 
-                    if !resp.status().is_success() {
-                        let text = resp.text().await.unwrap_or_default();
-                        return Err(BridgeError::Server(text));
-                    }
-
-                    resp.json::<T>()
-                        .await
-                        .map_err(|e| BridgeError::Server(e.to_string()))
+                    Self::handle_http_response(resp).await
                 }
                 _ => Err(BridgeError::NotAuthenticated),
             },
@@ -1277,9 +1014,7 @@ impl ClientBridge {
                 client, edge_url, ..
             } => match client {
                 Some(RemoteClientState::Authenticated(auth)) => {
-                    let http = auth
-                        .edge_http_client()
-                        .ok_or(BridgeError::NotInitialized)?;
+                    let http = auth.edge_http_client().ok_or(BridgeError::NotInitialized)?;
                     let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
                     let url = format!("{}{}", edge_url, path);
 
@@ -1324,9 +1059,7 @@ impl ClientBridge {
                 client, edge_url, ..
             } => match client {
                 Some(RemoteClientState::Authenticated(auth)) => {
-                    let http = auth
-                        .edge_http_client()
-                        .ok_or(BridgeError::NotInitialized)?;
+                    let http = auth.edge_http_client().ok_or(BridgeError::NotInitialized)?;
                     let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
                     let url = format!("{}{}", edge_url, path);
 
@@ -1372,9 +1105,7 @@ impl ClientBridge {
                 client, edge_url, ..
             } => match client {
                 Some(RemoteClientState::Authenticated(auth)) => {
-                    let http = auth
-                        .edge_http_client()
-                        .ok_or(BridgeError::NotInitialized)?;
+                    let http = auth.edge_http_client().ok_or(BridgeError::NotInitialized)?;
                     let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
                     let url = format!("{}{}", edge_url, path);
 
@@ -1386,14 +1117,364 @@ impl ClientBridge {
                         .await
                         .map_err(|e| BridgeError::Server(e.to_string()))?;
 
-                    if !resp.status().is_success() {
-                        let text = resp.text().await.unwrap_or_default();
-                        return Err(BridgeError::Server(text));
-                    }
+                    Self::handle_http_response(resp).await
+                }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
+        }
+    }
 
-                    resp.json::<T>()
+    // ============ Order Event Sourcing API ============
+
+    /// Execute an order command (event sourcing)
+    pub async fn execute_order_command(
+        &self,
+        command: OrderCommand,
+    ) -> Result<CommandResponse, BridgeError> {
+        let mode_guard = self.mode.read().await;
+
+        match &*mode_guard {
+            ClientMode::Server { server_state, .. } => {
+                let (response, events) = server_state
+                    .orders_manager()
+                    .execute_command_with_events(command);
+
+                if let Some(handle) = &self.app_handle {
+                    for event in events {
+                        if let Err(e) = handle.emit("order-event", &event) {
+                            tracing::warn!("Failed to emit order event: {}", e);
+                        }
+                    }
+                }
+
+                Ok(response)
+            }
+            ClientMode::Client { client, .. } => {
+                // Send command via MessageBus RequestCommand protocol
+                match client {
+                    Some(RemoteClientState::Authenticated(auth)) => {
+                        // Map OrderCommand payload type to action string
+                        let action = match &command.payload {
+                            shared::order::OrderCommandPayload::OpenTable { .. } => {
+                                "order.open_table"
+                            }
+                            shared::order::OrderCommandPayload::CompleteOrder { .. } => {
+                                "order.complete"
+                            }
+                            shared::order::OrderCommandPayload::VoidOrder { .. } => "order.void",
+                            shared::order::OrderCommandPayload::RestoreOrder { .. } => {
+                                "order.restore"
+                            }
+                            shared::order::OrderCommandPayload::AddItems { .. } => {
+                                "order.add_items"
+                            }
+                            shared::order::OrderCommandPayload::ModifyItem { .. } => {
+                                "order.modify_item"
+                            }
+                            shared::order::OrderCommandPayload::RemoveItem { .. } => {
+                                "order.remove_item"
+                            }
+                            shared::order::OrderCommandPayload::RestoreItem { .. } => {
+                                "order.restore_item"
+                            }
+                            shared::order::OrderCommandPayload::AddPayment { .. } => {
+                                "order.add_payment"
+                            }
+                            shared::order::OrderCommandPayload::CancelPayment { .. } => {
+                                "order.cancel_payment"
+                            }
+                            shared::order::OrderCommandPayload::SplitOrder { .. } => "order.split",
+                            shared::order::OrderCommandPayload::MoveOrder { .. } => "order.move",
+                            shared::order::OrderCommandPayload::MergeOrders { .. } => "order.merge",
+                            shared::order::OrderCommandPayload::SetSurchargeExempt { .. } => {
+                                "order.set_surcharge_exempt"
+                            }
+                            shared::order::OrderCommandPayload::UpdateOrderInfo { .. } => {
+                                "order.update_info"
+                            }
+                        };
+
+                        // Build RequestCommand message with full command (preserves command_id, operator info)
+                        let request_payload = shared::message::RequestCommandPayload {
+                            action: action.to_string(),
+                            params: serde_json::to_value(&command).ok(),
+                        };
+                        let request_msg =
+                            shared::message::BusMessage::request_command(&request_payload);
+
+                        // Send via MessageClient and wait for response
+                        let response_msg = auth
+                            .request(&request_msg)
+                            .await
+                            .map_err(|e| BridgeError::Server(format!("Request failed: {}", e)))?;
+
+                        // Parse response
+                        let response_payload: shared::message::ResponsePayload = response_msg
+                            .parse_payload()
+                            .map_err(|e| BridgeError::Server(format!("Invalid response: {}", e)))?;
+
+                        if response_payload.success {
+                            // Extract CommandResponse from data if present
+                            if let Some(data) = response_payload.data {
+                                let cmd_response: CommandResponse = serde_json::from_value(data)
+                                    .unwrap_or_else(|_| CommandResponse {
+                                        command_id: command.command_id.clone(),
+                                        success: true,
+                                        order_id: None,
+                                        error: None,
+                                    });
+                                Ok(cmd_response)
+                            } else {
+                                Ok(CommandResponse {
+                                    command_id: command.command_id,
+                                    success: true,
+                                    order_id: None,
+                                    error: None,
+                                })
+                            }
+                        } else {
+                            Ok(CommandResponse {
+                                command_id: command.command_id,
+                                success: false,
+                                order_id: None,
+                                error: Some(shared::order::CommandError::new(
+                                    shared::order::CommandErrorCode::InternalError,
+                                    response_payload.message,
+                                )),
+                            })
+                        }
+                    }
+                    Some(RemoteClientState::Connected(_)) => Err(BridgeError::NotAuthenticated),
+                    None => Err(BridgeError::NotInitialized),
+                }
+            }
+            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
+        }
+    }
+
+    /// Get all active order snapshots (event sourcing)
+    pub async fn get_active_orders(&self) -> Result<Vec<OrderSnapshot>, BridgeError> {
+        let mode_guard = self.mode.read().await;
+
+        match &*mode_guard {
+            ClientMode::Server { server_state, .. } => server_state
+                .orders_manager()
+                .get_active_orders()
+                .map_err(|e| BridgeError::Server(e.to_string())),
+            ClientMode::Client { client, .. } => match client {
+                Some(RemoteClientState::Authenticated(auth)) => {
+                    // Use sync.orders request to get active orders
+                    let request_payload = shared::message::RequestCommandPayload {
+                        action: "sync.orders".to_string(),
+                        params: Some(serde_json::json!({ "since_sequence": 0 })),
+                    };
+                    let request_msg =
+                        shared::message::BusMessage::request_command(&request_payload);
+
+                    let response_msg = auth
+                        .request(&request_msg)
                         .await
-                        .map_err(|e| BridgeError::Server(e.to_string()))
+                        .map_err(|e| BridgeError::Server(format!("Request failed: {}", e)))?;
+
+                    let response_payload: shared::message::ResponsePayload = response_msg
+                        .parse_payload()
+                        .map_err(|e| BridgeError::Server(format!("Invalid response: {}", e)))?;
+
+                    if response_payload.success {
+                        if let Some(data) = response_payload.data {
+                            let sync_response: SyncResponse = serde_json::from_value(data)
+                                .map_err(|e| {
+                                    BridgeError::Server(format!("Invalid sync response: {}", e))
+                                })?;
+                            Ok(sync_response.active_orders)
+                        } else {
+                            Ok(vec![])
+                        }
+                    } else {
+                        Err(BridgeError::Server(response_payload.message))
+                    }
+                }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
+        }
+    }
+
+    /// Get a single order snapshot by ID
+    pub async fn get_order_snapshot(
+        &self,
+        order_id: &str,
+    ) -> Result<Option<OrderSnapshot>, BridgeError> {
+        let mode_guard = self.mode.read().await;
+
+        match &*mode_guard {
+            ClientMode::Server { server_state, .. } => server_state
+                .orders_manager()
+                .get_snapshot(order_id)
+                .map_err(|e| BridgeError::Server(e.to_string())),
+            ClientMode::Client { client, .. } => match client {
+                Some(RemoteClientState::Authenticated(auth)) => {
+                    // Use sync.order_snapshot request via MessageBus
+                    let request_payload = shared::message::RequestCommandPayload {
+                        action: "sync.order_snapshot".to_string(),
+                        params: Some(serde_json::json!({ "order_id": order_id })),
+                    };
+                    let request_msg =
+                        shared::message::BusMessage::request_command(&request_payload);
+
+                    let response_msg = auth
+                        .request(&request_msg)
+                        .await
+                        .map_err(|e| BridgeError::Server(format!("Request failed: {}", e)))?;
+
+                    let response_payload: shared::message::ResponsePayload = response_msg
+                        .parse_payload()
+                        .map_err(|e| BridgeError::Server(format!("Invalid response: {}", e)))?;
+
+                    if response_payload.success {
+                        if let Some(data) = response_payload.data {
+                            let snapshot: OrderSnapshot =
+                                serde_json::from_value(data).map_err(|e| {
+                                    BridgeError::Server(format!("Invalid snapshot: {}", e))
+                                })?;
+                            Ok(Some(snapshot))
+                        } else {
+                            Ok(None)
+                        }
+                    } else {
+                        // Not found is not an error, just return None
+                        if response_payload.error_code.as_deref() == Some("NOT_FOUND") {
+                            Ok(None)
+                        } else {
+                            Err(BridgeError::Server(response_payload.message))
+                        }
+                    }
+                }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
+        }
+    }
+
+    /// Sync orders since a given sequence (for reconnection)
+    pub async fn sync_orders_since(
+        &self,
+        since_sequence: u64,
+    ) -> Result<SyncResponse, BridgeError> {
+        let mode_guard = self.mode.read().await;
+
+        match &*mode_guard {
+            ClientMode::Server { server_state, .. } => {
+                let orders_manager = server_state.orders_manager();
+
+                let events = orders_manager
+                    .get_events_since(since_sequence)
+                    .map_err(|e| BridgeError::Server(e.to_string()))?;
+
+                let active_orders = orders_manager
+                    .get_active_orders()
+                    .map_err(|e| BridgeError::Server(e.to_string()))?;
+
+                let server_sequence = orders_manager
+                    .get_current_sequence()
+                    .map_err(|e| BridgeError::Server(e.to_string()))?;
+
+                Ok(SyncResponse {
+                    events,
+                    active_orders,
+                    server_sequence,
+                    requires_full_sync: since_sequence == 0,
+                })
+            }
+            ClientMode::Client { client, .. } => match client {
+                Some(RemoteClientState::Authenticated(auth)) => {
+                    // Use sync.orders request via MessageBus
+                    let request_payload = shared::message::RequestCommandPayload {
+                        action: "sync.orders".to_string(),
+                        params: Some(serde_json::json!({ "since_sequence": since_sequence })),
+                    };
+                    let request_msg =
+                        shared::message::BusMessage::request_command(&request_payload);
+
+                    let response_msg = auth
+                        .request(&request_msg)
+                        .await
+                        .map_err(|e| BridgeError::Server(format!("Request failed: {}", e)))?;
+
+                    let response_payload: shared::message::ResponsePayload = response_msg
+                        .parse_payload()
+                        .map_err(|e| BridgeError::Server(format!("Invalid response: {}", e)))?;
+
+                    if response_payload.success {
+                        if let Some(data) = response_payload.data {
+                            let sync_response: SyncResponse = serde_json::from_value(data)
+                                .map_err(|e| {
+                                    BridgeError::Server(format!("Invalid sync response: {}", e))
+                                })?;
+                            Ok(sync_response)
+                        } else {
+                            Ok(SyncResponse {
+                                events: vec![],
+                                active_orders: vec![],
+                                server_sequence: 0,
+                                requires_full_sync: true,
+                            })
+                        }
+                    } else {
+                        Err(BridgeError::Server(response_payload.message))
+                    }
+                }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
+        }
+    }
+
+    /// Get events for active orders since a given sequence
+    pub async fn get_active_events_since(
+        &self,
+        since_sequence: u64,
+    ) -> Result<Vec<OrderEvent>, BridgeError> {
+        let mode_guard = self.mode.read().await;
+
+        match &*mode_guard {
+            ClientMode::Server { server_state, .. } => server_state
+                .orders_manager()
+                .get_active_events_since(since_sequence)
+                .map_err(|e| BridgeError::Server(e.to_string())),
+            ClientMode::Client { client, .. } => match client {
+                Some(RemoteClientState::Authenticated(auth)) => {
+                    // Use sync.active_events request via MessageBus
+                    let request_payload = shared::message::RequestCommandPayload {
+                        action: "sync.active_events".to_string(),
+                        params: Some(serde_json::json!({ "since_sequence": since_sequence })),
+                    };
+                    let request_msg =
+                        shared::message::BusMessage::request_command(&request_payload);
+
+                    let response_msg = auth
+                        .request(&request_msg)
+                        .await
+                        .map_err(|e| BridgeError::Server(format!("Request failed: {}", e)))?;
+
+                    let response_payload: shared::message::ResponsePayload = response_msg
+                        .parse_payload()
+                        .map_err(|e| BridgeError::Server(format!("Invalid response: {}", e)))?;
+
+                    if response_payload.success {
+                        if let Some(data) = response_payload.data {
+                            let events: Vec<OrderEvent> =
+                                serde_json::from_value(data).map_err(|e| {
+                                    BridgeError::Server(format!("Invalid events: {}", e))
+                                })?;
+                            Ok(events)
+                        } else {
+                            Ok(vec![])
+                        }
+                    } else {
+                        Err(BridgeError::Server(response_payload.message))
+                    }
                 }
                 _ => Err(BridgeError::NotAuthenticated),
             },
