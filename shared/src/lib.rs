@@ -24,3 +24,8 @@ pub use message::{BusMessage, EventType};
 
 // Intent re-exports (for DataIntent dispatch pattern)
 pub use intent::{CrudAction, DataIntent, DataResult, QueryRequest, PaginatedResponse};
+
+// Unified error system re-exports
+pub use error::{
+    ApiResponse as UnifiedApiResponse, AppError, AppResult, ErrorCategory, ErrorCode,
+};
