@@ -134,15 +134,14 @@ impl PriceRuleRepository {
             .ok_or_else(|| RepoError::NotFound(format!("Price rule {} not found", id)))?;
 
         // Check duplicate name if changing
-        if let Some(ref new_name) = data.name {
-            if new_name != &existing.name {
-                if self.find_by_name(new_name).await?.is_some() {
-                    return Err(RepoError::Duplicate(format!(
-                        "Price rule '{}' already exists",
-                        new_name
-                    )));
-                }
-            }
+        if let Some(ref new_name) = data.name
+            && new_name != &existing.name
+            && self.find_by_name(new_name).await?.is_some()
+        {
+            return Err(RepoError::Duplicate(format!(
+                "Price rule '{}' already exists",
+                new_name
+            )));
         }
 
         let updated: Option<PriceRule> = self.base.db().update((TABLE, id)).merge(data).await?;

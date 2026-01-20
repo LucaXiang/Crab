@@ -1,9 +1,9 @@
 //! Employee Repository
 
 use super::{BaseRepository, RepoError, RepoResult};
-use crate::db::models::{Employee, EmployeeCreate, EmployeeUpdate, EmployeeResponse};
-use surrealdb::engine::local::Db;
+use crate::db::models::{Employee, EmployeeCreate, EmployeeResponse, EmployeeUpdate};
 use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 
 const TABLE: &str = "employee";
 
@@ -104,19 +104,20 @@ impl EmployeeRepository {
 
         // Prevent modifying system users
         if existing.is_system {
-            return Err(RepoError::Validation("Cannot modify system user".to_string()));
+            return Err(RepoError::Validation(
+                "Cannot modify system user".to_string(),
+            ));
         }
 
         // Check duplicate username if changing
-        if let Some(ref new_username) = data.username {
-            if new_username != &existing.username {
-                if self.find_by_username(new_username).await?.is_some() {
-                    return Err(RepoError::Duplicate(format!(
-                        "Username '{}' already exists",
-                        new_username
-                    )));
-                }
-            }
+        if let Some(ref new_username) = data.username
+            && new_username != &existing.username
+            && self.find_by_username(new_username).await?.is_some()
+        {
+            return Err(RepoError::Duplicate(format!(
+                "Username '{}' already exists",
+                new_username
+            )));
         }
 
         // Build update document
@@ -148,7 +149,8 @@ impl EmployeeRepository {
             is_active: data.is_active,
         };
 
-        let updated: Option<Employee> = self.base.db().update((TABLE, id)).merge(update_doc).await?;
+        let updated: Option<Employee> =
+            self.base.db().update((TABLE, id)).merge(update_doc).await?;
         updated
             .map(|e| e.into())
             .ok_or_else(|| RepoError::NotFound(format!("Employee {} not found", id)))
@@ -163,7 +165,9 @@ impl EmployeeRepository {
 
         // Prevent deleting system users
         if existing.is_system {
-            return Err(RepoError::Validation("Cannot delete system user".to_string()));
+            return Err(RepoError::Validation(
+                "Cannot delete system user".to_string(),
+            ));
         }
 
         #[derive(serde::Serialize)]

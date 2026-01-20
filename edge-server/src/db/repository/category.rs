@@ -98,15 +98,14 @@ impl CategoryRepository {
             .ok_or_else(|| RepoError::NotFound(format!("Category {} not found", id)))?;
 
         // Check duplicate name if changing
-        if let Some(ref new_name) = data.name {
-            if new_name != &existing.name {
-                if self.find_by_name(new_name).await?.is_some() {
-                    return Err(RepoError::Duplicate(format!(
-                        "Category '{}' already exists",
-                        new_name
-                    )));
-                }
-            }
+        if let Some(ref new_name) = data.name
+            && new_name != &existing.name
+            && self.find_by_name(new_name).await?.is_some()
+        {
+            return Err(RepoError::Duplicate(format!(
+                "Category '{}' already exists",
+                new_name
+            )));
         }
 
         #[derive(Serialize)]

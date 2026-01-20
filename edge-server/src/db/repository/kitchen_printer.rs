@@ -2,8 +2,8 @@
 
 use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{KitchenPrinter, KitchenPrinterCreate, KitchenPrinterUpdate};
-use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 
 const TABLE: &str = "kitchen_printer";
 
@@ -79,18 +79,18 @@ impl KitchenPrinterRepository {
             .ok_or_else(|| RepoError::NotFound(format!("Kitchen printer {} not found", id)))?;
 
         // Check duplicate name if changing
-        if let Some(ref new_name) = data.name {
-            if new_name != &existing.name {
-                if self.find_by_name(new_name).await?.is_some() {
-                    return Err(RepoError::Duplicate(format!(
-                        "Kitchen printer '{}' already exists",
-                        new_name
-                    )));
-                }
-            }
+        if let Some(ref new_name) = data.name
+            && new_name != &existing.name
+            && self.find_by_name(new_name).await?.is_some()
+        {
+            return Err(RepoError::Duplicate(format!(
+                "Kitchen printer '{}' already exists",
+                new_name
+            )));
         }
 
-        let updated: Option<KitchenPrinter> = self.base.db().update((TABLE, id)).merge(data).await?;
+        let updated: Option<KitchenPrinter> =
+            self.base.db().update((TABLE, id)).merge(data).await?;
         updated.ok_or_else(|| RepoError::NotFound(format!("Kitchen printer {} not found", id)))
     }
 

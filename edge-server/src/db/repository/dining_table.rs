@@ -113,13 +113,13 @@ impl DiningTableRepository {
 
         if data.name.is_some() || data.zone.is_some() {
             let zone_id = check_zone.id.to_string();
-            if let Some(found) = self.find_by_name_in_zone(&zone_id, check_name).await? {
-                if found.id != existing.id {
-                    return Err(RepoError::Duplicate(format!(
-                        "Table '{}' already exists in this zone",
-                        check_name
-                    )));
-                }
+            if let Some(found) = self.find_by_name_in_zone(&zone_id, check_name).await?
+                && found.id != existing.id
+            {
+                return Err(RepoError::Duplicate(format!(
+                    "Table '{}' already exists in this zone",
+                    check_name
+                )));
             }
         }
 
