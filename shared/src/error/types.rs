@@ -192,6 +192,45 @@ impl<T> From<AppError> for ApiResponse<T> {
 /// Type alias for Result with AppError
 pub type AppResult<T> = Result<T, AppError>;
 
+// ===== Axum Integration =====
+
+impl axum::response::IntoResponse for AppError {
+    fn into_response(self) -> axum::response::Response {
+        use axum::Json;
+
+        let status = self.http_status();
+        let body = ApiResponse::<()>::error(&self);
+
+        // Log system errors
+        if matches!(self.code.category(), super::category::ErrorCategory::System) {
+            tracing::error!(
+                code = %self.code,
+                message = %self.message,
+                "System error occurred"
+            );
+        }
+
+        (status, Json(body)).into_response()
+    }
+}
+
+impl<T: Serialize> axum::response::IntoResponse for ApiResponse<T> {
+    fn into_response(self) -> axum::response::Response {
+        use axum::Json;
+        use super::codes::ErrorCode;
+
+        let status = if self.code == Some(0) || self.code.is_none() {
+            http::StatusCode::OK
+        } else {
+            ErrorCode::try_from(self.code.unwrap_or(1))
+                .map(|c| c.http_status())
+                .unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR)
+        };
+
+        (status, Json(self)).into_response()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

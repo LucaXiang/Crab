@@ -2,6 +2,7 @@
 name = "shared"
 version.workspace = true
 edition.workspace = true
+build = "build.rs"
 
 [dependencies]
 # Workspace crates
@@ -32,3 +33,6 @@ uuid.workspace = true
 
 # Validation
 validator.workspace = true
+
+# Logging
+tracing.workspace = true
