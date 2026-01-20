@@ -71,7 +71,8 @@ impl ErrorCode {
             | Self::BridgeNotConnected
             | Self::BridgeConnectionFailed
             | Self::PrinterNotAvailable
-            | Self::PrintFailed => StatusCode::INTERNAL_SERVER_ERROR,
+            | Self::PrintFailed
+            | Self::ClientDisconnected => StatusCode::INTERNAL_SERVER_ERROR,
 
             // 400 Bad Request (default for validation/business errors)
             _ => StatusCode::BAD_REQUEST,

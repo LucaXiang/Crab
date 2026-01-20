@@ -411,7 +411,7 @@ async fn read_client_messages(
                         }
                     }
                     Err(e) => {
-                        if matches!(e, AppError::ClientDisconnected) {
+                        if e.code == shared::error::ErrorCode::ClientDisconnected {
                             tracing::debug!(client_id = %client_id, "Client {} disconnected", addr);
                         } else {
                             tracing::debug!(client_id = %client_id, "Client {} read error: {}", addr, e);

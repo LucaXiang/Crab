@@ -68,7 +68,7 @@ pub async fn require_auth(
             .ok_or_else(|| AppError::invalid_token("Invalid authorization header"))?,
         None => {
             security_log!("WARN", "auth_missing", uri = format!("{:?}", req.uri()));
-            return Err(AppError::Unauthorized);
+            return Err(AppError::unauthorized());
         }
     };
 
@@ -96,7 +96,7 @@ pub async fn require_auth(
             );
 
             match e {
-                crate::auth::JwtError::ExpiredToken => Err(AppError::TokenExpired),
+                crate::auth::JwtError::ExpiredToken => Err(AppError::token_expired()),
                 _ => Err(AppError::invalid_token("Invalid token")),
             }
         }
@@ -129,7 +129,7 @@ pub async fn require_permission(
             let user = req
                 .extensions()
                 .get::<CurrentUser>()
-                .ok_or(AppError::Unauthorized)?;
+                .ok_or(AppError::unauthorized())?;
 
             if !user.has_permission(permission) {
                 security_log!(
@@ -162,7 +162,7 @@ pub async fn require_admin(req: Request, next: Next) -> Result<Response, AppErro
     let user = req
         .extensions()
         .get::<CurrentUser>()
-        .ok_or(AppError::Unauthorized)?;
+        .ok_or(AppError::unauthorized())?;
     if !user.is_admin() {
         security_log!(
             "WARN",
@@ -201,6 +201,6 @@ impl CurrentUserExt for Request {
     fn current_user(&self) -> Result<&CurrentUser, AppError> {
         self.extensions()
             .get::<CurrentUser>()
-            .ok_or(AppError::Unauthorized)
+            .ok_or(AppError::unauthorized())
     }
 }

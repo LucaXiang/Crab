@@ -65,12 +65,12 @@ pub(crate) async fn read_from_stream<R: AsyncReadExt + Unpin>(
     match reader.read_exact(&mut type_buf).await {
         Ok(_) => {}
         Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-            return Err(AppError::ClientDisconnected);
+            return Err(AppError::client_disconnected());
         }
         Err(e) => {
             // Handle rustls "peer closed connection without sending TLS close_notify"
             if e.to_string().contains("close_notify") {
-                return Err(AppError::ClientDisconnected);
+                return Err(AppError::client_disconnected());
             }
             return Err(AppError::internal(format!("Read type failed: {}", e)));
         }

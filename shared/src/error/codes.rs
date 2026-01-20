@@ -182,6 +182,8 @@ pub enum ErrorCode {
     PrinterNotAvailable = 9201,
     /// Print operation failed
     PrintFailed = 9202,
+    /// Client disconnected
+    ClientDisconnected = 9301,
 }
 
 impl ErrorCode {
@@ -288,6 +290,7 @@ impl ErrorCode {
             ErrorCode::BridgeConnectionFailed => "Bridge connection failed",
             ErrorCode::PrinterNotAvailable => "Printer is not available",
             ErrorCode::PrintFailed => "Print operation failed",
+            ErrorCode::ClientDisconnected => "Client disconnected",
         }
     }
 }
@@ -404,6 +407,7 @@ impl TryFrom<u16> for ErrorCode {
             9103 => Ok(ErrorCode::BridgeConnectionFailed),
             9201 => Ok(ErrorCode::PrinterNotAvailable),
             9202 => Ok(ErrorCode::PrintFailed),
+            9301 => Ok(ErrorCode::ClientDisconnected),
 
             _ => Err(InvalidErrorCode(value)),
         }

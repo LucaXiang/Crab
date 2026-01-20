@@ -30,6 +30,7 @@ pub mod core;
 pub mod db;
 pub mod message;
 pub mod orders;
+pub mod pricing;
 pub mod services;
 pub mod utils;
 
@@ -38,11 +39,15 @@ pub use auth::{CurrentUser, JwtService};
 pub use core::{Config, Server, ServerState};
 pub use message::{BusMessage, EventType};
 pub use orders::{OrdersManager, OrderReducer, OrderStorage};
+pub use pricing::PriceRuleEngine;
 pub use utils::AppError as AppErrorType;
 pub use utils::{AppResponse, AppResult};
 
 // 为向后兼容性提供 AppError 别名
 pub use utils::AppError;
+
+// Re-export unified error types from shared
+pub use utils::{ApiResponse, ErrorCategory, ErrorCode};
 
 // Re-export logger functions
 pub use utils::logger::{cleanup_old_logs, init_logger, init_logger_with_file};

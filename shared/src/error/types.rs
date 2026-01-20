@@ -100,6 +100,51 @@ impl AppError {
         Self::with_message(ErrorCode::AlreadyExists, format!("{} already exists", r))
             .with_detail("resource", r)
     }
+
+    /// Create an invalid request error (alias for invalid_request)
+    pub fn invalid(msg: impl Into<String>) -> Self {
+        Self::with_message(ErrorCode::InvalidRequest, msg)
+    }
+
+    /// Create a forbidden/permission denied error (alias for permission_denied)
+    pub fn forbidden(msg: impl Into<String>) -> Self {
+        Self::with_message(ErrorCode::PermissionDenied, msg)
+    }
+
+    /// Create an invalid token error
+    pub fn invalid_token(msg: impl Into<String>) -> Self {
+        Self::with_message(ErrorCode::TokenInvalid, msg)
+    }
+
+    /// Create a token expired error
+    pub fn token_expired() -> Self {
+        Self::new(ErrorCode::TokenExpired)
+    }
+
+    /// Create an unauthorized error (alias for not_authenticated)
+    pub fn unauthorized() -> Self {
+        Self::new(ErrorCode::NotAuthenticated)
+    }
+
+    /// Create an invalid credentials error
+    pub fn invalid_credentials() -> Self {
+        Self::new(ErrorCode::InvalidCredentials)
+    }
+
+    /// Create a conflict error
+    pub fn conflict(msg: impl Into<String>) -> Self {
+        Self::with_message(ErrorCode::AlreadyExists, msg)
+    }
+
+    /// Create a business rule error
+    pub fn business_rule(msg: impl Into<String>) -> Self {
+        Self::with_message(ErrorCode::ValidationFailed, msg)
+    }
+
+    /// Create a client disconnected error
+    pub fn client_disconnected() -> Self {
+        Self::new(ErrorCode::ClientDisconnected)
+    }
 }
 
 /// Unified API response structure

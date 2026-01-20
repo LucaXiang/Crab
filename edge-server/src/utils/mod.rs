@@ -2,19 +2,23 @@
 //!
 //! # 内容
 //!
-//! - [`AppError`] - 应用错误类型
-//! - [`AppResponse`] - API 响应结构
+//! - [`AppError`] - 应用错误类型 (from shared::error)
+//! - [`ApiResponse`] - API 响应结构 (from shared::error)
 //! - 日志等工具
 
+pub mod error;
 pub mod logger;
 pub mod result;
 pub mod types;
 
-// 错误类型 - 从 shared 模块导入
-pub use result::AppResult;
-pub use shared::error::ApiError as AppError;
+// Re-export error types from the error module (which re-exports from shared)
+pub use error::{ApiResponse, AppError, AppResult, ErrorCategory, ErrorCode};
+pub use error::{ok, ok_with_message};
 
-/// API 响应结构
+/// Legacy API 响应结构
+///
+/// Kept for backward compatibility with existing code that uses the old format.
+/// New code should use `ApiResponse` from `shared::error`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppResponse<T> {
