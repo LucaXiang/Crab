@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { Shield, Save, RefreshCw, Check, Plus, Trash2, Info } from 'lucide-react';
-import { Role } from '@/core/domain/types';
+import { Role, RoleListData, RolePermissionListData } from '@/core/domain/types';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 
 // Map permissions to readable labels
@@ -99,27 +99,29 @@ export const RolePermissionsEditor: React.FC = () => {
     setLoading(true);
     try {
       // 1. Get all available permissions
-      const allPerms = await invoke<string[]>('get_all_permissions');
-      setAvailablePermissions(allPerms);
+      const allPerms = await invokeApi<string[]>('get_all_permissions');
+      setAvailablePermissions(allPerms || []);
       
       // 2. Get roles
-      const rolesData = await invoke<Role[]>('fetch_roles');
-      setRoles(rolesData);
+      const rolesData = await invokeApi<RoleListData>('list_roles');
+      const rolesList = rolesData?.roles || [];
+      setRoles(rolesList);
       
       // Select first role by default if none selected
-      if (!selectedRole && rolesData.length > 0) {
-        setSelectedRole(rolesData[0]);
+      if (!selectedRole && rolesList.length > 0) {
+        setSelectedRole(rolesList[0]);
       } else if (selectedRole) {
         // Update selected role object from new data
-        const updated = rolesData.find(r => r.id === selectedRole.id);
+        const updated = rolesList.find(r => r.id === selectedRole.id);
         if (updated) setSelectedRole(updated);
       }
       
       // 3. Get permissions for each role
       const rolePerms: Record<string, string[]> = {};
-      for (const role of rolesData) {
-        const perms = await invoke<string[]>('get_role_permissions', { role: role.name });
-        rolePerms[role.name] = perms;
+      for (const role of rolesList) {
+        const permsData = await invokeApi<RolePermissionListData>('get_role_permissions', { role_id: role.id });
+        // Extract permission strings from RolePermission objects
+        rolePerms[role.name] = permsData?.permissions?.map(p => p.permission) || [];
       }
       setRolePermissions(rolePerms);
     } catch (err) {
@@ -155,8 +157,8 @@ export const RolePermissionsEditor: React.FC = () => {
         // Skip admin role as it has fixed permissions
         if (role.name === 'admin') continue;
 
-        await invoke('update_role_permissions', {
-          role: role.name,
+        await invokeApi('update_role_permissions', {
+          role_id: role.id,
           permissions: rolePermissions[role.name] || []
         });
       }
@@ -182,11 +184,13 @@ export const RolePermissionsEditor: React.FC = () => {
     }
 
     try {
-      await invoke('create_role', {
-        input: {
+      await invokeApi('create_role', {
+        data: {
           name: newRoleName,
-          displayName: newRoleDisplayName,
-          description: newRoleDesc
+          display_name: newRoleDisplayName,
+          description: newRoleDesc,
+          is_system: false,
+          is_active: true
         }
       });
       toast.success(t('settings.roles.form.createSuccess'));
@@ -205,7 +209,7 @@ export const RolePermissionsEditor: React.FC = () => {
     if (!confirmDelete) return;
     
     try {
-      await invoke('delete_role', { id: confirmDelete.roleId });
+      await invokeApi('delete_role', { id: confirmDelete.roleId });
       toast.success(t('settings.roles.form.deleteSuccess'));
       setConfirmDelete(null);
       loadData();

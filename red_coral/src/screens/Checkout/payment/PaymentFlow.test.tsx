@@ -25,15 +25,21 @@ vi.mock('@/stores/usePaymentStore', () => ({
   usePaymentTotals: () => ({ totalPaid: 0 })
 }));
 
-vi.mock('@/stores/useOrderEventStore', () => ({
-  useOrderEventStore: {
+vi.mock('@/core/stores/order/useActiveOrdersStore', () => ({
+  useActiveOrdersStore: {
     getState: () => ({
+      orders: {},
       getOrder: vi.fn(),
-      getOrderEvents: vi.fn(() => []),
-      updateOrderInfo: vi.fn(),
-      addSplitEvent: vi.fn()
+      getOrderByTable: vi.fn(),
     })
   }
+}));
+
+vi.mock('@/core/stores/order/useOrderOperations', () => ({
+  completeOrder: vi.fn(),
+  voidOrder: vi.fn(),
+  partialSettle: vi.fn(),
+  splitOrder: vi.fn(),
 }));
 
 vi.mock('@/stores/order/useReceiptStore', () => ({

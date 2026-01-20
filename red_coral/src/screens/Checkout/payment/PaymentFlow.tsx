@@ -20,8 +20,9 @@ import {
   validatePaymentAmount,
   printOrderReceipt,
 } from '@/core/services/order/paymentService';
-import { completeOrder, ensureActiveOrder } from '@/core/stores/order/useOrderOperations';
-import { useOrderEventStore } from '@/core/stores/order/useOrderEventStore';
+import { completeOrder, ensureActiveOrder, splitOrder, updateOrderInfo } from '@/core/stores/order/useOrderOperations';
+import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
+import { toHeldOrder } from '@/core/stores/order/orderAdapter';
 import { useReceiptStore } from '@/core/stores/order/useReceiptStore';
 
 // Components
@@ -98,7 +99,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
     if (validation.isValid) {
       try {
-        const completed = completeOrder(order, [payment]);
+        const completed = await completeOrder(order, [payment]);
         const isRetail = order.isRetail;
 
         if (context?.isCash && context.tendered !== undefined) {
@@ -215,9 +216,9 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
   const handlePrintPrePayment = useCallback(async () => {
     try {
-      const store = useOrderEventStore.getState();
-      const existingOrder = store.getOrder(order.key);
-      let currentOrder = existingOrder ? { ...existingOrder } : { ...order };
+      const store = useActiveOrdersStore.getState();
+      const existingSnapshot = store.getOrder(order.key);
+      let currentOrder = existingSnapshot ? toHeldOrder(existingSnapshot) : { ...order };
 
       if (!currentOrder.receiptNumber || !currentOrder.receiptNumber.startsWith('FAC')) {
         const receiptStore = useReceiptStore.getState();
@@ -232,17 +233,14 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         if (onUpdateOrder) onUpdateOrder(currentOrder);
       }
 
-      // Ensure active order in event store
+      // Ensure active order
       ensureActiveOrder(currentOrder);
 
-      // Update info in store (Always mark as pre-payment printed)
-      // Always include receiptNumber so the timeline event contains it for display
-      const infoToUpdate: any = {
+      // Update info via command (mark as pre-payment printed)
+      await updateOrderInfo(currentOrder, {
         isPrePayment: true,
-        receiptNumber: currentOrder.receiptNumber
-      };
-
-      store.updateOrderInfo(currentOrder.key, infoToUpdate);
+        receiptNumber: currentOrder.receiptNumber,
+      });
 
       // Update local object for printing
       currentOrder.isPrePayment = true;
@@ -275,7 +273,6 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
       if (itemsToSplit.length === 0) return false;
 
       setIsProcessingSplit(true);
-      const eventStore = useOrderEventStore.getState();
 
       try {
         let total = 0;
@@ -289,69 +286,67 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           tip: 0,
         };
 
-        eventStore.addSplitEvent(order.key, {
+        // Execute split order command
+        const updatedOrder = await splitOrder(order, {
           splitAmount: payment.amount,
           items: itemsToSplit.map((i) => ({
             instanceId: i.instanceId,
             name: i.name,
             quantity: i.quantity,
-            price: i.price,
-            selectedOptions: i.selectedOptions,
           })),
           paymentMethod: method,
           tendered: cashDetails?.tendered,
           change: cashDetails ? cashDetails.tendered - payment.amount : undefined,
         });
 
-        const updatedOrder = eventStore.getOrder(order.key);
-        if (updatedOrder && onUpdateOrder) {
+        if (onUpdateOrder) {
           onUpdateOrder(updatedOrder);
+        }
 
-          const isFullyPaid =
-            updatedOrder.total > 0 &&
-            (updatedOrder.paidAmount ?? 0) >= updatedOrder.total - 0.01;
+        const isFullyPaid =
+          updatedOrder.total > 0 &&
+          (updatedOrder.paidAmount ?? 0) >= updatedOrder.total - 0.01;
 
-          if (isFullyPaid) {
-            try {
-              const completed = await completeOrder(updatedOrder, []);
-              const isRetail = updatedOrder.isRetail;
+        if (isFullyPaid) {
+          try {
+            const completed = await completeOrder(updatedOrder, []);
+            const isRetail = updatedOrder.isRetail;
 
-              if (method === 'CASH' && cashDetails?.tendered !== undefined) {
-                setSuccessModal({
-                  isOpen: true,
-                  type: 'CASH',
-                  change: cashDetails.tendered - payment.amount,
-                  onClose: handleComplete,
-                  onPrint: isRetail ? async () => {
-                    await printOrderReceipt(completed);
-                    toast.success(t('settings.payment.receiptPrintSuccess'));
-                  } : undefined,
-                  autoCloseDelay: isRetail ? 0 : 10000,
-                });
-              } else {
-                setSuccessModal({
-                  isOpen: true,
-                  type: 'NORMAL',
-                  onClose: handleComplete,
-                  onPrint: isRetail ? async () => {
-                    await printOrderReceipt(completed);
-                    toast.success(t('settings.payment.receiptPrintSuccess'));
-                  } : undefined,
-                  autoCloseDelay: isRetail ? 0 : 5000,
-                });
-              }
-            } catch (error) {
-              console.error('Auto-complete failed:', error);
+            if (method === 'CASH' && cashDetails?.tendered !== undefined) {
+              setSuccessModal({
+                isOpen: true,
+                type: 'CASH',
+                change: cashDetails.tendered - payment.amount,
+                onClose: handleComplete,
+                onPrint: isRetail ? async () => {
+                  await printOrderReceipt(completed);
+                  toast.success(t('settings.payment.receiptPrintSuccess'));
+                } : undefined,
+                autoCloseDelay: isRetail ? 0 : 10000,
+              });
+            } else {
+              setSuccessModal({
+                isOpen: true,
+                type: 'NORMAL',
+                onClose: handleComplete,
+                onPrint: isRetail ? async () => {
+                  await printOrderReceipt(completed);
+                  toast.success(t('settings.payment.receiptPrintSuccess'));
+                } : undefined,
+                autoCloseDelay: isRetail ? 0 : 5000,
+              });
             }
-          } else if (method === 'CASH' && cashDetails?.tendered !== undefined) {
-            setSuccessModal({
-              isOpen: true,
-              type: 'CASH',
-              change: cashDetails.tendered - payment.amount,
-              onClose: () => setSuccessModal(null),
-              autoCloseDelay: 10000,
-            });
+          } catch (error) {
+            console.error('Auto-complete failed:', error);
           }
+        } else if (method === 'CASH' && cashDetails?.tendered !== undefined) {
+          setSuccessModal({
+            isOpen: true,
+            type: 'CASH',
+            change: cashDetails.tendered - payment.amount,
+            onClose: () => setSuccessModal(null),
+            autoCloseDelay: 10000,
+          });
         }
 
         setMode('ITEM_SPLIT');

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Image as ImageIcon, Tag, Hash, FileText, Layers, MoreHorizontal, PackagePlus, Printer } from 'lucide-react';
 import { FormField, inputClass, selectClass } from './FormField';
-import { convertFileSrc, invoke } from '@tauri-apps/api/core';
-import { createTauriClient } from '@/infrastructure/api';
 import { AttributeSelectionModal } from './AttributeSelectionModal';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { createTauriClient, invokeApi } from '@/infrastructure/api';
 import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions } from '@/core/stores/resources';
 import { useIsKitchenPrintEnabled, useIsLabelPrintEnabled } from '@/core/stores/ui';
 import { usePriceInput } from '@/hooks/usePriceInput';
@@ -381,7 +381,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 {formData.image ? (
                   <img
                     src={
-                      /^https?:\/\//.test(formData.image)
+                      /^(https?:\/\/|data:)/.test(formData.image)
                         ? formData.image
                         : convertFileSrc(formData.image)
                     }
@@ -495,10 +495,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           // If editing an existing product, update the backend immediately
           // to match SpecificationManager's behavior (which saves specs immediately)
           if (formData.id) {
-            invoke('update_product', {
-              params: {
-                id: formData.id,
-                hasMultiSpec: enabled
+            invokeApi('update_product', {
+              id: formData.id,
+              data: {
+                has_multi_spec: enabled
               }
             }).catch(e => console.error('Failed to update hasMultiSpec:', e));
           }

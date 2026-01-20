@@ -5,11 +5,12 @@ import { createTauriClient } from '@/infrastructure/api';
 
 const api = createTauriClient();
 import { Table, Zone, HeldOrder, Permission } from '@/core/domain/types';
-import { useOrderEventStore } from '@/core/stores/order/useOrderEventStore';
+import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
+import { toHeldOrder } from '@/core/stores/order/orderAdapter';
+import * as orderOps from '@/core/stores/order/useOrderOperations';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { ZoneSidebar } from '../ZoneSidebar';
 import { TableCard } from '../TableCard';
-import { invoke } from '@tauri-apps/api/core';
 import { toast } from '@/presentation/components/Toast';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 
@@ -63,8 +64,9 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         if (nextZoneId) setActiveZoneId(nextZoneId);
     }, [zones, heldOrders, sourceTable.id, activeZoneId]);
 
-    const eventStore = useOrderEventStore();
-    const sourceOrder = useOrderEventStore(state => state.ordersCache[sourceTable.id]) || heldOrders.find(o => o.key === sourceTable.id);
+    // Get source order from active store or fallback to prop
+    const sourceOrderSnapshot = useActiveOrdersStore(state => state.orders[sourceTable.id as string]);
+    const sourceOrder = sourceOrderSnapshot ? toHeldOrder(sourceOrderSnapshot) : heldOrders.find(o => o.key === sourceTable.id);
 
     const isSurchargeExempt = sourceOrder?.surchargeExempt || false;
 
@@ -82,49 +84,64 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         return orderSurcharge > 0 || itemsSurcharge > 0;
     }, [sourceOrder]);
 
-    const handleWaiveSurcharge = () => {
-        if (sourceTable.id) {
-            eventStore.setSurchargeExempt(sourceTable.id, !isSurchargeExempt);
+    const handleWaiveSurcharge = async () => {
+        if (sourceOrder && sourceTable.id) {
+            try {
+                await orderOps.setSurchargeExempt(sourceOrder, !isSurchargeExempt);
 
-            // Sync with checkout store immediately to ensure UI updates if we are in checkout flow
-            // This fixes the issue where price doesn't update when clicking the button
-            const checkoutStore = useCheckoutStore.getState();
-            if (checkoutStore.currentOrderKey === sourceTable.id) {
-                const updatedOrder = useOrderEventStore.getState().getOrder(sourceTable.id);
-                if (updatedOrder) {
-                    checkoutStore.setCheckoutOrder(updatedOrder);
+                // Sync with checkout store after command completes
+                const checkoutStore = useCheckoutStore.getState();
+                if (checkoutStore.currentOrderKey === sourceTable.id) {
+                    const store = useActiveOrdersStore.getState();
+                    const updatedSnapshot = store.getOrder(sourceTable.id as string);
+                    if (updatedSnapshot) {
+                        checkoutStore.setCheckoutOrder(toHeldOrder(updatedSnapshot));
+                    }
                 }
+            } catch (err) {
+                console.error('Failed to set surcharge exempt:', err);
             }
         }
     };
 
-    const handleMerge = () => {
-        if (!selectedTargetTable) return;
-        const checkout = useCheckoutStore.getState();
-        const target = useOrderEventStore.getState().getOrder(selectedTargetTable.id);
-        const source = useOrderEventStore.getState().getOrder(sourceTable.id);
-        if (!target || !source) return;
-        eventStore.mergeOrder(target, source);
+    const handleMerge = async () => {
+        if (!selectedTargetTable || !sourceOrder) return;
+        const store = useActiveOrdersStore.getState();
+        const targetSnapshot = store.getOrder(selectedTargetTable.id as string);
+        if (!targetSnapshot) return;
+        const targetOrder = toHeldOrder(targetSnapshot);
 
-        checkout.setCurrentOrderKey(selectedTargetTable.id);
-        checkout.setCheckoutOrder(target);
-        onSuccess(selectedTargetTable.id);
+        try {
+            const mergedOrder = await orderOps.mergeOrders(sourceOrder, targetOrder);
+            const checkout = useCheckoutStore.getState();
+            checkout.setCurrentOrderKey(selectedTargetTable.id as string);
+            checkout.setCheckoutOrder(mergedOrder);
+            onSuccess(selectedTargetTable.id as string);
+        } catch (err) {
+            console.error('Merge failed:', err);
+            toast.error(t('checkout.error.mergeFailed'));
+        }
     };
 
-    const handleMove = () => {
-        if (!selectedTargetTable) return;
+    const handleMove = async () => {
+        if (!selectedTargetTable || !sourceOrder) return;
         const targetZone = zones.find(z => z.id === selectedTargetTable.zone);
-        eventStore.moveOrder(sourceTable.id, {
-            ...selectedTargetTable,
-            zoneName: targetZone?.name
-        });
-        const checkout = useCheckoutStore.getState();
-        const target = useOrderEventStore.getState().getOrder(selectedTargetTable.id);
-        if (target) {
-            checkout.setCurrentOrderKey(selectedTargetTable.id);
-            checkout.setCheckoutOrder(target);
+
+        try {
+            const movedOrder = await orderOps.moveOrder(
+                sourceOrder,
+                selectedTargetTable.id as string,
+                selectedTargetTable.name,
+                targetZone?.name
+            );
+            const checkout = useCheckoutStore.getState();
+            checkout.setCurrentOrderKey(selectedTargetTable.id as string);
+            checkout.setCheckoutOrder(movedOrder);
+            onSuccess(selectedTargetTable.id as string);
+        } catch (err) {
+            console.error('Move failed:', err);
+            toast.error(t('checkout.error.moveFailed'));
         }
-        onSuccess(selectedTargetTable.id);
     };
 
     const handleSplitPayment = async (method: 'CASH' | 'CARD') => {
@@ -153,39 +170,14 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                 total += splitItem.price * splitItem.quantity;
             });
 
-            const payment = {
-                method,
-                amount: total,
-                tip: 0
-            };
-
-            await invoke('split_order_payment', {
-                params: {
-                    originalOrderKey: sourceTable.id,
-                    tableName: sourceTable.name,
-                    splitItems: itemsToSplit,
-                    payment
-                }
-            });
-
-            // Record the split event for audit logs
-            const eventStore = useOrderEventStore.getState();
-            eventStore.addSplitEvent(sourceTable.id, {
-                splitAmount: payment.amount,
-                items: itemsToSplit.map(i => ({
-                    instanceId: i.instanceId,
-                    name: i.name,
-                    quantity: i.quantity,
-                    price: i.price
-                })),
+            await orderOps.splitOrder(sourceOrder, {
+                splitAmount: total,
+                items: itemsToSplit,
                 paymentMethod: method
             });
 
-            // No longer modify item quantities on the order itself
-            // The event reducer will update 'paidAmount' and 'paidItemQuantities'
-
-            // Force a save to persist these changes
-            // The eventStore usually auto-saves or syncs.
+            // Server handles everything via event sourcing
+            // State will be updated when server emits OrderUpdated event
 
             onClose();
             toast.success(t('checkout.split.success'));

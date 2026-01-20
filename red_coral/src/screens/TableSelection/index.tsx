@@ -13,7 +13,8 @@ import { GuestInputPanel } from './GuestInputPanel';
 import { TableManagementModal } from './components';
 import { useDataVersion } from '@/core/stores/settings/useSettingsStore';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
-import { useOrderEventStore } from '@/core/stores/order/useOrderEventStore';
+import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
+import { toHeldOrder } from '@/core/stores/order/orderAdapter';
 
 export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.memo(
   ({ heldOrders, onSelectTable, onClose, mode, cart = [], manageTableId }) => {
@@ -156,9 +157,8 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
       
       const tableIds = new Set(zoneTables.map(t => t.id));
       
-      return heldOrders.filter(o => 
-        !tableIds.has(o.key) && 
-        !o.key.startsWith('RETAIL-') && 
+      return heldOrders.filter(o =>
+        !tableIds.has(o.key) &&
         !o.isRetail
       );
     }, [activeZoneId, loading, zoneTables, heldOrders]);
@@ -236,15 +236,16 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
               onSuccess={(navigateToTableId) => {
                 if (navigateToTableId) {
                   const checkout = useCheckoutStore.getState();
-                  const store = useOrderEventStore.getState();
+                  const store = useActiveOrdersStore.getState();
                   checkout.setCurrentOrderKey(navigateToTableId);
-                  const target = store.getOrder(navigateToTableId);
-                  if (target) {
-                    checkout.setCheckoutOrder(target);
+                  const targetSnapshot = store.getOrder(navigateToTableId);
+                  if (targetSnapshot) {
+                    checkout.setCheckoutOrder(toHeldOrder(targetSnapshot));
                   } else {
+                    // Wait for event to arrive
                     setTimeout(() => {
-                      const t = useOrderEventStore.getState().getOrder(navigateToTableId);
-                      if (t) useCheckoutStore.getState().setCheckoutOrder(t);
+                      const snapshot = useActiveOrdersStore.getState().getOrder(navigateToTableId);
+                      if (snapshot) useCheckoutStore.getState().setCheckoutOrder(toHeldOrder(snapshot));
                     }, 50);
                   }
                 }
@@ -389,15 +390,16 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
                 setSelectedTableForInput(null);
                 if (navigateToTableId) {
                   const checkout = useCheckoutStore.getState();
-                  const store = useOrderEventStore.getState();
+                  const store = useActiveOrdersStore.getState();
                   checkout.setCurrentOrderKey(navigateToTableId);
-                  const target = store.getOrder(navigateToTableId);
-                  if (target) {
-                    checkout.setCheckoutOrder(target);
+                  const targetSnapshot = store.getOrder(navigateToTableId);
+                  if (targetSnapshot) {
+                    checkout.setCheckoutOrder(toHeldOrder(targetSnapshot));
                   } else {
+                    // Wait for event to arrive
                     setTimeout(() => {
-                      const t = useOrderEventStore.getState().getOrder(navigateToTableId);
-                      if (t) useCheckoutStore.getState().setCheckoutOrder(t);
+                      const snapshot = useActiveOrdersStore.getState().getOrder(navigateToTableId);
+                      if (snapshot) useCheckoutStore.getState().setCheckoutOrder(toHeldOrder(snapshot));
                     }, 50);
                   }
                 }

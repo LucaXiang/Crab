@@ -6,9 +6,9 @@ import { useI18n } from '@/hooks/useI18n';
 import { OrderItemsSummary } from '@/screens/Checkout/OrderItemsSummary';
 import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDetailModal';
 import { QuickAddModal } from '@/presentation/components/modals/QuickAddModal';
-import { recalculateOrderTotal, convertEventToTimelineEvent, reduceOrderEvents, createEmptyOrder, mergeItemsIntoList } from '@/core/services/order/eventReducer';
+import { recalculateOrderTotal, convertEventToTimelineEvent, mergeItemsIntoList } from '@/core/services/order/eventReducer';
 import { v4 as uuidv4 } from 'uuid';
-import { useOrderActions, useOrderEventStore } from '@/core/stores/order/useOrderEventStore';
+import * as orderOps from '@/core/stores/order/useOrderOperations';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { Currency } from '@/utils/currency';
 import { formatCurrency } from '@/utils/currency';
@@ -32,7 +32,6 @@ type Tab = 'ITEMS' | 'TIMELINE';
 
 export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, remaining, onUpdateOrder, onManage }) => {
   const { t } = useI18n();
-  const { modifyItem, removeItem, addItems } = useOrderActions();
   const { user: currentUser } = useAuthStore();
   const [activeTab, setActiveTab] = useState<Tab>('ITEMS');
   const [editingItem, setEditingItem] = useState<{ item: CartItem; index: number } | null>(null);
@@ -49,23 +48,24 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     }
   }, [order]);
 
-  const handleSaveItem = React.useCallback((index: number, updates: Partial<CartItem>, options?: { userId?: string }) => {
+  const handleSaveItem = React.useCallback(async (index: number, updates: Partial<CartItem>, _options?: { userId?: string }) => {
     const item = order.items[index];
     const instanceId = item.instanceId || `item-${index}`;
 
-    // Ensure we have a user ID if logged in (convert to string)
-    const finalOptions = {
-      userId: options?.userId || (currentUser?.id ? String(currentUser.id) : undefined)
-    };
+    // Send command to backend - state will be updated via event
+    await orderOps.modifyItem(order.key, instanceId, {
+      price: updates.price,
+      quantity: updates.quantity,
+      discountPercent: updates.discountPercent,
+      surcharge: updates.surcharge,
+      note: updates.note,
+    });
 
-    // 1. Update global store (persistence)
-    modifyItem(order.key, instanceId, updates, finalOptions);
-
-    // 2. Update local UI immediately (if onUpdateOrder is provided)
+    // Optimistic update for immediate UI feedback
     if (onUpdateOrder) {
       const newItems = [...order.items];
       newItems[index] = { ...newItems[index], ...updates };
-      
+
       // Create ItemModifiedEvent for local display
       const event: ItemModifiedEvent = {
         id: uuidv4(),
@@ -87,40 +87,33 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         items: newItems,
         timeline: [...(order.timeline || []), timelineEvent]
       });
-      
+
       onUpdateOrder(updatedOrder);
     }
     setEditingItem(null);
-  }, [order, currentUser, modifyItem, onUpdateOrder]);
+  }, [order, onUpdateOrder]);
 
-  const handleDeleteItem = React.useCallback((index: number, options?: { userId?: string }) => {
+  const handleDeleteItem = React.useCallback(async (index: number, _options?: { userId?: string }) => {
     const item = order.items[index];
     const instanceId = item.instanceId || `item-${index}`;
     const paidQty = order.paidItemQuantities?.[instanceId] || 0;
 
-    // Ensure we have a user ID if logged in (convert to string)
-    const finalOptions = {
-      userId: options?.userId || (currentUser?.id ? String(currentUser.id) : undefined)
-    };
-
     // Case 1: Partially paid item - Remove unpaid portion
     if (paidQty > 0 && paidQty < item.quantity) {
       const qtyToRemove = item.quantity - paidQty;
-      
-      // 1. Update global store (persistence)
-      removeItem(order.key, instanceId, 'Removed unpaid portion', { ...finalOptions, quantity: qtyToRemove });
 
-      // 2. Update local UI immediately (if onUpdateOrder is provided)
+      // Send command to backend - state will be updated via event
+      await orderOps.removeItem(order.key, instanceId, 'Removed unpaid portion', qtyToRemove);
+
+      // Optimistic update for immediate UI feedback
       if (onUpdateOrder) {
         const newItems = order.items.map((it, idx) => {
           if (idx === index) {
-            // Recalculate price for new quantity (approximation for UI)
             return { ...it, quantity: paidQty };
           }
           return it;
         });
 
-        // Create ItemRemovedEvent for local display
         const event: ItemRemovedEvent = {
           id: uuidv4(),
           type: OrderEventType.ITEM_REMOVED,
@@ -134,7 +127,6 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           }
         };
 
-        // Convert to timeline event
         const timelineEvent = convertEventToTimelineEvent(event);
 
         const updatedOrder = recalculateOrderTotal({
@@ -142,17 +134,16 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           items: newItems,
           timeline: [...(order.timeline || []), timelineEvent]
         });
-        
+
         onUpdateOrder(updatedOrder);
       }
       return;
     }
 
     // Case 2: Fully paid or Unpaid - Remove (Soft Delete)
-    // 1. Update global store (persistence)
-    removeItem(order.key, instanceId, 'Removed from payment screen', finalOptions);
-    
-    // 2. Update local UI immediately (if onUpdateOrder is provided)
+    await orderOps.removeItem(order.key, instanceId, 'Removed from payment screen');
+
+    // Optimistic update for immediate UI feedback
     if (onUpdateOrder) {
       const newItems = order.items.map((it, idx) => {
         if (idx === index) {
@@ -160,8 +151,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         }
         return it;
       });
-      
-      // Create ItemRemovedEvent for local display
+
       const event: ItemRemovedEvent = {
         id: uuidv4(),
         type: OrderEventType.ITEM_REMOVED,
@@ -174,7 +164,6 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         }
       };
 
-      // Convert to timeline event
       const timelineEvent = convertEventToTimelineEvent(event);
 
       const updatedOrder = recalculateOrderTotal({
@@ -182,11 +171,11 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         items: newItems,
         timeline: [...(order.timeline || []), timelineEvent]
       });
-      
+
       onUpdateOrder(updatedOrder);
     }
     setEditingItem(null);
-  }, [order, currentUser, removeItem, onUpdateOrder, handleSaveItem]);
+  }, [order, onUpdateOrder]);
 
   const {
     displayOriginalPrice,
@@ -239,14 +228,9 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
 
   React.useEffect(() => {
     if (activeTab !== 'TIMELINE') return;
-    const events = useOrderEventStore.getState().getOrderEvents(order.key);
-    if (events && events.length > 0) {
-      const rebuilt = reduceOrderEvents(events, createEmptyOrder(order.key));
-      setLazyTimeline(rebuilt.timeline || []);
-    } else {
-      setLazyTimeline(order.timeline || []);
-    }
-  }, [activeTab, order.key, order.timeline]);
+    // Timeline events come from server via order.timeline
+    setLazyTimeline(order.timeline || []);
+  }, [activeTab, order.timeline]);
 
   return (
     <div className="w-[400px] bg-white h-full border-r border-gray-200 flex flex-col shadow-xl relative">
@@ -276,7 +260,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
               <span className="text-sm font-bold">{t('pos.quickAdd.title')}</span>
             </button>
 
-            {onManage && !order.key.startsWith('RETAIL-') && (
+            {onManage && !order.isRetail && (
             <button
               onClick={onManage}
               className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors"
@@ -394,34 +378,29 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       {showQuickAdd && (
         <QuickAddModal
           onClose={() => setShowQuickAdd(false)}
-          onConfirm={(items) => {
-            // 1. Add items to store (Single Source of Truth)
-            addItems(order.key, items);
+          onConfirm={async (items) => {
+            // Send command to backend - state will be updated via event
+            await orderOps.addItems(order.key, items);
 
-            // 2. Optimistic Update for immediate UI feedback
+            // Optimistic update for immediate UI feedback
             if (onUpdateOrder) {
-               // Construct a temporary event for local calculation
-               const event: any = { 
+               const event: any = {
                    id: uuidv4(),
                    type: OrderEventType.ITEMS_ADDED,
                    timestamp: Date.now(),
                    data: { items }
                };
-               
-               // Append new items
+
                const newItems = mergeItemsIntoList(order.items, items);
-               
-               // Convert to timeline event
                const timelineEvent = convertEventToTimelineEvent(event);
-               
-               // Recalculate totals
+
                const optimOrder = recalculateOrderTotal({
                    ...order,
                    items: newItems,
                    isPrePayment: false,
                    timeline: [...(order.timeline || []), timelineEvent]
                });
-               
+
                onUpdateOrder(optimOrder);
             }
 

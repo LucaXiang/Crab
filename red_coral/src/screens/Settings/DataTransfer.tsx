@@ -2,9 +2,8 @@ import React, { useState } from 'react';
 import { Upload, Download, FileArchive } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { invoke } from '@tauri-apps/api/core';
 import { toast } from '@/presentation/components/Toast';
-import { createTauriClient } from '@/infrastructure/api';
+import { createTauriClient, invokeApi } from '@/infrastructure/api';
 
 const api = createTauriClient();
 import { useProductStore, useCategoryStore } from '@/core/stores/resources';
@@ -30,7 +29,7 @@ export const DataTransfer: React.FC = () => {
       if (!path) return;
 
       setLoading(true);
-      await invoke('export_data', { path });
+      await invokeApi('export_data', { path });
       toast.success(t('settings.dataTransfer.export.success'));
     } catch (error) {
       console.error('Export failed:', error);
@@ -55,7 +54,7 @@ export const DataTransfer: React.FC = () => {
       if (!selectedPath) return;
 
       setLoading(true);
-      await invoke('import_data', { path: selectedPath });
+      await invokeApi('import_data', { path: selectedPath });
 
       // Clear all caches to force reload
       useProductStore.getState().fetchAll();

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { logger } from '@/utils/logger';
 
 /**
@@ -76,7 +76,7 @@ export const useHistoryOrderList = (
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const response = await invoke<FetchOrderListResponse>('fetch_order_list', {
+      const response = await invokeApi<FetchOrderListResponse>('fetch_order_list', {
         params: {
           page,
           limit: initialPageSize,

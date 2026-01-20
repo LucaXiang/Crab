@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import DefaultImage from '../../assets/reshot.svg';
-import { useOrderEventStore } from '@/core/stores/order/useOrderEventStore';
+import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
+import { voidOrder } from '@/core/stores/order/useOrderOperations';
+import { toHeldOrder } from '@/core/stores/order/orderAdapter';
 import { useCanManageProducts } from '@/hooks/usePermission';
 import { EntityFormModal } from '../Settings/EntityFormModal';
 
@@ -72,10 +74,9 @@ import { useDraftHandlers } from '@/hooks/useDraftHandlers';
 
 export const POSScreen: React.FC = () => {
   const { t } = useI18n();
-  const hydrateActive = useOrderEventStore((s) => s.hydrateActiveFromLocalStorage);
-  useEffect(() => {
-    hydrateActive();
-  }, [hydrateActive]);
+
+  // With event sourcing, orders are hydrated from server events automatically
+  // No local hydration needed
 
   // Permissions & Modal
   const canManageProducts = useCanManageProducts();
@@ -429,24 +430,29 @@ export const POSScreen: React.FC = () => {
     handleCheckoutStart(cart.length > 0 ? null : currentOrderKey);
   }, [handleCheckoutStart, cart.length, currentOrderKey]);
 
-  const handleRequestExit = useCallback(() => {
-    const eventStore = useOrderEventStore.getState();
+  const handleRequestExit = useCallback(async () => {
+    const store = useActiveOrdersStore.getState();
 
-    const active = eventStore.getActiveOrders();
-    const retailActive = active.filter((o) => o.key.startsWith('RETAIL-'));
+    const active = store.getActiveOrders();
+    const retailActive = active.filter((o) => o.is_retail === true);
 
-    retailActive.forEach((order) => {
+    // Void retail orders
+    for (const snapshot of retailActive) {
       try {
-        eventStore.voidOrder(order.key, 'Retail session cancelled on logout');
-      } catch {}
-    });
+        const order = toHeldOrder(snapshot);
+        await voidOrder(order, 'Retail session cancelled on logout');
+      } catch {
+        // Ignore errors - best effort cleanup
+      }
+    }
 
-    const remaining = eventStore
+    // Check for remaining non-retail orders
+    const remaining = store
       .getActiveOrders()
-      .filter((o) => !o.key.startsWith('RETAIL-'));
+      .filter((o) => o.is_retail !== true);
 
     if (remaining && remaining.length > 0) {
-      const names = remaining.map((o) => o.tableName || o.key).slice(0, 5).join('、');
+      const names = remaining.map((o) => o.table_name || o.order_id).slice(0, 5).join('、');
       const moreText = remaining.length > 5 ? ` 等 ${remaining.length} 个桌台` : '';
       setExitDialog({
         open: true,

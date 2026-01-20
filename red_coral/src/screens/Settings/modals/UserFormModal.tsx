@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, User as UserIcon, Mail, Shield, Eye, EyeOff } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { useI18n } from '../../../hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { User, Role } from '@/core/domain/types';
+import { RoleListData } from '@/core/domain/types/api';
 import { useAuthStore, useCurrentUser } from '@/core/stores/auth/useAuthStore';
 
 interface UserFormModalProps {
@@ -36,8 +37,9 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
   useEffect(() => {
     // Fetch roles
-    invoke<Role[]>('fetch_roles')
-      .then((fetchedRoles) => {
+    invokeApi<RoleListData>('list_roles')
+      .then((resp) => {
+        const fetchedRoles = resp.roles;
         setRoles(fetchedRoles);
         // Set default role if creating new user
         if (!editingUser && fetchedRoles.length > 0) {

@@ -1,8 +1,10 @@
 import { useCallback, useMemo } from 'react';
 import { CartItem, HeldOrder, Table, Zone } from '@/core/domain/types';
-import { useOrderEventStore } from '@/core/stores/order/useOrderEventStore';
+import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { useCartStore } from '@/core/stores/cart/useCartStore';
+import { toHeldOrder } from '@/core/stores/order/orderAdapter';
+import * as orderOps from '@/core/stores/order/useOrderOperations';
 
 interface UseOrderHandlersParams {
   handleTableSelectStore: (
@@ -13,8 +15,8 @@ interface UseOrderHandlersParams {
     enableIndividualMode?: boolean,
     isIndividualMode?: boolean,
     zone?: Zone
-  ) => 'MERGED' | 'CREATED' | 'RETRIEVED' | 'EMPTY';
-  voidOrder: (order: HeldOrder, reason?: string) => HeldOrder;
+  ) => Promise<'MERGED' | 'CREATED' | 'RETRIEVED' | 'EMPTY'>;
+  voidOrder: (order: HeldOrder, reason?: string) => Promise<HeldOrder>;
   setCheckoutOrder: (order: HeldOrder | null) => void;
   setCurrentOrderKey: (key: string | null) => void;
   setViewMode: (mode: 'pos' | 'checkout') => void;
@@ -32,7 +34,7 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
   } = params;
 
   const handleTableSelect = useCallback(
-    (
+    async (
       table: Table,
       guestCount: number,
       enableIndividualMode?: boolean,
@@ -40,7 +42,7 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
     ) => {
       const { cart, totalAmount } = useCartStore.getState();
 
-      const result = handleTableSelectStore(
+      const result = await handleTableSelectStore(
         table,
         guestCount,
         cart,
@@ -70,16 +72,17 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
   }, [setShowTableScreen]);
 
   const handleCheckoutStart = useCallback(
-    (key: string | null) => {
-      const store = useOrderEventStore.getState();
+    async (key: string | null) => {
+      const store = useActiveOrdersStore.getState();
       const checkout = useCheckoutStore.getState();
       const { cart } = useCartStore.getState();
 
-      if (key && !key.startsWith('RETAIL-')) {
-        setCurrentOrderKey(key);
-        const existing = store.getOrder(key);
-        if (existing) {
-          checkout.setCheckoutOrder(existing);
+      // Try to retrieve existing non-retail order
+      if (key) {
+        const existingSnapshot = store.getOrder(key);
+        if (existingSnapshot && !existingSnapshot.is_retail) {
+          setCurrentOrderKey(key);
+          checkout.setCheckoutOrder(toHeldOrder(existingSnapshot));
           setViewMode('checkout');
           return;
         }
@@ -87,32 +90,46 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
 
       if (cart.length === 0) return;
 
-      if (!key || key.startsWith('RETAIL-')) {
-        checkout.setCurrentOrderKey(null);
-      }
+      // Clear key for retail orders (new order will be created)
+      checkout.setCurrentOrderKey(null);
 
-      const retailKey = `RETAIL-${Date.now()}`;
+      // Create retail order via command
+      const retailTable: Table = {
+        id: null, // Will be assigned by backend for retail
+        name: 'Inmediata',
+        capacity: 1,
+        zone: '',
+        is_active: true,
+      };
 
-      store.openTable({
-        tableId: retailKey,
-        tableName: 'Inmediata',
-        guestCount: 1,
-      });
+      try {
+        const result = await orderOps.handleTableSelect(
+          retailTable,
+          1,
+          cart,
+          0,
+          false,
+          false,
+          undefined
+        );
 
-      store.addItems(retailKey, cart);
+        if (result === 'CREATED' || result === 'MERGED') {
+          // Wait a bit for event to arrive and update store
+          await new Promise(resolve => setTimeout(resolve, 100));
 
-      const createdOrder = store.getOrder(retailKey);
+          // Find the created retail order
+          const activeOrders = store.getActiveOrders();
+          const retailOrder = activeOrders.find(o => o.is_retail === true);
 
-      if (createdOrder) {
-        const retailOrder = {
-          ...createdOrder,
-          isRetail: true,
-          tableName: 'Inmediata',
-        };
-
-        checkout.setCheckoutOrder(retailOrder);
-        setCurrentOrderKey(retailKey);
-        setViewMode('checkout');
+          if (retailOrder) {
+            const heldOrder = toHeldOrder(retailOrder);
+            checkout.setCheckoutOrder(heldOrder);
+            setCurrentOrderKey(heldOrder.key);
+            setViewMode('checkout');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to create retail order:', error);
       }
     },
     [setCurrentOrderKey, setViewMode]
@@ -132,21 +149,16 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
     setCurrentOrderKey(null);
   }, [setViewMode, setCheckoutOrder, setCurrentOrderKey]);
 
-  const handleCheckoutVoid = useCallback(() => {
+  const handleCheckoutVoid = useCallback(async () => {
     const { checkoutOrder } = useCheckoutStore.getState();
     if (!checkoutOrder) return;
-    voidOrder(checkoutOrder, 'Manual Void');
+
+    await voidOrder(checkoutOrder, 'Manual Void');
     setViewMode('pos');
     setCheckoutOrder(null);
     useCartStore.getState().clearCart();
     setCurrentOrderKey(null);
   }, [voidOrder, setViewMode, setCheckoutOrder, setCurrentOrderKey]);
-
-  /**
-   * Helper to void any potentially abandoned retail order that has a Receipt Number
-   * This should be called when "Clear Cart" is clicked in Sidebar
-   */
-  
 
   return useMemo(
     () => ({

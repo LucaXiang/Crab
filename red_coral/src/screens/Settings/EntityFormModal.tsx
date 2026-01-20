@@ -6,13 +6,13 @@ import {
   useSettingsFormMeta,
   useSettingsStore,
 } from '@/core/stores/settings/useSettingsStore';
-import { createTauriClient } from '@/infrastructure/api';
+import { createTauriClient, invokeApi } from '@/infrastructure/api';
+import { invoke } from '@tauri-apps/api/core';
 import { useProductStore, useZones, useCategoryStore } from '@/core/stores/resources';
 
 const api = createTauriClient();
 import { toast } from '@/presentation/components/Toast';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
-import { invoke } from '@tauri-apps/api/core';
 import { syncAttributeBindings } from './utils';
 import { useZoneTableStore } from '@/hooks/useZonesAndTables';
 
@@ -399,18 +399,18 @@ export const EntityFormModal: React.FC = React.memo(() => {
         if (action === 'CREATE' && formData.hasMultiSpec && formData.tempSpecifications) {
           try {
             // First enable multi-spec for the product
-            await invoke('toggle_product_multi_spec', {
-              productId,
-              enabled: true,
+            await invokeApi('update_product', {
+              id: productId,
+              data: { has_multi_spec: true },
             });
 
             // Then create all specifications
             for (const spec of formData.tempSpecifications) {
-              await invoke('create_product_specification', {
-                params: {
-                  productId,
+              await invokeApi('create_spec', {
+                data: {
+                  product_id: productId,
                   name: spec.name,
-                  receiptName: spec.receiptName || null,
+                  receipt_name: spec.receiptName || null,
                   price: spec.price,
                 },
               });
@@ -419,9 +419,9 @@ export const EntityFormModal: React.FC = React.memo(() => {
             // Set default specification if any
             const defaultSpec = formData.tempSpecifications?.find((s: { isDefault?: boolean }) => s.isDefault);
             if (defaultSpec) {
-              await invoke('update_product_specification', {
+              await invokeApi('update_spec', {
                 id: defaultSpec.id,
-                params: { isDefault: true },
+                data: { is_default: true },
               });
             }
           } catch (error) {

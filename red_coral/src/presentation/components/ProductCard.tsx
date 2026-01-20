@@ -55,7 +55,7 @@ export const ProductCard = React.memo<ProductCardProps>(
     });
 
     const imageSrc = product.image 
-      ? (/^https?:\/\//.test(product.image) ? product.image : convertFileSrc(product.image)) 
+      ? (/^(https?:\/\/|data:)/.test(product.image) ? product.image : convertFileSrc(product.image)) 
       : DefaultImage;
 
     return (
