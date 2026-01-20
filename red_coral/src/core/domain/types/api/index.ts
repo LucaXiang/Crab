@@ -425,10 +425,6 @@ export interface UpdateRoleRequest {
   description?: string;
 }
 
-export interface RolePermissionListData {
-  permissions: RolePermission[];
-}
-
 export interface CreateRolePermissionsRequest {
   role_id: number;
   permissions: string[];

@@ -7,7 +7,8 @@
  * Note: Some types with conflicting names exist in different submodules.
  * Import from specific submodules when needed:
  * - '@/core/domain/types/api' - Backend API types (matches Rust server)
- * - '@/core/domain/types/events' - Client-side event sourcing types
+ * - '@/core/domain/types/events' - Client-side event sourcing types (legacy)
+ * - '@/core/domain/types/orderEvent' - Server-side event sourcing types (new)
  * - '@/core/domain/types/print' - Print and label types
  * - '@/core/domain/types/pricing' - Frontend pricing adjustment types
  */
@@ -17,6 +18,74 @@ export * from './api';
 
 // Print and label types
 export * from './print';
+
+// Order Event Sourcing types (new server-side state architecture)
+// Import with namespace to avoid conflicts: import { OrderEvent } from '@/core/domain/types/orderEvent'
+// Or use: import type { OrderEvent as ServerOrderEvent } from '@/core/domain/types/orderEvent'
+export type {
+  // Event types
+  OrderEventType,
+  OrderEvent,
+  EventPayload,
+  TableOpenedPayload,
+  OrderCompletedPayload,
+  OrderVoidedPayload,
+  OrderRestoredPayload,
+  ItemsAddedPayload,
+  ItemModifiedPayload,
+  ItemModificationResult,
+  ItemRemovedPayload,
+  ItemRestoredPayload,
+  PaymentAddedPayload,
+  PaymentCancelledPayload,
+  OrderSplitPayload,
+  OrderMovedPayload,
+  OrderMovedOutPayload,
+  OrderMergedPayload,
+  OrderMergedOutPayload,
+  TableReassignedPayload,
+  SurchargeExemptSetPayload,
+  OrderInfoUpdatedPayload,
+  // Command types
+  OrderCommand,
+  OrderCommandPayload,
+  OpenTableCommand,
+  CompleteOrderCommand,
+  VoidOrderCommand,
+  RestoreOrderCommand,
+  AddItemsCommand,
+  ModifyItemCommand,
+  RemoveItemCommand,
+  RestoreItemCommand,
+  AddPaymentCommand,
+  CancelPaymentCommand,
+  SplitOrderCommand,
+  MoveOrderCommand,
+  MergeOrdersCommand,
+  SetSurchargeExemptCommand,
+  UpdateOrderInfoCommand,
+  // Response types
+  CommandResponse,
+  CommandError,
+  CommandErrorCode,
+  // Sync types
+  SyncRequest,
+  SyncResponse,
+  // Snapshot types
+  OrderSnapshot,
+  // Shared types (snake_case for Rust compatibility)
+  CartItemSnapshot,
+  CartItemInput,
+  ItemOption,
+  SpecificationInfo,
+  ItemChanges as ServerItemChanges,
+  SplitItem,
+  PaymentSummaryItem,
+  SurchargeConfig,
+  PaymentRecord as ServerPaymentRecord,
+  PaymentMethod,
+  OrderConnectionState,
+} from './orderEvent';
 
 // Frontend-specific types for cart and orders
 export interface CartItem {

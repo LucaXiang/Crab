@@ -1,5 +1,6 @@
 import { useShallow } from 'zustand/react/shallow';
-import { useOrderEventStore } from './useOrderEventStore';
+import { useActiveOrdersStore } from './useActiveOrdersStore';
+import { toHeldOrders } from './orderAdapter';
 import * as orderOps from './useOrderOperations';
 
 // Re-export sub-stores
@@ -15,11 +16,14 @@ import { useReceiptStore } from './useReceiptStore';
 
 // --- Selectors ---
 
-// Active Orders from Event Store
-export const useHeldOrders = () => useOrderEventStore(useShallow((state) => state.getActiveOrders()));
+// Active Orders (uses new event-sourcing store)
+export const useHeldOrders = () => {
+  const snapshots = useActiveOrdersStore(useShallow((state) => state.getActiveOrders()));
+  return toHeldOrders(snapshots);
+};
 
-export const useHeldOrdersCount = () => useOrderEventStore((state) =>
-  state.getActiveOrders().filter(o => (o.key || String(o.tableId || '')).startsWith('RETAIL-') === false).length
+export const useHeldOrdersCount = () => useActiveOrdersStore((state) =>
+  state.getActiveOrders().filter(o => o.is_retail !== true).length
 );
 
 // Combined actions selector

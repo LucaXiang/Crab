@@ -6,3 +6,5 @@ export * from './useConnectionStatus';
 export * from './useSyncListener';
 export * from './useConnectionRecovery';
 export * from './usePreloadCoreData';
+export * from './useOrderEventListener';
+export * from './useCommandLock';

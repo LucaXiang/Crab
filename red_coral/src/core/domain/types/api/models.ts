@@ -532,10 +532,11 @@ export type Payment = OrderPayment;
 // ============ Role ============
 
 export interface Role {
-  id: string | null;
+  id: string;
   name: string;
   display_name: string;
   description: string | null;
+  is_system: boolean;
   is_active: boolean;
 }
 
@@ -555,6 +556,14 @@ export interface RoleUpdate {
 export interface RolePermission {
   role_id: string;
   permission: string;
+}
+
+export interface RoleListData {
+  roles: Role[];
+}
+
+export interface RolePermissionListData {
+  permissions: RolePermission[];
 }
 
 // ============ User (Frontend representation) ============
