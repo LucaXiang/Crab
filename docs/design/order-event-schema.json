@@ -1,0 +1,720 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Order Event System Schema",
+  "description": "订单事件系统的完整 JSON Schema 定义，用于事件溯源和时间线渲染",
+
+  "definitions": {
+    "OrderEvent": {
+      "type": "object",
+      "description": "通用事件结构",
+      "required": ["event_id", "sequence", "order_id", "timestamp", "operator_id", "operator_name", "command_id", "event_type", "payload"],
+      "properties": {
+        "event_id": { "type": "string", "format": "uuid", "description": "事件唯一 ID" },
+        "sequence": { "type": "integer", "minimum": 0, "description": "全局递增序列号（用于排序/重播）" },
+        "order_id": { "type": "string", "description": "所属订单 ID" },
+        "timestamp": { "type": "integer", "description": "事件发生时间（Unix 毫秒）" },
+        "operator_id": { "type": "string", "description": "操作员 ID" },
+        "operator_name": { "type": "string", "description": "操作员姓名（时间线显示用）" },
+        "command_id": { "type": "string", "format": "uuid", "description": "触发此事件的命令 ID（审计追溯）" },
+        "event_type": { "$ref": "#/definitions/OrderEventType" },
+        "payload": { "$ref": "#/definitions/EventPayload" }
+      }
+    },
+
+    "OrderEventType": {
+      "type": "string",
+      "enum": [
+        "TABLE_OPENED",
+        "ORDER_COMPLETED",
+        "ORDER_VOIDED",
+        "ORDER_RESTORED",
+        "ITEMS_ADDED",
+        "ITEM_MODIFIED",
+        "ITEM_REMOVED",
+        "ITEM_RESTORED",
+        "PAYMENT_ADDED",
+        "PAYMENT_CANCELLED",
+        "ORDER_SPLIT",
+        "ORDER_MOVED",
+        "ORDER_MOVED_OUT",
+        "ORDER_MERGED",
+        "ORDER_MERGED_OUT",
+        "TABLE_REASSIGNED",
+        "SURCHARGE_EXEMPT_SET",
+        "ORDER_INFO_UPDATED"
+      ]
+    },
+
+    "EventPayload": {
+      "oneOf": [
+        { "$ref": "#/definitions/TableOpenedPayload" },
+        { "$ref": "#/definitions/OrderCompletedPayload" },
+        { "$ref": "#/definitions/OrderVoidedPayload" },
+        { "$ref": "#/definitions/OrderRestoredPayload" },
+        { "$ref": "#/definitions/ItemsAddedPayload" },
+        { "$ref": "#/definitions/ItemModifiedPayload" },
+        { "$ref": "#/definitions/ItemRemovedPayload" },
+        { "$ref": "#/definitions/ItemRestoredPayload" },
+        { "$ref": "#/definitions/PaymentAddedPayload" },
+        { "$ref": "#/definitions/PaymentCancelledPayload" },
+        { "$ref": "#/definitions/OrderSplitPayload" },
+        { "$ref": "#/definitions/OrderMovedPayload" },
+        { "$ref": "#/definitions/OrderMovedOutPayload" },
+        { "$ref": "#/definitions/OrderMergedPayload" },
+        { "$ref": "#/definitions/OrderMergedOutPayload" },
+        { "$ref": "#/definitions/TableReassignedPayload" },
+        { "$ref": "#/definitions/SurchargeExemptSetPayload" },
+        { "$ref": "#/definitions/OrderInfoUpdatedPayload" }
+      ]
+    },
+
+    "TableOpenedPayload": {
+      "type": "object",
+      "required": ["guest_count", "is_retail"],
+      "properties": {
+        "table_id": { "type": ["string", "null"] },
+        "table_name": { "type": ["string", "null"] },
+        "zone_id": { "type": ["string", "null"] },
+        "zone_name": { "type": ["string", "null"] },
+        "guest_count": { "type": "integer", "minimum": 0 },
+        "is_retail": { "type": "boolean" },
+        "surcharge": { "$ref": "#/definitions/SurchargeConfig" },
+        "receipt_number": { "type": ["string", "null"] }
+      }
+    },
+
+    "OrderCompletedPayload": {
+      "type": "object",
+      "required": ["receipt_number", "final_total", "payment_summary"],
+      "properties": {
+        "receipt_number": { "type": "string" },
+        "final_total": { "type": "number" },
+        "payment_summary": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/PaymentSummaryItem" }
+        }
+      }
+    },
+
+    "OrderVoidedPayload": {
+      "type": "object",
+      "properties": {
+        "reason": { "type": ["string", "null"] }
+      }
+    },
+
+    "OrderRestoredPayload": {
+      "type": "object",
+      "properties": {}
+    },
+
+    "ItemsAddedPayload": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/CartItemSnapshot" }
+        }
+      }
+    },
+
+    "ItemModifiedPayload": {
+      "type": "object",
+      "required": ["instance_id", "item_name", "changes", "previous_values"],
+      "properties": {
+        "instance_id": { "type": "string" },
+        "item_name": { "type": "string", "description": "商品名称（时间线显示用）" },
+        "changes": { "$ref": "#/definitions/ItemChanges" },
+        "previous_values": { "$ref": "#/definitions/ItemChanges", "description": "变更前的值（时间线对比用）" }
+      }
+    },
+
+    "ItemRemovedPayload": {
+      "type": "object",
+      "required": ["instance_id", "item_name"],
+      "properties": {
+        "instance_id": { "type": "string" },
+        "item_name": { "type": "string" },
+        "quantity": { "type": ["integer", "null"], "description": "部分移除时的数量" },
+        "reason": { "type": ["string", "null"] }
+      }
+    },
+
+    "ItemRestoredPayload": {
+      "type": "object",
+      "required": ["instance_id", "item_name"],
+      "properties": {
+        "instance_id": { "type": "string" },
+        "item_name": { "type": "string" }
+      }
+    },
+
+    "PaymentAddedPayload": {
+      "type": "object",
+      "required": ["payment_id", "method", "amount"],
+      "properties": {
+        "payment_id": { "type": "string" },
+        "method": { "type": "string", "enum": ["cash", "card", "wechat", "alipay", "other"] },
+        "amount": { "type": "number" },
+        "tendered": { "type": ["number", "null"], "description": "现金实收金额" },
+        "change": { "type": ["number", "null"], "description": "现金找零金额" },
+        "note": { "type": ["string", "null"] }
+      }
+    },
+
+    "PaymentCancelledPayload": {
+      "type": "object",
+      "required": ["payment_id", "method", "amount"],
+      "properties": {
+        "payment_id": { "type": "string" },
+        "method": { "type": "string" },
+        "amount": { "type": "number" },
+        "reason": { "type": ["string", "null"] }
+      }
+    },
+
+    "OrderSplitPayload": {
+      "type": "object",
+      "required": ["split_amount", "payment_method", "items"],
+      "properties": {
+        "split_amount": { "type": "number" },
+        "payment_method": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/SplitItem" }
+        }
+      }
+    },
+
+    "OrderMovedPayload": {
+      "type": "object",
+      "required": ["source_table_id", "source_table_name", "target_table_id", "target_table_name", "items"],
+      "properties": {
+        "source_table_id": { "type": "string" },
+        "source_table_name": { "type": "string" },
+        "target_table_id": { "type": "string" },
+        "target_table_name": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/CartItemSnapshot" }
+        }
+      }
+    },
+
+    "OrderMovedOutPayload": {
+      "type": "object",
+      "required": ["target_table_id", "target_table_name"],
+      "properties": {
+        "target_table_id": { "type": "string" },
+        "target_table_name": { "type": "string" },
+        "reason": { "type": ["string", "null"] }
+      }
+    },
+
+    "OrderMergedPayload": {
+      "type": "object",
+      "required": ["source_table_id", "source_table_name", "items"],
+      "properties": {
+        "source_table_id": { "type": "string" },
+        "source_table_name": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/CartItemSnapshot" }
+        }
+      }
+    },
+
+    "OrderMergedOutPayload": {
+      "type": "object",
+      "required": ["target_table_id", "target_table_name"],
+      "properties": {
+        "target_table_id": { "type": "string" },
+        "target_table_name": { "type": "string" },
+        "reason": { "type": ["string", "null"] }
+      }
+    },
+
+    "TableReassignedPayload": {
+      "type": "object",
+      "required": ["source_table_id", "source_table_name", "target_table_id", "target_table_name", "original_start_time", "items"],
+      "properties": {
+        "source_table_id": { "type": "string" },
+        "source_table_name": { "type": "string" },
+        "target_table_id": { "type": "string" },
+        "target_table_name": { "type": "string" },
+        "target_zone_name": { "type": ["string", "null"] },
+        "original_start_time": { "type": "integer" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/CartItemSnapshot" }
+        }
+      }
+    },
+
+    "SurchargeExemptSetPayload": {
+      "type": "object",
+      "required": ["exempt"],
+      "properties": {
+        "exempt": { "type": "boolean" }
+      }
+    },
+
+    "OrderInfoUpdatedPayload": {
+      "type": "object",
+      "properties": {
+        "receipt_number": { "type": ["string", "null"] },
+        "guest_count": { "type": ["integer", "null"] },
+        "table_name": { "type": ["string", "null"] },
+        "is_pre_payment": { "type": ["boolean", "null"] }
+      }
+    },
+
+    "CartItemSnapshot": {
+      "type": "object",
+      "description": "商品快照（用于事件重播和时间线显示）",
+      "required": ["id", "instance_id", "name", "price", "quantity"],
+      "properties": {
+        "id": { "type": "string", "description": "产品 ID" },
+        "instance_id": { "type": "string", "description": "实例 ID（唯一标识这一项）" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "original_price": { "type": ["number", "null"] },
+        "quantity": { "type": "integer", "minimum": 1 },
+        "selected_options": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/definitions/ItemOption" }
+        },
+        "selected_specification": { "$ref": "#/definitions/SpecificationInfo" },
+        "discount_percent": { "type": ["number", "null"] },
+        "surcharge": { "type": ["number", "null"] },
+        "note": { "type": ["string", "null"] },
+        "authorizer_id": { "type": ["string", "null"] },
+        "authorizer_name": { "type": ["string", "null"] }
+      }
+    },
+
+    "ItemOption": {
+      "type": "object",
+      "required": ["attribute_id", "attribute_name", "option_idx", "option_name"],
+      "properties": {
+        "attribute_id": { "type": "string" },
+        "attribute_name": { "type": "string" },
+        "option_idx": { "type": "integer" },
+        "option_name": { "type": "string" },
+        "price_modifier": { "type": ["number", "null"] }
+      }
+    },
+
+    "SpecificationInfo": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "receipt_name": { "type": ["string", "null"] },
+        "price": { "type": ["number", "null"] }
+      }
+    },
+
+    "ItemChanges": {
+      "type": "object",
+      "description": "商品变更字段",
+      "properties": {
+        "price": { "type": ["number", "null"] },
+        "quantity": { "type": ["integer", "null"] },
+        "discount_percent": { "type": ["number", "null"] },
+        "surcharge": { "type": ["number", "null"] },
+        "note": { "type": ["string", "null"] }
+      }
+    },
+
+    "SplitItem": {
+      "type": "object",
+      "required": ["instance_id", "name", "quantity"],
+      "properties": {
+        "instance_id": { "type": "string" },
+        "name": { "type": "string" },
+        "quantity": { "type": "integer" }
+      }
+    },
+
+    "PaymentSummaryItem": {
+      "type": "object",
+      "required": ["method", "amount"],
+      "properties": {
+        "method": { "type": "string" },
+        "amount": { "type": "number" }
+      }
+    },
+
+    "SurchargeConfig": {
+      "type": "object",
+      "required": ["type", "value", "amount"],
+      "properties": {
+        "type": { "type": "string", "enum": ["percentage", "fixed"] },
+        "value": { "type": "number" },
+        "amount": { "type": "number" },
+        "total": { "type": ["number", "null"] }
+      }
+    },
+
+    "OrderCommand": {
+      "type": "object",
+      "description": "订单命令结构（前端 → 后端）",
+      "required": ["command_id", "timestamp", "operator_id", "payload"],
+      "properties": {
+        "command_id": { "type": "string", "format": "uuid", "description": "幂等 ID（前端生成）" },
+        "timestamp": { "type": "integer", "description": "发送时间" },
+        "operator_id": { "type": "string" },
+        "operator_name": { "type": "string" },
+        "payload": { "$ref": "#/definitions/CommandPayload" }
+      }
+    },
+
+    "CommandPayload": {
+      "oneOf": [
+        { "$ref": "#/definitions/OpenTableCommand" },
+        { "$ref": "#/definitions/CompleteOrderCommand" },
+        { "$ref": "#/definitions/VoidOrderCommand" },
+        { "$ref": "#/definitions/RestoreOrderCommand" },
+        { "$ref": "#/definitions/AddItemsCommand" },
+        { "$ref": "#/definitions/ModifyItemCommand" },
+        { "$ref": "#/definitions/RemoveItemCommand" },
+        { "$ref": "#/definitions/RestoreItemCommand" },
+        { "$ref": "#/definitions/AddPaymentCommand" },
+        { "$ref": "#/definitions/CancelPaymentCommand" },
+        { "$ref": "#/definitions/SplitOrderCommand" },
+        { "$ref": "#/definitions/MoveOrderCommand" },
+        { "$ref": "#/definitions/MergeOrdersCommand" },
+        { "$ref": "#/definitions/SetSurchargeExemptCommand" },
+        { "$ref": "#/definitions/UpdateOrderInfoCommand" }
+      ]
+    },
+
+    "OpenTableCommand": {
+      "type": "object",
+      "required": ["type", "is_retail"],
+      "properties": {
+        "type": { "const": "OPEN_TABLE" },
+        "table_id": { "type": ["string", "null"] },
+        "table_name": { "type": ["string", "null"] },
+        "zone_id": { "type": ["string", "null"] },
+        "zone_name": { "type": ["string", "null"] },
+        "guest_count": { "type": "integer", "default": 1 },
+        "is_retail": { "type": "boolean" }
+      }
+    },
+
+    "CompleteOrderCommand": {
+      "type": "object",
+      "required": ["type", "order_id", "receipt_number"],
+      "properties": {
+        "type": { "const": "COMPLETE_ORDER" },
+        "order_id": { "type": "string" },
+        "receipt_number": { "type": "string" }
+      }
+    },
+
+    "VoidOrderCommand": {
+      "type": "object",
+      "required": ["type", "order_id"],
+      "properties": {
+        "type": { "const": "VOID_ORDER" },
+        "order_id": { "type": "string" },
+        "reason": { "type": ["string", "null"] }
+      }
+    },
+
+    "RestoreOrderCommand": {
+      "type": "object",
+      "required": ["type", "order_id"],
+      "properties": {
+        "type": { "const": "RESTORE_ORDER" },
+        "order_id": { "type": "string" }
+      }
+    },
+
+    "AddItemsCommand": {
+      "type": "object",
+      "required": ["type", "order_id", "items"],
+      "properties": {
+        "type": { "const": "ADD_ITEMS" },
+        "order_id": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/CartItemInput" }
+        }
+      }
+    },
+
+    "CartItemInput": {
+      "type": "object",
+      "description": "添加商品时的输入（不含 instance_id，由后端生成）",
+      "required": ["product_id", "name", "price", "quantity"],
+      "properties": {
+        "product_id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "original_price": { "type": ["number", "null"] },
+        "quantity": { "type": "integer", "minimum": 1 },
+        "selected_options": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/definitions/ItemOption" }
+        },
+        "selected_specification": { "$ref": "#/definitions/SpecificationInfo" },
+        "discount_percent": { "type": ["number", "null"] },
+        "surcharge": { "type": ["number", "null"] },
+        "note": { "type": ["string", "null"] },
+        "authorizer_id": { "type": ["string", "null"] },
+        "authorizer_name": { "type": ["string", "null"] }
+      }
+    },
+
+    "ModifyItemCommand": {
+      "type": "object",
+      "required": ["type", "order_id", "instance_id", "changes"],
+      "properties": {
+        "type": { "const": "MODIFY_ITEM" },
+        "order_id": { "type": "string" },
+        "instance_id": { "type": "string" },
+        "changes": { "$ref": "#/definitions/ItemChanges" }
+      }
+    },
+
+    "RemoveItemCommand": {
+      "type": "object",
+      "required": ["type", "order_id", "instance_id"],
+      "properties": {
+        "type": { "const": "REMOVE_ITEM" },
+        "order_id": { "type": "string" },
+        "instance_id": { "type": "string" },
+        "quantity": { "type": ["integer", "null"], "description": "部分移除数量，null 表示全部移除" },
+        "reason": { "type": ["string", "null"] }
+      }
+    },
+
+    "RestoreItemCommand": {
+      "type": "object",
+      "required": ["type", "order_id", "instance_id"],
+      "properties": {
+        "type": { "const": "RESTORE_ITEM" },
+        "order_id": { "type": "string" },
+        "instance_id": { "type": "string" }
+      }
+    },
+
+    "AddPaymentCommand": {
+      "type": "object",
+      "required": ["type", "order_id", "method", "amount"],
+      "properties": {
+        "type": { "const": "ADD_PAYMENT" },
+        "order_id": { "type": "string" },
+        "method": { "type": "string" },
+        "amount": { "type": "number" },
+        "tendered": { "type": ["number", "null"] },
+        "note": { "type": ["string", "null"] }
+      }
+    },
+
+    "CancelPaymentCommand": {
+      "type": "object",
+      "required": ["type", "order_id", "payment_id"],
+      "properties": {
+        "type": { "const": "CANCEL_PAYMENT" },
+        "order_id": { "type": "string" },
+        "payment_id": { "type": "string" },
+        "reason": { "type": ["string", "null"] }
+      }
+    },
+
+    "SplitOrderCommand": {
+      "type": "object",
+      "required": ["type", "order_id", "split_amount", "payment_method", "items"],
+      "properties": {
+        "type": { "const": "SPLIT_ORDER" },
+        "order_id": { "type": "string" },
+        "split_amount": { "type": "number" },
+        "payment_method": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/SplitItem" }
+        }
+      }
+    },
+
+    "MoveOrderCommand": {
+      "type": "object",
+      "required": ["type", "order_id", "target_table_id", "target_table_name"],
+      "properties": {
+        "type": { "const": "MOVE_ORDER" },
+        "order_id": { "type": "string" },
+        "target_table_id": { "type": "string" },
+        "target_table_name": { "type": "string" },
+        "target_zone_name": { "type": ["string", "null"] }
+      }
+    },
+
+    "MergeOrdersCommand": {
+      "type": "object",
+      "required": ["type", "source_order_id", "target_order_id"],
+      "properties": {
+        "type": { "const": "MERGE_ORDERS" },
+        "source_order_id": { "type": "string" },
+        "target_order_id": { "type": "string" }
+      }
+    },
+
+    "SetSurchargeExemptCommand": {
+      "type": "object",
+      "required": ["type", "order_id", "exempt"],
+      "properties": {
+        "type": { "const": "SET_SURCHARGE_EXEMPT" },
+        "order_id": { "type": "string" },
+        "exempt": { "type": "boolean" }
+      }
+    },
+
+    "UpdateOrderInfoCommand": {
+      "type": "object",
+      "required": ["type", "order_id"],
+      "properties": {
+        "type": { "const": "UPDATE_ORDER_INFO" },
+        "order_id": { "type": "string" },
+        "receipt_number": { "type": ["string", "null"] },
+        "guest_count": { "type": ["integer", "null"] },
+        "table_name": { "type": ["string", "null"] },
+        "is_pre_payment": { "type": ["boolean", "null"] }
+      }
+    },
+
+    "CommandResponse": {
+      "type": "object",
+      "description": "命令响应（ACK/NACK）",
+      "required": ["command_id", "success"],
+      "properties": {
+        "command_id": { "type": "string", "format": "uuid" },
+        "success": { "type": "boolean" },
+        "order_id": { "type": ["string", "null"], "description": "新创建订单的 ID（仅 OpenTable 命令）" },
+        "error": { "$ref": "#/definitions/CommandError" }
+      }
+    },
+
+    "CommandError": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "ORDER_NOT_FOUND",
+            "ORDER_ALREADY_COMPLETED",
+            "ORDER_ALREADY_VOIDED",
+            "ITEM_NOT_FOUND",
+            "PAYMENT_NOT_FOUND",
+            "INSUFFICIENT_QUANTITY",
+            "INVALID_AMOUNT",
+            "DUPLICATE_COMMAND",
+            "INTERNAL_ERROR"
+          ]
+        },
+        "message": { "type": "string" }
+      }
+    },
+
+    "SyncRequest": {
+      "type": "object",
+      "description": "断线重连同步请求",
+      "required": ["since_sequence"],
+      "properties": {
+        "since_sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "客户端最后已知的事件序列号"
+        }
+      }
+    },
+
+    "SyncResponse": {
+      "type": "object",
+      "description": "断线重连同步响应",
+      "required": ["events", "active_orders", "server_sequence", "requires_full_sync"],
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/OrderEvent" },
+          "description": "自 since_sequence 以来的增量事件"
+        },
+        "active_orders": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/OrderSnapshot" },
+          "description": "当前所有活跃订单快照"
+        },
+        "server_sequence": {
+          "type": "integer",
+          "description": "服务端当前最新序列号"
+        },
+        "requires_full_sync": {
+          "type": "boolean",
+          "description": "是否需要全量同步（gap 过大时为 true）"
+        }
+      }
+    },
+
+    "OrderSnapshot": {
+      "type": "object",
+      "description": "订单快照（从事件流计算得出）",
+      "required": ["order_id", "status", "items", "total", "created_at", "updated_at"],
+      "properties": {
+        "order_id": { "type": "string" },
+        "table_id": { "type": ["string", "null"] },
+        "table_name": { "type": ["string", "null"] },
+        "zone_id": { "type": ["string", "null"] },
+        "zone_name": { "type": ["string", "null"] },
+        "guest_count": { "type": "integer" },
+        "is_retail": { "type": "boolean" },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "COMPLETED", "VOID", "MOVED", "MERGED"]
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/CartItemSnapshot" }
+        },
+        "payments": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/PaymentRecord" }
+        },
+        "subtotal": { "type": "number" },
+        "tax": { "type": "number" },
+        "discount": { "type": "number" },
+        "surcharge": { "$ref": "#/definitions/SurchargeConfig" },
+        "surcharge_exempt": { "type": "boolean" },
+        "total": { "type": "number" },
+        "paid_amount": { "type": "number" },
+        "receipt_number": { "type": ["string", "null"] },
+        "start_time": { "type": "integer" },
+        "end_time": { "type": ["integer", "null"] },
+        "created_at": { "type": "integer" },
+        "updated_at": { "type": "integer" },
+        "last_sequence": { "type": "integer", "description": "最后应用的事件序列号" }
+      }
+    },
+
+    "PaymentRecord": {
+      "type": "object",
+      "required": ["payment_id", "method", "amount", "timestamp"],
+      "properties": {
+        "payment_id": { "type": "string" },
+        "method": { "type": "string" },
+        "amount": { "type": "number" },
+        "tendered": { "type": ["number", "null"] },
+        "change": { "type": ["number", "null"] },
+        "note": { "type": ["string", "null"] },
+        "timestamp": { "type": "integer" },
+        "cancelled": { "type": "boolean", "default": false },
+        "cancel_reason": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
