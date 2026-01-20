@@ -1,27 +1,41 @@
 //! API Response wrapper
 //!
 //! 统一的 API 响应格式，与前端 TypeScript ApiResponse<T> 类型对齐
+//! 支持新的 unified error system (shared::error::ErrorCode)
 
 use serde::Serialize;
+use serde_json::Value;
+use std::collections::HashMap;
+
+// Re-export for convenience
+pub use shared::error::ErrorCode;
 
 /// 统一的 API 响应格式
+///
+/// Compatible with unified error system while maintaining backward compatibility
 #[derive(Debug, Clone, Serialize)]
 pub struct ApiResponse<T: Serialize> {
-    /// 错误码，null 表示成功
-    pub error_code: Option<String>,
+    /// 错误码 (null or 0 = success)
+    /// Now using numeric codes from shared::error::ErrorCode
+    pub code: Option<u16>,
     /// 消息
     pub message: String,
     /// 数据
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<T>,
+    /// Context details for i18n
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<HashMap<String, Value>>,
 }
 
 impl<T: Serialize> ApiResponse<T> {
     /// 创建成功响应
     pub fn success(data: T) -> Self {
         Self {
-            error_code: None,
+            code: Some(0),
             message: "success".to_string(),
             data: Some(data),
+            details: None,
         }
     }
 
@@ -29,18 +43,53 @@ impl<T: Serialize> ApiResponse<T> {
     #[allow(dead_code)]
     pub fn success_with_message(data: T, message: impl Into<String>) -> Self {
         Self {
-            error_code: None,
+            code: Some(0),
             message: message.into(),
             data: Some(data),
+            details: None,
         }
     }
 
-    /// 创建错误响应
+    /// Create error response with string code (legacy, for backward compatibility)
+    ///
+    /// NOTE: This method is kept for backward compatibility with existing code.
+    /// Prefer using `error_with_code()` for new code.
+    #[deprecated(since = "0.2.0", note = "Use error_with_code() with ErrorCode instead")]
+    #[allow(deprecated)]
     pub fn error(code: impl Into<String>, message: impl Into<String>) -> Self {
+        let code_str = code.into();
+        // Try parse as number, fallback to 1 (Unknown)
+        let code_num = code_str.parse::<u16>().unwrap_or(1);
         Self {
-            error_code: Some(code.into()),
+            code: Some(code_num),
             message: message.into(),
             data: None,
+            details: None,
+        }
+    }
+
+    /// Create error response with ErrorCode (new unified error system)
+    ///
+    /// This is the preferred method for creating error responses.
+    /// Uses numeric error codes from `shared::error::ErrorCode`.
+    pub fn error_with_code(code: ErrorCode, message: impl Into<String>) -> Self {
+        Self {
+            code: Some(code.code()),
+            message: message.into(),
+            data: None,
+            details: None,
+        }
+    }
+}
+
+impl ApiResponse<()> {
+    /// 创建无数据的成功响应
+    pub fn ok() -> Self {
+        Self {
+            code: Some(0),
+            message: "success".to_string(),
+            data: None,
+            details: None,
         }
     }
 }
@@ -50,7 +99,12 @@ impl<T: Serialize> From<Result<T, String>> for ApiResponse<T> {
     fn from(result: Result<T, String>) -> Self {
         match result {
             Ok(data) => ApiResponse::success(data),
-            Err(e) => ApiResponse::error("ERROR", e),
+            Err(e) => Self {
+                code: Some(ErrorCode::Unknown.code()),
+                message: e,
+                data: None,
+                details: None,
+            },
         }
     }
 }
@@ -85,6 +139,12 @@ pub struct ProductListData {
 #[derive(Debug, Clone, Serialize)]
 pub struct ProductData {
     pub product: shared::models::Product,
+}
+
+/// 完整 Product (含 specs, attributes, tags)
+#[derive(Debug, Clone, Serialize)]
+pub struct ProductFullData {
+    pub product: shared::models::ProductFull,
 }
 
 /// Specifications 列表

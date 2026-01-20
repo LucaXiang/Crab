@@ -1,4 +1,14 @@
-//! Error Codes - 标准化错误码
+//! DEPRECATED: Use shared::error::ErrorCode instead
+//!
+//! This module is deprecated since v0.2.0. The unified error system in
+//! `shared::error::ErrorCode` provides numeric error codes that work
+//! across all components (edge-server, tauri, frontend).
+//!
+//! Migration guide:
+//! - Replace `error_codes::auth::NOT_AUTHENTICATED` with `ErrorCode::NotAuthenticated`
+//! - Use `ErrorCode::code()` method to get the numeric code
+//!
+//! Error Codes - 标准化错误码 (Legacy)
 //!
 //! 错误码格式: {CATEGORY}_{OPERATION}_{REASON}
 //! 前端通过错误码映射到本地化消息
