@@ -315,20 +315,24 @@ const ItemsAddedRenderer: EventRenderer<ItemsAddedPayload> = {
 
 ---
 
-### 第二步：前端清理（并行进行）
+### 第二步：前端清理
 
 **责任人**: 前端开发
 
-**任务列表**：
-1. [x] 删除旧事件系统
-2. [x] Timeline 组件改造
-3. [ ] 修复模块引用（8 个 TS2307）
-4. [ ] 临时修复属性访问（41 个 TS2339）
-5. [ ] 修复类型不匹配（15 个）
-6. [ ] 删除 ItemAttributeSelection，改用 ItemOption
-7. [ ] 验证所有组件编译通过
+**已完成**：
+1. [x] 删除旧事件系统 (fd59e83)
+2. [x] Timeline 组件改造 - Renderer 架构 (fd59e83)
 
-**预计工期**: 2-3 天
+**进行中** (详见 `2026-01-21-frontend-cleanup-tasks.md`):
+3. [ ] Task 1: 修复 ItemChanges 类型定义
+4. [ ] Task 2: 临时修复 external_id/product_id 缺失
+5. [ ] Task 3: 修复 OrderEventType 运行时使用问题
+6. [ ] Task 4: 分析并重构 useOrderEventStore (关键决策点)
+7. [ ] Task 5: 删除 ItemAttributeSelection，改用 ItemOption
+8. [ ] Task 6: 修复 event.type → event.event_type
+9. [ ] Task 7: 最终验证和清理
+
+**预计剩余工期**: 1-2 天
 
 ---
 

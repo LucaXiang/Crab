@@ -8,7 +8,11 @@ import { useCategories, useCategoryStore } from '@/core/stores/resources/useCate
 import { useProducts, useProductStore } from '@/core/stores/resources/useProductStore';
 import { ProductCard } from '@/presentation/components/ProductCard';
 import clsx from 'clsx';
-import { mergeItemsIntoList } from '@/core/services/order/eventReducer';
+// TODO: refactor to use shared merge logic
+// import { mergeItemsIntoList } from '@/core/services/order/eventReducer';
+
+// TEMPORARY: Placeholder function until refactoring is complete
+const mergeItemsIntoList = (existing: CartItem[], newItems: CartItem[]) => [...existing, ...newItems];
 
 interface QuickAddModalProps {
   onClose: () => void;
@@ -77,10 +81,10 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     // Convert domain Product to CartItem
     const newItem: CartItem = {
       id: String(product.id),
-      product_id: String(product.id),
       name: product.name,
       price: product.price ?? 0,
       quantity: 1,
+      unpaid_quantity: 1,
       instance_id: uuidv4(),
       selected_options: [],
     };

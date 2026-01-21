@@ -7,12 +7,42 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { HeldOrder, CartItem, PaymentRecord } from '@/core/domain/types';
-import { OrderEvent, OrderEventType, createEvent, ItemChanges } from '@/core/domain/events';
-import { reduceOrderEvents, createEmptyOrder } from '@/core/services/order/eventReducer';
+import type { OrderEvent, OrderEventType, ItemChanges } from '@/core/domain/types/orderEvent';
+// TODO: Import event creation functions after refactoring
+// import { createEvent } from '@/core/domain/events/factory';
+// TODO: Import reducer functions after refactoring
+// import { reduceOrderEvents, createEmptyOrder } from '@/core/services/order/eventReducer';
 import { logger } from '@/utils/logger';
 import { reportError } from '@/utils/reportError';
 import { useUIStore } from '@/core/stores/ui/useUIStore';
 // 按新存储策略：活跃订单仅使用 localStorage；完成/作废订单发送到 Tauri 端关系型库
+
+// TEMPORARY: Placeholder functions until refactoring is complete
+const createEvent = (type: OrderEventType, data: any, metadata?: any): any => {
+  logger.warn('Using placeholder createEvent - needs refactoring', { type, data, metadata });
+  return { type, data, timestamp: Date.now(), ...metadata };
+};
+const reduceOrderEvents = (events: OrderEvent[], initial: any): HeldOrder => {
+  logger.warn('Using placeholder reduceOrderEvents - needs refactoring');
+  return initial;
+};
+const createEmptyOrder = (key: string): HeldOrder => {
+  logger.warn('Using placeholder createEmptyOrder - needs refactoring');
+  return {
+    key,
+    table_id: '',
+    items: [],
+    payments: [],
+    total: 0,
+    subtotal: 0,
+    tax: 0,
+    discount: 0,
+    status: 'ACTIVE',
+    guest_count: 1,
+    start_time: Date.now(),
+    paid_amount: 0,
+  } as any;
+};
 
 interface OrderEventStore {
   // 事件存储（按订单key分组）
