@@ -123,7 +123,7 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
           if (retailOrder) {
             const heldOrder = retailOrder;
             checkout.setCheckoutOrder(heldOrder);
-            setCurrentOrderKey(heldOrder.key || heldOrder.order_id || '');
+            setCurrentOrderKey(heldOrder.order_id || '');
             setViewMode('checkout');
           }
         }

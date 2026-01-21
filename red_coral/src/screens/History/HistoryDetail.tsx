@@ -114,9 +114,8 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
     () =>
       order.timeline.filter(
         (e) =>
-          e.type === 'PAYMENT' ||
-          e.type === 'PAYMENT_ADDED' ||
-          e.type === 'ORDER_SPLIT'
+          e.event_type === 'PAYMENT_ADDED' ||
+          e.event_type === 'ORDER_SPLIT'
       ),
     [order.timeline]
   );
@@ -245,7 +244,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                 <div className="p-4 text-center text-gray-400 text-sm">{t('history.payment.noPayments')}</div>
               ) : (
                 paymentEvents.map((event, idx) => (
-                  <PaymentEventRow key={event.id || `${event.type}-${event.timestamp}-${idx}`} event={event} t={t} />
+                  <PaymentEventRow key={event.event_id || `${event.event_type}-${event.timestamp}-${idx}`} event={event} t={t} />
                 ))
               )}
             </div>
@@ -381,29 +380,25 @@ export interface PaymentEventRowProps {
 
 export const PaymentEventRow: React.FC<PaymentEventRowProps> = React.memo(({ event, t }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const data: any = (event as any).data || {};
+  const payload = event.payload;
 
   let methodRaw = '';
   let amountNum = 0;
   let note: string | undefined = undefined;
 
-  if (event.type === 'ORDER_SPLIT') {
-    methodRaw = data.paymentMethod || '';
-    amountNum = data.splitAmount || 0;
+  if (event.event_type === 'ORDER_SPLIT' && payload.type === 'ORDER_SPLIT') {
+    methodRaw = payload.payment_method || '';
+    amountNum = payload.split_amount || 0;
     note = t('timeline.splitBill');
-  } else {
-    const payment = data.payment || data;
-    methodRaw = payment?.method || '';
-    amountNum = typeof payment?.amount === 'number' ? payment.amount : (() => {
-      const m = (event.summary || '').match(/€([0-9.]+)/);
-      return m ? parseFloat(m[1]) : 0;
-    })();
-    note = payment?.note || event.data?.note || undefined;
+  } else if (event.event_type === 'PAYMENT_ADDED' && payload.type === 'PAYMENT_ADDED') {
+    methodRaw = payload.method || '';
+    amountNum = payload.amount || 0;
+    note = payload.note || undefined;
   }
 
   const isCash = /cash/i.test(methodRaw);
   const isCard = /card|visa|master/i.test(methodRaw);
-  const hasItems = event.type === 'ORDER_SPLIT' && data.items && Array.isArray(data.items) && data.items.length > 0;
+  const hasItems = event.event_type === 'ORDER_SPLIT' && payload.type === 'ORDER_SPLIT' && Array.isArray(payload.items) && payload.items.length > 0;
 
   return (
     <div className={`transition-colors ${isExpanded ? 'bg-gray-50/50' : ''}`}>
@@ -439,10 +434,10 @@ export const PaymentEventRow: React.FC<PaymentEventRowProps> = React.memo(({ eve
         </div>
       </div>
       
-      {isExpanded && hasItems && (
+      {isExpanded && hasItems && event.event_type === 'ORDER_SPLIT' && payload.type === 'ORDER_SPLIT' && (
         <div className="px-14 pb-4 pt-0 animate-in slide-in-from-top-2 duration-200">
           <div className="p-3 bg-white rounded-lg border border-gray-100 space-y-2 shadow-sm">
-            {data.items.map((item: any, idx: number) => (
+            {payload.items.map((item: any, idx: number) => (
               <div key={idx} className="flex justify-between items-start text-sm">
                 <div className="flex flex-col">
                   <span className="text-gray-800 font-medium">
