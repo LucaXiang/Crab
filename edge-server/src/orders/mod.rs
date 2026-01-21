@@ -27,6 +27,8 @@
 //! 6. Event is broadcast to all subscribers
 //! 7. CommandResponse is returned to client
 
+pub mod actions;
+pub mod appliers;
 pub mod manager;
 pub mod reducer;
 pub mod storage;
