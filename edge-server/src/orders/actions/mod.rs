@@ -12,12 +12,14 @@ mod add_payment;
 mod complete_order;
 mod modify_item;
 mod open_table;
+mod remove_item;
 
 pub use add_items::AddItemsAction;
 pub use add_payment::AddPaymentAction;
 pub use complete_order::CompleteOrderAction;
 pub use modify_item::ModifyItemAction;
 pub use open_table::OpenTableAction;
+pub use remove_item::RemoveItemAction;
 
 /// CommandAction enum - dispatches to concrete action implementations
 ///
@@ -27,6 +29,7 @@ pub enum CommandAction {
     OpenTable(OpenTableAction),
     AddItems(AddItemsAction),
     ModifyItem(ModifyItemAction),
+    RemoveItem(RemoveItemAction),
     AddPayment(AddPaymentAction),
     CompleteOrder(CompleteOrderAction),
 }
@@ -79,6 +82,21 @@ impl From<&OrderCommand> for CommandAction {
                     payment: payment.clone(),
                 })
             }
+            OrderCommandPayload::RemoveItem {
+                order_id,
+                instance_id,
+                quantity,
+                reason,
+                authorizer_id,
+                authorizer_name,
+            } => CommandAction::RemoveItem(RemoveItemAction {
+                order_id: order_id.clone(),
+                instance_id: instance_id.clone(),
+                quantity: *quantity,
+                reason: reason.clone(),
+                authorizer_id: authorizer_id.clone(),
+                authorizer_name: authorizer_name.clone(),
+            }),
             OrderCommandPayload::CompleteOrder {
                 order_id,
                 receipt_number,
