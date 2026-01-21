@@ -1,24 +1,16 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { HeldOrder, CartItem } from '@/core/domain/types';
-import type { OrderEventType } from '@/core/domain/types/orderEvent';
+import type { OrderEvent } from '@/core/domain/types/orderEvent';
 import { Clock, List, Settings, ShoppingBag } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { OrderItemsSummary } from '@/screens/Checkout/OrderItemsSummary';
 import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDetailModal';
 import { QuickAddModal } from '@/presentation/components/modals/QuickAddModal';
-// TODO: refactor to applyEventToSnapshot for incremental updates
-// import { recalculateOrderTotal, convertEventToTimelineEvent, mergeItemsIntoList } from '@/core/services/order/eventReducer';
-import { v4 as uuidv4 } from 'uuid';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { Currency } from '@/utils/currency';
 import { formatCurrency } from '@/utils/currency';
 import { calculateDiscountAmount, calculateOptionsModifier } from '@/utils/pricing';
-
-// TEMPORARY: Placeholder functions until refactoring is complete
-const recalculateOrderTotal = (order: any) => order;
-const convertEventToTimelineEvent = (event: any) => event;
-const mergeItemsIntoList = (existing: CartItem[], newItems: CartItem[]) => [...existing, ...newItems];
 
 // Lazy load TimelineList - only loads when user clicks Timeline tab
 const TimelineList = lazy(() =>
@@ -41,7 +33,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   const [activeTab, setActiveTab] = useState<Tab>('ITEMS');
   const [editingItem, setEditingItem] = useState<{ item: CartItem; index: number } | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [lazyTimeline, setLazyTimeline] = useState<any[] | null>(null);
+  const [lazyTimeline, setLazyTimeline] = useState<OrderEvent[] | null>(null);
 
   const handleEditItem = React.useCallback((item: CartItem) => {
     // Find index of item in order.items
@@ -57,7 +49,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     const item = order.items[index];
     const instanceId = item.instance_id || `item-${index}`;
 
-    // Send command to backend - state will be updated via event
+    // Send command to backend - state will be updated via event (Server Authority)
     await orderOps.modifyItem(order.key, instanceId, {
       price: updates.price,
       quantity: updates.quantity,
@@ -66,36 +58,8 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       note: updates.note,
     });
 
-    // Optimistic update for immediate UI feedback
-    if (onUpdateOrder) {
-      const newItems = [...order.items];
-      newItems[index] = { ...newItems[index], ...updates };
-
-      // TODO: refactor to use new OrderEvent format
-      const event: any = {
-        id: uuidv4(),
-        type: 'ITEM_MODIFIED' as OrderEventType,
-        timestamp: Date.now(),
-        data: {
-          instance_id: instanceId,
-          item_name: item.name,
-          changes: updates
-        }
-      };
-
-      // Convert to timeline event
-      const timelineEvent = convertEventToTimelineEvent(event);
-
-      const updatedOrder = recalculateOrderTotal({
-        ...order,
-        items: newItems,
-        timeline: [...(order.timeline || []), timelineEvent]
-      });
-
-      onUpdateOrder(updatedOrder);
-    }
     setEditingItem(null);
-  }, [order, onUpdateOrder]);
+  }, [order]);
 
   const handleDeleteItem = React.useCallback(async (index: number, _options?: { userId?: string }) => {
     const item = order.items[index];
@@ -106,78 +70,17 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     if (paidQty > 0 && paidQty < item.quantity) {
       const qtyToRemove = item.quantity - paidQty;
 
-      // Send command to backend - state will be updated via event
+      // Send command to backend - state will be updated via event (Server Authority)
       await orderOps.removeItem(order.key, instanceId, 'Removed unpaid portion', qtyToRemove);
-
-      // Optimistic update for immediate UI feedback
-      if (onUpdateOrder) {
-        const newItems = order.items.map((it, idx) => {
-          if (idx === index) {
-            return { ...it, quantity: paidQty };
-          }
-          return it;
-        });
-
-        const event: any = {
-          id: uuidv4(),
-          type: 'ITEM_REMOVED' as OrderEventType,
-          timestamp: Date.now(),
-          data: {
-            instance_id: instanceId,
-            item_name: item.name,
-            quantity: qtyToRemove,
-            reason: 'Removed unpaid portion'
-          }
-        };
-
-        const timelineEvent = convertEventToTimelineEvent(event);
-
-        const updatedOrder = recalculateOrderTotal({
-          ...order,
-          items: newItems,
-          timeline: [...(order.timeline || []), timelineEvent]
-        });
-
-        onUpdateOrder(updatedOrder);
-      }
       return;
     }
 
     // Case 2: Fully paid or Unpaid - Remove (Soft Delete)
+    // Send command to backend - state will be updated via event (Server Authority)
     await orderOps.removeItem(order.key, instanceId, 'Removed from payment screen');
 
-    // Optimistic update for immediate UI feedback
-    if (onUpdateOrder) {
-      const newItems = order.items.map((it, idx) => {
-        if (idx === index) {
-          return { ...it, _removed: true };
-        }
-        return it;
-      });
-
-      const event: any = {
-        id: uuidv4(),
-        type: 'ITEM_REMOVED' as OrderEventType,
-        timestamp: Date.now(),
-        data: {
-          instance_id: instanceId,
-          item_name: item.name,
-          reason: 'Removed from payment screen'
-        }
-      };
-
-      const timelineEvent = convertEventToTimelineEvent(event);
-
-      const updatedOrder = recalculateOrderTotal({
-        ...order,
-        items: newItems,
-        timeline: [...(order.timeline || []), timelineEvent]
-      });
-
-      onUpdateOrder(updatedOrder);
-    }
     setEditingItem(null);
-  }, [order, onUpdateOrder]);
+  }, [order]);
 
   const {
     displayOriginalPrice,
@@ -380,31 +283,8 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         <QuickAddModal
           onClose={() => setShowQuickAdd(false)}
           onConfirm={async (items) => {
-            // Send command to backend - state will be updated via event
+            // Send command to backend - state will be updated via event (Server Authority)
             await orderOps.addItems(order.key, items);
-
-            // Optimistic update for immediate UI feedback
-            if (onUpdateOrder) {
-               const event: any = {
-                   id: uuidv4(),
-                   type: 'ITEMS_ADDED' as OrderEventType,
-                   timestamp: Date.now(),
-                   data: { items }
-               };
-
-               const newItems = mergeItemsIntoList(order.items, items);
-               const timelineEvent = convertEventToTimelineEvent(event);
-
-               const optimOrder = recalculateOrderTotal({
-                   ...order,
-                   items: newItems,
-                   is_pre_payment: false,
-                   timeline: [...(order.timeline || []), timelineEvent]
-               });
-
-               onUpdateOrder(optimOrder);
-            }
-
             setShowQuickAdd(false);
           }}
         />

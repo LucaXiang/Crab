@@ -8,11 +8,6 @@ import { useCategories, useCategoryStore } from '@/core/stores/resources/useCate
 import { useProducts, useProductStore } from '@/core/stores/resources/useProductStore';
 import { ProductCard } from '@/presentation/components/ProductCard';
 import clsx from 'clsx';
-// TODO: refactor to use shared merge logic
-// import { mergeItemsIntoList } from '@/core/services/order/eventReducer';
-
-// TEMPORARY: Placeholder function until refactoring is complete
-const mergeItemsIntoList = (existing: CartItem[], newItems: CartItem[]) => [...existing, ...newItems];
 
 interface QuickAddModalProps {
   onClose: () => void;
@@ -89,10 +84,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       selected_options: [],
     };
 
-    setTempItems(prev => {
-      // Use the centralized merge logic
-      return mergeItemsIntoList(prev, [newItem]);
-    });
+    // Each item gets a unique instance_id, so no need to merge - just append
+    setTempItems(prev => [...prev, newItem]);
   };
 
   const updateQuantity = (index: number, delta: number) => {
