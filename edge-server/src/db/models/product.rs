@@ -38,11 +38,9 @@ pub struct Product {
     pub tax_rate: i32,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    /// Record link to kitchen_printer (override category setting)
-    pub kitchen_printer: Option<Thing>,
-    /// -1=inherit, 0=disabled, 1=enabled
-    #[serde(default = "default_inherit")]
-    pub is_kitchen_print_enabled: i32,
+    /// 打印目的地
+    #[serde(default)]
+    pub print_destinations: Vec<Thing>,
     #[serde(default = "default_inherit")]
     pub is_label_print_enabled: i32,
     #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
@@ -74,8 +72,7 @@ impl Product {
             tax_rate: 0,
             receipt_name: None,
             kitchen_print_name: None,
-            kitchen_printer: None,
-            is_kitchen_print_enabled: -1,
+            print_destinations: vec![],
             is_label_print_enabled: -1,
             is_active: true,
             tags: vec![],
@@ -95,9 +92,8 @@ pub struct ProductCreate {
     pub tax_rate: Option<i32>,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    #[serde(default, with = "serde_thing::option")]
-    pub kitchen_printer: Option<Thing>,
-    pub is_kitchen_print_enabled: Option<i32>,
+    #[serde(default, with = "serde_thing::option_vec")]
+    pub print_destinations: Option<Vec<Thing>>,
     pub is_label_print_enabled: Option<i32>,
     #[serde(default, with = "serde_thing::option_vec")]
     pub tags: Option<Vec<Thing>>,
@@ -121,10 +117,8 @@ pub struct ProductUpdate {
     pub receipt_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kitchen_print_name: Option<String>,
-    #[serde(default, with = "serde_thing::option", skip_serializing_if = "Option::is_none")]
-    pub kitchen_printer: Option<Thing>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_kitchen_print_enabled: Option<i32>,
+    #[serde(default, with = "serde_thing::option_vec", skip_serializing_if = "Option::is_none")]
+    pub print_destinations: Option<Vec<Thing>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_label_print_enabled: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]

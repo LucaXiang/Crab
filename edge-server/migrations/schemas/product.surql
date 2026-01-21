@@ -35,13 +35,9 @@ DEFINE FIELD OVERWRITE receipt_name ON product TYPE option<string>
 DEFINE FIELD OVERWRITE kitchen_print_name ON product TYPE option<string>
     PERMISSIONS FULL;
 
--- 厨房打印机关联 (覆盖分类设置)
-DEFINE FIELD OVERWRITE kitchen_printer ON product TYPE option<record<kitchen_printer>>
-    PERMISSIONS FULL;
-
--- 打印设置: -1=继承分类, 0=禁用, 1=启用
-DEFINE FIELD OVERWRITE is_kitchen_print_enabled ON product TYPE int
-    DEFAULT -1
+-- 打印目的地
+DEFINE FIELD OVERWRITE print_destinations ON product TYPE array<record<print_destination>>
+    DEFAULT []
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE is_label_print_enabled ON product TYPE int

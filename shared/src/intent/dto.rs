@@ -33,33 +33,6 @@ pub struct TagUpdateDto {
 }
 
 // =============================================================================
-// KitchenPrinter (厨房打印机)
-// =============================================================================
-
-/// 创建厨房打印机
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KitchenPrinterDto {
-    pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub printer_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-}
-
-/// 更新厨房打印机
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct KitchenPrinterUpdateDto {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub printer_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_active: Option<bool>,
-}
-
-// =============================================================================
 // Category (分类)
 // =============================================================================
 

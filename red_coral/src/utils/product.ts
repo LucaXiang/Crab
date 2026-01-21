@@ -19,8 +19,9 @@ export const canQuickAdd = (product: ProductFull): boolean => {
     product.specs.some((s) => s.is_default && s.is_active) ||
     product.specs.filter((s) => s.is_active).length === 1;
 
+  // Check required attributes have default_option_idx (now on attribute, not binding)
   const requiredAttrs = product.attributes.filter((a) => a.is_required);
-  const allAttrsHaveDefault = requiredAttrs.every((a) => a.default_option_idx != null);
+  const allAttrsHaveDefault = requiredAttrs.every((a) => a.attribute.default_option_idx != null);
 
   return hasDefaultSpec && allAttrsHaveDefault;
 };
@@ -30,8 +31,9 @@ export const getDefaultAttributeOptions = (
   attributes: ProductAttributeBinding[]
 ): Array<{ attribute_id: string; option_idx: number }> =>
   attributes
-    .filter((a) => a.is_required && a.default_option_idx != null)
+    // default_option_idx is now on the attribute object, not the binding
+    .filter((a) => a.is_required && a.attribute.default_option_idx != null)
     .map((a) => ({
       attribute_id: a.attribute.id!,
-      option_idx: a.default_option_idx!,
+      option_idx: a.attribute.default_option_idx!,
     }));

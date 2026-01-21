@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FormField, inputClass } from './FormField';
-import { Layers } from 'lucide-react';
-import { attributeHelpers } from '@/core/stores/resources';
+import { Layers, Filter } from 'lucide-react';
+import { attributeHelpers, useTags } from '@/core/stores/resources';
 import { AttributeSelectionModal } from './AttributeSelectionModal';
 import { SelectField } from '@/presentation/components/form/FormField/SelectField';
 import { KitchenPrinterSelector } from '@/presentation/components/form/FormField/KitchenPrinterSelector';
@@ -15,6 +15,9 @@ interface CategoryFormProps {
     isLabelPrintEnabled?: boolean;
     selectedAttributeIds?: string[];
     attributeDefaultOptions?: Record<string, string | string[]>;
+    isVirtual?: boolean;
+    tagIds?: string[];
+    matchMode?: 'any' | 'all';
   };
   onFieldChange: (field: string, value: any) => void;
   t: (key: string) => string;
@@ -24,9 +27,23 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
   const [showAttributeModal, setShowAttributeModal] = useState(false);
 
   const selectedAttributeIds = formData.selectedAttributeIds || [];
+  const tags = useTags();
 
   // Use stable helper directly (same reference every render)
   const getAttributeById = attributeHelpers.getAttributeById;
+
+  // Virtual category state
+  const isVirtual = formData.isVirtual ?? false;
+  const selectedTagIds = formData.tagIds || [];
+  const matchMode = formData.matchMode || 'any';
+
+  // Toggle tag selection
+  const handleTagToggle = (tagId: string) => {
+    const newTagIds = selectedTagIds.includes(tagId)
+      ? selectedTagIds.filter((id) => id !== tagId)
+      : [...selectedTagIds, tagId];
+    onFieldChange('tagIds', newTagIds);
+  };
 
   return (
     <div className="space-y-4">
@@ -38,6 +55,77 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
           className={inputClass}
         />
       </FormField>
+
+      {/* Virtual Category Settings */}
+      <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-4 shadow-sm">
+        <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 pb-2 border-b border-gray-100">
+          <Filter size={16} className="text-teal-500" />
+          {t('settings.category.form.virtualSettings')}
+        </h3>
+
+        <div className="space-y-4">
+          <SelectField
+            label={t('settings.category.form.isVirtual')}
+            value={isVirtual ? 'true' : 'false'}
+            onChange={(value) => onFieldChange('isVirtual', value === 'true')}
+            options={[
+              { value: 'false', label: t('settings.category.form.regularCategory') },
+              { value: 'true', label: t('settings.category.form.virtualCategory') }
+            ]}
+          />
+
+          {isVirtual && (
+            <div className="pl-4 border-l-2 border-teal-100 space-y-4">
+              <SelectField
+                label={t('settings.category.form.matchMode')}
+                value={matchMode}
+                onChange={(value) => onFieldChange('matchMode', value)}
+                options={[
+                  { value: 'any', label: t('settings.category.form.matchAny') },
+                  { value: 'all', label: t('settings.category.form.matchAll') }
+                ]}
+              />
+
+              <FormField label={t('settings.category.form.filterTags')}>
+                <div className="min-h-[60px]">
+                  {tags.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {tags.map((tag) => {
+                        const isSelected = selectedTagIds.includes(tag.id);
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => handleTagToggle(tag.id)}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                              isSelected
+                                ? 'bg-teal-500 text-white shadow-sm'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                            style={isSelected ? { backgroundColor: tag.color || undefined } : undefined}
+                          >
+                            {tag.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-4 text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                      <p className="text-sm">{t('settings.category.form.noTagsAvailable')}</p>
+                    </div>
+                  )}
+                </div>
+              </FormField>
+
+              {selectedTagIds.length === 0 && isVirtual && (
+                <p className="text-xs text-amber-600">
+                  {t('settings.category.form.selectTagsHint')}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Print Settings Section */}
       <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-4 shadow-sm">

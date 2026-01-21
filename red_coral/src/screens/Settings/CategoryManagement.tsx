@@ -137,22 +137,15 @@ export const CategoryManagement: React.FC = React.memo(() => {
         header: t('settings.product.print.kitchenPrinting'),
         width: '120px',
         render: (item) => {
-          const val = item.is_kitchen_print_enabled;
-          if (val === null || val === undefined) {
-            return (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                {t('common.label.default')}
-              </span>
-            );
-          }
-          const isEnabled = val === true;
+          // Kitchen printing is enabled if print_destinations array is not empty
+          const hasDestinations = item.print_destinations && item.print_destinations.length > 0;
           return (
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                isEnabled ? 'bg-orange-50 text-orange-700' : 'bg-gray-100 text-gray-600'
+                hasDestinations ? 'bg-orange-50 text-orange-700' : 'bg-gray-100 text-gray-600'
               }`}
             >
-              {isEnabled ? (t('common.status.enabled')) : (t('common.status.disabled'))}
+              {hasDestinations ? (t('common.status.enabled')) : (t('common.status.disabled'))}
             </span>
           );
         },

@@ -13,17 +13,15 @@ pub type AttributeId = Thing;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeOption {
     pub name: String,
-    pub value_code: Option<String>,
     /// Price modifier in cents (positive=add, negative=subtract)
     #[serde(default)]
     pub price_modifier: i64,
-    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
-    pub is_default: bool,
     #[serde(default)]
     pub display_order: i32,
     #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_active: bool,
     pub receipt_name: Option<String>,
+    pub kitchen_print_name: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -34,12 +32,11 @@ impl AttributeOption {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            value_code: None,
             price_modifier: 0,
-            is_default: false,
             display_order: 0,
             is_active: true,
             receipt_name: None,
+            kitchen_print_name: None,
         }
     }
 }
@@ -49,26 +46,47 @@ impl AttributeOption {
 pub struct Attribute {
     pub id: Option<AttributeId>,
     pub name: String,
-    /// Attribute type: single_select, multi_select
-    #[serde(default = "default_attr_type")]
-    pub attr_type: String,
+
+    // 作用域
+    /// Scope: "global" | "inherited"
+    #[serde(default = "default_scope")]
+    pub scope: String,
+    /// Excluded categories (only for global scope)
+    #[serde(default)]
+    pub excluded_categories: Vec<Thing>,
+
+    // 选择模式
+    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
+    pub is_multi_select: bool,
+    /// Max selections (null = unlimited)
+    pub max_selections: Option<i32>,
+
+    // 默认值
+    pub default_option_idx: Option<i32>,
+
+    // 显示
     #[serde(default)]
     pub display_order: i32,
     #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_active: bool,
+
+    // 小票
     #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub show_on_receipt: bool,
     pub receipt_name: Option<String>,
-    pub kitchen_printer: Option<Thing>,
+
+    // 厨打
     #[serde(default, deserialize_with = "serde_helpers::bool_false")]
-    pub is_global: bool,
+    pub show_on_kitchen_print: bool,
+    pub kitchen_print_name: Option<String>,
+
     /// Embedded options (Graph DB style - no join table)
     #[serde(default)]
     pub options: Vec<AttributeOption>,
 }
 
-fn default_attr_type() -> String {
-    "single_select".to_string()
+fn default_scope() -> String {
+    "inherited".to_string()
 }
 
 impl Attribute {
@@ -76,13 +94,17 @@ impl Attribute {
         Self {
             id: None,
             name,
-            attr_type: default_attr_type(),
+            scope: default_scope(),
+            excluded_categories: vec![],
+            is_multi_select: false,
+            max_selections: None,
+            default_option_idx: None,
             display_order: 0,
             is_active: true,
             show_on_receipt: false,
             receipt_name: None,
-            kitchen_printer: None,
-            is_global: false,
+            show_on_kitchen_print: false,
+            kitchen_print_name: None,
             options: vec![],
         }
     }
@@ -91,25 +113,33 @@ impl Attribute {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeCreate {
     pub name: String,
-    pub attr_type: Option<String>,
+    pub scope: Option<String>,
+    pub excluded_categories: Option<Vec<Thing>>,
+    pub is_multi_select: Option<bool>,
+    pub max_selections: Option<i32>,
+    pub default_option_idx: Option<i32>,
     pub display_order: Option<i32>,
     pub show_on_receipt: Option<bool>,
     pub receipt_name: Option<String>,
-    pub kitchen_printer: Option<Thing>,
-    pub is_global: Option<bool>,
+    pub show_on_kitchen_print: Option<bool>,
+    pub kitchen_print_name: Option<String>,
     pub options: Option<Vec<AttributeOption>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeUpdate {
     pub name: Option<String>,
-    pub attr_type: Option<String>,
+    pub scope: Option<String>,
+    pub excluded_categories: Option<Vec<Thing>>,
+    pub is_multi_select: Option<bool>,
+    pub max_selections: Option<i32>,
+    pub default_option_idx: Option<i32>,
     pub display_order: Option<i32>,
     pub is_active: Option<bool>,
     pub show_on_receipt: Option<bool>,
     pub receipt_name: Option<String>,
-    pub kitchen_printer: Option<Thing>,
-    pub is_global: Option<bool>,
+    pub show_on_kitchen_print: Option<bool>,
+    pub kitchen_print_name: Option<String>,
     pub options: Option<Vec<AttributeOption>>,
 }
 
@@ -125,5 +155,4 @@ pub struct HasAttribute {
     pub is_required: bool,
     #[serde(default)]
     pub display_order: i32,
-    pub default_option_idx: Option<i32>,
 }

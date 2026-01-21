@@ -13,7 +13,7 @@ import { useTableStore } from './useTableStore';
 import { useEmployeeStore } from './useEmployeeStore';
 import { useRoleStore } from './useRoleStore';
 import { usePriceRuleStore } from './usePriceRuleStore';
-import { useKitchenPrinterStore } from './useKitchenPrinterStore';
+import { usePrintDestinationStore } from './usePrintDestinationStore';
 
 // Store interface for registry
 interface RegistryStore {
@@ -34,7 +34,7 @@ interface RegistryStore {
  * - 菜单相关: product, category, tag, attribute
  * - 位置相关: zone, dining_table
  * - 人员相关: employee, role (role 无 sync，只读)
- * - 其他: price_rule, kitchen_printer
+ * - 其他: price_rule, print_destination
  */
 export const storeRegistry: Record<string, RegistryStore> = {
   product: useProductStore,
@@ -46,7 +46,7 @@ export const storeRegistry: Record<string, RegistryStore> = {
   employee: useEmployeeStore,
   role: useRoleStore,                    // 后端无 sync (只读 API)
   price_rule: usePriceRuleStore,
-  kitchen_printer: useKitchenPrinterStore,
+  print_destination: usePrintDestinationStore,
 };
 
 /**

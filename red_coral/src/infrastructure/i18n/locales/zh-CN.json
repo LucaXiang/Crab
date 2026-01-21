@@ -556,6 +556,28 @@
         "updated": "商品更新成功"
       }
     },
+    "tag": {
+      "title": "标签管理",
+      "description": "管理商品标签",
+      "unit": "个标签",
+      "name": "标签名称",
+      "namePlaceholder": "请输入标签名称",
+      "color": "标签颜色",
+      "displayOrder": "显示顺序",
+      "addTag": "添加标签",
+      "editTag": "编辑标签",
+      "deleteTag": "删除标签",
+      "tagDeleted": "标签已删除",
+      "preview": "预览",
+      "sampleTag": "示例标签",
+      "confirm": {
+        "delete": "确定要删除标签 \"{name}\" 吗？"
+      },
+      "message": {
+        "created": "标签创建成功",
+        "updated": "标签更新成功"
+      }
+    },
     "category": {
       "title": "分类管理",
       "description": "管理商品分类",
@@ -576,7 +598,17 @@
       "form": {
         "name": "分类名称",
         "namePlaceholder": "请输入分类名称",
-        "attributes": "分类属性"
+        "attributes": "分类属性",
+        "virtualSettings": "虚拟分类设置",
+        "isVirtual": "分类类型",
+        "regularCategory": "常规分类",
+        "virtualCategory": "虚拟分类（按标签筛选）",
+        "matchMode": "匹配模式",
+        "matchAny": "匹配任一标签",
+        "matchAll": "匹配全部标签",
+        "filterTags": "筛选标签",
+        "noTagsAvailable": "暂无可用标签",
+        "selectTagsHint": "请至少选择一个标签用于筛选产品"
       },
       "message": {
         "exists": "分类已存在"

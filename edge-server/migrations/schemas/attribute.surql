@@ -10,9 +10,27 @@ DEFINE FIELD OVERWRITE name ON attribute TYPE string
     ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
--- 属性类型: single_select, multi_select
-DEFINE FIELD OVERWRITE attr_type ON attribute TYPE string
-    DEFAULT "single_select"
+-- 作用域: "global" | "inherited"
+DEFINE FIELD OVERWRITE scope ON attribute TYPE string
+    DEFAULT "inherited"
+    PERMISSIONS FULL;
+
+-- 排除的分类 (仅 global 生效)
+DEFINE FIELD OVERWRITE excluded_categories ON attribute TYPE array<record<category>>
+    DEFAULT []
+    PERMISSIONS FULL;
+
+-- 选择模式
+DEFINE FIELD OVERWRITE is_multi_select ON attribute TYPE bool
+    DEFAULT false
+    PERMISSIONS FULL;
+
+-- 多选上限 (null = 无限)
+DEFINE FIELD OVERWRITE max_selections ON attribute TYPE option<int>
+    PERMISSIONS FULL;
+
+-- 默认选项索引
+DEFINE FIELD OVERWRITE default_option_idx ON attribute TYPE option<int>
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE display_order ON attribute TYPE int
@@ -30,15 +48,16 @@ DEFINE FIELD OVERWRITE show_on_receipt ON attribute TYPE bool
 DEFINE FIELD OVERWRITE receipt_name ON attribute TYPE option<string>
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE kitchen_printer ON attribute TYPE option<record<kitchen_printer>>
-    PERMISSIONS FULL;
-
-DEFINE FIELD OVERWRITE is_global ON attribute TYPE bool
+-- 厨打设置
+DEFINE FIELD OVERWRITE show_on_kitchen_print ON attribute TYPE bool
     DEFAULT false
     PERMISSIONS FULL;
 
+DEFINE FIELD OVERWRITE kitchen_print_name ON attribute TYPE option<string>
+    PERMISSIONS FULL;
+
 -- 选项直接嵌入 (Graph DB 风格: 减少 JOIN)
--- options: [{ name: "微辣", price_modifier: 0, is_default: true }, ...]
+-- options: [{ name: "微辣", price_modifier: 0, kitchen_print_name: null }, ...]
 DEFINE FIELD OVERWRITE options ON attribute TYPE array<object>
     DEFAULT []
     PERMISSIONS FULL;
@@ -65,10 +84,6 @@ DEFINE FIELD OVERWRITE is_required ON has_attribute TYPE bool
 
 DEFINE FIELD OVERWRITE display_order ON has_attribute TYPE int
     DEFAULT 0
-    PERMISSIONS FULL;
-
--- 默认选项索引 (引用 options 数组的索引)
-DEFINE FIELD OVERWRITE default_option_idx ON has_attribute TYPE option<int>
     PERMISSIONS FULL;
 
 DEFINE INDEX OVERWRITE has_attr_unique ON has_attribute FIELDS in, out UNIQUE;

@@ -60,7 +60,7 @@ impl ProductRepository {
         let mut result = self
             .base
             .db()
-            .query("SELECT * FROM product WHERE id = $id FETCH category, kitchen_printer")
+            .query("SELECT * FROM product WHERE id = $id FETCH category, print_destinations")
             .bind(("id", prod_thing))
             .await?;
         let products: Vec<Product> = result.take(0)?;
@@ -88,8 +88,7 @@ impl ProductRepository {
             tax_rate: data.tax_rate.unwrap_or(0),
             receipt_name: data.receipt_name,
             kitchen_print_name: data.kitchen_print_name,
-            kitchen_printer: data.kitchen_printer,
-            is_kitchen_print_enabled: data.is_kitchen_print_enabled.unwrap_or(-1),
+            print_destinations: data.print_destinations.unwrap_or_default(),
             is_label_print_enabled: data.is_label_print_enabled.unwrap_or(-1),
             is_active: true,
             tags: data.tags.unwrap_or_default(),

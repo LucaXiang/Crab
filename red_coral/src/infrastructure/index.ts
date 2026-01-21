@@ -15,8 +15,5 @@ export * from './print';
 // Label
 export * from './label';
 
-// Data Source
-export * from './dataSource';
-
 // Persistence
 export * from './persistence';

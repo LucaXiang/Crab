@@ -253,7 +253,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                               {attr.name}
                             </h3>
                             <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">
-                              {getAttributeTypeLabel(attr.attr_type)}
+                              {attr.is_multi_select ? t('settings.attribute.type.multiSelect') : t('settings.attribute.type.singleSelect')}
                             </span>
                             {!attr.is_active && (
                               <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
@@ -315,7 +315,10 @@ export const AttributeManagement: React.FC = React.memo(() => {
                         </div>
                       ) : (
                         <div className="divide-y divide-gray-100/50">
-                          {options.map((option) => (
+                          {options.map((option) => {
+                            // Check if this option is the default by comparing index with attr.default_option_idx
+                            const isDefault = attr.default_option_idx === option.index;
+                            return (
                             <div
                               key={option.index}
                               className="p-3 pl-12 hover:bg-white transition-colors group/opt relative"
@@ -325,7 +328,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-medium text-gray-700 text-sm">{option.name}</span>
-                                    {option.is_default && (
+                                    {isDefault && (
                                       <span className="text-[10px] uppercase tracking-wider bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded border border-teal-200/50">
                                         {t('common.label.default')}
                                       </span>
@@ -337,7 +340,6 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                     )}
                                   </div>
                                   <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
-                                    {option.value_code && <span className="font-mono bg-gray-100 px-1 rounded text-gray-600">{option.value_code}</span>}
                                   <span
                                     className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
                                       option.price_modifier > 0
@@ -372,7 +374,8 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                 </div>
                               </div>
                             </div>
-                          ))}
+                          );
+                          })}
                         </div>
                       )}
                     </div>

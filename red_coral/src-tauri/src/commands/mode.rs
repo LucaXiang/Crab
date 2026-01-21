@@ -36,7 +36,10 @@ pub async fn start_server_mode(
     let bridge = bridge.read().await;
     match bridge.start_server_mode().await {
         Ok(_) => Ok(ApiResponse::success(())),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::InternalError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::InternalError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -50,7 +53,10 @@ pub async fn start_client_mode(
     let bridge = bridge.read().await;
     match bridge.start_client_mode(&edge_url, &message_addr).await {
         Ok(_) => Ok(ApiResponse::success(())),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::BridgeConnectionFailed, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::BridgeConnectionFailed,
+            e.to_string(),
+        )),
     }
 }
 
@@ -62,7 +68,10 @@ pub async fn stop_mode(
     let bridge = bridge.read().await;
     match bridge.stop().await {
         Ok(_) => Ok(ApiResponse::success(())),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::InternalError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::InternalError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -128,7 +137,10 @@ pub async fn reconnect(
     {
         let bridge = bridge_arc.read().await;
         if let Err(e) = bridge.stop().await {
-            return Ok(ApiResponse::error_with_code(ErrorCode::BridgeConnectionFailed, e.to_string()));
+            return Ok(ApiResponse::error_with_code(
+                ErrorCode::BridgeConnectionFailed,
+                e.to_string(),
+            ));
         }
     }
 
@@ -139,7 +151,10 @@ pub async fn reconnect(
             .start_client_mode(&client_config.edge_url, &client_config.message_addr)
             .await
         {
-            return Ok(ApiResponse::error_with_code(ErrorCode::BridgeConnectionFailed, e.to_string()));
+            return Ok(ApiResponse::error_with_code(
+                ErrorCode::BridgeConnectionFailed,
+                e.to_string(),
+            ));
         }
     }
 

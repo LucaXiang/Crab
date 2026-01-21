@@ -143,10 +143,12 @@ pub async fn batch_update_sort_order(
                 CategoryUpdate {
                     name: None,
                     sort_order: Some(update.sort_order),
-                    kitchen_printer: None,
-                    is_kitchen_print_enabled: None,
+                    print_destinations: None,
                     is_label_print_enabled: None,
                     is_active: None,
+                    is_virtual: None,
+                    tag_ids: None,
+                    match_mode: None,
                 },
             )
             .await;
@@ -183,7 +185,6 @@ pub async fn batch_update_sort_order(
 pub struct BindAttributePayload {
     pub is_required: Option<bool>,
     pub display_order: Option<i32>,
-    pub default_option_idx: Option<i32>,
 }
 
 /// GET /api/categories/:id/attributes - 获取分类关联的属性
@@ -212,7 +213,6 @@ pub async fn bind_category_attribute(
             &attr_id,
             payload.is_required.unwrap_or(false),
             payload.display_order.unwrap_or(0),
-            payload.default_option_idx,
         )
         .await
         .map_err(|e| AppError::database(e.to_string()))?;

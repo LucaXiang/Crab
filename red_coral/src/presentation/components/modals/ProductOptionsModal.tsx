@@ -73,27 +73,17 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
 
         let initialIds: string[] = [];
 
-        // Handle default option from binding (default_option_idx is index-based)
-        const bindingDefaultIdx = binding?.default_option_idx;
-
-        // Priority 1: Product-specific default from binding
-        if (bindingDefaultIdx !== null && bindingDefaultIdx !== undefined && bindingDefaultIdx >= 0) {
-           // Filter to ensure default option actually exists and is active
-           const opt = options[bindingDefaultIdx];
+        // Use attribute-level default_option_idx
+        const attrDefaultIdx = attr.default_option_idx;
+        if (attrDefaultIdx !== null && attrDefaultIdx !== undefined && attrDefaultIdx >= 0) {
+           const opt = options[attrDefaultIdx];
            if (opt && opt.is_active) {
-             initialIds = [String(bindingDefaultIdx)];
+             initialIds = [String(attrDefaultIdx)];
            }
         }
 
-        // Priority 2: Attribute-level defaults (Legacy fallback)
-        if (initialIds.length === 0) {
-           initialIds = options
-             .filter(opt => opt.is_default && opt.is_active)
-             .map((_, idx) => String(idx));
-        }
-
-        // Enforce Single Choice constraints
-        const isSingleChoice = attr.attr_type.startsWith('SINGLE') || attr.attr_type === 'single_select';
+        // Enforce Single Choice constraints (is_multi_select=false means single)
+        const isSingleChoice = !attr.is_multi_select;
         if (isSingleChoice && initialIds.length > 1) {
            initialIds = [initialIds[0]];
         }
@@ -121,8 +111,10 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
     }
 
     // Validate required attributes
+    // Note: With new model, required is determined by binding.is_required, not attr_type
     for (const attr of attributes) {
-      if (attr.attr_type.includes('REQUIRED')) {
+      const binding = bindings?.find(b => b.to === attr.id);
+      if (binding?.is_required) {
         const selected = selections.get(String(attr.id)) || [];
         if (selected.length === 0) {
           toast.error(t('pos.attributeRequired', { name: attr.name }));
@@ -153,7 +145,6 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
           price_modifier: option.price_modifier,
           attribute_name: attr.name,
           attribute_receipt_name: attr.receipt_name,
-          kitchen_printer: attr.kitchen_printer,
           option_name: option.name,
           receipt_name: option.receipt_name,
         });

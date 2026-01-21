@@ -34,27 +34,42 @@ export interface Category {
   id: string | null;
   name: string;
   sort_order: number;
-  kitchen_printer: string | null;
-  is_kitchen_print_enabled: boolean;
+  print_destinations: string[];
   is_label_print_enabled: boolean;
   is_active: boolean;
+  /** Whether this is a virtual category (filters by tags instead of direct assignment) */
+  is_virtual: boolean;
+  /** Tag IDs for virtual category filtering */
+  tag_ids: string[];
+  /** Match mode for virtual category: "any" or "all" */
+  match_mode: 'any' | 'all';
 }
 
 export interface CategoryCreate {
   name: string;
   sort_order?: number;
-  kitchen_printer?: string;
-  is_kitchen_print_enabled?: boolean;
+  print_destinations?: string[];
   is_label_print_enabled?: boolean;
+  /** Whether this is a virtual category */
+  is_virtual?: boolean;
+  /** Tag IDs for virtual category filtering */
+  tag_ids?: string[];
+  /** Match mode: "any" or "all" */
+  match_mode?: 'any' | 'all';
 }
 
 export interface CategoryUpdate {
   name?: string;
   sort_order?: number;
-  kitchen_printer?: string;
-  is_kitchen_print_enabled?: boolean;
+  print_destinations?: string[];
   is_label_print_enabled?: boolean;
   is_active?: boolean;
+  /** Whether this is a virtual category */
+  is_virtual?: boolean;
+  /** Tag IDs for virtual category filtering */
+  tag_ids?: string[];
+  /** Match mode: "any" or "all" */
+  match_mode?: 'any' | 'all';
 }
 
 // ============ Product ============
@@ -79,9 +94,7 @@ export interface Product {
   tax_rate: number;
   receipt_name: string | null;
   kitchen_print_name: string | null;
-  kitchen_printer: string | null;
-  /** -1=inherit, 0=disabled, 1=enabled */
-  is_kitchen_print_enabled: number;
+  print_destinations: string[];
   is_label_print_enabled: number;
   is_active: boolean;
   /** Tag references (String IDs) */
@@ -98,8 +111,7 @@ export interface ProductCreate {
   tax_rate?: number;
   receipt_name?: string;
   kitchen_print_name?: string;
-  kitchen_printer?: string;
-  is_kitchen_print_enabled?: number;
+  print_destinations?: string[];
   is_label_print_enabled?: number;
   tags?: string[];
   /** 嵌入式规格 */
@@ -114,8 +126,7 @@ export interface ProductUpdate {
   tax_rate?: number;
   receipt_name?: string;
   kitchen_print_name?: string;
-  kitchen_printer?: string;
-  is_kitchen_print_enabled?: number;
+  print_destinations?: string[];
   is_label_print_enabled?: number;
   is_active?: boolean;
   tags?: string[];
@@ -131,7 +142,6 @@ export interface ProductAttributeBinding {
   attribute: Attribute;
   is_required: boolean;
   display_order: number;
-  default_option_idx: number | null;
 }
 
 /** Full product with all related data */
@@ -144,9 +154,7 @@ export interface ProductFull {
   tax_rate: number;
   receipt_name: string | null;
   kitchen_print_name: string | null;
-  kitchen_printer: string | null;
-  /** -1=inherit, 0=disabled, 1=enabled */
-  is_kitchen_print_enabled: number;
+  print_destinations: string[];
   is_label_print_enabled: number;
   is_active: boolean;
   /** Embedded specifications */
@@ -161,49 +169,61 @@ export interface ProductFull {
 
 export interface AttributeOption {
   name: string;
-  value_code: string | null;
   /** Price modifier in cents */
   price_modifier: number;
-  is_default: boolean;
   display_order: number;
   is_active: boolean;
   receipt_name: string | null;
+  kitchen_print_name: string | null;
 }
+
+export type AttributeScope = 'global' | 'inherited';
 
 export interface Attribute {
   id: string | null;
   name: string;
-  /** single_select or multi_select */
-  attr_type: string;
+  scope: AttributeScope;
+  excluded_categories: string[];
+  is_multi_select: boolean;
+  max_selections: number | null;
+  default_option_idx: number | null;
   display_order: number;
   is_active: boolean;
   show_on_receipt: boolean;
   receipt_name: string | null;
-  kitchen_printer: string | null;
-  is_global: boolean;
+  show_on_kitchen_print: boolean;
+  kitchen_print_name: string | null;
   options: AttributeOption[];
 }
 
 export interface AttributeCreate {
   name: string;
-  attr_type?: string;
+  scope?: AttributeScope;
+  excluded_categories?: string[];
+  is_multi_select?: boolean;
+  max_selections?: number;
+  default_option_idx?: number;
   display_order?: number;
   show_on_receipt?: boolean;
   receipt_name?: string;
-  kitchen_printer?: string;
-  is_global?: boolean;
+  show_on_kitchen_print?: boolean;
+  kitchen_print_name?: string;
   options?: AttributeOption[];
 }
 
 export interface AttributeUpdate {
   name?: string;
-  attr_type?: string;
+  scope?: AttributeScope;
+  excluded_categories?: string[];
+  is_multi_select?: boolean;
+  max_selections?: number;
+  default_option_idx?: number;
   display_order?: number;
   is_active?: boolean;
   show_on_receipt?: boolean;
   receipt_name?: string;
-  kitchen_printer?: string;
-  is_global?: boolean;
+  show_on_kitchen_print?: boolean;
+  kitchen_print_name?: string;
   options?: AttributeOption[];
 }
 
@@ -215,29 +235,42 @@ export interface HasAttribute {
   to: string;
   is_required: boolean;
   display_order: number;
-  default_option_idx: number | null;
 }
 
-// ============ Kitchen Printer ============
+// ============ Embedded Printer ============
 
-export interface KitchenPrinter {
-  id: string | null;
-  name: string;
-  printer_name: string | null;
-  description: string | null;
+export type PrinterType = 'network' | 'driver';
+
+export interface EmbeddedPrinter {
+  printer_type: PrinterType;
+  ip?: string;
+  port?: number;
+  driver_name?: string;
+  priority: number;
   is_active: boolean;
 }
 
-export interface KitchenPrinterCreate {
+// ============ Print Destination ============
+
+export interface PrintDestination {
+  id?: string;
   name: string;
-  printer_name?: string;
   description?: string;
+  printers: EmbeddedPrinter[];
+  is_active: boolean;
 }
 
-export interface KitchenPrinterUpdate {
-  name?: string;
-  printer_name?: string;
+export interface PrintDestinationCreate {
+  name: string;
   description?: string;
+  printers?: EmbeddedPrinter[];
+  is_active?: boolean;
+}
+
+export interface PrintDestinationUpdate {
+  name?: string;
+  description?: string;
+  printers?: EmbeddedPrinter[];
   is_active?: boolean;
 }
 

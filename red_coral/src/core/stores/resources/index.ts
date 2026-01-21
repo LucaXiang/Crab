@@ -38,6 +38,13 @@ export {
   useCategoriesLoading,
   useCategoryById,
   useCategoryActions,
+  // Virtual/Regular category selectors
+  useVirtualCategories,
+  useRegularCategories,
+  useCategoryByName,
+  getVirtualCategories,
+  getRegularCategories,
+  getCategoryByName,
 } from './useCategoryStore';
 
 // Tag
@@ -102,12 +109,12 @@ export {
   useActivePriceRules,
 } from './usePriceRuleStore';
 
-// KitchenPrinter
+// PrintDestination
 export {
-  useKitchenPrinterStore,
-  useKitchenPrinters,
-  useKitchenPrintersLoading,
-  useKitchenPrinterById,
-  useKitchenPrinterActions,
-} from './useKitchenPrinterStore';
+  usePrintDestinationStore,
+  usePrintDestinations,
+  usePrintDestinationsLoading,
+  usePrintDestinationById,
+  usePrintDestinationActions,
+} from './usePrintDestinationStore';
 

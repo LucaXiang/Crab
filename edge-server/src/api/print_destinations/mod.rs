@@ -1,4 +1,4 @@
-//! Kitchen Printer API 模块
+//! Print Destination API 模块
 
 mod handler;
 
@@ -11,7 +11,7 @@ use crate::core::ServerState;
 
 pub fn router() -> Router<ServerState> {
     Router::new()
-        .nest("/api/kitchen-printers", routes())
+        .nest("/api/print-destinations", routes())
 }
 
 fn routes() -> Router<ServerState> {

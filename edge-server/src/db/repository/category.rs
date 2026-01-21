@@ -32,12 +32,12 @@ impl CategoryRepository {
         Ok(categories)
     }
 
-    /// Find all categories with kitchen_printer fetched
-    pub async fn find_all_with_printer(&self) -> RepoResult<Vec<Category>> {
+    /// Find all categories with print_destinations fetched
+    pub async fn find_all_with_destinations(&self) -> RepoResult<Vec<Category>> {
         let categories: Vec<Category> = self
             .base
             .db()
-            .query("SELECT * FROM category WHERE is_active = true ORDER BY sort_order FETCH kitchen_printer")
+            .query("SELECT * FROM category WHERE is_active = true ORDER BY sort_order FETCH print_destinations")
             .await?
             .take(0)?;
         Ok(categories)
@@ -74,18 +74,28 @@ impl CategoryRepository {
             )));
         }
 
-        let kitchen_printer = data
-            .kitchen_printer
-            .map(|id| make_thing("kitchen_printer", &id));
+        let print_destinations: Vec<Thing> = data
+            .print_destinations
+            .iter()
+            .map(|id| make_thing("print_destination", id))
+            .collect();
+
+        let tag_ids: Vec<Thing> = data
+            .tag_ids
+            .iter()
+            .map(|id| make_thing("tag", id))
+            .collect();
 
         let category = Category {
             id: None,
             name: data.name,
             sort_order: data.sort_order.unwrap_or(0),
-            kitchen_printer,
-            is_kitchen_print_enabled: data.is_kitchen_print_enabled.unwrap_or(true),
+            print_destinations,
             is_label_print_enabled: data.is_label_print_enabled.unwrap_or(true),
             is_active: true,
+            is_virtual: data.is_virtual.unwrap_or(false),
+            tag_ids,
+            match_mode: data.match_mode.unwrap_or_else(|| "any".to_string()),
         };
 
         let created: Option<Category> = self.base.db().create(TABLE).content(category).await?;
@@ -117,24 +127,36 @@ impl CategoryRepository {
             #[serde(skip_serializing_if = "Option::is_none")]
             sort_order: Option<i32>,
             #[serde(skip_serializing_if = "Option::is_none")]
-            kitchen_printer: Option<Thing>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            is_kitchen_print_enabled: Option<bool>,
+            print_destinations: Option<Vec<Thing>>,
             #[serde(skip_serializing_if = "Option::is_none")]
             is_label_print_enabled: Option<bool>,
             #[serde(skip_serializing_if = "Option::is_none")]
             is_active: Option<bool>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            is_virtual: Option<bool>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            tag_ids: Option<Vec<Thing>>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            match_mode: Option<String>,
         }
 
         let update_data = CategoryUpdateDb {
             name: data.name,
             sort_order: data.sort_order,
-            kitchen_printer: data
-                .kitchen_printer
-                .map(|id| make_thing("kitchen_printer", &id)),
-            is_kitchen_print_enabled: data.is_kitchen_print_enabled,
+            print_destinations: data.print_destinations.map(|ids| {
+                ids.iter()
+                    .map(|id| make_thing("print_destination", id))
+                    .collect()
+            }),
             is_label_print_enabled: data.is_label_print_enabled,
             is_active: data.is_active,
+            is_virtual: data.is_virtual,
+            tag_ids: data.tag_ids.map(|ids| {
+                ids.iter()
+                    .map(|id| make_thing("tag", id))
+                    .collect()
+            }),
+            match_mode: data.match_mode,
         };
 
         // Extract pure id if it contains table prefix

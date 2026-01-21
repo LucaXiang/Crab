@@ -14,13 +14,9 @@ DEFINE FIELD OVERWRITE sort_order ON category TYPE int
     DEFAULT 0
     PERMISSIONS FULL;
 
--- 厨房打印机关联 (SurrealDB Record Link)
-DEFINE FIELD OVERWRITE kitchen_printer ON category TYPE option<record<kitchen_printer>>
-    PERMISSIONS FULL;
-
--- 打印设置
-DEFINE FIELD OVERWRITE is_kitchen_print_enabled ON category TYPE bool
-    DEFAULT true
+-- 打印目的地
+DEFINE FIELD OVERWRITE print_destinations ON category TYPE array<record<print_destination>>
+    DEFAULT []
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE is_label_print_enabled ON category TYPE bool
@@ -29,6 +25,19 @@ DEFINE FIELD OVERWRITE is_label_print_enabled ON category TYPE bool
 
 DEFINE FIELD OVERWRITE is_active ON category TYPE bool
     DEFAULT true
+    PERMISSIONS FULL;
+
+-- 虚拟分类支持
+DEFINE FIELD OVERWRITE is_virtual ON category TYPE bool
+    DEFAULT false
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE tag_ids ON category TYPE array<record<tag>>
+    DEFAULT []
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE match_mode ON category TYPE string
+    DEFAULT 'any'
     PERMISSIONS FULL;
 
 DEFINE INDEX OVERWRITE category_name_unique ON category FIELDS name UNIQUE;

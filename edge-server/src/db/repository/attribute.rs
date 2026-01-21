@@ -41,7 +41,7 @@ impl AttributeRepository {
         let attrs: Vec<Attribute> = self
             .base
             .db()
-            .query("SELECT * FROM attribute WHERE is_global = true AND is_active = true ORDER BY display_order")
+            .query("SELECT * FROM attribute WHERE scope = 'global' AND is_active = true ORDER BY display_order")
             .await?
             .take(0)?;
         Ok(attrs)
@@ -60,13 +60,17 @@ impl AttributeRepository {
         let attr = Attribute {
             id: None,
             name: data.name,
-            attr_type: data.attr_type.unwrap_or_else(|| "single_select".to_string()),
+            scope: data.scope.unwrap_or_else(|| "inherited".to_string()),
+            excluded_categories: data.excluded_categories.unwrap_or_default(),
+            is_multi_select: data.is_multi_select.unwrap_or(false),
+            max_selections: data.max_selections,
+            default_option_idx: data.default_option_idx,
             display_order: data.display_order.unwrap_or(0),
             is_active: true,
             show_on_receipt: data.show_on_receipt.unwrap_or(false),
             receipt_name: data.receipt_name,
-            kitchen_printer: data.kitchen_printer,
-            is_global: data.is_global.unwrap_or(false),
+            show_on_kitchen_print: data.show_on_kitchen_print.unwrap_or(false),
+            kitchen_print_name: data.kitchen_print_name,
             options: data.options.unwrap_or_default(),
         };
 
@@ -177,19 +181,17 @@ impl AttributeRepository {
         attr_id: &str,
         is_required: bool,
         display_order: i32,
-        default_option_idx: Option<i32>,
     ) -> RepoResult<HasAttribute> {
         let mut result = self
             .base
             .db()
             .query(
-                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order, default_option_idx = $default"
+                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order"
             )
             .bind(("from", make_thing("product", product_id)))
             .bind(("to", make_thing(TABLE, attr_id)))
             .bind(("req", is_required))
             .bind(("order", display_order))
-            .bind(("default", default_option_idx))
             .await?;
         let edges: Vec<HasAttribute> = result.take(0)?;
         edges
@@ -205,19 +207,17 @@ impl AttributeRepository {
         attr_id: &str,
         is_required: bool,
         display_order: i32,
-        default_option_idx: Option<i32>,
     ) -> RepoResult<HasAttribute> {
         let mut result = self
             .base
             .db()
             .query(
-                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order, default_option_idx = $default"
+                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order"
             )
             .bind(("from", make_thing("category", category_id)))
             .bind(("to", make_thing(TABLE, attr_id)))
             .bind(("req", is_required))
             .bind(("order", display_order))
-            .bind(("default", default_option_idx))
             .await?;
         let edges: Vec<HasAttribute> = result.take(0)?;
         edges
@@ -298,7 +298,6 @@ impl AttributeRepository {
             out: surrealdb::sql::Thing,
             is_required: bool,
             display_order: i32,
-            default_option_idx: Option<i32>,
             attr_data: Attribute,
         }
 
@@ -313,7 +312,6 @@ impl AttributeRepository {
                     to: row.out,
                     is_required: row.is_required,
                     display_order: row.display_order,
-                    default_option_idx: row.default_option_idx,
                 };
                 (binding, row.attr_data)
             })
@@ -338,8 +336,8 @@ impl AttributeRepository {
                 -- Category attributes
                 LET $cat_attrs = SELECT ->has_attribute->attribute.* FROM $cat;
 
-                -- Global attributes
-                LET $global_attrs = SELECT * FROM attribute WHERE is_global = true AND is_active = true;
+                -- Global attributes (excluding those that exclude this category)
+                LET $global_attrs = SELECT * FROM attribute WHERE scope = 'global' AND is_active = true AND $cat NOT IN excluded_categories;
 
                 -- Combine and deduplicate
                 RETURN array::distinct(array::concat($prod_attrs, $cat_attrs, $global_attrs));

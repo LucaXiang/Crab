@@ -1,7 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '../../../hooks/useI18n';
-import { useOptionActions, attributeHelpers } from '@/core/stores/resources';
+import { useOptionActions } from '@/core/stores/resources';
 import type { AttributeOption } from '@/core/domain/types/api';
 import { FormField, inputClass } from './FormField';
 import { useFormInitialization } from '../../../hooks/useFormInitialization';
@@ -18,9 +18,8 @@ interface AttributeOptionWithIndex extends AttributeOption {
 interface OptionFormData {
   name: string;
   receiptName: string;
-  valueCode: string;
+  kitchenPrintName: string;
   priceModifier: number;
-  isDefault: boolean;
   displayOrder: number;
   isActive: boolean;
 }
@@ -31,9 +30,8 @@ const mapToFormData = (opt: AttributeOptionWithIndex | null): OptionFormData => 
     return {
       name: '',
       receiptName: '',
-      valueCode: '',
+      kitchenPrintName: '',
       priceModifier: 0,
-      isDefault: false,
       displayOrder: 0,
       isActive: true,
     };
@@ -41,9 +39,8 @@ const mapToFormData = (opt: AttributeOptionWithIndex | null): OptionFormData => 
   return {
     name: opt.name,
     receiptName: opt.receipt_name || '',
-    valueCode: opt.value_code || '',
+    kitchenPrintName: opt.kitchen_print_name || '',
     priceModifier: opt.price_modifier,
-    isDefault: opt.is_default,
     displayOrder: opt.display_order,
     isActive: opt.is_active,
   };
@@ -64,10 +61,6 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
 }) => {
   const { t } = useI18n();
   const { createOption, updateOption } = useOptionActions();
-
-  // Use stable helpers directly
-  const getAttributeById = attributeHelpers.getAttributeById;
-  const getOptionsByAttributeId = attributeHelpers.getOptionsByAttributeId;
 
   // Use form initialization hook with mapped data
   const [formData, setFormData] = useFormInitialization<OptionFormData>(
@@ -100,28 +93,11 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
         // Ensure price is committed before submit
         commitPrice();
 
-        // Logic to ensure only one default option for Single Choice attributes
-        if (data.isDefault) {
-          const attribute = getAttributeById(attributeId);
-          if (attribute && (attribute.attr_type === 'SINGLE_REQUIRED' || attribute.attr_type === 'SINGLE_OPTIONAL')) {
-            const existingOptions = getOptionsByAttributeId(attributeId);
-            const otherDefaults = existingOptions.filter(opt => opt.is_default);
-
-            if (otherDefaults.length > 0) {
-              await Promise.all(otherDefaults.map(other =>
-                updateOption({ attributeId, index: other.index, is_default: false })
-              ));
-            }
-          }
-        }
-
         await createOption({
           attributeId,
           name: data.name.trim(),
           receipt_name: data.receiptName?.trim() || undefined,
-          value_code: data.valueCode?.trim() || undefined,
           price_modifier: data.priceModifier,
-          is_default: data.isDefault,
           display_order: data.displayOrder,
         });
       },
@@ -129,31 +105,12 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
         // Ensure price is committed before submit
         commitPrice();
 
-        // Logic to ensure only one default option for Single Choice attributes
-        if (data.isDefault) {
-          const attribute = getAttributeById(attributeId);
-          if (attribute && (attribute.attr_type === 'SINGLE_REQUIRED' || attribute.attr_type === 'SINGLE_OPTIONAL')) {
-            const existingOptions = getOptionsByAttributeId(attributeId);
-            const otherDefaults = existingOptions.filter(opt =>
-              opt.is_default && opt.index !== editingOption!.index
-            );
-
-            if (otherDefaults.length > 0) {
-              await Promise.all(otherDefaults.map(other =>
-                updateOption({ attributeId, index: other.index, is_default: false })
-              ));
-            }
-          }
-        }
-
         await updateOption({
           attributeId,
           index: editingOption!.index,
           name: data.name.trim(),
           receipt_name: data.receiptName?.trim() || undefined,
-          value_code: data.valueCode?.trim() || undefined,
           price_modifier: data.priceModifier,
-          is_default: data.isDefault,
           display_order: data.displayOrder,
           is_active: data.isActive,
         });
@@ -217,11 +174,11 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
               />
             </FormField>
 
-            <FormField label={t('settings.attribute.option.form.valueCode')}>
+            <FormField label={t('settings.attribute.option.form.kitchenPrintName')}>
               <input
-                value={formData.valueCode}
-                onChange={(e) => handleFieldChange('valueCode', e.target.value)}
-                placeholder={t('settings.attribute.option.form.valueCodePlaceholder')}
+                value={formData.kitchenPrintName}
+                onChange={(e) => handleFieldChange('kitchenPrintName', e.target.value)}
+                placeholder={t('settings.attribute.option.form.kitchenPrintNamePlaceholder')}
                 className={inputClass}
               />
             </FormField>
@@ -246,31 +203,15 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
               </p>
             </FormField>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label={t('settings.attribute.option.form.sort')}>
-                <input
-                  type="number"
-                  value={formData.displayOrder}
-                  onChange={(e) => handleFieldChange('displayOrder', parseInt(e.target.value) || 0)}
-                  placeholder={t('settings.form.placeholder.sortOrder')}
-                  className={inputClass}
-                />
-              </FormField>
-
-              <FormField label={t('settings.attribute.option.form.default')}>
-                <label className="flex items-center gap-2 cursor-pointer h-full">
-                  <input
-                    type="checkbox"
-                    checked={formData.isDefault}
-                    onChange={(e) => handleFieldChange('isDefault', e.target.checked)}
-                    className="w-4 h-4 text-teal-600 bg-gray-100 border-gray-300 rounded focus:ring-teal-500"
-                  />
-                  <span className="text-sm text-gray-700">
-                    {t('settings.attribute.option.form.setAsDefault')}
-                  </span>
-                </label>
-              </FormField>
-            </div>
+            <FormField label={t('settings.attribute.option.form.sort')}>
+              <input
+                type="number"
+                value={formData.displayOrder}
+                onChange={(e) => handleFieldChange('displayOrder', parseInt(e.target.value) || 0)}
+                placeholder={t('settings.form.placeholder.sortOrder')}
+                className={inputClass}
+              />
+            </FormField>
 
             {editingOption && (
               <FormField label={t('settings.attribute.option.form.status')}>

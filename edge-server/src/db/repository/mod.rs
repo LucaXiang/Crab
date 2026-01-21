@@ -11,7 +11,7 @@ pub mod tag;
 pub mod category;
 pub mod product;
 pub mod attribute;
-pub mod kitchen_printer;
+pub mod print_destination;
 
 // Location
 pub mod zone;
@@ -33,7 +33,7 @@ pub use tag::TagRepository;
 pub use category::CategoryRepository;
 pub use product::ProductRepository;
 pub use attribute::AttributeRepository;
-pub use kitchen_printer::KitchenPrinterRepository;
+pub use print_destination::PrintDestinationRepository;
 pub use zone::ZoneRepository;
 pub use dining_table::DiningTableRepository;
 pub use price_rule::PriceRuleRepository;

@@ -53,8 +53,6 @@ pub enum DataIntent {
     ProductSpecification(CrudAction<ProductSpecDto, ProductSpecUpdateDto>),
     /// 属性
     Attribute(CrudAction<AttributeDto, AttributeUpdateDto>),
-    /// 厨房打印机
-    KitchenPrinter(CrudAction<KitchenPrinterDto, KitchenPrinterUpdateDto>),
 
     // ===== 位置域 =====
     /// 区域

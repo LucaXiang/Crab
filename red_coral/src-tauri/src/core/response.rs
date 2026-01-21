@@ -159,18 +159,6 @@ pub struct AttributeData {
     pub template: shared::models::Attribute,
 }
 
-/// Kitchen Printers 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct PrinterListData {
-    pub printers: Vec<shared::models::KitchenPrinter>,
-}
-
-/// 单个 Printer
-#[derive(Debug, Clone, Serialize)]
-pub struct PrinterData {
-    pub printer: shared::models::KitchenPrinter,
-}
-
 /// 删除响应
 #[derive(Debug, Clone, Serialize)]
 pub struct DeleteData {
@@ -187,6 +175,20 @@ impl DeleteData {
 #[derive(Debug, Clone, Serialize)]
 pub struct ProductAttributeListData {
     pub attributes: Vec<shared::models::HasAttribute>,
+}
+
+// ============ Print Destinations ============
+
+/// Print Destinations 列表
+#[derive(Debug, Clone, Serialize)]
+pub struct PrintDestinationListData {
+    pub print_destinations: Vec<shared::models::PrintDestination>,
+}
+
+/// 单个 PrintDestination
+#[derive(Debug, Clone, Serialize)]
+pub struct PrintDestinationData {
+    pub print_destination: shared::models::PrintDestination,
 }
 
 // ============ Zones & Tables ============

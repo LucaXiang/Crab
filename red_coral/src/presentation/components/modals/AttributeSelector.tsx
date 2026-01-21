@@ -21,8 +21,10 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
 }) => {
   const { t } = useI18n();
 
-  const isSingleChoice = attribute.attr_type.startsWith('SINGLE') || attribute.attr_type === 'single_select';
-  const isRequired = attribute.attr_type.includes('REQUIRED');
+  // is_multi_select=false means single select, is_multi_select=true means multi select
+  const isSingleChoice = !attribute.is_multi_select;
+  // Note: Required is no longer part of attribute type, check via binding's is_required if needed
+  const isRequired = false;
 
   // Filter only active options
   const activeOptions = options.filter(opt => opt.is_active);
@@ -45,15 +47,9 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
   };
 
   const getAttributeTypeLabel = () => {
-    const labels: Record<string, string> = {
-      SINGLE_REQUIRED: t('settings.attribute.type.singleRequired'),
-      SINGLE_OPTIONAL: t('settings.attribute.type.singleOptional'),
-      MULTI_REQUIRED: t('settings.attribute.type.multiRequired'),
-      MULTI_OPTIONAL: t('settings.attribute.type.multiOptional'),
-      single_select: t('settings.attribute.type.singleOptional'),
-      multi_select: t('settings.attribute.type.multiOptional'),
-    };
-    return labels[attribute.attr_type] || attribute.attr_type;
+    return attribute.is_multi_select
+      ? t('settings.attribute.type.multiOptional')
+      : t('settings.attribute.type.singleOptional');
   };
 
   if (activeOptions.length === 0) {

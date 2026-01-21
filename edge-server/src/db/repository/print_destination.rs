@@ -1,0 +1,129 @@
+//! Print Destination Repository
+
+use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
+use crate::db::models::{PrintDestination, PrintDestinationCreate, PrintDestinationUpdate};
+use surrealdb::engine::local::Db;
+use surrealdb::Surreal;
+
+const TABLE: &str = "print_destination";
+
+#[derive(Clone)]
+pub struct PrintDestinationRepository {
+    base: BaseRepository,
+}
+
+impl PrintDestinationRepository {
+    pub fn new(db: Surreal<Db>) -> Self {
+        Self {
+            base: BaseRepository::new(db),
+        }
+    }
+
+    /// Find all active print destinations
+    pub async fn find_all(&self) -> RepoResult<Vec<PrintDestination>> {
+        let items: Vec<PrintDestination> = self
+            .base
+            .db()
+            .query("SELECT * FROM print_destination WHERE is_active = true ORDER BY name")
+            .await?
+            .take(0)?;
+        Ok(items)
+    }
+
+    /// Find all print destinations (including inactive)
+    pub async fn find_all_with_inactive(&self) -> RepoResult<Vec<PrintDestination>> {
+        let items: Vec<PrintDestination> = self
+            .base
+            .db()
+            .query("SELECT * FROM print_destination ORDER BY name")
+            .await?
+            .take(0)?;
+        Ok(items)
+    }
+
+    /// Find print destination by id
+    pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<PrintDestination>> {
+        let pure_id = strip_table_prefix(TABLE, id);
+        let item: Option<PrintDestination> = self.base.db().select((TABLE, pure_id)).await?;
+        Ok(item)
+    }
+
+    /// Find print destination by name
+    pub async fn find_by_name(&self, name: &str) -> RepoResult<Option<PrintDestination>> {
+        let name_owned = name.to_string();
+        let mut result = self
+            .base
+            .db()
+            .query("SELECT * FROM print_destination WHERE name = $name LIMIT 1")
+            .bind(("name", name_owned))
+            .await?;
+        let items: Vec<PrintDestination> = result.take(0)?;
+        Ok(items.into_iter().next())
+    }
+
+    /// Create a new print destination
+    pub async fn create(&self, data: PrintDestinationCreate) -> RepoResult<PrintDestination> {
+        // Check duplicate name
+        if self.find_by_name(&data.name).await?.is_some() {
+            return Err(RepoError::Duplicate(format!(
+                "Print destination '{}' already exists",
+                data.name
+            )));
+        }
+
+        let item = PrintDestination {
+            id: None,
+            name: data.name,
+            description: data.description,
+            printers: data.printers,
+            is_active: data.is_active,
+        };
+
+        let created: Option<PrintDestination> = self.base.db().create(TABLE).content(item).await?;
+        created.ok_or_else(|| RepoError::Database("Failed to create print destination".to_string()))
+    }
+
+    /// Update a print destination
+    pub async fn update(&self, id: &str, data: PrintDestinationUpdate) -> RepoResult<PrintDestination> {
+        let pure_id = strip_table_prefix(TABLE, id);
+        let existing = self
+            .find_by_id(pure_id)
+            .await?
+            .ok_or_else(|| RepoError::NotFound(format!("Print destination {} not found", id)))?;
+
+        // Check duplicate name if changing
+        if let Some(ref new_name) = data.name
+            && new_name != &existing.name
+            && self.find_by_name(new_name).await?.is_some()
+        {
+            return Err(RepoError::Duplicate(format!(
+                "Print destination '{}' already exists",
+                new_name
+            )));
+        }
+
+        let thing = make_thing(TABLE, pure_id);
+        self.base
+            .db()
+            .query("UPDATE $thing MERGE $data")
+            .bind(("thing", thing))
+            .bind(("data", data))
+            .await?;
+
+        self.find_by_id(pure_id)
+            .await?
+            .ok_or_else(|| RepoError::NotFound(format!("Print destination {} not found", id)))
+    }
+
+    /// Hard delete a print destination
+    pub async fn delete(&self, id: &str) -> RepoResult<bool> {
+        let pure_id = strip_table_prefix(TABLE, id);
+        let thing = make_thing(TABLE, pure_id);
+        self.base
+            .db()
+            .query("DELETE $thing")
+            .bind(("thing", thing))
+            .await?;
+        Ok(true)
+    }
+}

@@ -34,10 +34,9 @@ pub struct Product {
     pub tax_rate: i32,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    /// Kitchen printer reference (override category setting)
-    pub kitchen_printer: Option<String>,
-    /// -1=inherit, 0=disabled, 1=enabled
-    pub is_kitchen_print_enabled: i32,
+    /// 打印目的地
+    #[serde(default)]
+    pub print_destinations: Vec<String>,
     pub is_label_print_enabled: i32,
     pub is_active: bool,
     /// Tag references (String IDs)
@@ -58,8 +57,7 @@ pub struct ProductCreate {
     pub tax_rate: Option<i32>,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    pub kitchen_printer: Option<String>,
-    pub is_kitchen_print_enabled: Option<i32>,
+    pub print_destinations: Option<Vec<String>>,
     pub is_label_print_enabled: Option<i32>,
     pub tags: Option<Vec<String>>,
     /// 规格列表 (至少 1 个)
@@ -76,8 +74,7 @@ pub struct ProductUpdate {
     pub tax_rate: Option<i32>,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    pub kitchen_printer: Option<String>,
-    pub is_kitchen_print_enabled: Option<i32>,
+    pub print_destinations: Option<Vec<String>>,
     pub is_label_print_enabled: Option<i32>,
     pub is_active: Option<bool>,
     pub tags: Option<Vec<String>>,
@@ -94,7 +91,6 @@ pub struct ProductAttributeBinding {
     pub attribute: super::attribute::Attribute,
     pub is_required: bool,
     pub display_order: i32,
-    pub default_option_idx: Option<i32>,
 }
 
 /// Full product with all related data
@@ -108,8 +104,9 @@ pub struct ProductFull {
     pub tax_rate: i32,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    pub kitchen_printer: Option<String>,
-    pub is_kitchen_print_enabled: i32,
+    /// 打印目的地
+    #[serde(default)]
+    pub print_destinations: Vec<String>,
     pub is_label_print_enabled: i32,
     pub is_active: bool,
     /// 嵌入式规格

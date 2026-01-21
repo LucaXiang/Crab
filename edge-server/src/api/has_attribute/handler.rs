@@ -20,7 +20,6 @@ pub struct CreateBindingRequest {
     pub is_required: bool,
     #[serde(default)]
     pub display_order: i32,
-    pub default_option_idx: Option<i32>,
 }
 
 /// 更新绑定的请求体
@@ -51,7 +50,6 @@ pub async fn create(
             &payload.attribute_id,
             payload.is_required,
             payload.display_order,
-            payload.default_option_idx,
         )
         .await
         .map_err(|e| AppError::database(e.to_string()))?;

@@ -45,10 +45,12 @@ impl From<db::Category> for api::Category {
             id: option_thing_to_string(&c.id),
             name: c.name,
             sort_order: c.sort_order,
-            kitchen_printer: option_thing_to_string(&c.kitchen_printer),
-            is_kitchen_print_enabled: c.is_kitchen_print_enabled,
+            print_destinations: things_to_strings(&c.print_destinations),
             is_label_print_enabled: c.is_label_print_enabled,
             is_active: c.is_active,
+            is_virtual: c.is_virtual,
+            tag_ids: things_to_strings(&c.tag_ids),
+            match_mode: c.match_mode,
         }
     }
 }
@@ -79,8 +81,7 @@ impl From<db::Product> for api::Product {
             tax_rate: p.tax_rate,
             receipt_name: p.receipt_name,
             kitchen_print_name: p.kitchen_print_name,
-            kitchen_printer: option_thing_to_string(&p.kitchen_printer),
-            is_kitchen_print_enabled: p.is_kitchen_print_enabled,
+            print_destinations: things_to_strings(&p.print_destinations),
             is_label_print_enabled: p.is_label_print_enabled,
             is_active: p.is_active,
             tags: things_to_strings(&p.tags),
@@ -95,12 +96,11 @@ impl From<db::AttributeOption> for api::AttributeOption {
     fn from(o: db::AttributeOption) -> Self {
         Self {
             name: o.name,
-            value_code: o.value_code,
             price_modifier: o.price_modifier,
-            is_default: o.is_default,
             display_order: o.display_order,
             is_active: o.is_active,
             receipt_name: o.receipt_name,
+            kitchen_print_name: o.kitchen_print_name,
         }
     }
 }
@@ -110,13 +110,17 @@ impl From<db::Attribute> for api::Attribute {
         Self {
             id: option_thing_to_string(&a.id),
             name: a.name,
-            attr_type: a.attr_type,
+            scope: a.scope,
+            excluded_categories: things_to_strings(&a.excluded_categories),
+            is_multi_select: a.is_multi_select,
+            max_selections: a.max_selections,
+            default_option_idx: a.default_option_idx,
             display_order: a.display_order,
             is_active: a.is_active,
             show_on_receipt: a.show_on_receipt,
             receipt_name: a.receipt_name,
-            kitchen_printer: option_thing_to_string(&a.kitchen_printer),
-            is_global: a.is_global,
+            show_on_kitchen_print: a.show_on_kitchen_print,
+            kitchen_print_name: a.kitchen_print_name,
             options: a.options.into_iter().map(Into::into).collect(),
         }
     }
@@ -130,21 +134,33 @@ impl From<db::HasAttribute> for api::HasAttribute {
             to: thing_to_string(&h.to),
             is_required: h.is_required,
             display_order: h.display_order,
-            default_option_idx: h.default_option_idx,
         }
     }
 }
 
-// ============ Kitchen Printer ============
+// ============ Print Destination ============
 
-impl From<db::KitchenPrinter> for api::KitchenPrinter {
-    fn from(k: db::KitchenPrinter) -> Self {
+impl From<db::EmbeddedPrinter> for api::EmbeddedPrinter {
+    fn from(p: db::EmbeddedPrinter) -> Self {
         Self {
-            id: option_thing_to_string(&k.id),
-            name: k.name,
-            printer_name: k.printer_name,
-            description: k.description,
-            is_active: k.is_active,
+            printer_type: p.printer_type,
+            ip: p.ip,
+            port: p.port,
+            driver_name: p.driver_name,
+            priority: p.priority,
+            is_active: p.is_active,
+        }
+    }
+}
+
+impl From<db::PrintDestination> for api::PrintDestination {
+    fn from(p: db::PrintDestination) -> Self {
+        Self {
+            id: option_thing_to_string(&p.id),
+            name: p.name,
+            description: p.description,
+            printers: p.printers.into_iter().map(Into::into).collect(),
+            is_active: p.is_active,
         }
     }
 }

@@ -167,7 +167,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
         ) : (
           selectedAttributes.map((attr) => {
             const attrId = String(attr.id);
-            const isMulti = (attr.attr_type || '').startsWith('MULTI');
+            const isMulti = attr.is_multi_select;
             const defaultOptions = getDefaultOptions(attrId);
             const options = optionsMap.get(attrId) || [];
             const hasDefault = defaultOptions.length > 0;
@@ -178,12 +178,8 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                 <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-gray-800">{attr.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                      (attr.attr_type || '').includes('REQUIRED')
-                        ? 'bg-red-50 text-red-600 border-red-100'
-                        : 'bg-blue-50 text-blue-600 border-blue-100'
-                    }`}>
-                      {getAttributeTypeLabel(attr.attr_type)}
+                    <span className="text-[10px] px-1.5 py-0.5 rounded border bg-blue-50 text-blue-600 border-blue-100">
+                      {attr.is_multi_select ? t('settings.attribute.type.multiSelect') : t('settings.attribute.type.singleSelect')}
                     </span>
                   </div>
                   {inheritedAttributeIds.includes(attrId) ? (

@@ -219,7 +219,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                           (() => {
                             if (!isGlobalKitchenEnabled) return (t('common.status.disabledGlobal'));
                             const cat = categories.find(c => String(c.id) === String(formData.categoryId));
-                            const isEnabled = cat ? (cat.is_kitchen_print_enabled !== false) : true;
+                            // Kitchen printing is enabled if category has print_destinations
+                            const isEnabled = cat ? (cat.print_destinations && cat.print_destinations.length > 0) : false;
                             return isEnabled ? (t('common.status.enabled')) : (t('common.status.disabled'));
                           })()
                         }

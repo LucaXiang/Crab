@@ -10,7 +10,7 @@ import type {
   Category,
   Zone,
   Table,
-  KitchenPrinter,
+  PrintDestination,
   Attribute,
   AttributeTemplate,
   AttributeOption,
@@ -147,8 +147,7 @@ export interface ProductResponse {
   tax_rate: number;
   receipt_name: string | null;
   kitchen_print_name: string | null;
-  kitchen_printer_id: number | null;
-  is_kitchen_print_enabled: boolean;
+  print_destinations: string[];
   is_label_print_enabled: boolean;
   is_active: boolean;
   created_at: string;
@@ -173,8 +172,7 @@ export interface CreateProductRequest {
   tax_rate?: number;
   receipt_name?: string;
   kitchen_print_name?: string;
-  kitchen_printer_id?: number;
-  is_kitchen_print_enabled?: number;
+  print_destinations?: string[];
   is_label_print_enabled?: number;
   external_id?: number;
   specs: EmbeddedSpec[];
@@ -188,8 +186,7 @@ export interface UpdateProductRequest {
   tax_rate?: number;
   receipt_name?: string;
   kitchen_print_name?: string;
-  kitchen_printer_id?: number;
-  is_kitchen_print_enabled?: number;
+  print_destinations?: string[];
   is_label_print_enabled?: number;
   external_id?: number;
   specs?: EmbeddedSpec[];
@@ -207,18 +204,14 @@ export interface CategoryListData {
 export interface CreateCategoryRequest {
   name: string;
   sort_order?: number;
-  kitchen_printer_id?: number;
-  kitchen_printer?: string;
-  is_kitchen_print_enabled?: boolean;
+  print_destinations?: string[];
   is_label_print_enabled?: boolean;
 }
 
 export interface UpdateCategoryRequest {
   name?: string;
   sort_order?: number;
-  kitchen_printer_id?: number;
-  kitchen_printer?: string;
-  is_kitchen_print_enabled?: boolean;
+  print_destinations?: string[];
   is_label_print_enabled?: boolean;
 }
 
@@ -305,24 +298,32 @@ export interface AttributeTemplateListData {
 
 export interface CreateAttributeTemplateRequest {
   name: string;
-  type_: string;
+  scope?: 'global' | 'inherited';
+  excluded_categories?: string[];
+  is_multi_select?: boolean;
+  max_selections?: number;
+  default_option_idx?: number;
   display_order?: number;
   is_active?: boolean;
   show_on_receipt?: boolean;
   receipt_name?: string;
-  kitchen_printer_id?: number;
-  is_global?: boolean;
+  show_on_kitchen_print?: boolean;
+  kitchen_print_name?: string;
 }
 
 export interface UpdateAttributeTemplateRequest {
   name?: string;
-  type_?: string;
+  scope?: 'global' | 'inherited';
+  excluded_categories?: string[];
+  is_multi_select?: boolean;
+  max_selections?: number;
+  default_option_idx?: number;
   display_order?: number;
   is_active?: boolean;
   show_on_receipt?: boolean;
   receipt_name?: string;
-  kitchen_printer_id?: number;
-  is_global?: boolean;
+  show_on_kitchen_print?: boolean;
+  kitchen_print_name?: string;
 }
 
 // Attribute Option types
@@ -336,22 +337,20 @@ export interface AttributeOptionListData {
 export interface CreateAttributeOptionRequest {
   attribute_id: number;
   name: string;
-  value_code: string;
   price_modifier?: number;
-  is_default?: boolean;
   display_order?: number;
   is_active?: boolean;
   receipt_name?: string;
+  kitchen_print_name?: string;
 }
 
 export interface UpdateAttributeOptionRequest {
   name?: string;
-  value_code?: string;
   price_modifier?: number;
-  is_default?: boolean;
   display_order?: number;
   is_active?: boolean;
   receipt_name?: string;
+  kitchen_print_name?: string;
 }
 
 // Tag types
@@ -398,24 +397,40 @@ export interface CreateRolePermissionsRequest {
   permissions: string[];
 }
 
-// Printer types
-export interface PrinterData extends KitchenPrinter {}
+// Print Destination types
+export interface PrintDestinationData extends PrintDestination {}
 
-export interface PrinterListData {
-  printers: KitchenPrinter[];
+export interface PrintDestinationListData {
+  destinations: PrintDestination[];
   total: number;
 }
 
-export interface CreatePrinterRequest {
+export interface CreatePrintDestinationRequest {
   name: string;
-  printer_name: string;
   description?: string;
+  printers?: Array<{
+    printer_type: 'network' | 'driver';
+    ip?: string;
+    port?: number;
+    driver_name?: string;
+    priority: number;
+    is_active: boolean;
+  }>;
+  is_active?: boolean;
 }
 
-export interface UpdatePrinterRequest {
-  name: string;
-  printer_name?: string;
+export interface UpdatePrintDestinationRequest {
+  name?: string;
   description?: string;
+  printers?: Array<{
+    printer_type: 'network' | 'driver';
+    ip?: string;
+    port?: number;
+    driver_name?: string;
+    priority: number;
+    is_active: boolean;
+  }>;
+  is_active?: boolean;
 }
 
 // Zone types
@@ -499,13 +514,11 @@ export interface CreateProductAttributeRequest {
   attribute_id: string;
   is_required?: boolean;
   display_order?: number;
-  default_option_idx?: number;
 }
 
 export interface UpdateProductAttributeRequest {
   is_required?: boolean;
   display_order?: number;
-  default_option_idx?: number;
 }
 
 // Health types

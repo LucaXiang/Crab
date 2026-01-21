@@ -262,29 +262,9 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
     try {
       const orderAfterAdd = get().getOrder(orderKey);
       const isRetail = orderKey.startsWith('RETAIL-') || orderAfterAdd?.isRetail === true;
+      // Kitchen print is now handled server-side via order events
       if (orderAfterAdd && !isRetail) {
-        // Kitchen Print
-        import('@/infrastructure/print/printService').then(async ({ printKitchenTicketLegacy }) => {
-          try {
-            await printKitchenTicketLegacy(orderAfterAdd, true, false, 'dining', items);
-          } catch (e) {
-            try {
-              await reportError(
-                'Auto kitchen print failed',
-                e as any,
-                'useOrderEventStore:addItems',
-                {
-                  extras: {
-                    receipt_number: orderAfterAdd.receiptNumber ?? null,
-                    order_key: orderKey,
-                  },
-                }
-              );
-            } catch {}
-          }
-        });
-
-        // Label Print
+        // Label Print (client-side for now)
         import('@/infrastructure/label/LabelPrintService').then(async ({ LabelPrintService }) => {
           const { isLabelPrintEnabled } = useUIStore.getState();
           if (isLabelPrintEnabled) {

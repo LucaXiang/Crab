@@ -44,22 +44,24 @@ interface AttributeStore {
   // CRUD operations
   createAttribute: (params: {
     name: string;
-    attr_type: string;
+    scope?: 'global' | 'inherited';
     display_order?: number;
     is_active?: boolean;
     show_on_receipt?: boolean;
     receipt_name?: string;
-    kitchen_printer?: string;
+    show_on_kitchen_print?: boolean;
+    kitchen_print_name?: string;
   }) => Promise<void>;
   updateAttribute: (params: {
     id: string;
     name?: string;
-    attr_type?: string;
+    scope?: 'global' | 'inherited';
     display_order?: number;
     is_active?: boolean;
     show_on_receipt?: boolean;
     receipt_name?: string;
-    kitchen_printer?: string;
+    show_on_kitchen_print?: boolean;
+    kitchen_print_name?: string;
   }) => Promise<void>;
   deleteAttribute: (id: string) => Promise<void>;
   createOption: (params: {
@@ -90,7 +92,6 @@ interface AttributeStore {
     attributeId: string;
     is_required?: boolean;
     display_order?: number;
-    default_option_idx?: number;
   }) => Promise<void>;
   unbindProductAttribute: (bindingId: string) => Promise<void>;
 }
@@ -318,12 +319,12 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   },
   bindProductAttribute: async (params) => {
     try {
+      // Note: default_option_idx is now on the Attribute itself, not on the binding
       await api.bindProductAttribute({
         product_id: params.productId,
         attribute_id: params.attributeId,
         is_required: params.is_required,
         display_order: params.display_order,
-        default_option_idx: params.default_option_idx,
       });
     } catch (e: any) {
       console.error('[Store] bindProductAttribute failed:', e.message);

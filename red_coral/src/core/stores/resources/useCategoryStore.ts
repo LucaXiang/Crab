@@ -80,3 +80,38 @@ export const useCategoryActions = () => ({
   remove: useCategoryStore.getState().remove,
   fetchAll: useCategoryStore.getState().fetchAll,
 });
+
+// Virtual/Regular category selectors
+// Virtual categories: is_virtual=true, is_active=true, sorted by sort_order
+export const useVirtualCategories = () =>
+  useCategoryStore((state) =>
+    state.items
+      .filter((c) => c.is_virtual && c.is_active)
+      .sort((a, b) => a.sort_order - b.sort_order)
+  );
+
+// Regular categories: is_virtual=false, sorted by sort_order
+export const useRegularCategories = () =>
+  useCategoryStore((state) =>
+    state.items
+      .filter((c) => !c.is_virtual)
+      .sort((a, b) => a.sort_order - b.sort_order)
+  );
+
+// Get category by name (useful for POS filtering)
+export const useCategoryByName = (name: string) =>
+  useCategoryStore((state) => state.items.find((c) => c.name === name));
+
+// Static getters for non-hook usage
+export const getVirtualCategories = () =>
+  useCategoryStore.getState().items
+    .filter((c) => c.is_virtual && c.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+export const getRegularCategories = () =>
+  useCategoryStore.getState().items
+    .filter((c) => !c.is_virtual)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+export const getCategoryByName = (name: string) =>
+  useCategoryStore.getState().items.find((c) => c.name === name);

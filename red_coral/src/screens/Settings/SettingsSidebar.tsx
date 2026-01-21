@@ -7,6 +7,7 @@ import {
   LayoutGrid,
   Utensils,
   Tag,
+  Tags,
   Sliders,
   Database,
   Store,
@@ -22,7 +23,7 @@ import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
 import { usePermission } from '@/hooks/usePermission';
 
-type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'ATTRIBUTES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS';
+type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS';
 
 interface SettingsSidebarProps {
   onBack: () => void;
@@ -175,6 +176,13 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
                       category="CATEGORIES"
                       icon={Tag}
                       label={t('settings.category.title')}
+                    />
+                  </ProtectedGate>
+                  <ProtectedGate permission={Permission.MANAGE_CATEGORIES}>
+                    <CategoryItem
+                      category="TAGS"
+                      icon={Tags}
+                      label={t('settings.tag.title')}
                     />
                   </ProtectedGate>
                   <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>

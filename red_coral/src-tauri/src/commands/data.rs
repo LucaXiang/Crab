@@ -10,8 +10,8 @@ use tokio::sync::RwLock;
 use crate::core::response::ErrorCode;
 use crate::core::{
     ApiResponse, AttributeData, AttributeListData, CategoryData, CategoryListData, ClientBridge,
-    DeleteData, PrinterData, PrinterListData, ProductData, ProductFullData, ProductListData,
-    TagListData,
+    DeleteData, PrintDestinationData, PrintDestinationListData, ProductData, ProductFullData,
+    ProductListData, TagListData,
 };
 use shared::models::{
     // Attributes
@@ -24,10 +24,10 @@ use shared::models::{
     CategoryCreate,
     CategoryUpdate,
     HasAttribute,
-    // Kitchen Printers
-    KitchenPrinter,
-    KitchenPrinterCreate,
-    KitchenPrinterUpdate,
+    // Print Destinations
+    PrintDestination,
+    PrintDestinationCreate,
+    PrintDestinationUpdate,
     // Products
     Product,
     ProductCreate,
@@ -391,83 +391,6 @@ pub async fn delete_attribute_option(
     }
 }
 
-// ============ Kitchen Printers ============
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn list_kitchen_printers(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-) -> Result<ApiResponse<PrinterListData>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .get::<Vec<KitchenPrinter>>("/api/kitchen-printers")
-        .await
-    {
-        Ok(printers) => Ok(ApiResponse::success(PrinterListData { printers })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
-    }
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn get_kitchen_printer(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    id: String,
-) -> Result<ApiResponse<PrinterData>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .get::<KitchenPrinter>(&format!("/api/kitchen-printers/{}", encode(&id)))
-        .await
-    {
-        Ok(p) => Ok(ApiResponse::success(PrinterData { printer: p })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::PrinterNotAvailable, e.to_string())),
-    }
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn create_kitchen_printer(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    data: KitchenPrinterCreate,
-) -> Result<ApiResponse<PrinterData>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .post::<KitchenPrinter, _>("/api/kitchen-printers", &data)
-        .await
-    {
-        Ok(p) => Ok(ApiResponse::success(PrinterData { printer: p })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
-    }
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn update_kitchen_printer(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    id: String,
-    data: KitchenPrinterUpdate,
-) -> Result<ApiResponse<PrinterData>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .put::<KitchenPrinter, _>(&format!("/api/kitchen-printers/{}", encode(&id)), &data)
-        .await
-    {
-        Ok(p) => Ok(ApiResponse::success(PrinterData { printer: p })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
-    }
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn delete_kitchen_printer(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    id: String,
-) -> Result<ApiResponse<DeleteData>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .delete::<bool>(&format!("/api/kitchen-printers/{}", encode(&id)))
-        .await
-    {
-        Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
-    }
-}
-
 // ============ Product Attributes (Bindings) ============
 
 #[tauri::command(rename_all = "snake_case")]
@@ -629,6 +552,77 @@ pub async fn batch_update_category_sort_order(
         .await
     {
         Ok(result) => Ok(ApiResponse::success(result)),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+    }
+}
+
+// ============ Print Destinations ============
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn list_print_destinations(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+) -> Result<ApiResponse<PrintDestinationListData>, String> {
+    let bridge = bridge.read().await;
+    match bridge.get::<Vec<PrintDestination>>("/api/print-destinations").await {
+        Ok(print_destinations) => Ok(ApiResponse::success(PrintDestinationListData { print_destinations })),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_print_destination(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    id: String,
+) -> Result<ApiResponse<PrintDestinationData>, String> {
+    let bridge = bridge.read().await;
+    match bridge
+        .get::<PrintDestination>(&format!("/api/print-destinations/{}", encode(&id)))
+        .await
+    {
+        Ok(print_destination) => Ok(ApiResponse::success(PrintDestinationData { print_destination })),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::NotFound, e.to_string())),
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn create_print_destination(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    data: PrintDestinationCreate,
+) -> Result<ApiResponse<PrintDestinationData>, String> {
+    let bridge = bridge.read().await;
+    match bridge.post::<PrintDestination, _>("/api/print-destinations", &data).await {
+        Ok(print_destination) => Ok(ApiResponse::success(PrintDestinationData { print_destination })),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn update_print_destination(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    id: String,
+    data: PrintDestinationUpdate,
+) -> Result<ApiResponse<PrintDestinationData>, String> {
+    let bridge = bridge.read().await;
+    match bridge
+        .put::<PrintDestination, _>(&format!("/api/print-destinations/{}", encode(&id)), &data)
+        .await
+    {
+        Ok(print_destination) => Ok(ApiResponse::success(PrintDestinationData { print_destination })),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn delete_print_destination(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    id: String,
+) -> Result<ApiResponse<DeleteData>, String> {
+    let bridge = bridge.read().await;
+    match bridge
+        .delete::<bool>(&format!("/api/print-destinations/{}", encode(&id)))
+        .await
+    {
+        Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
         Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
     }
 }

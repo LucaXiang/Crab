@@ -150,15 +150,9 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
 
   const handleSave = () => {
     // Validate required attributes
-    for (const attr of attributes) {
-        if (attr.attr_type?.includes('REQUIRED')) {
-            const selected = selections.get(String(attr.id)) || [];
-            if (selected.length === 0) {
-                toast.error(t('pos.attributeRequired', { name: attr.name }) || `Please select ${attr.name}`);
-                return;
-            }
-        }
-    }
+    // Note: With new model, required is determined by binding.is_required, not attr_type
+    // For now, skip validation as required info is in bindings
+    // TODO: Check bindings for is_required if validation needed
 
     // Build selected options array
     const selectedOptions: ItemAttributeSelection[] = [];

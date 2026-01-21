@@ -11,6 +11,9 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   ApiResponse,
   LoginResponseData,
+  Tag,
+  TagCreate,
+  TagUpdate,
   TagListData,
   CategoryListData,
   Category,
@@ -25,8 +28,10 @@ import type {
   ZoneListData,
   Table,
   TableListData,
-  KitchenPrinter,
-  PrinterListData,
+  PrintDestination,
+  PrintDestinationCreate,
+  PrintDestinationUpdate,
+  PrintDestinationListData,
   Attribute,
   AttributeCreate,
   AttributeUpdate,
@@ -124,6 +129,22 @@ export class TauriApiClient {
 
   async listTags(): Promise<ApiResponse<TagListData>> {
     return invokeCommand<ApiResponse<TagListData>>('list_tags');
+  }
+
+  async getTag(id: string): Promise<ApiResponse<{ tag: Tag }>> {
+    return invokeCommand<ApiResponse<{ tag: Tag }>>('get_tag', { id });
+  }
+
+  async createTag(data: TagCreate): Promise<ApiResponse<{ tag: Tag }>> {
+    return invokeCommand<ApiResponse<{ tag: Tag }>>('create_tag', { data });
+  }
+
+  async updateTag(id: string, data: TagUpdate): Promise<ApiResponse<{ tag: Tag }>> {
+    return invokeCommand<ApiResponse<{ tag: Tag }>>('update_tag', { id, data });
+  }
+
+  async deleteTag(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
+    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_tag', { id });
   }
 
   // ============ Categories ============
@@ -278,22 +299,22 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_table', { id: String(id) });
   }
 
-  // ============ Kitchen Printers ============
+  // ============ Print Destinations ============
 
-  async listPrinters(): Promise<ApiResponse<PrinterListData>> {
-    return invokeCommand<ApiResponse<PrinterListData>>('list_kitchen_printers');
+  async listPrintDestinations(): Promise<ApiResponse<PrintDestinationListData>> {
+    return invokeCommand<ApiResponse<PrintDestinationListData>>('list_print_destinations');
   }
 
-  async createPrinter(data: { name: string; printer_name?: string; description?: string }): Promise<ApiResponse<{ printer: KitchenPrinter }>> {
-    return invokeCommand<ApiResponse<{ printer: KitchenPrinter }>>('create_kitchen_printer', { data });
+  async createPrintDestination(data: PrintDestinationCreate): Promise<ApiResponse<{ destination: PrintDestination }>> {
+    return invokeCommand<ApiResponse<{ destination: PrintDestination }>>('create_print_destination', { data });
   }
 
-  async updatePrinter(id: string, data: { name?: string; printer_name?: string; description?: string; is_active?: boolean }): Promise<ApiResponse<{ printer: KitchenPrinter }>> {
-    return invokeCommand<ApiResponse<{ printer: KitchenPrinter }>>('update_kitchen_printer', { id, data });
+  async updatePrintDestination(id: string, data: PrintDestinationUpdate): Promise<ApiResponse<{ destination: PrintDestination }>> {
+    return invokeCommand<ApiResponse<{ destination: PrintDestination }>>('update_print_destination', { id, data });
   }
 
-  async deletePrinter(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_kitchen_printer', { id });
+  async deletePrintDestination(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
+    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_print_destination', { id });
   }
 
   // ============ Employees ============

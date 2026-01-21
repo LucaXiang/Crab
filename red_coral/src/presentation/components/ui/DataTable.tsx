@@ -23,7 +23,7 @@ interface DataTableProps<T> {
   getRowKey: (item: T) => string;
   pageSize?: number;
   selectable?: boolean;
-  themeColor?: 'blue' | 'orange' | 'purple' | 'teal';
+  themeColor?: 'blue' | 'orange' | 'purple' | 'teal' | 'indigo';
   // Server-side pagination props
   totalItems?: number;
   currentPage?: number;
@@ -82,6 +82,19 @@ const THEMES = {
     selectBtn: 'text-teal-600 bg-teal-50 hover:bg-teal-100 border-teal-100',
     selectModeHeader: 'bg-teal-50 border-teal-100',
     selectModeText: 'text-teal-700',
+  },
+  indigo: {
+    headerBg: 'bg-indigo-50',
+    headerBorder: 'border-indigo-100',
+    headerText: 'text-indigo-700',
+    rowHover: 'hover:bg-indigo-50/50',
+    rowSelected: 'bg-indigo-50/70',
+    checkboxActive: 'bg-indigo-600 border-indigo-600',
+    checkboxHover: 'hover:border-indigo-500',
+    paginationActive: 'bg-indigo-600 text-white',
+    selectBtn: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-indigo-100',
+    selectModeHeader: 'bg-indigo-50 border-indigo-100',
+    selectModeText: 'text-indigo-700',
   },
 };
 
@@ -327,6 +340,7 @@ export function DataTable<T>({
             themeColor === 'orange' ? 'border-t-orange-500' :
             themeColor === 'purple' ? 'border-t-purple-600' :
             themeColor === 'teal' ? 'border-t-teal-600' :
+            themeColor === 'indigo' ? 'border-t-indigo-600' :
             'border-t-blue-600'
           }`} />
         </div>

@@ -23,6 +23,7 @@ import {
   ZoneForm,
   ProductForm,
   CategoryForm,
+  TagForm,
   DeleteConfirmation
 } from './forms';
 
@@ -90,12 +91,13 @@ export const EntityFormModal: React.FC = React.memo(() => {
           const inherited: string[] = [];
           setInheritedAttributeIds(inherited);
 
-          // Load default options from attribute bindings
+          // Load default options from attributes (default_option_idx is on the attribute itself)
           const defaultOptions: Record<string, string[]> = {};
           productFull.attributes.forEach((binding) => {
             const attrId = binding.attribute.id;
-            if (attrId && binding.default_option_idx !== null && binding.default_option_idx !== undefined) {
-              defaultOptions[attrId] = [String(binding.default_option_idx)];
+            const defaultIdx = binding.attribute.default_option_idx;
+            if (attrId && defaultIdx !== null && defaultIdx !== undefined) {
+              defaultOptions[attrId] = [String(defaultIdx)];
             }
           });
 
@@ -168,19 +170,22 @@ export const EntityFormModal: React.FC = React.memo(() => {
         TABLE: t('settings.table.addTable'),
         ZONE: t('settings.zone.addZone'),
         PRODUCT: t('settings.product.addProduct'),
-        CATEGORY: t('settings.category.addCategory')
+        CATEGORY: t('settings.category.addCategory'),
+        TAG: t('settings.tag.addTag')
       },
       EDIT: {
         TABLE: t('settings.table.editTable'),
         ZONE: t('settings.zone.editZone'),
         PRODUCT: t('settings.product.editProduct'),
-        CATEGORY: t('settings.category.editCategory')
+        CATEGORY: t('settings.category.editCategory'),
+        TAG: t('settings.tag.editTag')
       },
       DELETE: {
         TABLE: t('settings.table.deleteTable'),
         ZONE: t('settings.zone.deleteZone'),
         PRODUCT: t('settings.product.deleteProduct'),
-        CATEGORY: t('settings.category.deleteCategory')
+        CATEGORY: t('settings.category.deleteCategory'),
+        TAG: t('settings.tag.deleteTag')
       }
     };
     return titles[action]?.[entity] || '';
@@ -191,7 +196,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
       TABLE: 'blue',
       ZONE: 'purple',
       PRODUCT: 'orange',
-      CATEGORY: 'teal'
+      CATEGORY: 'teal',
+      TAG: 'indigo'
     };
     return colors[entity] || 'blue';
   };
@@ -246,6 +252,16 @@ export const EntityFormModal: React.FC = React.memo(() => {
           useProductStore.getState().fetchAll();
           useCategoryStore.getState().fetchAll();
           toast.success(t('settings.category.categoryDeleted'));
+        } catch (e: any) {
+          toast.error(getErrorMessage(e));
+          return;
+        }
+      } else if (entity === 'TAG') {
+        try {
+          await api.deleteTag(String(data.id));
+          // Trigger refresh
+          refreshData();
+          toast.success(t('settings.tag.tagDeleted'));
         } catch (e: any) {
           toast.error(getErrorMessage(e));
           return;
@@ -344,8 +360,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             sort_order: productData.sortOrder || 0,
             receipt_name: productData.receiptName,
             kitchen_print_name: productData.kitchenPrintName,
-            kitchen_printer: productData.kitchenPrinterId ? String(productData.kitchenPrinterId) : undefined,
-            is_kitchen_print_enabled: productData.isKitchenPrintEnabled,
+            print_destinations: productData.kitchenPrinterId ? [String(productData.kitchenPrinterId)] : [],
             is_label_print_enabled: productData.isLabelPrintEnabled,
             // Price is embedded in specs
             specs: [{
@@ -375,8 +390,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             sort_order: productData.sortOrder || 0,
             receipt_name: productData.receiptName,
             kitchen_print_name: productData.kitchenPrintName,
-            kitchen_printer: productData.kitchenPrinterId ? String(productData.kitchenPrinterId) : undefined,
-            is_kitchen_print_enabled: productData.isKitchenPrintEnabled,
+            print_destinations: productData.kitchenPrinterId ? [String(productData.kitchenPrinterId)] : [],
             is_label_print_enabled: productData.isLabelPrintEnabled,
             // Update specs with price and external_id
             specs: [{
@@ -400,8 +414,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             sort_order: productData.sortOrder ?? p.sort_order,
             receipt_name: productData.receiptName ?? null,
             kitchen_print_name: productData.kitchenPrintName ?? null,
-            kitchen_printer: productData.kitchenPrinterId ? String(productData.kitchenPrinterId) : null,
-            is_kitchen_print_enabled: productData.isKitchenPrintEnabled ?? p.is_kitchen_print_enabled,
+            print_destinations: productData.kitchenPrinterId ? [String(productData.kitchenPrinterId)] : p.print_destinations,
             is_label_print_enabled: productData.isLabelPrintEnabled ?? p.is_label_print_enabled,
             // Update embedded specs
             specs: [{
@@ -441,13 +454,13 @@ export const EntityFormModal: React.FC = React.memo(() => {
           formData.attributeDefaultOptions || {},
           existingBindings,
           async (attrId) => api.unbindProductAttribute(String(attrId)),
-          async (attrId, defaultOptionIds, index) => {
+          async (attrId, _defaultOptionIds, index) => {
+            // Note: default_option_idx is now stored on the Attribute itself, not on the binding
             await api.bindProductAttribute({
               product_id: productId,
               attribute_id: attrId,
               is_required: false,
               display_order: index,
-              default_option_idx: defaultOptionIds?.[0] !== undefined ? Number(defaultOptionIds[0]) : undefined
             });
           }
         );
@@ -477,19 +490,24 @@ export const EntityFormModal: React.FC = React.memo(() => {
         }
       } else if (entity === 'CATEGORY') {
         const categoryName = formData.name.trim();
-        // Backend expects boolean for Categories (true=Enabled, false=Disabled)
-        // Default to Enabled (true) if undefined/null
-        const isKitchenPrintEnabled = (formData.isKitchenPrintEnabled as unknown) !== false;
+        // Backend expects print_destinations array and is_label_print_enabled boolean
         const isLabelPrintEnabled = (formData.isLabelPrintEnabled as unknown) !== false;
+        const printDestinations = formData.kitchenPrinterId ? [String(formData.kitchenPrinterId)] : [];
+        // Virtual category fields (snake_case for API)
+        const isVirtual = formData.isVirtual ?? false;
+        const tagIds = formData.tagIds || [];
+        const matchMode = formData.matchMode || 'any';
 
         let categoryId: string;
         if (action === 'CREATE') {
           const resp = await api.createCategory({
             name: categoryName,
             sort_order: formData.sortOrder ?? 0,
-            kitchen_printer: formData.kitchenPrinterId ? String(formData.kitchenPrinterId) : undefined,
-            is_kitchen_print_enabled: isKitchenPrintEnabled,
-            is_label_print_enabled: isLabelPrintEnabled
+            print_destinations: printDestinations,
+            is_label_print_enabled: isLabelPrintEnabled,
+            is_virtual: isVirtual,
+            tag_ids: tagIds,
+            match_mode: matchMode,
           });
           categoryId = resp.data?.category?.id || '';
           // Trigger refresh of products store
@@ -501,9 +519,11 @@ export const EntityFormModal: React.FC = React.memo(() => {
           await api.updateCategory(categoryId, {
             name: categoryName,
             sort_order: formData.sortOrder ?? 0,
-            kitchen_printer: formData.kitchenPrinterId ? String(formData.kitchenPrinterId) : undefined,
-            is_kitchen_print_enabled: isKitchenPrintEnabled,
-            is_label_print_enabled: isLabelPrintEnabled
+            print_destinations: printDestinations,
+            is_label_print_enabled: isLabelPrintEnabled,
+            is_virtual: isVirtual,
+            tag_ids: tagIds,
+            match_mode: matchMode,
           });
           // Trigger refresh of products store
           useProductStore.getState().fetchAll();
@@ -546,6 +566,28 @@ export const EntityFormModal: React.FC = React.memo(() => {
             });
           }
         );
+      } else if (entity === 'TAG') {
+        const tagName = formData.name.trim();
+        const tagColor = formData.color || '#3B82F6';
+        const displayOrder = formData.displayOrder ?? 0;
+
+        if (action === 'CREATE') {
+          await api.createTag({
+            name: tagName,
+            color: tagColor,
+            display_order: displayOrder
+          });
+          refreshData();
+          toast.success(t('settings.tag.message.created'));
+        } else {
+          await api.updateTag(String(data.id), {
+            name: tagName,
+            color: tagColor,
+            display_order: displayOrder
+          });
+          refreshData();
+          toast.success(t('settings.tag.message.updated'));
+        }
       }
       // Refresh strategy:
       // - CREATE operations: no refresh needed (optimistic update)
@@ -633,6 +675,19 @@ export const EntityFormModal: React.FC = React.memo(() => {
               isKitchenPrintEnabled: formData.isKitchenPrintEnabled !== 0 && (formData.isKitchenPrintEnabled as unknown) !== false,
               isLabelPrintEnabled: formData.isLabelPrintEnabled !== 0 && (formData.isLabelPrintEnabled as unknown) !== false,
               kitchenPrinterId: formData.kitchenPrinterId ?? undefined,
+            }}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onFieldChange={setFormField as (field: string, value: any) => void}
+            t={t}
+          />
+        );
+      case 'TAG':
+        return (
+          <TagForm
+            formData={{
+              name: formData.name,
+              color: formData.color || '#3B82F6',
+              displayOrder: formData.displayOrder ?? 0,
             }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onFieldChange={setFormField as (field: string, value: any) => void}

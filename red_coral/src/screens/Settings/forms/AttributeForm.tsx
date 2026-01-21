@@ -7,18 +7,18 @@ import { FormField, inputClass } from './FormField';
 import { useFormInitialization } from '../../../hooks/useFormInitialization';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { SelectField } from '@/presentation/components/form/FormField/SelectField';
-import { KitchenPrinterSelector } from '@/presentation/components/form/FormField/KitchenPrinterSelector';
 
 // Form state uses camelCase internally, converted to snake_case on submit
 interface AttributeFormData {
   name: string;
   receiptName: string;
-  type: 'SINGLE_REQUIRED' | 'SINGLE_OPTIONAL' | 'MULTI_REQUIRED' | 'MULTI_OPTIONAL';
+  isMultiSelect: boolean;
   displayOrder: number;
   isActive: boolean;
   showOnReceipt: boolean;
-  kitchenPrinterId: string | null;
-  isGlobal: boolean;
+  showOnKitchenPrint: boolean;
+  kitchenPrintName: string;
+  scope: 'global' | 'inherited';
 }
 
 // Map Attribute (snake_case) to form data (camelCase)
@@ -27,23 +27,25 @@ const mapToFormData = (attr: Attribute | null): AttributeFormData => {
     return {
       name: '',
       receiptName: '',
-      type: 'SINGLE_REQUIRED',
+      isMultiSelect: false,
       displayOrder: 0,
       isActive: true,
       showOnReceipt: false,
-      kitchenPrinterId: null,
-      isGlobal: false,
+      showOnKitchenPrint: false,
+      kitchenPrintName: '',
+      scope: 'inherited',
     };
   }
   return {
     name: attr.name,
     receiptName: attr.receipt_name || '',
-    type: (attr.attr_type || 'SINGLE_REQUIRED') as AttributeFormData['type'],
+    isMultiSelect: attr.is_multi_select,
     displayOrder: attr.display_order,
     isActive: attr.is_active,
     showOnReceipt: attr.show_on_receipt,
-    kitchenPrinterId: attr.kitchen_printer,
-    isGlobal: attr.is_global,
+    showOnKitchenPrint: attr.show_on_kitchen_print,
+    kitchenPrintName: attr.kitchen_print_name || '',
+    scope: attr.scope,
   };
 };
 
@@ -82,23 +84,25 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
       onCreate: async (data) => {
         await createAttribute({
           name: data.name.trim(),
-          attr_type: data.type,
+          scope: data.scope,
           display_order: data.displayOrder,
           show_on_receipt: data.showOnReceipt,
           receipt_name: data.receiptName?.trim() || undefined,
-          kitchen_printer: data.kitchenPrinterId || undefined,
+          show_on_kitchen_print: data.showOnKitchenPrint,
+          kitchen_print_name: data.kitchenPrintName?.trim() || undefined,
         });
       },
       onUpdate: async (data) => {
         await updateAttribute({
           id: String(editingAttribute!.id),
           name: data.name.trim(),
-          attr_type: data.type,
+          scope: data.scope,
           display_order: data.displayOrder,
           is_active: data.isActive,
           show_on_receipt: data.showOnReceipt,
           receipt_name: data.receiptName?.trim() || undefined,
-          kitchen_printer: data.kitchenPrinterId || undefined,
+          show_on_kitchen_print: data.showOnKitchenPrint,
+          kitchen_print_name: data.kitchenPrintName?.trim() || undefined,
         });
       },
       onSuccess: onClose,
@@ -111,11 +115,9 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
 
   if (!isOpen) return null;
 
-  const ATTRIBUTE_TYPES = [
-    { value: 'SINGLE_REQUIRED', label: t('settings.attribute.type.singleRequired') },
-    { value: 'SINGLE_OPTIONAL', label: t('settings.attribute.type.singleOptional') },
-    { value: 'MULTI_REQUIRED', label: t('settings.attribute.type.multiRequired') },
-    { value: 'MULTI_OPTIONAL', label: t('settings.attribute.type.multiOptional') },
+  const SCOPE_OPTIONS = [
+    { value: 'inherited', label: t('settings.attribute.scope.inherited') },
+    { value: 'global', label: t('settings.attribute.scope.global') },
   ];
 
   return (
@@ -158,20 +160,27 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
               />
             </FormField>
 
+            <SelectField
+              label={t('settings.attribute.form.scope')}
+              value={formData.scope}
+              onChange={(value) => handleFieldChange('scope', value)}
+              options={SCOPE_OPTIONS}
+            />
+
             <div className="flex items-start space-x-3 py-2">
                 <div className="flex items-center h-5">
                     <input
                         type="checkbox"
-                        id="isGlobal"
-                        checked={formData.isGlobal}
-                        onChange={(e) => handleFieldChange('isGlobal', e.target.checked)}
+                        id="isMultiSelect"
+                        checked={formData.isMultiSelect}
+                        onChange={(e) => handleFieldChange('isMultiSelect', e.target.checked)}
                         className="w-4 h-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
                     />
                 </div>
-                <label htmlFor="isGlobal" className="text-gray-700 cursor-pointer select-none">
-                    <span className="font-medium block">{t('settings.attribute.form.isGlobal')}</span>
+                <label htmlFor="isMultiSelect" className="text-gray-700 cursor-pointer select-none">
+                    <span className="font-medium block">{t('settings.attribute.form.isMultiSelect')}</span>
                     <span className="text-sm text-gray-500 block">
-                        {t('settings.attribute.form.isGlobalDesc')}
+                        {t('settings.attribute.form.isMultiSelectDesc')}
                     </span>
                 </label>
             </div>
@@ -185,14 +194,6 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
               />
             </FormField>
 
-            <SelectField
-              label={t('settings.attribute.form.type')}
-              value={formData.type}
-              onChange={(value) => handleFieldChange('type', value)}
-              options={ATTRIBUTE_TYPES}
-              required
-            />
-
             <FormField label={t('settings.attribute.form.sort')}>
               <input
                 type="number"
@@ -203,12 +204,30 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
               />
             </FormField>
 
-            <KitchenPrinterSelector
-              label={t('settings.attribute.form.kitchenPrinter')}
-              value={formData.kitchenPrinterId}
-              onChange={(value) => handleFieldChange('kitchenPrinterId', value)}
-              t={t}
-            />
+            <FormField label={t('settings.attribute.form.showOnKitchenPrint')}>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.showOnKitchenPrint}
+                  onChange={(e) => handleFieldChange('showOnKitchenPrint', e.target.checked)}
+                  className="w-4 h-4 text-teal-600 bg-gray-100 border-gray-300 rounded focus:ring-teal-500"
+                />
+                <span className="text-sm text-gray-700">
+                  {t('settings.attribute.form.showOnKitchenPrintHint')}
+                </span>
+              </label>
+            </FormField>
+
+            {formData.showOnKitchenPrint && (
+              <FormField label={t('settings.attribute.form.kitchenPrintName')}>
+                <input
+                  value={formData.kitchenPrintName}
+                  onChange={(e) => handleFieldChange('kitchenPrintName', e.target.value)}
+                  placeholder={t('settings.attribute.form.kitchenPrintNamePlaceholder')}
+                  className={inputClass}
+                />
+              </FormField>
+            )}
 
             <FormField label={t('settings.attribute.form.showOnReceipt')}>
               <label className="flex items-center gap-2 cursor-pointer">

@@ -97,6 +97,52 @@ export const POSScreen: React.FC = () => {
   const selectedCategory = useSelectedCategory();
   const { setSelectedCategory } = usePOSUIActions();
 
+  // Filter products based on selected category
+  const filteredProducts = useMemo(() => {
+    // "all" category: show all active products sorted by external_id
+    if (selectedCategory === 'all') {
+      return [...products]
+        .filter((p) => p.is_active)
+        .sort((a, b) => {
+          const aId = a.specs[0]?.external_id ?? Number.MAX_SAFE_INTEGER;
+          const bId = b.specs[0]?.external_id ?? Number.MAX_SAFE_INTEGER;
+          return aId - bId;
+        });
+    }
+
+    // Find the selected category
+    const category = categories.find((c) => c.name === selectedCategory);
+    if (!category) {
+      return [];
+    }
+
+    // Virtual category: filter by tags based on match_mode
+    if (category.is_virtual) {
+      const tagIds = category.tag_ids || [];
+      if (tagIds.length === 0) {
+        return [];
+      }
+
+      return products.filter((p) => {
+        if (!p.is_active) return false;
+        const productTags = p.tags || [];
+
+        if (category.match_mode === 'all') {
+          // Product must have ALL tags
+          return tagIds.every((tagId) => productTags.includes(tagId));
+        } else {
+          // Product must have ANY tag (default: 'any')
+          return tagIds.some((tagId) => productTags.includes(tagId));
+        }
+      });
+    }
+
+    // Regular category: filter by category id
+    return products.filter(
+      (p) => p.is_active && p.category === category.id
+    );
+  }, [products, categories, selectedCategory]);
+
   // Only load data on first mount (new architecture auto-handles sync)
   useEffect(() => {
     const initializeData = async () => {
@@ -527,7 +573,7 @@ export const POSScreen: React.FC = () => {
 
           {/* Product Grid */}
           <ProductGrid
-            products={products}
+            products={filteredProducts}
             isLoading={isProductLoading}
             onAdd={addToCart}
             onLongPress={handleLongPressProduct}

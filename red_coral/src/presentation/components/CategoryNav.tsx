@@ -1,12 +1,12 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useI18n } from '@/hooks/useI18n';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronUp, ChevronDown, Tag } from 'lucide-react';
 import { Category } from '@/core/domain/types';
 
 interface CategoryNavProps {
   selected: string;
   onSelect: (category: string) => void;
-  categories: (string | Category)[];
+  categories: Category[];
 }
 
 export const CategoryNav = React.memo<CategoryNavProps>(
@@ -17,6 +17,21 @@ export const CategoryNav = React.memo<CategoryNavProps>(
     const [canScrollDown, setCanScrollDown] = useState(false);
 
     const SCROLL_ROW_HEIGHT = 58;
+
+    // Organize categories: [all] | [virtual categories] | [regular categories]
+    const organizedCategories = useMemo(() => {
+      // Filter and sort virtual categories (is_virtual=true, is_active=true)
+      const virtualCats = categories
+        .filter((c) => c.is_virtual && c.is_active)
+        .sort((a, b) => a.sort_order - b.sort_order);
+
+      // Filter and sort regular categories (is_virtual=false)
+      const regularCats = categories
+        .filter((c) => !c.is_virtual)
+        .sort((a, b) => a.sort_order - b.sort_order);
+
+      return { virtualCats, regularCats };
+    }, [categories]);
 
     const checkScroll = useCallback(() => {
       if (scrollRef.current) {
@@ -61,6 +76,37 @@ export const CategoryNav = React.memo<CategoryNavProps>(
 
     const showControls = canScrollUp || canScrollDown;
 
+    // Render a category button
+    const renderCategoryButton = (
+      catName: string,
+      label: string,
+      isVirtual: boolean = false
+    ) => {
+      const isActive = selected === catName;
+
+      return (
+        <button
+          key={catName}
+          onClick={() => onSelect(catName)}
+          className={`
+            px-6 py-2.5 text-lg transition-all duration-200 cursor-pointer rounded-md whitespace-nowrap border h-[46px] flex items-center gap-1.5
+            ${isActive
+              ? 'bg-white text-[#FF5E5E] border-white font-bold shadow-sm'
+              : isVirtual
+                ? 'bg-white/15 text-white border-white/30 hover:bg-white/25'
+                : 'bg-white/10 text-white border-transparent hover:bg-white/20'
+            }
+          `}
+        >
+          {isVirtual && <Tag size={14} className="opacity-70" />}
+          {label}
+        </button>
+      );
+    };
+
+    const { virtualCats, regularCats } = organizedCategories;
+    const hasVirtualCats = virtualCats.length > 0;
+
     return (
       <div className="w-full bg-[#FF5E5E] shadow-md relative z-20 h-[134px] flex border-t border-white/10">
         <div
@@ -69,27 +115,24 @@ export const CategoryNav = React.memo<CategoryNavProps>(
           className="flex-1 px-3 py-[14px] overflow-hidden relative"
         >
           <div className="flex flex-wrap gap-3">
-            {categories.map((cat) => {
-              const catName = typeof cat === 'string' ? cat : cat.name;
-              const isActive = selected === catName;
-              const label = catName === 'all' ? (t('common.status.all')) : catName;
-              
-              return (
-                <button
-                  key={catName}
-                  onClick={() => onSelect(catName)}
-                  className={`
-                    px-6 py-2.5 text-lg transition-all duration-200 cursor-pointer rounded-md whitespace-nowrap border h-[46px]
-                    ${isActive
-                      ? 'bg-white text-[#FF5E5E] border-white font-bold shadow-sm'
-                      : 'bg-white/10 text-white border-transparent hover:bg-white/20'
-                    }
-                  `}
-                >
-                  {label}
-                </button>
-              );
-            })}
+            {/* 1. "All" button - always first */}
+            {renderCategoryButton('all', t('common.status.all'))}
+
+            {/* 2. Virtual categories with visual separator */}
+            {hasVirtualCats && (
+              <>
+                <div className="w-px h-[46px] bg-white/20 mx-1" />
+                {virtualCats.map((cat) =>
+                  renderCategoryButton(cat.name, cat.name, true)
+                )}
+                <div className="w-px h-[46px] bg-white/20 mx-1" />
+              </>
+            )}
+
+            {/* 3. Regular categories */}
+            {regularCats.map((cat) =>
+              renderCategoryButton(cat.name, cat.name, false)
+            )}
           </div>
         </div>
 
@@ -130,13 +173,21 @@ export const CategoryNav = React.memo<CategoryNavProps>(
   },
   // Only re-render if selected or categories change
   (prevProps, nextProps) => {
-    // Helper to get category name
-    const getCatName = (c: string | Category) => typeof c === 'string' ? c : c.name;
+    // Shallow compare categories by id and is_virtual
+    const isCategoriesEqual = (prev: Category[], next: Category[]) => {
+      if (prev.length !== next.length) return false;
+      return prev.every((cat, idx) =>
+        cat.id === next[idx].id &&
+        cat.name === next[idx].name &&
+        cat.is_virtual === next[idx].is_virtual &&
+        cat.is_active === next[idx].is_active &&
+        cat.sort_order === next[idx].sort_order
+      );
+    };
 
     return (
       prevProps.selected === nextProps.selected &&
-      prevProps.categories.length === nextProps.categories.length &&
-      prevProps.categories.every((cat, idx) => getCatName(cat) === getCatName(nextProps.categories[idx]))
+      isCategoriesEqual(prevProps.categories, nextProps.categories)
     );
   }
 );

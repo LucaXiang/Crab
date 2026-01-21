@@ -1,7 +1,7 @@
 import React from 'react';
 import { FormField } from './FormField';
 import { selectClass } from './FormField';
-import { useKitchenPrinterStore } from '@/core/stores/resources';
+import { usePrintDestinationStore } from '@/core/stores/resources';
 
 export interface KitchenPrinterSelectorProps {
   value: string | number | null | undefined;
@@ -11,8 +11,8 @@ export interface KitchenPrinterSelectorProps {
 }
 
 /**
- * Reusable kitchen printer selector component
- * Automatically fetches and displays available kitchen printers
+ * Reusable print destination selector component
+ * Automatically fetches and displays available print destinations
  */
 export const KitchenPrinterSelector: React.FC<KitchenPrinterSelectorProps> = ({
   value,
@@ -20,7 +20,7 @@ export const KitchenPrinterSelector: React.FC<KitchenPrinterSelectorProps> = ({
   label,
   t
 }) => {
-  const { kitchenPrinters } = useKitchenPrinterStore();
+  const items = usePrintDestinationStore((state) => state.items);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
@@ -36,7 +36,7 @@ export const KitchenPrinterSelector: React.FC<KitchenPrinterSelectorProps> = ({
           className={selectClass}
         >
           <option value="">{t('common.label.default')}</option>
-          {kitchenPrinters.map((p) => (
+          {items.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>

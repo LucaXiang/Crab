@@ -5,7 +5,7 @@ use axum::{
     extract::{Path, State},
 };
 
-use crate::api::convert::{option_thing_to_string, thing_to_string};
+use crate::api::convert::{option_thing_to_string, thing_to_string, things_to_strings};
 use crate::core::ServerState;
 use crate::db::models::{ProductCreate, ProductUpdate};
 use crate::db::repository::{ProductRepository, AttributeRepository, TagRepository};
@@ -100,7 +100,6 @@ pub async fn get_full(
             attribute: attr.into(),
             is_required: binding.is_required,
             display_order: binding.display_order,
-            default_option_idx: binding.default_option_idx,
         })
         .collect();
 
@@ -114,8 +113,7 @@ pub async fn get_full(
         tax_rate: product.tax_rate,
         receipt_name: product.receipt_name,
         kitchen_print_name: product.kitchen_print_name,
-        kitchen_printer: option_thing_to_string(&product.kitchen_printer),
-        is_kitchen_print_enabled: product.is_kitchen_print_enabled,
+        print_destinations: things_to_strings(&product.print_destinations),
         is_label_print_enabled: product.is_label_print_enabled,
         is_active: product.is_active,
         specs,
@@ -198,7 +196,6 @@ pub async fn list_product_attributes(
             attribute: attr.into(),
             is_required: binding.is_required,
             display_order: binding.display_order,
-            default_option_idx: binding.default_option_idx,
         })
         .collect();
 

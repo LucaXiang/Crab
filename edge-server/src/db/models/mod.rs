@@ -10,7 +10,7 @@ pub mod role;
 
 // Product Domain
 pub mod tag;
-pub mod kitchen_printer;
+pub mod print_destination;
 pub mod category;
 pub mod product;
 pub mod attribute;
@@ -32,7 +32,7 @@ pub mod system_state;
 pub use employee::{Employee, EmployeeId, EmployeeCreate, EmployeeUpdate, EmployeeResponse};
 pub use role::{Role, RoleCreate, RoleId, RoleUpdate};
 pub use tag::{Tag, TagCreate, TagUpdate};
-pub use kitchen_printer::{KitchenPrinter, KitchenPrinterCreate, KitchenPrinterUpdate};
+pub use print_destination::{PrintDestination, PrintDestinationCreate, PrintDestinationUpdate, EmbeddedPrinter};
 pub use category::{Category, CategoryCreate, CategoryUpdate};
 pub use product::{Product, ProductCreate, ProductUpdate, EmbeddedSpec};
 pub use attribute::{Attribute, AttributeOption, AttributeCreate, AttributeUpdate, HasAttribute};

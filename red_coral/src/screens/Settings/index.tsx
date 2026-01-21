@@ -6,6 +6,7 @@ import { PrinterSettings } from './PrinterSettings';
 import { TableManagement } from './TableManagement';
 import { ProductManagement } from './ProductManagement';
 import { CategoryManagement } from './CategoryManagement';
+import { TagManagement } from './TagManagement';
 import { AttributeManagement } from './AttributeManagement';
 import { DataTransfer } from './DataTransfer';
 import { StoreSettings } from './StoreSettings';
@@ -35,6 +36,11 @@ const SettingsContent: React.FC = React.memo(() => {
         {activeCategory === 'CATEGORIES' && (
           <ProtectedGate permission={Permission.MANAGE_CATEGORIES}>
             <CategoryManagement />
+          </ProtectedGate>
+        )}
+        {activeCategory === 'TAGS' && (
+          <ProtectedGate permission={Permission.MANAGE_CATEGORIES}>
+            <TagManagement />
           </ProtectedGate>
         )}
         {activeCategory === 'ATTRIBUTES' && (

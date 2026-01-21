@@ -21,10 +21,10 @@ pub use bridge::{
 pub use response::{
     ApiResponse, AppConfigResponse, AttributeData, AttributeListData, AuthData, CategoryData,
     CategoryListData, DeleteData, EmployeeListData, FetchOrderListResponse, OrderEventListData,
-    OrderListData, OrderSnapshotListData, PriceRuleListData, PrinterData, PrinterListData,
-    ProductAttributeListData, ProductData, ProductFullData, ProductListData, Role, RoleListData,
-    RolePermission, RolePermissionListData, TableListData, TagListData,
-    TenantListData, ZoneListData,
+    OrderListData, OrderSnapshotListData, PriceRuleListData, PrintDestinationData,
+    PrintDestinationListData, ProductAttributeListData, ProductData, ProductFullData,
+    ProductListData, Role, RoleListData, RolePermission, RolePermissionListData, TableListData,
+    TagListData, TenantListData, ZoneListData,
 };
 pub use session_cache::{EmployeeSession, LoginMode, SessionCache, SessionCacheError};
 pub use tenant_manager::{TenantError, TenantInfo, TenantManager};

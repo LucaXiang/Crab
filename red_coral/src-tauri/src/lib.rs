@@ -173,11 +173,6 @@ pub async fn run() {
             commands::add_attribute_option,
             commands::update_attribute_option,
             commands::delete_attribute_option,
-            commands::list_kitchen_printers,
-            commands::get_kitchen_printer,
-            commands::create_kitchen_printer,
-            commands::update_kitchen_printer,
-            commands::delete_kitchen_printer,
             // Product-Attribute binding commands
             commands::list_product_attributes,
             commands::bind_product_attribute,
@@ -188,6 +183,12 @@ pub async fn run() {
             commands::bind_category_attribute,
             commands::unbind_category_attribute,
             commands::batch_update_category_sort_order,
+            // Print Destination commands
+            commands::list_print_destinations,
+            commands::get_print_destination,
+            commands::create_print_destination,
+            commands::update_print_destination,
+            commands::delete_print_destination,
             // Location commands
             commands::list_zones,
             commands::get_zone,

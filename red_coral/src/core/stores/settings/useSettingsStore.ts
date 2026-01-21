@@ -10,9 +10,9 @@ import type { EmbeddedSpec } from '@/core/domain/types';
  * 本 Store 仅管理: 导航、Modal、表单、筛选/分页 UI 状态
  */
 
-type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'ATTRIBUTES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS';
+type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS';
 type ModalAction = 'CREATE' | 'EDIT' | 'DELETE';
-type ModalEntity = 'TABLE' | 'ZONE' | 'PRODUCT' | 'CATEGORY';
+type ModalEntity = 'TABLE' | 'ZONE' | 'PRODUCT' | 'CATEGORY' | 'TAG';
 
 interface StoreInfo {
   name: string;
@@ -56,6 +56,13 @@ interface FormData {
   // Loaded from getProductFull API (embedded specs)
   loadedSpecs?: EmbeddedSpec[];
   selectedTagIds?: string[];
+  // Tag form fields
+  color?: string;
+  displayOrder?: number;
+  // Virtual category fields (Category)
+  isVirtual?: boolean;
+  tagIds?: string[];
+  matchMode?: 'any' | 'all';
 }
 
 interface SettingsStore {
@@ -128,6 +135,8 @@ const initialFormData: FormData = {
   isKitchenPrintEnabled: -1,
   isLabelPrintEnabled: -1,
   hasMultiSpec: false,
+  color: '#3B82F6',
+  displayOrder: 0,
 };
 
 function normalizeKitchenPrintTri(value: unknown): number {
@@ -209,6 +218,17 @@ export const useSettingsStore = create<SettingsStore>()(
             isLabelPrintEnabled: data?.isLabelPrintEnabled ?? data?.is_label_print_enabled ?? true,
             selectedAttributeIds: data?.selectedAttributeIds || [],
             attributeDefaultOptions: data?.attributeDefaultOptions || {},
+            // Virtual category fields (support both camelCase and snake_case)
+            isVirtual: data?.isVirtual ?? data?.is_virtual ?? false,
+            tagIds: data?.tagIds ?? data?.tag_ids ?? [],
+            matchMode: data?.matchMode ?? data?.match_mode ?? 'any',
+          };
+        } else if (entity === 'TAG') {
+          formData = {
+            ...formData,
+            name: data?.name || '',
+            color: data?.color || '#3B82F6',
+            displayOrder: data?.display_order ?? data?.displayOrder ?? 0,
           };
         }
 
@@ -377,6 +397,8 @@ function validateSettingsForm(entity: ModalEntity, formData: FormData): Record<s
     }
   } else if (entity === 'CATEGORY') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.category.nameRequired';
+  } else if (entity === 'TAG') {
+    if (!formData.name?.trim()) errors.name = 'settings.errors.tag.nameRequired';
   }
   return errors;
 }
@@ -402,6 +424,9 @@ function computeIsDirty(entity: ModalEntity, next: FormData, initial: FormData):
       'name', 'kitchenPrinterId', 'isKitchenPrintEnabled', 'isLabelPrintEnabled',
       'selectedAttributeIds', 'attributeDefaultOptions',
     ];
+    return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
+  } else if (entity === 'TAG') {
+    const keys: (keyof FormData)[] = ['name', 'color', 'displayOrder'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   }
   return false;

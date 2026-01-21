@@ -34,7 +34,8 @@ pub fn matches_product_scope(
         ProductScope::Tag => {
             if let Some(target) = &rule.target {
                 let target_id = target.id.to_string();
-                tags.iter().any(|t| t == &target_id || format!("tag:{}", t) == target.to_string())
+                tags.iter()
+                    .any(|t| t == &target_id || format!("tag:{}", t) == target.to_string())
             } else {
                 false
             }
@@ -46,7 +47,7 @@ pub fn matches_product_scope(
 /// zone_scope: -1=all zones, 0=retail only, >0=specific zone
 pub fn matches_zone_scope(rule: &PriceRule, zone_id: Option<&str>, is_retail: bool) -> bool {
     match rule.zone_scope {
-        -1 => true, // All zones
+        -1 => true,     // All zones
         0 => is_retail, // Retail only
         zone_scope => {
             // Specific zone
@@ -95,11 +96,8 @@ fn check_schedule(rule: &PriceRule, _current_time: i64) -> bool {
                 NaiveTime::parse_from_str(start, "%H:%M"),
                 NaiveTime::parse_from_str(end, "%H:%M"),
             ) {
-                let current_time = NaiveTime::from_hms_opt(
-                    now.hour(),
-                    now.minute(),
-                    0,
-                ).unwrap_or_else(|| NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+                let current_time = NaiveTime::from_hms_opt(now.hour(), now.minute(), 0)
+                    .unwrap_or_else(|| NaiveTime::from_hms_opt(0, 0, 0).unwrap());
 
                 // Handle overnight ranges (e.g., 22:00 - 02:00)
                 if start_time <= end_time {
@@ -122,16 +120,16 @@ fn check_schedule(rule: &PriceRule, _current_time: i64) -> bool {
 /// Check one-time date range constraint
 fn check_onetime(rule: &PriceRule, current_time: i64) -> bool {
     // start_time and end_time are ISO8601 date strings
-    if let (Some(start), Some(end)) = (&rule.start_time, &rule.end_time) {
-        if let (Ok(start_dt), Ok(end_dt)) = (
+    if let (Some(start), Some(end)) = (&rule.start_time, &rule.end_time)
+        && let (Ok(start_dt), Ok(end_dt)) = (
             chrono::DateTime::parse_from_rfc3339(start),
             chrono::DateTime::parse_from_rfc3339(end),
-        ) {
-            let current = chrono::DateTime::from_timestamp_millis(current_time)
-                .unwrap_or_else(|| chrono::Utc::now().into());
+        )
+    {
+        let current =
+            chrono::DateTime::from_timestamp_millis(current_time).unwrap_or_else(chrono::Utc::now);
 
-            return current >= start_dt && current <= end_dt;
-        }
+        return current >= start_dt && current <= end_dt;
     }
     false
 }
@@ -151,7 +149,12 @@ mod tests {
             description: None,
             rule_type: RuleType::Discount,
             product_scope,
-            target: target.map(|t| Thing::from((t.split(':').next().unwrap_or("product"), t.split(':').last().unwrap_or(t)))),
+            target: target.map(|t| {
+                Thing::from((
+                    t.split(':').next().unwrap_or("product"),
+                    t.split(':').last().unwrap_or(t),
+                ))
+            }),
             zone_scope: -1,
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10,
