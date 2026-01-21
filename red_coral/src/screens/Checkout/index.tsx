@@ -13,7 +13,7 @@ import { HeldOrder } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { useConfirm } from '@/hooks/useConfirm';
 import { PaymentFlow } from './payment/PaymentFlow';
-import { useOrderActions } from '@/core/stores/order/useOrderEventStore';
+import { useOrderCommands } from '@/core/stores/order';
 import { VoidReasonModal } from './VoidReasonModal';
 import { SupervisorAuthModal } from '@/presentation/components/auth/SupervisorAuthModal';
 import { usePermission } from '@/hooks/usePermission';
@@ -39,7 +39,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 }) => {
   const { t } = useI18n();
   const { dialogProps } = useConfirm();
-  const { voidOrder } = useOrderActions();
+  const { voidOrder } = useOrderCommands();
   const { hasPermission } = usePermission();
   const { setCheckoutOrder } = useCheckoutActions();
   
@@ -90,15 +90,27 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   /**
    * 执行作废操作
    */
-  const processVoid = useCallback((reason: string) => {
+  const processVoid = useCallback(async (reason: string) => {
     if (propOnVoid) {
       propOnVoid(reason);
+      setIsVoidModalOpen(false);
     } else {
-      const orderKey = order.key || String(order.table_id || '');
-      voidOrder(orderKey, reason);
+      const orderKey = order.key || order.order_id || String(order.table_id || '');
+
+      // Execute async command
+      const response = await voidOrder(orderKey, reason);
+
+      if (!response.success) {
+        // Display error to user
+        console.error('Void order failed:', response.error);
+        // TODO: Add toast notification
+        setIsVoidModalOpen(false);
+        return;
+      }
+
+      setIsVoidModalOpen(false);
       onCancel();
     }
-    setIsVoidModalOpen(false);
   }, [propOnVoid, voidOrder, order, onCancel]);
 
   /**
