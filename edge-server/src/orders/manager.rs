@@ -310,7 +310,11 @@ impl OrdersManager {
         }
 
         // 9. Update sequence counter
-        let max_sequence = events.iter().map(|e| e.sequence).max().unwrap_or(current_sequence);
+        let max_sequence = events
+            .iter()
+            .map(|e| e.sequence)
+            .max()
+            .unwrap_or(current_sequence);
         if max_sequence > current_sequence {
             self.storage.set_sequence(&txn, max_sequence)?;
         }

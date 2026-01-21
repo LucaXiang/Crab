@@ -133,10 +133,7 @@ mod tests {
         let applier = OrderSplitApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(
-            snapshot.paid_item_quantities.get("item-1"),
-            Some(&2)
-        );
+        assert_eq!(snapshot.paid_item_quantities.get("item-1"), Some(&2));
     }
 
     #[test]
@@ -165,14 +162,8 @@ mod tests {
         let applier = OrderSplitApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(
-            snapshot.paid_item_quantities.get("item-1"),
-            Some(&2)
-        );
-        assert_eq!(
-            snapshot.paid_item_quantities.get("item-2"),
-            Some(&1)
-        );
+        assert_eq!(snapshot.paid_item_quantities.get("item-1"), Some(&2));
+        assert_eq!(snapshot.paid_item_quantities.get("item-2"), Some(&1));
     }
 
     #[test]
@@ -201,7 +192,9 @@ mod tests {
     #[test]
     fn test_order_split_accumulates_paid_quantities() {
         let mut snapshot = create_test_snapshot("order-1");
-        snapshot.paid_item_quantities.insert("item-1".to_string(), 1);
+        snapshot
+            .paid_item_quantities
+            .insert("item-1".to_string(), 1);
         snapshot.paid_amount = 10.0;
 
         let event = create_order_split_event(
@@ -220,10 +213,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // 1 + 2 = 3
-        assert_eq!(
-            snapshot.paid_item_quantities.get("item-1"),
-            Some(&3)
-        );
+        assert_eq!(snapshot.paid_item_quantities.get("item-1"), Some(&3));
         // 10 + 20 = 30
         assert_eq!(snapshot.paid_amount, 30.0);
     }
@@ -233,13 +223,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         snapshot.last_sequence = 5;
 
-        let event = create_order_split_event(
-            "order-1",
-            10,
-            20.0,
-            "cash",
-            vec![],
-        );
+        let event = create_order_split_event("order-1", 10, 20.0, "cash", vec![]);
 
         let applier = OrderSplitApplier;
         applier.apply(&mut snapshot, &event);
@@ -252,13 +236,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         snapshot.updated_at = 1000000000;
 
-        let event = create_order_split_event(
-            "order-1",
-            2,
-            20.0,
-            "cash",
-            vec![],
-        );
+        let event = create_order_split_event("order-1", 2, 20.0, "cash", vec![]);
         let expected_timestamp = event.timestamp;
 
         let applier = OrderSplitApplier;
@@ -441,10 +419,7 @@ mod tests {
         // Payment method doesn't affect the snapshot directly
         // It's stored in the event for audit purposes
         assert_eq!(snapshot.paid_amount, 20.0);
-        assert_eq!(
-            snapshot.paid_item_quantities.get("item-1"),
-            Some(&1)
-        );
+        assert_eq!(snapshot.paid_item_quantities.get("item-1"), Some(&1));
     }
 
     #[test]
@@ -467,10 +442,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Zero quantity is added (no-op in terms of value change)
-        assert_eq!(
-            snapshot.paid_item_quantities.get("item-1"),
-            Some(&0)
-        );
+        assert_eq!(snapshot.paid_item_quantities.get("item-1"), Some(&0));
     }
 
     #[test]
