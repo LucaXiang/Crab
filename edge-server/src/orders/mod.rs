@@ -31,6 +31,7 @@ pub mod manager;
 pub mod reducer;
 pub mod storage;
 pub mod sync;
+pub mod traits;
 
 // Re-exports
 pub use manager::OrdersManager;
