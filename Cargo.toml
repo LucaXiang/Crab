@@ -100,6 +100,7 @@ surrealdb-migrations = "2.4"
 redb = "3.0"
 
 # ========== Utilities ==========
+enum_dispatch = "0.3"
 dotenv = "0.15"
 socketioxide = "0.18"
 mime_guess = "2.0"

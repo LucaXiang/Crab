@@ -75,6 +75,7 @@ mime_guess.workspace = true
 
 # Other utilities
 dotenv.workspace = true
+enum_dispatch.workspace = true
 include_dir.workspace = true
 symlink.workspace = true
 dashmap.workspace = true
