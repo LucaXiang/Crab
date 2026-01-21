@@ -80,7 +80,13 @@ mod tests {
         snapshot.status = OrderStatus::Active;
         assert!(snapshot.end_time.is_none());
 
-        let event = create_order_voided_event("order-1", 1, Some("Customer cancelled".to_string()), None, None);
+        let event = create_order_voided_event(
+            "order-1",
+            1,
+            Some("Customer cancelled".to_string()),
+            None,
+            None,
+        );
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);
@@ -186,7 +192,8 @@ mod tests {
         snapshot.paid_amount = 50.0;
         snapshot.guest_count = 4;
 
-        let event = create_order_voided_event("order-1", 1, Some("Test void".to_string()), None, None);
+        let event =
+            create_order_voided_event("order-1", 1, Some("Test void".to_string()), None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);
@@ -241,13 +248,8 @@ mod tests {
             None,
             None,
         );
-        let event2 = create_order_voided_event(
-            "order-2",
-            1,
-            Some("Order error".to_string()),
-            None,
-            None,
-        );
+        let event2 =
+            create_order_voided_event("order-2", 1, Some("Order error".to_string()), None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot1, &event1);
@@ -294,7 +296,13 @@ mod tests {
             cancel_reason: None,
         });
 
-        let event = create_order_voided_event("order-1", 2, Some("Voiding paid order".to_string()), None, None);
+        let event = create_order_voided_event(
+            "order-1",
+            2,
+            Some("Voiding paid order".to_string()),
+            None,
+            None,
+        );
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);

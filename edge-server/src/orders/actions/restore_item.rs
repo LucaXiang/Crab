@@ -174,9 +174,13 @@ mod tests {
         // Create an active order with the item still present
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot
-            .items
-            .push(create_test_item("item-1", "prod-1", "Test Product", 10.0, 1));
+        snapshot.items.push(create_test_item(
+            "item-1",
+            "prod-1",
+            "Test Product",
+            10.0,
+            1,
+        ));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();

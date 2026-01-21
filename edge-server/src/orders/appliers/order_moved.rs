@@ -192,8 +192,7 @@ mod tests {
         snapshot.table_id = None;
         snapshot.table_name = None;
 
-        let event =
-            create_order_moved_event("order-1", 2, "", "", "table-2", "Table 2", vec![]);
+        let event = create_order_moved_event("order-1", 2, "", "", "table-2", "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);

@@ -61,6 +61,7 @@ ring.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 async-trait.workspace = true
+futures.workspace = true
 
 # HTTP Client
 reqwest.workspace = true

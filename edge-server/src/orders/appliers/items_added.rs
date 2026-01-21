@@ -75,7 +75,12 @@ mod tests {
     use super::*;
     use shared::order::OrderEventType;
 
-    fn create_test_item(instance_id: &str, name: &str, price: f64, quantity: i32) -> CartItemSnapshot {
+    fn create_test_item(
+        instance_id: &str,
+        name: &str,
+        price: f64,
+        quantity: i32,
+    ) -> CartItemSnapshot {
         CartItemSnapshot {
             id: "product-1".to_string(),
             instance_id: instance_id.to_string(),
@@ -94,7 +99,11 @@ mod tests {
         }
     }
 
-    fn create_items_added_event(order_id: &str, seq: u64, items: Vec<CartItemSnapshot>) -> OrderEvent {
+    fn create_items_added_event(
+        order_id: &str,
+        seq: u64,
+        items: Vec<CartItemSnapshot>,
+    ) -> OrderEvent {
         OrderEvent::new(
             seq,
             order_id.to_string(),
@@ -152,7 +161,9 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
 
         // Add initial item
-        snapshot.items.push(create_test_item("item-1", "Product A", 10.0, 2));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "Product A", 10.0, 2));
         snapshot.subtotal = 20.0;
         snapshot.total = 20.0;
 
@@ -177,7 +188,9 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
 
         // Add initial item
-        snapshot.items.push(create_test_item("item-1", "Product A", 10.0, 2));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "Product A", 10.0, 2));
 
         // Add different item
         let items = vec![create_test_item("item-2", "Product B", 15.0, 1)];

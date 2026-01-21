@@ -3,14 +3,16 @@
 //! Each action implements the `CommandHandler` trait and handles
 //! one specific command type.
 
-use enum_dispatch::enum_dispatch;
+use async_trait::async_trait;
 
-use shared::order::{OrderCommand, OrderCommandPayload};
+use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::{OrderCommand, OrderCommandPayload, OrderEvent};
 
 mod add_items;
 mod add_payment;
 mod cancel_payment;
 mod complete_order;
+mod merge_orders;
 mod modify_item;
 mod move_order;
 mod open_table;
@@ -19,14 +21,13 @@ mod restore_item;
 mod restore_order;
 mod split_order;
 mod update_order_info;
-mod merge_orders;
 mod void_order;
 
 pub use add_items::AddItemsAction;
-pub use merge_orders::MergeOrdersAction;
 pub use add_payment::AddPaymentAction;
 pub use cancel_payment::CancelPaymentAction;
 pub use complete_order::CompleteOrderAction;
+pub use merge_orders::MergeOrdersAction;
 pub use modify_item::ModifyItemAction;
 pub use move_order::MoveOrderAction;
 pub use open_table::OpenTableAction;
@@ -38,9 +39,6 @@ pub use update_order_info::UpdateOrderInfoAction;
 pub use void_order::VoidOrderAction;
 
 /// CommandAction enum - dispatches to concrete action implementations
-///
-/// Uses enum_dispatch for zero-cost static dispatch.
-#[enum_dispatch(CommandHandler)]
 pub enum CommandAction {
     OpenTable(OpenTableAction),
     AddItems(AddItemsAction),
@@ -56,6 +54,33 @@ pub enum CommandAction {
     MoveOrder(MoveOrderAction),
     MergeOrders(MergeOrdersAction),
     SplitOrder(SplitOrderAction),
+}
+
+/// Manual implementation of CommandHandler for CommandAction
+#[async_trait]
+impl CommandHandler for CommandAction {
+    async fn execute(
+        &self,
+        ctx: &mut CommandContext<'_>,
+        metadata: &CommandMetadata,
+    ) -> Result<Vec<OrderEvent>, OrderError> {
+        match self {
+            CommandAction::OpenTable(action) => action.execute(ctx, metadata).await,
+            CommandAction::AddItems(action) => action.execute(ctx, metadata).await,
+            CommandAction::ModifyItem(action) => action.execute(ctx, metadata).await,
+            CommandAction::RemoveItem(action) => action.execute(ctx, metadata).await,
+            CommandAction::RestoreItem(action) => action.execute(ctx, metadata).await,
+            CommandAction::AddPayment(action) => action.execute(ctx, metadata).await,
+            CommandAction::CancelPayment(action) => action.execute(ctx, metadata).await,
+            CommandAction::CompleteOrder(action) => action.execute(ctx, metadata).await,
+            CommandAction::UpdateOrderInfo(action) => action.execute(ctx, metadata).await,
+            CommandAction::VoidOrder(action) => action.execute(ctx, metadata).await,
+            CommandAction::RestoreOrder(action) => action.execute(ctx, metadata).await,
+            CommandAction::MoveOrder(action) => action.execute(ctx, metadata).await,
+            CommandAction::MergeOrders(action) => action.execute(ctx, metadata).await,
+            CommandAction::SplitOrder(action) => action.execute(ctx, metadata).await,
+        }
+    }
 }
 
 /// Convert OrderCommand to CommandAction
@@ -105,7 +130,7 @@ impl From<&OrderCommand> for CommandAction {
                     order_id: order_id.clone(),
                     payment: payment.clone(),
                 })
-            },
+            }
             OrderCommandPayload::CancelPayment {
                 order_id,
                 payment_id,
@@ -146,12 +171,12 @@ impl From<&OrderCommand> for CommandAction {
                     order_id: order_id.clone(),
                     reason: reason.clone(),
                 })
-            },
+            }
             OrderCommandPayload::RestoreOrder { order_id } => {
                 CommandAction::RestoreOrder(RestoreOrderAction {
                     order_id: order_id.clone(),
                 })
-            },
+            }
             OrderCommandPayload::RestoreItem {
                 order_id,
                 instance_id,

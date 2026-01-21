@@ -37,7 +37,7 @@ pub mod traits;
 
 // Re-exports
 pub use manager::OrdersManager;
-pub use reducer::OrderReducer;
+pub use reducer::{generate_instance_id, input_to_snapshot};
 pub use storage::OrderStorage;
 pub use sync::{SyncRequest, SyncResponse};
 

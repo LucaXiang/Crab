@@ -143,20 +143,27 @@ impl SyncService {
     /// Verify snapshot integrity by rebuilding from events
     pub fn verify_snapshot(&self, order_id: &str) -> Result<bool, ManagerError> {
         let stored = self.manager.get_snapshot(order_id)?;
-        let rebuilt = self.manager.rebuild_snapshot(order_id)?;
 
-        match (stored, rebuilt) {
-            (Some(s), Some(r)) => {
-                // Compare key fields
-                let match_status = s.status == r.status;
-                let match_items = s.items.len() == r.items.len();
-                let match_total = (s.total - r.total).abs() < 0.01;
-                let match_sequence = s.last_sequence == r.last_sequence;
+        match self.manager.rebuild_snapshot(order_id) {
+            Ok(rebuilt) => {
+                match stored {
+                    Some(s) => {
+                        // Compare key fields
+                        let match_status = s.status == rebuilt.status;
+                        let match_items = s.items.len() == rebuilt.items.len();
+                        let match_total = (s.total - rebuilt.total).abs() < 0.01;
+                        let match_sequence = s.last_sequence == rebuilt.last_sequence;
 
-                Ok(match_status && match_items && match_total && match_sequence)
+                        Ok(match_status && match_items && match_total && match_sequence)
+                    }
+                    None => Ok(false), // Stored missing but rebuilt exists
+                }
             }
-            (None, None) => Ok(true), // Both missing is consistent
-            _ => Ok(false),           // One exists, one doesn't
+            Err(ManagerError::OrderNotFound(_)) => {
+                // Rebuilt failed because no events - check if stored also doesn't exist
+                Ok(stored.is_none())
+            }
+            Err(e) => Err(e),
         }
     }
 

@@ -3,9 +3,8 @@
 //! Each applier implements the `EventApplier` trait and handles
 //! one specific event type. Appliers are PURE functions.
 
-use enum_dispatch::enum_dispatch;
-
-use shared::order::{EventPayload, OrderEvent};
+use crate::orders::traits::EventApplier;
+use shared::order::{EventPayload, OrderEvent, OrderSnapshot};
 
 mod item_modified;
 mod item_removed;
@@ -38,9 +37,6 @@ pub use payment_cancelled::PaymentCancelledApplier;
 pub use table_opened::TableOpenedApplier;
 
 /// EventAction enum - dispatches to concrete applier implementations
-///
-/// Uses enum_dispatch for zero-cost static dispatch.
-#[enum_dispatch(EventApplier)]
 pub enum EventAction {
     TableOpened(TableOpenedApplier),
     ItemsAdded(ItemsAddedApplier),
@@ -57,6 +53,29 @@ pub enum EventAction {
     OrderMerged(OrderMergedApplier),
     OrderMergedOut(OrderMergedOutApplier),
     OrderSplit(OrderSplitApplier),
+}
+
+/// Manual implementation of EventApplier for EventAction
+impl EventApplier for EventAction {
+    fn apply(&self, snapshot: &mut OrderSnapshot, event: &OrderEvent) {
+        match self {
+            EventAction::TableOpened(applier) => applier.apply(snapshot, event),
+            EventAction::ItemsAdded(applier) => applier.apply(snapshot, event),
+            EventAction::ItemModified(applier) => applier.apply(snapshot, event),
+            EventAction::ItemRemoved(applier) => applier.apply(snapshot, event),
+            EventAction::ItemRestored(applier) => applier.apply(snapshot, event),
+            EventAction::PaymentAdded(applier) => applier.apply(snapshot, event),
+            EventAction::PaymentCancelled(applier) => applier.apply(snapshot, event),
+            EventAction::OrderCompleted(applier) => applier.apply(snapshot, event),
+            EventAction::OrderInfoUpdated(applier) => applier.apply(snapshot, event),
+            EventAction::OrderMoved(applier) => applier.apply(snapshot, event),
+            EventAction::OrderRestored(applier) => applier.apply(snapshot, event),
+            EventAction::OrderVoided(applier) => applier.apply(snapshot, event),
+            EventAction::OrderMerged(applier) => applier.apply(snapshot, event),
+            EventAction::OrderMergedOut(applier) => applier.apply(snapshot, event),
+            EventAction::OrderSplit(applier) => applier.apply(snapshot, event),
+        }
+    }
 }
 
 /// Convert OrderEvent reference to EventAction

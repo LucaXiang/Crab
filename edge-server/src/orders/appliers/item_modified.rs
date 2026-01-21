@@ -194,13 +194,9 @@ mod tests {
     #[test]
     fn test_item_modified_full_price_change() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item(
-            "item-1",
-            "prod-1",
-            "Product A",
-            10.0,
-            2,
-        ));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 2));
         snapshot.subtotal = 20.0;
         snapshot.total = 20.0;
 
@@ -234,13 +230,9 @@ mod tests {
     #[test]
     fn test_item_modified_full_discount() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item(
-            "item-1",
-            "prod-1",
-            "Product A",
-            100.0,
-            1,
-        ));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 100.0, 1));
         snapshot.subtotal = 100.0;
         snapshot.total = 100.0;
 
@@ -271,13 +263,9 @@ mod tests {
     #[test]
     fn test_item_modified_partial_split() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item(
-            "item-1",
-            "prod-1",
-            "Product A",
-            10.0,
-            5,
-        ));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 5));
         snapshot.subtotal = 50.0;
         snapshot.total = 50.0;
 
@@ -328,13 +316,9 @@ mod tests {
     #[test]
     fn test_item_modified_surcharge() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item(
-            "item-1",
-            "prod-1",
-            "Product A",
-            10.0,
-            1,
-        ));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 1));
 
         let source = create_test_item("item-1", "prod-1", "Product A", 10.0, 1);
         let changes = ItemChanges {
@@ -360,13 +344,9 @@ mod tests {
     #[test]
     fn test_item_modified_note() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item(
-            "item-1",
-            "prod-1",
-            "Product A",
-            10.0,
-            1,
-        ));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 1));
 
         let source = create_test_item("item-1", "prod-1", "Product A", 10.0, 1);
         let changes = ItemChanges {
@@ -392,13 +372,9 @@ mod tests {
     #[test]
     fn test_item_modified_quantity_change() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item(
-            "item-1",
-            "prod-1",
-            "Product A",
-            10.0,
-            3,
-        ));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 3));
         snapshot.subtotal = 30.0;
         snapshot.total = 30.0;
 
@@ -428,13 +404,9 @@ mod tests {
     #[test]
     fn test_item_modified_updates_sequence() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item(
-            "item-1",
-            "prod-1",
-            "Product A",
-            10.0,
-            1,
-        ));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 1));
         snapshot.last_sequence = 5;
 
         let source = create_test_item("item-1", "prod-1", "Product A", 10.0, 1);
@@ -461,13 +433,9 @@ mod tests {
     #[test]
     fn test_item_modified_updates_checksum() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item(
-            "item-1",
-            "prod-1",
-            "Product A",
-            10.0,
-            1,
-        ));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 1));
         let initial_checksum = snapshot.state_checksum.clone();
 
         let source = create_test_item("item-1", "prod-1", "Product A", 10.0, 1);
@@ -495,13 +463,9 @@ mod tests {
     #[test]
     fn test_item_modified_nonexistent_item_is_noop() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item(
-            "item-1",
-            "prod-1",
-            "Product A",
-            10.0,
-            1,
-        ));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 1));
 
         // Try to modify nonexistent item
         let source = create_test_item("nonexistent", "prod-1", "Product A", 10.0, 1);
@@ -530,13 +494,9 @@ mod tests {
     #[test]
     fn test_item_modified_multiple_changes() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item(
-            "item-1",
-            "prod-1",
-            "Product A",
-            10.0,
-            2,
-        ));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 2));
 
         let source = create_test_item("item-1", "prod-1", "Product A", 10.0, 2);
         let changes = ItemChanges {
@@ -570,13 +530,9 @@ mod tests {
     #[test]
     fn test_item_modified_split_with_note() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.items.push(create_test_item(
-            "item-1",
-            "prod-1",
-            "Product A",
-            10.0,
-            3,
-        ));
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 3));
 
         let source = create_test_item("item-1", "prod-1", "Product A", 10.0, 3);
         let changes = ItemChanges {

@@ -38,7 +38,7 @@ pub mod utils;
 pub use auth::{CurrentUser, JwtService};
 pub use core::{Config, Server, ServerState};
 pub use message::{BusMessage, EventType};
-pub use orders::{OrderReducer, OrderStorage, OrdersManager};
+pub use orders::{OrderStorage, OrdersManager};
 pub use pricing::PriceRuleEngine;
 pub use utils::AppError as AppErrorType;
 pub use utils::{AppResponse, AppResult};

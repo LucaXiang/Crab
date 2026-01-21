@@ -688,9 +688,6 @@ mod tests {
         );
 
         // Empty changes
-        assert_eq!(
-            determine_operation(&ItemChanges::default()),
-            "MODIFY_ITEM"
-        );
+        assert_eq!(determine_operation(&ItemChanges::default()), "MODIFY_ITEM");
     }
 }

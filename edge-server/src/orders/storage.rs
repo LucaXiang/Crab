@@ -178,6 +178,15 @@ impl OrderStorage {
             .unwrap_or(0))
     }
 
+    /// Set sequence number (within transaction)
+    ///
+    /// Used by the action-based architecture to update sequence after events are generated.
+    pub fn set_sequence(&self, txn: &WriteTransaction, sequence: u64) -> StorageResult<()> {
+        let mut table = txn.open_table(SEQUENCE_TABLE)?;
+        table.insert(SEQUENCE_KEY, sequence)?;
+        Ok(())
+    }
+
     // ========== Command Idempotency ==========
 
     /// Check if a command has been processed

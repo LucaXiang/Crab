@@ -290,7 +290,9 @@ mod tests {
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         // Pay 99.995 (within 0.01 tolerance)
-        snapshot.payments.push(create_payment_record("CASH", 99.995));
+        snapshot
+            .payments
+            .push(create_payment_record("CASH", 99.995));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
