@@ -560,6 +560,8 @@ export interface ItemChanges {
   discount_percent?: number | null;
   surcharge?: number | null;
   note?: string | null;
+  original_price?: number | null;
+  selected_options?: ItemOption[] | null;
 }
 
 export interface SplitItem {
