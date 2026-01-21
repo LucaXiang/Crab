@@ -8,9 +8,11 @@ use enum_dispatch::enum_dispatch;
 use shared::order::{OrderCommand, OrderCommandPayload};
 
 mod add_items;
+mod complete_order;
 mod open_table;
 
 pub use add_items::AddItemsAction;
+pub use complete_order::CompleteOrderAction;
 pub use open_table::OpenTableAction;
 
 /// CommandAction enum - dispatches to concrete action implementations
@@ -20,6 +22,7 @@ pub use open_table::OpenTableAction;
 pub enum CommandAction {
     OpenTable(OpenTableAction),
     AddItems(AddItemsAction),
+    CompleteOrder(CompleteOrderAction),
 }
 
 /// Convert OrderCommand to CommandAction
@@ -49,6 +52,13 @@ impl From<&OrderCommand> for CommandAction {
                     items: items.clone(),
                 })
             }
+            OrderCommandPayload::CompleteOrder {
+                order_id,
+                receipt_number,
+            } => CommandAction::CompleteOrder(CompleteOrderAction {
+                order_id: order_id.clone(),
+                receipt_number: receipt_number.clone(),
+            }),
             // Other commands will be added here
             _ => todo!("Command not yet implemented"),
         }
