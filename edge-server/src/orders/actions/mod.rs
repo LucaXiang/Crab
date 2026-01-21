@@ -13,6 +13,8 @@ mod complete_order;
 mod modify_item;
 mod open_table;
 mod remove_item;
+mod update_order_info;
+mod void_order;
 
 pub use add_items::AddItemsAction;
 pub use add_payment::AddPaymentAction;
@@ -20,6 +22,8 @@ pub use complete_order::CompleteOrderAction;
 pub use modify_item::ModifyItemAction;
 pub use open_table::OpenTableAction;
 pub use remove_item::RemoveItemAction;
+pub use update_order_info::UpdateOrderInfoAction;
+pub use void_order::VoidOrderAction;
 
 /// CommandAction enum - dispatches to concrete action implementations
 ///
@@ -32,6 +36,8 @@ pub enum CommandAction {
     RemoveItem(RemoveItemAction),
     AddPayment(AddPaymentAction),
     CompleteOrder(CompleteOrderAction),
+    UpdateOrderInfo(UpdateOrderInfoAction),
+    VoidOrder(VoidOrderAction),
 }
 
 /// Convert OrderCommand to CommandAction
@@ -103,6 +109,25 @@ impl From<&OrderCommand> for CommandAction {
             } => CommandAction::CompleteOrder(CompleteOrderAction {
                 order_id: order_id.clone(),
                 receipt_number: receipt_number.clone(),
+            }),
+            OrderCommandPayload::VoidOrder { order_id, reason } => {
+                CommandAction::VoidOrder(VoidOrderAction {
+                    order_id: order_id.clone(),
+                    reason: reason.clone(),
+                })
+            }
+            OrderCommandPayload::UpdateOrderInfo {
+                order_id,
+                receipt_number,
+                guest_count,
+                table_name,
+                is_pre_payment,
+            } => CommandAction::UpdateOrderInfo(UpdateOrderInfoAction {
+                order_id: order_id.clone(),
+                receipt_number: receipt_number.clone(),
+                guest_count: *guest_count,
+                table_name: table_name.clone(),
+                is_pre_payment: *is_pre_payment,
             }),
             // Other commands will be added here
             _ => todo!("Command not yet implemented"),
