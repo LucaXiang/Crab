@@ -33,7 +33,7 @@ export const CartList = React.memo<CartListProps>(({
         <div className="divide-y divide-gray-100">
           {cart.map((item) => {
             return (
-              <React.Fragment key={item.instanceId}>
+              <React.Fragment key={item.instance_id}>
                 <CartItem
                   item={item}
                   onQuantityChange={onQuantityChange}

@@ -18,9 +18,9 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
 
     // Check if overtime (2 hours)
     const isLongTime =
-      isOccupied && order && Date.now() - order.startTime > 2 * 60 * 60 * 1000;
+      isOccupied && order && Date.now() - order.start_time > 2 * 60 * 60 * 1000;
 
-    const isPrePayment = isOccupied && !!order?.isPrePayment;
+    const is_pre_payment = isOccupied && !!order?.is_pre_payment;
 
     // Timer Logic
     const [duration, setDuration] = useState<string>('');
@@ -33,7 +33,7 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
 
       const updateTime = () => {
         const now = Date.now();
-        const diff = now - order.startTime;
+        const diff = now - order.start_time;
         const minutes = Math.floor(diff / 60000);
         const hours = Math.floor(minutes / 60);
         const mins = minutes % 60;
@@ -56,7 +56,7 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
           ${className || 'h-[120px]'}
           ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md'}
           ${
-            isPrePayment
+            is_pre_payment
               ? 'bg-purple-50 border-purple-300 hover:border-purple-500'
               : isLongTime && isOccupied
               ? 'bg-orange-50 border-orange-300 hover:border-orange-500 animate-pulse'
@@ -73,7 +73,7 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
           <span
             className={`text-xl font-bold ${
               isOccupied
-                ? isPrePayment
+                ? is_pre_payment
                   ? 'text-purple-600'
                   : isLongTime
                   ? 'text-orange-600'
@@ -90,7 +90,7 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
           <div className="flex flex-col items-center gap-1 w-full">
             <div
               className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
-                isPrePayment
+                is_pre_payment
                   ? 'text-purple-700 bg-purple-100/50'
                   : isLongTime
                   ? 'text-orange-700 bg-orange-100/50'
@@ -98,18 +98,18 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
               }`}
             >
               <Users size={14} />
-              <span className="font-bold text-sm">{order?.guestCount}</span>
+              <span className="font-bold text-sm">{order?.guest_count}</span>
             </div>
             <div
               className={`flex items-center gap-1 text-xs mt-0.5 ${
-                isPrePayment
+                is_pre_payment
                   ? 'text-purple-600 font-bold'
                   : isLongTime
                   ? 'text-orange-600 font-bold'
                   : 'text-blue-400'
               }`}
             >
-              {isPrePayment ? <Receipt size={12} /> : <Clock size={12} />}
+              {is_pre_payment ? <Receipt size={12} /> : <Clock size={12} />}
               <span>{duration || '0m'}</span>
             </div>
           </div>

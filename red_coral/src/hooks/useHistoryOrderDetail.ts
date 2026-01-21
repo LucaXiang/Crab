@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { HeldOrder } from '@/core/domain/types';
-import { OrderEvent as ESOrderEvent } from '@/core/domain/types/orderEvent';
-import { toFrontendEvents } from '@/core/stores/order/orderAdapter';
-import { reduceOrderEvents, createEmptyOrder } from '@/core/services/order/eventReducer';
+import type { OrderEvent, OrderSnapshot } from '@/core/domain/types/orderEvent';
 import { logger } from '@/utils/logger';
 
 interface UseHistoryOrderDetailResult {
@@ -26,7 +24,8 @@ interface ApiResponse<T> {
 }
 
 interface OrderEventListData {
-  events: ESOrderEvent[];
+  events: OrderEvent[];
+  snapshot?: OrderSnapshot | null;
 }
 
 /**
@@ -71,23 +70,59 @@ export const useHistoryOrderDetail = (order_id: string | number | null): UseHist
         throw new Error(response.error?.message || 'Failed to fetch order events');
       }
 
-      const esEvents = response.data?.events || [];
+      // Server returns computed snapshot (no client-side event sourcing needed)
+      const snapshot = response.data?.snapshot;
 
-      if (esEvents.length === 0) {
-        throw new Error('No events found for order');
+      if (!snapshot) {
+        throw new Error('No snapshot found for order');
       }
 
-      // Convert ES events to frontend event format
-      const frontendEvents = toFrontendEvents(esEvents);
+      // Convert OrderSnapshot to HeldOrder format
+      const rebuiltOrder: HeldOrder = {
+        key: snapshot.order_id,
+        table_id: snapshot.table_id || '',
+        table_name: snapshot.table_name || '',
+        zone_id: snapshot.zone_id,
+        zone_name: snapshot.zone_name,
+        guest_count: snapshot.guest_count,
+        is_retail: snapshot.is_retail,
+        status: snapshot.status,
+        items: snapshot.items.map(item => ({
+          id: item.id,
+          product_id: item.id,
+          instance_id: item.instance_id,
+          name: item.name,
+          price: item.price,
+          original_price: item.original_price,
+          quantity: item.quantity,
+          unpaid_quantity: item.unpaid_quantity,
+          selected_options: item.selected_options || [],
+          selected_specification: item.selected_specification,
+          discount_percent: item.discount_percent,
+          surcharge: item.surcharge,
+          note: item.note,
+          authorizer_id: item.authorizer_id,
+          authorizer_name: item.authorizer_name,
+          _removed: item._removed,
+        })),
+        payments: snapshot.payments,
+        subtotal: snapshot.subtotal,
+        tax: snapshot.tax,
+        discount: snapshot.discount,
+        total: snapshot.total,
+        paid_amount: snapshot.paid_amount,
+        paid_item_quantities: snapshot.paid_item_quantities,
+        receipt_number: snapshot.receipt_number || undefined,
+        is_pre_payment: snapshot.is_pre_payment,
+        start_time: snapshot.start_time,
+        end_time: snapshot.end_time || undefined,
+        timeline: [], // Timeline is loaded separately if needed
+      };
 
-      // Rebuild order state from events using the existing reducer
-      const rebuiltOrder = reduceOrderEvents(frontendEvents, createEmptyOrder(orderId));
-
-      logger.debug('Rebuilt order from ES events', {
+      logger.debug('Loaded order snapshot from server', {
         component: 'useHistoryOrderDetail',
         action: 'fetchOrderDetail',
         order_id: orderId,
-        eventCount: esEvents.length,
         itemCount: rebuiltOrder.items.length,
       });
 

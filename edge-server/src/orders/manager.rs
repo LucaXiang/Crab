@@ -22,7 +22,7 @@
 //!     └─ 9. Return response
 //! ```
 
-use super::reducer::{generate_instance_id, input_to_snapshot, OrderReducer};
+use super::reducer::{OrderReducer, generate_instance_id, input_to_snapshot};
 use super::storage::{OrderStorage, StorageError};
 use shared::order::{
     CartItemInput, CartItemSnapshot, CommandError, CommandErrorCode, CommandResponse, EventPayload,
@@ -71,30 +71,35 @@ impl From<ManagerError> for CommandError {
     fn from(err: ManagerError) -> Self {
         let (code, message) = match err {
             ManagerError::Storage(e) => (CommandErrorCode::InternalError, e.to_string()),
-            ManagerError::OrderNotFound(id) => {
-                (CommandErrorCode::OrderNotFound, format!("Order not found: {}", id))
-            }
-            ManagerError::OrderAlreadyCompleted(id) => {
-                (CommandErrorCode::OrderAlreadyCompleted, format!("Order already completed: {}", id))
-            }
-            ManagerError::OrderAlreadyVoided(id) => {
-                (CommandErrorCode::OrderAlreadyVoided, format!("Order already voided: {}", id))
-            }
-            ManagerError::ItemNotFound(id) => {
-                (CommandErrorCode::ItemNotFound, format!("Item not found: {}", id))
-            }
-            ManagerError::PaymentNotFound(id) => {
-                (CommandErrorCode::PaymentNotFound, format!("Payment not found: {}", id))
-            }
-            ManagerError::InsufficientQuantity => {
-                (CommandErrorCode::InsufficientQuantity, "Insufficient quantity".to_string())
-            }
-            ManagerError::InvalidAmount => {
-                (CommandErrorCode::InvalidAmount, "Invalid amount".to_string())
-            }
-            ManagerError::InvalidOperation(msg) => {
-                (CommandErrorCode::InvalidOperation, msg)
-            }
+            ManagerError::OrderNotFound(id) => (
+                CommandErrorCode::OrderNotFound,
+                format!("Order not found: {}", id),
+            ),
+            ManagerError::OrderAlreadyCompleted(id) => (
+                CommandErrorCode::OrderAlreadyCompleted,
+                format!("Order already completed: {}", id),
+            ),
+            ManagerError::OrderAlreadyVoided(id) => (
+                CommandErrorCode::OrderAlreadyVoided,
+                format!("Order already voided: {}", id),
+            ),
+            ManagerError::ItemNotFound(id) => (
+                CommandErrorCode::ItemNotFound,
+                format!("Item not found: {}", id),
+            ),
+            ManagerError::PaymentNotFound(id) => (
+                CommandErrorCode::PaymentNotFound,
+                format!("Payment not found: {}", id),
+            ),
+            ManagerError::InsufficientQuantity => (
+                CommandErrorCode::InsufficientQuantity,
+                "Insufficient quantity".to_string(),
+            ),
+            ManagerError::InvalidAmount => (
+                CommandErrorCode::InvalidAmount,
+                "Invalid amount".to_string(),
+            ),
+            ManagerError::InvalidOperation(msg) => (CommandErrorCode::InvalidOperation, msg),
             ManagerError::Internal(msg) => (CommandErrorCode::InternalError, msg),
         };
         CommandError::new(code, message)
@@ -135,7 +140,11 @@ impl OrdersManager {
         let (event_tx, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
         let epoch = uuid::Uuid::new_v4().to_string();
         tracing::info!(epoch = %epoch, "OrdersManager started with new epoch");
-        Ok(Self { storage, event_tx, epoch })
+        Ok(Self {
+            storage,
+            event_tx,
+            epoch,
+        })
     }
 
     /// Create an OrdersManager with existing storage (for testing)
@@ -143,7 +152,11 @@ impl OrdersManager {
     pub fn with_storage(storage: OrderStorage) -> Self {
         let (event_tx, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
         let epoch = uuid::Uuid::new_v4().to_string();
-        Self { storage, event_tx, epoch }
+        Self {
+            storage,
+            event_tx,
+            epoch,
+        }
     }
 
     /// Get the server epoch (unique instance ID)
@@ -210,16 +223,20 @@ impl OrdersManager {
         let txn = self.storage.begin_write()?;
 
         // Double-check idempotency within transaction
-        if self.storage.is_command_processed_txn(&txn, &cmd.command_id)? {
+        if self
+            .storage
+            .is_command_processed_txn(&txn, &cmd.command_id)?
+        {
             return Ok((CommandResponse::duplicate(cmd.command_id), vec![]));
         }
 
         // 3. Process command based on payload
         let result = match &cmd.payload {
             OrderCommandPayload::OpenTable { .. } => self.handle_open_table(&txn, &cmd),
-            OrderCommandPayload::CompleteOrder { order_id, receipt_number } => {
-                self.handle_complete_order(&txn, &cmd, order_id, receipt_number)
-            }
+            OrderCommandPayload::CompleteOrder {
+                order_id,
+                receipt_number,
+            } => self.handle_complete_order(&txn, &cmd, order_id, receipt_number),
             OrderCommandPayload::VoidOrder { order_id, reason } => {
                 self.handle_void_order(&txn, &cmd, order_id, reason.clone())
             }
@@ -263,9 +280,10 @@ impl OrdersManager {
                 authorizer_id.clone(),
                 authorizer_name.clone(),
             ),
-            OrderCommandPayload::RestoreItem { order_id, instance_id } => {
-                self.handle_restore_item(&txn, &cmd, order_id, instance_id)
-            }
+            OrderCommandPayload::RestoreItem {
+                order_id,
+                instance_id,
+            } => self.handle_restore_item(&txn, &cmd, order_id, instance_id),
             OrderCommandPayload::AddPayment { order_id, payment } => {
                 self.handle_add_payment(&txn, &cmd, order_id, payment)
             }
@@ -289,7 +307,9 @@ impl OrdersManager {
                 split_amount,
                 payment_method,
                 items,
-            } => self.handle_split_order(&txn, &cmd, order_id, *split_amount, payment_method, items),
+            } => {
+                self.handle_split_order(&txn, &cmd, order_id, *split_amount, payment_method, items)
+            }
             OrderCommandPayload::MoveOrder {
                 order_id,
                 target_table_id,
@@ -662,7 +682,7 @@ impl OrdersManager {
                     price: item.price,
                     discount_percent: item.discount_percent,
                     action: "UNCHANGED".to_string(),
-                },
+                },Box::new()
                 ItemModificationResult {
                     instance_id: new_instance_id,
                     quantity: affected_qty,
@@ -682,7 +702,7 @@ impl OrdersManager {
             OrderEventType::ItemModified,
             EventPayload::ItemModified {
                 operation: operation.to_string(),
-                source: item.clone(),
+                source: Box::new(item.clone()),
                 affected_quantity: affected_qty,
                 changes: changes.clone(),
                 previous_values,
@@ -721,7 +741,9 @@ impl OrdersManager {
             .find(|i| i.instance_id == instance_id)
             .ok_or_else(|| ManagerError::ItemNotFound(instance_id.to_string()))?;
 
-        if let Some(qty) = quantity && qty > item.quantity {
+        if let Some(qty) = quantity
+            && qty > item.quantity
+        {
             return Err(ManagerError::InsufficientQuantity);
         }
 
@@ -1057,7 +1079,9 @@ impl OrdersManager {
 
         match snapshot.status {
             OrderStatus::Active => Ok(snapshot),
-            OrderStatus::Completed => Err(ManagerError::OrderAlreadyCompleted(order_id.to_string())),
+            OrderStatus::Completed => {
+                Err(ManagerError::OrderAlreadyCompleted(order_id.to_string()))
+            }
             OrderStatus::Void => Err(ManagerError::OrderAlreadyVoided(order_id.to_string())),
             _ => Err(ManagerError::OrderNotFound(order_id.to_string())),
         }

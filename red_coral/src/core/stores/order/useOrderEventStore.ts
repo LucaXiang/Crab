@@ -27,13 +27,13 @@ interface OrderEventStore {
    * 开台
    */
   openTable: (params: {
-    tableId: string;
-    tableName: string;
-    guestCount: number;
-    zoneId?: string;
-    zoneName?: string;
+    table_id: string;
+    table_name: string;
+    guest_count: number;
+    zone_id?: string;
+    zone_name?: string;
     surcharge?: { type: 'percentage' | 'fixed'; amount: number; name?: string };
-    receiptNumber?: string;
+    receipt_number?: string;
   }) => void;
 
   /**
@@ -80,7 +80,7 @@ interface OrderEventStore {
 
   // ============ Table Management ============
   mergeOrder: (targetOrder: HeldOrder, sourceOrder: HeldOrder) => void;
-  moveOrder: (sourceOrderKey: string, targetTable: { id: string, name: string, zoneId?: string, zoneName?: string }) => void;
+  moveOrder: (sourceOrderKey: string, targetTable: { id: string, name: string, zoneId?: string, zone_name?: string }) => void;
 
 
   // ============ 支付操作 ============
@@ -104,22 +104,22 @@ interface OrderEventStore {
       receiptNumber?: string;
       guestCount?: number;
       tableName?: string;
-      isPrePayment?: boolean;
+      is_pre_payment?: boolean;
     }
   ) => void;
 
   addSplitEvent: (
     orderKey: string,
     data: {
-      splitAmount: number;
+      split_amount: number;
       items: {
-        instanceId: string;
+        instance_id: string;
         name: string;
         quantity: number;
         price: number;
-        selectedOptions?: import('@/core/domain/types').ItemAttributeSelection[];
+        selected_options?: import('@/core/domain/types').ItemAttributeSelection[];
       }[];
-      paymentMethod: string;
+      payment_method: string;
       tendered?: number;
       change?: number;
     }
@@ -176,7 +176,7 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
   // ============ 订单生命周期操作 ============
 
   openTable: (params) => {
-    const orderKey = params.tableId;
+    const orderKey = params.table_id;
     
     // Check if we have a finished order in memory that needs clearing
     // If the previous order on this table was completed/voided, we must clear the event history
@@ -202,15 +202,15 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
     if (!order) return;
 
     const event = createEvent(OrderEventType.ORDER_COMPLETED, {
-      receiptNumber,
-      finalTotal: order.total,
+      receipt_number: receiptNumber,
+      final_total: order.total,
     });
 
     get()._addEvent(orderKey, event);
 
     // Retail Label Print (Print on Complete)
-    const isRetail = orderKey.startsWith('RETAIL-') || order.isRetail === true;
-    if (isRetail) {
+    const is_retail = orderKey.startsWith('RETAIL-') || order.is_retail === true;
+    if (is_retail) {
       import('@/infrastructure/label/LabelPrintService').then(async ({ LabelPrintService }) => {
         const { isLabelPrintEnabled } = useUIStore.getState();
         if (isLabelPrintEnabled) {
@@ -249,21 +249,21 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
     // Even if items merge, we now emit ITEMS_ADDED to preserve the user intent for auditing.
     // The Event Reducer will handle the merging logic.
 
-    // Check if current order has isPrePayment set to true
+    // Check if current order has is_pre_payment set to true
     const currentOrder = get().getOrder(orderKey);
-    const isPrePayment = currentOrder?.isPrePayment === true;
+    const is_pre_payment = currentOrder?.is_pre_payment === true;
 
     const event = createEvent(OrderEventType.ITEMS_ADDED, { 
       items,
-      ...(isPrePayment ? { prePaymentReset: true } : {})
+      ...(is_pre_payment ? { prePaymentReset: true } : {})
     });
     get()._addEvent(orderKey, event);
 
     try {
       const orderAfterAdd = get().getOrder(orderKey);
-      const isRetail = orderKey.startsWith('RETAIL-') || orderAfterAdd?.isRetail === true;
+      const is_retail = orderKey.startsWith('RETAIL-') || orderAfterAdd?.is_retail === true;
       // Kitchen print is now handled server-side via order events
-      if (orderAfterAdd && !isRetail) {
+      if (orderAfterAdd && !is_retail) {
         // Label Print (client-side for now)
         import('@/infrastructure/label/LabelPrintService').then(async ({ LabelPrintService }) => {
           const { isLabelPrintEnabled } = useUIStore.getState();
@@ -288,7 +288,7 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
 
   modifyItem: (orderKey, instanceId, changes, options) => {
     const order = get().getOrder(orderKey);
-    let item = order?.items.find(i => i.instanceId === instanceId);
+    let item = order?.items.find(i => i.instance_id === instanceId);
     if (!item && instanceId && instanceId.startsWith('item-')) {
       const idxStr = instanceId.replace('item-', '');
       const idx = parseInt(idxStr);
@@ -331,8 +331,8 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
             // but we should ignore this unless originalPrice is also changing.
             
             if (key === 'price') {
-              const originalPriceChanged = changes.originalPrice !== undefined && 
-                  changes.originalPrice !== item?.originalPrice;
+              const originalPriceChanged = changes.original_price !== undefined && 
+                  changes.original_price !== item?.original_price;
               
               if (!originalPriceChanged) {
                 // If originalPrice didn't change, ignore 'price' update (it's just a base price reset)
@@ -340,8 +340,8 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
               }
             }
 
-            // Ignore originalPrice normalization unless price truly changed
-            if (key === 'originalPrice') {
+            // Ignore original_price normalization unless price truly changed
+            if (key === 'original_price') {
               const priceChanged = changes.price !== undefined && changes.price !== item?.price;
               if (!priceChanged) {
                 return;
@@ -355,10 +355,10 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
                   if (typeof oldValue === 'number') previousValues.price = oldValue;
                 }
                 break;
-              case 'originalPrice':
+              case 'original_price':
                 if (typeof newValue === 'number') {
-                  realChanges.originalPrice = newValue;
-                  if (typeof oldValue === 'number') previousValues.originalPrice = oldValue;
+                  realChanges.original_price = newValue;
+                  if (typeof oldValue === 'number') previousValues.original_price = oldValue;
                 }
                 break;
               case 'quantity':
@@ -367,10 +367,10 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
                   if (typeof oldValue === 'number') previousValues.quantity = oldValue;
                 }
                 break;
-              case 'discountPercent':
+              case 'discount_percent':
                 if (typeof newValue === 'number') {
-                  realChanges.discountPercent = newValue;
-                  if (typeof oldValue === 'number') previousValues.discountPercent = oldValue;
+                  realChanges.discount_percent = newValue;
+                  if (typeof oldValue === 'number') previousValues.discount_percent = oldValue;
                 }
                 break;
               case 'surcharge':
@@ -385,10 +385,10 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
                   if (typeof oldValue === 'string') previousValues.note = oldValue;
                 }
                 break;
-              case 'selectedOptions':
+              case 'selected_options':
                 if (Array.isArray(newValue)) {
-                  realChanges.selectedOptions = newValue;
-                  if (Array.isArray(oldValue)) previousValues.selectedOptions = oldValue;
+                  realChanges.selected_options = newValue;
+                  if (Array.isArray(oldValue)) previousValues.selected_options = oldValue;
                 }
                 break;
             }
@@ -399,9 +399,9 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
     if (Object.keys(realChanges).length === 0) return;
 
     const event = createEvent(OrderEventType.ITEM_MODIFIED, {
-      instanceId,
-      itemName: item?.name,
-      externalId: item?.externalId ? String(item.externalId) : undefined,
+      instance_id: instanceId,
+      item_name: item?.name,
+      external_id: item?.external_id ? String(item.external_id) : undefined,
       changes: realChanges,
       previousValues: Object.keys(previousValues).length > 0 ? previousValues : undefined
     }, { userId: options?.userId });
@@ -410,11 +410,11 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
 
   removeItem: (orderKey, instanceId, reason, options) => {
     const order = get().getOrder(orderKey);
-    const item = order?.items.find(i => i.instanceId === instanceId);
+    const item = order?.items.find(i => i.instance_id === instanceId);
     const event = createEvent(OrderEventType.ITEM_REMOVED, {
-      instanceId,
-      itemName: item?.name,
-      externalId: item?.externalId ? String(item.externalId) : undefined,
+      instance_id: instanceId,
+      item_name: item?.name,
+      external_id: item?.external_id ? String(item.external_id) : undefined,
       quantity: options?.quantity,
       reason,
     }, { userId: options?.userId });
@@ -422,7 +422,7 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
   },
 
   restoreItem: (orderKey, instanceId) => {
-    const event = createEvent(OrderEventType.ITEM_RESTORED, { instanceId });
+    const event = createEvent(OrderEventType.ITEM_RESTORED, { instance_id: instanceId });
     get()._addEvent(orderKey, event);
   },
 
@@ -437,7 +437,7 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
 
   cancelPayment: (orderKey, paymentId, reason) => {
     const event = createEvent(OrderEventType.PAYMENT_CANCELLED, {
-      paymentId,
+      payment_id: paymentId,
       reason,
     });
     get()._addEvent(orderKey, event);
@@ -449,7 +449,7 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
   },
 
   addSplitEvent: (orderKey, data) => {
-    const summary = `Split Bill: ${data.items.map(i => `${i.name} x${i.quantity}`).join(', ')}, Paid: ${data.splitAmount.toFixed(2)}`;
+    const summary = `Split Bill: ${data.items.map(i => `${i.name} x${i.quantity}`).join(', ')}, Paid: ${data.split_amount.toFixed(2)}`;
     const event = createEvent(OrderEventType.ORDER_SPLIT, data, {
         title: 'Split Payment',
         summary
@@ -462,22 +462,22 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
   mergeOrder: (targetOrder, sourceOrder) => {
     if (!sourceOrder) return;
 
-    const targetKey = targetOrder.key || String(targetOrder.tableId || '');
-    const sourceKey = sourceOrder.key || String(sourceOrder.tableId || '');
+    const targetKey = targetOrder.key || String(targetOrder.table_id || '');
+    const sourceKey = sourceOrder.key || String(sourceOrder.table_id || '');
 
     // 1. Add merged items to target
     const mergeEvent = createEvent(OrderEventType.ORDER_MERGED, {
-      sourceTableId: sourceKey,
-      sourceTableName: sourceOrder.receiptNumber || sourceKey,
+      source_table_id: sourceKey,
+      source_table_name: sourceOrder.receipt_number || sourceKey,
       items: sourceOrder.items.filter(i => !i._removed)
     });
     get()._addEvent(targetKey, mergeEvent);
 
     // 2. Mark source order as merged out (new status for audit)
     const mergedOutEvent = createEvent(OrderEventType.ORDER_MERGED_OUT, {
-      targetTableId: targetKey,
-      targetTableName: targetOrder.tableName || targetOrder.receiptNumber || targetKey,
-      reason: `Merged to ${targetOrder.receiptNumber || targetKey}`,
+      target_table_id: targetKey,
+      target_table_name: targetOrder.table_name || targetOrder.receipt_number || targetKey,
+      reason: `Merged to ${targetOrder.receipt_number || targetKey}`,
     });
     get()._addEvent(sourceKey, mergedOutEvent);
   },
@@ -498,34 +498,34 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
 
     // 1. First, open the target table (creates base order state)
     const openEvent = createEvent(OrderEventType.TABLE_OPENED, {
-      tableId: targetTable.id,
-      tableName: targetTable.name,
-      zoneId: targetTable.zoneId,
-      zoneName: targetTable.zoneName,
-      guestCount: sourceOrder.guestCount,
+      table_id: targetTable.id,
+      table_name: targetTable.name,
+      zone_id: targetTable.zoneId,
+      zone_name: targetTable.zone_name,
+      guest_count: sourceOrder.guest_count,
     });
     get()._addEvent(targetOrderKey, openEvent);
 
     // 2. Add TABLE_REASSIGNED event to update table info and transfer items
     // This event handles the table change without mutating original events
     const reassignEvent = createEvent(OrderEventType.TABLE_REASSIGNED, {
-      sourceTableId: sourceOrderKey,
-      sourceTableName: sourceOrder.tableName,
-      sourceZoneId: sourceOrder.zoneName,
-      sourceZoneName: sourceOrder.zoneName,
-      targetTableId: targetTable.id,
-      targetTableName: targetTable.name,
-      targetZoneId: targetTable.zoneId,
-      targetZoneName: targetTable.zoneName,
-      originalStartTime: tableOpenedEvent?.timestamp || sourceOrder.startTime,
+      source_table_id: sourceOrderKey,
+      source_table_name: sourceOrder.table_name,
+      source_zone_id: sourceOrder.zone_name,
+      source_zone_name: sourceOrder.zone_name,
+      target_table_id: targetTable.id,
+      target_table_name: targetTable.name,
+      target_zone_id: targetTable.zoneId,
+      target_zone_name: targetTable.zone_name,
+      original_start_time: tableOpenedEvent?.timestamp || sourceOrder.start_time,
       items: sourceOrder.items.filter(i => !i._removed),
     });
     get()._addEvent(targetOrderKey, reassignEvent);
 
     // 3. Close source order as MOVED
     const moveOutEvent = createEvent(OrderEventType.ORDER_MOVED_OUT, {
-      targetTableId: targetTable.id,
-      targetTableName: targetTable.name,
+      target_table_id: targetTable.id,
+      target_table_name: targetTable.name,
     });
     get()._addEvent(sourceOrderKey, moveOutEvent);
   },
@@ -620,7 +620,7 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
       const activeOrders = Object.values(orders);
       const moveEvents = activeOrders
         .flatMap(o => {
-          const orderKey = o.key || String(o.tableId || '');
+          const orderKey = o.key || String(o.table_id || '');
           return orderKey ? (events[orderKey] || []) : [];
         })
         .filter(e => e.type === OrderEventType.ORDER_MOVED);

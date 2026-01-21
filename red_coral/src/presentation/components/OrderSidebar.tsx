@@ -40,7 +40,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   const handleEditItem = React.useCallback((item: CartItem) => {
     // Find index of item in order.items
     const index = order.items.findIndex((i) => 
-      i.instanceId ? i.instanceId === item.instanceId : i.id === item.id
+      i.instance_id ? i.instance_id === item.instance_id : i.id === item.id
     );
     if (index !== -1) {
       setEditingItem({ item, index });
@@ -49,13 +49,13 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
 
   const handleSaveItem = React.useCallback(async (index: number, updates: Partial<CartItem>, _options?: { userId?: string }) => {
     const item = order.items[index];
-    const instanceId = item.instanceId || `item-${index}`;
+    const instanceId = item.instance_id || `item-${index}`;
 
     // Send command to backend - state will be updated via event
     await orderOps.modifyItem(order.key, instanceId, {
       price: updates.price,
       quantity: updates.quantity,
-      discountPercent: updates.discountPercent,
+      discount_percent: updates.discount_percent,
       surcharge: updates.surcharge,
       note: updates.note,
     });
@@ -71,9 +71,9 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         type: OrderEventType.ITEM_MODIFIED,
         timestamp: Date.now(),
         data: {
-          instanceId: instanceId,
-          itemName: item.name,
-          externalId: item.externalId ? String(item.externalId) : undefined,
+          instance_id: instanceId,
+          item_name: item.name,
+          external_id: item.external_id ? String(item.external_id) : undefined,
           changes: updates
         }
       };
@@ -94,8 +94,8 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
 
   const handleDeleteItem = React.useCallback(async (index: number, _options?: { userId?: string }) => {
     const item = order.items[index];
-    const instanceId = item.instanceId || `item-${index}`;
-    const paidQty = order.paidItemQuantities?.[instanceId] || 0;
+    const instanceId = item.instance_id || `item-${index}`;
+    const paidQty = order.paid_item_quantities?.[instanceId] || 0;
 
     // Case 1: Partially paid item - Remove unpaid portion
     if (paidQty > 0 && paidQty < item.quantity) {
@@ -118,9 +118,9 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           type: OrderEventType.ITEM_REMOVED,
           timestamp: Date.now(),
           data: {
-            instanceId: instanceId,
-            itemName: item.name,
-            externalId: item.externalId ? String(item.externalId) : undefined,
+            instance_id: instanceId,
+            item_name: item.name,
+            external_id: item.external_id ? String(item.external_id) : undefined,
             quantity: qtyToRemove,
             reason: 'Removed unpaid portion'
           }
@@ -156,9 +156,9 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         type: OrderEventType.ITEM_REMOVED,
         timestamp: Date.now(),
         data: {
-          instanceId: instanceId,
-          itemName: item.name,
-          externalId: item.externalId ? String(item.externalId) : undefined,
+          instance_id: instanceId,
+          item_name: item.name,
+          external_id: item.external_id ? String(item.external_id) : undefined,
           reason: 'Removed from payment screen'
         }
       };
@@ -187,10 +187,10 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       .reduce(
         (acc, item) => {
           const quantity = item.quantity;
-          const optionsModifier = calculateOptionsModifier(item.selectedOptions).toNumber();
-          const basePrice = (item.originalPrice ?? item.price) + optionsModifier;
+          const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
+          const basePrice = (item.original_price ?? item.price) + optionsModifier;
 
-          const unitDiscount = calculateDiscountAmount(basePrice, item.discountPercent || 0).toNumber();
+          const unitDiscount = calculateDiscountAmount(basePrice, item.discount_percent || 0).toNumber();
           const unitSurcharge = item.surcharge || 0;
 
           return {
@@ -218,10 +218,10 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   // Use backend-provided unpaidQuantity for each item
   const unpaidItems = React.useMemo(() => {
     return order.items
-      .filter(item => !item._removed && (item.unpaidQuantity ?? item.quantity) > 0)
+      .filter(item => !item._removed && (item.unpaid_quantity ?? item.quantity) > 0)
       .map(item => ({
         ...item,
-        quantity: item.unpaidQuantity ?? item.quantity, // Use unpaid quantity for display
+        quantity: item.unpaid_quantity ?? item.quantity, // Use unpaid quantity for display
       }));
   }, [order.items]);
 
@@ -238,14 +238,14 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-lg font-bold text-gray-800 leading-tight">
-              {t('checkout.tableOrder')} {order.zoneName }-{order.tableName}
+              {t('checkout.tableOrder')} {order.zone_name }-{order.table_name}
             </h1>
             <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
               <span>
-                {order.guestCount} {t('table.guests')}
+                {order.guest_count} {t('table.guests')}
               </span>
               <span className="w-1 h-1 rounded-full bg-gray-300" />
-              <span>{new Date(order.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+              <span>{new Date(order.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
             </div>
           </div>
 
@@ -259,7 +259,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
               <span className="text-sm font-bold">{t('pos.quickAdd.title')}</span>
             </button>
 
-            {onManage && !order.isRetail && (
+            {onManage && !order.is_retail && (
             <button
               onClick={onManage}
               className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors"
@@ -306,7 +306,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
             onUpdateSelectedQty={() => {}}
             onEditItem={handleEditItem}
             t={t}
-            paidItemQuantities={order.paidItemQuantities}
+            paid_item_quantities={order.paid_item_quantities}
           />
         ) : (
           <Suspense fallback={
@@ -395,7 +395,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
                const optimOrder = recalculateOrderTotal({
                    ...order,
                    items: newItems,
-                   isPrePayment: false,
+                   is_pre_payment: false,
                    timeline: [...(order.timeline || []), timelineEvent]
                });
 

@@ -51,7 +51,7 @@ export const DraftListModal = React.memo<DraftListModalProps>(({
                       {draft.items.reduce((acc, item) => acc + item.quantity, 0)} {t('common.label.quantity')}
                     </span>
                     <span className="text-gray-400 text-sm flex items-center gap-1">
-                      <Clock size={14} /> {new Date(draft.createdAt).toLocaleString()}
+                      <Clock size={14} /> {new Date(draft.created_at).toLocaleString()}
                     </span>
                   </div>
                   <div className="text-gray-500 text-sm line-clamp-1">

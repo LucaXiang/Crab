@@ -27,14 +27,14 @@ export const TimelinePreview: React.FC<TimelinePreviewProps> = ({
   });
 
   const groupedItems = React.useMemo(() => {
-    const map = new Map<string, { name: string; externalId?: number | string; quantity: number }>();
+    const map = new Map<string, { name: string; external_id?: number | string; quantity: number }>();
     
     cart.forEach((item) => {
-        const key = item.externalId ? `${item.externalId}-${item.name}` : item.name;
+        const key = item.external_id ? `${item.external_id}-${item.name}` : item.name;
         if (!map.has(key)) {
             map.set(key, { 
                 name: item.name, 
-                externalId: item.externalId, 
+                external_id: item.external_id, 
                 quantity: 0 
             });
         }
@@ -77,9 +77,9 @@ export const TimelinePreview: React.FC<TimelinePreviewProps> = ({
                   <div key={idx} className="flex justify-between items-center py-1 border-b border-gray-50 last:border-0">
                     <div className="flex items-center gap-1.5 min-w-0 pr-2">
                         {/* User requested to use InstanceID instead of ExternalID
-                        {item.externalId && (
+                        {item.external_id && (
                             <span className="text-[10px] text-white bg-gray-900/85 font-bold font-mono px-1.5 py-0.5 rounded backdrop-blur-[1px] shrink-0">
-                                {item.externalId}
+                                {item.external_id}
                             </span>
                         )} */}
                         <span className="font-medium text-gray-700 truncate">{item.name}</span>

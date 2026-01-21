@@ -327,7 +327,9 @@ impl ClientBridge {
                                 if let Some(session) = tenant_manager.current_session() {
                                     // 检查会话是否过期 (优先使用 expires_at，否则从 token 解析)
                                     let expires_at = session.expires_at.or_else(|| {
-                                        super::session_cache::EmployeeSession::parse_jwt_exp(&session.token)
+                                        super::session_cache::EmployeeSession::parse_jwt_exp(
+                                            &session.token,
+                                        )
                                     });
 
                                     if let Some(exp) = expires_at {
@@ -732,7 +734,8 @@ impl ClientBridge {
                                     ))
                                 })?;
                                 let token = authenticated.token().unwrap_or_default().to_string();
-                                let expires_at = super::session_cache::EmployeeSession::parse_jwt_exp(&token);
+                                let expires_at =
+                                    super::session_cache::EmployeeSession::parse_jwt_exp(&token);
 
                                 let session = super::session_cache::EmployeeSession {
                                     username: username.to_string(),
@@ -767,7 +770,8 @@ impl ClientBridge {
                                     ))
                                 })?;
                                 let token = authenticated.token().unwrap_or_default().to_string();
-                                let expires_at = super::session_cache::EmployeeSession::parse_jwt_exp(&token);
+                                let expires_at =
+                                    super::session_cache::EmployeeSession::parse_jwt_exp(&token);
 
                                 let session = super::session_cache::EmployeeSession {
                                     username: username.to_string(),
@@ -806,7 +810,8 @@ impl ClientBridge {
                                     ))
                                 })?;
                                 let token = authenticated.token().unwrap_or_default().to_string();
-                                let expires_at = super::session_cache::EmployeeSession::parse_jwt_exp(&token);
+                                let expires_at =
+                                    super::session_cache::EmployeeSession::parse_jwt_exp(&token);
 
                                 let session = super::session_cache::EmployeeSession {
                                     username: username.to_string(),
@@ -840,7 +845,8 @@ impl ClientBridge {
                                     ))
                                 })?;
                                 let token = authenticated.token().unwrap_or_default().to_string();
-                                let expires_at = super::session_cache::EmployeeSession::parse_jwt_exp(&token);
+                                let expires_at =
+                                    super::session_cache::EmployeeSession::parse_jwt_exp(&token);
 
                                 let session = super::session_cache::EmployeeSession {
                                     username: username.to_string(),
@@ -952,11 +958,14 @@ impl ClientBridge {
                 }
             }
 
-            return Err(BridgeError::Http(status.as_u16(), if text.is_empty() {
-                format!("HTTP Error: {}", status)
-            } else {
-                text
-            }));
+            return Err(BridgeError::Http(
+                status.as_u16(),
+                if text.is_empty() {
+                    format!("HTTP Error: {}", status)
+                } else {
+                    text
+                },
+            ));
         }
 
         resp.json::<T>()

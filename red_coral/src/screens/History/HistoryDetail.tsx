@@ -57,19 +57,19 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
   
   const allocatedPaidMap = React.useMemo(() => {
     const map = new Map<string, number>();
-    if (!order.paidItemQuantities) return map;
+    if (!order.paid_item_quantities) return map;
 
-    // Group items by originalInstanceId (or instanceId if no original)
+    // Group items by original_instance_id (or instanceId if no original)
     const groups = new Map<string, typeof order.items>();
     order.items.forEach(item => {
-        const key = item.originalInstanceId || item.instanceId;
+        const key = item.original_instance_id || item.instance_id;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(item);
     });
 
     // Distribute paid quantities
     groups.forEach((items, key) => {
-        let availablePaid = order.paidItemQuantities![key] || 0;
+        let availablePaid = order.paid_item_quantities![key] || 0;
         
         // Sort items: Active first, then Removed
         // This ensures that if we have 3 items (1 paid), and delete 2,
@@ -81,18 +81,18 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
 
         sortedItems.forEach(item => {
             const allocated = Math.min(item.quantity, availablePaid);
-            map.set(item.instanceId, allocated);
+            map.set(item.instance_id, allocated);
             availablePaid -= allocated;
         });
     });
 
     return map;
-  }, [order.items, order.paidItemQuantities]);
+  }, [order.items, order.paid_item_quantities]);
 
   const itemIndexMap = React.useMemo(() => {
     const map = new Map<string, number>();
     order.items.forEach((item, idx) => {
-      map.set(item.instanceId, idx);
+      map.set(item.instance_id, idx);
     });
     return map;
   }, [order.items]);
@@ -127,7 +127,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
         <div>
           <div className="flex items-center gap-3 mb-2">
             <h1 className={`text-2xl font-bold ${isVoid || isMerged ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
-              {order.receiptNumber || order.tableName }
+              {order.receipt_number || order.table_name }
             </h1>
             {isVoid && (
               <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded uppercase">
@@ -150,18 +150,18 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
             </ProtectedGate>
           </div>
           <div className="flex gap-4 text-sm text-gray-500">
-            {order.tableName !== 'RETAIL' && (
+            {order.table_name !== 'RETAIL' && (
               <div className="flex items-center gap-1.5 font-medium text-gray-700">
-                <span>{t('history.info.table')}: {order.tableName}</span>
+                <span>{t('history.info.table')}: {order.table_name}</span>
               </div>
             )}
             <div className="flex items-center gap-1.5">
               <Calendar size={16} />
-              <span>{new Date(order.startTime).toLocaleDateString()}</span>
+              <span>{new Date(order.start_time).toLocaleDateString()}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Clock size={16} />
-              <span>{new Date(order.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} - {order.endTime ? new Date(order.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : t('common.label.none')}</span>
+              <span>{new Date(order.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} - {order.end_time ? new Date(order.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : t('common.label.none')}</span>
             </div>
           </div>
         </div>
@@ -189,17 +189,17 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
             </div>
             <div className="divide-y divide-gray-100">
               {activeItems.map((item) => {
-                const idx = itemIndexMap.get(item.instanceId) ?? -1;
+                const idx = itemIndexMap.get(item.instance_id) ?? -1;
                 return (
                   <OrderItemRow
-                    key={item.instanceId || `${item.id}-${idx}`}
+                    key={item.instance_id || `${item.id}-${idx}`}
                     item={item}
                     index={idx}
                     isExpanded={expandedItems.has(idx)}
                     onToggle={toggleItem}
                     order={order}
                     t={t}
-                    allocatedPaidQty={allocatedPaidMap.get(item.instanceId)}
+                    allocatedPaidQty={allocatedPaidMap.get(item.instance_id)}
                   />
                 );
               })}
@@ -210,17 +210,17 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                     {t('history.info.removedItems')}
                   </div>
                   {removedItems.map((item) => {
-                    const idx = itemIndexMap.get(item.instanceId) ?? -1;
+                    const idx = itemIndexMap.get(item.instance_id) ?? -1;
                     return (
                       <OrderItemRow
-                        key={item.instanceId || `${item.id}-${idx}`}
+                        key={item.instance_id || `${item.id}-${idx}`}
                         item={item}
                         index={idx}
                         isExpanded={expandedItems.has(idx)}
                         onToggle={toggleItem}
                         order={order}
                         t={t}
-                        allocatedPaidQty={allocatedPaidMap.get(item.instanceId)}
+                        allocatedPaidQty={allocatedPaidMap.get(item.instance_id)}
                       />
                     );
                   })}
@@ -278,15 +278,15 @@ interface OrderItemRowProps {
 
 const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
   ({ item, index, isExpanded, onToggle, order, t, allocatedPaidQty }) => {
-    const discountPercent = item.discountPercent || 0;
-    const optionsModifier = calculateOptionsModifier(item.selectedOptions).toNumber();
-    const baseUnitPrice = (item.originalPrice ?? item.price) + optionsModifier;
+    const discountPercent = item.discount_percent || 0;
+    const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
+    const baseUnitPrice = (item.original_price ?? item.price) + optionsModifier;
     const finalUnitPrice = calculateItemFinalPrice(item).toNumber();
     const lineTotal = calculateItemTotal(item).toNumber();
     const hasDiscount = discountPercent > 0 || baseUnitPrice !== finalUnitPrice;
     const itemSurcharge = item.surcharge || 0;
-    const hasAttributes = item.selectedOptions && item.selectedOptions.length > 0;
-    const paidQty = allocatedPaidQty !== undefined ? allocatedPaidQty : (order.paidItemQuantities?.[item.instanceId] || 0);
+    const hasAttributes = item.selected_options && item.selected_options.length > 0;
+    const paidQty = allocatedPaidQty !== undefined ? allocatedPaidQty : (order.paid_item_quantities?.[item.instance_id] || 0);
     const isFullyPaid = paidQty >= item.quantity;
     const isRemoved = item._removed;
 
@@ -310,17 +310,17 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
             <div className="flex-1 min-w-0">
               <div className="font-medium text-gray-800 flex items-center gap-2 flex-wrap">
                 {/* User requested to use InstanceID instead of ExternalID
-                {item.externalId && (
+                {item.external_id && (
                   <span className="text-[10px] text-white bg-gray-900/85 font-bold font-mono px-1.5 py-0.5 rounded backdrop-blur-[1px]">
-                    {item.externalId}
+                    {item.external_id}
                   </span>
                 )} */}
                 <span>{item.name}</span>
                 <span className="text-[10px] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded">
-                  #{(item.originalInstanceId || item.instanceId).slice(-5)}
+                  #{(item.original_instance_id || item.instance_id).slice(-5)}
                 </span>
-                {item.discountPercent ? (
-                  <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">-{item.discountPercent}%</span>
+                {item.discount_percent ? (
+                  <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">-{item.discount_percent}%</span>
                 ) : null}
                 {itemSurcharge > 0 ? (
                   <span className="text-[10px] font-bold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">+{formatCurrency(itemSurcharge)}</span>
@@ -351,7 +351,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
         {isExpanded && hasAttributes && (
           <div className="px-16 pb-4 pt-0 animate-in slide-in-from-top-2 duration-200">
             <div className="p-3 bg-white rounded-lg border border-gray-100 space-y-1 shadow-sm">
-              {item.selectedOptions && groupOptionsByAttribute(item.selectedOptions).map((group, idx) => (
+              {item.selected_options && groupOptionsByAttribute(item.selected_options).map((group, idx) => (
                 <div key={idx} className="flex justify-between items-center text-sm">
                   <div className="flex items-center gap-2">
                     <span className="text-gray-500 font-medium">{group.attributeName}:</span>
@@ -447,15 +447,15 @@ export const PaymentEventRow: React.FC<PaymentEventRowProps> = React.memo(({ eve
                 <div className="flex flex-col">
                   <span className="text-gray-800 font-medium">
                     {item.name} <span className="text-gray-500">x{item.quantity}</span>
-                    {item.instanceId && (
+                    {item.instance_id && (
                       <span className="ml-1.5 text-[10px] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded">
-                        #{item.instanceId.slice(-5)}
+                        #{item.instance_id.slice(-5)}
                       </span>
                     )}
                   </span>
-                  {item.selectedOptions && item.selectedOptions.length > 0 && (
+                  {item.selected_options && item.selected_options.length > 0 && (
                     <span className="text-xs text-gray-500 pl-2 border-l-2 border-gray-100 mt-1">
-                      {item.selectedOptions.map((o: any) => o.optionName).join(', ')}
+                      {item.selected_options.map((o: any) => o.optionName).join(', ')}
                     </span>
                   )}
                 </div>

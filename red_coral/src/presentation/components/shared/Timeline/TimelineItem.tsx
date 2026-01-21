@@ -1,6 +1,6 @@
 import React from 'react';
 import { getTagStyle } from '../CustomerInput';
-import { TimelineDisplayData } from './useTimelineEvent';
+import type { TimelineDisplayData } from './renderers';
 
 const renderDetailText = (text: string) => {
     const parts = text.split(/(#\d{5})/g);

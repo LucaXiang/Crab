@@ -6,7 +6,6 @@ import { createTauriClient } from '@/infrastructure/api';
 const api = createTauriClient();
 import { Table, Zone, HeldOrder, Permission } from '@/core/domain/types';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
-import { toHeldOrder } from '@/core/stores/order/orderAdapter';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { ZoneSidebar } from '../ZoneSidebar';
@@ -59,19 +58,19 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         if (!zones || zones.length === 0) return;
         if (activeZoneId) return;
         const sourceOrder = heldOrders.find(o => o.key === sourceTable.id);
-        const preferZone = sourceOrder?.zoneName ? zones.find(z => z.name === sourceOrder.zoneName) : undefined;
+        const preferZone = sourceOrder?.zone_name ? zones.find(z => z.name === sourceOrder.zone_name) : undefined;
         const nextZoneId = preferZone?.id || zones[0].id;
         if (nextZoneId) setActiveZoneId(nextZoneId);
     }, [zones, heldOrders, sourceTable.id, activeZoneId]);
 
     // Get source order from active store or fallback to prop
     const sourceOrderSnapshot = useActiveOrdersStore(state => state.orders[sourceTable.id as string]);
-    const sourceOrder = sourceOrderSnapshot ? toHeldOrder(sourceOrderSnapshot) : heldOrders.find(o => o.key === sourceTable.id);
+    const sourceOrder = sourceOrderSnapshot ? sourceOrderSnapshot : heldOrders.find(o => o.key === sourceTable.id);
 
     const hasPayments = useMemo(() => {
         if (!sourceOrder) return false;
-        const hasPaidAmount = (sourceOrder.paidAmount || 0) > 0;
-        const hasPaidItems = sourceOrder.paidItemQuantities && Object.keys(sourceOrder.paidItemQuantities).length > 0;
+        const hasPaidAmount = (sourceOrder.paid_amount || 0) > 0;
+        const hasPaidItems = sourceOrder.paid_item_quantities && Object.keys(sourceOrder.paid_item_quantities).length > 0;
         return hasPaidAmount || hasPaidItems;
     }, [sourceOrder]);
 
@@ -80,7 +79,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         const store = useActiveOrdersStore.getState();
         const targetSnapshot = store.getOrder(selectedTargetTable.id as string);
         if (!targetSnapshot) return;
-        const targetOrder = toHeldOrder(targetSnapshot);
+        const targetOrder = targetSnapshot;
 
         try {
             const mergedOrder = await orderOps.mergeOrders(sourceOrder, targetOrder);
@@ -123,7 +122,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             .map(([instanceId, qty]) => {
                 const originalItem = sourceOrder.items.find(i => i.id === instanceId);
                 return {
-                    instanceId,
+                    instance_id: instanceId,
                     quantity: qty,
                     name: originalItem?.name || t('common.label.unknownItem'),
                     price: originalItem?.price || 0
@@ -208,7 +207,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                     <div className="space-y-2">
                         {sourceOrder.items.map(item => {
                             const currentSplitQty = splitItems[item.id] || 0;
-                            const paidQty = (sourceOrder.paidItemQuantities && sourceOrder.paidItemQuantities[item.instanceId]) || 0;
+                            const paidQty = (sourceOrder.paid_item_quantities && sourceOrder.paid_item_quantities[item.instance_id]) || 0;
                             const maxQty = Math.max(0, item.quantity - paidQty);
 
                             return (

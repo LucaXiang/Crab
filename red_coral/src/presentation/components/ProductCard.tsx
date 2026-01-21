@@ -13,7 +13,7 @@ import { formatCurrency } from '@/utils/currency';
  */
 export interface ProductWithPrice extends Product {
   price?: number;      // From root spec
-  externalId?: number | string; // From root spec external_id
+  external_id?: number | string; // From root spec external_id
 }
 
 interface ProductCardProps {
@@ -89,9 +89,9 @@ export const ProductCard = React.memo<ProductCardProps>(
                <ImageOff size={24} />
              </div>
           )}
-          {product.externalId !== undefined && (
+          {product.external_id !== undefined && (
             <div className="absolute bottom-0 left-0 bg-gray-900/85 text-white text-[10px] font-bold font-mono px-1.5 py-0.5 rounded-tr-md backdrop-blur-[1px] shadow-sm z-10 leading-none">
-              {product.externalId}
+              {product.external_id}
             </div>
           )}
         </div>

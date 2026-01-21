@@ -91,24 +91,24 @@ fn check_schedule(rule: &PriceRule, _current_time: i64) -> bool {
         }
 
         // Check time range
-        if let (Some(start), Some(end)) = (&config.start_time, &config.end_time) {
-            if let (Ok(start_time), Ok(end_time)) = (
+        if let (Some(start), Some(end)) = (&config.start_time, &config.end_time)
+            && let (Ok(start_time), Ok(end_time)) = (
                 NaiveTime::parse_from_str(start, "%H:%M"),
                 NaiveTime::parse_from_str(end, "%H:%M"),
-            ) {
-                let current_time = NaiveTime::from_hms_opt(now.hour(), now.minute(), 0)
-                    .unwrap_or_else(|| NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+            )
+        {
+            let current_time = NaiveTime::from_hms_opt(now.hour(), now.minute(), 0)
+                .unwrap_or_else(|| NaiveTime::from_hms_opt(0, 0, 0).unwrap());
 
-                // Handle overnight ranges (e.g., 22:00 - 02:00)
-                if start_time <= end_time {
-                    if !(current_time >= start_time && current_time <= end_time) {
-                        return false;
-                    }
-                } else {
-                    // Overnight
-                    if !(current_time >= start_time || current_time <= end_time) {
-                        return false;
-                    }
+            // Handle overnight ranges (e.g., 22:00 - 02:00)
+            if start_time <= end_time {
+                if !(current_time >= start_time && current_time <= end_time) {
+                    return false;
+                }
+            } else {
+                // Overnight
+                if !(current_time >= start_time || current_time <= end_time) {
+                    return false;
                 }
             }
         }

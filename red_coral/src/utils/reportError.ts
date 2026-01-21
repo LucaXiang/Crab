@@ -15,7 +15,7 @@ export async function reportError(
   const err = error instanceof Error ? error : new Error(String(error));
 
   let authState: { user?: { id?: number; username?: string; role_name?: string } | null } | null = null;
-  let checkoutState: { currentOrderKey?: string | null; checkoutOrder?: { key?: string; receiptNumber?: string; tableName?: string; zoneName?: string } | null } | null = null;
+  let checkoutState: { currentOrderKey?: string | null; checkoutOrder?: { key?: string; receipt_number?: string; table_name?: string; zone_name?: string } | null } | null = null;
 
   try {
     const { useAuthStore } = await import('@/core/stores/auth/useAuthStore');
@@ -32,9 +32,9 @@ export async function reportError(
   }
 
   const activeOrderKey = checkoutState?.currentOrderKey ?? checkoutState?.checkoutOrder?.key ?? null;
-  const receiptNumber = checkoutState?.checkoutOrder?.receiptNumber ?? null;
-  const tableName = checkoutState?.checkoutOrder?.tableName ?? null;
-  const zoneName = checkoutState?.checkoutOrder?.zoneName ?? null;
+  const receiptNumber = checkoutState?.checkoutOrder?.receipt_number ?? null;
+  const tableName = checkoutState?.checkoutOrder?.table_name ?? null;
+  const zone_name = checkoutState?.checkoutOrder?.zone_name ?? null;
 
   const payload: Record<string, unknown> = {
     source: options?.source ?? 'frontend',
@@ -48,7 +48,7 @@ export async function reportError(
     order_key: activeOrderKey,
     receipt_number: receiptNumber,
     table_name: tableName,
-    zone_name: zoneName,
+    zone_name: zone_name,
   };
 
   if (options?.extras) {

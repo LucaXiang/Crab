@@ -33,7 +33,7 @@ export const printOrderReceipt = async (
 ): Promise<void> => {
   try {
     const { printReceipt } = await import('@/infrastructure/print/printService');
-    const orderId = order.receiptNumber || order.key || '';
+    const orderId = order.receipt_number || order.key || '';
     await printReceipt({
       orderId,
       printerId: printerName ? parseInt(printerName) : undefined,

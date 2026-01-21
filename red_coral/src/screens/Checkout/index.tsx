@@ -56,11 +56,11 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   }, [order]);
 
   const handleUpdateOrder = useCallback((updatedOrder: HeldOrder) => {
-    // Preserve isRetail flag if it exists in current localOrder but missing in updatedOrder
-    // (because EventStore doesn't persist isRetail for Retail orders)
+    // Preserve is_retail flag if it exists in current localOrder but missing in updatedOrder
+    // (because EventStore doesn't persist is_retail for Retail orders)
     const preservedOrder = {
         ...updatedOrder,
-        isRetail: localOrder.isRetail || updatedOrder.isRetail
+        is_retail: localOrder.is_retail || updatedOrder.is_retail
     };
 
     setLocalOrder(preservedOrder);
@@ -71,7 +71,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     }
 
     // 不再在 ACTIVE 阶段持久化到后端，仅更新本地状态
-  }, [propOnUpdateOrder, localOrder.isRetail, setCheckoutOrder]);
+  }, [propOnUpdateOrder, localOrder.is_retail, setCheckoutOrder]);
 
   /**
    * 处理支付完成
@@ -94,7 +94,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     if (propOnVoid) {
       propOnVoid(reason);
     } else {
-      const orderKey = order.key || String(order.tableId || '');
+      const orderKey = order.key || String(order.table_id || '');
       voidOrder(orderKey, reason);
       onCancel();
     }

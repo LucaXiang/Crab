@@ -39,7 +39,7 @@ impl From<BusMessage> for ServerMessageEvent {
 /// Used to determine how to emit the message to the frontend.
 pub enum MessageRoute {
     /// Order event - should be emitted as "order-event"
-    OrderEvent(OrderEvent),
+    OrderEvent(Box<OrderEvent>),
     /// General server message - should be emitted as "server-message"
     ServerMessage(ServerMessageEvent),
 }
@@ -59,7 +59,7 @@ impl MessageRoute {
                     // Try to extract OrderEvent from data field
                     if let Some(data) = sync_payload.data {
                         if let Ok(order_event) = serde_json::from_value::<OrderEvent>(data) {
-                            return MessageRoute::OrderEvent(order_event);
+                            return MessageRoute::OrderEvent(Box::new(order_event));
                         }
                     }
                 }
@@ -97,7 +97,7 @@ mod tests {
 
     #[test]
     fn test_message_route_order_event() {
-        use shared::order::{OrderEventType, EventPayload};
+        use shared::order::{EventPayload, OrderEventType};
 
         // Create an OrderEvent with all required fields
         let order_event = OrderEvent {
@@ -105,7 +105,7 @@ mod tests {
             sequence: 1,
             order_id: "order-123".to_string(),
             timestamp: 1705900000000, // Unix milliseconds (server time)
-            client_timestamp: None, // Optional client timestamp for clock skew debugging
+            client_timestamp: None,   // Optional client timestamp for clock skew debugging
             operator_id: "op-001".to_string(),
             operator_name: "Test Operator".to_string(),
             command_id: "cmd-001".to_string(),

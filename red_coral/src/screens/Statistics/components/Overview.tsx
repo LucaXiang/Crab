@@ -32,7 +32,7 @@ export const Overview: React.FC<OverviewProps> = ({
   onCustomEndDateChange,
 }) => {
   const { t } = useI18n();
-  const hasData = overview.todayOrders > 0 || revenueTrend.length > 0;
+  const hasData = overview.today_orders > 0 || revenueTrend.length > 0;
 
   return (
     <div className="space-y-6 min-w-0">

@@ -12,7 +12,6 @@ import { calculateDiscountAmount, calculateItemFinalPrice } from '@/utils/pricin
 import { useActiveOrdersStore } from './useActiveOrdersStore';
 import { useReceiptStore } from './useReceiptStore';
 import { useCheckoutStore } from './useCheckoutStore';
-import { toHeldOrder } from './orderAdapter';
 import { useBridgeStore } from '@/core/stores/bridge/useBridgeStore';
 import type {
   OrderCommand,
@@ -72,7 +71,7 @@ async function sendCommand(command: OrderCommand): Promise<CommandResponse> {
  */
 function toCartItemInput(item: CartItem): CartItemInput {
   // Convert ItemAttributeSelection[] to ItemOption[] if present
-  const selectedOptions = item.selectedOptions?.map(opt => ({
+  const selectedOptions = item.selected_options?.map(opt => ({
     attribute_id: opt.attribute_id,
     attribute_name: opt.attribute_name ?? opt.name,
     option_idx: opt.option_idx,
@@ -81,23 +80,23 @@ function toCartItemInput(item: CartItem): CartItemInput {
   })) ?? null;
 
   return {
-    product_id: item.productId ?? item.id,
+    product_id: item.product_id ?? item.id,
     name: item.name,
     price: item.price,
-    original_price: item.originalPrice ?? item.price,
+    original_price: item.original_price ?? item.price,
     quantity: item.quantity,
     note: item.note ?? null,
-    discount_percent: item.discountPercent ?? null,
+    discount_percent: item.discount_percent ?? null,
     surcharge: item.surcharge ?? null,
     selected_options: selectedOptions,
-    selected_specification: item.selectedSpecification ? {
-      id: item.selectedSpecification.id,
-      name: item.selectedSpecification.name,
-      receipt_name: item.selectedSpecification.receipt_name ?? null,
-      price: item.selectedSpecification.price ?? null,
+    selected_specification: item.selected_specification ? {
+      id: item.selected_specification.id,
+      name: item.selected_specification.name,
+      receipt_name: item.selected_specification.receipt_name ?? null,
+      price: item.selected_specification.price ?? null,
     } : null,
-    authorizer_id: item.authorizerId ?? null,
-    authorizer_name: item.authorizerName ?? null,
+    authorizer_id: item.authorizer_id ?? null,
+    authorizer_name: item.authorizer_name ?? null,
   };
 }
 
@@ -177,7 +176,7 @@ export const handleTableSelect = async (
   const checkoutStore = useCheckoutStore.getState();
 
   const existingSnapshot = store.getOrderByTable(tableId);
-  const existingOrder = existingSnapshot ? toHeldOrder(existingSnapshot) : undefined;
+  const existingOrder = existingSnapshot ? existingSnapshot : undefined;
 
   // 1. If cart has items, we are ADDING (Merge) or CREATING
   if (cart.length > 0) {
@@ -207,10 +206,10 @@ export const completeOrder = async (
   const receiptStore = useReceiptStore.getState();
   const store = useActiveOrdersStore.getState();
 
-  const orderId = order.id || order.key || String(order.tableId || '');
+  const orderId = order.id || order.key || String(order.table_id || '');
 
   // Ensure receipt number
-  let finalReceiptNumber = order.receiptNumber;
+  let finalReceiptNumber = order.receipt_number;
   if (!finalReceiptNumber || !finalReceiptNumber.startsWith('FAC')) {
     finalReceiptNumber = receiptStore.generateReceiptNumber();
   }
@@ -238,7 +237,7 @@ export const completeOrder = async (
 
   // Return updated order (may take a moment for event to arrive)
   const snapshot = store.getOrder(orderId);
-  return snapshot ? toHeldOrder(snapshot) : order;
+  return snapshot ? snapshot : order;
 };
 
 /**
@@ -249,7 +248,7 @@ export const voidOrder = async (
   reason?: string
 ): Promise<HeldOrder> => {
   const store = useActiveOrdersStore.getState();
-  const orderId = order.id || order.key || String(order.tableId || '');
+  const orderId = order.id || order.key || String(order.table_id || '');
 
   const command = createCommand({
     type: 'VOID_ORDER',
@@ -259,7 +258,7 @@ export const voidOrder = async (
   await sendCommand(command);
 
   const snapshot = store.getOrder(orderId);
-  return snapshot ? toHeldOrder(snapshot) : order;
+  return snapshot ? snapshot : order;
 };
 
 /**
@@ -272,7 +271,7 @@ export const partialSettle = async (
   const store = useActiveOrdersStore.getState();
   const checkoutStore = useCheckoutStore.getState();
 
-  const orderId = order.id || order.key || String(order.tableId || '');
+  const orderId = order.id || order.key || String(order.table_id || '');
 
   // Add payments
   for (const payment of newPayments) {
@@ -289,7 +288,7 @@ export const partialSettle = async (
 
   // Sync checkout store
   const snapshot = store.getOrder(orderId);
-  const updatedOrder = snapshot ? toHeldOrder(snapshot) : order;
+  const updatedOrder = snapshot ? snapshot : order;
 
   if (checkoutStore.checkoutOrder?.key === orderId) {
     checkoutStore.setCheckoutOrder(updatedOrder);
@@ -314,14 +313,14 @@ export const splitOrder = async (
   order: HeldOrder,
   splitData: {
     splitAmount: number;
-    items: { instanceId: string; name: string; quantity: number }[];
+    items: { instance_id: string; name: string; quantity: number }[];
     paymentMethod: string;
     tendered?: number;
     change?: number;
   }
 ): Promise<HeldOrder> => {
   const store = useActiveOrdersStore.getState();
-  const orderId = order.id || order.key || String(order.tableId || '');
+  const orderId = order.id || order.key || String(order.table_id || '');
 
   const command = createCommand({
     type: 'SPLIT_ORDER',
@@ -329,7 +328,7 @@ export const splitOrder = async (
     split_amount: splitData.splitAmount,
     payment_method: splitData.paymentMethod,
     items: splitData.items.map(item => ({
-      instance_id: item.instanceId,
+      instance_id: item.instance_id,
       name: item.name,
       quantity: item.quantity,
     })),
@@ -338,7 +337,7 @@ export const splitOrder = async (
   await sendCommand(command);
 
   const snapshot = store.getOrder(orderId);
-  return snapshot ? toHeldOrder(snapshot) : order;
+  return snapshot ? snapshot : order;
 };
 
 /**
@@ -347,28 +346,28 @@ export const splitOrder = async (
 export const updateOrderInfo = async (
   order: HeldOrder,
   info: {
-    receiptNumber?: string;
-    guestCount?: number;
-    tableName?: string;
-    isPrePayment?: boolean;
+    receipt_number?: string;
+    guest_count?: number;
+    table_name?: string;
+    is_pre_payment?: boolean;
   }
 ): Promise<HeldOrder> => {
   const store = useActiveOrdersStore.getState();
-  const orderId = order.id || order.key || String(order.tableId || '');
+  const orderId = order.id || order.key || String(order.table_id || '');
 
   const command = createCommand({
     type: 'UPDATE_ORDER_INFO',
     order_id: orderId,
-    receipt_number: info.receiptNumber ?? null,
-    guest_count: info.guestCount ?? null,
-    table_name: info.tableName ?? null,
-    is_pre_payment: info.isPrePayment ?? null,
+    receipt_number: info.receipt_number ?? null,
+    guest_count: info.guest_count ?? null,
+    table_name: info.table_name ?? null,
+    is_pre_payment: info.is_pre_payment ?? null,
   });
 
   await sendCommand(command);
 
   const snapshot = store.getOrder(orderId);
-  return snapshot ? toHeldOrder(snapshot) : order;
+  return snapshot ? snapshot : order;
 };
 
 /**
@@ -381,7 +380,7 @@ export const moveOrder = async (
   targetZoneName?: string
 ): Promise<HeldOrder> => {
   const store = useActiveOrdersStore.getState();
-  const orderId = order.id || order.key || String(order.tableId || '');
+  const orderId = order.id || order.key || String(order.table_id || '');
 
   const command = createCommand({
     type: 'MOVE_ORDER',
@@ -395,7 +394,7 @@ export const moveOrder = async (
 
   // Order will be at new table ID after move
   const snapshot = store.getOrder(targetTableId);
-  return snapshot ? toHeldOrder(snapshot) : order;
+  return snapshot ? snapshot : order;
 };
 
 /**
@@ -406,8 +405,8 @@ export const mergeOrders = async (
   targetOrder: HeldOrder
 ): Promise<HeldOrder> => {
   const store = useActiveOrdersStore.getState();
-  const sourceId = sourceOrder.id || sourceOrder.key || String(sourceOrder.tableId || '');
-  const targetId = targetOrder.id || targetOrder.key || String(targetOrder.tableId || '');
+  const sourceId = sourceOrder.id || sourceOrder.key || String(sourceOrder.table_id || '');
+  const targetId = targetOrder.id || targetOrder.key || String(targetOrder.table_id || '');
 
   const command = createCommand({
     type: 'MERGE_ORDERS',
@@ -418,7 +417,7 @@ export const mergeOrders = async (
   await sendCommand(command);
 
   const snapshot = store.getOrder(targetId);
-  return snapshot ? toHeldOrder(snapshot) : targetOrder;
+  return snapshot ? snapshot : targetOrder;
 };
 
 // ============================================================================
@@ -446,11 +445,11 @@ export const addItems = async (
  */
 export const modifyItem = async (
   orderId: string,
-  instanceId: string,
+  instance_id: string,
   changes: {
     price?: number;
     quantity?: number;
-    discountPercent?: number;
+    discount_percent?: number;
     surcharge?: number;
     note?: string;
   }
@@ -458,11 +457,11 @@ export const modifyItem = async (
   const command = createCommand({
     type: 'MODIFY_ITEM',
     order_id: orderId,
-    instance_id: instanceId,
+    instance_id: instance_id,
     changes: {
       price: changes.price ?? null,
       quantity: changes.quantity ?? null,
-      discount_percent: changes.discountPercent ?? null,
+      discount_percent: changes.discount_percent ?? null,
       surcharge: changes.surcharge ?? null,
       note: changes.note ?? null,
     },
@@ -476,14 +475,14 @@ export const modifyItem = async (
  */
 export const removeItem = async (
   orderId: string,
-  instanceId: string,
+  instance_id: string,
   reason?: string,
   quantity?: number
 ): Promise<void> => {
   const command = createCommand({
     type: 'REMOVE_ITEM',
     order_id: orderId,
-    instance_id: instanceId,
+    instance_id: instance_id,
     reason: reason ?? null,
     quantity: quantity ?? null,
   });

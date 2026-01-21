@@ -173,23 +173,12 @@ export const useAuthStore = create<AuthStore>()(
        */
       hasRole: (role: string | string[]) => {
         const { user } = get();
-        if (!user) return false;
+        if (!user || !user.role_name) return false;
 
-        // 优先检查 role_name
-        if (user.role_name) {
-          if (Array.isArray(role)) {
-            return role.includes(user.role_name);
-          }
-          return user.role_name === role;
-        }
-
-        // Fallback to role_id check (legacy)
-        // Note: This is a simplified check. In a real app, you'd fetch role names
-        // For now, we'll just check if user is admin (role_id === 1)
         if (Array.isArray(role)) {
-          return role.includes('admin') && user.role_id === 1;
+          return role.includes(user.role_name);
         }
-        return role === 'admin' && user.role_id === 1;
+        return user.role_name === role;
       },
 
       // ==================== User Management ====================

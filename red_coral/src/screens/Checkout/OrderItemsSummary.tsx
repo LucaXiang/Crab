@@ -19,7 +19,7 @@ interface OrderItemsSummaryProps {
   onEditItem: (item: CartItem) => void;
   t: (key: string) => string;
   surchargeExempt?: boolean;
-  paidItemQuantities?: Record<string, number>;
+  paid_item_quantities?: Record<string, number>;
 }
 
 interface ActiveItemRowProps {
@@ -47,13 +47,13 @@ const ActiveItemRow: React.FC<ActiveItemRowProps> = ({
 }) => {
   const isSelected = selectedQuantities[originalIndex] > 0;
   const currentQty = selectedQuantities[originalIndex] || 0;
-  const optionsModifier = calculateOptionsModifier(item.selectedOptions).toNumber();
-  const basePrice = (item.originalPrice ?? item.price) + optionsModifier;
+  const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
+  const basePrice = (item.original_price ?? item.price) + optionsModifier;
   const unitPrice = calculateItemFinalPrice({
     ...item,
     surcharge: surchargeExempt ? 0 : item.surcharge,
   }).toNumber();
-  const hasDiscount = (item.discountPercent || 0) > 0 || basePrice !== unitPrice;
+  const hasDiscount = (item.discount_percent || 0) > 0 || basePrice !== unitPrice;
   const isSelectMode = mode === 'SELECT';
 
   const clickHandlers = useLongPress(
@@ -82,16 +82,16 @@ const ActiveItemRow: React.FC<ActiveItemRowProps> = ({
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex items-center gap-2 mb-1">
             <div className="font-bold text-gray-900 text-base truncate">
-              {item.name} {item.selectedSpecification ? `(${item.selectedSpecification.name})` : ''}
-              {item.selectedOptions && item.selectedOptions.length > 0 && (
+              {item.name} {item.selected_specification ? `(${item.selected_specification.name})` : ''}
+              {item.selected_options && item.selected_options.length > 0 && (
                 <div className="text-xs font-normal text-gray-500 mt-0.5 truncate">
-                  {groupOptionsByAttribute(item.selectedOptions).map(g => `${g.attributeName}: ${g.optionNames.join(', ')}`).join(' | ')}
+                  {groupOptionsByAttribute(item.selected_options).map(g => `${g.attributeName}: ${g.optionNames.join(', ')}`).join(' | ')}
                 </div>
             )}
             </div>
-            {item.discountPercent ? (
+            {item.discount_percent ? (
               <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">
-                -{item.discountPercent}%
+                -{item.discount_percent}%
               </span>
             ) : null}
             {!surchargeExempt && item.surcharge ? (
@@ -114,9 +114,9 @@ const ActiveItemRow: React.FC<ActiveItemRowProps> = ({
                 <span className="font-semibold text-gray-700">{formatCurrency(unitPrice)}</span>
               )}
             </div>
-            {item.externalId && (
+            {item.external_id && (
               <div className="text-[10px] text-white bg-gray-900/85 font-bold font-mono px-1.5 py-0.5 rounded ml-2 backdrop-blur-[1px]">
-                {item.externalId}
+                {item.external_id}
               </div>
             )}
           </div>
@@ -188,7 +188,7 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
   onEditItem,
   t,
   surchargeExempt,
-  paidItemQuantities
+  paid_item_quantities
 }) => {
   const categories = useCategories();
 
@@ -198,10 +198,10 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
 
   items.forEach((item) => {
     // Calculate paid quantity first to decide if we should process this item
-    // If paidItemQuantities is provided, use it as the source of truth (supports soft-deleted items)
+    // If paid_item_quantities is provided, use it as the source of truth (supports soft-deleted items)
     let paidQty = 0;
-    if (paidItemQuantities && item.instanceId && paidItemQuantities[item.instanceId] !== undefined) {
-      paidQty = paidItemQuantities[item.instanceId];
+    if (paid_item_quantities && item.instance_id && paid_item_quantities[item.instance_id] !== undefined) {
+      paidQty = paid_item_quantities[item.instance_id];
     }
 
     // If item is removed and has no paid quantity, skip it completely
@@ -210,17 +210,17 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
     // Find corresponding unpaid item to know how much is left
     // We match by instanceId if available, or id
     const unpaidIdx = unpaidItems.findIndex(u =>
-      item.instanceId
-        ? u.instanceId === item.instanceId
+      item.instance_id
+        ? u.instance_id === item.instance_id
         : (u.id === item.id )
     );
 
     const remainingItem = unpaidIdx !== -1 ? unpaidItems[unpaidIdx] : null;
     const remainingQty = remainingItem ? remainingItem.quantity : 0;
     
-    // Fallback calculation for non-split/legacy if not using paidItemQuantities
+    // Fallback calculation for non-split/legacy if not using paid_item_quantities
     // Only apply fallback if item is NOT removed (removed items shouldn't imply paid unless explicit)
-    if ((!paidItemQuantities || !item.instanceId || paidItemQuantities[item.instanceId] === undefined) && !item._removed) {
+    if ((!paid_item_quantities || !item.instance_id || paid_item_quantities[item.instance_id] === undefined) && !item._removed) {
       paidQty = item.quantity - remainingQty;
     }
 
@@ -259,8 +259,8 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
     // Use productId as tie-breaker or just sort by name
 
     // 1. Fallback: External ID (if available)
-    const extIdA = aItem.externalId ? parseInt(String(aItem.externalId), 10) || 0 : 0;
-    const extIdB = bItem.externalId ? parseInt(String(bItem.externalId), 10) || 0 : 0;
+    const extIdA = aItem.external_id ? parseInt(String(aItem.external_id), 10) || 0 : 0;
+    const extIdB = bItem.external_id ? parseInt(String(bItem.external_id), 10) || 0 : 0;
     if (extIdA !== extIdB) {
       return extIdA - extIdB;
     }
@@ -301,13 +301,13 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
           </div>
           <div className="space-y-3">
             {completedItems.map(({ item, paidQty }, idx) => {
-              const optionsModifier = calculateOptionsModifier(item.selectedOptions).toNumber();
-              const basePrice = (item.originalPrice ?? item.price) + optionsModifier;
+              const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
+              const basePrice = (item.original_price ?? item.price) + optionsModifier;
               const unitPricePaid = calculateItemFinalPrice({
                 ...item,
                 surcharge: surchargeExempt ? 0 : item.surcharge,
               }).toNumber();
-              const hasDiscount = (item.discountPercent || 0) > 0 || basePrice !== unitPricePaid;
+              const hasDiscount = (item.discount_percent || 0) > 0 || basePrice !== unitPricePaid;
 
               return (
                 <div 
@@ -320,9 +320,9 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
                       <div className="flex items-center gap-2 mb-1">
                         <div className="font-bold text-gray-700 text-base truncate decoration-gray-400">
                           {item.name}
-                          {item.selectedOptions && item.selectedOptions.length > 0 && (
+                          {item.selected_options && item.selected_options.length > 0 && (
                             <div className="text-xs font-normal text-gray-500 mt-0.5 space-y-0.5">
-                              {groupOptionsByAttribute(item.selectedOptions).map((group, idx) => (
+                              {groupOptionsByAttribute(item.selected_options).map((group, idx) => (
                                 <div key={idx} className="flex items-center gap-1">
                                   <span>{group.attributeName}: {group.optionNames.join(', ')}</span>
                                   {group.totalPrice !== 0 && (
@@ -336,9 +336,9 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
                           )}
                         </div>
                          {/* Tags */}
-                        {item.discountPercent ? (
+                        {item.discount_percent ? (
                           <span className="text-[10px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
-                            -{item.discountPercent}%
+                            -{item.discount_percent}%
                           </span>
                         ) : null}
                       </div>
@@ -356,9 +356,9 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
                             <span className="font-semibold text-gray-600">{formatCurrency(unitPricePaid)}</span>
                           )}
                         </div>
-                        {item.externalId && (
+                        {item.external_id && (
                           <div className="text-[10px] text-white bg-gray-900/85 font-bold font-mono px-1.5 py-0.5 rounded ml-2 backdrop-blur-[1px]">
-                            {item.externalId}
+                            {item.external_id}
                           </div>
                         )}
                       </div>

@@ -5,7 +5,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import { OrderEvent, OrderEventType, PaymentAddedEvent, OrderSplitEvent } from '@/core/domain/events/types';
+import type { OrderEvent, OrderEventType, PaymentAddedPayload, OrderSplitPayload } from '@/core/domain/types/orderEvent';
 import { HeldOrder } from '@/core/domain/types';
 import { PaymentRecord } from '@/core/domain/types';
 import { logger } from '@/utils/logger';
@@ -25,10 +25,10 @@ export const saveCompletedOrder = async (
 
   const persistedOrder: HeldOrder = {
     ...order,
-    endTime:
-      order.endTime && order.endTime > 0
-        ? order.endTime
-        : (order.status && order.status !== 'ACTIVE' ? Date.now() : order.endTime),
+    end_time:
+      order.end_time && order.end_time > 0
+        ? order.end_time
+        : (order.status && order.status !== 'ACTIVE' ? Date.now() : order.end_time),
   } as HeldOrder;
 
   // 若未显式传入 payments，则从事件中提取
@@ -36,29 +36,27 @@ export const saveCompletedOrder = async (
   const derivedPayments: PaymentRecord[] = payments && payments.length > 0
     ? payments
     : events
-        .filter(ev => ev.type === OrderEventType.PAYMENT_ADDED || ev.type === OrderEventType.ORDER_SPLIT)
+        .filter(ev => ev.event_type === 'PAYMENT_ADDED' || ev.event_type === 'ORDER_SPLIT')
         .map((ev) => {
-          if (ev.type === OrderEventType.PAYMENT_ADDED) {
-            const p = (ev as PaymentAddedEvent).data.payment;
+          if (ev.event_type === 'PAYMENT_ADDED') {
+            const p = ev.payload as PaymentAddedPayload;
             return {
-              id: p.id || `pay-${order.key}-${ev.timestamp}`,
+              payment_id: p.payment_id || `pay-${order.key}-${ev.timestamp}`,
               method: p.method,
               amount: Number(p.amount || 0),
-              timestamp: Number(ev.timestamp || order.endTime || Date.now()),
+              timestamp: Number(ev.timestamp || order.end_time || Date.now()),
               note: p.note,
               tendered: p.tendered,
               change: p.change,
             };
           } else {
             // ORDER_SPLIT
-            const data = (ev as OrderSplitEvent).data;
+            const data = ev.payload as OrderSplitPayload;
             return {
-              id: `split-${order.key}-${ev.timestamp}`,
-              method: `Split ${data.paymentMethod}`,
-              amount: Number(data.splitAmount || 0),
-              timestamp: Number(ev.timestamp || order.endTime || Date.now()),
-              tendered: data.tendered,
-              change: data.change,
+              payment_id: `split-${order.key}-${ev.timestamp}`,
+              method: `Split ${data.payment_method}`,
+              amount: Number(data.split_amount || 0),
+              timestamp: Number(ev.timestamp || order.end_time || Date.now()),
             };
           }
         });

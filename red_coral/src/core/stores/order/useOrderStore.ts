@@ -1,6 +1,5 @@
 import { useShallow } from 'zustand/react/shallow';
 import { useActiveOrdersStore } from './useActiveOrdersStore';
-import { toHeldOrders } from './orderAdapter';
 import * as orderOps from './useOrderOperations';
 
 // Re-export sub-stores
@@ -19,7 +18,7 @@ import { useReceiptStore } from './useReceiptStore';
 // Active Orders (uses new event-sourcing store)
 export const useHeldOrders = () => {
   const snapshots = useActiveOrdersStore(useShallow((state) => state.getActiveOrders()));
-  return toHeldOrders(snapshots);
+  return snapshots;
 };
 
 export const useHeldOrdersCount = () => useActiveOrdersStore((state) =>

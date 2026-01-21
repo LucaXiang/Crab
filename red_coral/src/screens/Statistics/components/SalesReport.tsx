@@ -142,7 +142,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
                 onClick={() => handleSort('receipt_number')}
               >
                 <div className="flex items-center">
-                  {t('history.info.orderId')}
+                  {t('history.info.order_id')}
                   <SortIcon field="receipt_number" />
                 </div>
               </th>
@@ -183,7 +183,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
               const isMerged = item.status === 'MERGED';
               return (
               <tr 
-                key={item.orderId} 
+                key={item.order_id} 
                 className={`transition-colors cursor-pointer ${
                   isVoided
                     ? 'bg-red-100 hover:bg-red-200 border-l-4 border-l-red-500'
@@ -191,10 +191,10 @@ export const SalesReport: React.FC<SalesReportProps> = ({
                     ? 'bg-yellow-50 hover:bg-yellow-100 border-l-4 border-l-yellow-400'
                     : 'hover:bg-blue-50'
                 }`}
-                onClick={() => setSelectedOrderId(item.orderId)}
+                onClick={() => setSelectedOrderId(item.order_id)}
               >
                 <td className="px-6 py-4 font-medium text-gray-900">
-                    {item.receiptNumber || `#${item.orderId}`}
+                    {item.receipt_number || `#${item.order_id}`}
                 </td>
                 <td className="px-6 py-4 text-gray-500">
                     {item.date}

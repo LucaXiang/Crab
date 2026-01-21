@@ -77,12 +77,12 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     // Convert domain Product to CartItem
     const newItem: CartItem = {
       id: String(product.id),
-      productId: String(product.id),
+      product_id: String(product.id),
       name: product.name,
       price: product.price ?? 0,
       quantity: 1,
-      instanceId: uuidv4(),
-      selectedOptions: [],
+      instance_id: uuidv4(),
+      selected_options: [],
     };
 
     setTempItems(prev => {
@@ -216,7 +216,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
                 </div>
               ) : (
                 tempItems.map((item, index) => (
-                  <div key={item.instanceId || index} className="flex flex-col p-3 bg-white border border-gray-100 rounded-xl shadow-sm gap-2">
+                  <div key={item.instance_id || index} className="flex flex-col p-3 bg-white border border-gray-100 rounded-xl shadow-sm gap-2">
                     <div className="flex justify-between items-start">
                       <span className="font-bold text-gray-800 line-clamp-2">{item.name}</span>
                       <span className="font-bold text-gray-900">{formatCurrency(item.price * item.quantity)}</span>

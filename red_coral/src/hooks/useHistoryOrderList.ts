@@ -8,13 +8,13 @@ import { logger } from '@/utils/logger';
  */
 export interface OrderSummary {
   order_id: number;
-  receiptNumber?: string;
-  tableName: string;
+  receipt_number?: string;
+  table_name: string;
   total: number;
   status: 'COMPLETED' | 'VOID' | 'MOVED' | 'MERGED';
-  startTime: number;
-  endTime?: number;
-  guestCount: number;
+  start_time: number;
+  end_time?: number;
+  guest_count: number;
 }
 
 interface FetchOrderListResponse {
@@ -92,13 +92,13 @@ export const useHistoryOrderList = (
       };
       const mapped = (response.orders || []).map((o: any) => ({
         order_id: Number(o.order_id),
-        receiptNumber: o.receipt_number,
-        tableName: o.table_name,
+        receipt_number: o.receipt_number,
+        table_name: o.table_name,
         total: Number(o.total),
         status: o.status,
-        startTime: toMs(o.start_time),
-        endTime: toMs(o.end_time),
-        guestCount: Number(o.guest_count),
+        start_time: toMs(o.start_time),
+        end_time: toMs(o.end_time),
+        guest_count: Number(o.guest_count),
       }));
       setOrders((prev) => (page === 1 ? mapped : [...prev, ...mapped]));
       setTotal(Number(response.total));

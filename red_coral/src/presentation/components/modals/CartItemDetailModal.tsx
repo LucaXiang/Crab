@@ -18,12 +18,12 @@ interface CartItemDetailModalProps {
 export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item, onClose, onUpdate, onRemove, readOnlyAttributes = false }) => {
   const { t } = useI18n();
   const [quantity, setQuantity] = useState(item.quantity);
-  const [discount, setDiscount] = useState(item.discountPercent || 0);
+  const [discount, setDiscount] = useState(item.discount_percent || 0);
   const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; username: string } | undefined>();
   
   // Specification State
   const [specifications, setSpecifications] = useState<EmbeddedSpec[]>([]);
-  const [selectedSpecId, setSelectedSpecId] = useState<string | undefined>(item.selectedSpecification?.id);
+  const [selectedSpecId, setSelectedSpecId] = useState<string | undefined>(item.selected_specification?.id);
 
   // Attribute State
   const [isLoadingAttributes, setIsLoadingAttributes] = useState(false);
@@ -90,7 +90,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
             const initialSelections = new Map<string, string[]>();
 
             // 1. Pre-fill with existing selections
-            item.selectedOptions?.forEach(sel => {
+            item.selected_options?.forEach(sel => {
                 const attrKey = String(sel.attribute_id);
                 const current = initialSelections.get(attrKey) || [];
                 initialSelections.set(attrKey, [...current, String(sel.option_idx)]);
@@ -98,7 +98,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
 
             // 2. If no selection for an attribute (and we have defaults), maybe fill?
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if ((!item.selectedOptions || item.selectedOptions.length === 0) && (attrData as any).attributes?.length > 0) {
+            if ((!item.selected_options || item.selected_options.length === 0) && (attrData as any).attributes?.length > 0) {
                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                  ((attrData as any).attributes as Array<{id: string; defaultOptionIds?: string[]; type?: string}>).forEach((attr) => {
                      if (!initialSelections.has(attr.id)) {
@@ -140,7 +140,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     };
     load();
     return () => { mounted = false; };
-  }, [item.id, item.instanceId]); 
+  }, [item.id, item.instance_id]); 
 
   const handleAttributeSelect = (attributeId: string, optionIds: string[]) => {
       const newSelections = new Map(selections);
@@ -194,30 +194,30 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
         }
     }
 
-    onUpdate(item.instanceId, {
+    onUpdate(item.instance_id, {
       quantity: finalQty,
-      discountPercent: finalDisc,
-      selectedOptions: selectedOptions,
-      selectedSpecification
+      discount_percent: finalDisc,
+      selected_options: selectedOptions,
+      selected_specification: selectedSpecification
     }, discountAuthorizer ? { userId: discountAuthorizer.id } : undefined);
     
     onClose();
   };
 
   const handleRemove = (authorizer?: { id: string; username: string }) => {
-    onRemove(item.instanceId, authorizer ? { userId: authorizer.id } : undefined);
+    onRemove(item.instance_id, authorizer ? { userId: authorizer.id } : undefined);
     onClose();
   };
 
   // --- Calculations ---
-  const basePrice = item.originalPrice ?? item.price;
+  const basePrice = item.original_price ?? item.price;
   
   return (
     <ItemConfiguratorModal
       isOpen={true} 
       onClose={onClose}
       title={t('pos.cart.editItem')}
-      productName={item.externalId ? `${item.externalId} ${item.name}` : item.name}
+      productName={item.external_id ? `${item.external_id} ${item.name}` : item.name}
       isLoading={isLoadingAttributes}
       attributes={attributes}
       allOptions={allOptions}

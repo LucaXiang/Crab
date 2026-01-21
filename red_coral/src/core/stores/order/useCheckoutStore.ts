@@ -9,7 +9,7 @@ import {
 function calculateUnpaidItems(items: CartItem[], paidQuantities?: Record<string, number>): CartItem[] {
   if (!paidQuantities) return items;
   return items.map(item => {
-      const key = item.instanceId || `${item.id}`;
+      const key = item.instance_id || `${item.id}`;
       const paidQty = paidQuantities[key] || 0;
       const remainingQty = item.quantity - paidQty;
       if (remainingQty <= 0) return null;
@@ -136,7 +136,7 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
     mode: 'retail',
     activeTab: 'items',
     paymentRecords: [],
-    unpaidItems: calculateUnpaidItems(order.items, order.paidItemQuantities),
+    unpaidItems: calculateUnpaidItems(order.items, order.paid_item_quantities),
     selectedQuantities: {},
     inputBuffer: '',
     isTyping: false,
@@ -153,7 +153,7 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
       // as this might be an intermediate update.
       set({
           order,
-          unpaidItems: calculateUnpaidItems(order.items, order.paidItemQuantities)
+          unpaidItems: calculateUnpaidItems(order.items, order.paid_item_quantities)
       });
   },
 
@@ -246,7 +246,7 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
       return state._computeStrategy(state);
     }
 
-    const previousPaid = order.paidAmount || 0; // From previous split payments
+    const previousPaid = order.paid_amount || 0; // From previous split payments
     const currentSessionPaid = state.paymentRecords.reduce((sum, p) => sum + p.amount, 0);
     const totalPaid = previousPaid + currentSessionPaid;
     const remaining = calculateRemaining(order.total, totalPaid);

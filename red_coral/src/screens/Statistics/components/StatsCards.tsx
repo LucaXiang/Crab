@@ -26,7 +26,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {formatCurrency(overview.todayRevenue)}
+          {formatCurrency(overview.today_revenue)}
         </div>
         <div className="text-sm text-gray-500">{getLabel('revenue')}</div>
       </div>
@@ -39,7 +39,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {overview.todayOrders}
+          {overview.today_orders}
         </div>
         <div className="text-sm text-gray-500">{getLabel('orders')}</div>
       </div>
@@ -52,7 +52,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {overview.todayCustomers}
+          {overview.today_customers}
         </div>
         <div className="text-sm text-gray-500">{getLabel('customers')}</div>
       </div>
@@ -68,7 +68,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </span>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {formatCurrency(overview.averageOrderValue)}
+          {formatCurrency(overview.average_order_value)}
         </div>
         <div className="text-sm text-gray-500">{t("statistics.metric.avgOrderValue")}</div>
       </div>
@@ -81,9 +81,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {formatCurrency(overview.cashRevenue)}
+          {formatCurrency(overview.cash_revenue)}
         </div>
-        <div className="text-sm text-gray-500">{t("statistics.metric.cashRevenue")}</div>
+        <div className="text-sm text-gray-500">{t("statistics.metric.cash_revenue")}</div>
       </div>
 
       {/* 6. Card Revenue */}
@@ -94,13 +94,13 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {formatCurrency(overview.cardRevenue)}
+          {formatCurrency(overview.card_revenue)}
         </div>
-        <div className="text-sm text-gray-500">{t("statistics.metric.cardRevenue")}</div>
+        <div className="text-sm text-gray-500">{t("statistics.metric.card_revenue")}</div>
       </div>
 
       {/* 7. Other Revenue (Conditional) */}
-      {(overview.otherRevenue !== undefined && overview.otherRevenue > 0) && (
+      {(overview.other_revenue !== undefined && overview.other_revenue > 0) && (
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
             <div className="p-3 bg-gray-100 rounded-lg">
@@ -108,9 +108,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
             </div>
           </div>
           <div className="text-2xl font-bold text-gray-800 mb-1">
-            {formatCurrency(overview.otherRevenue)}
+            {formatCurrency(overview.other_revenue)}
           </div>
-          <div className="text-sm text-gray-500">{t("statistics.metric.otherRevenue")}</div>
+          <div className="text-sm text-gray-500">{t("statistics.metric.other_revenue")}</div>
         </div>
       )}
 
@@ -122,9 +122,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {formatCurrency(overview.avgGuestSpend)}
+          {formatCurrency(overview.avg_guest_spend)}
         </div>
-        <div className="text-sm text-gray-500">{t("statistics.metric.avgGuestSpend")}</div>
+        <div className="text-sm text-gray-500">{t("statistics.metric.avg_guest_spend")}</div>
       </div>
 
       {/* 9. Avg Dining Time */}
@@ -135,9 +135,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {Math.round(overview.avgDiningTime)} min
+          {Math.round(overview.avg_dining_time)} min
         </div>
-        <div className="text-sm text-gray-500">{t("statistics.metric.avgDiningTime")}</div>
+        <div className="text-sm text-gray-500">{t("statistics.metric.avg_dining_time")}</div>
       </div>
 
       {/* 10. Voided Orders */}
@@ -148,10 +148,10 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {overview.voidedOrders}
+          {overview.voided_orders}
         </div>
         <div className="text-sm text-gray-500">
-             {t("statistics.metric.voidedOrders")} ({formatCurrency(overview.voidedAmount)})
+             {t("statistics.metric.voided_orders")} ({formatCurrency(overview.voided_amount)})
         </div>
       </div>
 
@@ -163,9 +163,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {formatCurrency(overview.totalDiscount)}
+          {formatCurrency(overview.total_discount)}
         </div>
-        <div className="text-sm text-gray-500">{t("statistics.metric.totalDiscount")}</div>
+        <div className="text-sm text-gray-500">{t("statistics.metric.total_discount")}</div>
       </div>
     </div>
   );

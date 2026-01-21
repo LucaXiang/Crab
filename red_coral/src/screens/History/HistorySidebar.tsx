@@ -37,7 +37,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
     // User request: "Modify retail page logic to hide voided/prepaid receipts" & "If it is null, do not display it"
     // Update: Allow VOID / MERGED / MOVED orders to be visible for audit purposes
     if (order.status === 'VOID' || order.status === 'MERGED' || order.status === 'MOVED') return true;
-    if (!order.receiptNumber) return false;
+    if (!order.receipt_number) return false;
     return true;
   });
 
@@ -91,7 +91,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`font-bold ${isSelected ? 'text-red-600' : 'text-gray-800'}`}>
-                        {order.receiptNumber || order.tableName}
+                        {order.receipt_number || order.table_name}
                       </span>
                       {isVoid && (
                         <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">
@@ -100,11 +100,11 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                       )}
                     </div>
                     <div className="flex gap-2 text-[10px] items-center mb-1">
-                      {order.receiptNumber && order.tableName !== 'RETAIL' && (
-                        <span className="text-gray-500 bg-gray-100 px-1 rounded">{order.tableName}</span>
+                      {order.receipt_number && order.table_name !== 'RETAIL' && (
+                        <span className="text-gray-500 bg-gray-100 px-1 rounded">{order.table_name}</span>
                       )}
-                      {!order.receiptNumber && (
-                        <span className="text-gray-500 bg-gray-100 px-1 rounded">{order.tableName}</span>
+                      {!order.receipt_number && (
+                        <span className="text-gray-500 bg-gray-100 px-1 rounded">{order.table_name}</span>
                       )}
                       <span className={`px-1.5 py-0.5 rounded-full font-bold ${isVoid ? 'bg-gray-200 text-gray-600' : (isMoved || isMerged) ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                         {isVoid
@@ -117,7 +117,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                       </span>
                     </div>
                     <div className="text-xs text-gray-400 font-mono">
-                      {new Date(order.endTime || order.startTime).toLocaleString([], { hour12: false })}
+                      {new Date(order.end_time || order.start_time).toLocaleString([], { hour12: false })}
                     </div>
                   </div>
                     <div className="text-right">

@@ -3,7 +3,6 @@ import DefaultImage from '../../assets/reshot.svg';
 import { getImageUrl } from '@/core/services/imageCache';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { voidOrder } from '@/core/stores/order/useOrderOperations';
-import { toHeldOrder } from '@/core/stores/order/orderAdapter';
 import { useCanManageProducts } from '@/hooks/usePermission';
 import { EntityFormModal } from '../Settings/EntityFormModal';
 
@@ -472,7 +471,7 @@ export const POSScreen: React.FC = () => {
     // Void retail orders
     for (const snapshot of retailActive) {
       try {
-        const order = toHeldOrder(snapshot);
+        const order = snapshot;
         await voidOrder(order, 'Retail session cancelled on logout');
       } catch {
         // Ignore errors - best effort cleanup

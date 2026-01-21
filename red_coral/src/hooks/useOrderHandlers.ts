@@ -3,7 +3,6 @@ import { CartItem, HeldOrder, Table, Zone } from '@/core/domain/types';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { useCartStore } from '@/core/stores/cart/useCartStore';
-import { toHeldOrder } from '@/core/stores/order/orderAdapter';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
 
 interface UseOrderHandlersParams {
@@ -82,7 +81,7 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
         const existingSnapshot = store.getOrder(key);
         if (existingSnapshot && !existingSnapshot.is_retail) {
           setCurrentOrderKey(key);
-          checkout.setCheckoutOrder(toHeldOrder(existingSnapshot));
+          checkout.setCheckoutOrder(existingSnapshot);
           setViewMode('checkout');
           return;
         }
@@ -122,9 +121,9 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
           const retailOrder = activeOrders.find(o => o.is_retail === true);
 
           if (retailOrder) {
-            const heldOrder = toHeldOrder(retailOrder);
+            const heldOrder = retailOrder;
             checkout.setCheckoutOrder(heldOrder);
-            setCurrentOrderKey(heldOrder.key);
+            setCurrentOrderKey(heldOrder.key || heldOrder.order_id || '');
             setViewMode('checkout');
           }
         }
@@ -148,7 +147,7 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
 
     // For retail orders, void them when cancelled (audit requirement)
     // Retail orders should not remain active when user exits checkout
-    if (checkoutOrder?.isRetail) {
+    if (checkoutOrder?.is_retail) {
       try {
         await voidOrder(checkoutOrder, 'Retail checkout cancelled');
       } catch (error) {

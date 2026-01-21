@@ -92,10 +92,10 @@ export const useCartStore = create<CartStore>((set, get) => ({
       // 5. Same specification (if any)
       const existingIndex = state.cart.findIndex(item =>
         item.id === String(product.id) &&
-        (item.discountPercent || 0) === discount &&
-        areOptionsEqual(item.selectedOptions, selectedOptions) &&
-        areSpecificationsEqual(item.selectedSpecification, selectedSpecification) &&
-        item.authorizerId === authorizer?.id
+        (item.discount_percent || 0) === discount &&
+        areOptionsEqual(item.selected_options, selectedOptions) &&
+        areSpecificationsEqual(item.selected_specification, selectedSpecification) &&
+        item.authorizer_id === authorizer?.id
       );
 
       if (existingIndex >= 0) {
@@ -112,17 +112,17 @@ export const useCartStore = create<CartStore>((set, get) => ({
       return {
         cart: [...state.cart, {
           id: String(product.id),
-          productId: String(product.id),  // SurrealDB string ID
+          product_id: String(product.id),  // SurrealDB string ID
           name: product.name,
           quantity: quantity,
           price: effectivePrice,
-          originalPrice: effectivePrice,
-          discountPercent: discount,
-          selectedOptions: selectedOptions && selectedOptions.length > 0 ? selectedOptions : undefined,
-          selectedSpecification: selectedSpecification,
-          instanceId: `item-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-          authorizerId: authorizer?.id,
-          authorizerName: authorizer?.username
+          original_price: effectivePrice,
+          discount_percent: discount,
+          selected_options: selectedOptions && selectedOptions.length > 0 ? selectedOptions : undefined,
+          selected_specification: selectedSpecification,
+          instance_id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          authorizer_id: authorizer?.id,
+          authorizer_name: authorizer?.username
         }]
       };
     });
@@ -131,7 +131,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
   removeFromCart: (instanceId: string) => {
     set((state) => ({
-      cart: state.cart.filter(item => item.instanceId !== instanceId)
+      cart: state.cart.filter(item => item.instance_id !== instanceId)
     }));
     get().calculateTotal();
   },
@@ -139,7 +139,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   incrementItemQuantity: (instanceId: string, delta: number) => {
     set((state) => ({
       cart: state.cart.map((item) =>
-        item.instanceId === instanceId
+        item.instance_id === instanceId
           ? { ...item, quantity: Math.max(1, item.quantity + delta) }
           : item
       ),
@@ -152,7 +152,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
     const safeQty = Math.max(1, Math.floor(quantity));
     set((state) => ({
       cart: state.cart.map((item) =>
-        item.instanceId === instanceId ? { ...item, quantity: safeQty } : item
+        item.instance_id === instanceId ? { ...item, quantity: safeQty } : item
       ),
     }));
     get().calculateTotal();
@@ -161,7 +161,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   updateCartItem: (instanceId: string, updates: Partial<CartItem>) => {
     set((state) => ({
       cart: state.cart.map(item =>
-        item.instanceId === instanceId ? { ...item, ...updates } : item
+        item.instance_id === instanceId ? { ...item, ...updates } : item
       )
     }));
     get().calculateTotal();

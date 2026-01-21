@@ -14,7 +14,6 @@ import { TableManagementModal } from './components';
 import { useDataVersion } from '@/core/stores/settings/useSettingsStore';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
-import { toHeldOrder } from '@/core/stores/order/orderAdapter';
 
 export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.memo(
   ({ heldOrders, onSelectTable, onClose, mode, cart = [], manageTableId }) => {
@@ -51,8 +50,8 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
 
       if (manageTableId !== processedManageIdRef.current) {
         const order = getOrder(manageTableId);
-        if (order && order.zoneName) {
-          const targetZone = zones.find((z) => z.name === order.zoneName);
+        if (order && order.zone_name) {
+          const targetZone = zones.find((z) => z.name === order.zone_name);
           if (targetZone && targetZone.id !== activeZoneId) {
             setActiveZoneId(targetZone.id);
           }
@@ -64,7 +63,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
     // Check if overtime (2 hours)
     const isOvertime = (order?: HeldOrder) => {
       if (!order) return false;
-      return Date.now() - order.startTime > 2 * 60 * 60 * 1000;
+      return Date.now() - order.start_time > 2 * 60 * 60 * 1000;
     };
 
     // Load zones on mount
@@ -110,12 +109,12 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
         EMPTY: zoneTables.filter((t) => !getOrder(t.id)).length,
         OCCUPIED: zoneTables.filter((t) => {
           const order = getOrder(t.id);
-          return !!order && !order.isPrePayment;
+          return !!order && !order.is_pre_payment;
         }).length,
         OVERTIME: zoneTables.filter((t) => isOvertime(getOrder(t.id))).length,
         PRE_PAYMENT: zoneTables.filter((t) => {
           const order = getOrder(t.id);
-          return order && order.isPrePayment;
+          return order && order.is_pre_payment;
         }).length,
       };
     }, [zoneTables, heldOrders]);
@@ -130,9 +129,9 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
           case 'EMPTY':
             return !isOccupied;
           case 'OCCUPIED':
-            return isOccupied && !order?.isPrePayment;
+            return isOccupied && !order?.is_pre_payment;
           case 'PRE_PAYMENT':
-            return isOccupied && !!order?.isPrePayment;
+            return isOccupied && !!order?.is_pre_payment;
           case 'OVERTIME':
             return isOvertime(order);
           default:
@@ -159,7 +158,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
       
       return heldOrders.filter(o =>
         !tableIds.has(o.key) &&
-        !o.isRetail
+        !o.is_retail
       );
     }, [activeZoneId, loading, zoneTables, heldOrders]);
 
@@ -171,11 +170,11 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
 
       if (isOccupied) {
         if (mode === 'HOLD') {
-          setGuestInput(order?.guestCount.toString() || '0');
+          setGuestInput(order?.guest_count.toString() || '0');
           setEnableIndividualMode(false);
           setSelectedTableForInput(table);
         } else {
-          onSelectTable(table, order?.guestCount || 1, undefined, activeZone);
+          onSelectTable(table, order?.guest_count || 1, undefined, activeZone);
         }
       } else {
         setGuestInput('');
@@ -214,10 +213,10 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
       if (found) return found;
       const order = heldOrders.find((o) => o.key === manageTableId);
       if (!order) return null;
-      const zone = zones.find((z) => z.name === order.zoneName);
+      const zone = zones.find((z) => z.name === order.zone_name);
       return {
         id: manageTableId,
-        name: order.tableName || '',
+        name: order.table_name || '',
         zone: zone ? zone.id : '',
         capacity: 0,
         is_active: true,
@@ -240,12 +239,12 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
                   checkout.setCurrentOrderKey(navigateToTableId);
                   const targetSnapshot = store.getOrder(navigateToTableId);
                   if (targetSnapshot) {
-                    checkout.setCheckoutOrder(toHeldOrder(targetSnapshot));
+                    checkout.setCheckoutOrder(targetSnapshot);
                   } else {
                     // Wait for event to arrive
                     setTimeout(() => {
                       const snapshot = useActiveOrdersStore.getState().getOrder(navigateToTableId);
-                      if (snapshot) useCheckoutStore.getState().setCheckoutOrder(toHeldOrder(snapshot));
+                      if (snapshot) useCheckoutStore.getState().setCheckoutOrder(snapshot);
                     }, 50);
                   }
                 }
@@ -308,7 +307,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
                                     key={order.key}
                                     table={{
                                         id: order.key,
-                                        name: order.tableName || order.key,
+                                        name: order.table_name || order.key,
                                         zone: 'GHOST',
                                         capacity: 0,
                                         is_active: true,
@@ -317,7 +316,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
                                     mode={mode}
                                     onClick={() => handleTableClick({
                                         id: order.key,
-                                        name: order.tableName || order.key,
+                                        name: order.table_name || order.key,
                                         zone: 'GHOST',
                                         capacity: 0,
                                         is_active: true,
@@ -392,12 +391,12 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
                   checkout.setCurrentOrderKey(navigateToTableId);
                   const targetSnapshot = store.getOrder(navigateToTableId);
                   if (targetSnapshot) {
-                    checkout.setCheckoutOrder(toHeldOrder(targetSnapshot));
+                    checkout.setCheckoutOrder(targetSnapshot);
                   } else {
                     // Wait for event to arrive
                     setTimeout(() => {
                       const snapshot = useActiveOrdersStore.getState().getOrder(navigateToTableId);
-                      if (snapshot) useCheckoutStore.getState().setCheckoutOrder(toHeldOrder(snapshot));
+                      if (snapshot) useCheckoutStore.getState().setCheckoutOrder(snapshot);
                     }, 50);
                   }
                 }

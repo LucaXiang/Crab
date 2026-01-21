@@ -84,35 +84,15 @@ export type {
   OrderConnectionState,
 } from './orderEvent';
 
-// Frontend-specific types for cart and orders
-export interface CartItem {
-  id: string;
-  instanceId?: string;
-  originalInstanceId?: string;
-  productId: string;  // SurrealDB string ID
-  specificationId?: string;  // SurrealDB string ID
-  name: string;
-  price: number;
-  originalPrice?: number;
-  quantity: number;
-  /** Unpaid quantity (computed by backend: quantity - paid_quantity) */
-  unpaidQuantity?: number;
-  note?: string;
-  attributes?: ItemAttributeSelection[];
-  selectedOptions?: ItemAttributeSelection[];
-  selectedSpecification?: {
-    id: string;
-    name: string;
-    receipt_name?: string;
-    price?: number;
-  };
-  _removed?: boolean;
-  discountPercent?: number;
-  surcharge?: number;
-  externalId?: string;
-  authorizerId?: string;
-  authorizerName?: string;
-}
+// ============================================================================
+// Type Aliases - Unified to Backend Standard
+// ============================================================================
+
+/**
+ * CartItem is now an alias for CartItemSnapshot (backend type)
+ * Use backend type directly for consistency
+ */
+export type CartItem = import('./orderEvent').CartItemSnapshot;
 
 export interface ItemAttributeSelection {
   attribute_id: string;  // SurrealDB string ID (attr_id)
@@ -128,56 +108,34 @@ export interface ItemAttributeSelection {
   option_name?: string;  // Added for option name display
 }
 
-export interface PaymentRecord {
-  id: string;
-  amount: number;
-  method: string;
-  timestamp: number;
-  note?: string;
-  tendered?: number;
-  change?: number;
-}
+/**
+ * PaymentRecord is now an alias for backend PaymentRecord
+ * Use backend type directly for consistency
+ */
+export type PaymentRecord = import('./orderEvent').PaymentRecord;
 
 export type OrderStatus = 'ACTIVE' | 'COMPLETED' | 'VOID' | 'MOVED' | 'MERGED';
 
-export interface HeldOrder {
-  id?: string;
-  key?: string;
-  tableKey?: string;
-  tableId?: number;
-  tableName?: string;
-  zoneId?: number;
-  zoneName?: string;
-  guestCount?: number;
-  items: CartItem[];
-  subtotal: number;
-  tax: number;
-  discount: number;
-  total: number;
-  paidAmount?: number;
-  paidItemQuantities?: Record<string, number>;
-  payments: PaymentRecord[];
-  note?: string;
-  receiptNumber?: string;
-  isPrePayment?: boolean;
-  isRetail?: boolean;
-  status?: OrderStatus;
-  startTime?: number;
-  endTime?: number;
-  timeline: TimelineEvent[];
-  createdAt: number;
-  updatedAt: number;
-}
+/**
+ * HeldOrder is OrderSnapshot plus optional timeline
+ * 
+ * Timeline is optional and stores OrderEvent[] (服务端权威类型).
+ * UI 层使用 Renderer 按需格式化，不存储转换后的数据。
+ */
+export type HeldOrder = import('./orderEvent').OrderSnapshot & {
+  // Legacy aliases for backward compatibility
+  key?: string;                   // Alias for order_id
+  id?: string;                    // Alias for order_id
+  
+  // Timeline: 存储原始 OrderEvent[]，UI 层按需格式化
+  timeline?: import('./orderEvent').OrderEvent[];
+};
 
-export interface TimelineEvent {
-  id?: string;
-  type: 'ITEM_ADDED' | 'ITEM_REMOVED' | 'QUANTITY_CHANGED' | 'NOTE_ADDED' | 'ORDER_CREATED' | 'PAYMENT_ADDED' | 'STATUS_CHANGED' | 'PAYMENT' | 'ORDER_SPLIT' | 'TABLE_OPENED' | 'ITEMS_ADDED' | 'ITEM_MODIFIED' | 'ITEM_RESTORED' | 'PAYMENT_CANCELLED' | 'ORDER_COMPLETED' | 'ORDER_VOIDED' | 'ORDER_RESTORED' | 'ORDER_SURCHARGE_EXEMPT_SET' | 'ORDER_MERGED' | 'ORDER_MOVED' | 'ORDER_MOVED_OUT' | 'ORDER_MERGED_OUT' | 'TABLE_REASSIGNED' | 'ORDER_INFO_UPDATED';
-  timestamp: number;
-  data: Record<string, unknown>;
-  userId?: number;
-  title?: string;
-  summary?: string;
-}
+// ============================================================================
+// TimelineEvent 已删除
+// ============================================================================
+// Timeline 现在直接使用 OrderEvent[]（服务端权威类型）
+// UI 层通过 Renderer 按需格式化，不再存储转换后的数据
 
 export type CheckoutMode = 'retail' | 'dine-in' | 'takeout' | 'SELECT';
 export type DetailTab = 'items' | 'payments' | 'timeline';
@@ -226,18 +184,18 @@ export type TimeRange = 'today' | 'week' | 'month' | 'year' | 'custom';
 export type ActiveTab = 'overview' | 'sales' | 'products' | 'categories';
 
 export interface OverviewStats {
-  todayRevenue: number;
-  todayOrders: number;
-  todayCustomers: number;
-  averageOrderValue: number;
-  cashRevenue: number;
-  cardRevenue: number;
-  otherRevenue: number;
-  voidedOrders: number;
-  voidedAmount: number;
-  totalDiscount: number;
-  avgGuestSpend: number;
-  avgDiningTime?: number;
+  today_revenue: number;
+  today_orders: number;
+  today_customers: number;
+  average_order_value: number;
+  cash_revenue: number;
+  card_revenue: number;
+  other_revenue: number;
+  voided_orders: number;
+  voided_amount: number;
+  total_discount: number;
+  avg_guest_spend: number;
+  avg_dining_time?: number;
 }
 
 // Matches Rust RevenueTrendPoint
@@ -260,8 +218,8 @@ export interface TopProduct {
 }
 
 export interface SalesReportItem {
-  orderId: number;
-  receiptNumber: string | null;
+  order_id: number;
+  receipt_number: string | null;
   date: string;
   total: number;
   status: string;

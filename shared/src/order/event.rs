@@ -139,7 +139,7 @@ pub enum EventPayload {
         /// Operation description for audit
         operation: String,
         /// Source item before modification
-        source: CartItemSnapshot,
+        source: Box<CartItemSnapshot>,
         /// Number of items affected
         affected_quantity: i32,
         /// Changes applied

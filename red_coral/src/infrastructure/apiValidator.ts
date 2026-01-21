@@ -170,18 +170,18 @@ export type AdjustmentConfig = z.infer<typeof adjustmentConfigSchema>;
 // ============================================================================
 
 const overviewStatsSchema = z.object({
-  todayRevenue: currencySchema,
-  todayOrders: nonNegativeIntSchema,
-  todayCustomers: nonNegativeIntSchema,
-  averageOrderValue: currencySchema,
-  cashRevenue: currencySchema,
-  cardRevenue: currencySchema,
-  otherRevenue: currencySchema,
-  voidedOrders: nonNegativeIntSchema,
-  voidedAmount: currencySchema,
-  totalDiscount: currencySchema,
-  avgGuestSpend: currencySchema,
-  avgDiningTime: z.number().optional(),
+  today_revenue: currencySchema,
+  today_orders: nonNegativeIntSchema,
+  today_customers: nonNegativeIntSchema,
+  average_order_value: currencySchema,
+  cash_revenue: currencySchema,
+  card_revenue: currencySchema,
+  other_revenue: currencySchema,
+  voided_orders: nonNegativeIntSchema,
+  voided_amount: currencySchema,
+  total_discount: currencySchema,
+  avg_guest_spend: currencySchema,
+  avg_dining_time: z.number().optional(),
 });
 
 const revenueTrendPointSchema = z.object({
@@ -209,18 +209,18 @@ const statisticsResponseSchema = z.object({
 
 export interface StatisticsResponse {
   overview: {
-    todayRevenue: number;
-    todayOrders: number;
-    todayCustomers: number;
-    averageOrderValue: number;
-    cashRevenue: number;
-    cardRevenue: number;
-    otherRevenue: number;
-    voidedOrders: number;
-    voidedAmount: number;
-    totalDiscount: number;
-    avgGuestSpend: number;
-    avgDiningTime?: number;
+    today_revenue: number;
+    today_orders: number;
+    today_customers: number;
+    average_order_value: number;
+    cash_revenue: number;
+    card_revenue: number;
+    other_revenue: number;
+    voided_orders: number;
+    voided_amount: number;
+    total_discount: number;
+    avg_guest_spend: number;
+    avg_dining_time?: number;
   };
   revenueTrend: Array<{ time: string; value: number }>;
   categorySales: Array<{ name: string; value: number; color: string }>;
@@ -244,8 +244,8 @@ export async function getStatistics(
 // ============================================================================
 
 const salesReportItemSchema = z.object({
-  orderId: positiveIntSchema,
-  receiptNumber: z.string().nullable(),
+  order_id: positiveIntSchema,
+  receipt_number: z.string().nullable(),
   date: z.string().min(1),
   total: currencySchema,
   status: z.string().min(1),
@@ -260,7 +260,7 @@ const salesReportResponseSchema = z.object({
 });
 
 export interface SalesReportResponse {
-  items: Array<{ orderId: number; receiptNumber: string | null; date: string; total: number; status: string }>;
+  items: Array<{ order_id: number; receipt_number: string | null; date: string; total: number; status: string }>;
   total: number;
   page: number;
   pageSize: number;

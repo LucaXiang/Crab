@@ -64,14 +64,14 @@ function applyDiscount(
  * @returns 最终单价
  */
 export function calculateItemFinalPrice(item: CartItem): Decimal {
-  let basePrice = new Decimal(item.originalPrice ?? item.price);
+  let basePrice = new Decimal(item.original_price ?? item.price);
 
   // 2. Apply attribute options modifier
-  const optionsModifier = calculateOptionsModifier(item.selectedOptions);
+  const optionsModifier = calculateOptionsModifier(item.selected_options);
   basePrice = Currency.add(basePrice, optionsModifier);
 
   // 3. Apply discount
-  const afterDiscount = applyDiscount(basePrice, item.discountPercent || 0);
+  const afterDiscount = applyDiscount(basePrice, item.discount_percent || 0);
 
   // 4. Apply surcharge
   const surchargeAmount = item.surcharge || 0;

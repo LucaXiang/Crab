@@ -88,8 +88,8 @@ interface AttributeStore {
   deleteOption: (attributeId: string, index: number) => Promise<void>;
   reorderOptions: (attributeId: string, ids: string[]) => Promise<void>;
   bindProductAttribute: (params: {
-    productId: string;
-    attributeId: string;
+    product_id: string;
+    attribute_id: string;
     is_required?: boolean;
     display_order?: number;
   }) => Promise<void>;
@@ -321,8 +321,8 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     try {
       // Note: default_option_idx is now on the Attribute itself, not on the binding
       await api.bindProductAttribute({
-        product_id: params.productId,
-        attribute_id: params.attributeId,
+        product_id: params.product_id,
+        attribute_id: params.attribute_id,
         is_required: params.is_required,
         display_order: params.display_order,
       });

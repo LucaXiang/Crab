@@ -36,12 +36,12 @@ import type {
 // ============================================================================
 
 export interface OpenTableParams {
-  tableId?: string;
-  tableName?: string;
-  zoneId?: string;
-  zoneName?: string;
-  guestCount?: number;
-  isRetail: boolean;
+  table_id?: string;
+  table_name?: string;
+  zone_id?: string;
+  zone_name?: string;
+  guest_count?: number;
+  is_retail: boolean;
 }
 
 export interface PaymentInput {
@@ -149,12 +149,12 @@ export function useOrderCommands() {
     async (params: OpenTableParams): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'OPEN_TABLE',
-        table_id: params.tableId || null,
-        table_name: params.tableName || null,
-        zone_id: params.zoneId || null,
-        zone_name: params.zoneName || null,
-        guest_count: params.guestCount ?? 1,
-        is_retail: params.isRetail,
+        table_id: params.table_id || null,
+        table_name: params.table_name || null,
+        zone_id: params.zone_id || null,
+        zone_name: params.zone_name || null,
+        guest_count: params.guest_count ?? 1,
+        is_retail: params.is_retail,
       });
 
       return sendCommand(command);
@@ -407,19 +407,19 @@ export function useOrderCommands() {
     async (
       orderId: string,
       info: {
-        receiptNumber?: string;
-        guestCount?: number;
-        tableName?: string;
-        isPrePayment?: boolean;
+        receipt_number?: string;
+        guest_count?: number;
+        table_name?: string;
+        is_pre_payment?: boolean;
       }
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'UPDATE_ORDER_INFO',
         order_id: orderId,
-        receipt_number: info.receiptNumber ?? null,
-        guest_count: info.guestCount ?? null,
-        table_name: info.tableName ?? null,
-        is_pre_payment: info.isPrePayment ?? null,
+        receipt_number: info.receipt_number ?? null,
+        guest_count: info.guest_count ?? null,
+        table_name: info.table_name ?? null,
+        is_pre_payment: info.is_pre_payment ?? null,
       });
 
       return sendCommand(command);

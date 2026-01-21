@@ -20,9 +20,9 @@ export const CartItem = React.memo<CartItemProps>(({
   onClick
 }) => {
   const performanceMode = useSettingsStore(state => state.performanceMode);
-  const discountPercent = item.discountPercent || 0;
-  const optionsModifier = calculateOptionsModifier(item.selectedOptions).toNumber();
-  const baseUnitPrice = (item.originalPrice ?? item.price) + optionsModifier;
+  const discountPercent = item.discount_percent || 0;
+  const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
+  const baseUnitPrice = (item.original_price ?? item.price) + optionsModifier;
   const finalUnitPrice = calculateItemFinalPrice(item).toNumber();
   const finalLineTotal = calculateItemTotal(item).toNumber();
 
@@ -30,7 +30,7 @@ export const CartItem = React.memo<CartItemProps>(({
     e.stopPropagation();
     const newQty = item.quantity + delta;
     if (newQty >= 1) {
-      onQuantityChange(item.instanceId || item.id, delta);
+      onQuantityChange(item.instance_id || item.id, delta);
     }
   };
 
@@ -51,13 +51,13 @@ export const CartItem = React.memo<CartItemProps>(({
 
 	      <div className="flex-1 min-w-0 pr-3" {...clickHandlers}>
         <div className="font-medium text-gray-800 text-sm truncate">
-          {item.name} {item.selectedSpecification ? `(${item.selectedSpecification.name})` : ''}
+          {item.name} {item.selected_specification ? `(${item.selected_specification.name})` : ''}
         </div>
 
         {/* Selected Options */}
-        {item.selectedOptions && item.selectedOptions.length > 0 && (
+        {item.selected_options && item.selected_options.length > 0 && (
           <div className="text-[10px] text-gray-500 mt-0.5 space-y-0.5">
-            {groupOptionsByAttribute(item.selectedOptions).map((group, idx) => (
+            {groupOptionsByAttribute(item.selected_options).map((group, idx) => (
               <div key={idx} className="flex items-center gap-1">
                 <span>{group.attributeName}: {group.optionNames.join(', ')}</span>
                 {group.totalPrice !== 0 && (
@@ -84,9 +84,9 @@ export const CartItem = React.memo<CartItemProps>(({
               <div className="text-xs text-[#FF5E5E]">{formatCurrency(finalUnitPrice)}</div>
             )}
           </div>
-          {item.externalId && (
+          {item.external_id && (
             <div className="text-[10px] text-white bg-gray-900/85 font-bold font-mono px-1.5 py-0.5 rounded backdrop-blur-[1px]">
-              {item.externalId}
+              {item.external_id}
             </div>
           )}
         </div>

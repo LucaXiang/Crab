@@ -28,7 +28,7 @@ export const useDraftOrderStore = create<DraftOrderState>()(
           }));
           return draft.items.map(i => ({
             ...i,
-            instanceId: i.instanceId || `restored-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+            instance_id: i.instance_id || `restored-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
           }));
         }
         return [];

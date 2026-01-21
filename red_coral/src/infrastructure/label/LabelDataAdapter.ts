@@ -9,14 +9,14 @@ export interface LabelData {
   product?: {
     name: string;
     price: number;
-    externalId?: string;
+    external_id?: string;
   };
   specification?: {
     name: string;
   };
   order?: {
-    receiptNumber: string;
-    tableName?: string;
+    receipt_number: string;
+    table_name?: string;
   };
   item?: {
     quantity: number;
@@ -35,13 +35,13 @@ export const LabelDataAdapter = {
   adaptProductData(product: {
     name: string;
     price: number;
-    externalId?: string;
+    external_id?: string;
   }): Partial<LabelData> {
     return {
       product: {
         name: product.name,
         price: product.price,
-        externalId: product.externalId,
+        external_id: product.external_id,
       },
     };
   },
@@ -50,8 +50,8 @@ export const LabelDataAdapter = {
    * Adapt order data for label template
    */
   adaptOrderData(order: {
-    receiptNumber: string;
-    tableName?: string;
+    receipt_number: string;
+    table_name?: string;
     items: Array<{
       quantity: number;
       productName: string;
@@ -60,8 +60,8 @@ export const LabelDataAdapter = {
   }): Partial<LabelData> {
     return {
       order: {
-        receiptNumber: order.receiptNumber,
-        tableName: order.tableName,
+        receipt_number: order.receipt_number,
+        table_name: order.table_name,
       },
       item: order.items[0] ? {
         quantity: order.items[0].quantity,

@@ -33,9 +33,9 @@ export function useDraftHandlers(params: UseDraftHandlersParams) {
       tax: 0,
       discount: 0,
       payments: [],
-      guestCount: 0,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      guest_count: 0,
+      created_at: Date.now(),
+      updated_at: Date.now(),
       timeline: [],
     };
     saveDraft(draft);
