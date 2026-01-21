@@ -8,10 +8,12 @@ use enum_dispatch::enum_dispatch;
 use shared::order::{OrderCommand, OrderCommandPayload};
 
 mod add_items;
+mod add_payment;
 mod complete_order;
 mod open_table;
 
 pub use add_items::AddItemsAction;
+pub use add_payment::AddPaymentAction;
 pub use complete_order::CompleteOrderAction;
 pub use open_table::OpenTableAction;
 
@@ -22,6 +24,7 @@ pub use open_table::OpenTableAction;
 pub enum CommandAction {
     OpenTable(OpenTableAction),
     AddItems(AddItemsAction),
+    AddPayment(AddPaymentAction),
     CompleteOrder(CompleteOrderAction),
 }
 
@@ -50,6 +53,12 @@ impl From<&OrderCommand> for CommandAction {
                 CommandAction::AddItems(AddItemsAction {
                     order_id: order_id.clone(),
                     items: items.clone(),
+                })
+            }
+            OrderCommandPayload::AddPayment { order_id, payment } => {
+                CommandAction::AddPayment(AddPaymentAction {
+                    order_id: order_id.clone(),
+                    payment: payment.clone(),
                 })
             }
             OrderCommandPayload::CompleteOrder {

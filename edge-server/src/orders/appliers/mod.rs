@@ -9,10 +9,12 @@ use shared::order::{EventPayload, OrderEvent};
 
 mod items_added;
 mod order_completed;
+mod payment_added;
 mod table_opened;
 
 pub use items_added::ItemsAddedApplier;
 pub use order_completed::OrderCompletedApplier;
+pub use payment_added::PaymentAddedApplier;
 pub use table_opened::TableOpenedApplier;
 
 /// EventAction enum - dispatches to concrete applier implementations
@@ -22,6 +24,7 @@ pub use table_opened::TableOpenedApplier;
 pub enum EventAction {
     TableOpened(TableOpenedApplier),
     ItemsAdded(ItemsAddedApplier),
+    PaymentAdded(PaymentAddedApplier),
     OrderCompleted(OrderCompletedApplier),
 }
 
@@ -33,6 +36,7 @@ impl From<&OrderEvent> for EventAction {
         match &event.payload {
             EventPayload::TableOpened { .. } => EventAction::TableOpened(TableOpenedApplier),
             EventPayload::ItemsAdded { .. } => EventAction::ItemsAdded(ItemsAddedApplier),
+            EventPayload::PaymentAdded { .. } => EventAction::PaymentAdded(PaymentAddedApplier),
             EventPayload::OrderCompleted { .. } => {
                 EventAction::OrderCompleted(OrderCompletedApplier)
             }
