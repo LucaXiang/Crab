@@ -1,5 +1,9 @@
 //! Database Models
 
+// Serde helpers
+pub mod serde_helpers;
+pub mod serde_thing;
+
 // Auth
 pub mod employee;
 pub mod role;
@@ -9,7 +13,6 @@ pub mod tag;
 pub mod kitchen_printer;
 pub mod category;
 pub mod product;
-pub mod product_specification;
 pub mod attribute;
 
 // Location
@@ -27,12 +30,11 @@ pub mod system_state;
 
 // Re-exports
 pub use employee::{Employee, EmployeeId, EmployeeCreate, EmployeeUpdate, EmployeeResponse};
-pub use role::{Role, RoleId};
+pub use role::{Role, RoleCreate, RoleId, RoleUpdate};
 pub use tag::{Tag, TagCreate, TagUpdate};
 pub use kitchen_printer::{KitchenPrinter, KitchenPrinterCreate, KitchenPrinterUpdate};
 pub use category::{Category, CategoryCreate, CategoryUpdate};
-pub use product::{Product, ProductCreate, ProductUpdate};
-pub use product_specification::{ProductSpecification, ProductSpecificationCreate, ProductSpecificationUpdate};
+pub use product::{Product, ProductCreate, ProductUpdate, EmbeddedSpec};
 pub use attribute::{Attribute, AttributeOption, AttributeCreate, AttributeUpdate, HasAttribute};
 pub use zone::{Zone, ZoneCreate, ZoneUpdate};
 pub use dining_table::{DiningTable, DiningTableCreate, DiningTableUpdate};
