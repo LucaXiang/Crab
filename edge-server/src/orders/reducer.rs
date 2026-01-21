@@ -352,6 +352,7 @@ impl OrderReducer {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn apply_payment_added(
         snapshot: &mut OrderSnapshot,
         payment_id: &str,

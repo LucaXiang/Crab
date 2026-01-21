@@ -270,6 +270,7 @@ impl OrderEvent {
     /// * `client_timestamp` - Client-provided timestamp (for audit, may have clock skew)
     /// * `event_type` - Event type
     /// * `payload` - Event payload
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         sequence: u64,
         order_id: String,

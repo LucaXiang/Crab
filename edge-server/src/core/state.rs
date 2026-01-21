@@ -120,6 +120,7 @@ impl ServerState {
     /// 创建服务器状态 (手动构造)
     ///
     /// 通常使用 [`initialize()`] 方法代替
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         config: Config,
         db: Surreal<Db>,

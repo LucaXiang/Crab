@@ -10,11 +10,13 @@ use shared::order::{OrderCommand, OrderCommandPayload};
 mod add_items;
 mod add_payment;
 mod complete_order;
+mod modify_item;
 mod open_table;
 
 pub use add_items::AddItemsAction;
 pub use add_payment::AddPaymentAction;
 pub use complete_order::CompleteOrderAction;
+pub use modify_item::ModifyItemAction;
 pub use open_table::OpenTableAction;
 
 /// CommandAction enum - dispatches to concrete action implementations
@@ -24,6 +26,7 @@ pub use open_table::OpenTableAction;
 pub enum CommandAction {
     OpenTable(OpenTableAction),
     AddItems(AddItemsAction),
+    ModifyItem(ModifyItemAction),
     AddPayment(AddPaymentAction),
     CompleteOrder(CompleteOrderAction),
 }
@@ -55,6 +58,21 @@ impl From<&OrderCommand> for CommandAction {
                     items: items.clone(),
                 })
             }
+            OrderCommandPayload::ModifyItem {
+                order_id,
+                instance_id,
+                affected_quantity,
+                changes,
+                authorizer_id,
+                authorizer_name,
+            } => CommandAction::ModifyItem(ModifyItemAction {
+                order_id: order_id.clone(),
+                instance_id: instance_id.clone(),
+                affected_quantity: *affected_quantity,
+                changes: changes.clone(),
+                authorizer_id: authorizer_id.clone(),
+                authorizer_name: authorizer_name.clone(),
+            }),
             OrderCommandPayload::AddPayment { order_id, payment } => {
                 CommandAction::AddPayment(AddPaymentAction {
                     order_id: order_id.clone(),
