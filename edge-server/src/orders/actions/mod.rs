@@ -5,13 +5,12 @@
 
 use enum_dispatch::enum_dispatch;
 
-use shared::order::{OrderCommand, OrderCommandPayload, SplitItem};
+use shared::order::{OrderCommand, OrderCommandPayload};
 
 mod add_items;
 mod add_payment;
 mod cancel_payment;
 mod complete_order;
-mod merge_orders;
 mod modify_item;
 mod move_order;
 mod open_table;
@@ -20,13 +19,14 @@ mod restore_item;
 mod restore_order;
 mod split_order;
 mod update_order_info;
+mod merge_orders;
 mod void_order;
 
 pub use add_items::AddItemsAction;
+pub use merge_orders::MergeOrdersAction;
 pub use add_payment::AddPaymentAction;
 pub use cancel_payment::CancelPaymentAction;
 pub use complete_order::CompleteOrderAction;
-pub use merge_orders::MergeOrdersAction;
 pub use modify_item::ModifyItemAction;
 pub use move_order::MoveOrderAction;
 pub use open_table::OpenTableAction;
@@ -105,7 +105,7 @@ impl From<&OrderCommand> for CommandAction {
                     order_id: order_id.clone(),
                     payment: payment.clone(),
                 })
-            }
+            },
             OrderCommandPayload::CancelPayment {
                 order_id,
                 payment_id,
@@ -146,12 +146,12 @@ impl From<&OrderCommand> for CommandAction {
                     order_id: order_id.clone(),
                     reason: reason.clone(),
                 })
-            }
+            },
             OrderCommandPayload::RestoreOrder { order_id } => {
                 CommandAction::RestoreOrder(RestoreOrderAction {
                     order_id: order_id.clone(),
                 })
-            }
+            },
             OrderCommandPayload::RestoreItem {
                 order_id,
                 instance_id,
@@ -202,8 +202,6 @@ impl From<&OrderCommand> for CommandAction {
                 payment_method: payment_method.clone(),
                 items: items.clone(),
             }),
-            // Other commands will be added here
-            _ => todo!("Command not yet implemented"),
         }
     }
 }
