@@ -15,7 +15,9 @@ mod order_completed;
 mod order_info_updated;
 mod order_moved;
 mod order_restored;
+mod order_split;
 mod order_voided;
+mod orders_merged;
 mod payment_added;
 mod payment_cancelled;
 mod table_opened;
@@ -28,7 +30,9 @@ pub use order_completed::OrderCompletedApplier;
 pub use order_info_updated::OrderInfoUpdatedApplier;
 pub use order_moved::OrderMovedApplier;
 pub use order_restored::OrderRestoredApplier;
+pub use order_split::OrderSplitApplier;
 pub use order_voided::OrderVoidedApplier;
+pub use orders_merged::{OrderMergedApplier, OrderMergedOutApplier};
 pub use payment_added::PaymentAddedApplier;
 pub use payment_cancelled::PaymentCancelledApplier;
 pub use table_opened::TableOpenedApplier;
@@ -50,6 +54,9 @@ pub enum EventAction {
     OrderMoved(OrderMovedApplier),
     OrderRestored(OrderRestoredApplier),
     OrderVoided(OrderVoidedApplier),
+    OrderMerged(OrderMergedApplier),
+    OrderMergedOut(OrderMergedOutApplier),
+    OrderSplit(OrderSplitApplier),
 }
 
 /// Convert OrderEvent reference to EventAction
@@ -76,6 +83,11 @@ impl From<&OrderEvent> for EventAction {
             }
             EventPayload::OrderMoved { .. } => EventAction::OrderMoved(OrderMovedApplier),
             EventPayload::ItemRestored { .. } => EventAction::ItemRestored(ItemRestoredApplier),
+            EventPayload::OrderMerged { .. } => EventAction::OrderMerged(OrderMergedApplier),
+            EventPayload::OrderMergedOut { .. } => {
+                EventAction::OrderMergedOut(OrderMergedOutApplier)
+            }
+            EventPayload::OrderSplit { .. } => EventAction::OrderSplit(OrderSplitApplier),
             // Other events will be added here
             _ => todo!("Event applier not yet implemented"),
         }

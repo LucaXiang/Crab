@@ -5,18 +5,20 @@
 
 use enum_dispatch::enum_dispatch;
 
-use shared::order::{OrderCommand, OrderCommandPayload};
+use shared::order::{OrderCommand, OrderCommandPayload, SplitItem};
 
 mod add_items;
 mod add_payment;
 mod cancel_payment;
 mod complete_order;
+mod merge_orders;
 mod modify_item;
 mod move_order;
 mod open_table;
 mod remove_item;
 mod restore_item;
 mod restore_order;
+mod split_order;
 mod update_order_info;
 mod void_order;
 
@@ -24,12 +26,14 @@ pub use add_items::AddItemsAction;
 pub use add_payment::AddPaymentAction;
 pub use cancel_payment::CancelPaymentAction;
 pub use complete_order::CompleteOrderAction;
+pub use merge_orders::MergeOrdersAction;
 pub use modify_item::ModifyItemAction;
 pub use move_order::MoveOrderAction;
 pub use open_table::OpenTableAction;
 pub use remove_item::RemoveItemAction;
 pub use restore_item::RestoreItemAction;
 pub use restore_order::RestoreOrderAction;
+pub use split_order::SplitOrderAction;
 pub use update_order_info::UpdateOrderInfoAction;
 pub use void_order::VoidOrderAction;
 
@@ -50,6 +54,8 @@ pub enum CommandAction {
     VoidOrder(VoidOrderAction),
     RestoreOrder(RestoreOrderAction),
     MoveOrder(MoveOrderAction),
+    MergeOrders(MergeOrdersAction),
+    SplitOrder(SplitOrderAction),
 }
 
 /// Convert OrderCommand to CommandAction
@@ -99,7 +105,7 @@ impl From<&OrderCommand> for CommandAction {
                     order_id: order_id.clone(),
                     payment: payment.clone(),
                 })
-            },
+            }
             OrderCommandPayload::CancelPayment {
                 order_id,
                 payment_id,
@@ -140,12 +146,12 @@ impl From<&OrderCommand> for CommandAction {
                     order_id: order_id.clone(),
                     reason: reason.clone(),
                 })
-            },
+            }
             OrderCommandPayload::RestoreOrder { order_id } => {
                 CommandAction::RestoreOrder(RestoreOrderAction {
                     order_id: order_id.clone(),
                 })
-            },
+            }
             OrderCommandPayload::RestoreItem {
                 order_id,
                 instance_id,
@@ -177,6 +183,24 @@ impl From<&OrderCommand> for CommandAction {
                 target_table_name: target_table_name.clone(),
                 target_zone_id: None, // Not in OrderCommandPayload
                 target_zone_name: target_zone_name.clone(),
+            }),
+            OrderCommandPayload::MergeOrders {
+                source_order_id,
+                target_order_id,
+            } => CommandAction::MergeOrders(MergeOrdersAction {
+                source_order_id: source_order_id.clone(),
+                target_order_id: target_order_id.clone(),
+            }),
+            OrderCommandPayload::SplitOrder {
+                order_id,
+                split_amount,
+                payment_method,
+                items,
+            } => CommandAction::SplitOrder(SplitOrderAction {
+                order_id: order_id.clone(),
+                split_amount: *split_amount,
+                payment_method: payment_method.clone(),
+                items: items.clone(),
             }),
             // Other commands will be added here
             _ => todo!("Command not yet implemented"),
