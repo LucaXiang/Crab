@@ -5,16 +5,16 @@ use axum::{
     extract::{Path, State},
 };
 
+use crate::api::convert::{option_thing_to_string, thing_to_string};
 use crate::core::ServerState;
-use crate::db::models::{
-    Product, ProductCreate, ProductUpdate,
-    ProductSpecification, ProductSpecificationCreate, ProductSpecificationUpdate,
-};
-use crate::db::repository::{ProductRepository, ProductSpecificationRepository};
+use crate::db::models::{ProductCreate, ProductUpdate};
+use crate::db::repository::{ProductRepository, AttributeRepository, TagRepository};
 use crate::utils::{AppError, AppResult};
 
+// API 返回类型使用 shared::models (String ID)
+use shared::models::{Product, ProductFull, ProductAttributeBinding, EmbeddedSpec};
+
 const RESOURCE_PRODUCT: &str = "product";
-const RESOURCE_SPEC: &str = "product_specification";
 
 // =============================================================================
 // Product Handlers
@@ -26,7 +26,8 @@ pub async fn list(
 ) -> AppResult<Json<Vec<Product>>> {
     let repo = ProductRepository::new(state.db.clone());
     let products = repo.find_all().await.map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(products))
+    // 转换为 API 类型 (Thing -> String)
+    Ok(Json(products.into_iter().map(Into::into).collect()))
 }
 
 /// GET /api/products/by-category/:category_id - 按分类获取商品
@@ -36,7 +37,7 @@ pub async fn list_by_category(
 ) -> AppResult<Json<Vec<Product>>> {
     let repo = ProductRepository::new(state.db.clone());
     let products = repo.find_by_category(&category_id).await.map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(products))
+    Ok(Json(products.into_iter().map(Into::into).collect()))
 }
 
 /// GET /api/products/:id - 获取单个商品
@@ -49,32 +50,80 @@ pub async fn get_by_id(
         .find_by_id(&id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?
-        .ok_or_else(|| AppError::not_found(format!("Product {} not found", id)))?;
-    Ok(Json(product))
+        .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
+    Ok(Json(product.into()))
 }
 
-/// GET /api/products/:id/full - 获取商品完整信息 (含关联数据)
+/// GET /api/products/:id/full - 获取商品完整信息 (含规格、属性、标签)
 pub async fn get_full(
     State(state): State<ServerState>,
     Path(id): Path<String>,
-) -> AppResult<Json<Product>> {
-    let repo = ProductRepository::new(state.db.clone());
-    let product = repo
-        .find_by_id_full(&id)
+) -> AppResult<Json<ProductFull>> {
+    let product_repo = ProductRepository::new(state.db.clone());
+    let attr_repo = AttributeRepository::new(state.db.clone());
+    let tag_repo = TagRepository::new(state.db.clone());
+
+    // Get product (specs are now embedded)
+    let product = product_repo
+        .find_by_id(&id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?
-        .ok_or_else(|| AppError::not_found(format!("Product {} not found", id)))?;
-    Ok(Json(product))
-}
+        .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
 
-/// GET /api/products/:id/specs - 获取商品的所有规格
-pub async fn get_specs(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-) -> AppResult<Json<(Product, Vec<ProductSpecification>)>> {
-    let repo = ProductRepository::new(state.db.clone());
-    let result = repo.find_with_specs(&id).await.map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(result))
+    // Get attribute bindings
+    let bindings = attr_repo
+        .find_bindings_for_product(&id)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+
+    // Get full tag objects
+    let tag_ids: Vec<String> = product.tags.iter().map(|t| t.id.to_string()).collect();
+    let mut tags = Vec::new();
+    for tag_id in tag_ids {
+        if let Some(tag) = tag_repo
+            .find_by_id(&tag_id)
+            .await
+            .map_err(|e| AppError::database(e.to_string()))?
+        {
+            tags.push(tag.into());
+        }
+    }
+
+    // Convert embedded specs to API type
+    let specs: Vec<EmbeddedSpec> = product.specs.into_iter().map(Into::into).collect();
+
+    // Convert attribute bindings
+    let attr_bindings: Vec<ProductAttributeBinding> = bindings
+        .into_iter()
+        .map(|(binding, attr)| ProductAttributeBinding {
+            id: binding.id.map(|t| t.to_raw()),
+            attribute: attr.into(),
+            is_required: binding.is_required,
+            display_order: binding.display_order,
+            default_option_idx: binding.default_option_idx,
+        })
+        .collect();
+
+    // Build ProductFull
+    let product_full = ProductFull {
+        id: option_thing_to_string(&product.id),
+        name: product.name,
+        image: product.image,
+        category: thing_to_string(&product.category),
+        sort_order: product.sort_order,
+        tax_rate: product.tax_rate,
+        receipt_name: product.receipt_name,
+        kitchen_print_name: product.kitchen_print_name,
+        kitchen_printer: option_thing_to_string(&product.kitchen_printer),
+        is_kitchen_print_enabled: product.is_kitchen_print_enabled,
+        is_label_print_enabled: product.is_label_print_enabled,
+        is_active: product.is_active,
+        specs,
+        attributes: attr_bindings,
+        tags,
+    };
+
+    Ok(Json(product_full))
 }
 
 /// POST /api/products - 创建商品
@@ -85,11 +134,15 @@ pub async fn create(
     let repo = ProductRepository::new(state.db.clone());
     let product = repo.create(payload).await.map_err(|e| AppError::database(e.to_string()))?;
 
-    // 广播同步通知
-    let id = product.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
-    state.broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&product)).await;
+    // Get product ID for broadcast
+    let product_id = product.id.clone().ok_or_else(|| AppError::internal("Product created without ID"))?;
 
-    Ok(Json(product))
+    // 广播同步通知
+    let id = product_id.id.to_string();
+    let api_product: Product = product.into();
+    state.broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&api_product)).await;
+
+    Ok(Json(api_product))
 }
 
 /// PUT /api/products/:id - 更新商品
@@ -102,9 +155,10 @@ pub async fn update(
     let product = repo.update(&id, payload).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE_PRODUCT, "updated", &id, Some(&product)).await;
+    let api_product: Product = product.into();
+    state.broadcast_sync(RESOURCE_PRODUCT, "updated", &id, Some(&api_product)).await;
 
-    Ok(Json(product))
+    Ok(Json(api_product))
 }
 
 /// DELETE /api/products/:id - 删除商品 (软删除)
@@ -123,94 +177,64 @@ pub async fn delete(
     Ok(Json(result))
 }
 
-// =============================================================================
-// ProductSpecification Handlers
-// =============================================================================
-
-/// GET /api/specs/:id - 获取单个规格
-pub async fn get_spec(
+/// GET /api/products/:id/attributes - 获取商品的属性绑定列表
+pub async fn list_product_attributes(
     State(state): State<ServerState>,
     Path(id): Path<String>,
-) -> AppResult<Json<ProductSpecification>> {
-    let repo = ProductSpecificationRepository::new(state.db.clone());
-    let spec = repo
-        .find_by_id_with_tags(&id)
+) -> AppResult<Json<Vec<ProductAttributeBinding>>> {
+    let attr_repo = AttributeRepository::new(state.db.clone());
+
+    // Get attribute bindings for this product
+    let bindings = attr_repo
+        .find_bindings_for_product(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?
-        .ok_or_else(|| AppError::not_found(format!("Specification {} not found", id)))?;
-    Ok(Json(spec))
-}
+        .map_err(|e| AppError::database(e.to_string()))?;
 
-/// POST /api/specs - 创建规格
-pub async fn create_spec(
-    State(state): State<ServerState>,
-    Json(payload): Json<ProductSpecificationCreate>,
-) -> AppResult<Json<ProductSpecification>> {
-    let repo = ProductSpecificationRepository::new(state.db.clone());
-    let spec = repo.create(payload).await.map_err(|e| AppError::database(e.to_string()))?;
-
-    // 广播同步通知
-    let id = spec.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
-    state.broadcast_sync(RESOURCE_SPEC, "created", &id, Some(&spec)).await;
-
-    Ok(Json(spec))
-}
-
-/// PUT /api/specs/:id - 更新规格
-pub async fn update_spec(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-    Json(payload): Json<ProductSpecificationUpdate>,
-) -> AppResult<Json<ProductSpecification>> {
-    let repo = ProductSpecificationRepository::new(state.db.clone());
-    let spec = repo.update(&id, payload).await.map_err(|e| AppError::database(e.to_string()))?;
-
-    // 广播同步通知
-    state.broadcast_sync(RESOURCE_SPEC, "updated", &id, Some(&spec)).await;
-
-    Ok(Json(spec))
-}
-
-/// DELETE /api/specs/:id - 删除规格 (软删除)
-pub async fn delete_spec(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-) -> AppResult<Json<bool>> {
-    let repo = ProductSpecificationRepository::new(state.db.clone());
-    let result = repo.delete(&id).await.map_err(|e| AppError::database(e.to_string()))?;
-
-    // 广播同步通知
-    if result {
-        state.broadcast_sync::<()>(RESOURCE_SPEC, "deleted", &id, None).await;
-    }
+    // Convert to API type
+    let result: Vec<ProductAttributeBinding> = bindings
+        .into_iter()
+        .map(|(binding, attr)| ProductAttributeBinding {
+            id: binding.id.map(|t| t.to_raw()),
+            attribute: attr.into(),
+            is_required: binding.is_required,
+            display_order: binding.display_order,
+            default_option_idx: binding.default_option_idx,
+        })
+        .collect();
 
     Ok(Json(result))
 }
 
-/// POST /api/specs/:id/tags/:tag_id - 给规格添加标签
-pub async fn add_tag(
+// =============================================================================
+// Product Tag Handlers
+// =============================================================================
+
+/// POST /api/products/:id/tags/:tag_id - 给商品添加标签
+pub async fn add_product_tag(
     State(state): State<ServerState>,
-    Path((spec_id, tag_id)): Path<(String, String)>,
-) -> AppResult<Json<ProductSpecification>> {
-    let repo = ProductSpecificationRepository::new(state.db.clone());
-    let spec = repo.add_tag(&spec_id, &tag_id).await.map_err(|e| AppError::database(e.to_string()))?;
+    Path((product_id, tag_id)): Path<(String, String)>,
+) -> AppResult<Json<Product>> {
+    let repo = ProductRepository::new(state.db.clone());
+    let product = repo.add_tag(&product_id, &tag_id).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE_SPEC, "updated", &spec_id, Some(&spec)).await;
+    let api_product: Product = product.into();
+    state.broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&api_product)).await;
 
-    Ok(Json(spec))
+    Ok(Json(api_product))
 }
 
-/// DELETE /api/specs/:id/tags/:tag_id - 从规格移除标签
-pub async fn remove_tag(
+/// DELETE /api/products/:id/tags/:tag_id - 从商品移除标签
+pub async fn remove_product_tag(
     State(state): State<ServerState>,
-    Path((spec_id, tag_id)): Path<(String, String)>,
-) -> AppResult<Json<ProductSpecification>> {
-    let repo = ProductSpecificationRepository::new(state.db.clone());
-    let spec = repo.remove_tag(&spec_id, &tag_id).await.map_err(|e| AppError::database(e.to_string()))?;
+    Path((product_id, tag_id)): Path<(String, String)>,
+) -> AppResult<Json<Product>> {
+    let repo = ProductRepository::new(state.db.clone());
+    let product = repo.remove_tag(&product_id, &tag_id).await.map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE_SPEC, "updated", &spec_id, Some(&spec)).await;
+    let api_product: Product = product.into();
+    state.broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&api_product)).await;
 
-    Ok(Json(spec))
+    Ok(Json(api_product))
 }

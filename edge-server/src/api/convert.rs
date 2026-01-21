@@ -7,19 +7,19 @@ use shared::models as api;
 
 // ============ Helper ============
 
-fn thing_to_string(thing: &surrealdb::sql::Thing) -> String {
+pub fn thing_to_string(thing: &surrealdb::sql::Thing) -> String {
     thing.to_string()
 }
 
-fn option_thing_to_string(thing: &Option<surrealdb::sql::Thing>) -> Option<String> {
+pub fn option_thing_to_string(thing: &Option<surrealdb::sql::Thing>) -> Option<String> {
     thing.as_ref().map(thing_to_string)
 }
 
-fn things_to_strings(things: &[surrealdb::sql::Thing]) -> Vec<String> {
+pub fn things_to_strings(things: &[surrealdb::sql::Thing]) -> Vec<String> {
     things.iter().map(thing_to_string).collect()
 }
 
-fn datetime_to_string(dt: &Option<chrono::DateTime<chrono::Utc>>) -> Option<String> {
+pub fn datetime_to_string(dt: &Option<chrono::DateTime<chrono::Utc>>) -> Option<String> {
     dt.map(|d| d.to_rfc3339())
 }
 
@@ -55,6 +55,19 @@ impl From<db::Category> for api::Category {
 
 // ============ Product ============
 
+impl From<db::EmbeddedSpec> for api::EmbeddedSpec {
+    fn from(s: db::EmbeddedSpec) -> Self {
+        Self {
+            name: s.name,
+            price: s.price,
+            display_order: s.display_order,
+            is_default: s.is_default,
+            is_active: s.is_active,
+            external_id: s.external_id,
+        }
+    }
+}
+
 impl From<db::Product> for api::Product {
     fn from(p: db::Product) -> Self {
         Self {
@@ -64,32 +77,14 @@ impl From<db::Product> for api::Product {
             category: thing_to_string(&p.category),
             sort_order: p.sort_order,
             tax_rate: p.tax_rate,
-            has_multi_spec: p.has_multi_spec,
             receipt_name: p.receipt_name,
             kitchen_print_name: p.kitchen_print_name,
             kitchen_printer: option_thing_to_string(&p.kitchen_printer),
             is_kitchen_print_enabled: p.is_kitchen_print_enabled,
             is_label_print_enabled: p.is_label_print_enabled,
             is_active: p.is_active,
-        }
-    }
-}
-
-impl From<db::ProductSpecification> for api::ProductSpecification {
-    fn from(s: db::ProductSpecification) -> Self {
-        Self {
-            id: option_thing_to_string(&s.id),
-            product: thing_to_string(&s.product),
-            name: s.name,
-            price: s.price,
-            display_order: s.display_order,
-            is_default: s.is_default,
-            is_active: s.is_active,
-            is_root: s.is_root,
-            external_id: s.external_id,
-            tags: things_to_strings(&s.tags),
-            created_at: datetime_to_string(&s.created_at),
-            updated_at: datetime_to_string(&s.updated_at),
+            tags: things_to_strings(&p.tags),
+            specs: p.specs.into_iter().map(Into::into).collect(),
         }
     }
 }
