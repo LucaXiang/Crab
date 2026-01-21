@@ -101,9 +101,8 @@ pub struct ProductCreate {
     pub is_label_print_enabled: Option<i32>,
     #[serde(default, with = "serde_thing::option_vec")]
     pub tags: Option<Vec<Thing>>,
-    /// 嵌入式规格 (创建时可选，默认创建 root spec)
-    #[serde(default)]
-    pub specs: Option<Vec<EmbeddedSpec>>,
+    /// 嵌入式规格 (必需，至少一个规格)
+    pub specs: Vec<EmbeddedSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

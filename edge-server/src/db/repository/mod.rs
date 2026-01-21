@@ -4,6 +4,7 @@
 
 // Auth
 pub mod employee;
+pub mod role;
 
 // Product Domain
 pub mod tag;
@@ -27,9 +28,10 @@ pub mod system_state;
 
 // Re-exports
 pub use employee::EmployeeRepository;
+pub use role::RoleRepository;
 pub use tag::TagRepository;
 pub use category::CategoryRepository;
-pub use product::{ProductRepository, ProductSpecificationRepository};
+pub use product::ProductRepository;
 pub use attribute::AttributeRepository;
 pub use kitchen_printer::KitchenPrinterRepository;
 pub use zone::ZoneRepository;
@@ -90,6 +92,12 @@ pub fn parse_thing(id: &str) -> Option<surrealdb::sql::Thing> {
 /// Helper to create Thing from table name and id
 pub fn make_thing(table: &str, id: &str) -> surrealdb::sql::Thing {
     surrealdb::sql::Thing::from((table.to_string(), id.to_string()))
+}
+
+/// Strip table prefix from id (e.g., "product:xxx" -> "xxx")
+pub fn strip_table_prefix<'a>(table: &str, id: &'a str) -> &'a str {
+    let prefix = format!("{}:", table);
+    id.strip_prefix(&prefix).unwrap_or(id)
 }
 
 /// Base repository with database reference
