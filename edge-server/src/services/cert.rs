@@ -305,19 +305,23 @@ impl CertService {
                 metadata.not_after
             );
         } else {
-            tracing::info!("  ✅ Certificate validity period OK (expires: {}).", metadata.not_after);
+            tracing::info!(
+                "  ✅ Certificate validity period OK (expires: {}).",
+                metadata.not_after
+            );
         }
 
         // Step 3: 验证 Credential.json 签名 (使用本地 tenant_ca 公钥)
         // 优先使用缓存的 binding，避免重复读取磁盘
-        let binding_to_check: Option<std::borrow::Cow<'_, crate::services::tenant_binding::TenantBinding>> =
-            if let Some(b) = cached_binding {
-                Some(std::borrow::Cow::Borrowed(b))
-            } else {
-                crate::services::tenant_binding::TenantBinding::load(&self.work_dir)
-                    .map_err(|e| AppError::internal(format!("Failed to load credential: {}", e)))?
-                    .map(std::borrow::Cow::Owned)
-            };
+        let binding_to_check: Option<
+            std::borrow::Cow<'_, crate::services::tenant_binding::TenantBinding>,
+        > = if let Some(b) = cached_binding {
+            Some(std::borrow::Cow::Borrowed(b))
+        } else {
+            crate::services::tenant_binding::TenantBinding::load(&self.work_dir)
+                .map_err(|e| AppError::internal(format!("Failed to load credential: {}", e)))?
+                .map(std::borrow::Cow::Owned)
+        };
 
         if let Some(binding) = binding_to_check {
             // Step 3a: 检测时钟篡改

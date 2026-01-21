@@ -12,7 +12,10 @@ pub struct DiningTable {
     pub zone: Thing,
     #[serde(default)]
     pub capacity: i32,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
 }
 

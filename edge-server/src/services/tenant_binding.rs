@@ -131,17 +131,19 @@ impl Subscription {
 
     /// 验证订阅签名
     pub fn verify_signature(&self, tenant_ca_cert_pem: &str) -> Result<(), AppError> {
-        let sig_b64 = self.signature.as_ref().ok_or_else(|| {
-            AppError::validation("Subscription is not signed")
-        })?;
+        let sig_b64 = self
+            .signature
+            .as_ref()
+            .ok_or_else(|| AppError::validation("Subscription is not signed"))?;
 
         let sig_bytes = base64_decode(sig_b64).map_err(|e| {
             AppError::validation(format!("Invalid subscription signature encoding: {}", e))
         })?;
 
         let data = self.signable_data();
-        crab_cert::verify(tenant_ca_cert_pem, data.as_bytes(), &sig_bytes)
-            .map_err(|e| AppError::validation(format!("Subscription signature verification failed: {}", e)))
+        crab_cert::verify(tenant_ca_cert_pem, data.as_bytes(), &sig_bytes).map_err(|e| {
+            AppError::validation(format!("Subscription signature verification failed: {}", e))
+        })
     }
 
     /// 检查签名是否过期 (需要刷新)
@@ -159,7 +161,9 @@ impl Subscription {
 
         // 2. 检查签名有效期
         if self.is_signature_expired() {
-            return Err(AppError::validation("Subscription signature has expired, needs refresh"));
+            return Err(AppError::validation(
+                "Subscription signature has expired, needs refresh",
+            ));
         }
 
         Ok(())
@@ -201,7 +205,6 @@ pub struct TenantBinding {
     pub subscription: Option<Subscription>,
 }
 
-
 impl TenantBinding {
     /// 从 SignedBinding 创建 (推荐)
     pub fn from_signed(binding: SignedBinding) -> Self {
@@ -232,7 +235,9 @@ impl TenantBinding {
 
     /// 完整验证 (签名 + 硬件 + 时钟)
     pub fn validate(&self, tenant_ca_cert_pem: &str) -> Result<(), AppError> {
-        self.binding.validate(tenant_ca_cert_pem).map_err(AppError::validation)
+        self.binding
+            .validate(tenant_ca_cert_pem)
+            .map_err(AppError::validation)
     }
 
     /// 检查是否已签名

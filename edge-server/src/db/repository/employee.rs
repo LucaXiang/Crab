@@ -1,6 +1,6 @@
 //! Employee Repository
 
-use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
+use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
 use crate::db::models::{Employee, EmployeeCreate, EmployeeResponse, EmployeeUpdate};
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;

@@ -17,8 +17,8 @@
 //! - Full sync is always available as fallback
 
 use super::manager::{ManagerError, OrdersManager};
-use shared::order::{OrderEvent, OrderSnapshot};
 use serde::{Deserialize, Serialize};
+use shared::order::{OrderEvent, OrderSnapshot};
 
 /// Maximum events to return in incremental sync
 /// If gap exceeds this, full sync is recommended
@@ -49,7 +49,11 @@ pub struct SyncResponse {
 
 impl SyncResponse {
     /// Create a full sync response
-    pub fn full_sync(active_orders: Vec<OrderSnapshot>, server_sequence: u64, epoch: String) -> Self {
+    pub fn full_sync(
+        active_orders: Vec<OrderSnapshot>,
+        server_sequence: u64,
+        epoch: String,
+    ) -> Self {
         Self {
             events: vec![],
             active_orders,
@@ -101,16 +105,26 @@ impl SyncService {
         // If gap is large, recommend full sync
         if gap > MAX_INCREMENTAL_EVENTS as u64 {
             let active_orders = self.manager.get_active_orders()?;
-            return Ok(SyncResponse::full_sync(active_orders, server_sequence, epoch));
+            return Ok(SyncResponse::full_sync(
+                active_orders,
+                server_sequence,
+                epoch,
+            ));
         }
 
         // Return incremental events
-        let events = self.manager.get_active_events_since(request.since_sequence)?;
+        let events = self
+            .manager
+            .get_active_events_since(request.since_sequence)?;
 
         // Double-check: if we got too many events, fall back to full sync
         if events.len() > MAX_INCREMENTAL_EVENTS {
             let active_orders = self.manager.get_active_orders()?;
-            return Ok(SyncResponse::full_sync(active_orders, server_sequence, epoch));
+            return Ok(SyncResponse::full_sync(
+                active_orders,
+                server_sequence,
+                epoch,
+            ));
         }
 
         Ok(SyncResponse::incremental(events, server_sequence, epoch))

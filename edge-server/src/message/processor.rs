@@ -304,7 +304,11 @@ impl RequestCommandProcessor {
             .and_then(|v| v.as_u64())
             .unwrap_or(0);
 
-        match self.state.orders_manager().get_active_events_since(since_sequence) {
+        match self
+            .state
+            .orders_manager()
+            .get_active_events_since(since_sequence)
+        {
             Ok(events) => {
                 let current_sequence = self
                     .state
@@ -376,15 +380,9 @@ impl MessageProcessor for RequestCommandProcessor {
                 self.handle_order_command(action, &payload.params).await
             }
             // ========== Sync Commands ==========
-            "sync.orders" => {
-                self.handle_sync_orders(&payload.params).await
-            }
-            "sync.order_snapshot" => {
-                self.handle_sync_order_snapshot(&payload.params).await
-            }
-            "sync.active_events" => {
-                self.handle_sync_active_events(&payload.params).await
-            }
+            "sync.orders" => self.handle_sync_orders(&payload.params).await,
+            "sync.order_snapshot" => self.handle_sync_order_snapshot(&payload.params).await,
+            "sync.active_events" => self.handle_sync_active_events(&payload.params).await,
             _ => {
                 tracing::warn!("Unknown request action: {}", payload.action);
                 Ok(ProcessResult::Failed {

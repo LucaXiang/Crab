@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::services::tenant_binding::{TenantBinding, Subscription, SubscriptionStatus, PlanType};
+use crate::services::tenant_binding::{PlanType, Subscription, SubscriptionStatus, TenantBinding};
 use crate::utils::AppError;
 
 /// 激活服务 - 管理边缘节点激活状态
@@ -114,7 +114,10 @@ impl ActivationService {
             //    使用缓存的 credential，避免重复读取磁盘
             tracing::info!("🔍 Performing self-check...");
             let cached_binding = self.credential_cache.read().await.clone(); // clone 后立即释放读锁
-            match cert_service.self_check_with_binding(cached_binding.as_ref()).await {
+            match cert_service
+                .self_check_with_binding(cached_binding.as_ref())
+                .await
+            {
                 Ok(()) => {
                     tracing::info!("✅ Self-check passed!");
 
@@ -129,9 +132,7 @@ impl ActivationService {
                     // 进入未绑定状态
                     self.enter_unbound_state(cert_service).await;
 
-                    tracing::warn!(
-                        "🔄 Server entered unbound state. Waiting for reactivation..."
-                    );
+                    tracing::warn!("🔄 Server entered unbound state. Waiting for reactivation...");
                     // Loop continues, will wait for activation again
                 }
             }
@@ -144,7 +145,10 @@ impl ActivationService {
     /// 进入未绑定状态 (公开接口)
     ///
     /// 供 ServerState 在 TLS 加载失败时调用
-    pub async fn enter_unbound_state_public(&self, cert_service: &crate::services::cert::CertService) {
+    pub async fn enter_unbound_state_public(
+        &self,
+        cert_service: &crate::services::cert::CertService,
+    ) {
         self.enter_unbound_state(cert_service).await;
     }
 
@@ -266,7 +270,10 @@ impl ActivationService {
         };
 
         if !resp.status().is_success() {
-            tracing::warn!("Auth Server returned error for binding refresh: {}", resp.status());
+            tracing::warn!(
+                "Auth Server returned error for binding refresh: {}",
+                resp.status()
+            );
             return;
         }
 
@@ -428,7 +435,10 @@ impl ActivationService {
         let tenant_ca_pem = match std::fs::read_to_string(&tenant_ca_path) {
             Ok(pem) => pem,
             Err(e) => {
-                tracing::error!("Failed to read tenant CA for subscription verification: {}", e);
+                tracing::error!(
+                    "Failed to read tenant CA for subscription verification: {}",
+                    e
+                );
                 return None;
             }
         };

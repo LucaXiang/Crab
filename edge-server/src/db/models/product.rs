@@ -43,7 +43,10 @@ pub struct Product {
     pub print_destinations: Vec<Thing>,
     #[serde(default = "default_inherit")]
     pub is_label_print_enabled: i32,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
     /// Array of record links to tags
     #[serde(default)]
@@ -107,7 +110,11 @@ pub struct ProductUpdate {
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub image: Option<String>,
-    #[serde(default, with = "serde_thing::option", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "serde_thing::option",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub category: Option<Thing>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sort_order: Option<i32>,
@@ -117,13 +124,21 @@ pub struct ProductUpdate {
     pub receipt_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kitchen_print_name: Option<String>,
-    #[serde(default, with = "serde_thing::option_vec", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "serde_thing::option_vec",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub print_destinations: Option<Vec<Thing>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_label_print_enabled: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_active: Option<bool>,
-    #[serde(default, with = "serde_thing::option_vec", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        with = "serde_thing::option_vec",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub tags: Option<Vec<Thing>>,
     /// 嵌入式规格
     #[serde(skip_serializing_if = "Option::is_none")]

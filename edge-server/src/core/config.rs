@@ -115,7 +115,9 @@ impl ConfigBuilder {
             message_tcp_port: self.message_tcp_port.unwrap_or(8081),
             jwt: self.jwt.unwrap_or_default(),
             environment: self.environment.unwrap_or_else(|| "development".into()),
-            auth_server_url: self.auth_server_url.unwrap_or_else(|| "http://localhost:3001".into()),
+            auth_server_url: self
+                .auth_server_url
+                .unwrap_or_else(|| "http://localhost:3001".into()),
             max_connections: self.max_connections.unwrap_or(1000),
             request_timeout_ms: self.request_timeout_ms.unwrap_or(30000),
             shutdown_timeout_ms: self.shutdown_timeout_ms.unwrap_or(10000),
@@ -160,8 +162,7 @@ impl Config {
             )
             .environment(std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".into()))
             .auth_server_url(
-                std::env::var("AUTH_SERVER_URL")
-                    .unwrap_or_else(|_| "http://localhost:3001".into()),
+                std::env::var("AUTH_SERVER_URL").unwrap_or_else(|_| "http://localhost:3001".into()),
             )
             .max_connections(
                 std::env::var("MAX_CONNECTIONS")

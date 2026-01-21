@@ -63,13 +63,18 @@ pub async fn get_by_id(
     Path(id): Path<String>,
 ) -> AppResult<Json<HasAttribute>> {
     // 通过 ID 查询 has_attribute 边
-    let mut result = state.db
+    let mut result = state
+        .db
         .query("SELECT * FROM has_attribute WHERE id = $id")
-        .bind(("id", crate::db::repository::make_thing("has_attribute", &id)))
+        .bind((
+            "id",
+            crate::db::repository::make_thing("has_attribute", &id),
+        ))
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    let bindings: Vec<HasAttribute> = result.take(0)
+    let bindings: Vec<HasAttribute> = result
+        .take(0)
         .map_err(|e| AppError::database(e.to_string()))?;
 
     bindings
@@ -87,14 +92,16 @@ pub async fn update(
 ) -> AppResult<Json<HasAttribute>> {
     let thing = crate::db::repository::make_thing("has_attribute", &id);
 
-    let mut result = state.db
+    let mut result = state
+        .db
         .query("UPDATE $thing MERGE $data RETURN AFTER")
         .bind(("thing", thing))
         .bind(("data", payload))
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    let bindings: Vec<HasAttribute> = result.take(0)
+    let bindings: Vec<HasAttribute> = result
+        .take(0)
         .map_err(|e| AppError::database(e.to_string()))?;
 
     bindings
@@ -111,7 +118,8 @@ pub async fn delete(
 ) -> AppResult<Json<bool>> {
     let thing = crate::db::repository::make_thing("has_attribute", &id);
 
-    state.db
+    state
+        .db
         .query("DELETE $thing")
         .bind(("thing", thing))
         .await

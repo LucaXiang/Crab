@@ -1,8 +1,8 @@
 //! Role API Handlers
 
+use axum::Json;
 use axum::extract::{Extension, Path, Query, State};
 use axum::response::IntoResponse;
-use axum::Json;
 use serde::Deserialize;
 
 use crate::auth::CurrentUser;

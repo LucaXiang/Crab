@@ -158,7 +158,9 @@ fn load_jwt_secret() -> Result<Vec<u8>, JwtError> {
                     "⚠️  JWT_SECRET not set! Using fixed development key for stability."
                 );
                 // Use fixed key for development to avoid token invalidation on restart
-                Ok("CrabEdgeServerDevelopmentSecureKey2024!".as_bytes().to_vec())
+                Ok("CrabEdgeServerDevelopmentSecureKey2024!"
+                    .as_bytes()
+                    .to_vec())
             }
             #[cfg(not(debug_assertions))]
             {

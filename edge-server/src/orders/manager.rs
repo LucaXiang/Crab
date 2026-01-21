@@ -682,7 +682,7 @@ impl OrdersManager {
                     price: item.price,
                     discount_percent: item.discount_percent,
                     action: "UNCHANGED".to_string(),
-                },Box::new()
+                },
                 ItemModificationResult {
                     instance_id: new_instance_id,
                     quantity: affected_qty,

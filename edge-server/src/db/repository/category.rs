@@ -151,11 +151,9 @@ impl CategoryRepository {
             is_label_print_enabled: data.is_label_print_enabled,
             is_active: data.is_active,
             is_virtual: data.is_virtual,
-            tag_ids: data.tag_ids.map(|ids| {
-                ids.iter()
-                    .map(|id| make_thing("tag", id))
-                    .collect()
-            }),
+            tag_ids: data
+                .tag_ids
+                .map(|ids| ids.iter().map(|id| make_thing("tag", id)).collect()),
             match_mode: data.match_mode,
         };
 

@@ -1,9 +1,9 @@
 //! Price Rule Repository
 
-use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
+use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
 use crate::db::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope, TimeMode};
-use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 
 const TABLE: &str = "price_rule";
 

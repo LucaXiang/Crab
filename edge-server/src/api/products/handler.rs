@@ -8,11 +8,11 @@ use axum::{
 use crate::api::convert::{option_thing_to_string, thing_to_string, things_to_strings};
 use crate::core::ServerState;
 use crate::db::models::{ProductCreate, ProductUpdate};
-use crate::db::repository::{ProductRepository, AttributeRepository, TagRepository};
+use crate::db::repository::{AttributeRepository, ProductRepository, TagRepository};
 use crate::utils::{AppError, AppResult};
 
 // API 返回类型使用 shared::models (String ID)
-use shared::models::{Product, ProductFull, ProductAttributeBinding, EmbeddedSpec};
+use shared::models::{EmbeddedSpec, Product, ProductAttributeBinding, ProductFull};
 
 const RESOURCE_PRODUCT: &str = "product";
 
@@ -21,11 +21,12 @@ const RESOURCE_PRODUCT: &str = "product";
 // =============================================================================
 
 /// GET /api/products - 获取所有商品
-pub async fn list(
-    State(state): State<ServerState>,
-) -> AppResult<Json<Vec<Product>>> {
+pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Product>>> {
     let repo = ProductRepository::new(state.db.clone());
-    let products = repo.find_all().await.map_err(|e| AppError::database(e.to_string()))?;
+    let products = repo
+        .find_all()
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
     // 转换为 API 类型 (Thing -> String)
     Ok(Json(products.into_iter().map(Into::into).collect()))
 }
@@ -36,7 +37,10 @@ pub async fn list_by_category(
     Path(category_id): Path<String>,
 ) -> AppResult<Json<Vec<Product>>> {
     let repo = ProductRepository::new(state.db.clone());
-    let products = repo.find_by_category(&category_id).await.map_err(|e| AppError::database(e.to_string()))?;
+    let products = repo
+        .find_by_category(&category_id)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
     Ok(Json(products.into_iter().map(Into::into).collect()))
 }
 
@@ -130,15 +134,23 @@ pub async fn create(
     Json(payload): Json<ProductCreate>,
 ) -> AppResult<Json<Product>> {
     let repo = ProductRepository::new(state.db.clone());
-    let product = repo.create(payload).await.map_err(|e| AppError::database(e.to_string()))?;
+    let product = repo
+        .create(payload)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // Get product ID for broadcast
-    let product_id = product.id.clone().ok_or_else(|| AppError::internal("Product created without ID"))?;
+    let product_id = product
+        .id
+        .clone()
+        .ok_or_else(|| AppError::internal("Product created without ID"))?;
 
     // 广播同步通知
     let id = product_id.id.to_string();
     let api_product: Product = product.into();
-    state.broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&api_product)).await;
+    state
+        .broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&api_product))
+        .await;
 
     Ok(Json(api_product))
 }
@@ -150,11 +162,16 @@ pub async fn update(
     Json(payload): Json<ProductUpdate>,
 ) -> AppResult<Json<Product>> {
     let repo = ProductRepository::new(state.db.clone());
-    let product = repo.update(&id, payload).await.map_err(|e| AppError::database(e.to_string()))?;
+    let product = repo
+        .update(&id, payload)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
     let api_product: Product = product.into();
-    state.broadcast_sync(RESOURCE_PRODUCT, "updated", &id, Some(&api_product)).await;
+    state
+        .broadcast_sync(RESOURCE_PRODUCT, "updated", &id, Some(&api_product))
+        .await;
 
     Ok(Json(api_product))
 }
@@ -165,11 +182,16 @@ pub async fn delete(
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let repo = ProductRepository::new(state.db.clone());
-    let result = repo.delete(&id).await.map_err(|e| AppError::database(e.to_string()))?;
+    let result = repo
+        .delete(&id)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
     if result {
-        state.broadcast_sync::<()>(RESOURCE_PRODUCT, "deleted", &id, None).await;
+        state
+            .broadcast_sync::<()>(RESOURCE_PRODUCT, "deleted", &id, None)
+            .await;
     }
 
     Ok(Json(result))
@@ -212,11 +234,16 @@ pub async fn add_product_tag(
     Path((product_id, tag_id)): Path<(String, String)>,
 ) -> AppResult<Json<Product>> {
     let repo = ProductRepository::new(state.db.clone());
-    let product = repo.add_tag(&product_id, &tag_id).await.map_err(|e| AppError::database(e.to_string()))?;
+    let product = repo
+        .add_tag(&product_id, &tag_id)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
     let api_product: Product = product.into();
-    state.broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&api_product)).await;
+    state
+        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&api_product))
+        .await;
 
     Ok(Json(api_product))
 }
@@ -227,11 +254,16 @@ pub async fn remove_product_tag(
     Path((product_id, tag_id)): Path<(String, String)>,
 ) -> AppResult<Json<Product>> {
     let repo = ProductRepository::new(state.db.clone());
-    let product = repo.remove_tag(&product_id, &tag_id).await.map_err(|e| AppError::database(e.to_string()))?;
+    let product = repo
+        .remove_tag(&product_id, &tag_id)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
     let api_product: Product = product.into();
-    state.broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&api_product)).await;
+    state
+        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&api_product))
+        .await;
 
     Ok(Json(api_product))
 }

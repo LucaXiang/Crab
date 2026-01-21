@@ -1,8 +1,8 @@
 //! Order API Handlers
 
 use axum::{
-    extract::{Path, Query, State},
     Json,
+    extract::{Path, Query, State},
 };
 use serde::Deserialize;
 
@@ -98,7 +98,11 @@ pub async fn create(
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    let id = order.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
+    let id = order
+        .id
+        .as_ref()
+        .map(|t| t.id.to_string())
+        .unwrap_or_default();
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&order))
         .await;

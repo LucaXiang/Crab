@@ -26,11 +26,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // === 1. 初始化 ServerState ===
     println!("1. Initializing ServerState...");
-    
+
     // 使用临时目录避免权限问题
     let temp_dir = std::env::temp_dir().join("crab-local-example");
     std::fs::create_dir_all(&temp_dir)?;
-    
+
     let config = Config::with_overrides(temp_dir.to_string_lossy(), 0, 0);
     let state = ServerState::initialize(&config).await;
 
@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 从 MessageBus 获取双向通道
     let client_tx = state.message_bus().sender_to_server().clone(); // 客户端→服务器
-    let server_tx = state.message_bus().sender().clone();           // 服务器→客户端
+    let server_tx = state.message_bus().sender().clone(); // 服务器→客户端
 
     println!("   Router and Channels ready.\n");
 

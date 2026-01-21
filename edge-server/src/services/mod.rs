@@ -10,15 +10,15 @@
 
 pub mod activation;
 pub mod cert;
-pub mod tenant_binding;
 pub mod https;
 pub mod message_bus;
 pub mod provisioning;
+pub mod tenant_binding;
 
 pub use activation::ActivationService;
 pub use activation::ActivationStatus;
 pub use cert::CertService;
-pub use tenant_binding::{TenantBinding, Subscription};
 pub use https::HttpsService;
 pub use message_bus::MessageBusService;
 pub use provisioning::ProvisioningService;
+pub use tenant_binding::{Subscription, TenantBinding};

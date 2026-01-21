@@ -13,11 +13,12 @@ use crate::utils::{AppError, AppResult};
 const RESOURCE: &str = "price_rule";
 
 /// GET /api/price-rules - 获取所有价格规则
-pub async fn list(
-    State(state): State<ServerState>,
-) -> AppResult<Json<Vec<PriceRule>>> {
+pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<PriceRule>>> {
     let repo = PriceRuleRepository::new(state.db.clone());
-    let rules = repo.find_all().await.map_err(|e| AppError::database(e.to_string()))?;
+    let rules = repo
+        .find_all()
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
     Ok(Json(rules))
 }
 
@@ -35,7 +36,10 @@ pub async fn list_by_scope(
     };
 
     let repo = PriceRuleRepository::new(state.db.clone());
-    let rules = repo.find_by_scope(scope).await.map_err(|e| AppError::database(e.to_string()))?;
+    let rules = repo
+        .find_by_scope(scope)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
     Ok(Json(rules))
 }
 
@@ -45,7 +49,10 @@ pub async fn list_for_product(
     Path(product_id): Path<String>,
 ) -> AppResult<Json<Vec<PriceRule>>> {
     let repo = PriceRuleRepository::new(state.db.clone());
-    let rules = repo.find_for_product(&product_id).await.map_err(|e| AppError::database(e.to_string()))?;
+    let rules = repo
+        .find_for_product(&product_id)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
     Ok(Json(rules))
 }
 
@@ -69,11 +76,20 @@ pub async fn create(
     Json(payload): Json<PriceRuleCreate>,
 ) -> AppResult<Json<PriceRule>> {
     let repo = PriceRuleRepository::new(state.db.clone());
-    let rule = repo.create(payload).await.map_err(|e| AppError::database(e.to_string()))?;
+    let rule = repo
+        .create(payload)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let id = rule.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
-    state.broadcast_sync(RESOURCE, "created", &id, Some(&rule)).await;
+    let id = rule
+        .id
+        .as_ref()
+        .map(|t| t.id.to_string())
+        .unwrap_or_default();
+    state
+        .broadcast_sync(RESOURCE, "created", &id, Some(&rule))
+        .await;
 
     Ok(Json(rule))
 }
@@ -85,10 +101,15 @@ pub async fn update(
     Json(payload): Json<PriceRuleUpdate>,
 ) -> AppResult<Json<PriceRule>> {
     let repo = PriceRuleRepository::new(state.db.clone());
-    let rule = repo.update(&id, payload).await.map_err(|e| AppError::database(e.to_string()))?;
+    let rule = repo
+        .update(&id, payload)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE, "updated", &id, Some(&rule)).await;
+    state
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&rule))
+        .await;
 
     Ok(Json(rule))
 }
@@ -99,11 +120,16 @@ pub async fn delete(
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let repo = PriceRuleRepository::new(state.db.clone());
-    let result = repo.delete(&id).await.map_err(|e| AppError::database(e.to_string()))?;
+    let result = repo
+        .delete(&id)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
     if result {
-        state.broadcast_sync::<()>(RESOURCE, "deleted", &id, None).await;
+        state
+            .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
+            .await;
     }
 
     Ok(Json(result))

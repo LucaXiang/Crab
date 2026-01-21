@@ -7,15 +7,15 @@ pub mod employee;
 pub mod role;
 
 // Product Domain
-pub mod tag;
-pub mod category;
-pub mod product;
 pub mod attribute;
+pub mod category;
 pub mod print_destination;
+pub mod product;
+pub mod tag;
 
 // Location
-pub mod zone;
 pub mod dining_table;
+pub mod zone;
 
 // Pricing
 pub mod price_rule;
@@ -27,21 +27,21 @@ pub mod order;
 pub mod system_state;
 
 // Re-exports
-pub use employee::EmployeeRepository;
-pub use role::RoleRepository;
-pub use tag::TagRepository;
-pub use category::CategoryRepository;
-pub use product::ProductRepository;
 pub use attribute::AttributeRepository;
-pub use print_destination::PrintDestinationRepository;
-pub use zone::ZoneRepository;
+pub use category::CategoryRepository;
 pub use dining_table::DiningTableRepository;
-pub use price_rule::PriceRuleRepository;
+pub use employee::EmployeeRepository;
 pub use order::OrderRepository;
+pub use price_rule::PriceRuleRepository;
+pub use print_destination::PrintDestinationRepository;
+pub use product::ProductRepository;
+pub use role::RoleRepository;
 pub use system_state::SystemStateRepository;
+pub use tag::TagRepository;
+pub use zone::ZoneRepository;
 
-use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 use thiserror::Error;
 
 /// Repository error types
@@ -83,7 +83,10 @@ pub trait Repository<T, CreateDto, UpdateDto> {
 pub fn parse_thing(id: &str) -> Option<surrealdb::sql::Thing> {
     let parts: Vec<&str> = id.split(':').collect();
     if parts.len() == 2 {
-        Some(surrealdb::sql::Thing::from((parts[0].to_string(), parts[1].to_string())))
+        Some(surrealdb::sql::Thing::from((
+            parts[0].to_string(),
+            parts[1].to_string(),
+        )))
     } else {
         None
     }

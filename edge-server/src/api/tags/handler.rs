@@ -13,11 +13,12 @@ use crate::utils::{AppError, AppResult};
 const RESOURCE: &str = "tag";
 
 /// GET /api/tags - 获取所有标签
-pub async fn list(
-    State(state): State<ServerState>,
-) -> AppResult<Json<Vec<Tag>>> {
+pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Tag>>> {
     let repo = TagRepository::new(state.db.clone());
-    let tags = repo.find_all().await.map_err(|e| AppError::database(e.to_string()))?;
+    let tags = repo
+        .find_all()
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
     Ok(Json(tags))
 }
 
@@ -41,11 +42,20 @@ pub async fn create(
     Json(payload): Json<TagCreate>,
 ) -> AppResult<Json<Tag>> {
     let repo = TagRepository::new(state.db.clone());
-    let tag = repo.create(payload).await.map_err(|e| AppError::database(e.to_string()))?;
+    let tag = repo
+        .create(payload)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let id = tag.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
-    state.broadcast_sync(RESOURCE, "created", &id, Some(&tag)).await;
+    let id = tag
+        .id
+        .as_ref()
+        .map(|t| t.id.to_string())
+        .unwrap_or_default();
+    state
+        .broadcast_sync(RESOURCE, "created", &id, Some(&tag))
+        .await;
 
     Ok(Json(tag))
 }
@@ -57,10 +67,15 @@ pub async fn update(
     Json(payload): Json<TagUpdate>,
 ) -> AppResult<Json<Tag>> {
     let repo = TagRepository::new(state.db.clone());
-    let tag = repo.update(&id, payload).await.map_err(|e| AppError::database(e.to_string()))?;
+    let tag = repo
+        .update(&id, payload)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE, "updated", &id, Some(&tag)).await;
+    state
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&tag))
+        .await;
 
     Ok(Json(tag))
 }
@@ -71,11 +86,16 @@ pub async fn delete(
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let repo = TagRepository::new(state.db.clone());
-    let result = repo.delete(&id).await.map_err(|e| AppError::database(e.to_string()))?;
+    let result = repo
+        .delete(&id)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
     if result {
-        state.broadcast_sync::<()>(RESOURCE, "deleted", &id, None).await;
+        state
+            .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
+            .await;
     }
 
     Ok(Json(result))

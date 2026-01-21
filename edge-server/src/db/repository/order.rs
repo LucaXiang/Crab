@@ -1,12 +1,12 @@
 //! Order Repository (Graph/Document hybrid)
 
-use super::{make_thing, BaseRepository, RepoError, RepoResult};
+use super::{BaseRepository, RepoError, RepoResult, make_thing};
 use crate::db::models::{
-    Order, OrderCreate, OrderStatus, OrderItem, OrderPayment,
-    OrderEvent, OrderEventType, OrderAddItem, OrderAddPayment,
+    Order, OrderAddItem, OrderAddPayment, OrderCreate, OrderEvent, OrderEventType, OrderItem,
+    OrderPayment, OrderStatus,
 };
-use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 
 const TABLE: &str = "order";
 const EVENT_TABLE: &str = "order_event";
@@ -159,7 +159,9 @@ impl OrderRepository {
         let mut result = self
             .base
             .db()
-            .query("UPDATE order SET items = array::remove(items, $idx) WHERE id = $id RETURN AFTER")
+            .query(
+                "UPDATE order SET items = array::remove(items, $idx) WHERE id = $id RETURN AFTER",
+            )
             .bind(("id", order_thing))
             .bind(("idx", item_idx))
             .await?;
@@ -249,12 +251,19 @@ impl OrderRepository {
     }
 
     /// Update order hash
-    pub async fn update_hash(&self, order_id: &str, prev_hash: String, curr_hash: String) -> RepoResult<Order> {
+    pub async fn update_hash(
+        &self,
+        order_id: &str,
+        prev_hash: String,
+        curr_hash: String,
+    ) -> RepoResult<Order> {
         let order_thing = make_thing(TABLE, order_id);
         let mut result = self
             .base
             .db()
-            .query("UPDATE order SET prev_hash = $prev, curr_hash = $curr WHERE id = $id RETURN AFTER")
+            .query(
+                "UPDATE order SET prev_hash = $prev, curr_hash = $curr WHERE id = $id RETURN AFTER",
+            )
             .bind(("id", order_thing))
             .bind(("prev", prev_hash))
             .bind(("curr", curr_hash))
@@ -292,10 +301,14 @@ impl OrderRepository {
         };
 
         let created: Option<OrderEvent> = self.base.db().create(EVENT_TABLE).content(event).await?;
-        let event = created.ok_or_else(|| RepoError::Database("Failed to create event".to_string()))?;
+        let event =
+            created.ok_or_else(|| RepoError::Database("Failed to create event".to_string()))?;
 
         // Create edge relation
-        let event_thing = event.id.clone().ok_or_else(|| RepoError::Database("Event has no ID".to_string()))?;
+        let event_thing = event
+            .id
+            .clone()
+            .ok_or_else(|| RepoError::Database("Event has no ID".to_string()))?;
         self.base
             .db()
             .query("RELATE $from->has_event->$to")

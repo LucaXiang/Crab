@@ -15,7 +15,10 @@ pub struct Tag {
     pub color: String,
     #[serde(default)]
     pub display_order: i32,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
 }
 

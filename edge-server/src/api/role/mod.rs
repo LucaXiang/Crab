@@ -2,8 +2,8 @@
 
 mod handler;
 
-use axum::routing::get;
 use axum::Router;
+use axum::routing::get;
 
 use crate::auth::require_admin;
 use crate::core::ServerState;

@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
 use crate::db::models::{CategoryCreate, CategoryUpdate};
-use crate::db::repository::{CategoryRepository, AttributeRepository};
+use crate::db::repository::{AttributeRepository, CategoryRepository};
 use crate::utils::{AppError, AppResult};
-use shared::models::Category as SharedCategory;
 use shared::models::Attribute as SharedAttribute;
+use shared::models::Category as SharedCategory;
 use shared::models::HasAttribute as SharedHasAttribute;
 
 const RESOURCE: &str = "category";
@@ -52,7 +52,11 @@ pub async fn create(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let id = category.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
+    let id = category
+        .id
+        .as_ref()
+        .map(|t| t.id.to_string())
+        .unwrap_or_default();
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&category))
         .await;
@@ -128,7 +132,10 @@ pub async fn batch_update_sort_order(
     State(state): State<ServerState>,
     Json(updates): Json<Vec<SortOrderUpdate>>,
 ) -> AppResult<Json<BatchUpdateResponse>> {
-    tracing::info!(count = updates.len(), "Batch update sort order request received");
+    tracing::info!(
+        count = updates.len(),
+        "Batch update sort order request received"
+    );
 
     let repo = CategoryRepository::new(state.db.clone());
     let mut updated_count = 0;
@@ -164,7 +171,11 @@ pub async fn batch_update_sort_order(
         }
     }
 
-    tracing::info!(updated = updated_count, total = updates.len(), "Batch update sort order completed");
+    tracing::info!(
+        updated = updated_count,
+        total = updates.len(),
+        "Batch update sort order completed"
+    );
 
     // 广播同步通知
     state

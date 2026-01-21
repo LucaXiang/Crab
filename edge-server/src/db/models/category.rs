@@ -16,9 +16,15 @@ pub struct Category {
     /// Record links to print_destination
     #[serde(default)]
     pub print_destinations: Vec<Thing>,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_label_print_enabled: bool,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
     /// Whether this is a virtual category (filters by tags instead of direct assignment)
     #[serde(default)]

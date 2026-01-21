@@ -2,10 +2,12 @@
 //!
 //! Uses RELATE to connect products/categories to attributes.
 
-use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
-use crate::db::models::{Attribute, AttributeCreate, AttributeUpdate, AttributeOption, HasAttribute};
-use surrealdb::engine::local::Db;
+use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
+use crate::db::models::{
+    Attribute, AttributeCreate, AttributeOption, AttributeUpdate, HasAttribute,
+};
 use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 
 const TABLE: &str = "attribute";
 
@@ -99,7 +101,11 @@ impl AttributeRepository {
     }
 
     /// Add option to attribute
-    pub async fn add_option(&self, attr_id: &str, option: AttributeOption) -> RepoResult<Attribute> {
+    pub async fn add_option(
+        &self,
+        attr_id: &str,
+        option: AttributeOption,
+    ) -> RepoResult<Attribute> {
         let mut result = self
             .base
             .db()
@@ -115,7 +121,12 @@ impl AttributeRepository {
     }
 
     /// Update option by index
-    pub async fn update_option(&self, attr_id: &str, idx: usize, option: AttributeOption) -> RepoResult<Attribute> {
+    pub async fn update_option(
+        &self,
+        attr_id: &str,
+        idx: usize,
+        option: AttributeOption,
+    ) -> RepoResult<Attribute> {
         let mut result = self
             .base
             .db()
@@ -186,7 +197,7 @@ impl AttributeRepository {
             .base
             .db()
             .query(
-                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order"
+                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order",
             )
             .bind(("from", make_thing("product", product_id)))
             .bind(("to", make_thing(TABLE, attr_id)))
@@ -212,7 +223,7 @@ impl AttributeRepository {
             .base
             .db()
             .query(
-                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order"
+                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order",
             )
             .bind(("from", make_thing("category", category_id)))
             .bind(("to", make_thing(TABLE, attr_id)))
@@ -274,7 +285,10 @@ impl AttributeRepository {
 
     /// Get product attribute bindings with full attribute data
     /// Returns (HasAttribute, Attribute) pairs for a product
-    pub async fn find_bindings_for_product(&self, product_id: &str) -> RepoResult<Vec<(HasAttribute, Attribute)>> {
+    pub async fn find_bindings_for_product(
+        &self,
+        product_id: &str,
+    ) -> RepoResult<Vec<(HasAttribute, Attribute)>> {
         // Query the has_attribute edge table and fetch the attribute
         let mut result = self
             .base
@@ -285,7 +299,7 @@ impl AttributeRepository {
                 FROM has_attribute
                 WHERE in = $prod AND out.is_active = true
                 ORDER BY display_order
-                "#
+                "#,
             )
             .bind(("prod", make_thing("product", product_id)))
             .await?;

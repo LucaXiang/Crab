@@ -21,7 +21,10 @@
 //! scenarios, consider batching snapshot updates (every N events) to reduce
 //! disk writes while maintaining reasonable recovery time.
 
-use redb::{Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition, WriteTransaction};
+use redb::{
+    Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition,
+    WriteTransaction,
+};
 use shared::order::{OrderEvent, OrderSnapshot};
 use std::path::Path;
 use std::sync::Arc;

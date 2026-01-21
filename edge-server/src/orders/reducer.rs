@@ -336,7 +336,11 @@ impl OrderReducer {
     fn apply_item_removed(snapshot: &mut OrderSnapshot, instance_id: &str, quantity: Option<i32>) {
         if let Some(qty) = quantity {
             // Partial removal
-            if let Some(item) = snapshot.items.iter_mut().find(|i| i.instance_id == instance_id) {
+            if let Some(item) = snapshot
+                .items
+                .iter_mut()
+                .find(|i| i.instance_id == instance_id)
+            {
                 item.quantity = (item.quantity - qty).max(0);
                 if item.quantity == 0 {
                     snapshot.items.retain(|i| i.instance_id != instance_id);

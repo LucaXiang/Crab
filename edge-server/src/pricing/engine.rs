@@ -5,8 +5,8 @@
 use crate::db::models::{PriceRule, Product};
 use crate::db::repository::PriceRuleRepository;
 use shared::order::CartItemInput;
-use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 
 use super::calculator::calculate_adjustments;
 use super::matcher::{is_time_valid, matches_product_scope, matches_zone_scope};
@@ -96,11 +96,7 @@ impl PriceRuleEngine {
         let product: Option<Product> = match self.db.select(("product", &item.product_id)).await {
             Ok(p) => p,
             Err(e) => {
-                tracing::warn!(
-                    "Failed to fetch product {}: {:?}",
-                    item.product_id,
-                    e
-                );
+                tracing::warn!("Failed to fetch product {}: {:?}", item.product_id, e);
                 return item;
             }
         };

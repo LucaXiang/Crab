@@ -65,7 +65,11 @@ pub struct CommandContext<'a> {
 }
 
 impl<'a> CommandContext<'a> {
-    pub fn new(txn: &'a WriteTransaction, storage: &'a OrderStorage, current_sequence: u64) -> Self {
+    pub fn new(
+        txn: &'a WriteTransaction,
+        storage: &'a OrderStorage,
+        current_sequence: u64,
+    ) -> Self {
         Self {
             txn,
             storage,
@@ -86,7 +90,8 @@ impl<'a> CommandContext<'a> {
             .map_err(|e| OrderError::Storage(e.to_string()))?
             .ok_or_else(|| OrderError::OrderNotFound(order_id.to_string()))?;
 
-        self.snapshot_cache.insert(order_id.to_string(), snapshot.clone());
+        self.snapshot_cache
+            .insert(order_id.to_string(), snapshot.clone());
         Ok(snapshot)
     }
 
@@ -99,7 +104,8 @@ impl<'a> CommandContext<'a> {
 
     /// Save a snapshot to the cache (actual persistence happens in manager)
     pub fn save_snapshot(&mut self, snapshot: OrderSnapshot) {
-        self.snapshot_cache.insert(snapshot.order_id.clone(), snapshot);
+        self.snapshot_cache
+            .insert(snapshot.order_id.clone(), snapshot);
     }
 
     /// Get all modified snapshots for persistence

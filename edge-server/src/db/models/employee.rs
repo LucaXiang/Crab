@@ -1,7 +1,7 @@
 //! Employee Model
 
-use super::serde_helpers;
 use super::RoleId;
+use super::serde_helpers;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -17,7 +17,10 @@ pub struct Employee {
     pub role: RoleId,
     #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_system: bool,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
 }
 
@@ -31,7 +34,10 @@ pub struct EmployeeResponse {
     pub id: String,
     pub username: String,
     pub role: RoleId,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
 }
 

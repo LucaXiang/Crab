@@ -18,7 +18,10 @@ pub struct AttributeOption {
     pub price_modifier: i64,
     #[serde(default)]
     pub display_order: i32,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
@@ -67,7 +70,10 @@ pub struct Attribute {
     // 显示
     #[serde(default)]
     pub display_order: i32,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
 
     // 小票
@@ -148,9 +154,9 @@ pub struct AttributeUpdate {
 pub struct HasAttribute {
     pub id: Option<Thing>,
     #[serde(rename = "in")]
-    pub from: Thing,  // product or category
+    pub from: Thing, // product or category
     #[serde(rename = "out")]
-    pub to: Thing,    // attribute
+    pub to: Thing, // attribute
     #[serde(default)]
     pub is_required: bool,
     #[serde(default)]

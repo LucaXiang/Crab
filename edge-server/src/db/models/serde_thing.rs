@@ -3,9 +3,9 @@
 //! 支持从字符串格式 "table:id" 反序列化为 Thing
 //! 同时兼容 SurrealDB 原生格式和 JSON 字符串格式
 
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use surrealdb::sql::Thing;
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::fmt;
+use surrealdb::sql::Thing;
 
 /// 从字符串 "table:id" 解析为 Thing
 fn parse_thing_from_string(s: &str) -> Thing {
@@ -208,8 +208,7 @@ pub mod option_vec {
                         if let Some(s) = v.as_str() {
                             Ok(parse_thing_from_string(s))
                         } else {
-                            serde_json::from_value::<Thing>(v)
-                                .map_err(de::Error::custom)
+                            serde_json::from_value::<Thing>(v).map_err(de::Error::custom)
                         }
                     })
                     .collect::<Result<Vec<Thing>, _>>()

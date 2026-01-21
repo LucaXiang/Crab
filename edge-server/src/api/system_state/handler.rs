@@ -1,6 +1,6 @@
 //! System State API Handlers
 
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 
 use crate::core::ServerState;
 use crate::db::models::{Order, SystemState, SystemStateUpdate};

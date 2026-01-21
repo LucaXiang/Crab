@@ -14,7 +14,10 @@ pub struct EmbeddedPrinter {
     pub driver_name: Option<String>,
     #[serde(default)]
     pub priority: i32,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
 }
 
@@ -25,7 +28,10 @@ pub struct PrintDestination {
     pub description: Option<String>,
     #[serde(default)]
     pub printers: Vec<EmbeddedPrinter>,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
 }
 

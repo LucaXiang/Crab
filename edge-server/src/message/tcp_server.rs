@@ -337,7 +337,7 @@ fn spawn_server_to_client_forwarder(
                                 dropped_messages = n,
                                 "Client lagged behind, sending resync notification"
                             );
-                            
+
                             // Send a Sync message to trigger client-side full resync
                             let resync_msg = BusMessage {
                                 event_type: EventType::Sync,
@@ -351,12 +351,12 @@ fn spawn_server_to_client_forwarder(
                                 source: Some("server".to_string()),
                                 target: Some(client_id.clone()),
                             };
-                            
+
                             if let Err(e) = transport.write_message(&resync_msg).await {
                                 tracing::debug!(client_id = %client_id, "Failed to send resync notification: {}", e);
                                 break;
                             }
-                            
+
                             // Continue listening - don't disconnect the client
                             continue;
                         }

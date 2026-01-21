@@ -7,8 +7,7 @@
 //! - 启动服务器
 
 use edge_server::{
-    init_logger_with_file, print_banner, cleanup_old_logs,
-    Config, Server, ServerState,
+    Config, Server, ServerState, cleanup_old_logs, init_logger_with_file, print_banner,
 };
 use std::path::PathBuf;
 

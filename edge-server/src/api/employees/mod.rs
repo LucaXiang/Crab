@@ -2,7 +2,7 @@
 
 mod handler;
 
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 
 use crate::core::ServerState;
 
@@ -15,5 +15,10 @@ fn routes() -> Router<ServerState> {
     Router::new()
         .route("/", get(handler::list).post(handler::create))
         .route("/all", get(handler::list_with_inactive))
-        .route("/{id}", get(handler::get_by_id).put(handler::update).delete(handler::delete))
+        .route(
+            "/{id}",
+            get(handler::get_by_id)
+                .put(handler::update)
+                .delete(handler::delete),
+        )
 }

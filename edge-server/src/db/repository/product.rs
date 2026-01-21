@@ -1,9 +1,9 @@
 //! Product Repository
 
-use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
+use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
 use crate::db::models::{Product, ProductCreate, ProductUpdate};
-use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 
 const PRODUCT_TABLE: &str = "product";
 
@@ -76,7 +76,9 @@ impl ProductRepository {
         // 校验最多一个 default
         let default_count = data.specs.iter().filter(|s| s.is_default).count();
         if default_count > 1 {
-            return Err(RepoError::Validation("only one default spec allowed".into()));
+            return Err(RepoError::Validation(
+                "only one default spec allowed".into(),
+            ));
         }
 
         let product = Product {
@@ -95,7 +97,12 @@ impl ProductRepository {
             specs: data.specs,
         };
 
-        let created: Option<Product> = self.base.db().create(PRODUCT_TABLE).content(product).await?;
+        let created: Option<Product> = self
+            .base
+            .db()
+            .create(PRODUCT_TABLE)
+            .content(product)
+            .await?;
         created.ok_or_else(|| RepoError::Database("Failed to create product".to_string()))
     }
 

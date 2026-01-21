@@ -10,7 +10,10 @@ pub struct Zone {
     pub id: Option<Thing>,
     pub name: String,
     pub description: Option<String>,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
 }
 

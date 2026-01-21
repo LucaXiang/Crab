@@ -10,15 +10,22 @@ use axum::{
 use crate::core::ServerState;
 
 pub fn router() -> Router<ServerState> {
-    Router::new()
-        .nest("/api/attributes", routes())
+    Router::new().nest("/api/attributes", routes())
 }
 
 fn routes() -> Router<ServerState> {
     Router::new()
         .route("/", get(handler::list).post(handler::create))
         .route("/global", get(handler::list_global))
-        .route("/{id}", get(handler::get_by_id).put(handler::update).delete(handler::delete))
+        .route(
+            "/{id}",
+            get(handler::get_by_id)
+                .put(handler::update)
+                .delete(handler::delete),
+        )
         .route("/{id}/options", post(handler::add_option))
-        .route("/{id}/options/{idx}", put(handler::update_option).delete(handler::remove_option))
+        .route(
+            "/{id}/options/{idx}",
+            put(handler::update_option).delete(handler::remove_option),
+        )
 }

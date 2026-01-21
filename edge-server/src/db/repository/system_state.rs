@@ -1,9 +1,9 @@
 //! System State Repository (Singleton)
 
-use super::{make_thing, BaseRepository, RepoError, RepoResult};
+use super::{BaseRepository, RepoError, RepoResult, make_thing};
 use crate::db::models::{SystemState, SystemStateUpdate};
-use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 
 const TABLE: &str = "system_state";
 const SINGLETON_ID: &str = "main";
@@ -89,7 +89,11 @@ impl SystemStateRepository {
     }
 
     /// Update last order info
-    pub async fn update_last_order(&self, order_id: &str, order_hash: String) -> RepoResult<SystemState> {
+    pub async fn update_last_order(
+        &self,
+        order_id: &str,
+        order_hash: String,
+    ) -> RepoResult<SystemState> {
         let order_thing = make_thing("order", order_id);
         self.update(SystemStateUpdate {
             last_order: Some(order_thing),

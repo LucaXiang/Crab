@@ -77,7 +77,10 @@ pub struct PriceRule {
     pub start_time: Option<String>,
     pub end_time: Option<String>,
     pub schedule_config: Option<ScheduleConfig>,
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
     pub created_by: Option<Thing>,
 }

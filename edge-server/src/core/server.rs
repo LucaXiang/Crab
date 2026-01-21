@@ -58,7 +58,10 @@ impl Server {
                 }
                 Err(e) => {
                     // Failed to load/parse certificates - enter unbound state
-                    tracing::error!("❌ Failed to load TLS config: {}. Entering unbound state.", e);
+                    tracing::error!(
+                        "❌ Failed to load TLS config: {}. Entering unbound state.",
+                        e
+                    );
                     state.enter_unbound_state().await;
                     continue;
                 }

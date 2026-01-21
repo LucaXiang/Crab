@@ -6,27 +6,29 @@ use axum::{
 };
 
 use crate::core::ServerState;
-use crate::db::models::{Attribute, AttributeCreate, AttributeUpdate, AttributeOption};
+use crate::db::models::{Attribute, AttributeCreate, AttributeOption, AttributeUpdate};
 use crate::db::repository::AttributeRepository;
 use crate::utils::{AppError, AppResult};
 
 const RESOURCE: &str = "attribute";
 
 /// GET /api/attributes - 获取所有属性
-pub async fn list(
-    State(state): State<ServerState>,
-) -> AppResult<Json<Vec<Attribute>>> {
+pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Attribute>>> {
     let repo = AttributeRepository::new(state.db.clone());
-    let attrs = repo.find_all().await.map_err(|e| AppError::database(e.to_string()))?;
+    let attrs = repo
+        .find_all()
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
     Ok(Json(attrs))
 }
 
 /// GET /api/attributes/global - 获取全局属性
-pub async fn list_global(
-    State(state): State<ServerState>,
-) -> AppResult<Json<Vec<Attribute>>> {
+pub async fn list_global(State(state): State<ServerState>) -> AppResult<Json<Vec<Attribute>>> {
     let repo = AttributeRepository::new(state.db.clone());
-    let attrs = repo.find_global().await.map_err(|e| AppError::database(e.to_string()))?;
+    let attrs = repo
+        .find_global()
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
     Ok(Json(attrs))
 }
 
@@ -50,11 +52,20 @@ pub async fn create(
     Json(payload): Json<AttributeCreate>,
 ) -> AppResult<Json<Attribute>> {
     let repo = AttributeRepository::new(state.db.clone());
-    let attr = repo.create(payload).await.map_err(|e| AppError::database(e.to_string()))?;
+    let attr = repo
+        .create(payload)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let id = attr.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
-    state.broadcast_sync(RESOURCE, "created", &id, Some(&attr)).await;
+    let id = attr
+        .id
+        .as_ref()
+        .map(|t| t.id.to_string())
+        .unwrap_or_default();
+    state
+        .broadcast_sync(RESOURCE, "created", &id, Some(&attr))
+        .await;
 
     Ok(Json(attr))
 }
@@ -66,10 +77,15 @@ pub async fn update(
     Json(payload): Json<AttributeUpdate>,
 ) -> AppResult<Json<Attribute>> {
     let repo = AttributeRepository::new(state.db.clone());
-    let attr = repo.update(&id, payload).await.map_err(|e| AppError::database(e.to_string()))?;
+    let attr = repo
+        .update(&id, payload)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE, "updated", &id, Some(&attr)).await;
+    state
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
+        .await;
 
     Ok(Json(attr))
 }
@@ -80,11 +96,16 @@ pub async fn delete(
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let repo = AttributeRepository::new(state.db.clone());
-    let result = repo.delete(&id).await.map_err(|e| AppError::database(e.to_string()))?;
+    let result = repo
+        .delete(&id)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
     if result {
-        state.broadcast_sync::<()>(RESOURCE, "deleted", &id, None).await;
+        state
+            .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
+            .await;
     }
 
     Ok(Json(result))
@@ -97,10 +118,15 @@ pub async fn add_option(
     Json(option): Json<AttributeOption>,
 ) -> AppResult<Json<Attribute>> {
     let repo = AttributeRepository::new(state.db.clone());
-    let attr = repo.add_option(&id, option).await.map_err(|e| AppError::database(e.to_string()))?;
+    let attr = repo
+        .add_option(&id, option)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE, "updated", &id, Some(&attr)).await;
+    state
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
+        .await;
 
     Ok(Json(attr))
 }
@@ -112,10 +138,15 @@ pub async fn update_option(
     Json(option): Json<AttributeOption>,
 ) -> AppResult<Json<Attribute>> {
     let repo = AttributeRepository::new(state.db.clone());
-    let attr = repo.update_option(&id, idx, option).await.map_err(|e| AppError::database(e.to_string()))?;
+    let attr = repo
+        .update_option(&id, idx, option)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE, "updated", &id, Some(&attr)).await;
+    state
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
+        .await;
 
     Ok(Json(attr))
 }
@@ -126,10 +157,15 @@ pub async fn remove_option(
     Path((id, idx)): Path<(String, usize)>,
 ) -> AppResult<Json<Attribute>> {
     let repo = AttributeRepository::new(state.db.clone());
-    let attr = repo.remove_option(&id, idx).await.map_err(|e| AppError::database(e.to_string()))?;
+    let attr = repo
+        .remove_option(&id, idx)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE, "updated", &id, Some(&attr)).await;
+    state
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
+        .await;
 
     Ok(Json(attr))
 }

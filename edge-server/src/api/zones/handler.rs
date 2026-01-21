@@ -6,18 +6,19 @@ use axum::{
 };
 
 use crate::core::ServerState;
-use crate::db::models::{Zone, ZoneCreate, ZoneUpdate, DiningTable};
-use crate::db::repository::{ZoneRepository, DiningTableRepository};
+use crate::db::models::{DiningTable, Zone, ZoneCreate, ZoneUpdate};
+use crate::db::repository::{DiningTableRepository, ZoneRepository};
 use crate::utils::{AppError, AppResult};
 
 const RESOURCE: &str = "zone";
 
 /// GET /api/zones - 获取所有区域
-pub async fn list(
-    State(state): State<ServerState>,
-) -> AppResult<Json<Vec<Zone>>> {
+pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Zone>>> {
     let repo = ZoneRepository::new(state.db.clone());
-    let zones = repo.find_all().await.map_err(|e| AppError::database(e.to_string()))?;
+    let zones = repo
+        .find_all()
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
     Ok(Json(zones))
 }
 
@@ -41,11 +42,20 @@ pub async fn create(
     Json(payload): Json<ZoneCreate>,
 ) -> AppResult<Json<Zone>> {
     let repo = ZoneRepository::new(state.db.clone());
-    let zone = repo.create(payload).await.map_err(|e| AppError::database(e.to_string()))?;
+    let zone = repo
+        .create(payload)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let id = zone.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
-    state.broadcast_sync(RESOURCE, "created", &id, Some(&zone)).await;
+    let id = zone
+        .id
+        .as_ref()
+        .map(|t| t.id.to_string())
+        .unwrap_or_default();
+    state
+        .broadcast_sync(RESOURCE, "created", &id, Some(&zone))
+        .await;
 
     Ok(Json(zone))
 }
@@ -57,10 +67,15 @@ pub async fn update(
     Json(payload): Json<ZoneUpdate>,
 ) -> AppResult<Json<Zone>> {
     let repo = ZoneRepository::new(state.db.clone());
-    let zone = repo.update(&id, payload).await.map_err(|e| AppError::database(e.to_string()))?;
+    let zone = repo
+        .update(&id, payload)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    state.broadcast_sync(RESOURCE, "updated", &id, Some(&zone)).await;
+    state
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&zone))
+        .await;
 
     Ok(Json(zone))
 }
@@ -71,11 +86,16 @@ pub async fn delete(
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let repo = ZoneRepository::new(state.db.clone());
-    let result = repo.delete(&id).await.map_err(|e| AppError::database(e.to_string()))?;
+    let result = repo
+        .delete(&id)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
     if result {
-        state.broadcast_sync::<()>(RESOURCE, "deleted", &id, None).await;
+        state
+            .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
+            .await;
     }
 
     Ok(Json(result))
@@ -87,6 +107,9 @@ pub async fn list_tables(
     Path(zone_id): Path<String>,
 ) -> AppResult<Json<Vec<DiningTable>>> {
     let repo = DiningTableRepository::new(state.db.clone());
-    let tables = repo.find_by_zone(&zone_id).await.map_err(|e| AppError::database(e.to_string()))?;
+    let tables = repo
+        .find_by_zone(&zone_id)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
     Ok(Json(tables))
 }

@@ -102,7 +102,8 @@ pub fn calculate_adjustments(rules: &[&PriceRule], base_price: f64) -> PriceAdju
         }
 
         // Calculate adjustment
-        let (surcharge, discount_pct, discount_fixed) = calculate_single_adjustment(rule, base_price);
+        let (surcharge, discount_pct, discount_fixed) =
+            calculate_single_adjustment(rule, base_price);
 
         // Apply adjustment
         if rule.is_stackable {
@@ -176,7 +177,13 @@ mod tests {
     #[test]
     fn test_fixed_discount() {
         // 500 cents = $5
-        let rule = make_rule(RuleType::Discount, AdjustmentType::FixedAmount, 500, 0, true);
+        let rule = make_rule(
+            RuleType::Discount,
+            AdjustmentType::FixedAmount,
+            500,
+            0,
+            true,
+        );
         let rules: Vec<&PriceRule> = vec![&rule];
         let adj = calculate_adjustments(&rules, 100.0);
 

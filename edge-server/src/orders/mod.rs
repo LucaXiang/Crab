@@ -43,6 +43,6 @@ pub use sync::{SyncRequest, SyncResponse};
 
 // Re-export shared types for convenience
 pub use shared::order::{
-    CommandError, CommandErrorCode, CommandResponse, OrderCommand, OrderCommandPayload,
-    OrderEvent, OrderEventType, OrderSnapshot, OrderStatus, EventPayload,
+    CommandError, CommandErrorCode, CommandResponse, EventPayload, OrderCommand,
+    OrderCommandPayload, OrderEvent, OrderEventType, OrderSnapshot, OrderStatus,
 };

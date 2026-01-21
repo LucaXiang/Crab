@@ -17,7 +17,10 @@ pub mod response {
         Json(ApiResponse::success(data))
     }
 
-    pub fn ok_with_message<T: serde::Serialize>(data: T, message: impl Into<String>) -> Json<ApiResponse<T>> {
+    pub fn ok_with_message<T: serde::Serialize>(
+        data: T,
+        message: impl Into<String>,
+    ) -> Json<ApiResponse<T>> {
         Json(ApiResponse::success_with_message(message, data))
     }
 }

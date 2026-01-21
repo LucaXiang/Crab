@@ -14,7 +14,9 @@ use shared::models::PrintDestination as SharedPrintDestination;
 const RESOURCE: &str = "print_destination";
 
 /// GET /api/print-destinations - 获取所有打印目的地
-pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<SharedPrintDestination>>> {
+pub async fn list(
+    State(state): State<ServerState>,
+) -> AppResult<Json<Vec<SharedPrintDestination>>> {
     let repo = PrintDestinationRepository::new(state.db.clone());
     let items = repo
         .find_all()
@@ -49,7 +51,11 @@ pub async fn create(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let id = item.id.as_ref().map(|t| t.id.to_string()).unwrap_or_default();
+    let id = item
+        .id
+        .as_ref()
+        .map(|t| t.id.to_string())
+        .unwrap_or_default();
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&item))
         .await;

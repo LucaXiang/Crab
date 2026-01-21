@@ -25,18 +25,18 @@ pub mod role;
 pub mod upload;
 
 // Data models API
-pub mod tags;
-pub mod categories;
-pub mod products;
 pub mod attributes;
+pub mod categories;
+pub mod employees;
 pub mod has_attribute;
-pub mod zones;
-pub mod tables;
+pub mod orders;
 pub mod price_rules;
 pub mod print_destinations;
-pub mod employees;
-pub mod orders;
+pub mod products;
 pub mod system_state;
+pub mod tables;
+pub mod tags;
+pub mod zones;
 
 // Re-export common types for handlers
 pub use crate::utils::{AppResponse, AppResult};

@@ -1,9 +1,9 @@
 //! Tag Repository
 
-use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
+use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
 use crate::db::models::{Tag, TagCreate, TagUpdate};
-use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 
 const TABLE: &str = "tag";
 
@@ -65,7 +65,10 @@ impl TagRepository {
     pub async fn create(&self, data: TagCreate) -> RepoResult<Tag> {
         // Check duplicate name
         if self.find_by_name(&data.name).await?.is_some() {
-            return Err(RepoError::Duplicate(format!("Tag '{}' already exists", data.name)));
+            return Err(RepoError::Duplicate(format!(
+                "Tag '{}' already exists",
+                data.name
+            )));
         }
 
         let tag = Tag {
@@ -93,7 +96,10 @@ impl TagRepository {
             && new_name != &existing.name
             && self.find_by_name(new_name).await?.is_some()
         {
-            return Err(RepoError::Duplicate(format!("Tag '{}' already exists", new_name)));
+            return Err(RepoError::Duplicate(format!(
+                "Tag '{}' already exists",
+                new_name
+            )));
         }
 
         let thing = make_thing(TABLE, pure_id);

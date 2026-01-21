@@ -1,9 +1,9 @@
 //! Dining Table Repository
 
-use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
+use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
 use crate::db::models::{DiningTable, DiningTableCreate, DiningTableUpdate};
-use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 
 const TABLE: &str = "dining_table";
 
@@ -36,7 +36,9 @@ impl DiningTableRepository {
         let tables: Vec<DiningTable> = self
             .base
             .db()
-            .query("SELECT * FROM dining_table WHERE zone = $zone AND is_active = true ORDER BY name")
+            .query(
+                "SELECT * FROM dining_table WHERE zone = $zone AND is_active = true ORDER BY name",
+            )
             .bind(("zone", zone_thing))
             .await?
             .take(0)?;
@@ -64,7 +66,11 @@ impl DiningTableRepository {
     }
 
     /// Find table by name in zone
-    pub async fn find_by_name_in_zone(&self, zone_id: &str, name: &str) -> RepoResult<Option<DiningTable>> {
+    pub async fn find_by_name_in_zone(
+        &self,
+        zone_id: &str,
+        name: &str,
+    ) -> RepoResult<Option<DiningTable>> {
         let zone_thing = make_thing("zone", zone_id);
         let name_owned = name.to_string();
         let mut result = self
@@ -82,7 +88,11 @@ impl DiningTableRepository {
     pub async fn create(&self, data: DiningTableCreate) -> RepoResult<DiningTable> {
         // Check duplicate name in same zone
         let zone_id = data.zone.id.to_string();
-        if self.find_by_name_in_zone(&zone_id, &data.name).await?.is_some() {
+        if self
+            .find_by_name_in_zone(&zone_id, &data.name)
+            .await?
+            .is_some()
+        {
             return Err(RepoError::Duplicate(format!(
                 "Table '{}' already exists in this zone",
                 data.name

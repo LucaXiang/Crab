@@ -22,7 +22,10 @@ pub struct Role {
     #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_system: bool,
     /// Whether the role is active
-    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
     pub is_active: bool,
 }
 

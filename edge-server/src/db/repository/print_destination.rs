@@ -1,9 +1,9 @@
 //! Print Destination Repository
 
-use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
+use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
 use crate::db::models::{PrintDestination, PrintDestinationCreate, PrintDestinationUpdate};
-use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 
 const TABLE: &str = "print_destination";
 
@@ -84,7 +84,11 @@ impl PrintDestinationRepository {
     }
 
     /// Update a print destination
-    pub async fn update(&self, id: &str, data: PrintDestinationUpdate) -> RepoResult<PrintDestination> {
+    pub async fn update(
+        &self,
+        id: &str,
+        data: PrintDestinationUpdate,
+    ) -> RepoResult<PrintDestination> {
         let pure_id = strip_table_prefix(TABLE, id);
         let existing = self
             .find_by_id(pure_id)
