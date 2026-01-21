@@ -102,20 +102,6 @@ export type CartItem = import('./orderEvent').CartItemSnapshot & {
   external_id?: string; // TODO: 等待后端添加
 };
 
-export interface ItemAttributeSelection {
-  attribute_id: string;  // SurrealDB string ID (attr_id)
-  option_idx: number;    // Index into attribute.options array
-  name: string;
-  value: string;
-  price_modifier?: number;
-  // Frontend display fields
-  attribute_name?: string;
-  attribute_receipt_name?: string | null;
-  kitchen_printer?: string | null;  // SurrealDB string ID
-  receipt_name?: string | null;
-  option_name?: string;  // Added for option name display
-}
-
 /**
  * PaymentRecord is now an alias for backend PaymentRecord
  * Use backend type directly for consistency

@@ -22,7 +22,7 @@ import {
 	}	from './components';
 
 // Types
-import { Product, ItemAttributeSelection, AttributeTemplate, AttributeOption, EmbeddedSpec, ProductAttribute } from '@/core/domain/types';
+import { Product, ItemOption, AttributeTemplate, AttributeOption, EmbeddedSpec, ProductAttribute } from '@/core/domain/types';
 
 // i18n
 import { useI18n } from '@/hooks/useI18n';
@@ -384,7 +384,7 @@ export const POSScreen: React.FC = () => {
 
   const handleOptionsConfirmed = useCallback(
     (
-      selectedOptions: ItemAttributeSelection[],
+      selectedOptions: ItemOption[],
       quantity: number,
       discount: number,
       authorizer?: { id: string; username: string },

@@ -1,4 +1,4 @@
-import { ItemAttributeSelection } from '@/core/domain/types';
+import type { ItemOption } from '@/core/domain/types';
 
 export interface GroupedAttribute {
   attributeName: string;
@@ -7,22 +7,22 @@ export interface GroupedAttribute {
 }
 
 // Re-export for backward compatibility
-export type { ItemAttributeSelection };
+export type { ItemOption };
 
-export const groupOptionsByAttribute = (options: ItemAttributeSelection[]): GroupedAttribute[] => {
+export const groupOptionsByAttribute = (options: ItemOption[]): GroupedAttribute[] => {
   const groups: GroupedAttribute[] = [];
 
   options.forEach(opt => {
-    let group = groups.find(g => g.attributeName === opt.name);
+    let group = groups.find(g => g.attributeName === opt.attribute_name);
     if (!group) {
       group = {
-        attributeName: opt.name,
+        attributeName: opt.attribute_name,
         optionNames: [],
         totalPrice: 0
       };
       groups.push(group);
     }
-    group.optionNames.push(opt.value);
+    group.optionNames.push(opt.option_name);
     group.totalPrice += opt.price_modifier || 0;
   });
 

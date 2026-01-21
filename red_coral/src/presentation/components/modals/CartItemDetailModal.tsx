@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CartItem, AttributeTemplate, AttributeOption, ProductAttribute, ItemAttributeSelection, EmbeddedSpec } from '@/core/domain/types';
+import { CartItem, AttributeTemplate, AttributeOption, ProductAttribute, ItemOption, EmbeddedSpec } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '../Toast';
@@ -155,7 +155,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     // TODO: Check bindings for is_required if validation needed
 
     // Build selected options array
-    const selectedOptions: ItemAttributeSelection[] = [];
+    const selectedOptions: ItemOption[] = [];
     selections.forEach((optionIdxs, attributeId) => {
         const attr = attributes.find(a => String(a.id) === attributeId);
         const options = allOptions.get(attributeId) || [];
@@ -167,10 +167,10 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                 if (opt) {
                     selectedOptions.push({
                         attribute_id: String(attr.id),
+                        attribute_name: attr.name,
                         option_idx: idx,
-                        name: attr.name,
-                        value: opt.name,
-                        price_modifier: opt.price_modifier
+                        option_name: opt.name,
+                        price_modifier: opt.price_modifier ?? null,
                     });
                 }
             });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '../Toast';
-import { AttributeTemplate, AttributeOption, ItemAttributeSelection, ProductAttribute, EmbeddedSpec } from '@/core/domain/types';
+import { AttributeTemplate, AttributeOption, ItemOption, ProductAttribute, EmbeddedSpec } from '@/core/domain/types';
 import { ItemConfiguratorModal } from './ItemConfiguratorModal';
 
 interface ProductOptionsModalProps {
@@ -15,7 +15,7 @@ interface ProductOptionsModalProps {
   specifications?: EmbeddedSpec[]; // Embedded specifications (use index as ID)
   hasMultiSpec?: boolean; // Whether this product has multiple specifications
   onConfirm: (
-    selectedOptions: ItemAttributeSelection[],
+    selectedOptions: ItemOption[],
     quantity: number,
     discount: number,
     authorizer?: { id: string; username: string },
@@ -123,8 +123,8 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
       }
     }
 
-    // Build ItemAttributeSelection array
-    const result: ItemAttributeSelection[] = [];
+    // Build ItemOption array (backend type)
+    const result: ItemOption[] = [];
 
     selections.forEach((optionIdxs, attributeId) => {
       const attr = attributes.find(a => String(a.id) === attributeId);
@@ -139,14 +139,10 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
 
         result.push({
           attribute_id: String(attr.id),
-          option_idx: optionIdx,
-          name: attr.name,
-          value: option.name,
-          price_modifier: option.price_modifier,
           attribute_name: attr.name,
-          attribute_receipt_name: attr.receipt_name,
+          option_idx: optionIdx,
           option_name: option.name,
-          receipt_name: option.receipt_name,
+          price_modifier: option.price_modifier ?? null,
         });
       });
     });

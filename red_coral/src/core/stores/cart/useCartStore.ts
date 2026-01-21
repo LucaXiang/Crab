@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import { CartItem, Product, ItemAttributeSelection } from '@/core/domain/types';
+import { CartItem, Product, ItemOption } from '@/core/domain/types';
 import { calculateOrderTotal } from '@/utils/pricing';
 
 /**
  * Compare two selectedOptions arrays for equality
  */
 function areOptionsEqual(
-  options1: ItemAttributeSelection[] | undefined,
-  options2: ItemAttributeSelection[] | undefined
+  options1: ItemOption[] | undefined,
+  options2: ItemOption[] | undefined
 ): boolean {
   // Normalize empty arrays to undefined for comparison
   const o1 = options1 && options1.length > 0 ? options1 : undefined;
@@ -63,7 +63,7 @@ interface CartStore {
   itemCount: number;
 
   // Actions
-  addToCart: (product: Product, selectedOptions?: ItemAttributeSelection[], quantity?: number, discount?: number, authorizer?: { id: string; username: string }, selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number }) => void;
+  addToCart: (product: Product, selectedOptions?: ItemOption[], quantity?: number, discount?: number, authorizer?: { id: string; username: string }, selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number }) => void;
   removeFromCart: (instanceId: string) => void;
   updateCartItem: (instanceId: string, updates: Partial<CartItem>) => void;
   incrementItemQuantity: (instanceId: string, delta: number) => void;
@@ -82,7 +82,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   itemCount: 0,
 
   // Actions
-  addToCart: (product: Product, selectedOptions?: ItemAttributeSelection[], quantity: number = 1, discount: number = 0, authorizer?: { id: string; username: string }, selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number }) => {
+  addToCart: (product: Product, selectedOptions?: ItemOption[], quantity: number = 1, discount: number = 0, authorizer?: { id: string; username: string }, selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number }) => {
     set((state) => {
       // Only merge if:
       // 1. Same product ID

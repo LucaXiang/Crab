@@ -7,7 +7,7 @@
  */
 
 import { Currency } from '../currency/currency';
-import { CartItem, ItemAttributeSelection } from '@/core/domain/types';
+import { CartItem, ItemOption } from '@/core/domain/types';
 import Decimal from 'decimal.js';
 
 /**
@@ -16,7 +16,7 @@ import Decimal from 'decimal.js';
  * @returns 总价格调整（可为正或负）
  */
 export function calculateOptionsModifier(
-  selectedOptions?: ItemAttributeSelection[]
+  selectedOptions?: ItemOption[]
 ): Decimal {
   if (!selectedOptions || selectedOptions.length === 0) {
     return new Decimal(0);

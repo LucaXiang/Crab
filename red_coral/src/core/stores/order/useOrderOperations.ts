@@ -70,12 +70,12 @@ async function sendCommand(command: OrderCommand): Promise<CommandResponse> {
  * Convert CartItem to CartItemInput for backend
  */
 function toCartItemInput(item: CartItem): CartItemInput {
-  // Convert ItemAttributeSelection[] to ItemOption[] if present
+  // CartItem.selected_options is already ItemOption[], pass through directly
   const selectedOptions = item.selected_options?.map(opt => ({
     attribute_id: opt.attribute_id,
-    attribute_name: opt.attribute_name ?? opt.name,
+    attribute_name: opt.attribute_name,
     option_idx: opt.option_idx,
-    option_name: opt.value,
+    option_name: opt.option_name,
     price_modifier: opt.price_modifier ?? null,
   })) ?? null;
 
