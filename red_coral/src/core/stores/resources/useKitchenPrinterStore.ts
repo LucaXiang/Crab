@@ -28,7 +28,7 @@ interface KitchenPrinterStore {
   error: string | null;
 
   // Core actions (new architecture)
-  fetchAll: () => Promise<void>;
+  fetchAll: (force?: boolean) => Promise<void>;
   applySync: () => void;
   getById: (id: string) => KitchenPrinterEntity | undefined;
   clear: () => void;
@@ -60,7 +60,12 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
   error: null,
 
   // Core actions
-  fetchAll: async () => {
+  fetchAll: async (force = false) => {
+    // Guard: skip if already loading, or already loaded (unless forced)
+    const state = get();
+    if (state.isLoading) return;
+    if (state.isLoaded && !force) return;
+
     set({ isLoading: true, error: null });
     try {
       const response = await api.listPrinters();
@@ -78,7 +83,7 @@ export const useKitchenPrinterStore = create<KitchenPrinterStore>((set, get) => 
 
   applySync: () => {
     if (get().isLoaded) {
-      get().fetchAll();
+      get().fetchAll(true);  // Force refresh on sync
     }
   },
 

@@ -1,7 +1,9 @@
 //! Role Model
 
+use super::serde_helpers;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
+
 /// Role ID type
 pub type RoleId = Thing;
 
@@ -14,11 +16,18 @@ pub struct Role {
     /// Name of the role
     pub role_name: String,
     /// List of permissions
+    #[serde(default)]
     pub permissions: Vec<String>,
     /// Whether this is a system role
+    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_system: bool,
     /// Whether the role is active
+    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_active: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Role {
@@ -32,4 +41,20 @@ impl Role {
             is_active: true,
         }
     }
+}
+
+/// Create role request
+#[derive(Debug, Deserialize)]
+pub struct RoleCreate {
+    pub role_name: String,
+    #[serde(default)]
+    pub permissions: Vec<String>,
+}
+
+/// Update role request
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RoleUpdate {
+    pub role_name: Option<String>,
+    pub permissions: Option<Vec<String>>,
+    pub is_active: Option<bool>,
 }

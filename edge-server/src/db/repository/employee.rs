@@ -1,6 +1,6 @@
 //! Employee Repository
 
-use super::{BaseRepository, RepoError, RepoResult};
+use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
 use crate::db::models::{Employee, EmployeeCreate, EmployeeResponse, EmployeeUpdate};
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
@@ -43,13 +43,15 @@ impl EmployeeRepository {
 
     /// Find employee by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Employee>> {
-        let emp: Option<Employee> = self.base.db().select((TABLE, id)).await?;
+        let pure_id = strip_table_prefix(TABLE, id);
+        let emp: Option<Employee> = self.base.db().select((TABLE, pure_id)).await?;
         Ok(emp)
     }
 
     /// Find employee by id (returns EmployeeResponse without password)
     pub async fn find_by_id_safe(&self, id: &str) -> RepoResult<Option<EmployeeResponse>> {
-        let emp: Option<Employee> = self.base.db().select((TABLE, id)).await?;
+        let pure_id = strip_table_prefix(TABLE, id);
+        let emp: Option<Employee> = self.base.db().select((TABLE, pure_id)).await?;
         Ok(emp.map(|e| e.into()))
     }
 
@@ -97,8 +99,9 @@ impl EmployeeRepository {
 
     /// Update an employee
     pub async fn update(&self, id: &str, data: EmployeeUpdate) -> RepoResult<EmployeeResponse> {
+        let pure_id = strip_table_prefix(TABLE, id);
         let existing = self
-            .find_by_id(id)
+            .find_by_id(pure_id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Employee {} not found", id)))?;
 
@@ -149,17 +152,25 @@ impl EmployeeRepository {
             is_active: data.is_active,
         };
 
-        let updated: Option<Employee> =
-            self.base.db().update((TABLE, id)).merge(update_doc).await?;
-        updated
+        let thing = make_thing(TABLE, pure_id);
+        self.base
+            .db()
+            .query("UPDATE $thing MERGE $data")
+            .bind(("thing", thing))
+            .bind(("data", update_doc))
+            .await?;
+
+        self.find_by_id(pure_id)
+            .await?
             .map(|e| e.into())
             .ok_or_else(|| RepoError::NotFound(format!("Employee {} not found", id)))
     }
 
-    /// Soft delete an employee
+    /// Hard delete an employee
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
+        let pure_id = strip_table_prefix(TABLE, id);
         let existing = self
-            .find_by_id(id)
+            .find_by_id(pure_id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Employee {} not found", id)))?;
 
@@ -170,17 +181,12 @@ impl EmployeeRepository {
             ));
         }
 
-        #[derive(serde::Serialize)]
-        struct DeleteDoc {
-            is_active: bool,
-        }
-
-        let result: Option<Employee> = self
-            .base
+        let thing = make_thing(TABLE, pure_id);
+        self.base
             .db()
-            .update((TABLE, id))
-            .merge(DeleteDoc { is_active: false })
+            .query("DELETE $thing")
+            .bind(("thing", thing))
             .await?;
-        Ok(result.is_some())
+        Ok(true)
     }
 }

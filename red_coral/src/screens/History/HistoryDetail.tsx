@@ -89,6 +89,14 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
     return map;
   }, [order.items, order.paidItemQuantities]);
 
+  const itemIndexMap = React.useMemo(() => {
+    const map = new Map<string, number>();
+    order.items.forEach((item, idx) => {
+      map.set(item.instanceId, idx);
+    });
+    return map;
+  }, [order.items]);
+
   const { activeItems, removedItems } = React.useMemo(() => {
     const active: typeof order.items = [];
     const removed: typeof order.items = [];
@@ -153,7 +161,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
             </div>
             <div className="flex items-center gap-1.5">
               <Clock size={16} />
-              <span>{new Date(order.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} - {order.endTime ? new Date(order.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : t('common.na')}</span>
+              <span>{new Date(order.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} - {order.endTime ? new Date(order.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : t('common.label.none')}</span>
             </div>
           </div>
         </div>
@@ -173,7 +181,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
               </div>
               <button
                 onClick={toggleAll}
-                title={expandedItems.size === order.items.length ? t('common.collapseAll') : t('common.expandAll')}
+                title={expandedItems.size === order.items.length ? t('common.action.collapseAll') : t('common.action.expandAll')}
                 className="p-1.5 text-gray-500 hover:text-gray-700 transition-colors rounded hover:bg-gray-200"
               >
                 {expandedItems.size === order.items.length ? <ChevronsUp size={18} /> : <ChevronsDown size={18} />}
@@ -181,7 +189,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
             </div>
             <div className="divide-y divide-gray-100">
               {activeItems.map((item) => {
-                const idx = order.items.indexOf(item);
+                const idx = itemIndexMap.get(item.instanceId) ?? -1;
                 return (
                   <OrderItemRow
                     key={item.instanceId || `${item.id}-${idx}`}
@@ -202,7 +210,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                     {t('history.info.removedItems')}
                   </div>
                   {removedItems.map((item) => {
-                    const idx = order.items.indexOf(item);
+                    const idx = itemIndexMap.get(item.instanceId) ?? -1;
                     return (
                       <OrderItemRow
                         key={item.instanceId || `${item.id}-${idx}`}
@@ -220,12 +228,6 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
               )}
             </div>
             <div className="p-5 bg-gray-50 border-t border-gray-200 space-y-2">
-              {!order.surchargeExempt && order.surcharge && order.surcharge.total > 0 && (
-                <div className="flex justify-between items-end">
-                  <span className="text-purple-500 font-medium text-sm">{order.surcharge.name || 'Surcharge'}</span>
-                  <span className="text-sm font-medium text-purple-500">+{formatCurrency(order.surcharge.total)}</span>
-                </div>
-              )}
               <div className="flex justify-between items-end pt-3 mt-1 border-t border-gray-200">
                 <span className="text-gray-800 font-bold">{t('checkout.amount.total')}</span>
                 <span className="text-xl font-bold text-[#FF5E5E]">{formatCurrency(order.total)}</span>
@@ -282,8 +284,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
     const finalUnitPrice = calculateItemFinalPrice(item).toNumber();
     const lineTotal = calculateItemTotal(item).toNumber();
     const hasDiscount = discountPercent > 0 || baseUnitPrice !== finalUnitPrice;
-    const orderLevelSurchargeActive = !order.surchargeExempt && !!order.surcharge && order.surcharge.amount > 0;
-    const itemSurcharge = order.surchargeExempt ? 0 : (orderLevelSurchargeActive ? 0 : (item.surcharge || 0));
+    const itemSurcharge = item.surcharge || 0;
     const hasAttributes = item.selectedOptions && item.selectedOptions.length > 0;
     const paidQty = allocatedPaidQty !== undefined ? allocatedPaidQty : (order.paidItemQuantities?.[item.instanceId] || 0);
     const isFullyPaid = paidQty >= item.quantity;
@@ -321,7 +322,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
                 {item.discountPercent ? (
                   <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">-{item.discountPercent}%</span>
                 ) : null}
-                {!order.surchargeExempt && itemSurcharge ? (
+                {itemSurcharge > 0 ? (
                   <span className="text-[10px] font-bold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">+{formatCurrency(itemSurcharge)}</span>
                 ) : null}
               </div>
@@ -338,7 +339,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
                 {hasAttributes && (
                   <span className="flex items-center gap-1 ml-2 text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">
                     {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                    {t('common.details')}
+                    {t('common.label.details')}
                   </span>
                 )}
               </div>
@@ -389,7 +390,7 @@ export const PaymentEventRow: React.FC<PaymentEventRowProps> = React.memo(({ eve
   if (event.type === 'ORDER_SPLIT') {
     methodRaw = data.paymentMethod || '';
     amountNum = data.splitAmount || 0;
-    note = t('timeline.event.splitBill');
+    note = t('timeline.splitBill');
   } else {
     const payment = data.payment || data;
     methodRaw = payment?.method || '';

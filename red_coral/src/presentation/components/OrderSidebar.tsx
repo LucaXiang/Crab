@@ -13,7 +13,6 @@ import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { Currency } from '@/utils/currency';
 import { formatCurrency } from '@/utils/currency';
 import { calculateDiscountAmount, calculateOptionsModifier } from '@/utils/pricing';
-import { calculateUnpaidItems } from '@/core/services/order/paymentService';
 
 // Lazy load TimelineList - only loads when user clicks Timeline tab
 const TimelineList = lazy(() =>
@@ -192,7 +191,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           const basePrice = (item.originalPrice ?? item.price) + optionsModifier;
 
           const unitDiscount = calculateDiscountAmount(basePrice, item.discountPercent || 0).toNumber();
-          const unitSurcharge = order.surchargeExempt ? 0 : (item.surcharge || 0);
+          const unitSurcharge = item.surcharge || 0;
 
           return {
             totalOriginalPrice: Currency.add(acc.totalOriginalPrice, Currency.mul(basePrice, quantity)).toNumber(),
@@ -203,14 +202,9 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         { totalOriginalPrice: 0, totalItemDiscount: 0, totalItemSurcharge: 0 }
       );
 
-    const orderLevelDiscount = 0;
-    const orderLevelSurcharge = order.surchargeExempt ? 0 : (order.surcharge ? order.surcharge.total : undefined);
-
     const displayOriginalPrice = totalOriginalPrice;
-    const displayTotalDiscount = Currency.add(totalItemDiscount, orderLevelDiscount).toNumber();
-    const displayTotalSurcharge = (orderLevelSurcharge !== undefined) 
-      ? Number(orderLevelSurcharge)
-      : Number(totalItemSurcharge);
+    const displayTotalDiscount = totalItemDiscount;
+    const displayTotalSurcharge = totalItemSurcharge;
     const displayFinalTotal = order.total;
 
     return {
@@ -219,12 +213,17 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       displayTotalSurcharge,
       displayFinalTotal,
     };
-  }, [order.items, order.surchargeExempt, order.surcharge, order.total]);
+  }, [order.items, order.total]);
 
-  const unpaidItems = React.useMemo(
-    () => calculateUnpaidItems(order.items, order.paidItemQuantities || {}),
-    [order.items, order.paidItemQuantities]
-  );
+  // Use backend-provided unpaidQuantity for each item
+  const unpaidItems = React.useMemo(() => {
+    return order.items
+      .filter(item => !item._removed && (item.unpaidQuantity ?? item.quantity) > 0)
+      .map(item => ({
+        ...item,
+        quantity: item.unpaidQuantity ?? item.quantity, // Use unpaid quantity for display
+      }));
+  }, [order.items]);
 
   React.useEffect(() => {
     if (activeTab !== 'TIMELINE') return;
@@ -243,7 +242,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
             </h1>
             <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
               <span>
-                {order.guestCount} {t('table.common.guests')}
+                {order.guestCount} {t('table.guests')}
               </span>
               <span className="w-1 h-1 rounded-full bg-gray-300" />
               <span>{new Date(order.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
@@ -307,7 +306,6 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
             onUpdateSelectedQty={() => {}}
             onEditItem={handleEditItem}
             t={t}
-            surchargeExempt={!!order.surchargeExempt}
             paidItemQuantities={order.paidItemQuantities}
           />
         ) : (
@@ -341,11 +339,11 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           </div>
         )}
 
-        {/* 3. Total Surcharge (If any) */}
-        {!order.surchargeExempt && displayTotalSurcharge > 0 && (
+        {/* 3. Total Surcharge (If any, from Price Rules) */}
+        {displayTotalSurcharge > 0 && (
           <div className="flex justify-between items-end">
             <span className="text-purple-500 font-medium text-sm">
-              {order.surcharge?.name || t('pos.cart.surcharge')}
+              {t('pos.cart.surcharge')}
             </span>
             <span className="text-sm font-medium text-purple-500">
 	              +{formatCurrency(displayTotalSurcharge)}

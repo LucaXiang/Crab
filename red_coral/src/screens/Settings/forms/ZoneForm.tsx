@@ -29,7 +29,7 @@ export const ZoneForm: React.FC<ZoneFormProps> = ({ formData, onFieldChange, t }
           value={formData.surchargeType}
           onChange={(value) => onFieldChange('surchargeType', value as string)}
           options={[
-            { value: 'none', label: t('common.none') },
+            { value: 'none', label: t('common.dialog.none') },
             { value: 'fixed', label: t("settings.table.zone.form.surchargeFixed") },
             { value: 'percentage', label: t("settings.table.zone.form.surchargePercentage") },
           ]}

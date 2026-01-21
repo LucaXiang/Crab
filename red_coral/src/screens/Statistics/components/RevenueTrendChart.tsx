@@ -68,7 +68,7 @@ export const RevenueTrendChart: React.FC<RevenueTrendChartProps> = ({
           </ResponsiveContainer>
         ) : (
           <div className="flex items-center justify-center h-full text-gray-400">
-            {t('statistics.noData')}
+            {t('common.empty.noData')}
           </div>
         )}
       </div>

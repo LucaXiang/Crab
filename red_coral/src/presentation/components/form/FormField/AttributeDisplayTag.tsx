@@ -49,7 +49,7 @@ export const AttributeDisplayTag: React.FC<AttributeDisplayTagProps> = ({
       {defaultOptions.length > 0 && (
         <span className="flex items-center gap-1 text-xs bg-teal-100 px-1.5 py-0.5 rounded text-teal-800 border border-teal-200">
           <span className="opacity-60 text-[10px] uppercase tracking-wider">
-            {t('common.default')}:
+            {t('common.label.default')}:
           </span>
           <span className="font-semibold">
             {defaultOptions.map(o => o?.name).join(', ')}
@@ -62,7 +62,7 @@ export const AttributeDisplayTag: React.FC<AttributeDisplayTagProps> = ({
           type="button"
           onClick={() => onRemove(String(attribute.id))}
           className="ml-auto hover:bg-teal-200/50 rounded p-0.5 transition-colors"
-          title={t('common.remove')}
+          title={t('common.action.remove')}
         >
           <X size={14} />
         </button>

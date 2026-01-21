@@ -14,10 +14,9 @@ import { createTauriClient } from '@/infrastructure/api';
 
 const api = createTauriClient();
 import { DataTable, Column } from '@/presentation/components/ui/DataTable';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
-import DefaultImage from '../../assets/reshot.svg';
+import { ProductImage } from '@/presentation/components/ProductImage';
 import { formatCurrency } from '@/utils/currency';
 
 // ProductItem matches Product type from models.ts (snake_case naming)
@@ -106,7 +105,7 @@ export const ProductManagement: React.FC = React.memo(() => {
       onConfirm: async () => {
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
         try {
-          const ids = items.map((item) => Number(item.id));
+          const ids = items.map((item) => item.id).filter((id): id is string => id != null);
           await api.bulkDeleteProducts(ids);
           // Optimistic update: remove from ProductStore
           items.forEach((item) => {
@@ -127,18 +126,12 @@ export const ProductManagement: React.FC = React.memo(() => {
         key: 'name',
         header: t('settings.product.form.name'),
         render: (item) => {
-          const imgSrc = item.image
-            ? /^https?:\/\//.test(item.image)
-              ? item.image
-              : convertFileSrc(item.image)
-            : DefaultImage;
           return (
             <div className="flex items-center gap-3">
-              <img
-                src={imgSrc}
+              <ProductImage
+                src={item.image}
                 alt={item.name}
                 className="w-10 h-10 rounded-lg object-cover border border-gray-200"
-                onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
               />
               <div>
                 <span className="font-medium text-gray-900">{item.name}</span>
@@ -165,10 +158,10 @@ export const ProductManagement: React.FC = React.memo(() => {
             item.is_kitchen_print_enabled === undefined || item.is_kitchen_print_enabled === null || item.is_kitchen_print_enabled === -1;
 
           const stateLabel = isDefault
-            ? t('common.default')
+            ? t('common.label.default')
             : item.is_kitchen_print_enabled === 1
-            ? t('common.enabled')
-            : t('common.disabled');
+            ? t('common.status.enabled')
+            : t('common.status.disabled');
 
           const chipClass = isDefault
             ? 'bg-blue-50 text-blue-700'
@@ -186,7 +179,7 @@ export const ProductManagement: React.FC = React.memo(() => {
               <span className="text-gray-400">
                 {item.kitchen_printer
                   ? `${t('settings.kitchenPrinter')} #${item.kitchen_printer}`
-                  : t('common.default')}
+                  : t('common.label.default')}
               </span>
             </div>
           );
@@ -201,10 +194,10 @@ export const ProductManagement: React.FC = React.memo(() => {
             item.is_label_print_enabled === undefined || item.is_label_print_enabled === null || item.is_label_print_enabled === -1;
 
           const stateLabel = isDefault
-            ? t('common.default')
+            ? t('common.label.default')
             : item.is_label_print_enabled === 1
-            ? t('common.enabled')
-            : t('common.disabled');
+            ? t('common.status.enabled')
+            : t('common.status.disabled');
 
           const chipClass = isDefault
             ? 'bg-blue-50 text-blue-700'
@@ -259,7 +252,7 @@ export const ProductManagement: React.FC = React.memo(() => {
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-orange-500/20 hover:bg-orange-600 hover:shadow-orange-500/30 transition-all"
             >
               <Plus size={16} />
-              <span>{t('settings.product.action.add')}</span>
+              <span>{t('settings.product.addProduct')}</span>
             </button>
           </ProtectedGate>
         </div>
@@ -270,7 +263,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-gray-500">
             <Filter size={16} />
-            <span className="text-sm font-medium">{t('common.filter')}</span>
+            <span className="text-sm font-medium">{t('common.action.filter')}</span>
           </div>
           <div className="h-5 w-px bg-gray-200" />
           <div className="flex items-center gap-2">
@@ -280,7 +273,7 @@ export const ProductManagement: React.FC = React.memo(() => {
               onChange={(e) => setCategoryFilter(e.target.value as any)}
               className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors min-w-[140px]"
             >
-              <option value="all">{t('common.all')}</option>
+              <option value="all">{t('common.status.all')}</option>
               {categories.map((c) => (
                 <option key={c.name} value={c.name}>
                   {c.name}
@@ -299,13 +292,13 @@ export const ProductManagement: React.FC = React.memo(() => {
                 setSearchQuery(e.target.value);
                 setPagination(1, filteredProducts.length);
               }}
-              placeholder={t('common.searchPlaceholder')}
+              placeholder={t('common.hint.searchPlaceholder')}
               className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
             />
           </div>
 
           <div className="ml-auto text-xs text-gray-400">
-            {t('common.total')} {filteredProducts.length} {t('common.items')}
+            {t('common.label.total')} {filteredProducts.length} {t('common.label.items')}
           </div>
         </div>
       </div>
@@ -319,7 +312,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         onEdit={canUpdateProduct ? (item) => openModal('PRODUCT', 'EDIT', item) : undefined}
         onDelete={canDeleteProduct ? (item) => openModal('PRODUCT', 'DELETE', item) : undefined}
         onBatchDelete={canDeleteProduct ? handleBatchDelete : undefined}
-        emptyText={t('settings.product.list.noData')}
+        emptyText={t('common.empty.noData')}
         pageSize={5}
         totalItems={filteredProducts.length}
         currentPage={page}

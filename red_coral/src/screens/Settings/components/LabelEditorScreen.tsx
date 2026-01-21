@@ -340,7 +340,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         await invoke('print_label_cmd', { ticket: ticketData });
         setDialogConfig({
           isOpen: true,
-          title: t('common.success'),
+          title: t('common.message.success'),
           description: (t("settings.label.testSent")).replace('{printer}', String(labelPrinter.selectedPrinterId ?? '')),
           variant: 'info'
         });
@@ -349,7 +349,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         const errorMsg = String(e);
         setDialogConfig({
           isOpen: true,
-          title: t('common.error'),
+          title: t('common.message.error'),
           description: (t("settings.label.testFailed")).replace('{error}', errorMsg),
           variant: 'danger'
         });
@@ -447,7 +447,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
             }`}
           >
             <Save size={18} />
-            {t('common.save')}
+            {t('common.action.save')}
           </button>
         </div>
       </div>
@@ -675,7 +675,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         description={dialogConfig.description}
         variant={dialogConfig.variant}
         showCancel={false}
-        confirmText={t('common.ok')}
+        confirmText={t('common.dialog.ok')}
         onConfirm={() => setDialogConfig(prev => ({ ...prev, isOpen: false }))}
         onCancel={() => setDialogConfig(prev => ({ ...prev, isOpen: false }))}
       />

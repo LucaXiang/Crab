@@ -26,7 +26,7 @@ export const LoadingScreen: React.FC = () => {
                 <div className="w-2 h-2 rounded-full bg-[#FF5E5E] animate-[bounce_1s_infinite_400ms]" />
             </div>
             <p className="text-sm text-gray-400 mt-2">
-                {t('common.loading')}
+                {t('common.message.loading')}
             </p>
         </div>
       </div>

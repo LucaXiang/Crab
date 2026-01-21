@@ -10,7 +10,7 @@ const api = createTauriClient();
 import { toast } from '@/presentation/components/Toast';
 import { Product } from '@/core/domain/types';
 import DefaultImage from '@/assets/reshot.svg';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { useImageUrl } from '@/core/hooks/useImageUrl';
 import { useSettingsStore } from '@/core/stores/settings';
 
 interface SortableProductItemProps {
@@ -31,6 +31,9 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ id, product }
     animateLayoutChanges: (args) => !args.isSorting && !args.wasDragging,
   });
 
+  const [imageUrl] = useImageUrl(product.image);
+  const imageSrc = imageUrl || DefaultImage;
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -45,18 +48,14 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ id, product }
       {...attributes}
       {...listeners}
       className={`group relative flex flex-col items-start gap-0 p-0 rounded-xl overflow-hidden transition-all duration-200 cursor-grab active:cursor-grabbing select-none h-full bg-white border
-        ${isDragging 
-          ? 'border-dashed border-gray-300 shadow-none opacity-40 grayscale' 
+        ${isDragging
+          ? 'border-dashed border-gray-300 shadow-none opacity-40 grayscale'
           : 'border-gray-100 shadow-sm hover:shadow-md hover:border-teal-200'
         }`}
     >
       <div className="w-full aspect-square bg-gray-50 relative overflow-hidden">
         <img
-          src={product.image
-            ? /^https?:\/\//.test(product.image)
-              ? product.image
-              : convertFileSrc(product.image)
-            : DefaultImage}
+          src={imageSrc}
           alt={product.name}
           className="w-full h-full object-cover pointer-events-none group-hover:scale-105 transition-transform duration-500 ease-out"
           onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
@@ -71,6 +70,37 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ id, product }
         </div>
       </div>
       
+      <div className="flex-1 flex items-center w-full p-2.5 bg-white">
+        <span className="font-medium text-gray-700 text-xs text-left line-clamp-2 leading-tight w-full">
+          {product.name}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// Drag overlay item component (separate to use hooks)
+const DragOverlayProductItem: React.FC<{ product: Product }> = ({ product }) => {
+  const [imageUrl] = useImageUrl(product.image);
+  const imageSrc = imageUrl || DefaultImage;
+
+  return (
+    <div className="group relative flex flex-col items-start gap-0 p-0 rounded-xl overflow-hidden cursor-grabbing select-none h-full bg-white border border-teal-500 shadow-xl scale-[1.02]">
+      <div className="w-full aspect-square bg-gray-50 relative overflow-hidden">
+        <img
+          src={imageSrc}
+          alt={product.name}
+          className="w-full h-full object-cover pointer-events-none"
+          onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
+        />
+        <div className="absolute bottom-1 left-1 z-10">
+          <div className="bg-black/80 backdrop-blur-[1px] px-1.5 py-0.5 rounded shadow-sm min-w-[20px] flex items-center justify-center">
+            <span className="text-[10px] text-white font-medium font-mono leading-none">
+              {product.sort_order}
+            </span>
+          </div>
+        </div>
+      </div>
       <div className="flex-1 flex items-center w-full p-2.5 bg-white">
         <span className="font-medium text-gray-700 text-xs text-left line-clamp-2 leading-tight w-full">
           {product.name}
@@ -121,7 +151,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
       setProducts(filteredProducts);
     } catch (e) {
       console.error(e);
-      toast.error(t('settings.loadFailed'));
+      toast.error(t('common.message.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -154,11 +184,11 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
     try {
       // API doesn't support batch reorder, skipping
       refreshData();
-      toast.success(t('settings.saveSuccess'));
+      toast.success(t('common.message.saveSuccess'));
       onClose();
     } catch (e) {
       console.error(e);
-      toast.error(t('settings.saveFailed'));
+      toast.error(t('common.message.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -220,34 +250,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
                   (() => {
                     const p = products.find((x) => x.id === activeId);
                     if (!p) return null;
-                    return (
-                      <div className="group relative flex flex-col items-start gap-0 p-0 rounded-xl overflow-hidden cursor-grabbing select-none h-full bg-white border border-teal-500 shadow-xl scale-[1.02]">
-                        <div className="w-full aspect-square bg-gray-50 relative overflow-hidden">
-                          <img
-                            src={p.image
-                              ? /^https?:\/\//.test(p.image)
-                                ? p.image
-                                : convertFileSrc(p.image)
-                              : DefaultImage}
-                            alt={p.name}
-                            className="w-full h-full object-cover pointer-events-none"
-                            onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
-                          />
-                          <div className="absolute bottom-1 left-1 z-10">
-                             <div className="bg-black/80 backdrop-blur-[1px] px-1.5 py-0.5 rounded shadow-sm min-w-[20px] flex items-center justify-center">
-                               <span className="text-[10px] text-white font-medium font-mono leading-none">
-                                 {p.sort_order}
-                               </span>
-                             </div>
-                          </div>
-                        </div>
-                        <div className="flex-1 flex items-center w-full p-2.5 bg-white">
-                          <span className="font-medium text-gray-700 text-xs text-left line-clamp-2 leading-tight w-full">
-                            {p.name}
-                          </span>
-                        </div>
-                      </div>
-                    );
+                    return <DragOverlayProductItem product={p} />;
                   })()
                 ) : null}
               </DragOverlay>
@@ -260,7 +263,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
             onClick={onClose}
             className="px-5 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl text-sm font-medium transition-colors border border-transparent hover:border-gray-200"
           >
-            {t('common.cancel')}
+            {t('common.action.cancel')}
           </button>
           <button
             onClick={handleSave}
@@ -272,7 +275,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
             ) : (
               <Save size={18} />
             )}
-            <span>{t('common.save')}</span>
+            <span>{t('common.action.save')}</span>
           </button>
         </div>
       </div>

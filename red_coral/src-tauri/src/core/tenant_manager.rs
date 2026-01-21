@@ -362,7 +362,7 @@ impl TenantManager {
             token: data.token.clone(),
             user_info: data.user,
             login_mode: LoginMode::Online,
-            expires_at: None, // TODO: Parse from JWT
+            expires_at: EmployeeSession::parse_jwt_exp(&data.token),
             logged_in_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()

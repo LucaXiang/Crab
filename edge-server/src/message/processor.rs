@@ -2,7 +2,7 @@ use crate::core::ServerState;
 use crate::message::{BusMessage, EventType};
 use crate::utils::AppError;
 use async_trait::async_trait;
-use shared::order::OrderCommand;
+use shared::order::{OrderCommand, OrderCommandPayload};
 use std::sync::Arc;
 
 /// 消息处理结果
@@ -132,6 +132,57 @@ impl RequestCommandProcessor {
         Self { state }
     }
 
+    /// Apply price rules to items if the command is AddItems
+    ///
+    /// This ensures price rules are applied regardless of how the command arrives
+    /// (local Tauri or remote MessageBus).
+    async fn apply_price_rules_if_needed(&self, mut command: OrderCommand) -> OrderCommand {
+        // Only process AddItems commands
+        if let OrderCommandPayload::AddItems { order_id, items } = &command.payload {
+            // Get order snapshot to find zone_id
+            let snapshot = match self.state.orders_manager().get_snapshot(order_id) {
+                Ok(Some(s)) => s,
+                Ok(None) | Err(_) => {
+                    // If order not found or error, return command unmodified
+                    return command;
+                }
+            };
+
+            // Determine if this is a retail order (no zone)
+            let is_retail = snapshot.zone_id.is_none();
+            let zone_id = snapshot.zone_id.as_deref();
+
+            // Load applicable price rules for this zone
+            let rules = self
+                .state
+                .price_rule_engine
+                .load_rules_for_zone(zone_id, is_retail)
+                .await;
+
+            if rules.is_empty() {
+                return command;
+            }
+
+            // Get current timestamp for time-based rule validation
+            let current_time = chrono::Utc::now().timestamp_millis();
+
+            // Apply price rules to items
+            let processed_items = self
+                .state
+                .price_rule_engine
+                .apply_rules(items.clone(), &rules, current_time)
+                .await;
+
+            // Update command with processed items
+            command.payload = OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: processed_items,
+            };
+        }
+
+        command
+    }
+
     /// Handle order commands (order.open_table, order.add_items, etc.)
     async fn handle_order_command(
         &self,
@@ -146,8 +197,11 @@ impl RequestCommandProcessor {
         };
 
         // Parse full command (sent by client with command_id, operator_id, etc.)
-        let command: OrderCommand = serde_json::from_value(params_value.clone())
+        let mut command: OrderCommand = serde_json::from_value(params_value.clone())
             .map_err(|e| AppError::invalid(format!("Invalid OrderCommand: {}", e)))?;
+
+        // Apply price rules for AddItems commands
+        command = self.apply_price_rules_if_needed(command).await;
 
         // Execute via OrdersManager
         let response = self.state.orders_manager().execute_command(command);

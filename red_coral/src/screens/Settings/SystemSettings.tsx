@@ -101,7 +101,7 @@ export const SystemSettings: React.FC = () => {
               onClick={() => setShowClearCacheDialog(true)}
               className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg font-medium hover:bg-red-50 transition-colors shadow-sm"
             >
-              {t('common.clear')}
+              {t('common.action.clear')}
             </button>
           </div>
 
@@ -113,7 +113,7 @@ export const SystemSettings: React.FC = () => {
         title={t('settings.system.clearCache.confirmTitle')}
         description={t('settings.system.clearCache.confirmDescription')}
         variant="danger"
-        confirmText={t('common.confirm')}
+        confirmText={t('common.action.confirm')}
         onConfirm={handleClearCache}
         onCancel={() => setShowClearCacheDialog(false)}
       />

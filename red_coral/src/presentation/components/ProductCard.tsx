@@ -1,8 +1,8 @@
 import React, { useRef, useCallback } from 'react';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { Product } from '@/core/domain/types';
 import DefaultImage from '../../assets/reshot.svg';
 import { ImageOff } from 'lucide-react';
+import { useImageUrl } from '@/core/hooks/useImageUrl';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useLongPress } from '@/hooks/useLongPress';
 import { formatCurrency } from '@/utils/currency';
@@ -54,9 +54,8 @@ export const ProductCard = React.memo<ProductCardProps>(
       isPreventDefault: true
     });
 
-    const imageSrc = product.image 
-      ? (/^(https?:\/\/|data:)/.test(product.image) ? product.image : convertFileSrc(product.image)) 
-      : DefaultImage;
+    const [imageUrl] = useImageUrl(product.image);
+    const imageSrc = imageUrl || DefaultImage;
 
     return (
       <div

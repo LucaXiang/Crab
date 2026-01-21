@@ -51,10 +51,10 @@ export function useOrderSync() {
   /**
    * Request sync from server
    */
-  const syncOrders = useCallback(async (sinceSequence: number): Promise<SyncResponse | null> => {
+  const syncOrders = useCallback(async (since_sequence: number): Promise<SyncResponse | null> => {
     try {
       const response = await invokeApi<SyncResponse>('order_sync_since', {
-        sinceSequence,
+        since_sequence,
       });
       return response;
     } catch (err: any) {
@@ -264,7 +264,7 @@ export async function setupOrderEventListeners(): Promise<() => void> {
 
       try {
         const response = await invoke<SyncResponse>('order_sync_since', {
-          sinceSequence: lastSequence,
+          since_sequence: lastSequence,
         });
 
         // Check for epoch change (server restart)

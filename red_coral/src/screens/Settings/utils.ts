@@ -3,19 +3,19 @@
 export async function syncAttributeBindings(
   selectedAttributeIds: string[],
   attributeDefaultOptions: Record<string, string | string[]>,
-  existingBindings: any[],
-  unbindFn: (attributeId: string) => Promise<unknown>,
+  existingBindings: { attributeId: string; id: string; defaultOptionIds?: string[]; defaultOptionId?: string }[],
+  unbindFn: (bindingId: string) => Promise<unknown>,
   bindFn: (attributeId: string, defaultOptionIds: string[], displayOrder: number) => Promise<unknown>
 ) {
   const existingAttributeIds = existingBindings.map(b => b.attributeId);
 
-  // Unbind removed attributes
-  const toUnbind = existingAttributeIds.filter(id => !selectedAttributeIds.includes(id));
-  for (const attributeId of toUnbind) {
+  // Unbind removed attributes - use binding ID, not attribute ID
+  const toUnbind = existingBindings.filter(b => !selectedAttributeIds.includes(b.attributeId));
+  for (const binding of toUnbind) {
     try {
-      await unbindFn(attributeId);
+      await unbindFn(binding.id);  // Pass binding ID
     } catch (error) {
-      console.error('Failed to unbind attribute:', attributeId, error);
+      console.error('Failed to unbind attribute:', binding.attributeId, error);
     }
   }
 
@@ -23,31 +23,31 @@ export async function syncAttributeBindings(
   for (let i = 0; i < selectedAttributeIds.length; i++) {
     const attributeId = selectedAttributeIds[i];
     const existingBinding = existingBindings.find(b => b.attributeId === attributeId);
-    
+
     // Normalize default options to array
     const rawNewDefaults = attributeDefaultOptions?.[attributeId];
-    const newDefaultOptionIds = Array.isArray(rawNewDefaults) 
-      ? rawNewDefaults 
+    const newDefaultOptionIds = Array.isArray(rawNewDefaults)
+      ? rawNewDefaults
       : (rawNewDefaults ? [rawNewDefaults] : []);
-    
+
     let shouldBind = false;
-    
+
     if (!existingBinding) {
       // New binding
       shouldBind = true;
     } else {
       // Existing binding, check if default option changed
-      const oldDefaultOptionIds = existingBinding.defaultOptionIds || 
+      const oldDefaultOptionIds = existingBinding.defaultOptionIds ||
                                  (existingBinding.defaultOptionId ? [existingBinding.defaultOptionId] : []);
-      
+
       const oldStr = [...oldDefaultOptionIds].sort().join(',');
       const newStr = [...newDefaultOptionIds].sort().join(',');
-      
+
       if (oldStr !== newStr) {
-        // Changed! Need to update. Unbind first.
+        // Changed! Need to update. Unbind first using binding ID.
         try {
-          await unbindFn(attributeId);
-        } catch(e) { 
+          await unbindFn(existingBinding.id);  // Pass binding ID
+        } catch(e) {
           // Ignore BINDING_NOT_FOUND, log others
           const msg = String(e);
           if (!msg.includes('BINDING_NOT_FOUND')) {
@@ -57,7 +57,7 @@ export async function syncAttributeBindings(
         shouldBind = true;
       }
     }
-    
+
     if (shouldBind) {
       try {
         await bindFn(attributeId, newDefaultOptionIds, i);
@@ -70,7 +70,11 @@ export async function syncAttributeBindings(
              // If ALREADY_EXISTS, it means unbind didn't work.
              console.warn('Binding already exists during sync, attempting force update:', attributeId);
              try {
-                await unbindFn(attributeId);
+                // Find binding ID for this attribute
+                const binding = existingBindings.find(b => b.attributeId === attributeId);
+                if (binding) {
+                  await unbindFn(binding.id);  // Pass binding ID
+                }
                 await bindFn(attributeId, newDefaultOptionIds, i);
              } catch (retryError) {
                 console.error('Failed to force update attribute:', attributeId, retryError);

@@ -11,14 +11,16 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   ApiResponse,
   LoginResponseData,
-  Tag,
   TagListData,
   CategoryListData,
   Category,
+  CategoryCreate,
+  CategoryUpdate,
   ProductListData,
   Product,
-  ProductSpecification,
-  ProductSpecListData,
+  ProductCreate,
+  ProductUpdate,
+  ProductFull,
   Zone,
   ZoneListData,
   Table,
@@ -26,6 +28,8 @@ import type {
   KitchenPrinter,
   PrinterListData,
   Attribute,
+  AttributeCreate,
+  AttributeUpdate,
   AttributeTemplateListData,
   RoleListData,
   RolePermissionListData,
@@ -33,7 +37,8 @@ import type {
   ProductAttributeListData,
   EmployeeResponse,
   PriceRule,
-  Role,
+  CreateProductAttributeRequest,
+  CreateCategoryAttributeRequest,
 } from '@/core/domain/types/api';
 
 // API Error class (与原 client.ts 保持一致)
@@ -51,7 +56,7 @@ export class ApiError extends Error {
 
 /**
  * Generic helper to invoke Tauri command and unwrap ApiResponse
- * 
+ *
  * Used by stores/services to get data directly or throw structured errors.
  */
 export async function invokeApi<T>(command: string, args?: any): Promise<T> {
@@ -71,7 +76,6 @@ export async function invokeApi<T>(command: string, args?: any): Promise<T> {
 
 /**
  * 包装 Tauri invoke 调用，统一错误处理
- * @deprecated Use invokeApi instead
  */
 async function invokeCommand<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {
@@ -122,40 +126,17 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<TagListData>>('list_tags');
   }
 
-  async getTag(id: string): Promise<ApiResponse<{ tag: Tag }>> {
-    return invokeCommand<ApiResponse<{ tag: Tag }>>('get_tag', { id });
-  }
-
-  async createTag(data: { name: string; color?: string; display_order?: number }): Promise<ApiResponse<{ tag: Tag }>> {
-    return invokeCommand<ApiResponse<{ tag: Tag }>>('create_tag', { data });
-  }
-
-  async updateTag(id: string, data: { name?: string; color?: string; display_order?: number; is_active?: boolean }): Promise<ApiResponse<{ tag: Tag }>> {
-    return invokeCommand<ApiResponse<{ tag: Tag }>>('update_tag', { id, data });
-  }
-
-  async deleteTag(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_tag', { id });
-  }
-
   // ============ Categories ============
 
   async listCategories(): Promise<ApiResponse<CategoryListData>> {
     return invokeCommand<ApiResponse<CategoryListData>>('list_categories');
   }
 
-  async createCategory(data: Record<string, unknown>): Promise<ApiResponse<{ category: Category }>> {
+  async createCategory(data: CategoryCreate): Promise<ApiResponse<{ category: Category }>> {
     return invokeCommand<ApiResponse<{ category: Category }>>('create_category', { data });
   }
 
-  async updateCategory(id: string, data: {
-    name?: string;
-    sort_order?: number;
-    kitchen_printer?: string;
-    is_kitchen_print_enabled?: boolean;
-    is_label_print_enabled?: boolean;
-    is_active?: boolean;
-  }): Promise<ApiResponse<{ category: Category }>> {
+  async updateCategory(id: string, data: CategoryUpdate): Promise<ApiResponse<{ category: Category }>> {
     return invokeCommand<ApiResponse<{ category: Category }>>('update_category', { id, data });
   }
 
@@ -173,11 +154,15 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<ProductListData>>('list_products');
   }
 
-  async createProduct(data: Record<string, unknown>): Promise<ApiResponse<{ product: Product }>> {
+  async getProductFull(id: string): Promise<ApiResponse<{ product: ProductFull }>> {
+    return invokeCommand<ApiResponse<{ product: ProductFull }>>('get_product_full', { id });
+  }
+
+  async createProduct(data: ProductCreate): Promise<ApiResponse<{ product: Product }>> {
     return invokeCommand<ApiResponse<{ product: Product }>>('create_product', { data });
   }
 
-  async updateProduct(id: string, data: Record<string, unknown>): Promise<ApiResponse<{ product: Product }>> {
+  async updateProduct(id: string, data: ProductUpdate): Promise<ApiResponse<{ product: Product }>> {
     return invokeCommand<ApiResponse<{ product: Product }>>('update_product', { id, data });
   }
 
@@ -185,34 +170,12 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_product', { id });
   }
 
-  async bulkDeleteProducts(ids: number[]): Promise<ApiResponse<{ deleted: boolean }>> {
+  async bulkDeleteProducts(ids: (string | number)[]): Promise<ApiResponse<{ deleted: boolean }>> {
     // Delete products one by one (bulk delete may not be implemented in backend)
     for (const id of ids) {
       await this.deleteProduct(String(id));
     }
     return { data: { deleted: true } } as ApiResponse<{ deleted: boolean }>;
-  }
-
-  // ============ Product Specifications ============
-
-  async listProductSpecs(productId: string | number): Promise<ApiResponse<ProductSpecListData>> {
-    return invokeCommand<ApiResponse<ProductSpecListData>>('list_specs', { product_id: String(productId) });
-  }
-
-  async listAllSpecs(): Promise<ApiResponse<ProductSpecListData>> {
-    return invokeCommand<ApiResponse<ProductSpecListData>>('list_all_specs');
-  }
-
-  async createProductSpec(productId: string | number, data: Record<string, unknown>): Promise<ApiResponse<{ spec: ProductSpecification }>> {
-    return invokeCommand<ApiResponse<{ spec: ProductSpecification }>>('create_spec', { product_id: String(productId), data });
-  }
-
-  async updateProductSpec(productId: string | number, specId: string | number, data: Record<string, unknown>): Promise<ApiResponse<{ spec: ProductSpecification }>> {
-    return invokeCommand<ApiResponse<{ spec: ProductSpecification }>>('update_spec', { id: String(specId), data });
-  }
-
-  async deleteProductSpec(productId: string | number, specId: string | number): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_spec', { id: String(specId) });
   }
 
   // ============ Product Attributes ============
@@ -221,7 +184,7 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<ProductAttributeListData>>('list_product_attributes', { product_id: productId });
   }
 
-  async bindProductAttribute(data: Record<string, unknown>): Promise<ApiResponse<{ binding: ProductAttribute }>> {
+  async bindProductAttribute(data: CreateProductAttributeRequest): Promise<ApiResponse<{ binding: ProductAttribute }>> {
     return invokeCommand<ApiResponse<{ binding: ProductAttribute }>>('bind_product_attribute', { data });
   }
 
@@ -235,7 +198,7 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ category_attributes: unknown[] }>>('list_category_attributes', { category_id: categoryId ? String(categoryId) : undefined });
   }
 
-  async bindCategoryAttribute(data: Record<string, unknown>): Promise<ApiResponse<{ binding: unknown }>> {
+  async bindCategoryAttribute(data: CreateCategoryAttributeRequest): Promise<ApiResponse<{ binding: unknown }>> {
     return invokeCommand<ApiResponse<{ binding: unknown }>>('bind_category_attribute', { data });
   }
 
@@ -253,16 +216,30 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ template: Attribute }>>('get_attribute', { id });
   }
 
-  async createAttribute(data: Record<string, unknown>): Promise<ApiResponse<{ attribute: Attribute }>> {
+  async createAttribute(data: AttributeCreate): Promise<ApiResponse<{ attribute: Attribute }>> {
     return invokeCommand<ApiResponse<{ attribute: Attribute }>>('create_attribute', { data });
   }
 
-  async updateAttribute(id: string, data: Record<string, unknown>): Promise<ApiResponse<{ attribute: Attribute }>> {
+  async updateAttribute(id: string, data: AttributeUpdate): Promise<ApiResponse<{ attribute: Attribute }>> {
     return invokeCommand<ApiResponse<{ attribute: Attribute }>>('update_attribute', { id, data });
   }
 
   async deleteAttribute(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
     return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_attribute', { id });
+  }
+
+  // ============ Attribute Options ============
+
+  async addAttributeOption(attributeId: string, data: { name: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string }): Promise<ApiResponse<{ template: Attribute }>> {
+    return invokeCommand<ApiResponse<{ template: Attribute }>>('add_attribute_option', { attribute_id: attributeId, data });
+  }
+
+  async updateAttributeOption(attributeId: string, index: number, data: { name?: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string }): Promise<ApiResponse<{ template: Attribute }>> {
+    return invokeCommand<ApiResponse<{ template: Attribute }>>('update_attribute_option', { attribute_id: attributeId, index, data });
+  }
+
+  async deleteAttributeOption(attributeId: string, index: number): Promise<ApiResponse<{ template: Attribute }>> {
+    return invokeCommand<ApiResponse<{ template: Attribute }>>('delete_attribute_option', { attribute_id: attributeId, index });
   }
 
   // ============ Zones ============
@@ -325,10 +302,6 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ employees: EmployeeResponse[] }>>('list_employees');
   }
 
-  async getEmployee(id: string): Promise<ApiResponse<{ employee: EmployeeResponse }>> {
-    return invokeCommand<ApiResponse<{ employee: EmployeeResponse }>>('get_employee', { id });
-  }
-
   async createEmployee(data: { username: string; password: string; role: string }): Promise<ApiResponse<{ employee: EmployeeResponse }>> {
     return invokeCommand<ApiResponse<{ employee: EmployeeResponse }>>('create_employee', { data });
   }
@@ -347,51 +320,10 @@ export class TauriApiClient {
     return invokeCommand<ApiResponse<{ rules: PriceRule[] }>>('list_price_rules');
   }
 
-  async listActivePriceRules(): Promise<ApiResponse<{ rules: PriceRule[] }>> {
-    return invokeCommand<ApiResponse<{ rules: PriceRule[] }>>('list_active_price_rules');
-  }
-
-  async getPriceRule(id: string): Promise<ApiResponse<{ rule: PriceRule }>> {
-    return invokeCommand<ApiResponse<{ rule: PriceRule }>>('get_price_rule', { id });
-  }
-
-  async createPriceRule(data: Record<string, unknown>): Promise<ApiResponse<{ rule: PriceRule }>> {
-    return invokeCommand<ApiResponse<{ rule: PriceRule }>>('create_price_rule', { data });
-  }
-
-  async updatePriceRule(id: string, data: Record<string, unknown>): Promise<ApiResponse<{ rule: PriceRule }>> {
-    return invokeCommand<ApiResponse<{ rule: PriceRule }>>('update_price_rule', { id, data });
-  }
-
-  async deletePriceRule(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_price_rule', { id });
-  }
-
-  /** @deprecated Use listPriceRules instead */
-  async listPriceAdjustments(): Promise<ApiResponse<{ rules: PriceRule[] }>> {
-    return this.listPriceRules();
-  }
-
   // ============ Roles ============
 
   async listRoles(): Promise<ApiResponse<RoleListData>> {
     return invokeCommand<ApiResponse<RoleListData>>('list_roles');
-  }
-
-  async getRole(id: string): Promise<ApiResponse<{ role: Role }>> {
-    return invokeCommand<ApiResponse<{ role: Role }>>('get_role', { id });
-  }
-
-  async createRole(data: { name: string; display_name: string; description?: string }): Promise<ApiResponse<{ role: Role }>> {
-    return invokeCommand<ApiResponse<{ role: Role }>>('create_role', { data });
-  }
-
-  async updateRole(id: string, data: { name?: string; display_name?: string; description?: string; is_active?: boolean }): Promise<ApiResponse<{ role: Role }>> {
-    return invokeCommand<ApiResponse<{ role: Role }>>('update_role', { id, data });
-  }
-
-  async deleteRole(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_role', { id });
   }
 
   async getRolePermissions(roleId: string): Promise<ApiResponse<RolePermissionListData>> {

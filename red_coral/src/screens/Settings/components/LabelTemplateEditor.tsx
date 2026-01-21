@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
 import { LabelTemplate, LabelField } from '@/core/domain/types/print';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { getImageUrl } from '@/core/services/imageCache';
 import { useI18n } from '../../../hooks/useI18n';
 
 interface LabelTemplateEditorProps {
@@ -93,9 +93,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
               return;
             }
 
-            src = content.startsWith('http') || content.startsWith('data:')
-              ? content
-              : convertFileSrc(content);
+            // Use image cache which handles hash -> path conversion and caching
+            src = await getImageUrl(content);
           }
 
           if (src) {

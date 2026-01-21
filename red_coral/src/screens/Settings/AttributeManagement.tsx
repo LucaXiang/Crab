@@ -4,6 +4,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { useShallow } from 'zustand/react/shallow';
+import { getErrorMessage } from '@/utils/error';
 import {
   useAttributes,
   useAttributesLoading,
@@ -113,7 +114,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
     e.stopPropagation();
     setConfirmDialog({
       isOpen: true,
-      title: t('settings.attribute.action.delete'),
+      title: t('settings.attribute.deleteAttribute'),
       description:
         t('settings.attribute.confirm.delete', { name: attr.name }),
       onConfirm: async () => {
@@ -121,9 +122,9 @@ export const AttributeManagement: React.FC = React.memo(() => {
         try {
           await deleteAttribute(String(attr.id));
           toast.success(t('settings.user.message.deleteSuccess'));
-        } catch (error: any) {
+        } catch (error) {
           console.error('Delete attribute error:', error);
-          toast.error(error.message || t('settings.user.message.deleteFailed'));
+          toast.error(getErrorMessage(error));
         }
       },
     });
@@ -148,7 +149,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
     e.stopPropagation();
     setConfirmDialog({
       isOpen: true,
-      title: t('settings.attribute.option.delete'),
+      title: t('settings.attribute.option.deleteOption'),
       description:
         t('settings.attribute.confirm.deleteOption', { name: option.name }),
       onConfirm: async () => {
@@ -156,9 +157,9 @@ export const AttributeManagement: React.FC = React.memo(() => {
         try {
           await deleteOption(option.attributeId, option.index);
           toast.success(t('settings.user.message.deleteSuccess'));
-        } catch (error: any) {
+        } catch (error) {
           console.error('Delete option error:', error);
-          toast.error(error.message || t('settings.user.message.deleteFailed'));
+          toast.error(getErrorMessage(error));
         }
       },
     });
@@ -180,7 +181,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
         icon={Settings}
         title={t('settings.attribute.title')}
         description={t('settings.attribute.description')}
-        addButtonText={t('settings.attribute.action.add')}
+        addButtonText={t('settings.attribute.addAttribute')}
         onAdd={handleAddAttribute}
         themeColor="teal"
         permission={Permission.MANAGE_ATTRIBUTES}
@@ -189,7 +190,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
       <FilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder={t('common.searchPlaceholder')}
+        searchPlaceholder={t('common.hint.searchPlaceholder')}
         totalCount={filteredAttributes.length}
         countUnit={t('settings.attribute.unit')}
         themeColor="teal"
@@ -205,7 +206,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
         {isLoading && attributes.length === 0 ? (
           <div className="text-gray-400 text-sm text-center py-16 flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-4 border-gray-200 border-t-teal-500 rounded-full animate-spin" />
-            <span>{t('common.loading')}</span>
+            <span>{t('common.message.loading')}</span>
           </div>
         ) : filteredAttributes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -213,7 +214,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
               <Settings className="text-gray-300" size={32} />
             </div>
             <p className="text-gray-500 font-medium">
-              {searchQuery ? t('common.noResults') : t('settings.attribute.noData')}
+              {searchQuery ? t('common.empty.noResults') : t('common.empty.noData')}
             </p>
             {!searchQuery && (
               <p className="text-sm text-gray-400 mt-1">
@@ -256,7 +257,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                             </span>
                             {!attr.is_active && (
                               <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
-                                {t('common.inactive')}
+                                {t('common.status.inactive')}
                               </span>
                             )}
                             <span className="text-xs text-gray-400 flex items-center gap-1">
@@ -272,7 +273,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                             <button
                               onClick={(e) => handleAddOption(attrId, e)}
                               className="p-2 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors"
-                              title={t('settings.attribute.option.action.add')}
+                              title={t('settings.attribute.option.addOption')}
                             >
                               <Plus size={16} />
                             </button>
@@ -304,7 +305,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                       {options.length === 0 ? (
                         <div className="p-8 text-sm text-gray-400 text-center flex flex-col items-center justify-center border-dashed border-2 border-gray-100 m-4 rounded-xl">
                           <span className="mb-2 block text-gray-300"><List size={24} /></span>
-                          {t('settings.attribute.option.noData')}
+                          {t('common.empty.noData')}
                           <button
                             onClick={(e) => handleAddOption(attrId, e)}
                             className="mt-2 text-teal-600 hover:text-teal-700 font-medium text-xs hover:underline"
@@ -326,12 +327,12 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                     <span className="font-medium text-gray-700 text-sm">{option.name}</span>
                                     {option.is_default && (
                                       <span className="text-[10px] uppercase tracking-wider bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded border border-teal-200/50">
-                                        {t('common.default')}
+                                        {t('common.label.default')}
                                       </span>
                                     )}
                                     {!option.is_active && (
                                       <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
-                                        {t('common.inactive')}
+                                        {t('common.status.inactive')}
                                       </span>
                                     )}
                                   </div>

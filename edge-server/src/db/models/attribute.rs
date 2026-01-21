@@ -3,6 +3,7 @@
 //! Options are embedded directly in the attribute record.
 //! Use RELATE to connect products/categories to attributes.
 
+use super::serde_helpers;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -16,11 +17,11 @@ pub struct AttributeOption {
     /// Price modifier in cents (positive=add, negative=subtract)
     #[serde(default)]
     pub price_modifier: i64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_default: bool,
     #[serde(default)]
     pub display_order: i32,
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_active: bool,
     pub receipt_name: Option<String>,
 }
@@ -53,13 +54,13 @@ pub struct Attribute {
     pub attr_type: String,
     #[serde(default)]
     pub display_order: i32,
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_active: bool,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub show_on_receipt: bool,
     pub receipt_name: Option<String>,
     pub kitchen_printer: Option<Thing>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_global: bool,
     /// Embedded options (Graph DB style - no join table)
     #[serde(default)]

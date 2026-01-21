@@ -54,9 +54,9 @@ pub async fn run() {
             let env_filter = if let Ok(from_env) = EnvFilter::try_from_default_env() {
                 from_env
             } else if cfg!(debug_assertions) {
-                EnvFilter::new("info,tao=error,sqlx=warn,red_coral=debug")
+                EnvFilter::new("info,tao=error,http_access=warn,surrealdb=warn,red_coral=debug")
             } else {
-                EnvFilter::new("warn,tao=error,sqlx=error")
+                EnvFilter::new("warn,tao=error,http_access=warn,surrealdb=warn")
             };
 
             let file_layer = fmt::layer()
@@ -145,14 +145,6 @@ pub async fn run() {
             commands::switch_tenant,
             commands::remove_tenant,
             commands::get_current_tenant,
-            // Auth commands (TenantManager-based)
-            commands::login_online,
-            commands::login_offline,
-            commands::login_auto,
-            commands::logout,
-            commands::get_current_session,
-            commands::has_offline_cache,
-            commands::list_cached_employees,
             // Auth commands (ClientBridge-based - unified)
             commands::login_employee,
             commands::logout_employee,
@@ -169,19 +161,18 @@ pub async fn run() {
             commands::delete_category,
             commands::list_products,
             commands::get_product,
+            commands::get_product_full,
             commands::create_product,
             commands::update_product,
             commands::delete_product,
-            commands::list_specs,
-            commands::get_spec,
-            commands::create_spec,
-            commands::update_spec,
-            commands::delete_spec,
             commands::list_attributes,
             commands::get_attribute,
             commands::create_attribute,
             commands::update_attribute,
             commands::delete_attribute,
+            commands::add_attribute_option,
+            commands::update_attribute_option,
+            commands::delete_attribute_option,
             commands::list_kitchen_printers,
             commands::get_kitchen_printer,
             commands::create_kitchen_printer,
@@ -209,7 +200,7 @@ pub async fn run() {
             commands::create_table,
             commands::update_table,
             commands::delete_table,
-            // Order commands
+            // Order commands (Query)
             commands::fetch_order_list,
             commands::list_orders,
             commands::list_open_orders,
@@ -217,22 +208,14 @@ pub async fn run() {
             commands::get_order_by_receipt,
             commands::get_last_order,
             commands::verify_order_chain,
-            commands::create_order,
-            commands::add_order_item,
-            commands::remove_order_item,
-            commands::add_order_payment,
-            commands::update_order_totals,
-            commands::update_order_status,
-            commands::update_order_hash,
-            commands::get_order_events,
-            commands::add_order_event,
-            // Order Event Sourcing commands (new architecture)
+            // Order Event Sourcing commands
             commands::order_execute_command,
             commands::order_execute,
             commands::order_get_active_orders,
             commands::order_get_snapshot,
             commands::order_sync_since,
             commands::order_get_events_since,
+            commands::order_get_events_for_order,
             // System commands
             commands::get_system_state,
             commands::update_system_state,
@@ -269,6 +252,7 @@ pub async fn run() {
             commands::resolve_image_paths,
             commands::prefetch_images,
             commands::cleanup_image_cache,
+            commands::save_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

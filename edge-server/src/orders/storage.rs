@@ -508,7 +508,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 2,
                 is_retail: false,
-                surcharge: None,
                 receipt_number: None,
             },
         }
@@ -529,8 +528,6 @@ mod tests {
             subtotal: 0.0,
             tax: 0.0,
             discount: 0.0,
-            surcharge: None,
-            surcharge_exempt: false,
             total: 0.0,
             paid_amount: 0.0,
             paid_item_quantities: std::collections::HashMap::new(),

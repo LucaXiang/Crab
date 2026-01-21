@@ -1,6 +1,7 @@
 import { persist } from 'zustand/middleware';
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
+import type { EmbeddedSpec } from '@/core/domain/types';
 
 /**
  * Settings UI Store - 纯 UI 状态管理
@@ -39,7 +40,7 @@ interface FormData {
   zoneId: string;
   price: number;
   image: string;
-  categoryId?: number;
+  categoryId?: string | number;
   externalId?: number;
   taxRate: number;
   surchargeType: 'percentage' | 'fixed' | 'none';
@@ -52,6 +53,9 @@ interface FormData {
   isKitchenPrintEnabled?: number | null;
   isLabelPrintEnabled?: number | null;
   hasMultiSpec?: boolean;
+  // Loaded from getProductFull API (embedded specs)
+  loadedSpecs?: EmbeddedSpec[];
+  selectedTagIds?: string[];
 }
 
 interface SettingsStore {
@@ -181,18 +185,19 @@ export const useSettingsStore = create<SettingsStore>()(
             ...formData,
             id: data?.id,
             name: data?.name || '',
-            receiptName: data?.receiptName || '',
+            receiptName: data?.receiptName ?? data?.receipt_name ?? '',
             price: data?.price ?? 0,
             image: data?.image || '',
-            categoryId: data?.categoryId ?? data?.defaultCategoryId,
-            externalId: data?.externalId,
-            taxRate: data?.taxRate ?? 10,
-            sortOrder: data?.sortOrder,
-            kitchenPrinterId: data?.kitchenPrinterId,
-            kitchenPrintName: data?.kitchenPrintName || '',
-            isKitchenPrintEnabled: normalizeKitchenPrintTri(data?.isKitchenPrintEnabled),
-            isLabelPrintEnabled: normalizeKitchenPrintTri(data?.isLabelPrintEnabled),
-            hasMultiSpec: data?.hasMultiSpec || false,
+            // Support both camelCase and snake_case field names
+            categoryId: data?.categoryId ?? data?.category ?? data?.defaultCategoryId,
+            externalId: data?.externalId ?? data?.external_id,
+            taxRate: data?.taxRate ?? data?.tax_rate ?? 10,
+            sortOrder: data?.sortOrder ?? data?.sort_order,
+            kitchenPrinterId: data?.kitchenPrinterId ?? data?.kitchen_printer,
+            kitchenPrintName: data?.kitchenPrintName ?? data?.kitchen_print_name ?? '',
+            isKitchenPrintEnabled: normalizeKitchenPrintTri(data?.isKitchenPrintEnabled ?? data?.is_kitchen_print_enabled),
+            isLabelPrintEnabled: normalizeKitchenPrintTri(data?.isLabelPrintEnabled ?? data?.is_label_print_enabled),
+            hasMultiSpec: data?.hasMultiSpec ?? data?.has_multi_spec ?? false,
             tempSpecifications: data?.specifications || [],
           };
         } else if (entity === 'CATEGORY') {

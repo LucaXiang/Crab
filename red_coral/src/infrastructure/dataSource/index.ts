@@ -9,7 +9,6 @@ export type {
   KitchenPrinter,
   AttributeTemplate,
   AttributeOption,
-  ProductSpecification,
 } from '@/core/domain/types';
 
 // Types

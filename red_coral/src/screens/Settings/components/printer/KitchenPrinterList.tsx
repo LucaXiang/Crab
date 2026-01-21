@@ -64,7 +64,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
           className="flex items-center gap-1.5 text-xs font-bold bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-black transition-all shadow-md active:scale-95"
         >
           <Plus size={14} />
-          {t("settings.printer.addStation")}
+          {t('settings.printer.kitchenStation.addStation')}
         </button>
       </div>
 

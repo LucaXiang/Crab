@@ -8,14 +8,12 @@ import { useProductStore } from './useProductStore';
 import { useCategoryStore } from './useCategoryStore';
 import { useTagStore } from './useTagStore';
 import { useAttributeStore } from './useAttributeStore';
-import { useSpecStore } from './useSpecStore';
 import { useZoneStore } from './useZoneStore';
 import { useTableStore } from './useTableStore';
 import { useEmployeeStore } from './useEmployeeStore';
 import { useRoleStore } from './useRoleStore';
 import { usePriceRuleStore } from './usePriceRuleStore';
 import { useKitchenPrinterStore } from './useKitchenPrinterStore';
-import { useOrderStore } from './useOrderStore';
 
 // Store interface for registry
 interface RegistryStore {
@@ -32,25 +30,23 @@ interface RegistryStore {
  *
  * key 必须与后端 broadcast_sync 的 resource 参数完全一致！
  *
- * 12 种资源类型:
- * - 菜单相关: product, category, tag, attribute, product_specification
+ * 10 种资源类型:
+ * - 菜单相关: product, category, tag, attribute
  * - 位置相关: zone, dining_table
  * - 人员相关: employee, role (role 无 sync，只读)
- * - 其他: price_rule, kitchen_printer, order
+ * - 其他: price_rule, kitchen_printer
  */
 export const storeRegistry: Record<string, RegistryStore> = {
   product: useProductStore,
   category: useCategoryStore,
   tag: useTagStore,
   attribute: useAttributeStore,
-  product_specification: useSpecStore,  // 后端: RESOURCE_SPEC = "product_specification"
   zone: useZoneStore,
   dining_table: useTableStore,          // 后端: RESOURCE = "dining_table"
   employee: useEmployeeStore,
   role: useRoleStore,                    // 后端无 sync (只读 API)
   price_rule: usePriceRuleStore,
   kitchen_printer: useKitchenPrinterStore,
-  order: useOrderStore,
 };
 
 /**

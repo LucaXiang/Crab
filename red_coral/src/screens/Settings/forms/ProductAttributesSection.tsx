@@ -121,7 +121,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder={t('common.search')}
+                placeholder={t('common.action.search')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 autoFocus
@@ -132,7 +132,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
             <div className="max-h-[240px] overflow-y-auto custom-scrollbar space-y-1">
               {filteredUnselected.length === 0 ? (
                 <div className="text-center py-4 text-xs text-gray-400">
-                  {unselectedAttributes.length === 0 ? (t('settings.allAttributesSelected')) : (t('common.noResults'))}
+                  {unselectedAttributes.length === 0 ? (t('settings.allAttributesSelected')) : (t('common.empty.noResults'))}
                 </div>
               ) : (
                 filteredUnselected.map(attr => (
@@ -194,7 +194,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                     <button
                       onClick={() => handleRemoveAttribute(attrId)}
                       className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50 opacity-0 group-hover:opacity-100"
-                      title={t('common.remove')}
+                      title={t('common.action.remove')}
                     >
                       <X size={16} />
                     </button>
@@ -204,7 +204,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                 {/* Options Area */}
                 <div className="p-4">
                   {options.length === 0 ? (
-                    <div className="text-sm text-gray-400 italic py-2 text-center">{t('settings.attribute.option.noData')}</div>
+                    <div className="text-sm text-gray-400 italic py-2 text-center">{t('common.empty.noData')}</div>
                   ) : (
                     <div className="flex flex-wrap gap-2 max-h-[220px] overflow-y-auto custom-scrollbar content-start">
                       {options.map((opt) => {

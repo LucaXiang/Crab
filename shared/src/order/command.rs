@@ -151,17 +151,6 @@ pub enum OrderCommandPayload {
 
     // ========== Other Operations ==========
 
-    /// Set surcharge exemption
-    SetSurchargeExempt {
-        order_id: String,
-        exempt: bool,
-        /// Authorizer for exemption
-        #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_name: Option<String>,
-    },
-
     /// Update order info
     UpdateOrderInfo {
         order_id: String,
@@ -208,7 +197,6 @@ impl OrderCommand {
             OrderCommandPayload::SplitOrder { order_id, .. } => Some(order_id),
             OrderCommandPayload::MoveOrder { order_id, .. } => Some(order_id),
             OrderCommandPayload::MergeOrders { source_order_id, .. } => Some(source_order_id),
-            OrderCommandPayload::SetSurchargeExempt { order_id, .. } => Some(order_id),
             OrderCommandPayload::UpdateOrderInfo { order_id, .. } => Some(order_id),
         }
     }

@@ -44,7 +44,7 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <h3 className="font-bold text-gray-800 flex items-center gap-2">
             {initialData ? <Edit2 size={18} className="text-blue-500" /> : <Plus size={18} className="text-blue-500" />}
-            {initialData ? (t('settings.printer.kitchenStation.action.edit')) : (t('settings.printer.kitchenStation.action.add'))}
+            {initialData ? (t('settings.printer.kitchenStation.editStation')) : (t('settings.printer.kitchenStation.addStation'))}
           </h3>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
             <X size={20} />
@@ -53,10 +53,10 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
 
         <div className="p-6 space-y-4">
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">{t('common.name')}</label>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">{t('common.label.name')}</label>
             <input
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white"
-              placeholder={t('common.namePlaceholder')}
+              placeholder={t('common.hint.namePlaceholder')}
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
               autoFocus
@@ -81,10 +81,10 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
           </div>
 
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">{t('common.description')}</label>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">{t('common.label.description')}</label>
             <input
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white"
-              placeholder={t('common.descriptionPlaceholder')}
+              placeholder={t('common.hint.descriptionPlaceholder')}
               value={formData.description}
               onChange={e => setFormData({ ...formData, description: e.target.value })}
             />
@@ -96,7 +96,7 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-xl transition-colors"
           >
-            {t('common.cancel')}
+            {t('common.action.cancel')}
           </button>
           <button
             onClick={() => {
@@ -108,7 +108,7 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
             className="px-4 py-2 text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center gap-2 disabled:opacity-50 disabled:shadow-none"
           >
             <Save size={16} />
-            {t('common.save')}
+            {t('common.action.save')}
           </button>
         </div>
       </div>

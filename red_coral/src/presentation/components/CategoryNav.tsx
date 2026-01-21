@@ -72,7 +72,7 @@ export const CategoryNav = React.memo<CategoryNavProps>(
             {categories.map((cat) => {
               const catName = typeof cat === 'string' ? cat : cat.name;
               const isActive = selected === catName;
-              const label = catName === 'all' ? (t('common.all')) : catName;
+              const label = catName === 'all' ? (t('common.status.all')) : catName;
               
               return (
                 <button

@@ -344,7 +344,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                surcharge: None,
                 receipt_number: None,
             },
         };
@@ -371,7 +370,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                surcharge: None,
                 receipt_number: None,
             },
         };

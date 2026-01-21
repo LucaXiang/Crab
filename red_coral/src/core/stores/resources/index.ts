@@ -60,15 +60,6 @@ export {
   useAttributeHelpers,
 } from './useAttributeStore';
 
-// Spec
-export {
-  useSpecStore,
-  useSpecs,
-  useSpecsLoading,
-  useSpecById,
-  useSpecsByProduct,
-} from './useSpecStore';
-
 // Zone
 export {
   useZoneStore,
@@ -120,11 +111,3 @@ export {
   useKitchenPrinterActions,
 } from './useKitchenPrinterStore';
 
-// Order
-export {
-  useOrderStore,
-  useOrders,
-  useOrdersLoading,
-  useOrderById,
-  useOpenOrders,
-} from './useOrderStore';

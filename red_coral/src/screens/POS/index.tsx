@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import DefaultImage from '../../assets/reshot.svg';
+import { getImageUrl } from '@/core/services/imageCache';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { voidOrder } from '@/core/stores/order/useOrderOperations';
 import { toHeldOrder } from '@/core/stores/order/orderAdapter';
@@ -23,7 +23,7 @@ import {
 	}	from './components';
 
 // Types
-import { Product, ItemAttributeSelection, AttributeTemplate, AttributeOption, ProductSpecification, ProductAttribute } from '@/core/domain/types';
+import { Product, ItemAttributeSelection, AttributeTemplate, AttributeOption, EmbeddedSpec, ProductAttribute } from '@/core/domain/types';
 
 // i18n
 import { useI18n } from '@/hooks/useI18n';
@@ -143,7 +143,7 @@ export const POSScreen: React.FC = () => {
     attributes: AttributeTemplate[];
     options: Map<string, AttributeOption[]>;
     bindings: ProductAttribute[];
-    specifications?: ProductSpecification[];
+    specifications?: EmbeddedSpec[];
     hasMultiSpec?: boolean;
   } | null>(null);
   const {
@@ -234,25 +234,13 @@ export const POSScreen: React.FC = () => {
         // options are embedded in the Attribute itself. For now, we'll leave optionsMap empty
         // and let ProductOptionsModal fetch options as needed.
 
-        // Load specifications if product has multi-spec enabled
-        let specifications: ProductSpecification[] = [];
-        const hasMultiSpec = product.has_multi_spec || false;
-        if (hasMultiSpec) {
-          try {
-            const specsResponse = await api.listProductSpecs(product.id);
-            specifications = specsResponse.data?.specs || [];
-          } catch (error) {
-            console.error('Failed to fetch specifications:', error);
-          }
-        }
+        // Specs are now embedded in Product (EmbeddedSpec[])
+        const hasMultiSpec = product.specs.length > 1;
+        const specifications: EmbeddedSpec[] = product.specs || [];
 
-        // Get base price from root/default spec or first spec
-        type SpecWithAliases = ProductSpecification & { isRoot?: boolean; isDefault?: boolean };
-        const specsWithAliases = specifications as SpecWithAliases[];
-        const rootSpec = specsWithAliases.find((s) => s.is_root || s.isRoot)
-          || specsWithAliases.find((s) => s.is_default || s.isDefault)
-          || specsWithAliases[0];
-        const basePrice = rootSpec?.price ?? (product as { price?: number }).price ?? 0;
+        // Get base price from default spec or first spec
+        const defaultSpec = specifications.find((s) => s.is_default) || specifications[0];
+        const basePrice = defaultSpec?.price ?? 0;
 
         // CASE 1: Force Detail View (e.g. Image Click)
         // If skipQuickAdd is true, we ALWAYS open the modal, regardless of whether attributes/specs exist.
@@ -273,12 +261,12 @@ export const POSScreen: React.FC = () => {
 
         // CASE 2: Has Multi-Spec or Attributes -> Check if we need modal
 
-        let selectedDefaultSpec: SpecWithAliases | undefined = undefined;
+        let selectedDefaultSpec: EmbeddedSpec | undefined = undefined;
 
         if (hasMultiSpec) {
             // Check for default specification
             // is_default is boolean in the type definition
-            selectedDefaultSpec = specsWithAliases.find((s) => s.is_default === true || s.isDefault === true);
+            selectedDefaultSpec = specifications.find((s) => s.is_default === true);
 
             // If no default specification is found, we MUST open the modal
             if (!selectedDefaultSpec) {
@@ -332,17 +320,17 @@ export const POSScreen: React.FC = () => {
         const id = `fly-${Date.now()}-${Math.random()}`;
         const targetX = 190;
         const targetY = window.innerHeight / 2;
-        const imageForAnim = product.image
-          ? (/^https?:\/\//.test(product.image) ? product.image : convertFileSrc(product.image))
-          : DefaultImage;
 
-        addAnimation({
-          id,
-          type: 'fly',
-          image: imageForAnim,
-          startRect,
-          targetX,
-          targetY,
+        // Get image URL async, use default immediately if not cached
+        getImageUrl(product.image).then((imageForAnim) => {
+          addAnimation({
+            id,
+            type: 'fly',
+            image: imageForAnim || DefaultImage,
+            startRect,
+            targetX,
+            targetY,
+          });
         });
       }
     },
@@ -369,17 +357,16 @@ export const POSScreen: React.FC = () => {
         const id = `fly-${Date.now()}-${Math.random()}`;
         const targetX = 190;
         const targetY = window.innerHeight / 2;
-        const imageForAnim = product.image
-          ? (/^https?:\/\//.test(product.image) ? product.image : convertFileSrc(product.image))
-          : DefaultImage;
 
-        addAnimation({
-          id,
-          type: 'fly',
-          image: imageForAnim,
-          startRect,
-          targetX,
-          targetY,
+        getImageUrl(product.image).then((imageForAnim) => {
+          addAnimation({
+            id,
+            type: 'fly',
+            image: imageForAnim || DefaultImage,
+            startRect,
+            targetX,
+            targetY,
+          });
         });
       }
 
@@ -561,7 +548,7 @@ export const POSScreen: React.FC = () => {
         title={exitDialog.title}
         description={exitDialog.description}
         variant={exitDialog.isBlocking ? "danger" : "warning"}
-        confirmText={exitDialog.isBlocking ? (t('common.ok')) : undefined}
+        confirmText={exitDialog.isBlocking ? (t('common.dialog.ok')) : undefined}
         showCancel={!exitDialog.isBlocking}
         onConfirm={() => {
           setExitDialog((d) => ({ ...d, open: false }));

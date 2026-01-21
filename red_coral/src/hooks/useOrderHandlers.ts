@@ -143,11 +143,24 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
     setCurrentOrderKey(null);
   }, [setViewMode, setCheckoutOrder, setCurrentOrderKey]);
 
-  const handleCheckoutCancel = useCallback(() => {
+  const handleCheckoutCancel = useCallback(async () => {
+    const { checkoutOrder } = useCheckoutStore.getState();
+
+    // For retail orders, void them when cancelled (audit requirement)
+    // Retail orders should not remain active when user exits checkout
+    if (checkoutOrder?.isRetail) {
+      try {
+        await voidOrder(checkoutOrder, 'Retail checkout cancelled');
+      } catch (error) {
+        console.error('Failed to void retail order on cancel:', error);
+        // Continue with UI cleanup even if void fails
+      }
+    }
+
     setViewMode('pos');
     setCheckoutOrder(null);
     setCurrentOrderKey(null);
-  }, [setViewMode, setCheckoutOrder, setCurrentOrderKey]);
+  }, [voidOrder, setViewMode, setCheckoutOrder, setCurrentOrderKey]);
 
   const handleCheckoutVoid = useCallback(async () => {
     const { checkoutOrder } = useCheckoutStore.getState();

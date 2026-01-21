@@ -60,6 +60,9 @@ pub enum ManagerError {
     #[error("Invalid amount")]
     InvalidAmount,
 
+    #[error("Invalid operation: {0}")]
+    InvalidOperation(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -88,6 +91,9 @@ impl From<ManagerError> for CommandError {
             }
             ManagerError::InvalidAmount => {
                 (CommandErrorCode::InvalidAmount, "Invalid amount".to_string())
+            }
+            ManagerError::InvalidOperation(msg) => {
+                (CommandErrorCode::InvalidOperation, msg)
             }
             ManagerError::Internal(msg) => (CommandErrorCode::InternalError, msg),
         };
@@ -301,19 +307,6 @@ impl OrdersManager {
                 source_order_id,
                 target_order_id,
             } => self.handle_merge_orders(&txn, &cmd, source_order_id, target_order_id),
-            OrderCommandPayload::SetSurchargeExempt {
-                order_id,
-                exempt,
-                authorizer_id,
-                authorizer_name,
-            } => self.handle_set_surcharge_exempt(
-                &txn,
-                &cmd,
-                order_id,
-                *exempt,
-                authorizer_id.clone(),
-                authorizer_name.clone(),
-            ),
             OrderCommandPayload::UpdateOrderInfo {
                 order_id,
                 receipt_number,
@@ -392,7 +385,6 @@ impl OrdersManager {
                 zone_name,
                 guest_count,
                 is_retail,
-                surcharge: None, // TODO: Load from config
                 receipt_number: None,
             },
         );
@@ -423,14 +415,25 @@ impl OrdersManager {
     ) -> ManagerResult<(CommandResponse, Vec<OrderEvent>)> {
         let snapshot = self.get_active_snapshot(txn, order_id)?;
 
-        // Calculate payment summary
+        // Calculate payment summary and total paid
         let mut payment_summary: std::collections::HashMap<String, f64> =
             std::collections::HashMap::new();
+        let mut total_paid = 0.0_f64;
         for payment in &snapshot.payments {
             if !payment.cancelled {
                 *payment_summary.entry(payment.method.clone()).or_insert(0.0) += payment.amount;
+                total_paid += payment.amount;
             }
         }
+
+        // Validate payment is sufficient (allow 0.01 tolerance for rounding)
+        if total_paid < snapshot.total - 0.01 {
+            return Err(ManagerError::InvalidOperation(format!(
+                "Payment insufficient: paid {:.2}, required {:.2}",
+                total_paid, snapshot.total
+            )));
+        }
+
         let payment_summary: Vec<PaymentSummaryItem> = payment_summary
             .into_iter()
             .map(|(method, amount)| PaymentSummaryItem { method, amount })
@@ -1002,38 +1005,6 @@ impl OrdersManager {
         Ok((
             CommandResponse::success(cmd.command_id.clone(), None),
             vec![event1, event2],
-        ))
-    }
-
-    fn handle_set_surcharge_exempt(
-        &self,
-        txn: &redb::WriteTransaction,
-        cmd: &OrderCommand,
-        order_id: &str,
-        exempt: bool,
-        authorizer_id: Option<String>,
-        authorizer_name: Option<String>,
-    ) -> ManagerResult<(CommandResponse, Vec<OrderEvent>)> {
-        let snapshot = self.get_active_snapshot(txn, order_id)?;
-        let sequence = self.storage.increment_sequence(txn)?;
-
-        let event = OrderEvent::from_command(
-            sequence,
-            order_id.to_string(),
-            cmd,
-            OrderEventType::SurchargeExemptSet,
-            EventPayload::SurchargeExemptSet {
-                exempt,
-                authorizer_id,
-                authorizer_name,
-            },
-        );
-
-        self.apply_and_store(txn, &snapshot, &event)?;
-
-        Ok((
-            CommandResponse::success(cmd.command_id.clone(), None),
-            vec![event],
         ))
     }
 

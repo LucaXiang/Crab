@@ -54,7 +54,7 @@ impl Default for JwtConfig {
             expiration_minutes: std::env::var("JWT_EXPIRATION_MINUTES")
                 .ok()
                 .and_then(|s| s.parse().ok())
-                .unwrap_or(1440), // 默认 24 小时
+                .unwrap_or(43200), // 默认 30 天 (一个月)
             issuer: std::env::var("JWT_ISSUER").unwrap_or_else(|_| "edge-server".to_string()),
             audience: std::env::var("JWT_AUDIENCE").unwrap_or_else(|_| "edge-clients".to_string()),
         }

@@ -1,5 +1,6 @@
 //! Price Rule Model
 
+use super::serde_helpers;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -67,14 +68,22 @@ pub struct PriceRule {
     pub adjustment_type: AdjustmentType,
     /// Adjustment value (percentage: 30=30%, fixed: cents)
     pub adjustment_value: i32,
+    #[serde(default)]
     pub priority: i32,
+    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_stackable: bool,
+    #[serde(default)]
     pub time_mode: TimeMode,
     pub start_time: Option<String>,
     pub end_time: Option<String>,
     pub schedule_config: Option<ScheduleConfig>,
+    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_active: bool,
     pub created_by: Option<Thing>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Create price rule payload

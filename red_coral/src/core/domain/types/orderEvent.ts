@@ -89,7 +89,6 @@ export type EventPayload =
   | OrderMergedPayload
   | OrderMergedOutPayload
   | TableReassignedPayload
-  | SurchargeExemptSetPayload
   | OrderInfoUpdatedPayload;
 
 export interface TableOpenedPayload {
@@ -100,7 +99,6 @@ export interface TableOpenedPayload {
   zone_name: string | null;
   guest_count: number;
   is_retail: boolean;
-  surcharge?: SurchargeConfig;
   receipt_number?: string | null;
 }
 
@@ -233,11 +231,6 @@ export interface TableReassignedPayload {
   items: CartItemSnapshot[];
 }
 
-export interface SurchargeExemptSetPayload {
-  type: 'SURCHARGE_EXEMPT_SET';
-  exempt: boolean;
-}
-
 export interface OrderInfoUpdatedPayload {
   type: 'ORDER_INFO_UPDATED';
   receipt_number?: string | null;
@@ -280,7 +273,6 @@ export type OrderCommandPayload =
   | SplitOrderCommand
   | MoveOrderCommand
   | MergeOrdersCommand
-  | SetSurchargeExemptCommand
   | UpdateOrderInfoCommand;
 
 export interface OpenTableCommand {
@@ -291,7 +283,6 @@ export interface OpenTableCommand {
   zone_name?: string | null;
   guest_count?: number;
   is_retail: boolean;
-  surcharge?: SurchargeConfig;
 }
 
 export interface CompleteOrderCommand {
@@ -374,12 +365,6 @@ export interface MergeOrdersCommand {
   type: 'MERGE_ORDERS';
   source_order_id: string;
   target_order_id: string;
-}
-
-export interface SetSurchargeExemptCommand {
-  type: 'SET_SURCHARGE_EXEMPT';
-  order_id: string;
-  exempt: boolean;
 }
 
 export interface UpdateOrderInfoCommand {
@@ -485,8 +470,6 @@ export interface OrderSnapshot {
   subtotal: number;
   tax: number;
   discount: number;
-  surcharge: SurchargeConfig | null;
-  surcharge_exempt: boolean;
   total: number;
   paid_amount: number;
   /** Quantities paid per item (for split bill) */
@@ -525,6 +508,8 @@ export interface CartItemSnapshot {
   price: number;
   original_price?: number | null;
   quantity: number;
+  /** Unpaid quantity (computed by backend: quantity - paid_quantity) */
+  unpaid_quantity: number;
   selected_options?: ItemOption[] | null;
   selected_specification?: SpecificationInfo | null;
   discount_percent?: number | null;
@@ -586,14 +571,6 @@ export interface SplitItem {
 export interface PaymentSummaryItem {
   method: string;
   amount: number;
-}
-
-export interface SurchargeConfig {
-  type: 'percentage' | 'fixed';
-  value: number;
-  amount: number;
-  total?: number | null;
-  name?: string;
 }
 
 export interface PaymentRecord {

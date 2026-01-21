@@ -1,5 +1,6 @@
 //! Employee Model
 
+use super::serde_helpers;
 use super::RoleId;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
@@ -14,8 +15,14 @@ pub struct Employee {
     pub username: String,
     pub hash_pass: String,
     pub role: RoleId,
+    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_system: bool,
+    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_active: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Employee response (without password hash)
@@ -24,6 +31,7 @@ pub struct EmployeeResponse {
     pub id: String,
     pub username: String,
     pub role: RoleId,
+    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_active: bool,
 }
 

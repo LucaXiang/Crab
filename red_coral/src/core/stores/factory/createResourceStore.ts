@@ -13,7 +13,7 @@ export interface ResourceStore<T extends { id: string }> {
   error: string | null;
 
   // 方法
-  fetchAll: () => Promise<void>;
+  fetchAll: (force?: boolean) => Promise<void>;
   applySync: (id: string) => void;
   getById: (id: string) => T | undefined;
   clear: () => void;
@@ -62,17 +62,22 @@ export function createResourceStore<T extends { id: string }>(
     isLoaded: false,
     error: null,
 
-    fetchAll: async () => {
+    fetchAll: async (force = false) => {
+      // Guard: skip if already loading, or already loaded (unless forced)
+      const state = get();
+      console.log(`[${resourceName}] fetchAll called, force=${force}, isLoading=${state.isLoading}, isLoaded=${state.isLoaded}`);
+      if (state.isLoading) return;
+      if (state.isLoaded && !force) return;
+
       set({ isLoading: true, error: null });
       try {
         const items = await fetchFn();
+        console.log(`[${resourceName}] fetchAll success, got ${items.length} items`);
         set({ items, isLoading: false, isLoaded: true });
       } catch (e: any) {
         const errorMsg = e.message || 'Failed to fetch';
         set({ error: errorMsg, isLoading: false });
-        if (import.meta.env.DEV) {
-          console.error(`[${resourceName}] fetch failed:`, errorMsg);
-        }
+        console.error(`[${resourceName}] fetch failed:`, errorMsg);
       }
     },
 
@@ -80,7 +85,7 @@ export function createResourceStore<T extends { id: string }>(
     // 只读 Store 没有本地 CRUD，无需去重
     applySync: (_id: string) => {
       if (get().isLoaded) {
-        get().fetchAll();
+        get().fetchAll(true);  // Force refresh on sync
       }
     },
 
@@ -129,30 +134,35 @@ export function createCrudResourceStore<
     isLoaded: false,
     error: null,
 
-    fetchAll: async () => {
+    fetchAll: async (force = false) => {
+      // Guard: skip if already loading, or already loaded (unless forced)
+      const state = get();
+      console.log(`[${resourceName}] fetchAll called, force=${force}, isLoading=${state.isLoading}, isLoaded=${state.isLoaded}`);
+      if (state.isLoading) return;
+      if (state.isLoaded && !force) return;
+
       set({ isLoading: true, error: null });
       try {
         const items = await fetchFn();
+        console.log(`[${resourceName}] fetchAll success, got ${items.length} items`);
         set({ items, isLoading: false, isLoaded: true });
       } catch (e: any) {
         const errorMsg = e.message || 'Failed to fetch';
         set({ error: errorMsg, isLoading: false });
-        if (import.meta.env.DEV) {
-          console.error(`[${resourceName}] fetch failed:`, errorMsg);
-        }
+        console.error(`[${resourceName}] fetch failed:`, errorMsg);
       }
     },
 
     // Sync 去重：如果是自己刚操作过的 ID，跳过刷新
     applySync: (id: string) => {
+      console.log(`[${resourceName}] applySync called, id=${id}, isLoaded=${get().isLoaded}`);
       if (pendingIds.has(id)) {
-        if (import.meta.env.DEV) {
-          console.debug(`[${resourceName}] applySync skipped for id=${id} (local pending)`);
-        }
+        console.log(`[${resourceName}] applySync skipped for id=${id} (local pending)`);
         return;
       }
       if (get().isLoaded) {
-        get().fetchAll();
+        console.log(`[${resourceName}] applySync triggering fetchAll(true)`);
+        get().fetchAll(true);  // Force refresh on sync
       }
     },
 

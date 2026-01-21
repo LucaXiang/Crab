@@ -60,7 +60,7 @@ export const AttributeSelectionModal: React.FC<AttributeSelectionModalProps> = (
             onClick={onClose}
             className="px-6 py-2 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors shadow-lg shadow-teal-600/20"
           >
-            {t('common.confirm')}
+            {t('common.action.confirm')}
           </button>
         </div>
       </div>

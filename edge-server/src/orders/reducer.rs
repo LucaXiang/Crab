@@ -27,7 +27,6 @@ impl OrderReducer {
                 zone_name,
                 guest_count,
                 is_retail,
-                surcharge,
                 receipt_number,
             } => {
                 let mut snapshot = OrderSnapshot::new(event.order_id.clone());
@@ -37,7 +36,6 @@ impl OrderReducer {
                 snapshot.zone_name = zone_name.clone();
                 snapshot.guest_count = *guest_count;
                 snapshot.is_retail = *is_retail;
-                snapshot.surcharge = surcharge.clone();
                 snapshot.receipt_number = receipt_number.clone();
                 snapshot.start_time = event.timestamp;
                 snapshot.created_at = event.timestamp;
@@ -191,10 +189,6 @@ impl OrderReducer {
                 snapshot.zone_name = target_zone_name.clone();
                 snapshot.start_time = *original_start_time;
                 snapshot.items = items.clone();
-            }
-
-            EventPayload::SurchargeExemptSet { exempt, .. } => {
-                snapshot.surcharge_exempt = *exempt;
             }
 
             EventPayload::OrderInfoUpdated {
@@ -408,11 +402,19 @@ impl OrderReducer {
     }
 
     fn recalculate_totals(snapshot: &mut OrderSnapshot) {
-        // Calculate subtotal from items
+        // Calculate subtotal and update unpaid_quantity for each item
         let subtotal: f64 = snapshot
             .items
-            .iter()
+            .iter_mut()
             .map(|item| {
+                // Compute unpaid_quantity: quantity - paid_quantity
+                let paid_qty = snapshot
+                    .paid_item_quantities
+                    .get(&item.instance_id)
+                    .copied()
+                    .unwrap_or(0);
+                item.unpaid_quantity = (item.quantity - paid_qty).max(0);
+
                 let base_price = item.price * item.quantity as f64;
                 let discount = item.discount_percent.unwrap_or(0.0) / 100.0;
                 base_price * (1.0 - discount)
@@ -421,26 +423,8 @@ impl OrderReducer {
 
         snapshot.subtotal = subtotal;
 
-        // Calculate surcharge
-        let surcharge_amount = if snapshot.surcharge_exempt {
-            0.0
-        } else if let Some(ref surcharge) = snapshot.surcharge {
-            match surcharge.surcharge_type.as_str() {
-                "percentage" => subtotal * surcharge.value / 100.0,
-                "fixed" => surcharge.value,
-                _ => 0.0,
-            }
-        } else {
-            0.0
-        };
-
-        // Update surcharge total if present
-        if let Some(ref mut surcharge) = snapshot.surcharge {
-            surcharge.total = Some(surcharge_amount);
-        }
-
-        // Calculate total
-        snapshot.total = subtotal + surcharge_amount + snapshot.tax - snapshot.discount;
+        // Calculate total (surcharge is now per-item via Price Rules)
+        snapshot.total = subtotal + snapshot.tax - snapshot.discount;
     }
 }
 
@@ -501,6 +485,7 @@ pub fn input_to_snapshot(input: &shared::order::CartItemInput) -> CartItemSnapsh
         price: input.price,
         original_price: input.original_price,
         quantity: input.quantity,
+        unpaid_quantity: input.quantity, // Initially all unpaid
         selected_options: input.selected_options.clone(),
         selected_specification: input.selected_specification.clone(),
         discount_percent: input.discount_percent,
@@ -534,7 +519,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 2,
                 is_retail: false,
-                surcharge: None,
                 receipt_number: None,
             },
         }
@@ -567,6 +551,7 @@ mod tests {
             price,
             original_price: None,
             quantity,
+            unpaid_quantity: quantity, // Initially all unpaid
             selected_options: None,
             selected_specification: None,
             discount_percent: None,

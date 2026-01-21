@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
-use super::types::{CartItemSnapshot, PaymentRecord, SurchargeConfig};
+use super::types::{CartItemSnapshot, PaymentRecord};
 
 /// Order status
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -56,12 +56,6 @@ pub struct OrderSnapshot {
     /// Discount amount
     #[serde(default)]
     pub discount: f64,
-    /// Surcharge configuration
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub surcharge: Option<SurchargeConfig>,
-    /// Whether surcharge is exempt
-    #[serde(default)]
-    pub surcharge_exempt: bool,
     /// Total amount
     pub total: f64,
     /// Amount paid
@@ -113,8 +107,6 @@ impl OrderSnapshot {
             subtotal: 0.0,
             tax: 0.0,
             discount: 0.0,
-            surcharge: None,
-            surcharge_exempt: false,
             total: 0.0,
             paid_amount: 0.0,
             paid_item_quantities: std::collections::HashMap::new(),

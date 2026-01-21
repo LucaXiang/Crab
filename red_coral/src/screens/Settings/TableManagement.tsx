@@ -60,7 +60,7 @@ const ZoneList: React.FC = React.memo(() => {
           const results = await Promise.all(
             items.map(async (item) => {
               try {
-                await api.deleteZone(Number(item.id));
+                await api.deleteZone(item.id);
                 return { success: true, id: item.id };
               } catch (e: any) {
                 return { success: false, id: item.id, error: e };
@@ -120,7 +120,7 @@ const ZoneList: React.FC = React.memo(() => {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-gray-500">
             <Filter size={16} />
-            <span className="text-sm font-medium">{t('common.filter')}</span>
+            <span className="text-sm font-medium">{t('common.action.filter')}</span>
           </div>
           <div className="h-5 w-px bg-gray-200" />
 
@@ -130,7 +130,7 @@ const ZoneList: React.FC = React.memo(() => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t('common.searchPlaceholder')}
+              placeholder={t('common.hint.searchPlaceholder')}
               className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
             />
           </div>
@@ -138,7 +138,7 @@ const ZoneList: React.FC = React.memo(() => {
           <div className="ml-auto flex items-center gap-4">
              <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-purple-500" />
-                <span className="text-sm text-gray-600">{t('common.total')}</span>
+                <span className="text-sm text-gray-600">{t('common.label.total')}</span>
                 <span className="text-sm font-bold text-gray-900">{filteredZones.length}</span>
                 <span className="text-sm text-gray-600">{t('settings.zone.unit')}</span>
              </div>
@@ -155,7 +155,7 @@ const ZoneList: React.FC = React.memo(() => {
         onEdit={canManageZones ? (item) => openModal('ZONE', 'EDIT', item) : undefined}
         onDelete={canManageZones ? (item) => openModal('ZONE', 'DELETE', item) : undefined}
         onBatchDelete={canManageZones ? handleBatchDelete : undefined}
-        emptyText={t('settings.zone.noData')}
+        emptyText={t('common.empty.noData')}
         themeColor="purple"
       />
 
@@ -243,7 +243,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
-          await Promise.all(items.map((item) => api.deleteTable(Number(item.id))));
+          await Promise.all(items.map((item) => api.deleteTable(item.id)));
           toast.success(t('settings.batchDelete.tablesSuccess', { count: items.length }) || '批量删除成功');
           await tableStore.fetchAll();
           setPagination(1, tableStore.items.length);
@@ -283,7 +283,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
       },
       {
         key: 'zone',
-        header: t('table.common.zones'),
+        header: t('table.zones'),
         width: '140px',
         render: (item) => (
           <span className="inline-flex items-center px-2.5 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium">
@@ -324,7 +324,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-blue-600/20 hover:bg-blue-700 hover:shadow-blue-600/30 transition-all"
               >
                 <Plus size={16} />
-                <span>{t('settings.table.action.add')}</span>
+                <span>{t('settings.table.addTable')}</span>
               </button>
             </ProtectedGate>
           ) : (
@@ -334,7 +334,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-purple-600/20 hover:bg-purple-700 hover:shadow-purple-600/30 transition-all"
               >
                 <Plus size={16} />
-                <span>{t('settings.zone.action.add')}</span>
+                <span>{t('settings.zone.addZone')}</span>
               </button>
             </ProtectedGate>
           )}
@@ -374,11 +374,11 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 text-gray-500">
                 <Filter size={16} />
-                <span className="text-sm font-medium">{t('common.filter')}</span>
+                <span className="text-sm font-medium">{t('common.action.filter')}</span>
               </div>
               <div className="h-5 w-px bg-gray-200" />
               <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600">{t('table.common.zones')}:</label>
+                <label className="text-sm text-gray-600">{t('table.zones')}:</label>
                 <select
                   value={zoneFilter}
                   onChange={(e) => setZoneFilter(e.target.value as any)}
@@ -403,13 +403,13 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
                     setSearchQuery(e.target.value);
                     setPagination(1, total);
                   }}
-                  placeholder={t('common.searchPlaceholder')}
+                  placeholder={t('common.hint.searchPlaceholder')}
                   className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 />
               </div>
 
               <div className="ml-auto text-xs text-gray-400">
-                {t('common.total')} {filteredTables.length} {t('common.items')}
+                {t('common.label.total')} {filteredTables.length} {t('common.label.items')}
               </div>
             </div>
           </div>
@@ -423,7 +423,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
             onEdit={canManageTables ? (item) => openModal('TABLE', 'EDIT', item) : undefined}
             onDelete={canManageTables ? (item) => openModal('TABLE', 'DELETE', item) : undefined}
             onBatchDelete={canManageTables ? handleBatchDelete : undefined}
-            emptyText={t('settings.table.noData')}
+            emptyText={t('common.empty.noData')}
             pageSize={5}
             totalItems={filteredTables.length}
             currentPage={page}

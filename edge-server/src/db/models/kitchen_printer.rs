@@ -1,5 +1,6 @@
 //! Kitchen Printer Model
 
+use super::serde_helpers;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -12,7 +13,7 @@ pub struct KitchenPrinter {
     pub name: String,
     pub printer_name: Option<String>,
     pub description: Option<String>,
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_active: bool,
 }
 

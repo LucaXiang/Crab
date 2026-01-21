@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Clock, Receipt, Percent } from 'lucide-react';
-import { Table, HeldOrder, Zone } from '@/core/domain/types';
+import { Users, Clock, Receipt } from 'lucide-react';
+import { Table, HeldOrder } from '@/core/domain/types';
 
 interface TableCardProps {
   table: Table;
@@ -9,11 +9,10 @@ interface TableCardProps {
   disabled?: boolean;
   className?: string;
   onClick: () => void;
-  zone?: Zone;
 }
 
 export const TableCard: React.FC<TableCardProps> = React.memo(
-  ({ table, order, mode, disabled, className, onClick, zone }) => {
+  ({ table, order, mode, disabled, className, onClick }) => {
     const isOccupied = !!order;
     const isDisabled = disabled || (mode === 'RETRIEVE' && !isOccupied);
 
@@ -22,10 +21,6 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
       isOccupied && order && Date.now() - order.startTime > 2 * 60 * 60 * 1000;
 
     const isPrePayment = isOccupied && !!order?.isPrePayment;
-    
-    // Check for surcharge
-    const hasSurcharge = zone?.surcharge_amount && zone.surcharge_amount > 0;
-    const isPercentage = zone?.surcharge_type === 'percentage';
 
     // Timer Logic
     const [duration, setDuration] = useState<string>('');
@@ -33,7 +28,7 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
     useEffect(() => {
       if (!isOccupied || !order) {
         setDuration('');
-        return () => {};
+        return;
       }
 
       const updateTime = () => {
@@ -47,9 +42,10 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
       };
 
       updateTime();
-      const timer = setInterval(updateTime, 60000);
+      // Update every minute for accurate time display
+      const timer = setInterval(updateTime, 60 * 1000);
       return () => clearInterval(timer);
-    }, [isOccupied, order]);
+    }, [isOccupied, order?.key]);
 
     return (
       <button
@@ -72,16 +68,6 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
           }
         `}
       >
-       
-
-        {/* Surcharge Indicator (for empty tables or tables without individual/color tags interfering) */}
-        {!isOccupied && hasSurcharge && (
-          <div className="absolute top-2 right-2 flex items-center gap-0.5 px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-bold border border-yellow-200/50 shadow-sm">
-            {isPercentage ? <Percent size={10} /> : <span className="text-[10px]">+</span>}
-            <span>{zone?.surcharge_amount}</span>
-          </div>
-        )}
-
         {/* Table Name */}
         <div className="flex justify-between w-full mb-1">
           <span

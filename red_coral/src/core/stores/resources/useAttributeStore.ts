@@ -25,7 +25,7 @@ interface AttributeStore {
   selectedAttributeId: string | null;
 
   // Core actions (new architecture)
-  fetchAll: () => Promise<void>;
+  fetchAll: (force?: boolean) => Promise<void>;
   applySync: () => void;
   getById: (id: string) => AttributeEntity | undefined;
   clear: () => void;
@@ -41,7 +41,7 @@ interface AttributeStore {
   attributes: AttributeEntity[];
   loadAttributes: () => Promise<void>;
 
-  // CRUD stubs (not implemented - use HTTP API directly)
+  // CRUD operations
   createAttribute: (params: {
     name: string;
     attr_type: string;
@@ -92,7 +92,7 @@ interface AttributeStore {
     display_order?: number;
     default_option_idx?: number;
   }) => Promise<void>;
-  unbindProductAttribute: (productId: string, attributeId: string) => Promise<void>;
+  unbindProductAttribute: (bindingId: string) => Promise<void>;
 }
 
 export const useAttributeStore = create<AttributeStore>((set, get) => ({
@@ -105,7 +105,12 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   selectedAttributeId: null,
 
   // Core actions
-  fetchAll: async () => {
+  fetchAll: async (force = false) => {
+    // Guard: skip if already loading, or already loaded (unless forced)
+    const state = get();
+    if (state.isLoading) return;
+    if (state.isLoaded && !force) return;
+
     set({ isLoading: true, error: null });
     try {
       const response = await api.listAttributeTemplates();
@@ -123,7 +128,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
 
   applySync: () => {
     if (get().isLoaded) {
-      get().fetchAll();
+      get().fetchAll(true);  // Force refresh on sync
     }
   },
 
@@ -170,33 +175,168 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     await get().fetchAll();
   },
 
-  // CRUD stubs - use HTTP API directly instead
-  createAttribute: async (_params) => {
-    console.warn('[Store] createAttribute not implemented - use HTTP API');
+  // CRUD operations
+  createAttribute: async (params) => {
+    try {
+      const response = await api.createAttribute(params);
+      if (response.data?.attribute) {
+        // Refresh list after creation
+        await get().fetchAll(true);
+      }
+    } catch (e: any) {
+      console.error('[Store] createAttribute failed:', e.message);
+      throw e;
+    }
   },
-  updateAttribute: async (_params) => {
-    console.warn('[Store] updateAttribute not implemented - use HTTP API');
+  updateAttribute: async (params) => {
+    try {
+      const { id, ...data } = params;
+      const response = await api.updateAttribute(id, data);
+      if (response.data?.attribute) {
+        // Refresh list after update
+        await get().fetchAll(true);
+      }
+    } catch (e: any) {
+      console.error('[Store] updateAttribute failed:', e.message);
+      throw e;
+    }
   },
-  deleteAttribute: async (_id) => {
-    console.warn('[Store] deleteAttribute not implemented - use HTTP API');
+  deleteAttribute: async (id) => {
+    try {
+      await api.deleteAttribute(id);
+      // Refresh list after deletion
+      await get().fetchAll(true);
+    } catch (e: any) {
+      console.error('[Store] deleteAttribute failed:', e.message);
+      throw e;
+    }
   },
-  createOption: async (_params) => {
-    console.warn('[Store] createOption not implemented - use HTTP API');
+  createOption: async (params) => {
+    try {
+      const { attributeId, ...data } = params;
+      const response = await api.addAttributeOption(attributeId, data);
+      if (response.data?.template) {
+        // Update local options cache
+        const opts = (response.data.template.options || []).map((opt, index) => ({
+          ...opt,
+          index,
+          attributeId,
+        }));
+        set((state) => {
+          const newOptions = new Map(state.options);
+          newOptions.set(attributeId, opts);
+          return { options: newOptions };
+        });
+        // Refresh attributes list
+        await get().fetchAll(true);
+      }
+    } catch (e: any) {
+      console.error('[Store] createOption failed:', e.message);
+      throw e;
+    }
   },
-  updateOption: async (_params) => {
-    console.warn('[Store] updateOption not implemented - use HTTP API');
+  updateOption: async (params) => {
+    try {
+      const { attributeId, index, ...data } = params;
+      const response = await api.updateAttributeOption(attributeId, index, data);
+      if (response.data?.template) {
+        // Update local options cache
+        const opts = (response.data.template.options || []).map((opt, idx) => ({
+          ...opt,
+          index: idx,
+          attributeId,
+        }));
+        set((state) => {
+          const newOptions = new Map(state.options);
+          newOptions.set(attributeId, opts);
+          return { options: newOptions };
+        });
+        // Refresh attributes list
+        await get().fetchAll(true);
+      }
+    } catch (e: any) {
+      console.error('[Store] updateOption failed:', e.message);
+      throw e;
+    }
   },
-  deleteOption: async (_attributeId, _index) => {
-    console.warn('[Store] deleteOption not implemented - use HTTP API');
+  deleteOption: async (attributeId, index) => {
+    try {
+      const response = await api.deleteAttributeOption(attributeId, index);
+      if (response.data?.template) {
+        // Update local options cache
+        const opts = (response.data.template.options || []).map((opt, idx) => ({
+          ...opt,
+          index: idx,
+          attributeId,
+        }));
+        set((state) => {
+          const newOptions = new Map(state.options);
+          newOptions.set(attributeId, opts);
+          return { options: newOptions };
+        });
+        // Refresh attributes list
+        await get().fetchAll(true);
+      }
+    } catch (e: any) {
+      console.error('[Store] deleteOption failed:', e.message);
+      throw e;
+    }
   },
-  reorderOptions: async (_attributeId, _ids) => {
-    console.warn('[Store] reorderOptions not implemented - use HTTP API');
+  reorderOptions: async (attributeId, newOrder) => {
+    try {
+      // Get current attribute with options
+      const attr = get().items.find(a => a.id === attributeId);
+      if (!attr?.options) return;
+
+      // Reorder options array based on newOrder indices
+      const reorderedOptions = newOrder.map((idxStr, newIdx) => {
+        const oldIdx = parseInt(idxStr, 10);
+        const opt = attr.options![oldIdx];
+        return { ...opt, display_order: newIdx };
+      });
+
+      // Single API call to update all options
+      await api.updateAttribute(attributeId, { options: reorderedOptions });
+
+      // Update local state directly (no extra API calls)
+      set((state) => {
+        const newItems = state.items.map(item =>
+          item.id === attributeId ? { ...item, options: reorderedOptions } : item
+        );
+        const newOptionsMap = new Map(state.options);
+        newOptionsMap.set(attributeId, reorderedOptions.map((opt, index) => ({
+          ...opt,
+          index,
+          attributeId,
+        })));
+        return { items: newItems, options: newOptionsMap };
+      });
+    } catch (e: any) {
+      console.error('[Store] reorderOptions failed:', e.message);
+      throw e;
+    }
   },
-  bindProductAttribute: async (_params) => {
-    console.warn('[Store] bindProductAttribute not implemented - use HTTP API');
+  bindProductAttribute: async (params) => {
+    try {
+      await api.bindProductAttribute({
+        product_id: params.productId,
+        attribute_id: params.attributeId,
+        is_required: params.is_required,
+        display_order: params.display_order,
+        default_option_idx: params.default_option_idx,
+      });
+    } catch (e: any) {
+      console.error('[Store] bindProductAttribute failed:', e.message);
+      throw e;
+    }
   },
-  unbindProductAttribute: async (_productId, _attributeId) => {
-    console.warn('[Store] unbindProductAttribute not implemented - use HTTP API');
+  unbindProductAttribute: async (bindingId) => {
+    try {
+      await api.unbindProductAttribute(bindingId);
+    } catch (e: any) {
+      console.error('[Store] unbindProductAttribute failed:', e.message);
+      throw e;
+    }
   },
 }));
 

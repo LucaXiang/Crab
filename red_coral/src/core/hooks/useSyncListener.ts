@@ -8,7 +8,7 @@
  * - "lagged" 类型: WiFi 丢包恢复，触发 Order 全量重同步
  */
 
-import { listen } from '@tauri-apps/api/event';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { storeRegistry } from '@/core/stores/resources/registry';
@@ -84,11 +84,14 @@ function parseLaggedPayload(payload: unknown): LaggedSyncPayload | null {
  */
 export function useSyncListener() {
   useEffect(() => {
-    const unlisten = listen<ServerMessageEvent>('server-message', async (event) => {
+    let unlisten: UnlistenFn | undefined;
+    let isMounted = true;
+
+    listen<ServerMessageEvent>('server-message', async (event) => {
       const message = event.payload;
 
-      // Only handle Sync type messages
-      if (message.event_type !== 'Sync') return;
+      // Only handle Sync type messages (case-insensitive)
+      if (message.event_type.toLowerCase() !== 'sync') return;
 
       // 检查是否为 WiFi 丢包恢复消息
       if (isLaggedPayload(message.payload)) {
@@ -104,7 +107,7 @@ export function useSyncListener() {
         try {
           // 请求从 sequence 0 开始的全量同步
           const response = await invoke<SyncResponse>('order_sync_since', {
-            sinceSequence: 0,
+            since_sequence: 0,
           });
 
           if (response) {
@@ -124,16 +127,28 @@ export function useSyncListener() {
       // 常规资源同步
       const payload = message.payload as SyncPayload;
       const { resource, id } = payload;
+      console.log(`[SyncListener] Received sync event: resource=${resource}, id=${id}`);
 
       // 调用 resources store 的 applySync（传入 id 用于去重）
       const store = storeRegistry[resource];
       if (store) {
+        console.log(`[SyncListener] Found store for ${resource}, calling applySync`);
         store.getState().applySync(id);
+      } else {
+        console.warn(`[SyncListener] No store found for resource: ${resource}`);
+      }
+    }).then((fn) => {
+      if (isMounted) {
+        unlisten = fn;
+      } else {
+        // Already unmounted, clean up immediately
+        fn();
       }
     });
 
     return () => {
-      unlisten.then((fn) => fn());
+      isMounted = false;
+      unlisten?.();
     };
   }, []);
 }

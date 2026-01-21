@@ -232,7 +232,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                 <div className="space-y-2">
                     <div className="flex justify-between items-end px-1">
                         <label className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                            {t('common.quantity')}
+                            {t('common.label.quantity')}
                         </label>
                     </div>
                     <div className="flex items-center gap-3">
@@ -355,7 +355,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                         className="h-full px-4 rounded-xl font-bold text-gray-600 bg-gray-100 border border-gray-200 hover:bg-gray-200 hover:text-gray-800 active:scale-95 transition-all flex items-center gap-2"
                     >
                         <X size={20} />
-                        <span>{t('common.cancel')}</span>
+                        <span>{t('common.action.cancel')}</span>
                     </button>
                 )}
 
@@ -364,7 +364,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                     <EscalatableGate
                         permission={Permission.VOID_ORDER}
                         mode="intercept"
-                        description={t('common.delete')}
+                        description={t('common.action.delete')}
                         onAuthorized={(user) => handleProtectedDelete({ id: String(user.id), username: user.username })}
                     >
                         <button
@@ -390,7 +390,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                         <span>{formatCurrency(finalTotal.toNumber())}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span>{confirmLabel || t('common.confirm')}</span>
+                        <span>{confirmLabel || t('common.action.confirm')}</span>
                         <Check size={20} />
                     </div>
                 </button>
@@ -403,7 +403,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
           <div className="flex items-center justify-between p-6 bg-white shadow-sm z-10">
             <div>
                 <span className="block font-bold text-gray-900 text-lg">
-                    {editMode === 'QTY' ? (t('common.quantity')) : editMode === 'PRICE' ? (t('pos.cart.unitPrice')) : (t('checkout.cart.discount'))}
+                    {editMode === 'QTY' ? (t('common.label.quantity')) : editMode === 'PRICE' ? (t('pos.cart.unitPrice')) : (t('checkout.cart.discount'))}
                 </span>
                 <span className="text-xs text-gray-500">
                      {editMode === 'QTY' ? (t('pos.cart.input.quantity')) : editMode === 'PRICE' ? (t('pos.cart.input.price')) : (t('pos.cart.input.discount'))}
@@ -412,7 +412,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
             <button 
                 onClick={() => setEditMode('STANDARD')} 
                 className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
-                title={t('common.close')}
+                title={t('common.action.close')}
             >
               <X size={20} className="text-gray-600" />
             </button>

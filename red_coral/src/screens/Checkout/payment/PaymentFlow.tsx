@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { HeldOrder, PaymentRecord } from '@/core/domain/types';
 import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
@@ -7,20 +7,11 @@ import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate'
 import { Permission } from '@/core/domain/types';
 import { useRetailServiceType, setRetailServiceType } from '@/core/stores/order/useCheckoutStore';
 import { formatCurrency } from '@/utils/currency';
+import { Currency } from '@/utils/currency';
 
-// Stores & Services
-import {
-  usePaymentActions,
-  usePaymentSession,
-  usePaymentTotals,
-} from '@/core/stores/order/usePaymentStore';
-import {
-  processCashPayment,
-  processCardPayment,
-  validatePaymentAmount,
-  printOrderReceipt,
-} from '@/core/services/order/paymentService';
-import { completeOrder, ensureActiveOrder, splitOrder, updateOrderInfo } from '@/core/stores/order/useOrderOperations';
+// Services & Operations
+import { openCashDrawer, printOrderReceipt } from '@/core/services/order/paymentService';
+import { completeOrder, splitOrder, updateOrderInfo } from '@/core/stores/order/useOrderOperations';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { toHeldOrder } from '@/core/stores/order/orderAdapter';
 import { useReceiptStore } from '@/core/stores/order/useReceiptStore';
@@ -39,21 +30,14 @@ interface PaymentFlowProps {
   onManageTable?: () => void;
 }
 
-type PaymentMode = 'SELECT' | 'CASH' | 'CARD' | 'ITEM_SPLIT' | 'AMOUNT_SPLIT';
+type PaymentMode = 'SELECT' | 'ITEM_SPLIT';
 
 export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onCancel, onUpdateOrder, onVoid, onManageTable }) => {
   const { t } = useI18n();
   const serviceType = useRetailServiceType();
-  const orderKey = order.key;
 
-  // Payment Store
-  const paymentActions = usePaymentActions();
-  const session = usePaymentSession(orderKey);
-  // Calculate totals including previous split payments (stored in order.paidAmount)
-  const { totalPaid: sessionPaid } = usePaymentTotals(orderKey, order.total);
-
-  const totalPaid = sessionPaid + (order.paidAmount || 0);
-  // Calculate remaining manually to ensure we account for split payments
+  // Calculate payment state from order (server state)
+  const totalPaid = order.paidAmount || 0;
   const remaining = Math.max(0, order.total - totalPaid);
   const isPaidInFull = remaining <= 0.01;
 
@@ -75,13 +59,6 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   const [splitItems, setSplitItems] = useState<Record<string, number>>({});
   const [isProcessingSplit, setIsProcessingSplit] = useState(false);
 
-  // 初始化支付会话
-  useEffect(() => {
-    if (!session) {
-      paymentActions.initSession(orderKey);
-    }
-  }, [orderKey, session, paymentActions]);
-
   // Defer completion to avoid "update during render" errors
   const handleComplete = useCallback(() => {
     requestAnimationFrame(() => {
@@ -89,131 +66,107 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     });
   }, [onComplete]);
 
-  // Unified Payment Success Handler
-  const handlePaymentSuccess = useCallback(async (payment: PaymentRecord, context?: { isCash: boolean, tendered?: number }) => {
-    paymentActions.addPayment(orderKey, payment);
-
-    // Check for completion
-    const newTotalPaid = totalPaid + payment.amount;
-    const validation = validatePaymentAmount(newTotalPaid, order.total);
-
-    if (validation.isValid) {
-      try {
-        const completed = await completeOrder(order, [payment]);
-        const isRetail = order.isRetail;
-
-        if (context?.isCash && context.tendered !== undefined) {
-          setSuccessModal({
-            isOpen: true,
-            type: 'CASH',
-            change: context.tendered - payment.amount,
-            onClose: handleComplete,
-            onPrint: isRetail ? async () => {
-              await printOrderReceipt(completed);
-              toast.success(t('settings.payment.receiptPrintSuccess'));
-            } : undefined,
-            autoCloseDelay: isRetail ? 0 : 10000 // 10s for cash, 0 for retail manual close
-          });
-        } else {
-          setSuccessModal({
-            isOpen: true,
-            type: 'NORMAL',
-            onClose: handleComplete,
-            onPrint: isRetail ? async () => {
-              await printOrderReceipt(completed);
-              toast.success(t('settings.payment.receiptPrintSuccess'));
-            } : undefined,
-            autoCloseDelay: isRetail ? 0 : 5000 // 5s for normal, 0 for retail manual close
-          });
-        }
-      } catch (error) {
-        console.error('Order completion failed:', error);
-        toast.error(t('checkout.error.completionFailed'));
-      }
-    } else {
-      // Partial payment
-      // Ensure order exists so payment is attached to something real
-      ensureActiveOrder(order);
-
-      if (context?.isCash && context.tendered !== undefined) {
-        // Partial cash payment (e.g. split) - still show change if desired? 
-        // Assuming user wants to see change for any cash transaction.
-        // But usually partial payment keeps the flow open.
-        // We can show modal and then just close modal (stay in flow).
-        setSuccessModal({
-          isOpen: true,
-          type: 'CASH',
-          change: context.tendered - payment.amount,
-          onClose: () => setSuccessModal(null),
-          autoCloseDelay: 10000
-        });
-      } else {
-        toast.success(t('checkout.payment.partial'));
-      }
-    }
-  }, [order, totalPaid, paymentActions, orderKey, handleComplete, t]);
-
   /**
-   * 处理现金支付（全额）
+   * 处理现金全额支付
    */
-  const handleFullCashPayment = useCallback(async () => {
+  const handleFullCashPayment = useCallback(() => {
     setPaymentContext('FULL');
     setShowCashModal(true);
   }, []);
 
   /**
-   * 确认现金支付（全额）
+   * 确认现金支付
    */
   const handleConfirmFullCash = useCallback(
     async (tenderedAmount: number) => {
+      if (Currency.lt(tenderedAmount, remaining)) {
+        toast.error(t('settings.payment.amountInsufficient'));
+        return;
+      }
+
       setIsProcessing(true);
       try {
-        const payment = await processCashPayment({
-          amount: remaining,
-          tenderedAmount,
-        });
+        // Open cash drawer
+        await openCashDrawer();
 
-        await handlePaymentSuccess(payment, { isCash: true, tendered: tenderedAmount });
+        // Create payment record
+        const payment: PaymentRecord = {
+          id: `pay-${Date.now()}`,
+          method: 'Cash',
+          amount: remaining,
+          timestamp: Date.now(),
+          tendered: tenderedAmount,
+          change: Currency.sub(tenderedAmount, remaining).toNumber(),
+        };
+
+        // Complete order via backend
+        const completed = await completeOrder(order, [payment]);
+        const isRetail = order.isRetail;
+
         setShowCashModal(false);
+        setSuccessModal({
+          isOpen: true,
+          type: 'CASH',
+          change: payment.change,
+          onClose: handleComplete,
+          onPrint: isRetail ? async () => {
+            await printOrderReceipt(completed);
+            toast.success(t('settings.payment.receiptPrintSuccess'));
+          } : undefined,
+          autoCloseDelay: isRetail ? 0 : 10000,
+        });
       } catch (error) {
         console.error('Cash payment failed:', error);
-        const errorKey = error instanceof Error ? error.message : '';
-        if (errorKey === 'PAYMENT_AMOUNT_INSUFFICIENT') {
-          toast.error(t('settings.payment.amountInsufficient'));
-        } else if (errorKey === 'RECEIPT_PRINT_FAILED') {
-          toast.error(t('settings.payment.receiptPrintFailed'));
-        } else {
-          toast.error(t('checkout.payment.failed'));
-        }
+        toast.error(t('checkout.payment.failed'));
       } finally {
         setIsProcessing(false);
       }
     },
-    [remaining, handlePaymentSuccess, t]
+    [remaining, order, handleComplete, t]
   );
 
   /**
-   * 处理刷卡支付（全额）
+   * 处理刷卡全额支付
    */
   const handleFullCardPayment = useCallback(async () => {
+    if (Currency.lte(remaining, 0)) {
+      toast.error(t('settings.payment.amountMustBePositive'));
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      const payment = await processCardPayment({ amount: remaining });
-      await handlePaymentSuccess(payment, { isCash: false });
+      const payment: PaymentRecord = {
+        id: `pay-${Date.now()}`,
+        method: 'VISA',
+        amount: remaining,
+        timestamp: Date.now(),
+      };
+
+      const completed = await completeOrder(order, [payment]);
+      const isRetail = order.isRetail;
+
+      setSuccessModal({
+        isOpen: true,
+        type: 'NORMAL',
+        onClose: handleComplete,
+        onPrint: isRetail ? async () => {
+          await printOrderReceipt(completed);
+          toast.success(t('settings.payment.receiptPrintSuccess'));
+        } : undefined,
+        autoCloseDelay: isRetail ? 0 : 5000,
+      });
     } catch (error) {
       console.error('Card payment failed:', error);
-      const errorKey = error instanceof Error ? error.message : '';
-      if (errorKey === 'PAYMENT_AMOUNT_MUST_BE_POSITIVE') {
-        toast.error(t('settings.payment.amountMustBePositive'));
-      } else {
-        toast.error(t('checkout.payment.failed'));
-      }
+      toast.error(t('checkout.payment.failed'));
     } finally {
       setIsProcessing(false);
     }
-  }, [remaining, handlePaymentSuccess, t]);
+  }, [remaining, order, handleComplete, t]);
 
-
+  /**
+   * 打印预付款收据
+   */
   const handlePrintPrePayment = useCallback(async () => {
     try {
       const store = useActiveOrdersStore.getState();
@@ -225,7 +178,6 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         const newReceiptNumber = receiptStore.generateReceiptNumber();
         currentOrder.receiptNumber = newReceiptNumber;
 
-        // Update CartStore for persistence across back navigation
         import('@/core/stores/cart/useCartStore').then((module) => {
           module.useCartStore.getState().setReceiptNumber(newReceiptNumber);
         });
@@ -233,18 +185,12 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         if (onUpdateOrder) onUpdateOrder(currentOrder);
       }
 
-      // Ensure active order
-      ensureActiveOrder(currentOrder);
-
-      // Update info via command (mark as pre-payment printed)
       await updateOrderInfo(currentOrder, {
         isPrePayment: true,
         receiptNumber: currentOrder.receiptNumber,
       });
 
-      // Update local object for printing
       currentOrder.isPrePayment = true;
-
       await printOrderReceipt(currentOrder);
       toast.success(t('settings.payment.receiptPrintSuccess'));
     } catch (error) {
@@ -253,6 +199,9 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     }
   }, [order, onUpdateOrder, t]);
 
+  /**
+   * 分账支付处理
+   */
   const handleSplitPayment = useCallback(
     async (method: 'CASH' | 'CARD', cashDetails?: { tendered: number }) => {
       if (!order || isProcessingSplit) return false;
@@ -264,9 +213,8 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           return {
             instanceId,
             quantity: qty,
-            name: originalItem?.name || t('common.unknownItem'),
+            name: originalItem?.name || t('common.label.unknownItem'),
             price: originalItem?.price || 0,
-            selectedOptions: originalItem?.selectedOptions,
           };
         });
 
@@ -280,15 +228,12 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           total += splitItem.price * splitItem.quantity;
         });
 
-        const payment = {
-          method,
-          amount: total,
-          tip: 0,
-        };
+        if (method === 'CASH') {
+          await openCashDrawer();
+        }
 
-        // Execute split order command
         const updatedOrder = await splitOrder(order, {
-          splitAmount: payment.amount,
+          splitAmount: total,
           items: itemsToSplit.map((i) => ({
             instanceId: i.instanceId,
             name: i.name,
@@ -296,7 +241,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           })),
           paymentMethod: method,
           tendered: cashDetails?.tendered,
-          change: cashDetails ? cashDetails.tendered - payment.amount : undefined,
+          change: cashDetails ? cashDetails.tendered - total : undefined,
         });
 
         if (onUpdateOrder) {
@@ -316,7 +261,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
               setSuccessModal({
                 isOpen: true,
                 type: 'CASH',
-                change: cashDetails.tendered - payment.amount,
+                change: cashDetails.tendered - total,
                 onClose: handleComplete,
                 onPrint: isRetail ? async () => {
                   await printOrderReceipt(completed);
@@ -343,7 +288,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           setSuccessModal({
             isOpen: true,
             type: 'CASH',
-            change: cashDetails.tendered - payment.amount,
+            change: cashDetails.tendered - total,
             onClose: () => setSuccessModal(null),
             autoCloseDelay: 10000,
           });
@@ -423,7 +368,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
               {t('checkout.split.title')}
             </h3>
             <button onClick={() => { setMode('SELECT'); setSplitItems({}); }} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium flex items-center gap-2 transition-all">
-              <ArrowLeft size={20} /> {t('common.back')}
+              <ArrowLeft size={20} /> {t('common.action.back')}
             </button>
           </div>
 
@@ -431,8 +376,6 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
             <div className="space-y-3 max-w-3xl mx-auto">
               {order.items.map(item => {
                 const currentSplitQty = splitItems[item.instanceId] || 0;
-                // Calculate remaining quantity available for split
-                // (Total quantity - Already Paid quantity)
                 const paidQty = (order.paidItemQuantities && order.paidItemQuantities[item.instanceId]) || 0;
                 const maxQty = Math.max(0, item.quantity - paidQty);
 
@@ -586,7 +529,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                 {onCancel && (
                   <button onClick={onCancel} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors flex items-center gap-2">
                     <ArrowLeft size={20} />
-                    {t('common.back')}
+                    {t('common.action.back')}
                   </button>
                 )}
               </div>

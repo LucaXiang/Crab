@@ -85,17 +85,22 @@ pub async fn delete(
     State(state): State<ServerState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
+    tracing::info!(id = %id, "Deleting category");
     let repo = CategoryRepository::new(state.db.clone());
     let result = repo
         .delete(&id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
+    tracing::info!(id = %id, result = %result, "Category delete result");
+
     // 广播同步通知
     if result {
         state
             .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
             .await;
+    } else {
+        tracing::warn!(id = %id, "Category delete returned false, not broadcasting");
     }
 
     Ok(Json(result))
@@ -123,10 +128,14 @@ pub async fn batch_update_sort_order(
     State(state): State<ServerState>,
     Json(updates): Json<Vec<SortOrderUpdate>>,
 ) -> AppResult<Json<BatchUpdateResponse>> {
+    tracing::info!(count = updates.len(), "Batch update sort order request received");
+
     let repo = CategoryRepository::new(state.db.clone());
     let mut updated_count = 0;
 
     for update in &updates {
+        tracing::debug!(id = %update.id, sort_order = update.sort_order, "Updating category sort order");
+
         // Use existing update method with just sort_order
         let result = repo
             .update(
@@ -142,10 +151,18 @@ pub async fn batch_update_sort_order(
             )
             .await;
 
-        if result.is_ok() {
-            updated_count += 1;
+        match &result {
+            Ok(_) => {
+                tracing::debug!(id = %update.id, "Category sort order updated successfully");
+                updated_count += 1;
+            }
+            Err(e) => {
+                tracing::error!(id = %update.id, error = %e, "Failed to update category sort order");
+            }
         }
     }
+
+    tracing::info!(updated = updated_count, total = updates.len(), "Batch update sort order completed");
 
     // 广播同步通知
     state

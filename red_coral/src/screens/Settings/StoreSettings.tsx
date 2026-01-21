@@ -47,7 +47,7 @@ export const StoreSettings: React.FC = () => {
             }`}
           >
             <Save className="w-4 h-4 mr-2" />
-            {t('common.save')}
+            {t('common.action.save')}
           </button>
         </div>
       </div>

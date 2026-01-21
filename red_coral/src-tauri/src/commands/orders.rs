@@ -7,11 +7,9 @@ use tauri::State;
 use tokio::sync::RwLock;
 use urlencoding::encode;
 
+use crate::core::response::ErrorCode;
 use crate::core::{ApiResponse, ClientBridge, FetchOrderListResponse, OrderListData};
-use shared::models::{
-    Order, OrderAddEvent, OrderAddItem, OrderAddPayment, OrderCreate, OrderEvent, OrderRemoveItem,
-    OrderUpdateHash, OrderUpdateStatus, OrderUpdateTotals,
-};
+use shared::models::Order;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct FetchOrderListParams {
@@ -23,7 +21,7 @@ pub struct FetchOrderListParams {
 
 // ============ Order Queries ============
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn fetch_order_list(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     params: FetchOrderListParams,
@@ -55,11 +53,11 @@ pub async fn fetch_order_list(
                 page: params.page,
             }))
         }
-        Err(e) => Ok(ApiResponse::error("FETCH_ORDER_LIST_FAILED", e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
     }
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_orders(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     limit: Option<i32>,
@@ -73,22 +71,22 @@ pub async fn list_orders(
         .await
     {
         Ok(orders) => Ok(ApiResponse::success(OrderListData { orders })),
-        Err(e) => Ok(ApiResponse::error("ORDER_LIST_FAILED", e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
     }
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_open_orders(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<OrderListData>, String> {
     let bridge = bridge.read().await;
     match bridge.get::<Vec<Order>>("/api/orders/open").await {
         Ok(orders) => Ok(ApiResponse::success(OrderListData { orders })),
-        Err(e) => Ok(ApiResponse::error("ORDER_LIST_OPEN_FAILED", e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
     }
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_order(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -99,11 +97,11 @@ pub async fn get_order(
         .await
     {
         Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error("ORDER_GET_FAILED", e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::OrderNotFound, e.to_string())),
     }
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_order_by_receipt(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     receipt: String,
@@ -114,25 +112,22 @@ pub async fn get_order_by_receipt(
         .await
     {
         Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error(
-            "ORDER_GET_BY_RECEIPT_FAILED",
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::OrderNotFound, e.to_string())),
     }
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_last_order(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<Option<Order>>, String> {
     let bridge = bridge.read().await;
     match bridge.get::<Option<Order>>("/api/orders/last").await {
         Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error("ORDER_GET_LAST_FAILED", e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
     }
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn verify_order_chain(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     from_hash: Option<String>,
@@ -144,164 +139,7 @@ pub async fn verify_order_chain(
     };
     match bridge.get::<bool>(&query).await {
         Ok(valid) => Ok(ApiResponse::success(valid)),
-        Err(e) => Ok(ApiResponse::error("ORDER_VERIFY_FAILED", e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
     }
 }
 
-// ============ Order Mutations ============
-
-#[tauri::command]
-pub async fn create_order(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    data: OrderCreate,
-) -> Result<ApiResponse<Order>, String> {
-    let bridge = bridge.read().await;
-    match bridge.post::<Order, _>("/api/orders", &data).await {
-        Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error("ORDER_CREATE_FAILED", e.to_string())),
-    }
-}
-
-#[tauri::command]
-pub async fn add_order_item(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    order_id: String,
-    item: OrderAddItem,
-) -> Result<ApiResponse<Order>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .post::<Order, _>(&format!("/api/orders/{}/items", encode(&order_id)), &item)
-        .await
-    {
-        Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error("ORDER_ADD_ITEM_FAILED", e.to_string())),
-    }
-}
-
-#[tauri::command]
-pub async fn remove_order_item(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    order_id: String,
-    data: OrderRemoveItem,
-) -> Result<ApiResponse<Order>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .delete_with_body::<Order, _>(&format!("/api/orders/{}/items", encode(&order_id)), &data)
-        .await
-    {
-        Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error(
-            "ORDER_REMOVE_ITEM_FAILED",
-            e.to_string(),
-        )),
-    }
-}
-
-#[tauri::command]
-pub async fn add_order_payment(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    order_id: String,
-    payment: OrderAddPayment,
-) -> Result<ApiResponse<Order>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .post::<Order, _>(
-            &format!("/api/orders/{}/payments", encode(&order_id)),
-            &payment,
-        )
-        .await
-    {
-        Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error(
-            "ORDER_ADD_PAYMENT_FAILED",
-            e.to_string(),
-        )),
-    }
-}
-
-#[tauri::command]
-pub async fn update_order_totals(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    order_id: String,
-    data: OrderUpdateTotals,
-) -> Result<ApiResponse<Order>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .put::<Order, _>(&format!("/api/orders/{}/totals", encode(&order_id)), &data)
-        .await
-    {
-        Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error(
-            "ORDER_UPDATE_TOTALS_FAILED",
-            e.to_string(),
-        )),
-    }
-}
-
-#[tauri::command]
-pub async fn update_order_status(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    order_id: String,
-    data: OrderUpdateStatus,
-) -> Result<ApiResponse<Order>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .put::<Order, _>(&format!("/api/orders/{}/status", encode(&order_id)), &data)
-        .await
-    {
-        Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error(
-            "ORDER_UPDATE_STATUS_FAILED",
-            e.to_string(),
-        )),
-    }
-}
-
-#[tauri::command]
-pub async fn update_order_hash(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    order_id: String,
-    data: OrderUpdateHash,
-) -> Result<ApiResponse<Order>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .put::<Order, _>(&format!("/api/orders/{}/hash", encode(&order_id)), &data)
-        .await
-    {
-        Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error(
-            "ORDER_UPDATE_HASH_FAILED",
-            e.to_string(),
-        )),
-    }
-}
-
-// ============ Order Events ============
-
-#[tauri::command]
-pub async fn get_order_events(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    order_id: String,
-) -> Result<ApiResponse<Vec<OrderEvent>>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .get::<Vec<OrderEvent>>(&format!("/api/orders/{}/events", encode(&order_id)))
-        .await
-    {
-        Ok(events) => Ok(ApiResponse::success(events)),
-        Err(e) => Ok(ApiResponse::error("ORDER_GET_EVENTS_FAILED", e.to_string())),
-    }
-}
-
-#[tauri::command]
-pub async fn add_order_event(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    order_id: String,
-    data: OrderAddEvent,
-) -> Result<OrderEvent, String> {
-    let bridge = bridge.read().await;
-    bridge
-        .post(&format!("/api/orders/{}/events", encode(&order_id)), &data)
-        .await
-        .map_err(|e| e.to_string())
-}

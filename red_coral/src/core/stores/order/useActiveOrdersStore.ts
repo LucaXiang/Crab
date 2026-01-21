@@ -363,10 +363,15 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
 
 /**
  * Select all active orders
- * Re-renders only when active orders change
+ * Re-renders only when active orders array shallow-equals previous
+ * Uses useShallow to prevent unnecessary re-renders when array contents haven't changed
  */
 export const useActiveOrders = () =>
-  useActiveOrdersStore((state) => state.getActiveOrders());
+  useActiveOrdersStore(
+    useShallow((state) =>
+      Array.from(state.orders.values()).filter((o) => o.status === 'ACTIVE')
+    )
+  );
 
 /**
  * Select a specific order by ID

@@ -2,15 +2,22 @@
  * Order Stores - Core exports
  */
 export { useCheckoutStore } from './useCheckoutStore';
-export { usePaymentStore } from './usePaymentStore';
-export { useHeldOrders } from './useOrderStore';
-export { useHeldOrdersCount } from './useOrderStore';
-export { useDraftOrders } from './useOrderStore';
-export { useDraftOrdersCount } from './useOrderStore';
-export { useOrderActions } from './useOrderStore';
 export { useCurrentOrderKey, useCheckoutOrder } from './useCheckoutStore';
 export { useDraftOrderStore } from './useDraftOrderStore';
 export { useReceiptStore } from './useReceiptStore';
+
+// ============================================================================
+// Event Sourcing Architecture - Active Orders (Server-Side State)
+// ============================================================================
+
+// Active Orders Store - Main store for server-synced orders
+export { useHeldOrders, useHeldOrdersCount } from './useOrderStore';
+
+// Draft Orders (Local Client State)
+export { useDraftOrders, useDraftOrdersCount } from './useDraftOrderStore';
+
+// Order Actions - Combined hook for all order manipulation (draft, checkout, operations)
+export { useOrderActions } from './useOrderStore';
 
 // Order Operations - Async command functions
 export * as orderOps from './useOrderOperations';

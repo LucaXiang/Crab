@@ -4,7 +4,7 @@ import { X, Check } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { AttributeSelector } from './AttributeSelector';
 import { ItemActionPanel } from '../ui/ItemActionPanel';
-import { AttributeTemplate, AttributeOption, ProductAttribute, ProductSpecification } from '@/core/domain/types';
+import { AttributeTemplate, AttributeOption, ProductAttribute, EmbeddedSpec } from '@/core/domain/types';
 import { formatCurrency } from '@/utils/formatCurrency';
 
 interface ItemConfiguratorModalProps {
@@ -23,8 +23,8 @@ interface ItemConfiguratorModalProps {
   selections: Map<string, string[]>;
   onAttributeSelect: (attributeId: string, optionIds: string[]) => void;
 
-  // Specification Selection (NEW)
-  specifications?: ProductSpecification[];
+  // Specification Selection (embedded specs, use index as ID)
+  specifications?: EmbeddedSpec[];
   hasMultiSpec?: boolean;
   selectedSpecId?: string | null;
   onSpecificationSelect?: (specId: string) => void;
@@ -136,14 +136,15 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         {specifications
-                          .filter(spec => spec.is_active)
-                          .map((spec) => {
-                            const isSelected = selectedSpecId === String(spec.id);
+                          .map((spec, specIdx) => ({ spec, specIdx }))
+                          .filter(({ spec }) => spec.is_active)
+                          .map(({ spec, specIdx }) => {
+                            const isSelected = selectedSpecId === String(specIdx);
                             return (
                               <button
-                                key={spec.id}
+                                key={specIdx}
                                 type="button"
-                                onClick={() => onSpecificationSelect?.(String(spec.id))}
+                                onClick={() => onSpecificationSelect?.(String(specIdx))}
                                 className={`
                                   relative p-3 rounded-xl border-2 transition-all text-left flex flex-col items-start min-h-[70px] justify-center
                                   ${isSelected
@@ -153,10 +154,10 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                                 `}
                               >
                                 <span className={`text-sm font-semibold mb-1 ${isSelected ? 'text-orange-900' : 'text-gray-900'}`}>
-                                  {spec.is_root && !spec.name ? t('settings.product.specification.label.default') : spec.name}
+                                  {spec.is_default && !spec.name ? t('settings.product.specification.label.default') : spec.name}
                                 </span>
                                 {spec.is_default && !isSelected && (
-                                  <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full border border-white" title={t('common.default')} />
+                                  <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full border border-white" title={t('common.label.default')} />
                                 )}
                                 <div className={`text-sm font-bold ${isSelected ? 'text-orange-600' : 'text-gray-700'}`}>
                                   {formatCurrency(spec.price)}
@@ -180,8 +181,8 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                     const attrId = String(attr.id);
                     const options = allOptions.get(attrId) || [];
                     const selectedOptionIds = selections.get(attrId) || [];
-                    // binding.out is the attribute ID in HasAttribute relation
-                    const binding = bindings?.find(b => b.out === attr.id);
+                    // binding.to is the attribute ID in HasAttribute relation
+                    const binding = bindings?.find(b => b.to === attr.id);
 
                     // Logic to find defaults for display (visual cues in AttributeSelector)
                     // default_option_idx is an index into the options array

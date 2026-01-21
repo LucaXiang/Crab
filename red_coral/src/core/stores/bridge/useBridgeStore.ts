@@ -185,10 +185,7 @@ interface BridgeStore {
   removeTenant: (tenantId: string) => Promise<void>;
   getCurrentTenant: () => Promise<string | null>;
 
-  // Auth Actions (legacy - TenantManager based)
-  loginOnline: (username: string, password: string, edgeUrl: string) => Promise<LoginResponse>;
-  loginOffline: (username: string, password: string) => Promise<LoginResponse>;
-  loginAuto: (username: string, password: string, edgeUrl: string) => Promise<LoginResponse>;
+  // Auth Actions
   logout: () => Promise<void>;
   fetchCurrentSession: () => Promise<void>;
   hasOfflineCache: (username: string) => Promise<boolean>;
@@ -262,7 +259,7 @@ export const useBridgeStore = create<BridgeStore>()(
       startClientMode: async (edgeUrl: string, messageAddr: string) => {
         try {
           set({ isLoading: true, error: null });
-          await invokeApi('start_client_mode', { edgeUrl, messageAddr });
+          await invokeApi('start_client_mode', { edge_url: edgeUrl, message_addr: messageAddr });
           await get().fetchAppState();
         } catch (error: any) {
           set({ error: error.message });
@@ -303,7 +300,7 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           set({ isLoading: true, error: null });
           const msg = await invokeApi<string>('activate_tenant', {
-            authUrl,
+            auth_url: authUrl,
             username,
             password,
           });
@@ -321,7 +318,7 @@ export const useBridgeStore = create<BridgeStore>()(
       switchTenant: async (tenantId) => {
         try {
           set({ isLoading: true });
-          await invokeApi('switch_tenant', { tenantId });
+          await invokeApi('switch_tenant', { tenant_id: tenantId });
           await get().fetchAppState();
         } catch (error: any) {
           set({ error: error.message });
@@ -350,75 +347,6 @@ export const useBridgeStore = create<BridgeStore>()(
       },
 
       // ==================== Auth Actions ====================
-
-      loginOnline: async (username: string, password: string, edgeUrl: string) => {
-        set({ isLoading: true, error: null });
-        try {
-          // AuthData wrapper
-          const data = await invokeApi<{ session: EmployeeSession | null, mode: LoginMode }>('login_online', {
-            username,
-            password,
-            edgeUrl,
-          });
-          
-          if (data.session) {
-            set({ currentSession: data.session });
-            return { success: true, session: data.session, error: null, mode: data.mode };
-          } else {
-            return { success: false, session: null, error: 'Login failed', mode: data.mode };
-          }
-        } catch (error: any) {
-          set({ error: error.message });
-          return { success: false, session: null, error: error.message, mode: 'Offline' };
-        } finally {
-          set({ isLoading: false });
-        }
-      },
-
-      loginOffline: async (username: string, password: string) => {
-        set({ isLoading: true, error: null });
-        try {
-          const data = await invokeApi<{ session: EmployeeSession | null, mode: LoginMode }>('login_offline', {
-            username,
-            password,
-          });
-          
-          if (data.session) {
-            set({ currentSession: data.session });
-            return { success: true, session: data.session, error: null, mode: data.mode };
-          } else {
-            return { success: false, session: null, error: 'Login failed', mode: data.mode };
-          }
-        } catch (error: any) {
-          set({ error: error.message });
-          return { success: false, session: null, error: error.message, mode: 'Offline' };
-        } finally {
-          set({ isLoading: false });
-        }
-      },
-
-      loginAuto: async (username: string, password: string, edgeUrl: string) => {
-        set({ isLoading: true, error: null });
-        try {
-          const data = await invokeApi<{ session: EmployeeSession | null, mode: LoginMode }>('login_auto', {
-            username,
-            password,
-            edgeUrl,
-          });
-          
-          if (data.session) {
-            set({ currentSession: data.session });
-            return { success: true, session: data.session, error: null, mode: data.mode };
-          } else {
-            return { success: false, session: null, error: 'Login failed', mode: data.mode };
-          }
-        } catch (error: any) {
-          set({ error: error.message });
-          return { success: false, session: null, error: error.message, mode: 'Offline' };
-        } finally {
-          set({ isLoading: false });
-        }
-      },
 
       logout: async () => {
         try {

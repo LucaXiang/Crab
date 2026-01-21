@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CartItem, AttributeTemplate, AttributeOption, ProductAttribute, ItemAttributeSelection, ProductSpecification } from '@/core/domain/types';
+import { CartItem, AttributeTemplate, AttributeOption, ProductAttribute, ItemAttributeSelection, EmbeddedSpec } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '../Toast';
@@ -22,7 +22,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
   const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; username: string } | undefined>();
   
   // Specification State
-  const [specifications, setSpecifications] = useState<ProductSpecification[]>([]);
+  const [specifications, setSpecifications] = useState<EmbeddedSpec[]>([]);
   const [selectedSpecId, setSelectedSpecId] = useState<string | undefined>(item.selectedSpecification?.id);
 
   // Attribute State
@@ -38,22 +38,23 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     const load = async () => {
         setIsLoadingAttributes(true);
         try {
-            const [attrData, specsResponse] = await Promise.all([
+            const [attrData, productResp] = await Promise.all([
                 api.fetchProductAttributes(String(item.id)),
-                api.listProductSpecs(item.id)
+                api.getProductFull(String(item.id))
             ]);
 
             if (!mounted) return;
 
-            const specs = specsResponse.data?.specs || [];
+            // Get specs from product (embedded specs)
+            const specs = productResp.data?.product?.specs || [];
             setSpecifications(specs);
 
             // If we have specs but none selected (or current selection invalid), select default
-            if (specs.length > 0) {
-                 const currentValid = specs.some(s => String(s.id) === selectedSpecId);
-                 if (!currentValid) {
-                     const defaultSpec = specs.find(s => s.is_default) || specs[0];
-                     setSelectedSpecId(String(defaultSpec.id));
+            if (specs.length > 1) {
+                 const currentSpecIdx = specs.findIndex((s, idx) => String(idx) === selectedSpecId);
+                 if (currentSpecIdx < 0) {
+                     const defaultIdx = specs.findIndex(s => s.is_default);
+                     setSelectedSpecId(String(defaultIdx >= 0 ? defaultIdx : 0));
                  }
             }
 
@@ -186,14 +187,15 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     const finalQty = Math.max(1, quantity);
     const finalDisc = Math.min(100, Math.max(0, discount));
 
-    // Resolve specification object
+    // Resolve specification object (using index since EmbeddedSpec doesn't have ID)
     let selectedSpecification: { id: string; name: string; } | undefined;
-    if (selectedSpecId) {
-        const spec = specifications.find(s => String(s.id) === selectedSpecId);
+    if (selectedSpecId !== undefined) {
+        const specIdx = parseInt(selectedSpecId, 10);
+        const spec = specifications[specIdx];
         if (spec) {
             selectedSpecification = {
-                id: String(spec.id),
-                name: spec.is_root && !spec.name ? t('settings.product.specification.label.default') : spec.name,
+                id: String(specIdx),
+                name: spec.is_default && !spec.name ? t('settings.product.specification.label.default') : spec.name,
             };
         }
     }
@@ -237,12 +239,12 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
         setDiscountAuthorizer(auth);
       }}
       onConfirm={handleSave}
-      confirmLabel={t('common.save')}
+      confirmLabel={t('common.action.save')}
       onDelete={handleRemove}
       showDelete={true}
       readOnlyAttributes={readOnlyAttributes}
       specifications={specifications}
-      hasMultiSpec={specifications.length > 0}
+      hasMultiSpec={specifications.length > 1}
       selectedSpecId={selectedSpecId}
       onSpecificationSelect={setSelectedSpecId}
     />

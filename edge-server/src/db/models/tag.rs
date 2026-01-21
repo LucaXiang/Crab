@@ -1,5 +1,6 @@
 //! Tag Model
 
+use super::serde_helpers;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -14,7 +15,7 @@ pub struct Tag {
     pub color: String,
     #[serde(default)]
     pub display_order: i32,
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_active: bool,
 }
 

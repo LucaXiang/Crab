@@ -182,8 +182,8 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900">
               {editingOption
-                ? (t('settings.attribute.option.action.edit'))
-                : (t('settings.attribute.option.action.add'))
+                ? (t('settings.attribute.option.editOption'))
+                : (t('settings.attribute.option.addOption'))
               }
             </h2>
             <button
@@ -282,7 +282,7 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
                     className="w-4 h-4 text-teal-600 bg-gray-100 border-gray-300 rounded focus:ring-teal-500"
                   />
                   <span className="text-sm text-gray-700">
-                    {t('common.active')}
+                    {t('common.status.active')}
                   </span>
                 </label>
               </FormField>
@@ -296,7 +296,7 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
             onClick={onClose}
             className="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors"
           >
-            {t('common.cancel')}
+            {t('common.action.cancel')}
           </button>
           <button
             onClick={handleSubmit}
@@ -304,8 +304,8 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
             className="px-5 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors shadow-lg shadow-teal-600/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-teal-600"
           >
             {editingOption
-              ? (t('common.save'))
-              : (t('common.create'))
+              ? (t('common.action.save'))
+              : (t('common.action.create'))
             }
           </button>
         </div>

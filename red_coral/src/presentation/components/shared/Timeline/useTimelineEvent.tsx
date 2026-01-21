@@ -46,7 +46,7 @@ function getArray<T>(value: unknown): T[] {
 const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => TimelineDisplayData> = {
   // ============ Order Lifecycle ============
   [OrderEventType.TABLE_OPENED]: (event, t) => ({
-    title: t('timeline.event.tableOrder'),
+    title: t('timeline.tableOrder'),
     summary: t('timeline.guestsCount', { n: getNumber(event.data?.guestCount, 1) }),
     details: [],
     icon: Utensils,
@@ -68,7 +68,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
       return `${name} ${spec} x${qty}${modifiers.length ? ` (${modifiers.join(', ')})` : ''}`;
     });
     return {
-      title: t('timeline.event.addItems'),
+      title: t('timeline.addItems'),
       summary: t('timeline.addedItems', { n: totalQty }),
       details,
       icon: ShoppingBag,
@@ -95,7 +95,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
     formatChange('discountPercent', 'timeline.labels.discount', v => `${v}%`);
     formatChange('surcharge', 'timeline.labels.surcharge');
     return {
-      title: t('timeline.event.itemModified'),
+      title: t('timeline.itemModified'),
       summary: getString(event.data?.itemName),
       details,
       icon: Edit3,
@@ -106,7 +106,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
   },
 
   [OrderEventType.ITEM_REMOVED]: (event, t) => ({
-    title: t('timeline.event.itemRemoved'),
+    title: t('timeline.itemRemoved'),
     summary: getString(event.data?.itemName || event.data?.reason),
     details: [],
     icon: Trash2,
@@ -116,7 +116,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
   }),
 
   [OrderEventType.ITEM_RESTORED]: (event, t) => ({
-    title: t('timeline.event.itemRestored'),
+    title: t('timeline.itemRestored'),
     summary: getString(event.data?.instanceId),
     details: [],
     icon: Utensils,
@@ -136,7 +136,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
       ? [`${t('checkout.amount.tendered')}: ${formatCurrency(getNumber(paymentTyped.tendered))}`, `${t('checkout.amount.change')}: ${formatCurrency(getNumber(paymentTyped.change))}`]
       : [paymentTyped.note].filter(Boolean) as string[];
     return {
-      title: `${t('timeline.event.payment')}: ${methodDisplay}`,
+      title: `${t('timeline.payment')}: ${methodDisplay}`,
       summary: formatCurrency(getNumber(paymentTyped.amount, 0)),
       details,
       icon: Coins,
@@ -146,7 +146,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
   },
 
   [OrderEventType.PAYMENT_CANCELLED]: (event, t) => ({
-    title: t('timeline.event.paymentCancelled'),
+    title: t('timeline.paymentCancelled'),
     summary: getString(event.data?.reason),
     details: [],
     icon: Ban,
@@ -155,7 +155,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
   }),
 
   [OrderEventType.ORDER_SPLIT]: (event, t) => ({
-    title: t('timeline.event.splitBill'),
+    title: t('timeline.splitBill'),
     summary: `${formatCurrency(getNumber(event.data?.splitAmount, 0))} (${getString(event.data?.paymentMethod)})`,
     details: getArray<{ name?: string; quantity?: number }>(event.data?.items).map((item) => `${getString(item.name)} x${getNumber(item.quantity, 1)}`),
     icon: Split,
@@ -165,7 +165,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
 
   // ============ Order State Changes ============
   [OrderEventType.ORDER_COMPLETED]: (event, t) => ({
-    title: t('timeline.event.orderCompleted'),
+    title: t('timeline.orderCompleted'),
     summary: event.data?.receiptNumber ? t('timeline.receiptNo', { n: getString(event.data.receiptNumber) }) : formatCurrency(getNumber(event.data?.finalTotal, 0)),
     details: [],
     icon: CheckCircle,
@@ -174,7 +174,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
   }),
 
   [OrderEventType.ORDER_VOIDED]: (event, t) => ({
-    title: t('timeline.event.orderVoided'),
+    title: t('timeline.orderVoided'),
     summary: getString(event.data?.reason),
     details: [],
     icon: Ban,
@@ -183,7 +183,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
   }),
 
   [OrderEventType.ORDER_RESTORED]: (event, t) => ({
-    title: t('timeline.event.orderRestored'),
+    title: t('timeline.orderRestored'),
     details: [],
     icon: CheckCircle,
     colorClass: 'bg-blue-400',
@@ -192,7 +192,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
 
   [OrderEventType.ORDER_SURCHARGE_EXEMPT_SET]: (event, t) => ({
     title: t('timeline.surchargeExempt'),
-    summary: event.data?.exempt ? t('common.yes') : t('common.no'),
+    summary: event.data?.exempt ? t('common.dialog.yes') : t('common.dialog.no'),
     details: [],
     icon: Tag,
     colorClass: 'bg-purple-500',
@@ -203,7 +203,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
   [OrderEventType.ORDER_MERGED]: (event, t) => {
     const itemsLength = getNumber((event.data?.items as unknown[])?.length, 0);
     return {
-      title: t("timeline.event.orderMerged"),
+      title: t('timeline.orderMerged'),
       summary: event.data?.sourceTableName ? t('timeline.fromTable', { n: getString(event.data.sourceTableName) }) : undefined,
       details: itemsLength > 0 ? [t('timeline.itemsMerged', { n: itemsLength })] : [],
       icon: ArrowLeft,
@@ -215,7 +215,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
   [OrderEventType.ORDER_MOVED]: (event, t) => {
     const itemsLength = getNumber((event.data?.items as unknown[])?.length, 0);
     return {
-      title: t("timeline.event.orderMoved"),
+      title: t('timeline.orderMoved'),
       summary: event.data?.targetTableName ? t('timeline.toTable', { n: getString(event.data.targetTableName) }) : undefined,
       details: itemsLength > 0 ? [t('timeline.itemsMoved', { n: itemsLength })] : [],
       icon: ArrowRight,
@@ -225,7 +225,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
   },
 
   [OrderEventType.ORDER_MOVED_OUT]: (event, t) => ({
-    title: t("timeline.event.orderMovedOut"),
+    title: t('timeline.orderMovedOut'),
     summary: event.data?.targetTableName ? t('timeline.toTable', { n: getString(event.data.targetTableName) }) : undefined,
     details: event.data?.reason ? [getString(event.data.reason)] : [],
     icon: ArrowRight,
@@ -234,7 +234,7 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
   }),
 
   [OrderEventType.ORDER_MERGED_OUT]: (event, t) => ({
-    title: t("timeline.event.orderMergedOut"),
+    title: t('timeline.orderMergedOut'),
     summary: event.data?.targetTableName ? t('timeline.toTable', { n: getString(event.data.targetTableName) }) : undefined,
     details: event.data?.reason ? [getString(event.data.reason)] : [],
     icon: ArrowLeft,
@@ -245,9 +245,9 @@ const adapters: Record<string, (event: TimelineEvent, t: TranslateFn) => Timelin
   [OrderEventType.ORDER_INFO_UPDATED]: (event, t) => {
     if (event.data?.isPrePayment) {
       return {
-        title: t("timeline.event.prePaymentPrinted"),
+        title: t('timeline.prePaymentPrinted'),
         summary: event.data?.receiptNumber ? t('timeline.receiptNo', { n: getString(event.data.receiptNumber) }) : undefined,
-        details: [t("timeline.event.prePaymentNote")],
+        details: [t('timeline.prePaymentNote')],
         icon: Printer,
         colorClass: 'bg-blue-600',
         timestamp: event.timestamp,

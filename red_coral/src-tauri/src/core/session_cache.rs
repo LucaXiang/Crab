@@ -50,6 +50,26 @@ pub struct EmployeeSession {
     pub logged_in_at: u64,
 }
 
+impl EmployeeSession {
+    /// 从 JWT token 中解析过期时间 (Unix timestamp)
+    pub fn parse_jwt_exp(token: &str) -> Option<u64> {
+        // JWT 格式: header.payload.signature
+        let parts: Vec<&str> = token.split('.').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+
+        // 解码 payload (base64url)
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+        let payload_bytes = URL_SAFE_NO_PAD.decode(parts[1]).ok()?;
+        let payload_str = String::from_utf8(payload_bytes).ok()?;
+
+        // 解析 JSON 提取 exp 字段
+        let payload: serde_json::Value = serde_json::from_str(&payload_str).ok()?;
+        payload.get("exp")?.as_u64()
+    }
+}
+
 /// 缓存的员工数据
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct CachedEmployee {

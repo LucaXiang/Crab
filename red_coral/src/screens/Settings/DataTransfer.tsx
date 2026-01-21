@@ -4,6 +4,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { toast } from '@/presentation/components/Toast';
 import { createTauriClient, invokeApi } from '@/infrastructure/api';
+import { getErrorMessage } from '@/utils/error';
 
 const api = createTauriClient();
 import { useProductStore, useCategoryStore } from '@/core/stores/resources';
@@ -33,7 +34,7 @@ export const DataTransfer: React.FC = () => {
       toast.success(t('settings.dataTransfer.export.success'));
     } catch (error) {
       console.error('Export failed:', error);
-      toast.error(t('settings.dataTransfer.export.failed') + String(error));
+      toast.error(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -66,7 +67,7 @@ export const DataTransfer: React.FC = () => {
       toast.success(t('settings.dataTransfer.import.success'));
     } catch (error) {
       console.error('[DataTransfer] Import failed:', error);
-      toast.error(t('settings.dataTransfer.import.failed') + String(error));
+      toast.error(getErrorMessage(error));
     } finally {
       setLoading(false);
     }

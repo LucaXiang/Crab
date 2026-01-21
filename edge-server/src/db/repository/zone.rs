@@ -1,6 +1,6 @@
 //! Zone Repository
 
-use super::{BaseRepository, RepoError, RepoResult};
+use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
 use crate::db::models::{Zone, ZoneCreate, ZoneUpdate};
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
@@ -32,7 +32,8 @@ impl ZoneRepository {
 
     /// Find zone by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Zone>> {
-        let zone: Option<Zone> = self.base.db().select((TABLE, id)).await?;
+        let pure_id = strip_table_prefix(TABLE, id);
+        let zone: Option<Zone> = self.base.db().select((TABLE, pure_id)).await?;
         Ok(zone)
     }
 
@@ -72,8 +73,9 @@ impl ZoneRepository {
 
     /// Update a zone
     pub async fn update(&self, id: &str, data: ZoneUpdate) -> RepoResult<Zone> {
+        let pure_id = strip_table_prefix(TABLE, id);
         let existing = self
-            .find_by_id(id)
+            .find_by_id(pure_id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Zone {} not found", id)))?;
 
@@ -88,19 +90,30 @@ impl ZoneRepository {
             )));
         }
 
-        let updated: Option<Zone> = self.base.db().update((TABLE, id)).merge(data).await?;
-        updated.ok_or_else(|| RepoError::NotFound(format!("Zone {} not found", id)))
+        let thing = make_thing(TABLE, pure_id);
+        self.base
+            .db()
+            .query("UPDATE $thing MERGE $data")
+            .bind(("thing", thing))
+            .bind(("data", data))
+            .await?;
+
+        self.find_by_id(pure_id)
+            .await?
+            .ok_or_else(|| RepoError::NotFound(format!("Zone {} not found", id)))
     }
 
-    /// Soft delete a zone (check for tables first)
+    /// Hard delete a zone (check for tables first)
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
+        let pure_id = strip_table_prefix(TABLE, id);
+
         // Check if zone has dining tables
-        let zone_thing = super::make_thing(TABLE, id);
+        let zone_thing = make_thing(TABLE, pure_id);
         let mut result = self
             .base
             .db()
             .query("SELECT count() FROM dining_table WHERE zone = $zone AND is_active = true GROUP ALL")
-            .bind(("zone", zone_thing))
+            .bind(("zone", zone_thing.clone()))
             .await?;
         let count: Option<i64> = result.take((0, "count"))?;
 
@@ -110,16 +123,11 @@ impl ZoneRepository {
             ));
         }
 
-        let result: Option<Zone> = self
-            .base
+        self.base
             .db()
-            .update((TABLE, id))
-            .merge(ZoneUpdate {
-                name: None,
-                description: None,
-                is_active: Some(false),
-            })
+            .query("DELETE $thing")
+            .bind(("thing", zone_thing))
             .await?;
-        Ok(result.is_some())
+        Ok(true)
     }
 }

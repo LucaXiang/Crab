@@ -79,7 +79,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
 
   const handleExport = () => {
      // Placeholder for export functionality
-     toast.success(t('common.exported'));
+     toast.success(t('common.message.exported'));
   };
 
   const handleSort = (field: string) => {
@@ -103,7 +103,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
       return (
         <div className="flex flex-col items-center justify-center h-96 text-gray-400">
           <Loader2 size={48} className="animate-spin mb-4 text-blue-500" />
-          <p>{t('common.loading')}</p>
+          <p>{t('common.message.loading')}</p>
         </div>
       );
     }
@@ -117,7 +117,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
               onClick={fetchReport}
               className="mt-4 px-4 py-2 bg-white border border-red-200 rounded-md shadow-sm text-red-600 hover:bg-red-50"
           >
-              {t('common.retry')}
+              {t('common.action.retry')}
           </button>
         </div>
       );
@@ -127,7 +127,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
       return (
         <div className="flex flex-col items-center justify-center h-96 text-gray-400">
           <FileText size={48} className="mb-4 opacity-20" />
-          <p>{t('statistics.noData')}</p>
+          <p>{t('common.empty.noData')}</p>
         </div>
       );
     }
@@ -151,7 +151,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
                 onClick={() => handleSort('date')}
               >
                 <div className="flex items-center">
-                  {t('common.date')}
+                  {t('common.label.date')}
                   <SortIcon field="date" />
                 </div>
               </th>
@@ -161,7 +161,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
                 onClick={() => handleSort('total')}
               >
                 <div className="flex items-center justify-end">
-                  {t('common.total')}
+                  {t('common.label.total')}
                   <SortIcon field="total" />
                 </div>
               </th>
@@ -236,7 +236,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
                     className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
                 >
                     <Download size={18} />
-                    {t('common.export')}
+                    {t('common.action.export')}
                 </button>
             </div>
         </div>
@@ -246,7 +246,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                 <input 
                     type="text"
-                    placeholder={t('common.search')}
+                    placeholder={t('common.action.search')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -280,7 +280,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
       {data.length > 0 && (
         <div className="p-4 border-t border-gray-100 flex items-center justify-between bg-gray-50">
             <div className="text-sm text-gray-500">
-                {t('common.showing')} {((page - 1) * pageSize) + 1} {t('common.to')} {Math.min(page * pageSize, totalCount)} {t('common.of')} {totalCount} {t('common.entries')}
+                {t('common.selection.showing')} {((page - 1) * pageSize) + 1} {t('common.label.to')} {Math.min(page * pageSize, totalCount)} {t('common.label.of')} {totalCount} {t('common.label.entries')}
             </div>
             <div className="flex gap-2">
                 <button 
@@ -291,7 +291,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
                     <ChevronLeft size={18} />
                 </button>
                 <div className="flex items-center px-4 bg-white border border-gray-200 rounded-md text-sm font-medium text-gray-700">
-                    {t('common.page')} {page} {t('common.of')} {totalPages}
+                    {t('common.label.page')} {page} {t('common.label.of')} {totalPages}
                 </div>
                 <button 
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}

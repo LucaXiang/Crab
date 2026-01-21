@@ -337,7 +337,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
 
                   {loading && zoneTables.length === 0 ? (
                     <div className="text-center text-gray-400 text-sm py-8">
-                      {t('common.loading')}
+                      {t('common.message.loading')}
                     </div>
                   ) : zoneTables.length === 0 ? (
                     <div className="text-center text-gray-400 text-sm py-8">
@@ -347,14 +347,12 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pb-10">
                       {filteredTables.map((table) => {
                         const order = getOrder(table.id);
-                        const tableZone = zones.find(z => z.id === table.zone);
                         return (
                           <TableCard
                             key={table.id}
                             table={table}
                             order={order}
                             mode={mode}
-                            zone={tableZone}
                             onClick={() => handleTableClick(table, !!order, order)}
                           />
                         );

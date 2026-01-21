@@ -82,7 +82,7 @@ const PaymentSuccessModalComponent: React.FC<PaymentSuccessModalProps> = ({
               className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
             >
               <Printer size={20} />
-              {t('common.print')}
+              {t('common.action.print')}
             </button>
             <button 
               onClick={(e) => {
@@ -91,12 +91,12 @@ const PaymentSuccessModalComponent: React.FC<PaymentSuccessModalProps> = ({
               }}
               className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors"
             >
-              {t('common.close')}
+              {t('common.action.close')}
             </button>
           </div>
         ) : (
           <div className="mt-8 text-sm text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" onClick={onClose}>
-             {t('common.tapToClose')}
+             {t('common.hint.tapToClose')}
              {autoCloseDelay > 0 && ` (${timeLeft}s)`}
           </div>
         )}

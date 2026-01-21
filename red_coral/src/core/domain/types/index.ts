@@ -44,7 +44,6 @@ export type {
   OrderMergedPayload,
   OrderMergedOutPayload,
   TableReassignedPayload,
-  SurchargeExemptSetPayload,
   OrderInfoUpdatedPayload,
   // Command types
   OrderCommand,
@@ -62,7 +61,6 @@ export type {
   SplitOrderCommand,
   MoveOrderCommand,
   MergeOrdersCommand,
-  SetSurchargeExemptCommand,
   UpdateOrderInfoCommand,
   // Response types
   CommandResponse,
@@ -81,7 +79,6 @@ export type {
   ItemChanges as ServerItemChanges,
   SplitItem,
   PaymentSummaryItem,
-  SurchargeConfig,
   PaymentRecord as ServerPaymentRecord,
   PaymentMethod,
   OrderConnectionState,
@@ -98,6 +95,8 @@ export interface CartItem {
   price: number;
   originalPrice?: number;
   quantity: number;
+  /** Unpaid quantity (computed by backend: quantity - paid_quantity) */
+  unpaidQuantity?: number;
   note?: string;
   attributes?: ItemAttributeSelection[];
   selectedOptions?: ItemAttributeSelection[];
@@ -139,14 +138,6 @@ export interface PaymentRecord {
   change?: number;
 }
 
-export interface SurchargeInfo {
-  type: 'percentage' | 'fixed';
-  amount: number;
-  total: number;
-  value?: number;
-  name?: string;
-}
-
 export type OrderStatus = 'ACTIVE' | 'COMPLETED' | 'VOID' | 'MOVED' | 'MERGED';
 
 export interface HeldOrder {
@@ -162,8 +153,6 @@ export interface HeldOrder {
   subtotal: number;
   tax: number;
   discount: number;
-  surcharge?: SurchargeInfo;
-  surchargeExempt?: boolean;
   total: number;
   paidAmount?: number;
   paidItemQuantities?: Record<string, number>;

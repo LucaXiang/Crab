@@ -5,11 +5,11 @@ use tauri::State;
 use tokio::sync::RwLock;
 
 use crate::core::DeleteData;
-use crate::core::response::TenantListData;
-use crate::core::{ApiResponse, ClientBridge};
+use crate::core::response::{ApiResponse, ErrorCode, TenantListData};
+use crate::core::ClientBridge;
 
 /// 获取已激活的租户列表
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn list_tenants(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<TenantListData>, String> {
@@ -23,7 +23,7 @@ pub async fn list_tenants(
 /// 激活新租户 (设备激活)
 ///
 /// 同时预激活 edge-server，为 Server 模式做准备
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn activate_tenant(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     auth_url: String,
@@ -39,12 +39,12 @@ pub async fn activate_tenant(
         .await
     {
         Ok(msg) => Ok(ApiResponse::success(msg)),
-        Err(e) => Ok(ApiResponse::error("ACTIVATE_FAILED", e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::ActivationFailed, e.to_string())),
     }
 }
 
 /// 切换当前租户
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn switch_tenant(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     tenant_id: String,
@@ -55,12 +55,12 @@ pub async fn switch_tenant(
     // 它会自动更新 TenantManager 和 Config
     match bridge.switch_tenant(&tenant_id).await {
         Ok(_) => Ok(ApiResponse::success(())),
-        Err(e) => Ok(ApiResponse::error("SWITCH_TENANT_FAILED", e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::TenantNotFound, e.to_string())),
     }
 }
 
 /// 移除租户
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn remove_tenant(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     tenant_id: String,
@@ -70,12 +70,12 @@ pub async fn remove_tenant(
 
     match tenant_manager.remove_tenant(&tenant_id) {
         Ok(_) => Ok(ApiResponse::success(DeleteData::success())),
-        Err(e) => Ok(ApiResponse::error("REMOVE_TENANT_FAILED", e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::TenantNotFound, e.to_string())),
     }
 }
 
 /// 获取当前租户ID
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_current_tenant(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<Option<String>>, String> {

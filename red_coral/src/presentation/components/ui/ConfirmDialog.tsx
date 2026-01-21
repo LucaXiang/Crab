@@ -59,7 +59,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 onClick={onCancel}
                 className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-200 transition-colors active:scale-95 transform"
               >
-                {cancelText || t('common.cancel')}
+                {cancelText || t('common.action.cancel')}
               </button>
             )}
             <button
@@ -72,7 +72,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                     : 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20'
               }`}
             >
-              {confirmText || t('common.confirm')}
+              {confirmText || t('common.action.confirm')}
             </button>
           </div>
         </div>

@@ -19,92 +19,8 @@ import type {
   OrderCommandPayload,
   CommandResponse,
   CartItemInput,
-  SurchargeConfig,
   PaymentMethod,
 } from '@/core/domain/types/orderEvent';
-
-// ============================================================================
-// Helper Functions (Pure Logic)
-// ============================================================================
-
-const applySurchargeToItems = (
-  items: CartItem[],
-  surchargePercentage: number,
-  surchargePerItem: number
-): CartItem[] => {
-  return items.map(item => {
-    const originalPrice = item.originalPrice ?? 0;
-    const discountAmount = calculateDiscountAmount(originalPrice, item.discountPercent || 0);
-    const discountedBase = Currency.sub(originalPrice, discountAmount);
-
-    let itemSurchargeAmount = Currency.toDecimal(0);
-    if (surchargePercentage > 0) {
-      itemSurchargeAmount = Currency.floor2((discountedBase.toNumber() * surchargePercentage) / 100);
-    } else if (surchargePerItem > 0) {
-      itemSurchargeAmount = Currency.floor2(surchargePerItem);
-    }
-
-    const itemForCalc = { ...item, surcharge: itemSurchargeAmount.toNumber() };
-    const finalItemPrice = calculateItemFinalPrice(itemForCalc);
-
-    return {
-      ...item,
-      price: finalItemPrice.toNumber(),
-      surcharge: itemSurchargeAmount.toNumber()
-    };
-  });
-};
-
-const calculateSurchargeInfo = (existingOrder: HeldOrder | undefined, zone: Zone | undefined) => {
-  let surchargePerItem = 0;
-  let surchargePercentage = 0;
-  let orderSurchargeInfo: SurchargeConfig | undefined;
-
-  if (existingOrder?.surcharge) {
-    if (existingOrder.surcharge.type === 'percentage') {
-      surchargePercentage = existingOrder.surcharge.value || 0;
-    } else {
-      surchargePerItem = existingOrder.surcharge.value || 0;
-    }
-    orderSurchargeInfo = {
-      type: existingOrder.surcharge.type,
-      value: existingOrder.surcharge.value || 0,
-      amount: existingOrder.surcharge.amount || 0,
-      total: existingOrder.surcharge.total || 0,
-      name: existingOrder.surcharge.name || null,
-    };
-  } else if (zone?.surcharge_type && zone?.surcharge_amount) {
-    if (zone.surcharge_type === 'percentage') {
-      surchargePercentage = zone.surcharge_amount;
-      orderSurchargeInfo = {
-        type: 'percentage',
-        value: surchargePercentage,
-        amount: 0,
-        total: 0,
-        name: zone.name || null,
-      };
-    } else {
-      surchargePerItem = zone.surcharge_amount;
-      orderSurchargeInfo = {
-        type: 'fixed',
-        value: surchargePerItem,
-        amount: 0,
-        total: 0,
-        name: zone.name || null,
-      };
-    }
-  }
-
-  return { surchargePerItem, surchargePercentage, orderSurchargeInfo };
-};
-
-const prepareItemsWithSurcharge = (
-  cart: CartItem[],
-  surchargePercentage: number,
-  surchargePerItem: number
-) => {
-  return applySurchargeToItems(cart, surchargePercentage, surchargePerItem);
-};
 
 // ============================================================================
 // Command Helpers
@@ -192,15 +108,11 @@ function toCartItemInput(item: CartItem): CartItemInput {
 const handleMergeToOrder = async (
   orderId: string,
   cart: CartItem[],
-  surchargePercentage: number,
-  surchargePerItem: number,
 ): Promise<'MERGED'> => {
-  const itemsToAdd = prepareItemsWithSurcharge(cart, surchargePercentage, surchargePerItem);
-
   const command = createCommand({
     type: 'ADD_ITEMS',
     order_id: orderId,
-    items: itemsToAdd.map(toCartItemInput),
+    items: cart.map(toCartItemInput),
   });
 
   await sendCommand(command);
@@ -213,15 +125,7 @@ const handleCreateNewOrder = async (
   guestCount: number,
   zone: Zone | undefined,
   cart: CartItem[],
-  surchargeInfo: { surchargePercentage: number; surchargePerItem: number; orderSurchargeInfo?: SurchargeConfig },
 ): Promise<'CREATED'> => {
-  const receiptNumber = useReceiptStore.getState().generateReceiptNumber();
-  const itemsToAdd = prepareItemsWithSurcharge(
-    cart,
-    surchargeInfo.surchargePercentage,
-    surchargeInfo.surchargePerItem
-  );
-
   // Create order
   const openCommand = createCommand({
     type: 'OPEN_TABLE',
@@ -231,7 +135,6 @@ const handleCreateNewOrder = async (
     zone_name: zone?.name || null,
     guest_count: guestCount,
     is_retail: false,
-    surcharge: surchargeInfo.orderSurchargeInfo || null,
   });
 
   const openResponse = await sendCommand(openCommand);
@@ -242,11 +145,11 @@ const handleCreateNewOrder = async (
   // Get the created order_id from response
   const orderId = openResponse.order_id || tableId;
 
-  // Add items
+  // Add items (Price Rules will be applied by backend)
   const addCommand = createCommand({
     type: 'ADD_ITEMS',
     order_id: orderId,
-    items: itemsToAdd.map(toCartItemInput),
+    items: cart.map(toCartItemInput),
   });
 
   await sendCommand(addCommand);
@@ -278,24 +181,10 @@ export const handleTableSelect = async (
 
   // 1. If cart has items, we are ADDING (Merge) or CREATING
   if (cart.length > 0) {
-    const surchargeInfo = calculateSurchargeInfo(existingOrder, zone);
-
     if (existingOrder && existingOrder.status === 'ACTIVE') {
-      return handleMergeToOrder(
-        existingSnapshot!.order_id,
-        cart,
-        surchargeInfo.surchargePercentage,
-        surchargeInfo.surchargePerItem,
-      );
+      return handleMergeToOrder(existingSnapshot!.order_id, cart);
     } else {
-      return handleCreateNewOrder(
-        tableId,
-        table,
-        guestCount,
-        zone,
-        cart,
-        surchargeInfo,
-      );
+      return handleCreateNewOrder(tableId, table, guestCount, zone, cart);
     }
   }
 
@@ -347,11 +236,6 @@ export const completeOrder = async (
   });
   await sendCommand(completeCommand);
 
-  // Cleanup payment session
-  import('@/core/stores/order/usePaymentStore').then(({ usePaymentStore }) => {
-    usePaymentStore.getState().clearSession(orderId);
-  });
-
   // Return updated order (may take a moment for event to arrive)
   const snapshot = store.getOrder(orderId);
   return snapshot ? toHeldOrder(snapshot) : order;
@@ -373,11 +257,6 @@ export const voidOrder = async (
     reason: reason || null,
   });
   await sendCommand(command);
-
-  // Cleanup
-  import('@/core/stores/order/usePaymentStore').then(({ usePaymentStore }) => {
-    usePaymentStore.getState().clearSession(orderId);
-  });
 
   const snapshot = store.getOrder(orderId);
   return snapshot ? toHeldOrder(snapshot) : order;
@@ -540,28 +419,6 @@ export const mergeOrders = async (
 
   const snapshot = store.getOrder(targetId);
   return snapshot ? toHeldOrder(snapshot) : targetOrder;
-};
-
-/**
- * Set surcharge exempt status
- */
-export const setSurchargeExempt = async (
-  order: HeldOrder,
-  exempt: boolean
-): Promise<HeldOrder> => {
-  const store = useActiveOrdersStore.getState();
-  const orderId = order.id || order.key || String(order.tableId || '');
-
-  const command = createCommand({
-    type: 'SET_SURCHARGE_EXEMPT',
-    order_id: orderId,
-    exempt,
-  });
-
-  await sendCommand(command);
-
-  const snapshot = store.getOrder(orderId);
-  return snapshot ? toHeldOrder(snapshot) : order;
 };
 
 // ============================================================================

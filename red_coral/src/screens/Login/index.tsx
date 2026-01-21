@@ -20,7 +20,6 @@ export const LoginScreen: React.FC = () => {
     currentSession,
     modeInfo,
     loginEmployee,
-    loginAuto,
     fetchModeInfo,
     fetchTenants,
     checkFirstRun,
@@ -61,13 +60,13 @@ export const LoginScreen: React.FC = () => {
   // Use appState for navigation decisions (consistent with ProtectedRoute)
   const appState = useAppState();
 
-  // Navigate when authenticated (based on appState, not local session)
+  // Navigate when authenticated (check both appState AND isAuthenticated)
   useEffect(() => {
-    if (AppStateHelpers.canAccessPOS(appState)) {
+    if (AppStateHelpers.canAccessPOS(appState) && isAuthenticated) {
       const from = (location.state as any)?.from?.pathname || '/pos';
       navigate(from, { replace: true });
     }
-  }, [appState, navigate, location]);
+  }, [appState, isAuthenticated, navigate, location]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,17 +79,10 @@ export const LoginScreen: React.FC = () => {
     }
 
     try {
-      // Use appropriate login method based on mode
-      // Server mode: use unified loginEmployee (In-Process)
-      // Client mode: use loginAuto (mTLS HTTP)
-      let response;
-      if (modeInfo?.mode === 'Server') {
-        response = await loginEmployee(username, password);
-      } else {
-        // TODO: Get edge URL from config
-        const edgeUrl = 'https://localhost:9625';
-        response = await loginAuto(username, password, edgeUrl);
-      }
+      // Use unified loginEmployee for both Server and Client modes
+      // - Server mode: In-Process communication via CrabClient
+      // - Client mode: mTLS HTTP communication via CrabClient
+      const response = await loginEmployee(username, password);
 
       if (response.success && response.session) {
         setLoginMode(response.mode);
@@ -204,7 +196,7 @@ export const LoginScreen: React.FC = () => {
         <button
           onClick={handleCloseApp}
           className="absolute top-6 right-6 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-20"
-          title={t('common.closeApp')}
+          title={t('common.dialog.closeApp')}
         >
           <Power size={24} />
         </button>

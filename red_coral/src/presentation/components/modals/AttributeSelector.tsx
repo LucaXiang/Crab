@@ -68,7 +68,7 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
           {attribute.name}
           {isRequired && (
             <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium">
-              {t('common.required')}
+              {t('common.label.required')}
             </span>
           )}
         </h3>
@@ -125,7 +125,7 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
 
               {/* Default Badge */}
               {isDefault && !isSelected && (
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full border border-white" title={t('common.default')} />
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full border border-white" title={t('common.label.default')} />
               )}
             </button>
           );

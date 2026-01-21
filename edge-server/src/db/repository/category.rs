@@ -1,6 +1,6 @@
 //! Category Repository
 
-use super::{BaseRepository, RepoError, RepoResult, make_thing};
+use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
 use crate::db::models::{Category, CategoryCreate, CategoryUpdate};
 use serde::Serialize;
 use surrealdb::Surreal;
@@ -45,7 +45,9 @@ impl CategoryRepository {
 
     /// Find category by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Category>> {
-        let category: Option<Category> = self.base.db().select((TABLE, id)).await?;
+        // Extract pure id if it contains table prefix (e.g., "category:xxx" -> "xxx")
+        let pure_id = strip_table_prefix(TABLE, id);
+        let category: Option<Category> = self.base.db().select((TABLE, pure_id)).await?;
         Ok(category)
     }
 
@@ -135,20 +137,31 @@ impl CategoryRepository {
             is_active: data.is_active,
         };
 
-        let updated: Option<Category> = self
-            .base
+        // Extract pure id if it contains table prefix
+        let pure_id = strip_table_prefix(TABLE, id);
+
+        // Update using raw query to avoid deserialization issues with null fields
+        let thing = make_thing(TABLE, pure_id);
+        self.base
             .db()
-            .update((TABLE, id))
-            .merge(update_data)
+            .query("UPDATE $thing MERGE $data")
+            .bind(("thing", thing.clone()))
+            .bind(("data", update_data))
             .await?;
 
-        updated.ok_or_else(|| RepoError::NotFound(format!("Category {} not found", id)))
+        // Fetch the updated record
+        self.find_by_id(pure_id)
+            .await?
+            .ok_or_else(|| RepoError::NotFound(format!("Category {} not found", id)))
     }
 
-    /// Soft delete a category
+    /// Hard delete a category
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
+        // Extract pure id if it contains table prefix (e.g., "category:xxx" -> "xxx")
+        let pure_id = strip_table_prefix(TABLE, id);
+
         // Check if category has products
-        let cat_thing = make_thing(TABLE, id);
+        let cat_thing = make_thing(TABLE, pure_id);
         let mut result = self
             .base
             .db()
@@ -165,19 +178,14 @@ impl CategoryRepository {
             ));
         }
 
-        let result: Option<Category> = self
-            .base
+        // Hard delete
+        let thing = make_thing(TABLE, pure_id);
+        self.base
             .db()
-            .update((TABLE, id))
-            .merge(CategoryUpdate {
-                name: None,
-                sort_order: None,
-                kitchen_printer: None,
-                is_kitchen_print_enabled: None,
-                is_label_print_enabled: None,
-                is_active: Some(false),
-            })
+            .query("DELETE $thing")
+            .bind(("thing", thing))
             .await?;
-        Ok(result.is_some())
+
+        Ok(true)
     }
 }

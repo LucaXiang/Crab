@@ -59,6 +59,17 @@ export interface CategoryUpdate {
 
 // ============ Product ============
 
+/** 嵌入式规格 (文档数据库风格) */
+export interface EmbeddedSpec {
+  name: string;
+  /** Price in cents */
+  price: number;
+  display_order: number;
+  is_default: boolean;
+  is_active: boolean;
+  external_id: number | null;
+}
+
 export interface Product {
   id: string | null;
   name: string;
@@ -66,7 +77,6 @@ export interface Product {
   category: string;
   sort_order: number;
   tax_rate: number;
-  has_multi_spec: boolean;
   receipt_name: string | null;
   kitchen_print_name: string | null;
   kitchen_printer: string | null;
@@ -74,6 +84,10 @@ export interface Product {
   is_kitchen_print_enabled: number;
   is_label_print_enabled: number;
   is_active: boolean;
+  /** Tag references (String IDs) */
+  tags: string[];
+  /** 嵌入式规格数组 */
+  specs: EmbeddedSpec[];
 }
 
 export interface ProductCreate {
@@ -82,12 +96,14 @@ export interface ProductCreate {
   category: string;
   sort_order?: number;
   tax_rate?: number;
-  has_multi_spec?: boolean;
   receipt_name?: string;
   kitchen_print_name?: string;
   kitchen_printer?: string;
   is_kitchen_print_enabled?: number;
   is_label_print_enabled?: number;
+  tags?: string[];
+  /** 嵌入式规格 */
+  specs: EmbeddedSpec[];
 }
 
 export interface ProductUpdate {
@@ -96,53 +112,49 @@ export interface ProductUpdate {
   category?: string;
   sort_order?: number;
   tax_rate?: number;
-  has_multi_spec?: boolean;
   receipt_name?: string;
   kitchen_print_name?: string;
   kitchen_printer?: string;
   is_kitchen_print_enabled?: number;
   is_label_print_enabled?: number;
   is_active?: boolean;
+  tags?: string[];
+  /** 嵌入式规格 */
+  specs?: EmbeddedSpec[];
 }
 
-// ============ Product Specification ============
-
-export interface ProductSpecification {
+/** Product attribute binding with full attribute data */
+export interface ProductAttributeBinding {
+  /** Relation ID (has_attribute edge) */
   id: string | null;
-  product: string;
-  name: string;
-  /** Price in cents */
-  price: number;
+  /** Full attribute object */
+  attribute: Attribute;
+  is_required: boolean;
   display_order: number;
-  is_default: boolean;
-  is_active: boolean;
-  is_root: boolean;
-  external_id: number | null;
-  tags: string[];
-  created_at: string | null;
-  updated_at: string | null;
+  default_option_idx: number | null;
 }
 
-export interface ProductSpecificationCreate {
-  product: string;
+/** Full product with all related data */
+export interface ProductFull {
+  id: string | null;
   name: string;
-  price: number;
-  display_order?: number;
-  is_default?: boolean;
-  is_root?: boolean;
-  external_id?: number;
-  tags?: string[];
-}
-
-export interface ProductSpecificationUpdate {
-  name?: string;
-  price?: number;
-  display_order?: number;
-  is_default?: boolean;
-  is_active?: boolean;
-  is_root?: boolean;
-  external_id?: number;
-  tags?: string[];
+  image: string;
+  category: string;
+  sort_order: number;
+  tax_rate: number;
+  receipt_name: string | null;
+  kitchen_print_name: string | null;
+  kitchen_printer: string | null;
+  /** -1=inherit, 0=disabled, 1=enabled */
+  is_kitchen_print_enabled: number;
+  is_label_print_enabled: number;
+  is_active: boolean;
+  /** Embedded specifications */
+  specs: EmbeddedSpec[];
+  /** Attribute bindings with full attribute data */
+  attributes: ProductAttributeBinding[];
+  /** Tags attached to this product */
+  tags: Tag[];
 }
 
 // ============ Attribute ============
@@ -197,10 +209,10 @@ export interface AttributeUpdate {
 
 export interface HasAttribute {
   id: string | null;
-  /** Product or Category ID (serialized as "in" from Rust) */
-  'in': string;
-  /** Attribute ID (serialized as "out" from Rust) */
-  'out': string;
+  /** Product or Category ID */
+  from: string;
+  /** Attribute ID */
+  to: string;
   is_required: boolean;
   display_order: number;
   default_option_idx: number | null;
@@ -236,10 +248,6 @@ export interface Zone {
   name: string;
   description: string | null;
   is_active: boolean;
-  /** Surcharge type: 'percentage' or 'fixed' */
-  surcharge_type?: 'percentage' | 'fixed';
-  /** Surcharge amount (percentage value or fixed amount in cents) */
-  surcharge_amount?: number;
 }
 
 export interface ZoneCreate {

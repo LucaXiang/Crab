@@ -141,7 +141,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
           if (val === null || val === undefined) {
             return (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                {t('common.default')}
+                {t('common.label.default')}
               </span>
             );
           }
@@ -152,7 +152,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
                 isEnabled ? 'bg-orange-50 text-orange-700' : 'bg-gray-100 text-gray-600'
               }`}
             >
-              {isEnabled ? (t('common.enabled')) : (t('common.disabled'))}
+              {isEnabled ? (t('common.status.enabled')) : (t('common.status.disabled'))}
             </span>
           );
         },
@@ -166,7 +166,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
           if (val === null || val === undefined) {
             return (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                {t('common.default')}
+                {t('common.label.default')}
               </span>
             );
           }
@@ -177,7 +177,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
                 isEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'
               }`}
             >
-              {isEnabled ? (t('common.enabled')) : (t('common.disabled'))}
+              {isEnabled ? (t('common.status.enabled')) : (t('common.status.disabled'))}
             </span>
           );
         },
@@ -197,7 +197,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-700 rounded-lg text-xs font-medium hover:bg-teal-100 transition-colors border border-teal-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <List size={14} />
-            <span>{t('settings.category.action.adjustOrder')}</span>
+            <span>{t('settings.category.adjustCategoryOrder')}</span>
           </button>
         ),
       },
@@ -220,7 +220,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
       <FilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder={t('common.searchPlaceholder')}
+        searchPlaceholder={t('common.hint.searchPlaceholder')}
         totalCount={filteredItems.length}
         countUnit={t('settings.category.unit')}
         themeColor="teal"
@@ -233,7 +233,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
         getRowKey={(item) => item.name}
         onEdit={canManageCategories ? (item) => openModal('CATEGORY', 'EDIT', item) : undefined}
         onDelete={canManageCategories ? (item) => openModal('CATEGORY', 'DELETE', item) : undefined}
-        emptyText={t('settings.category.noData')}
+        emptyText={t('common.empty.noData')}
         themeColor="teal"
       />
 

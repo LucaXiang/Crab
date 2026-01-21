@@ -98,8 +98,6 @@ interface OrderEventStore {
    */
   cancelPayment: (orderKey: string, paymentId: string, reason?: string) => void;
 
-  setSurchargeExempt: (orderKey: string, exempt: boolean) => void;
-
   updateOrderInfo: (
     orderKey: string,
     info: {
@@ -465,24 +463,6 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
     get()._addEvent(orderKey, event);
   },
 
-  setSurchargeExempt: (orderKey, exempt) => {
-    const order = get().getOrder(orderKey);
-    const s = order?.surcharge;
-    const event = createEvent(OrderEventType.ORDER_SURCHARGE_EXEMPT_SET, {
-      exempt,
-      surcharge: s
-        ? {
-            type: s.type,
-            amount: s.amount,
-            total: s.total,
-            value: s.value,
-            name: s.name,
-          }
-        : undefined,
-    });
-    get()._addEvent(orderKey, event);
-  },
-
   updateOrderInfo: (orderKey, info) => {
     const event = createEvent(OrderEventType.ORDER_INFO_UPDATED, info);
     get()._addEvent(orderKey, event);
@@ -543,7 +523,6 @@ export const useOrderEventStore = create<OrderEventStore & OrderEventStoreState>
       zoneId: targetTable.zoneId,
       zoneName: targetTable.zoneName,
       guestCount: sourceOrder.guestCount,
-      surcharge: sourceOrder.surcharge,
     });
     get()._addEvent(targetOrderKey, openEvent);
 
@@ -793,7 +772,6 @@ export const useOrderActions = () => {
     restoreItem: state.restoreItem,
     addPayment: state.addPayment,
     cancelPayment: state.cancelPayment,
-    setSurchargeExempt: state.setSurchargeExempt,
     updateOrderInfo: state.updateOrderInfo,
   })));
 };

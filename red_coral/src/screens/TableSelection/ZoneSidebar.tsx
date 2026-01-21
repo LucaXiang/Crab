@@ -16,7 +16,7 @@ export const ZoneSidebar: React.FC<ZoneSidebarProps> = React.memo(
       <div className="w-40 bg-white border-r border-gray-200 flex flex-col overflow-y-auto shrink-0">
         <div className="p-2">
           <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">
-            {t('table.common.zones')}
+            {t('table.zones')}
           </h2>
           <div className="space-y-1">
             <button
@@ -30,11 +30,11 @@ export const ZoneSidebar: React.FC<ZoneSidebarProps> = React.memo(
                 }
               `}
             >
-              <span className="text-xs">{t('common.all')}</span>
+              <span className="text-xs">{t('common.status.all')}</span>
             </button>
             {zones.length === 0 ? (
               <div className="text-center text-gray-400 text-xs py-4">
-                {t('common.na')}
+                {t('common.label.none')}
               </div>
             ) : (
               zones.map((zone) => (
@@ -51,15 +51,6 @@ export const ZoneSidebar: React.FC<ZoneSidebarProps> = React.memo(
                   `}
                 >
                   <span className="text-xs truncate">{zone.name}</span>
-                  {zone.surcharge_amount && zone.surcharge_amount > 0 && (
-                    <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                      activeZoneId === zone.id 
-                        ? 'bg-white/20 text-white' 
-                        : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {zone.surcharge_type === 'percentage' ? `${zone.surcharge_amount}%` : `+${zone.surcharge_amount}`}
-                    </span>
-                  )}
                 </button>
               ))
             )}

@@ -1,6 +1,6 @@
 //! Kitchen Printer Repository
 
-use super::{BaseRepository, RepoError, RepoResult};
+use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
 use crate::db::models::{KitchenPrinter, KitchenPrinterCreate, KitchenPrinterUpdate};
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
@@ -32,7 +32,8 @@ impl KitchenPrinterRepository {
 
     /// Find printer by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<KitchenPrinter>> {
-        let printer: Option<KitchenPrinter> = self.base.db().select((TABLE, id)).await?;
+        let pure_id = strip_table_prefix(TABLE, id);
+        let printer: Option<KitchenPrinter> = self.base.db().select((TABLE, pure_id)).await?;
         Ok(printer)
     }
 
@@ -73,8 +74,10 @@ impl KitchenPrinterRepository {
 
     /// Update a kitchen printer
     pub async fn update(&self, id: &str, data: KitchenPrinterUpdate) -> RepoResult<KitchenPrinter> {
+        let pure_id = strip_table_prefix(TABLE, id);
+
         let existing = self
-            .find_by_id(id)
+            .find_by_id(pure_id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Kitchen printer {} not found", id)))?;
 
@@ -89,24 +92,28 @@ impl KitchenPrinterRepository {
             )));
         }
 
-        let updated: Option<KitchenPrinter> =
-            self.base.db().update((TABLE, id)).merge(data).await?;
-        updated.ok_or_else(|| RepoError::NotFound(format!("Kitchen printer {} not found", id)))
+        let thing = make_thing(TABLE, pure_id);
+        self.base
+            .db()
+            .query("UPDATE $thing MERGE $data")
+            .bind(("thing", thing))
+            .bind(("data", data))
+            .await?;
+
+        self.find_by_id(pure_id)
+            .await?
+            .ok_or_else(|| RepoError::NotFound(format!("Kitchen printer {} not found", id)))
     }
 
-    /// Soft delete a kitchen printer
+    /// Hard delete a kitchen printer
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let result: Option<KitchenPrinter> = self
-            .base
+        let pure_id = strip_table_prefix(TABLE, id);
+        let thing = make_thing(TABLE, pure_id);
+        self.base
             .db()
-            .update((TABLE, id))
-            .merge(KitchenPrinterUpdate {
-                name: None,
-                printer_name: None,
-                description: None,
-                is_active: Some(false),
-            })
+            .query("DELETE $thing")
+            .bind(("thing", thing))
             .await?;
-        Ok(result.is_some())
+        Ok(true)
     }
 }

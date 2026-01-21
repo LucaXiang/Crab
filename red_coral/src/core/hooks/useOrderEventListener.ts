@@ -45,7 +45,7 @@ export function useOrderEventListener() {
     try {
       // Fetch all active orders from server
       const response = await invokeApi<SyncResponse>('order_sync_since', {
-        sinceSequence: 0,
+        since_sequence: 0,
       });
 
       // Full sync with server state
@@ -118,16 +118,16 @@ export function useOrderEventListener() {
  * Provides methods for manual sync operations (reconnection, refresh, etc.)
  */
 export function useOrderSyncActions() {
-  const syncOrders = useCallback(async (sinceSequence: number = 0) => {
+  const syncOrders = useCallback(async (since_sequence: number = 0) => {
     const store = useActiveOrdersStore.getState();
     store._setConnectionState('syncing');
 
     try {
       const response = await invokeApi<SyncResponse>('order_sync_since', {
-        sinceSequence,
+        since_sequence,
       });
 
-      if (response.requires_full_sync || sinceSequence === 0) {
+      if (response.requires_full_sync || since_sequence === 0) {
         store._fullSync(response.active_orders, response.server_sequence);
       } else if (response.events.length > 0) {
         store._applyEvents(response.events);

@@ -1,21 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Image as ImageIcon, Tag, Hash, FileText, Layers, MoreHorizontal, PackagePlus, Printer } from 'lucide-react';
+import { Image as ImageIcon, Tag, Hash, FileText, Layers, MoreHorizontal, Printer } from 'lucide-react';
 import { FormField, inputClass, selectClass } from './FormField';
 import { AttributeSelectionModal } from './AttributeSelectionModal';
-import { convertFileSrc } from '@tauri-apps/api/core';
-import { createTauriClient, invokeApi } from '@/infrastructure/api';
+import { ProductImage } from '@/presentation/components/ProductImage';
 import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions } from '@/core/stores/resources';
 import { useIsKitchenPrintEnabled, useIsLabelPrintEnabled } from '@/core/stores/ui';
 import { usePriceInput } from '@/hooks/usePriceInput';
 import { SelectField } from '@/presentation/components/form/FormField/SelectField';
 import { KitchenPrinterSelector } from '@/presentation/components/form/FormField/KitchenPrinterSelector';
 import { AttributeDisplayTag } from '@/presentation/components/form/FormField/AttributeDisplayTag';
-import { SpecificationManagementModal } from '../components/SpecificationManagementModal';
-import { Category, ProductSpecification } from '@/core/domain/types';
-import { formatCurrency } from '@/utils/currency';
-
-// API client for fetching specs
-const api = createTauriClient();
+import { Category, EmbeddedSpec } from '@/core/domain/types';
 
 interface ProductFormProps {
   formData: {
@@ -23,7 +17,7 @@ interface ProductFormProps {
     name: string;
     receiptName?: string;
     price: number;
-    categoryId?: number;
+    categoryId?: string | number;
     image: string;
     externalId?: number;
     taxRate: number;
@@ -33,8 +27,8 @@ interface ProductFormProps {
     kitchenPrintName?: string;
     isKitchenPrintEnabled?: number | null;
     isLabelPrintEnabled?: number | null;
-    hasMultiSpec?: boolean; // Whether this product has multiple specifications
-    tempSpecifications?: ProductSpecification[];
+    specs?: EmbeddedSpec[]; // Embedded specifications
+    selectedTagIds?: string[]; // Tag IDs loaded from getProductFull API
   };
   categories: Category[];
   onFieldChange: (field: string, value: any) => void;
@@ -54,7 +48,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const isGlobalKitchenEnabled = useIsKitchenPrintEnabled();
   const isGlobalLabelEnabled = useIsLabelPrintEnabled();
   const [showAttributeModal, setShowAttributeModal] = useState(false);
-  const [showSpecModal, setShowSpecModal] = useState(false);
   const allAttributes = useAttributes();
   const optionsMap = useAttributeStore(state => state.options);
   const { loadAttributes } = useAttributeActions();
@@ -89,29 +82,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     }
   }, [formData.selectedAttributeIds]);
 
-  const [previewSpecs, setPreviewSpecs] = useState<ProductSpecification[]>([]);
-
-  // Fetch specs for preview
-  useEffect(() => {
-    const fetchSpecs = async () => {
-      if (formData.id) {
-        try {
-          const response = await api.listProductSpecs(Number(formData.id));
-          setPreviewSpecs(response.data?.specs || []);
-        } catch (e) {
-          console.error('Failed to fetch specs for preview:', e);
-        }
-      } else {
-        setPreviewSpecs(formData.tempSpecifications || []);
-      }
-    };
-
-    // Fetch on mount and when modal closes to ensure latest data
-    if (!showSpecModal) {
-      fetchSpecs();
-    }
-  }, [formData.id, showSpecModal, formData.tempSpecifications]);
-
   const TAX_RATES = [
     { value: 21, label: t('settings.product.form.taxRateGeneral') },
     { value: 10, label: t('settings.product.form.taxRateReduced') },
@@ -131,7 +101,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 pb-2 border-b border-gray-100">
           <Tag size={16} className="text-orange-500" />
           {t('settings.form.basicInfo')}
-          <span className="text-xs font-normal text-gray-400 ml-auto">{t('common.required')}</span>
+          <span className="text-xs font-normal text-gray-400 ml-auto">{t('common.label.required')}</span>
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -149,8 +119,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           <SelectField
             label={t('settings.product.form.category')}
             value={formData.categoryId ?? ''}
-            onChange={(value) => onFieldChange('categoryId', Number(value))}
-            options={categories.map(c => ({ value: c.id, label: c.name }))}
+            onChange={(value) => onFieldChange('categoryId', value)}
+            options={categories.map(c => ({ value: c.id ?? '', label: c.name }))}
             placeholder={t('settings.product.form.selectCategory')}
             required
           />
@@ -173,11 +143,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 className={`${inputClass} pl-8 font-mono font-medium`}
               />
             </div>
-            {formData.hasMultiSpec && (
-              <p className="text-xs text-orange-500 mt-1">
-                {t('settings.product.form.priceBaseHint')}
-              </p>
-            )}
           </FormField>
 
           <SelectField
@@ -216,7 +181,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 pb-2 border-b border-gray-100">
           <Printer size={16} className="text-teal-500" />
           {t('settings.product.print.settings')}
-          <span className="text-xs font-normal text-gray-400 ml-auto">{t('common.optional')}</span>
+          <span className="text-xs font-normal text-gray-400 ml-auto">{t('common.label.optional')}</span>
         </h3>
 
         <div className="space-y-4">
@@ -242,9 +207,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     }}
                     className={selectClass}
                   >
-                    <option value="-1">{t('common.default')}</option>
-                    <option value="1">{t('common.enabled')}</option>
-                    <option value="0">{t('common.disabled')}</option>
+                    <option value="-1">{t('common.label.default')}</option>
+                    <option value="1">{t('common.status.enabled')}</option>
+                    <option value="0">{t('common.status.disabled')}</option>
                   </select>
                   {(formData.isKitchenPrintEnabled === undefined || formData.isKitchenPrintEnabled === null || formData.isKitchenPrintEnabled === -1) && (
                     <div className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
@@ -252,10 +217,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       <span>
                         {t('settings.product.print.effectiveState')}: {
                           (() => {
-                            if (!isGlobalKitchenEnabled) return (t('common.disabledGlobal'));
+                            if (!isGlobalKitchenEnabled) return (t('common.status.disabledGlobal'));
                             const cat = categories.find(c => String(c.id) === String(formData.categoryId));
                             const isEnabled = cat ? (cat.is_kitchen_print_enabled !== false) : true;
-                            return isEnabled ? (t('common.enabled')) : (t('common.disabled'));
+                            return isEnabled ? (t('common.status.enabled')) : (t('common.status.disabled'));
                           })()
                         }
                       </span>
@@ -307,9 +272,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     }}
                     className={selectClass}
                   >
-                    <option value="-1">{t('common.default')}</option>
-                    <option value="1">{t('common.enabled')}</option>
-                    <option value="0">{t('common.disabled')}</option>
+                    <option value="-1">{t('common.label.default')}</option>
+                    <option value="1">{t('common.status.enabled')}</option>
+                    <option value="0">{t('common.status.disabled')}</option>
                   </select>
                   {(formData.isLabelPrintEnabled === undefined || formData.isLabelPrintEnabled === null || formData.isLabelPrintEnabled === -1) && (
                     <div className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
@@ -317,10 +282,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       <span>
                         {t('settings.product.print.effectiveState')}: {
                           (() => {
-                            if (!isGlobalLabelEnabled) return (t('common.disabledGlobal'));
+                            if (!isGlobalLabelEnabled) return (t('common.status.disabledGlobal'));
                             const cat = categories.find(c => String(c.id) === String(formData.categoryId));
                             const isEnabled = cat ? (cat.is_label_print_enabled !== false) : true;
-                            return isEnabled ? (t('common.enabled')) : (t('common.disabled'));
+                            return isEnabled ? (t('common.status.enabled')) : (t('common.status.disabled'));
                           })()
                         }
                       </span>
@@ -364,7 +329,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 pb-2 border-b border-gray-100">
           <MoreHorizontal size={16} className="text-blue-500" />
           {t('settings.form.extendedInfo')}
-          <span className="text-xs font-normal text-gray-400 ml-auto">{t('common.optional')}</span>
+          <span className="text-xs font-normal text-gray-400 ml-auto">{t('common.label.optional')}</span>
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
@@ -379,12 +344,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 onClick={onSelectImage}
               >
                 {formData.image ? (
-                  <img
-                    src={
-                      /^(https?:\/\/|data:)/.test(formData.image)
-                        ? formData.image
-                        : convertFileSrc(formData.image)
-                    }
+                  <ProductImage
+                    src={formData.image}
                     alt="preview"
                     className="w-full h-full object-cover"
                   />
@@ -400,7 +361,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     onClick={onSelectImage}
                     className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    {formData.image ? (t('common.change')) : (t('common.uploadImage'))}
+                    {formData.image ? (t('common.action.change')) : (t('common.action.uploadImage'))}
                   </button>
                   {formData.image && (
                     <button
@@ -408,7 +369,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       onClick={() => onFieldChange('image', '')}
                       className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded-lg hover:bg-red-100 transition-colors"
                     >
-                      {t('common.remove')}
+                      {t('common.action.remove')}
                     </button>
                   )}
                 </div>
@@ -421,98 +382,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         </div>
       </section>
 
-      {/* Block 4: Product Specifications (Optional) - Only show in EDIT mode */}
-      {formData.id && (
-      <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-4 shadow-sm">
-        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900">
-            <PackagePlus size={16} className="text-teal-500" />
-            {t('settings.product.specification.title')}
-          </h3>
-          <button
-            type="button"
-            onClick={() => setShowSpecModal(true)}
-            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-all shadow-sm"
-          >
-            {t('settings.product.specification.manage')}
-          </button>
-        </div>
-
-        <div className={`rounded-xl border ${formData.hasMultiSpec && previewSpecs.length > 0 ? 'border-gray-100 bg-white' : 'border-dashed border-gray-200 bg-gray-50/50'} min-h-[80px] p-4 transition-all`}>
-          {formData.hasMultiSpec ? (
-            previewSpecs.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {previewSpecs.map(spec => (
-                  <div key={spec.id} className="flex justify-between items-center bg-white p-3 rounded-lg border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0"></div>
-                      <span className="text-sm font-medium text-gray-900 truncate group-hover:text-teal-700 transition-colors">
-                        {spec.is_root && !spec.name ? t('settings.product.specification.label.default') : spec.name}
-                      </span>
-                      {spec.is_default && (
-                        <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold text-teal-600 bg-teal-50 rounded border border-teal-100">
-                          {t('common.default')}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-sm font-mono font-medium text-gray-600 shrink-0">
-                      {formatCurrency(spec.price)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-2 text-gray-400 gap-2">
-                <PackagePlus size={20} className="text-gray-300" />
-                <span className="text-sm">{t('settings.product.specification.noConfigured')}</span>
-              </div>
-            )
-          ) : (
-            <div className="flex flex-col items-center justify-center py-2 text-gray-400 gap-2">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                <span className="text-sm font-medium text-gray-500">{t('settings.product.specification.disabled')}</span>
-              </div>
-              <span className="text-xs text-gray-400">
-                {t('settings.product.specification.hint')}
-              </span>
-            </div>
-          )}
-        </div>
-      </section>
-      )}
-
-      <SpecificationManagementModal
-        isOpen={showSpecModal}
-        onClose={() => setShowSpecModal(false)}
-        productId={formData.id || null}
-        basePrice={formData.price}
-        baseExternalId={formData.externalId}
-        initialSpecifications={formData.tempSpecifications}
-        hasMultiSpec={formData.hasMultiSpec}
-        onEnableMultiSpec={(enabled) => {
-          onFieldChange('hasMultiSpec', enabled);
-          // If editing an existing product, update the backend immediately
-          // to match SpecificationManager's behavior (which saves specs immediately)
-          if (formData.id) {
-            invokeApi('update_product', {
-              id: formData.id,
-              data: {
-                has_multi_spec: enabled
-              }
-            }).catch(e => console.error('Failed to update hasMultiSpec:', e));
-          }
-        }}
-        onSpecificationsChange={(specs) => {
-          // Store temp specifications in formData (only relevant for new products or local preview)
-          if (!formData.id && specs) {
-            onFieldChange('tempSpecifications', specs);
-          }
-        }}
-        t={t}
-      />
-
-      {/* Block 5: Attributes (Optional) */}
+      {/* Block 4: Attributes (Optional) */}
       <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-4 shadow-sm">
         <div className="flex items-center justify-between pb-2 border-b border-gray-100">
           <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900">

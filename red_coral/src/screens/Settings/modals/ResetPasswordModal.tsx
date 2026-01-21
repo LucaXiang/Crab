@@ -148,7 +148,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
               onClick={onClose}
               className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
             >
-              {t('common.cancel')}
+              {t('common.action.cancel')}
             </button>
             <button
               type="submit"
@@ -156,8 +156,8 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
               className="flex-1 px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting
-                ? t('common.submitting')
-                : t('common.confirm')}
+                ? t('common.message.submitting')
+                : t('common.action.confirm')}
             </button>
           </div>
         </form>

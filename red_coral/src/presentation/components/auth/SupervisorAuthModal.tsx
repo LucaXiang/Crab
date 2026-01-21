@@ -136,7 +136,7 @@ export const SupervisorAuthModal: React.FC<SupervisorAuthModalProps> = ({
               ) : (
                 <>
                   <Shield size={18} />
-                  <span>{t('common.confirm')}</span>
+                  <span>{t('common.action.confirm')}</span>
                 </>
               )}
             </button>

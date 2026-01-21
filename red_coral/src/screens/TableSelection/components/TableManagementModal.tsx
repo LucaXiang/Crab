@@ -68,41 +68,12 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
     const sourceOrderSnapshot = useActiveOrdersStore(state => state.orders[sourceTable.id as string]);
     const sourceOrder = sourceOrderSnapshot ? toHeldOrder(sourceOrderSnapshot) : heldOrders.find(o => o.key === sourceTable.id);
 
-    const isSurchargeExempt = sourceOrder?.surchargeExempt || false;
-
     const hasPayments = useMemo(() => {
         if (!sourceOrder) return false;
         const hasPaidAmount = (sourceOrder.paidAmount || 0) > 0;
         const hasPaidItems = sourceOrder.paidItemQuantities && Object.keys(sourceOrder.paidItemQuantities).length > 0;
         return hasPaidAmount || hasPaidItems;
     }, [sourceOrder]);
-
-    const hasSurcharge = useMemo(() => {
-        if (!sourceOrder) return false;
-        const orderSurcharge = sourceOrder.surcharge?.amount || 0;
-        const itemsSurcharge = sourceOrder.items?.reduce((sum, item) => sum + (item.surcharge || 0), 0) || 0;
-        return orderSurcharge > 0 || itemsSurcharge > 0;
-    }, [sourceOrder]);
-
-    const handleWaiveSurcharge = async () => {
-        if (sourceOrder && sourceTable.id) {
-            try {
-                await orderOps.setSurchargeExempt(sourceOrder, !isSurchargeExempt);
-
-                // Sync with checkout store after command completes
-                const checkoutStore = useCheckoutStore.getState();
-                if (checkoutStore.currentOrderKey === sourceTable.id) {
-                    const store = useActiveOrdersStore.getState();
-                    const updatedSnapshot = store.getOrder(sourceTable.id as string);
-                    if (updatedSnapshot) {
-                        checkoutStore.setCheckoutOrder(toHeldOrder(updatedSnapshot));
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to set surcharge exempt:', err);
-            }
-        }
-    };
 
     const handleMerge = async () => {
         if (!selectedTargetTable || !sourceOrder) return;
@@ -154,7 +125,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                 return {
                     instanceId,
                     quantity: qty,
-                    name: originalItem?.name || t('checkout.unknownItem'),
+                    name: originalItem?.name || t('common.label.unknownItem'),
                     price: originalItem?.price || 0
                 };
             });
@@ -229,7 +200,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                         {t('checkout.split.title')}
                     </h3>
                     <button onClick={() => { setMode('MENU'); setSplitItems({}); }} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all">
-                        <ArrowLeft size={14} /> {t('common.back')}
+                        <ArrowLeft size={14} /> {t('common.action.back')}
                     </button>
                 </div>
 
@@ -358,33 +329,6 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                     </div>
                 </button>
             </EscalatableGate>
-                        <EscalatableGate
-                permission={Permission.APPLY_DISCOUNT}
-                mode="intercept"
-                description={t('table.authRequired.discount')}
-                onAuthorized={handleWaiveSurcharge}
-            >
-            {(hasSurcharge || isSurchargeExempt) && (
-                <button
-                    onClick={handleWaiveSurcharge}
-                    className={`col-span-2 flex items-center p-4 rounded-lg border transition-all duration-200 gap-4 ${isSurchargeExempt
-                            ? 'bg-green-50/50 border-green-200 shadow-sm'
-                            : 'bg-white hover:bg-gray-50 border-gray-200 hover:border-gray-300 hover:shadow-md active:scale-[0.99]'
-                        }`}
-                >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm shrink-0 ${isSurchargeExempt ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                        {isSurchargeExempt ? <Check size={18} /> : <Percent size={18} />}
-                    </div>
-                    <div className="flex-1 text-left">
-                        <div className="font-bold text-gray-800 text-base mb-0.5">{t('checkout.surcharge.exempt')}</div>
-                        <div className="text-xs text-gray-500 font-medium">
-                            {isSurchargeExempt ? t('checkout.surcharge.waived') : t('checkout.surcharge.description')}
-                        </div>
-                    </div>
-                </button>
-            )}
-            </EscalatableGate>
         </div>
     );
 
@@ -401,7 +345,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                         {mode === 'MERGE' ? t('table.action.merge') : t('table.action.move')} - {t('table.selectTarget')}
                     </h3>
                     <button onClick={() => { setMode('MENU'); setSelectedTargetTable(null); }} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all">
-                        <ArrowLeft size={14} /> {t('common.back')}
+                        <ArrowLeft size={14} /> {t('common.action.back')}
                     </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-gray-50/50">
@@ -449,7 +393,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                         disabled={!selectedTargetTable}
                         className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold text-base disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 hover:shadow-lg transition-all active:scale-[0.99]"
                     >
-                        {t('common.confirm')}
+                        {t('common.action.confirm')}
                     </button>
                 </div>
             </div>

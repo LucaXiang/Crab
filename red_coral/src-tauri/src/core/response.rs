@@ -147,12 +147,6 @@ pub struct ProductFullData {
     pub product: shared::models::ProductFull,
 }
 
-/// Specifications 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct SpecListData {
-    pub specs: Vec<shared::models::ProductSpecification>,
-}
-
 /// Attributes 列表
 #[derive(Debug, Clone, Serialize)]
 pub struct AttributeListData {

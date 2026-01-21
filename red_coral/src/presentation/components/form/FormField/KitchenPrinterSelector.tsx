@@ -35,7 +35,7 @@ export const KitchenPrinterSelector: React.FC<KitchenPrinterSelectorProps> = ({
           onChange={handleChange}
           className={selectClass}
         >
-          <option value="">{t('common.default')}</option>
+          <option value="">{t('common.label.default')}</option>
           {kitchenPrinters.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}

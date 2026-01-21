@@ -52,8 +52,8 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
             value={formData.isKitchenPrintEnabled ? 'true' : 'false'}
             onChange={(value) => onFieldChange('isKitchenPrintEnabled', value === 'true')}
             options={[
-              { value: 'true', label: t('common.enabled') },
-              { value: 'false', label: t('common.disabled') }
+              { value: 'true', label: t('common.status.enabled') },
+              { value: 'false', label: t('common.status.disabled') }
             ]}
           />
 
@@ -74,8 +74,8 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
             value={formData.isLabelPrintEnabled ? 'true' : 'false'}
             onChange={(value) => onFieldChange('isLabelPrintEnabled', value === 'true')}
             options={[
-              { value: 'true', label: t('common.enabled') },
-              { value: 'false', label: t('common.disabled') }
+              { value: 'true', label: t('common.status.enabled') },
+              { value: 'false', label: t('common.status.disabled') }
             ]}
           />
         </div>

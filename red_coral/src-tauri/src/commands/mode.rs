@@ -4,14 +4,14 @@ use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock;
 
-use crate::core::response::AppConfigResponse;
-use crate::core::{ApiResponse, AppState, ClientBridge, ModeInfo, ModeType, ServerModeConfig};
+use crate::core::response::{ApiResponse, AppConfigResponse, ErrorCode};
+use crate::core::{AppState, ClientBridge, ModeInfo, ModeType, ServerModeConfig};
 
 /// 获取应用状态 (用于前端路由守卫)
 ///
 /// 返回当前应用所处的状态，前端可据此决定显示哪个页面。
 /// 参考设计文档: `docs/plans/2026-01-18-application-state-machine.md`
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_app_state(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<AppState>, String> {
@@ -20,7 +20,7 @@ pub async fn get_app_state(
 }
 
 /// 获取当前模式信息
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_mode_info(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<ModeInfo>, String> {
@@ -29,19 +29,19 @@ pub async fn get_mode_info(
 }
 
 /// 启动 Server 模式
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn start_server_mode(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<()>, String> {
     let bridge = bridge.read().await;
     match bridge.start_server_mode().await {
         Ok(_) => Ok(ApiResponse::success(())),
-        Err(e) => Ok(ApiResponse::error("START_SERVER_FAILED", e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::InternalError, e.to_string())),
     }
 }
 
 /// 启动 Client 模式
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn start_client_mode(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     edge_url: String,
@@ -50,24 +50,24 @@ pub async fn start_client_mode(
     let bridge = bridge.read().await;
     match bridge.start_client_mode(&edge_url, &message_addr).await {
         Ok(_) => Ok(ApiResponse::success(())),
-        Err(e) => Ok(ApiResponse::error("START_CLIENT_FAILED", e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::BridgeConnectionFailed, e.to_string())),
     }
 }
 
 /// 停止当前模式
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn stop_mode(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<()>, String> {
     let bridge = bridge.read().await;
     match bridge.stop().await {
         Ok(_) => Ok(ApiResponse::success(())),
-        Err(e) => Ok(ApiResponse::error("STOP_MODE_FAILED", e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::InternalError, e.to_string())),
     }
 }
 
 /// 获取当前模式类型
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_current_mode_type(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<ModeType>, String> {
@@ -77,7 +77,7 @@ pub async fn get_current_mode_type(
 }
 
 /// 检查是否首次运行
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn check_first_run(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<bool>, String> {
@@ -90,7 +90,7 @@ pub async fn check_first_run(
 }
 
 /// 重新连接 (仅 Client 模式)
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn reconnect(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<()>, String> {
@@ -103,8 +103,8 @@ pub async fn reconnect(
         let mode_info = bridge.get_mode_info().await;
 
         if mode_info.mode != ModeType::Client {
-            return Ok(ApiResponse::error(
-                "RECONNECT_FAILED",
+            return Ok(ApiResponse::error_with_code(
+                ErrorCode::InvalidRequest,
                 "Reconnect is only available in Client mode",
             ));
         }
@@ -117,8 +117,8 @@ pub async fn reconnect(
     let client_config = match client_config {
         Some(config) => config,
         None => {
-            return Ok(ApiResponse::error(
-                "RECONNECT_FAILED",
+            return Ok(ApiResponse::error_with_code(
+                ErrorCode::ConfigError,
                 "No client configuration found",
             ))
         }
@@ -128,7 +128,7 @@ pub async fn reconnect(
     {
         let bridge = bridge_arc.read().await;
         if let Err(e) = bridge.stop().await {
-            return Ok(ApiResponse::error("RECONNECT_FAILED", e.to_string()));
+            return Ok(ApiResponse::error_with_code(ErrorCode::BridgeConnectionFailed, e.to_string()));
         }
     }
 
@@ -139,7 +139,7 @@ pub async fn reconnect(
             .start_client_mode(&client_config.edge_url, &client_config.message_addr)
             .await
         {
-            return Ok(ApiResponse::error("RECONNECT_FAILED", e.to_string()));
+            return Ok(ApiResponse::error_with_code(ErrorCode::BridgeConnectionFailed, e.to_string()));
         }
     }
 
@@ -147,7 +147,7 @@ pub async fn reconnect(
     Ok(ApiResponse::success(()))
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn get_app_config(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<AppConfigResponse>, String> {

@@ -131,7 +131,7 @@ export const CashPaymentModal: React.FC<CashPaymentModalProps> = ({
                 onClick={onCancel}
                 disabled={isProcessing}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-                aria-label={t('common.close')}
+                aria-label={t('common.action.close')}
               >
                 <X size={20} className="text-gray-500" />
               </button>
@@ -195,7 +195,7 @@ export const CashPaymentModal: React.FC<CashPaymentModalProps> = ({
             disabled={isProcessing}
             className="mt-3 md:mt-6 w-full py-3 md:py-4 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {t('common.cancel')}
+            {t('common.action.cancel')}
           </button>
         </div>
 
@@ -232,7 +232,7 @@ export const CashPaymentModal: React.FC<CashPaymentModalProps> = ({
               {isProcessing ? (
                 <>
                   <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
-                  {t('common.processing')}
+                  {t('common.message.processing')}
                 </>
               ) : (
                 <>

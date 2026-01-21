@@ -2,7 +2,6 @@
 
 use super::types::{
     CartItemSnapshot, ItemChanges, ItemModificationResult, PaymentSummaryItem, SplitItem,
-    SurchargeConfig,
 };
 use serde::{Deserialize, Serialize};
 
@@ -66,7 +65,6 @@ pub enum OrderEventType {
     TableReassigned,
 
     // Other
-    SurchargeExemptSet,
     OrderInfoUpdated,
 }
 
@@ -89,7 +87,6 @@ impl std::fmt::Display for OrderEventType {
             OrderEventType::OrderMerged => write!(f, "ORDER_MERGED"),
             OrderEventType::OrderMergedOut => write!(f, "ORDER_MERGED_OUT"),
             OrderEventType::TableReassigned => write!(f, "TABLE_REASSIGNED"),
-            OrderEventType::SurchargeExemptSet => write!(f, "SURCHARGE_EXEMPT_SET"),
             OrderEventType::OrderInfoUpdated => write!(f, "ORDER_INFO_UPDATED"),
         }
     }
@@ -111,8 +108,6 @@ pub enum EventPayload {
         zone_name: Option<String>,
         guest_count: i32,
         is_retail: bool,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        surcharge: Option<SurchargeConfig>,
         #[serde(skip_serializing_if = "Option::is_none")]
         receipt_number: Option<String>,
     },
@@ -251,14 +246,6 @@ pub enum EventPayload {
     },
 
     // ========== Other ==========
-    SurchargeExemptSet {
-        exempt: bool,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_id: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        authorizer_name: Option<String>,
-    },
-
     OrderInfoUpdated {
         #[serde(skip_serializing_if = "Option::is_none")]
         receipt_number: Option<String>,

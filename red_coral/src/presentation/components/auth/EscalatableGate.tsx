@@ -42,7 +42,7 @@ export const EscalatableGate: React.FC<EscalatableGateProps> = ({
   const handleEscalate = () => {
     openEscalation({
       requiredPermission: permission,
-      description: description || t('common.authorizationRequired'),
+      description: description || t('common.auth.required'),
       onSuccess: (user) => {
         if (onAuthorized) {
           onAuthorized(user);
@@ -65,7 +65,7 @@ export const EscalatableGate: React.FC<EscalatableGateProps> = ({
     return React.cloneElement(child, {
       onClick: handleClick,
       // 可选：添加视觉提示
-      title: description || t('common.authorizationRequired'),
+      title: description || t('common.auth.required'),
     });
   }
 
@@ -76,16 +76,16 @@ export const EscalatableGate: React.FC<EscalatableGateProps> = ({
         <Lock className="w-8 h-8 text-gray-400" />
       </div>
       <h3 className="text-xl font-semibold text-gray-900 mb-2">
-        {t('common.accessDenied')}
+        {t('common.auth.denied')}
       </h3>
       <p className="max-w-md mx-auto text-gray-500 mb-6">
-        {description || t('common.accessDeniedMessage')}
+        {description || t('common.auth.deniedMessage')}
       </p>
       <button
         onClick={handleEscalate}
         className="px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
       >
-        {t('common.clickToAuthorize')}
+        {t('common.auth.clickToAuthorize')}
       </button>
     </div>
   );

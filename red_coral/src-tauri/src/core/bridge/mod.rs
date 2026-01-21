@@ -324,7 +324,22 @@ impl ClientBridge {
                                 AppState::ServerAuthenticated
                             }
                             _ => {
-                                if tenant_manager.current_session().is_some() {
+                                if let Some(session) = tenant_manager.current_session() {
+                                    // 检查会话是否过期 (优先使用 expires_at，否则从 token 解析)
+                                    let expires_at = session.expires_at.or_else(|| {
+                                        super::session_cache::EmployeeSession::parse_jwt_exp(&session.token)
+                                    });
+
+                                    if let Some(exp) = expires_at {
+                                        let now = std::time::SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .map(|d| d.as_secs())
+                                            .unwrap_or(0);
+                                        if now >= exp {
+                                            // Token 已过期，返回 ServerReady (需要重新登录)
+                                            return AppState::ServerReady;
+                                        }
+                                    }
                                     AppState::ServerAuthenticated
                                 } else {
                                     AppState::ServerReady
@@ -420,18 +435,22 @@ impl ClientBridge {
             let handle_clone = handle.clone();
 
             tokio::spawn(async move {
+                tracing::info!("Message listener task started");
                 loop {
                     match server_rx.recv().await {
                         Ok(msg) => {
+                            tracing::info!(event_type = ?msg.event_type, "Received message from bus");
                             // Route messages to appropriate channels
                             use crate::events::MessageRoute;
                             match MessageRoute::from_bus_message(msg) {
                                 MessageRoute::OrderEvent(order_event) => {
+                                    tracing::debug!("Emitting order-event");
                                     if let Err(e) = handle_clone.emit("order-event", &order_event) {
                                         tracing::warn!("Failed to emit order event: {}", e);
                                     }
                                 }
                                 MessageRoute::ServerMessage(event) => {
+                                    tracing::info!(event_type = %event.event_type, "Emitting server-message");
                                     if let Err(e) = handle_clone.emit("server-message", &event) {
                                         tracing::warn!("Failed to emit server message: {}", e);
                                     }
@@ -663,6 +682,28 @@ impl ClientBridge {
         self.config.read().await.client_config.clone()
     }
 
+    /// 获取 Client 模式的 mTLS HTTP client 和相关信息
+    ///
+    /// 返回 (edge_url, http_client, token) 用于需要直接访问 EdgeServer 的场景 (如图片上传)
+    /// Server 模式或未认证时返回 None
+    pub async fn get_edge_http_context(&self) -> Option<(String, reqwest::Client, String)> {
+        let mode_guard = self.mode.read().await;
+
+        match &*mode_guard {
+            ClientMode::Client {
+                client, edge_url, ..
+            } => match client {
+                Some(RemoteClientState::Authenticated(auth)) => {
+                    let http = auth.edge_http_client()?.clone();
+                    let token = auth.token()?.to_string();
+                    Some((edge_url.clone(), http, token))
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     // ============ 员工认证 ============
 
     /// 员工登录 (使用 CrabClient)
@@ -691,13 +732,14 @@ impl ClientBridge {
                                     ))
                                 })?;
                                 let token = authenticated.token().unwrap_or_default().to_string();
+                                let expires_at = super::session_cache::EmployeeSession::parse_jwt_exp(&token);
 
                                 let session = super::session_cache::EmployeeSession {
                                     username: username.to_string(),
                                     token,
                                     user_info,
                                     login_mode: super::session_cache::LoginMode::Online,
-                                    expires_at: None,
+                                    expires_at,
                                     logged_in_at: std::time::SystemTime::now()
                                         .duration_since(std::time::UNIX_EPOCH)
                                         .unwrap()
@@ -725,13 +767,14 @@ impl ClientBridge {
                                     ))
                                 })?;
                                 let token = authenticated.token().unwrap_or_default().to_string();
+                                let expires_at = super::session_cache::EmployeeSession::parse_jwt_exp(&token);
 
                                 let session = super::session_cache::EmployeeSession {
                                     username: username.to_string(),
                                     token,
                                     user_info,
                                     login_mode: super::session_cache::LoginMode::Online,
-                                    expires_at: None,
+                                    expires_at,
                                     logged_in_at: std::time::SystemTime::now()
                                         .duration_since(std::time::UNIX_EPOCH)
                                         .unwrap()
@@ -763,13 +806,14 @@ impl ClientBridge {
                                     ))
                                 })?;
                                 let token = authenticated.token().unwrap_or_default().to_string();
+                                let expires_at = super::session_cache::EmployeeSession::parse_jwt_exp(&token);
 
                                 let session = super::session_cache::EmployeeSession {
                                     username: username.to_string(),
                                     token,
                                     user_info,
                                     login_mode: super::session_cache::LoginMode::Online,
-                                    expires_at: None,
+                                    expires_at,
                                     logged_in_at: std::time::SystemTime::now()
                                         .duration_since(std::time::UNIX_EPOCH)
                                         .unwrap()
@@ -796,13 +840,14 @@ impl ClientBridge {
                                     ))
                                 })?;
                                 let token = authenticated.token().unwrap_or_default().to_string();
+                                let expires_at = super::session_cache::EmployeeSession::parse_jwt_exp(&token);
 
                                 let session = super::session_cache::EmployeeSession {
                                     username: username.to_string(),
                                     token,
                                     user_info,
                                     login_mode: super::session_cache::LoginMode::Online,
-                                    expires_at: None,
+                                    expires_at,
                                     logged_in_at: std::time::SystemTime::now()
                                         .duration_since(std::time::UNIX_EPOCH)
                                         .unwrap()
@@ -1136,9 +1181,14 @@ impl ClientBridge {
 
         match &*mode_guard {
             ClientMode::Server { server_state, .. } => {
+                // Apply price rules for AddItems commands
+                let processed_command = self
+                    .apply_price_rules_if_needed(server_state, command)
+                    .await;
+
                 let (response, events) = server_state
                     .orders_manager()
-                    .execute_command_with_events(command);
+                    .execute_command_with_events(processed_command);
 
                 if let Some(handle) = &self.app_handle {
                     for event in events {
@@ -1187,9 +1237,6 @@ impl ClientBridge {
                             shared::order::OrderCommandPayload::SplitOrder { .. } => "order.split",
                             shared::order::OrderCommandPayload::MoveOrder { .. } => "order.move",
                             shared::order::OrderCommandPayload::MergeOrders { .. } => "order.merge",
-                            shared::order::OrderCommandPayload::SetSurchargeExempt { .. } => {
-                                "order.set_surcharge_exempt"
-                            }
                             shared::order::OrderCommandPayload::UpdateOrderInfo { .. } => {
                                 "order.update_info"
                             }
@@ -1251,6 +1298,61 @@ impl ClientBridge {
             }
             ClientMode::Disconnected => Err(BridgeError::NotInitialized),
         }
+    }
+
+    /// Apply price rules to items if the command is AddItems (Server mode only)
+    ///
+    /// This processes CartItemInput through the PriceRuleEngine to apply
+    /// surcharges and discounts based on active price rules.
+    async fn apply_price_rules_if_needed(
+        &self,
+        server_state: &edge_server::ServerState,
+        mut command: OrderCommand,
+    ) -> OrderCommand {
+        // Only process AddItems commands
+        if let shared::order::OrderCommandPayload::AddItems { order_id, items } = &command.payload {
+            // Get order snapshot to find zone_id
+            let snapshot = match server_state.orders_manager().get_snapshot(order_id) {
+                Ok(Some(s)) => s,
+                Ok(None) | Err(_) => {
+                    // If order not found or error, return command unmodified
+                    // (will fail in execute_command anyway)
+                    return command;
+                }
+            };
+
+            // Determine if this is a retail order (no zone)
+            let is_retail = snapshot.zone_id.is_none();
+            let zone_id = snapshot.zone_id.as_deref();
+
+            // Load applicable price rules for this zone
+            let rules = server_state
+                .price_rule_engine
+                .load_rules_for_zone(zone_id, is_retail)
+                .await;
+
+            if rules.is_empty() {
+                // No rules to apply, return command unmodified
+                return command;
+            }
+
+            // Get current timestamp for time-based rule validation
+            let current_time = chrono::Utc::now().timestamp_millis();
+
+            // Apply price rules to items
+            let processed_items = server_state
+                .price_rule_engine
+                .apply_rules(items.clone(), &rules, current_time)
+                .await;
+
+            // Update command with processed items
+            command.payload = shared::order::OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: processed_items,
+            };
+        }
+
+        command
     }
 
     /// Get all active order snapshots (event sourcing)
@@ -1449,6 +1551,60 @@ impl ClientBridge {
                     let request_payload = shared::message::RequestCommandPayload {
                         action: "sync.active_events".to_string(),
                         params: Some(serde_json::json!({ "since_sequence": since_sequence })),
+                    };
+                    let request_msg =
+                        shared::message::BusMessage::request_command(&request_payload);
+
+                    let response_msg = auth
+                        .request(&request_msg)
+                        .await
+                        .map_err(|e| BridgeError::Server(format!("Request failed: {}", e)))?;
+
+                    let response_payload: shared::message::ResponsePayload = response_msg
+                        .parse_payload()
+                        .map_err(|e| BridgeError::Server(format!("Invalid response: {}", e)))?;
+
+                    if response_payload.success {
+                        if let Some(data) = response_payload.data {
+                            let events: Vec<OrderEvent> =
+                                serde_json::from_value(data).map_err(|e| {
+                                    BridgeError::Server(format!("Invalid events: {}", e))
+                                })?;
+                            Ok(events)
+                        } else {
+                            Ok(vec![])
+                        }
+                    } else {
+                        Err(BridgeError::Server(response_payload.message))
+                    }
+                }
+                _ => Err(BridgeError::NotAuthenticated),
+            },
+            ClientMode::Disconnected => Err(BridgeError::NotInitialized),
+        }
+    }
+
+    /// Get all events for a specific order (event sourcing)
+    ///
+    /// Used to reconstruct full order history including timeline.
+    pub async fn get_events_for_order(
+        &self,
+        order_id: &str,
+    ) -> Result<Vec<OrderEvent>, BridgeError> {
+        let mode_guard = self.mode.read().await;
+
+        match &*mode_guard {
+            ClientMode::Server { server_state, .. } => server_state
+                .orders_manager()
+                .storage()
+                .get_events_for_order(order_id)
+                .map_err(|e| BridgeError::Server(e.to_string())),
+            ClientMode::Client { client, .. } => match client {
+                Some(RemoteClientState::Authenticated(auth)) => {
+                    // Use sync.order_events request via MessageBus
+                    let request_payload = shared::message::RequestCommandPayload {
+                        action: "sync.order_events".to_string(),
+                        params: Some(serde_json::json!({ "order_id": order_id })),
                     };
                     let request_msg =
                         shared::message::BusMessage::request_command(&request_payload);

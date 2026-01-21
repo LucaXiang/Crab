@@ -117,7 +117,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 2,
                 is_retail: false,
-                surcharge: None,
                 receipt_number: None,
             },
         };

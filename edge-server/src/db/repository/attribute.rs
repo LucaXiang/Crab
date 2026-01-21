@@ -2,7 +2,7 @@
 //!
 //! Uses RELATE to connect products/categories to attributes.
 
-use super::{make_thing, BaseRepository, RepoError, RepoResult};
+use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
 use crate::db::models::{Attribute, AttributeCreate, AttributeUpdate, AttributeOption, HasAttribute};
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
@@ -49,7 +49,9 @@ impl AttributeRepository {
 
     /// Find attribute by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Attribute>> {
-        let attr: Option<Attribute> = self.base.db().select((TABLE, id)).await?;
+        // Extract pure id if it contains table prefix (e.g., "attribute:xxx" -> "xxx")
+        let pure_id = strip_table_prefix(TABLE, id);
+        let attr: Option<Attribute> = self.base.db().select((TABLE, pure_id)).await?;
         Ok(attr)
     }
 
@@ -74,8 +76,22 @@ impl AttributeRepository {
 
     /// Update an attribute
     pub async fn update(&self, id: &str, data: AttributeUpdate) -> RepoResult<Attribute> {
-        let updated: Option<Attribute> = self.base.db().update((TABLE, id)).merge(data).await?;
-        updated.ok_or_else(|| RepoError::NotFound(format!("Attribute {} not found", id)))
+        // Extract pure id if it contains table prefix
+        let pure_id = strip_table_prefix(TABLE, id);
+
+        // Update using raw query to avoid deserialization issues with null fields
+        let thing = make_thing(TABLE, pure_id);
+        self.base
+            .db()
+            .query("UPDATE $thing MERGE $data")
+            .bind(("thing", thing))
+            .bind(("data", data))
+            .await?;
+
+        // Fetch the updated record
+        self.find_by_id(pure_id)
+            .await?
+            .ok_or_else(|| RepoError::NotFound(format!("Attribute {} not found", id)))
     }
 
     /// Add option to attribute
@@ -127,25 +143,27 @@ impl AttributeRepository {
             .ok_or_else(|| RepoError::NotFound(format!("Attribute {} not found", attr_id)))
     }
 
-    /// Soft delete attribute
+    /// Hard delete attribute
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let result: Option<Attribute> = self
-            .base
+        // Extract pure id if it contains table prefix
+        let pure_id = strip_table_prefix(TABLE, id);
+
+        // Delete all relations first
+        let thing = make_thing(TABLE, pure_id);
+        self.base
             .db()
-            .update((TABLE, id))
-            .merge(AttributeUpdate {
-                name: None,
-                attr_type: None,
-                display_order: None,
-                is_active: Some(false),
-                show_on_receipt: None,
-                receipt_name: None,
-                kitchen_printer: None,
-                is_global: None,
-                options: None,
-            })
+            .query("DELETE has_attribute WHERE out = $attr")
+            .bind(("attr", thing.clone()))
             .await?;
-        Ok(result.is_some())
+
+        // Hard delete
+        self.base
+            .db()
+            .query("DELETE $thing")
+            .bind(("thing", thing))
+            .await?;
+
+        Ok(true)
     }
 
     // =========================================================================
@@ -252,6 +270,54 @@ impl AttributeRepository {
             .await?
             .take(0)?;
         Ok(attrs)
+    }
+
+    /// Get product attribute bindings with full attribute data
+    /// Returns (HasAttribute, Attribute) pairs for a product
+    pub async fn find_bindings_for_product(&self, product_id: &str) -> RepoResult<Vec<(HasAttribute, Attribute)>> {
+        // Query the has_attribute edge table and fetch the attribute
+        let mut result = self
+            .base
+            .db()
+            .query(
+                r#"
+                SELECT *, out.* as attr_data
+                FROM has_attribute
+                WHERE in = $prod AND out.is_active = true
+                ORDER BY display_order
+                "#
+            )
+            .bind(("prod", make_thing("product", product_id)))
+            .await?;
+
+        #[derive(Debug, serde::Deserialize)]
+        struct BindingRow {
+            id: Option<surrealdb::sql::Thing>,
+            #[serde(rename = "in")]
+            from: surrealdb::sql::Thing,
+            out: surrealdb::sql::Thing,
+            is_required: bool,
+            display_order: i32,
+            default_option_idx: Option<i32>,
+            attr_data: Attribute,
+        }
+
+        let rows: Vec<BindingRow> = result.take(0)?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let binding = HasAttribute {
+                    id: row.id,
+                    from: row.from,
+                    to: row.out,
+                    is_required: row.is_required,
+                    display_order: row.display_order,
+                    default_option_idx: row.default_option_idx,
+                };
+                (binding, row.attr_data)
+            })
+            .collect())
     }
 
     /// Get all attributes for a product (including inherited from category + global)

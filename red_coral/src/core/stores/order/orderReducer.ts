@@ -16,7 +16,6 @@ import type {
   OrderSnapshot,
   CartItemSnapshot,
   PaymentRecord,
-  SurchargeConfig,
   OrderStatus,
   TableOpenedPayload,
   OrderCompletedPayload,
@@ -31,7 +30,6 @@ import type {
   OrderMovedPayload,
   OrderMergedPayload,
   TableReassignedPayload,
-  SurchargeExemptSetPayload,
   OrderInfoUpdatedPayload,
 } from '@/core/domain/types/orderEvent';
 
@@ -124,8 +122,6 @@ export function createEmptySnapshot(orderId: string): OrderSnapshot {
     subtotal: 0,
     tax: 0,
     discount: 0,
-    surcharge: null,
-    surcharge_exempt: false,
     total: 0,
     paid_amount: 0,
     receipt_number: null,
@@ -208,9 +204,6 @@ export function applyEvent(
     case 'TABLE_REASSIGNED':
       result = applyTableReassigned(result, event.payload as TableReassignedPayload);
       break;
-    case 'SURCHARGE_EXEMPT_SET':
-      result = applySurchargeExemptSet(result, event.payload as SurchargeExemptSetPayload);
-      break;
     case 'ORDER_INFO_UPDATED':
       result = applyOrderInfoUpdated(result, event.payload as OrderInfoUpdatedPayload);
       break;
@@ -262,7 +255,6 @@ function applyTableOpened(
     zone_name: payload.zone_name,
     guest_count: payload.guest_count,
     is_retail: payload.is_retail,
-    surcharge: payload.surcharge || null,
     receipt_number: payload.receipt_number || null,
     status: 'ACTIVE',
     start_time: timestamp,
@@ -567,16 +559,6 @@ function applyTableReassigned(
   };
 }
 
-function applySurchargeExemptSet(
-  snapshot: OrderSnapshot,
-  payload: SurchargeExemptSetPayload
-): OrderSnapshot {
-  return {
-    ...snapshot,
-    surcharge_exempt: payload.exempt,
-  };
-}
-
 function applyOrderInfoUpdated(
   snapshot: OrderSnapshot,
   payload: OrderInfoUpdatedPayload
@@ -665,34 +647,18 @@ function recalculateTotals(snapshot: OrderSnapshot): OrderSnapshot {
     }
   }
 
-  // Calculate surcharge (order-level)
-  let surchargeAmount = Currency.toDecimal(0);
-  if (snapshot.surcharge && !snapshot.surcharge_exempt) {
-    if (snapshot.surcharge.type === 'percentage') {
-      surchargeAmount = Currency.mul(subtotal, snapshot.surcharge.value / 100);
-    } else {
-      surchargeAmount = Currency.toDecimal(snapshot.surcharge.amount);
-    }
-  }
-
-  // Calculate total
-  const total = Currency.floor2(Currency.add(subtotal, surchargeAmount)).toNumber();
+  // Calculate total (surcharge is now per-item via Price Rules)
+  const total = Currency.floor2(subtotal).toNumber();
 
   // Calculate paid amount from non-cancelled payments
   const paidAmount = snapshot.payments
     .filter((p) => !p.cancelled)
     .reduce((sum, p) => Currency.add(sum, p.amount), Currency.toDecimal(0));
 
-  // Update surcharge config with calculated total
-  const surcharge: SurchargeConfig | null = snapshot.surcharge
-    ? { ...snapshot.surcharge, total: surchargeAmount.toNumber() }
-    : null;
-
   return {
     ...snapshot,
     subtotal: Currency.floor2(subtotal).toNumber(),
     discount: Currency.floor2(discount).toNumber(),
-    surcharge,
     total,
     paid_amount: Currency.floor2(paidAmount).toNumber(),
   };

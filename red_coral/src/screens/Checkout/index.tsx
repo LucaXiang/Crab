@@ -13,7 +13,7 @@ import { HeldOrder } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { useConfirm } from '@/hooks/useConfirm';
 import { PaymentFlow } from './payment/PaymentFlow';
-import { useOrderActions } from '@/core/stores/order/useOrderStore';
+import { useOrderActions } from '@/core/stores/order/useOrderEventStore';
 import { VoidReasonModal } from './VoidReasonModal';
 import { SupervisorAuthModal } from '@/presentation/components/auth/SupervisorAuthModal';
 import { usePermission } from '@/hooks/usePermission';
@@ -94,7 +94,8 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     if (propOnVoid) {
       propOnVoid(reason);
     } else {
-      voidOrder(order, reason);
+      const orderKey = order.key || String(order.tableId || '');
+      voidOrder(orderKey, reason);
       onCancel();
     }
     setIsVoidModalOpen(false);
@@ -166,7 +167,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                 onClick={dialogProps.onCancel}
                 className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition-colors"
               >
-                {dialogProps.cancelText || t('common.cancel')}
+                {dialogProps.cancelText || t('common.action.cancel')}
               </button>
               <button
                 onClick={dialogProps.onConfirm}
@@ -176,7 +177,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
                     : 'bg-blue-500 hover:bg-blue-600'
                 }`}
               >
-                {dialogProps.confirmText || t('common.confirm')}
+                {dialogProps.confirmText || t('common.action.confirm')}
               </button>
             </div>
           </div>

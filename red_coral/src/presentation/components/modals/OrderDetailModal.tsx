@@ -23,7 +23,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
   const handleReprint = () => {
     // TODO: Implement reprint logic or connect to printer service
-    toast.success(t('common.sentToPrinter'));
+    toast.success(t('common.message.sentToPrinter'));
   };
 
   if (loading) {

@@ -3,6 +3,7 @@ import { X, User as UserIcon, Mail, Shield, Eye, EyeOff } from 'lucide-react';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { useI18n } from '../../../hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
+import { getErrorMessage } from '@/utils/error';
 import { User, Role } from '@/core/domain/types';
 import { RoleListData } from '@/core/domain/types/api';
 import { useAuthStore, useCurrentUser } from '@/core/stores/auth/useAuthStore';
@@ -112,9 +113,9 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         toast.success(t("settings.user.message.createSuccess"));
       }
       onSuccess();
-    } catch (error: any) {
+    } catch (error) {
       console.error('User form error:', error);
-      toast.error(error || t('settings.user.message.operationFailed'));
+      toast.error(getErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -133,8 +134,8 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
             </div>
             <h2 className="text-lg font-bold text-gray-900">
               {editingUser
-                ? t('settings.user.action.edit')
-                : t('settings.user.action.add')}
+                ? t('settings.user.editUser')
+                : t('settings.user.addUser')}
             </h2>
           </div>
           <button
@@ -283,7 +284,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
               onClick={onClose}
               className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
             >
-              {t('common.cancel')}
+              {t('common.action.cancel')}
             </button>
             <button
               type="submit"
@@ -291,8 +292,8 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
               className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting
-                ? t('common.submitting')
-                : t('common.confirm')}
+                ? t('common.message.submitting')
+                : t('common.action.confirm')}
             </button>
           </div>
         </form>

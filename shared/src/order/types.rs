@@ -17,6 +17,9 @@ pub struct CartItemSnapshot {
     pub original_price: Option<f64>,
     /// Quantity
     pub quantity: i32,
+    /// Unpaid quantity (computed: quantity - paid_quantity)
+    #[serde(default)]
+    pub unpaid_quantity: i32,
     /// Selected options
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_options: Option<Vec<ItemOption>>,
@@ -159,21 +162,6 @@ pub struct PaymentSummaryItem {
     pub amount: f64,
 }
 
-/// Surcharge configuration
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SurchargeConfig {
-    /// "percentage" or "fixed"
-    #[serde(rename = "type")]
-    pub surcharge_type: String,
-    /// Value (percentage or fixed amount)
-    pub value: f64,
-    /// Display amount
-    pub amount: f64,
-    /// Calculated total
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub total: Option<f64>,
-}
-
 /// Command response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandResponse {
@@ -245,6 +233,7 @@ pub enum CommandErrorCode {
     PaymentNotFound,
     InsufficientQuantity,
     InvalidAmount,
+    InvalidOperation,
     DuplicateCommand,
     InternalError,
 }

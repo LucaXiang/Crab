@@ -115,7 +115,7 @@ export const UserManagement: React.FC = React.memo(() => {
       // Disable user logic
       setConfirmDialog({
         isOpen: true,
-        title: t('settings.user.action.disable'),
+        title: t('settings.user.disableUser'),
         description: t('settings.user.confirm.disable', { name: user.display_name || user.username }),
         onConfirm: async () => {
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
@@ -134,7 +134,7 @@ export const UserManagement: React.FC = React.memo(() => {
       // Permanent delete logic
       setConfirmDialog({
         isOpen: true,
-        title: t('settings.user.action.deletePermanently'),
+        title: t('settings.user.deletePermanentlyUser'),
         description: t('settings.user.confirm.deletePermanently', { name: user.display_name || user.username }),
         onConfirm: async () => {
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
@@ -197,7 +197,7 @@ export const UserManagement: React.FC = React.memo(() => {
                 <span className="font-medium text-gray-900">{user.display_name || user.username}</span>
                 {!user.is_active && (
                   <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">
-                    {t('common.inactive')}
+                    {t('common.status.inactive')}
                   </span>
                 )}
               </div>
@@ -246,7 +246,7 @@ export const UserManagement: React.FC = React.memo(() => {
                   handleEditUser(user);
                 }}
                 className="p-2 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors border border-amber-200/50"
-                title={t('common.edit')}
+                title={t('common.action.edit')}
               >
                 <Edit3 size={14} />
               </button>
@@ -256,7 +256,7 @@ export const UserManagement: React.FC = React.memo(() => {
                   handleResetPassword(user);
                 }}
                 className="p-2 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors border border-orange-200/50"
-                title={t('settings.user.action.resetPassword')}
+                title={t('settings.user.resetPasswordUser')}
               >
                 <Key size={14} />
               </button>
@@ -271,7 +271,7 @@ export const UserManagement: React.FC = React.memo(() => {
                         ? 'bg-amber-50 text-amber-600 border-amber-200/50 hover:bg-amber-100'
                         : 'bg-red-50 text-red-600 border-red-200/50 hover:bg-red-100'
                     }`}
-                    title={user.is_active ? t('settings.user.action.disable') : t('settings.user.action.deletePermanently')}
+                    title={user.is_active ? t('settings.user.disableUser') : t('settings.user.deletePermanentlyUser')}
                   >
                     {user.is_active ? <Ban size={14} /> : <Trash2 size={14} />}
                   </button>
@@ -322,7 +322,7 @@ export const UserManagement: React.FC = React.memo(() => {
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-blue-600/20 hover:bg-blue-700 hover:shadow-blue-600/30 transition-all"
             >
               <Plus size={16} />
-              <span>{t('settings.user.action.add')}</span>
+              <span>{t('settings.user.addUser')}</span>
             </button>
           </ProtectedGate>
         </div>
@@ -361,7 +361,7 @@ export const UserManagement: React.FC = React.memo(() => {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-gray-500">
             <Filter size={16} />
-            <span className="text-sm font-medium">{t('common.filter')}</span>
+            <span className="text-sm font-medium">{t('common.action.filter')}</span>
           </div>
           <div className="h-5 w-px bg-gray-200" />
           <div className="flex items-center gap-2">
@@ -408,13 +408,13 @@ export const UserManagement: React.FC = React.memo(() => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t('common.searchPlaceholder')}
+              placeholder={t('common.hint.searchPlaceholder')}
               className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             />
           </div>
 
           <div className="ml-auto text-xs text-gray-400">
-            {t('common.total')} {filteredUsers.length} {t('settings.user.unit')}
+            {t('common.label.total')} {filteredUsers.length} {t('settings.user.unit')}
           </div>
         </div>
       </div>
@@ -425,7 +425,7 @@ export const UserManagement: React.FC = React.memo(() => {
         columns={columns}
         loading={isLoading}
         getRowKey={(user) => String(user.id)}
-        emptyText={t('settings.user.noData')}
+        emptyText={t('common.empty.noData')}
         themeColor="blue"
       />
         </>

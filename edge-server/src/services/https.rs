@@ -41,6 +41,7 @@ pub fn build_app() -> Router<ServerState> {
         .merge(crate::api::categories::router())
         .merge(crate::api::products::router())
         .merge(crate::api::attributes::router())
+        .merge(crate::api::has_attribute::router())
         .merge(crate::api::zones::router())
         .merge(crate::api::tables::router())
         .merge(crate::api::price_rules::router())

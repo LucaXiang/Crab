@@ -91,7 +91,7 @@ export const TimelinePreview: React.FC<TimelinePreviewProps> = ({
                 <div className="flex items-center gap-2 text-gray-500">
                   <Users size={14} />
                   <span className="font-medium">
-                    {guestInput || '0'} {t('table.common.guests')}
+                    {guestInput || '0'} {t('table.guests')}
                   </span>
                 </div>
               )}

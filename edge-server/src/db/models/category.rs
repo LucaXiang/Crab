@@ -1,5 +1,6 @@
 //! Category Model
 
+use super::serde_helpers;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -14,11 +15,11 @@ pub struct Category {
     pub sort_order: i32,
     /// Record link to kitchen_printer
     pub kitchen_printer: Option<Thing>,
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_kitchen_print_enabled: bool,
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_label_print_enabled: bool,
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_active: bool,
 }
 

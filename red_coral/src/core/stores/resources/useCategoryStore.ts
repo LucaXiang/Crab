@@ -23,6 +23,7 @@ interface UpdateCategoryInput {
 
 async function fetchCategories(): Promise<CategoryEntity[]> {
   const response = await api.listCategories();
+  console.log('[CategoryStore] listCategories response:', response);
   // Handle both formats: direct array or { data: { categories: [...] } }
   if (Array.isArray(response)) {
     return response as CategoryEntity[];

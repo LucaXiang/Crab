@@ -1,6 +1,6 @@
 //! Price Rule Repository
 
-use super::{BaseRepository, RepoError, RepoResult};
+use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
 use crate::db::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope, TimeMode};
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
@@ -73,7 +73,8 @@ impl PriceRuleRepository {
 
     /// Find rule by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<PriceRule>> {
-        let rule: Option<PriceRule> = self.base.db().select((TABLE, id)).await?;
+        let pure_id = strip_table_prefix(TABLE, id);
+        let rule: Option<PriceRule> = self.base.db().select((TABLE, pure_id)).await?;
         Ok(rule)
     }
 
@@ -128,8 +129,9 @@ impl PriceRuleRepository {
 
     /// Update a price rule
     pub async fn update(&self, id: &str, data: PriceRuleUpdate) -> RepoResult<PriceRule> {
+        let pure_id = strip_table_prefix(TABLE, id);
         let existing = self
-            .find_by_id(id)
+            .find_by_id(pure_id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Price rule {} not found", id)))?;
 
@@ -144,36 +146,28 @@ impl PriceRuleRepository {
             )));
         }
 
-        let updated: Option<PriceRule> = self.base.db().update((TABLE, id)).merge(data).await?;
-        updated.ok_or_else(|| RepoError::NotFound(format!("Price rule {} not found", id)))
+        let thing = make_thing(TABLE, pure_id);
+        self.base
+            .db()
+            .query("UPDATE $thing MERGE $data")
+            .bind(("thing", thing))
+            .bind(("data", data))
+            .await?;
+
+        self.find_by_id(pure_id)
+            .await?
+            .ok_or_else(|| RepoError::NotFound(format!("Price rule {} not found", id)))
     }
 
-    /// Soft delete a price rule
+    /// Hard delete a price rule
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let result: Option<PriceRule> = self
-            .base
+        let pure_id = strip_table_prefix(TABLE, id);
+        let thing = make_thing(TABLE, pure_id);
+        self.base
             .db()
-            .update((TABLE, id))
-            .merge(PriceRuleUpdate {
-                name: None,
-                display_name: None,
-                receipt_name: None,
-                description: None,
-                rule_type: None,
-                product_scope: None,
-                target: None,
-                zone_scope: None,
-                adjustment_type: None,
-                adjustment_value: None,
-                priority: None,
-                is_stackable: None,
-                time_mode: None,
-                start_time: None,
-                end_time: None,
-                schedule_config: None,
-                is_active: Some(false),
-            })
+            .query("DELETE $thing")
+            .bind(("thing", thing))
             .await?;
-        Ok(result.is_some())
+        Ok(true)
     }
 }

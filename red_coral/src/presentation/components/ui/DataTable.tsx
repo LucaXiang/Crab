@@ -309,7 +309,7 @@ export function DataTable<T>({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
             </svg>
           </div>
-          <p className="text-gray-500 text-sm">{emptyText || t('common.na')}</p>
+          <p className="text-gray-500 text-sm">{emptyText || t('common.label.none')}</p>
         </div>
       </div>
     );
@@ -337,7 +337,7 @@ export function DataTable<T>({
         <div className={`${theme.selectModeHeader} border-b px-4 py-3 flex items-center justify-between`}>
           <div className="flex items-center gap-3">
             <span className={`text-sm ${theme.selectModeText} font-medium`}>
-              {t('common.selected')} {selectedKeys.size} {t('common.items')}
+              {t('common.selection.selected')} {selectedKeys.size} {t('common.label.items')}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -347,14 +347,14 @@ export function DataTable<T>({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Trash2 size={14} />
-              <span>{t('common.batchDelete')}</span>
+              <span>{t('common.action.batchDelete')}</span>
             </button>
             <button
               onClick={exitSelectionMode}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-300 transition-colors"
             >
               <X size={14} />
-              <span>{t('common.cancel')}</span>
+              <span>{t('common.action.cancel')}</span>
             </button>
           </div>
         </div>
@@ -395,10 +395,10 @@ export function DataTable<T>({
                 <button
                   onClick={() => setIsSelectionMode(true)}
                   className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors border border-transparent ${theme.selectBtn}`}
-                  title={t('common.selectMode')}
+                  title={t('common.selection.selectMode')}
                 >
                   <ListChecks size={14} />
-                  <span className="hidden sm:inline scale-90 origin-left">{t('common.select')}</span>
+                  <span className="hidden sm:inline scale-90 origin-left">{t('common.action.select')}</span>
                 </button>
               )}
               <span className="py-1.5">{t('settings.common.actions')}</span>
@@ -408,7 +408,7 @@ export function DataTable<T>({
         {/* Hint for interactive actions */}
         {onEdit && (
           <div className="px-4 pb-2 text-[10px] text-gray-400 text-center">
-            💡 {t('common.longPressHint')}
+            💡 {t('common.hint.longPressToEdit')}
           </div>
         )}
       </div>
@@ -466,7 +466,7 @@ export function DataTable<T>({
                         <button
                           onClick={() => onEdit(item)}
                           className="p-2 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors border border-amber-200/50"
-                          title={t('common.edit')}
+                          title={t('common.action.edit')}
                         >
                           <Edit3 size={14} />
                         </button>
@@ -475,7 +475,7 @@ export function DataTable<T>({
                         <button
                           onClick={() => onDelete(item)}
                           className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors border border-red-200/50"
-                          title={t('common.delete')}
+                          title={t('common.action.delete')}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -494,12 +494,12 @@ export function DataTable<T>({
         <div className="flex items-center gap-3">
           {totalPages > 1 && (
             <div className="text-xs text-gray-500">
-              {t('common.showing')} {startIndex + 1}-{Math.min(endIndex, finalTotalItems)} / {finalTotalItems}
+              {t('common.selection.showing')} {startIndex + 1}-{Math.min(endIndex, finalTotalItems)} / {finalTotalItems}
             </div>
           )}
           {totalPages <= 1 && (
             <div className="text-xs text-gray-500">
-              {t('common.total')} {finalTotalItems} {t('common.items')}
+              {t('common.label.total')} {finalTotalItems} {t('common.label.items')}
             </div>
           )}
         </div>

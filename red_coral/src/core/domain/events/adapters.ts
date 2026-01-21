@@ -371,35 +371,14 @@ export function convertEventToTimelineEvent(event: OrderEvent): TimelineEvent {
 
 export function recalculateOrderTotal(order: HeldOrder): HeldOrder {
   const allItems = order.items.map(item => {
-    let surcharge = 0;
-    if (order.surchargeExempt) {
-      surcharge = 0;
-    } else if (order.surcharge && order.surcharge.value) {
-      if (order.surcharge.type === 'percentage') {
-        const basePrice = Currency.add(item.originalPrice ?? 0, 0);
-        const discountedBase = Currency.sub(basePrice, 0); // simplified
-        surcharge = Currency.floor2((discountedBase.toNumber() * order.surcharge.value) / 100).toNumber();
-      } else {
-        surcharge = order.surcharge.value;
-      }
-    } else {
-      surcharge = item.surcharge || 0;
-    }
+    // Keep item-level surcharge (from Price Rules)
+    const surcharge = item.surcharge || 0;
     const finalPrice = calculateItemFinalPrice({ ...item, surcharge }).toNumber();
     return { ...item, surcharge, price: finalPrice };
   });
 
   const activeItems = allItems.filter(i => !i._removed);
-  const itemsSubtotal = activeItems.reduce((sum, i) => Currency.add(sum, calculateItemTotal(i)).toNumber(), 0);
-
-  let total = itemsSubtotal;
-  if (!order.surchargeExempt && order.surcharge && order.surcharge.amount > 0) {
-    const surchargeTotal = order.surcharge.type === 'percentage'
-      ? Currency.floor2(Currency.mul(itemsSubtotal, order.surcharge.amount / 100)).toNumber()
-      : order.surcharge.amount;
-    total = Currency.add(total, surchargeTotal).toNumber();
-    order = { ...order, surcharge: { ...order.surcharge, total: surchargeTotal } };
-  }
+  const total = activeItems.reduce((sum, i) => Currency.add(sum, calculateItemTotal(i)).toNumber(), 0);
 
   return { ...order, items: allItems, total };
 }

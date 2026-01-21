@@ -4,7 +4,6 @@ export * from './models';
 // Import types used in this file
 import type {
   Product,
-  ProductSpecification,
   Tag,
   ProductAttribute,
   CategoryAttribute,
@@ -18,6 +17,7 @@ import type {
   Role,
   RolePermission,
   PriceRule,
+  EmbeddedSpec,
 } from './models';
 
 // API Response types - aligned with Rust server
@@ -133,7 +133,6 @@ export interface ProductQuery {
 
 export interface ProductData {
   product: Product;
-  specifications?: ProductSpecification[];
   tags?: Tag[];
   attributes?: ProductAttribute[];
 }
@@ -146,7 +145,6 @@ export interface ProductResponse {
   category_id: number | null;
   sort_order: number;
   tax_rate: number;
-  has_multi_spec: boolean;
   receipt_name: string | null;
   kitchen_print_name: string | null;
   kitchen_printer_id: number | null;
@@ -155,14 +153,13 @@ export interface ProductResponse {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  specifications?: ProductSpecification[];
+  specs?: EmbeddedSpec[];
   tags?: Tag[];
   attributes?: ProductAttribute[];
 }
 
 export interface ProductListData {
   products: Product[];
-  specs?: ProductSpecListData['specs'];
   total: number;
   page?: number;
   page_size?: number;
@@ -170,63 +167,34 @@ export interface ProductListData {
 
 export interface CreateProductRequest {
   name: string;
-  price: number;
   image?: string;
   category_id?: number;
   sort_order?: number;
   tax_rate?: number;
-  has_multi_spec?: boolean;
   receipt_name?: string;
   kitchen_print_name?: string;
   kitchen_printer_id?: number;
   is_kitchen_print_enabled?: number;
   is_label_print_enabled?: number;
   external_id?: number;
-  specifications?: CreateSpecificationRequest[];
-  specifications_to_delete?: string[];
+  specs: EmbeddedSpec[];
 }
 
 export interface UpdateProductRequest {
   name?: string;
-  price?: number;
   image?: string;
   category_id?: number;
   sort_order?: number;
   tax_rate?: number;
-  has_multi_spec?: boolean;
   receipt_name?: string;
   kitchen_print_name?: string;
   kitchen_printer_id?: number;
   is_kitchen_print_enabled?: number;
   is_label_print_enabled?: number;
   external_id?: number;
+  specs?: EmbeddedSpec[];
 }
 
-export interface CreateSpecificationRequest {
-  uuid?: string;
-  name: string;
-  price: number;
-  display_order?: number;
-  is_default?: boolean;
-  is_active?: boolean;
-  is_root?: boolean;
-  external_id?: string;
-}
-
-export interface UpdateSpecificationRequest {
-  name: string;
-  price: number;
-  receipt_name?: string | null;
-  external_id?: number | null;
-  display_order?: number;
-  is_default?: boolean;
-  is_active?: boolean;
-}
-
-export interface ProductSpecListData {
-  specs: ProductSpecification[];
-  total: number;
-}
 
 // Category types
 export interface CategoryData extends Category {}
@@ -538,24 +506,6 @@ export interface UpdateProductAttributeRequest {
   is_required?: boolean;
   display_order?: number;
   default_option_idx?: number;
-}
-
-// Specification Tag types
-export interface SpecificationTagData {
-  specification_id: number;
-  tag_id: number;
-  tag?: Tag;
-  created_at: string;
-}
-
-export interface SpecificationTagListData {
-  associations: SpecificationTagData[];
-  total: number;
-}
-
-export interface CreateSpecificationTagsRequest {
-  specification_id: number;
-  tag_ids: number[];
 }
 
 // Health types

@@ -1,90 +1,106 @@
 {
   "common": {
-    "save": "保存",
-    "cancel": "取消",
-    "delete": "删除",
-    "edit": "编辑",
-    "confirm": "确认",
-    "loading": "加载中...",
-    "error": "错误",
-    "success": "成功",
-    "total": "合计",
-    "back": "返回",
-    "create": "创建",
-    "change": "更换",
-    "remove": "移除",
-    "close": "关闭",
-    "enable": "启用",
-    "disabled": "已禁用",
-    "default": "默认",
-    "required": "必填",
-    "optional": "可选",
-    "filter": "筛选",
-    "search": "搜索",
-    "searchPlaceholder": "搜索...",
-    "all": "全部",
-    "details": "详情",
-    "hide": "隐藏",
-    "expandAll": "全部展开",
-    "collapseAll": "全部收起",
-    "na": "暂无",
-    "yes": "是",
-    "no": "否",
-    "none": "无",
-    "active": "已启用",
-    "inactive": "已停用",
-    "void": "作废",
-    "uploadImage": "上传图片",
-    "name": "名称",
-    "namePlaceholder": "请输入名称",
-    "description": "描述",
-    "descriptionPlaceholder": "请输入描述",
-    "clear": "清除",
-    "submitting": "提交中...",
-    "closeApp": "关闭应用",
-    "goBack": "返回",
-    "goHome": "返回主页",
-    "quantity": "数量",
-    "sentToPrinter": "已发送至打印机",
-    "authorizationRequired": "需要授权",
-    "accessDenied": "访问被拒绝",
-    "accessDeniedMessage": "您没有权限执行此操作",
-    "clickToAuthorize": "点击授权",
-    "disabledGlobal": "禁用 (全局关闭)",
-    "ok": "我知道了",
-    "selected": "已选择",
-    "items": "项",
-    "batchDelete": "批量删除",
-    "selectMode": "多选模式",
-    "select": "多选",
-    "longPressHint": "提示：长按或双击行即可编辑",
-    "showing": "显示",
-    "confirmDelete": "确认删除吗？",
+    "action": {
+      "save": "保存",
+      "cancel": "取消",
+      "delete": "删除",
+      "edit": "编辑",
+      "create": "创建",
+      "confirm": "确认",
+      "close": "关闭",
+      "back": "返回",
+      "refresh": "刷新",
+      "print": "打印",
+      "export": "导出",
+      "retry": "重试",
+      "search": "搜索",
+      "filter": "筛选",
+      "clear": "清除",
+      "select": "多选",
+      "remove": "移除",
+      "change": "更换",
+      "enable": "启用",
+      "hide": "隐藏",
+      "expandAll": "全部展开",
+      "collapseAll": "全部收起",
+      "batchDelete": "批量删除",
+      "uploadImage": "上传图片"
+    },
+    "status": {
+      "all": "全部",
+      "active": "已启用",
+      "inactive": "已停用",
+      "void": "作废",
+      "enabled": "已启用",
+      "disabled": "已禁用",
+      "disabledGlobal": "禁用 (全局关闭)"
+    },
+    "label": {
+      "name": "名称",
+      "description": "描述",
+      "total": "合计",
+      "details": "详情",
+      "default": "默认",
+      "required": "必填",
+      "optional": "可选",
+      "date": "日期",
+      "page": "页",
+      "entries": "条",
+      "of": "/",
+      "to": "至",
+      "quantity": "数量",
+      "items": "项",
+      "unknownItem": "未知项目",
+      "none": "N/A"
+    },
+    "message": {
+      "loading": "加载中...",
+      "success": "成功",
+      "error": "错误",
+      "submitting": "提交中...",
+      "processing": "处理中",
+      "saveSuccess": "保存成功",
+      "saveFailed": "保存失败",
+      "deleteFailed": "删除失败",
+      "loadFailed": "加载数据失败",
+      "invalidForm": "表单无效",
+      "sentToPrinter": "已发送至打印机",
+      "exported": "已导出"
+    },
+    "hint": {
+      "searchPlaceholder": "搜索...",
+      "namePlaceholder": "请输入名称",
+      "descriptionPlaceholder": "请输入描述",
+      "longPressToEdit": "提示：长按或双击行即可编辑",
+      "tapToClose": "点击关闭"
+    },
+    "empty": {
+      "noData": "暂无数据",
+      "noResults": "无结果"
+    },
+    "auth": {
+      "required": "需要授权",
+      "denied": "访问被拒绝",
+      "deniedMessage": "您没有权限执行此操作",
+      "clickToAuthorize": "点击授权"
+    },
+    "selection": {
+      "selected": "已选择",
+      "selectMode": "多选模式",
+      "showing": "显示"
+    },
+    "dialog": {
+      "ok": "我知道了",
+      "closeApp": "关闭应用",
+      "confirmDelete": "确认删除吗？",
+      "yes": "是",
+      "no": "否",
+      "none": "无"
+    },
     "discount": {
       "off": "折扣",
       "free": "免单"
-    },
-    "status": {
-      "all": "全部"
-    },
-    "exported": "已导出",
-    "retry": "重试",
-    "date": "日期",
-    "export": "导出",
-    "noResults": "无结果",
-    "enabled": "已启用",
-    "invalidForm": "表单无效",
-    "saveSuccess": "保存成功",
-    "saveFailed": "保存失败",
-    "refresh": "刷新",
-    "print": "打印",
-    "tapToClose": "点击关闭",
-    "unknownItem": "未知项目",
-    "processing": "处理中",
-    "to": "至",
-    "of": "/",
-    "entries": "条",
-    "page": "页"
+    }
   },
   "app": {
     "brand": {
@@ -112,11 +128,7 @@
   },
   "auth": {
     "unauthorized": {
-      "forbiddenCode": "403 无访问权限",
-      "title": "未授权访问",
-      "message": "您没有权限访问此页面",
-      "contact": "请联系管理员",
-      "hint": "当前用户无权执行此操作"
+      "message": "您没有权限访问此页面"
     },
     "user": {
       "role": "用户角色"
@@ -124,7 +136,6 @@
     "roles": {
       "admin": "管理员"
     },
-    "currentUser": "当前用户",
     "login": {
       "title": "登录",
       "subtitle": "欢迎使用 RedCoral POS",
@@ -232,22 +243,16 @@
       "reason": "选择作废原因"
     },
     "error": {
-      "completionFailed": "订单完成失败",
       "title": "结账错误",
       "hint": "结账区域加载失败，请重试",
-      "insufficient": "金额不足"
-    },
-    "unknownItem": "未知商品",
-    "surcharge": {
-      "exempt": "免除附加费",
-      "waived": "已免除附加费",
-      "description": "该订单免除附加费"
+      "insufficient": "金额不足",
+      "mergeFailed": "合并订单失败",
+      "moveFailed": "转台失败"
     },
     "tableOrder": "桌台订单",
     "orderCompleted": "订单完成",
     "payment": {
       "confirm": "确认支付",
-      "partial": "部分付款已记录",
       "failed": "支付失败",
       "method": "选择支付方式",
       "success": "支付成功"
@@ -288,8 +293,7 @@
     },
     "authRequired": {
       "merge": "合并桌台需要主管审批",
-      "move": "转移桌台需要主管审批",
-      "discount": "应用折扣需要主管审批"
+      "move": "转移桌台需要主管审批"
     },
     "warning": {
       "cannotMoveWithPayments": "存在已支付项目，无法转移"
@@ -301,10 +305,8 @@
       "retrieve": "取单"
     },
     "selectTarget": "选择目标桌台",
-    "common": {
-      "zones": "区域",
-      "guests": "位客人"
-    },
+    "zones": "区域",
+    "guests": "位客人",
     "ghostOrders": "幽灵订单",
     "addItems": "加单",
     "openTable": "开台",
@@ -352,7 +354,6 @@
     },
     "dateRange": "日期范围",
     "topProducts": "热销商品",
-    "noData": "暂无数据",
     "error": {
       "load": "加载统计数据失败"
     },
@@ -384,26 +385,24 @@
     }
   },
   "timeline": {
-    "event": {
-      "addItems": "加单",
-      "empty": "暂无时间线记录",
-      "payment": "支付",
-      "splitBill": "分单",
-      "itemModified": "项目修改",
-      "itemRemoved": "删除项目",
-      "orderCompleted": "订单完成",
-      "orderVoided": "订单作废",
-      "tableOrder": "桌台订单",
-      "itemRestored": "恢复项目",
-      "paymentCancelled": "取消支付",
-      "orderRestored": "恢复订单",
-      "orderMerged": "合并订单",
-      "orderMoved": "转移订单",
-      "orderMovedOut": "转出订单",
-      "orderMergedOut": "转出合并",
-      "prePaymentPrinted": "预付小票",
-      "prePaymentNote": "预付备注"
-    },
+    "addItems": "加单",
+    "empty": "暂无时间线记录",
+    "payment": "支付",
+    "splitBill": "分单",
+    "itemModified": "项目修改",
+    "itemRemoved": "删除项目",
+    "orderCompleted": "订单完成",
+    "orderVoided": "订单作废",
+    "tableOrder": "桌台订单",
+    "itemRestored": "恢复项目",
+    "paymentCancelled": "取消支付",
+    "orderRestored": "恢复订单",
+    "orderMerged": "合并订单",
+    "orderMoved": "转移订单",
+    "orderMovedOut": "转出订单",
+    "orderMergedOut": "转出合并",
+    "prePaymentPrinted": "预付小票",
+    "prePaymentNote": "预付备注",
     "surchargeExempt": "免除附加费"
   },
   "draft": {
@@ -416,152 +415,19 @@
     }
   },
   "error": {
-    "autoReload": "自动重新加载",
-    "viewDetails": "查看详情",
-    "copyDetails": "复制详情",
     "loadAttributes": "加载属性失败",
     "message": {
       "title": "出错了",
       "description": "发生了未知错误，请稍后重试。"
     },
     "action": {
-      "reload": "重新加载"
+      "reload": "重新加载",
+      "autoReload": "自动重新加载",
+      "viewDetails": "查看详情",
+      "copyDetails": "复制详情"
     },
     "status": {
       "reloading": "正在重新加载..."
-    },
-    "codes": {
-      "AUTH_NOT_AUTHENTICATED": "请先登录",
-      "AUTH_INVALID_CREDENTIALS": "用户名或密码错误",
-      "AUTH_TOKEN_EXPIRED": "登录已过期，请重新登录",
-      "AUTH_TOKEN_INVALID": "登录凭证无效",
-      "AUTH_SESSION_EXPIRED": "会话已过期",
-      "AUTH_PERMISSION_DENIED": "权限不足",
-      "AUTH_USER_DISABLED": "账号已被禁用",
-      "AUTH_USER_NOT_FOUND": "用户不存在",
-      "BRIDGE_NOT_INITIALIZED": "系统未初始化",
-      "BRIDGE_NOT_CONNECTED": "未连接到服务器",
-      "BRIDGE_ALREADY_RUNNING": "服务已在运行中",
-      "BRIDGE_CONNECTION_FAILED": "连接服务器失败",
-      "BRIDGE_CONNECTION_LOST": "与服务器的连接已断开",
-      "BRIDGE_TIMEOUT": "请求超时",
-      "TENANT_NOT_SELECTED": "请先选择租户",
-      "TENANT_NOT_FOUND": "租户不存在",
-      "TENANT_ACTIVATION_REQUIRED": "需要激活租户",
-      "TENANT_ACTIVATION_FAILED": "租户激活失败",
-      "TENANT_CERTIFICATE_INVALID": "证书无效",
-      "TENANT_CERTIFICATE_EXPIRED": "证书已过期",
-      "TENANT_SUBSCRIPTION_EXPIRED": "订阅已过期",
-      "TENANT_SUBSCRIPTION_INVALID": "订阅无效",
-      "SERVER_START_FAILED": "服务器启动失败",
-      "SERVER_NOT_RUNNING": "服务器未运行",
-      "SERVER_INTERNAL_ERROR": "服务器内部错误",
-      "SERVER_UNAVAILABLE": "服务器不可用",
-      "SERVER_DATABASE_ERROR": "数据库错误",
-      "TAG_LIST_FAILED": "获取标签列表失败",
-      "TAG_GET_FAILED": "获取标签详情失败",
-      "TAG_CREATE_FAILED": "创建标签失败",
-      "TAG_UPDATE_FAILED": "更新标签失败",
-      "TAG_DELETE_FAILED": "删除标签失败",
-      "TAG_NOT_FOUND": "标签不存在",
-      "TAG_NAME_EXISTS": "标签名称已存在",
-      "CATEGORY_LIST_FAILED": "获取分类列表失败",
-      "CATEGORY_GET_FAILED": "获取分类详情失败",
-      "CATEGORY_CREATE_FAILED": "创建分类失败",
-      "CATEGORY_UPDATE_FAILED": "更新分类失败",
-      "CATEGORY_DELETE_FAILED": "删除分类失败",
-      "CATEGORY_NOT_FOUND": "分类不存在",
-      "CATEGORY_NAME_EXISTS": "分类名称已存在",
-      "CATEGORY_HAS_PRODUCTS": "分类下存在商品，无法删除",
-      "PRODUCT_LIST_FAILED": "获取商品列表失败",
-      "PRODUCT_GET_FAILED": "获取商品详情失败",
-      "PRODUCT_CREATE_FAILED": "创建商品失败",
-      "PRODUCT_UPDATE_FAILED": "更新商品失败",
-      "PRODUCT_DELETE_FAILED": "删除商品失败",
-      "PRODUCT_NOT_FOUND": "商品不存在",
-      "PRODUCT_NAME_EXISTS": "商品名称已存在",
-      "PRODUCT_INVALID_PRICE": "价格无效",
-      "PRODUCT_CATEGORY_REQUIRED": "请选择商品分类",
-      "SPEC_LIST_FAILED": "获取规格列表失败",
-      "SPEC_GET_FAILED": "获取规格详情失败",
-      "SPEC_CREATE_FAILED": "创建规格失败",
-      "SPEC_UPDATE_FAILED": "更新规格失败",
-      "SPEC_DELETE_FAILED": "删除规格失败",
-      "SPEC_NOT_FOUND": "规格不存在",
-      "SPEC_CANNOT_DELETE_BASE": "基础规格无法删除",
-      "ATTRIBUTE_LIST_FAILED": "获取属性列表失败",
-      "ATTRIBUTE_GET_FAILED": "获取属性详情失败",
-      "ATTRIBUTE_CREATE_FAILED": "创建属性失败",
-      "ATTRIBUTE_UPDATE_FAILED": "更新属性失败",
-      "ATTRIBUTE_DELETE_FAILED": "删除属性失败",
-      "ATTRIBUTE_NOT_FOUND": "属性不存在",
-      "ATTRIBUTE_BIND_FAILED": "绑定属性失败",
-      "ATTRIBUTE_UNBIND_FAILED": "解绑属性失败",
-      "PRINTER_LIST_FAILED": "获取打印机列表失败",
-      "PRINTER_GET_FAILED": "获取打印机详情失败",
-      "PRINTER_CREATE_FAILED": "创建打印机失败",
-      "PRINTER_UPDATE_FAILED": "更新打印机失败",
-      "PRINTER_DELETE_FAILED": "删除打印机失败",
-      "PRINTER_NOT_FOUND": "打印机不存在",
-      "PRINTER_PRINT_FAILED": "打印失败",
-      "PRINTER_NOT_AVAILABLE": "打印机不可用",
-      "ZONE_LIST_FAILED": "获取区域列表失败",
-      "ZONE_GET_FAILED": "获取区域详情失败",
-      "ZONE_CREATE_FAILED": "创建区域失败",
-      "ZONE_UPDATE_FAILED": "更新区域失败",
-      "ZONE_DELETE_FAILED": "删除区域失败",
-      "ZONE_NOT_FOUND": "区域不存在",
-      "ZONE_HAS_TABLES": "区域下存在桌台，无法删除",
-      "TABLE_LIST_FAILED": "获取桌台列表失败",
-      "TABLE_GET_FAILED": "获取桌台详情失败",
-      "TABLE_CREATE_FAILED": "创建桌台失败",
-      "TABLE_UPDATE_FAILED": "更新桌台失败",
-      "TABLE_DELETE_FAILED": "删除桌台失败",
-      "TABLE_NOT_FOUND": "桌台不存在",
-      "TABLE_OCCUPIED": "桌台已被占用",
-      "EMPLOYEE_LIST_FAILED": "获取员工列表失败",
-      "EMPLOYEE_GET_FAILED": "获取员工详情失败",
-      "EMPLOYEE_CREATE_FAILED": "创建员工失败",
-      "EMPLOYEE_UPDATE_FAILED": "更新员工失败",
-      "EMPLOYEE_DELETE_FAILED": "删除员工失败",
-      "EMPLOYEE_NOT_FOUND": "员工不存在",
-      "EMPLOYEE_USERNAME_EXISTS": "用户名已存在",
-      "EMPLOYEE_CANNOT_DELETE_SELF": "无法删除自己的账号",
-      "EMPLOYEE_CANNOT_DELETE_ADMIN": "无法删除管理员账号",
-      "ROLE_LIST_FAILED": "获取角色列表失败",
-      "ROLE_GET_FAILED": "获取角色详情失败",
-      "ROLE_CREATE_FAILED": "创建角色失败",
-      "ROLE_UPDATE_FAILED": "更新角色失败",
-      "ROLE_DELETE_FAILED": "删除角色失败",
-      "ROLE_NOT_FOUND": "角色不存在",
-      "ROLE_CANNOT_DELETE_ADMIN": "无法删除管理员角色",
-      "ROLE_CANNOT_MODIFY_ADMIN": "无法修改管理员角色",
-      "ORDER_CREATE_FAILED": "创建订单失败",
-      "ORDER_UPDATE_FAILED": "更新订单失败",
-      "ORDER_NOT_FOUND": "订单不存在",
-      "ORDER_ALREADY_COMPLETED": "订单已完成",
-      "ORDER_ALREADY_VOIDED": "订单已作废",
-      "ORDER_VOID_FAILED": "作废订单失败",
-      "ORDER_RESTORE_FAILED": "恢复订单失败",
-      "ORDER_MERGE_FAILED": "合并订单失败",
-      "ORDER_MOVE_FAILED": "转移订单失败",
-      "ORDER_HAS_PAYMENTS": "订单存在支付记录",
-      "PAYMENT_FAILED": "支付失败",
-      "PAYMENT_INSUFFICIENT_AMOUNT": "支付金额不足",
-      "PAYMENT_INVALID_METHOD": "无效的支付方式",
-      "PAYMENT_CANCEL_FAILED": "取消支付失败",
-      "PAYMENT_REFUND_FAILED": "退款失败",
-      "VALIDATION_REQUIRED_FIELD": "必填字段不能为空",
-      "VALIDATION_INVALID_FORMAT": "格式无效",
-      "VALIDATION_VALUE_TOO_LONG": "内容过长",
-      "VALIDATION_VALUE_TOO_SHORT": "内容过短",
-      "VALIDATION_VALUE_OUT_OF_RANGE": "数值超出范围",
-      "VALIDATION_INVALID_ID": "无效的ID",
-      "UNKNOWN_ERROR": "未知错误",
-      "NOT_IMPLEMENTED": "功能尚未实现",
-      "NETWORK_ERROR": "网络错误",
-      "IO_ERROR": "IO错误",
-      "PARSE_ERROR": "数据解析错误"
     }
   },
   "settings": {
@@ -579,15 +445,10 @@
         "name": "区域名称"
       },
       "unit": "个区域",
-      "noData": "暂无区域",
-      "action": {
-        "add": "添加区域",
-        "edit": "编辑区域",
-        "delete": "删除区域",
-        "deleted": "区域已删除"
-      },
-      "deleteBlocked": "无法删除：区域包含桌台",
-      "deleteFailed": "删除区域失败",
+      "addZone": "添加区域",
+      "editZone": "编辑区域",
+      "deleteZone": "删除区域",
+      "zoneDeleted": "区域已删除",
       "message": {
         "created": "区域创建成功",
         "updated": "区域更新成功"
@@ -609,10 +470,6 @@
         "website": "官方网站"
       }
     },
-    "saveSuccess": "保存成功",
-    "saveFailed": "保存失败",
-    "deleteFailed": "删除失败",
-    "loadFailed": "加载数据失败",
     "batchDelete": {
       "confirmTitle": "确认批量删除",
       "zonesBlocked": "无法删除包含桌台的区域",
@@ -628,6 +485,7 @@
       "form": {
         "name": "菜品名称",
         "namePlaceholder": "请输入菜品名称",
+        "nameRequired": "请输入商品名称",
         "category": "分类",
         "selectCategory": "选择分类",
         "price": "价格",
@@ -642,6 +500,7 @@
         "image": "图片",
         "imageHint": "支持 JPG, PNG, WEBP 格式"
       },
+      "noProducts": "暂无商品",
       "print": {
         "settings": "打印设置",
         "kitchenPrinting": "厨房打印",
@@ -660,7 +519,10 @@
         "manage": "管理规格",
         "noConfigured": "暂无规格配置",
         "disabled": "多规格功能未启用",
-        "hint": "请点击上方\"管理规格\"按钮进行配置"
+        "hint": "请点击上方\"管理规格\"按钮进行配置",
+        "label": {
+          "default": "默认"
+        }
       },
       "attribute": {
         "title": "产品属性",
@@ -677,56 +539,40 @@
         }
       },
       "list": {
-        "noData": "暂无菜品数据",
         "batchDeleteTitle": "确认批量删除",
         "batchDeleteSuccess": "批量删除成功",
         "batchDeleteFailed": "批量删除失败"
       },
-      "action": {
-        "add": "添加菜品",
-        "edit": "编辑菜品",
-        "delete": "删除菜品",
-        "deleted": "菜品已删除",
-        "deleteFailed": "删除菜品失败"
-      },
+      "addProduct": "添加菜品",
+      "editProduct": "编辑菜品",
+      "deleteProduct": "删除菜品",
+      "productDeleted": "菜品已删除",
       "header": {
-        "price": "价格",
         "category": "分类",
         "products": "菜品"
       },
       "message": {
         "created": "商品创建成功",
         "updated": "商品更新成功"
-      },
-      "noProducts": "暂无商品",
-      "errors": {
-        "nameRequired": "请输入商品名称",
-        "categoryRequired": "请选择分类",
-        "pricePositive": "价格必须大于0",
-        "externalIdRequired": "请输入商品编号"
       }
     },
     "category": {
       "title": "分类管理",
       "description": "管理商品分类",
       "unit": "个分类",
-      "noData": "暂无分类数据",
       "confirm": {
         "delete": "确定要删除该分类吗？删除后该分类下的商品将变为未分类状态。"
       },
-      "addCategory": "添加分类",
       "header": {
         "sort": "排序"
       },
-      "action": {
-        "add": "添加分类",
-        "edit": "编辑分类",
-        "delete": "删除分类",
-        "adjustOrder": "调整排序",
-        "deleted": "分类已删除",
-        "createSuccess": "分类创建成功",
-        "updateSuccess": "分类更新成功"
-      },
+      "addCategory": "添加分类",
+      "editCategory": "编辑分类",
+      "deleteCategory": "删除分类",
+      "adjustCategoryOrder": "调整排序",
+      "categoryDeleted": "分类已删除",
+      "createCategorySuccess": "分类创建成功",
+      "updateCategorySuccess": "分类更新成功",
       "form": {
         "name": "分类名称",
         "namePlaceholder": "请输入分类名称",
@@ -735,8 +581,6 @@
       "message": {
         "exists": "分类已存在"
       },
-      "deleteBlocked": "无法删除：分类包含商品",
-      "deleteFailed": "删除分类失败",
       "required": "请选择分类",
       "createFirst": "请先创建分类"
     },
@@ -744,7 +588,6 @@
       "title": "属性管理",
       "description": "管理商品属性和选项",
       "unit": "个属性",
-      "noData": "暂无属性数据",
       "hint": {
         "addFirst": "请点击上方按钮添加第一个属性"
       },
@@ -769,14 +612,12 @@
         "multiRequired": "多选必选",
         "multiOptional": "多选可选"
       },
-      "action": {
-        "add": "添加属性",
-        "edit": "编辑属性",
-        "delete": "删除属性"
-      },
+      "addAttribute": "添加属性",
+      "editAttribute": "编辑属性",
+      "deleteAttribute": "删除属性",
       "option": {
         "title": "属性选项",
-        "delete": "删除选项",
+        "deleteOption": "删除选项",
         "hint": {
           "addFirst": "请点击上方按钮添加第一个选项"
         },
@@ -795,29 +636,23 @@
           "setAsDefault": "设为默认",
           "status": "状态"
         },
-        "action": {
-          "add": "添加选项",
-          "edit": "编辑选项"
-        },
-        "noData": "暂无选项"
+        "addOption": "添加选项",
+        "editOption": "编辑选项"
       }
     },
     "table": {
       "title": "桌台管理",
       "zoneManagement": "桌台与区域管理",
       "zoneManagementDesc": "管理餐厅桌台和区域",
-      "noData": "暂无桌台数据",
       "form": {
         "name": "桌台名称",
         "namePlaceholder": "请输入桌台名称",
         "capacity": "容量"
       },
-      "action": {
-        "add": "添加桌台",
-        "edit": "编辑桌台",
-        "delete": "删除桌台",
-        "deleted": "桌台已删除"
-      },
+      "addTable": "添加桌台",
+      "editTable": "编辑桌台",
+      "deleteTable": "删除桌台",
+      "tableDeleted": "桌台已删除",
       "confirm": {
         "delete": "确定要删除该桌台吗？删除后该桌台将无法恢复。"
       },
@@ -862,13 +697,11 @@
         "usernameRequired": "请输入用户名",
         "displayNameRequired": "请输入显示名称"
       },
-      "action": {
-        "add": "新增用户",
-        "edit": "编辑用户",
-        "resetPassword": "重置密码",
-        "disable": "禁用用户",
-        "deletePermanently": "永久删除用户"
-      },
+      "addUser": "新增用户",
+      "editUser": "编辑用户",
+      "resetPasswordUser": "重置密码",
+      "disableUser": "禁用用户",
+      "deletePermanentlyUser": "永久删除用户",
       "column": {
         "user": "用户",
         "createdAt": "创建时间",
@@ -885,13 +718,11 @@
         "updateFailed": "更新失败",
         "deleteFailed": "删除失败",
         "loadRolesFailed": "无法加载角色列表",
-        "operationFailed": "操作失败",
         "resetPasswordSuccess": "密码重置成功",
         "resetPasswordFailed": "密码重置失败",
         "createSuccess": "用户创建成功"
       },
-      "unit": "个用户",
-      "noData": "暂无用户数据"
+      "unit": "个用户"
     },
     "printer": {
       "title": "打印机设置",
@@ -919,10 +750,8 @@
         "title": "厨房工位",
         "noData": "创建您的第一个厨房工位",
         "defaultName": "工位",
-        "action": {
-          "add": "添加工位",
-          "edit": "编辑工位"
-        }
+        "addStation": "添加工位",
+        "editStation": "编辑工位"
       },
       "form": {
         "targetPrinter": "目标打印机",
@@ -948,11 +777,9 @@
       },
       "template": {
         "new": "新建模板",
-        "action": {
-          "create": "创建新模板",
-          "editDesign": "编辑设计",
-          "duplicate": "复制"
-        },
+        "createTemplate": "创建新模板",
+        "editDesign": "编辑设计",
+        "duplicateTemplate": "复制",
         "form": {
           "name": "模板名称",
           "namePlaceholder": "例如：商品标签 50x30mm",
@@ -964,8 +791,7 @@
         "deleteLastTemplate": "无法删除最后一个模板",
         "confirmDelete": "确定要删除吗？",
         "confirmDeleteDesc": "此操作无法撤销"
-      },
-      "addStation": "添加工位"
+      }
     },
     "dataTransfer": {
       "title": "数据导入/导出",
@@ -974,15 +800,13 @@
         "title": "导出数据",
         "description": "将所有数据（包括图片）导出为 ZIP 压缩包。",
         "button": "导出 ZIP",
-        "success": "导出成功",
-        "failed": "导出失败"
+        "success": "导出成功"
       },
       "import": {
         "title": "导入数据",
         "description": "从 ZIP 压缩包导入数据。重复的数据将被忽略。",
         "button": "导入 ZIP",
-        "success": "导入成功，数据已刷新",
-        "failed": "导入失败"
+        "success": "导入成功，数据已刷新"
       },
       "warning": {
         "title": "注意",
@@ -1070,9 +894,7 @@
         "errorEmpty": "角色ID和名称不能为空",
         "errorFormat": "角色ID只能包含小写字母、数字和下划线",
         "createSuccess": "角色创建成功",
-        "createFailed": "角色创建失败",
         "deleteSuccess": "角色删除成功",
-        "deleteFailed": "角色删除失败",
         "noDescription": "暂无描述"
       },
       "message": {
@@ -1101,8 +923,6 @@
         "price": "价格",
         "externalId": "POS 编号",
         "externalIdPlaceholder": "输入编号",
-        "receiptName": "小票打印名称",
-        "receiptNamePlaceholder": "如为空则使用规格名称",
         "baseSpecPriceHint": "基础规格价格请在菜品信息中修改",
         "setDefault": "设为默认规格",
         "setDefaultHint": "点单时将作为默认选项",

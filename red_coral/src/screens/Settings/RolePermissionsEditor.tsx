@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
+import { getErrorMessage } from '@/utils/error';
 import { Shield, Save, RefreshCw, Check, Plus, Trash2, Info } from 'lucide-react';
 import { Role, RoleListData, RolePermissionListData } from '@/core/domain/types';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
@@ -162,10 +163,10 @@ export const RolePermissionsEditor: React.FC = () => {
           permissions: rolePermissions[role.name] || []
         });
       }
-      toast.success(t('common.saveSuccess'));
+      toast.success(t('common.message.saveSuccess'));
     } catch (err) {
       console.error(err);
-      toast.error(t('common.saveFailed'));
+      toast.error(t('common.message.saveFailed'));
     } finally {
       setLoading(false);
     }
@@ -199,23 +200,23 @@ export const RolePermissionsEditor: React.FC = () => {
       setNewRoleDisplayName('');
       setNewRoleDesc('');
       loadData();
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      toast.error(err || t('settings.roles.form.createFailed'));
+      toast.error(getErrorMessage(err));
     }
   };
 
   const handleDeleteRole = async () => {
     if (!confirmDelete) return;
-    
+
     try {
       await invokeApi('delete_role', { id: confirmDelete.roleId });
       toast.success(t('settings.roles.form.deleteSuccess'));
       setConfirmDelete(null);
       loadData();
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      toast.error(err || t('settings.roles.form.deleteFailed'));
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -305,7 +306,7 @@ export const RolePermissionsEditor: React.FC = () => {
                   className="px-3 py-1.5 text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors text-sm"
                 >
                   <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                  <span>{t('common.refresh')}</span>
+                  <span>{t('common.action.refresh')}</span>
                 </button>
                 <button
                   onClick={handleSave}
@@ -313,7 +314,7 @@ export const RolePermissionsEditor: React.FC = () => {
                   className="px-4 py-1.5 text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save size={14} />
-                  <span>{t('common.save')}</span>
+                  <span>{t('common.action.save')}</span>
                 </button>
               </div>
             </div>
@@ -432,7 +433,7 @@ export const RolePermissionsEditor: React.FC = () => {
                 onClick={() => setIsCreateModalOpen(false)}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                {t('common.cancel')}
+                {t('common.action.cancel')}
               </button>
               <button
                 onClick={handleCreateRole}

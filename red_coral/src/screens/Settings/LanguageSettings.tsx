@@ -36,7 +36,7 @@ export const LanguageSettings: React.FC = React.memo(() => {
             onClick={handleSave}
             className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-100 hover:bg-blue-700"
           >
-            {t('common.save')}
+            {t('common.action.save')}
           </button>
         </div>
       </div>

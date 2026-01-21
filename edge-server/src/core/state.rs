@@ -10,6 +10,7 @@ use crate::core::Config;
 use crate::core::config::migrate_legacy_structure;
 use crate::db::DbService;
 use crate::orders::OrdersManager;
+use crate::pricing::PriceRuleEngine;
 use crate::services::{
     ActivationService, CertService, HttpsService, MessageBusService, ProvisioningService,
 };
@@ -111,6 +112,8 @@ pub struct ServerState {
     pub resource_versions: Arc<ResourceVersions>,
     /// 订单管理器 (事件溯源)
     pub orders_manager: Arc<OrdersManager>,
+    /// 价格规则引擎
+    pub price_rule_engine: PriceRuleEngine,
 }
 
 impl ServerState {
@@ -127,6 +130,7 @@ impl ServerState {
         jwt_service: Arc<JwtService>,
         resource_versions: Arc<ResourceVersions>,
         orders_manager: Arc<OrdersManager>,
+        price_rule_engine: PriceRuleEngine,
     ) -> Self {
         Self {
             config,
@@ -138,6 +142,7 @@ impl ServerState {
             jwt_service,
             resource_versions,
             orders_manager,
+            price_rule_engine,
         }
     }
 
@@ -188,6 +193,9 @@ impl ServerState {
             OrdersManager::new(&orders_db_path).expect("Failed to initialize orders manager"),
         );
 
+        // 4. Initialize PriceRuleEngine
+        let price_rule_engine = PriceRuleEngine::new(db.clone());
+
         let state = Self::new(
             config.clone(),
             db,
@@ -198,6 +206,7 @@ impl ServerState {
             jwt_service,
             resource_versions,
             orders_manager,
+            price_rule_engine,
         );
 
         // 3. Late initialization for HttpsService (needs state)
@@ -302,7 +311,11 @@ impl ServerState {
             id: id.to_string(),
             data: data.and_then(|d| serde_json::to_value(d).ok()),
         };
-        let _ = self.message_bus().publish(BusMessage::sync(&payload)).await;
+        tracing::info!(resource = %resource, action = %action, id = %id, "Broadcasting sync event");
+        match self.message_bus().publish(BusMessage::sync(&payload)).await {
+            Ok(_) => tracing::debug!("Sync broadcast successful"),
+            Err(e) => tracing::error!("Sync broadcast failed: {}", e),
+        }
     }
 
     /// 获取激活服务

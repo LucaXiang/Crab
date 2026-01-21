@@ -197,7 +197,7 @@ export const LabelTemplateManager: React.FC = () => {
                     handleDuplicateTemplate(template);
                   }}
                   className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  title={t('settings.printer.template.action.duplicate')}
+                  title={t('settings.printer.template.duplicateTemplate')}
                 >
                   <Copy size={16} />
                 </button>
@@ -207,7 +207,7 @@ export const LabelTemplateManager: React.FC = () => {
                     handleDeleteTemplate(template.id);
                   }}
                   className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title={t('common.delete')}
+                  title={t('common.action.delete')}
                 >
                   <Trash2 size={16} />
                 </button>
@@ -232,7 +232,7 @@ export const LabelTemplateManager: React.FC = () => {
               }`}
             >
               <Edit2 size={16} />
-              {t('settings.printer.template.action.editDesign')}
+              {t('settings.printer.template.editDesign')}
             </button>
           </div>
         );
@@ -246,7 +246,7 @@ export const LabelTemplateManager: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm">
             <Plus size={24} />
           </div>
-          <span className="font-medium">{t('settings.printer.template.action.create')}</span>
+          <span className="font-medium">{t('settings.printer.template.createTemplate')}</span>
         </button>
       </div>
 
@@ -292,14 +292,14 @@ export const LabelTemplateManager: React.FC = () => {
                 onClick={() => setShowNewTemplateDialog(false)}
                 className="flex-1 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
               >
-                {t('common.cancel')}
+                {t('common.action.cancel')}
               </button>
               <button
                 onClick={handleCreateTemplate}
                 disabled={!templateName.trim()}
                 className="flex-1 px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 disabled:opacity-50 disabled:shadow-none"
               >
-                {t('common.create')}
+                {t('common.action.create')}
               </button>
             </div>
           </div>
@@ -312,8 +312,8 @@ export const LabelTemplateManager: React.FC = () => {
         description={confirmDialog.description}
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
-        confirmText={t('common.confirm')}
-        cancelText={t('common.cancel')}
+        confirmText={t('common.action.confirm')}
+        cancelText={t('common.action.cancel')}
         variant="danger"
       />
     </div>

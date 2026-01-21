@@ -37,7 +37,7 @@ export const TimelineList = React.memo<TimelineListProps>(({ events, showNoteTag
     }, [events]);
     
     if (uniqueEvents.length === 0) {
-        return <div className="pl-6 text-gray-400 italic text-sm">{t('timeline.event.empty')}</div>;
+        return <div className="pl-6 text-gray-400 italic text-sm">{t('timeline.empty')}</div>;
     }
     return (
         <div className="relative border-l-2 border-gray-200 ml-3 space-y-6 py-2">

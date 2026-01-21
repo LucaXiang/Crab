@@ -1,5 +1,6 @@
 //! Dining Table Model
 
+use super::serde_helpers;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -9,8 +10,14 @@ pub struct DiningTable {
     pub id: Option<Thing>,
     pub name: String,
     pub zone: Thing,
+    #[serde(default)]
     pub capacity: i32,
+    #[serde(default = "default_true", deserialize_with = "serde_helpers::bool_true")]
     pub is_active: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Create dining table payload

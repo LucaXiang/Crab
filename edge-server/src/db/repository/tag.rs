@@ -1,6 +1,6 @@
 //! Tag Repository
 
-use super::{BaseRepository, RepoError, RepoResult};
+use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
 use crate::db::models::{Tag, TagCreate, TagUpdate};
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
@@ -43,7 +43,8 @@ impl TagRepository {
 
     /// Find tag by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Tag>> {
-        let tag: Option<Tag> = self.base.db().select((TABLE, id)).await?;
+        let pure_id = strip_table_prefix(TABLE, id);
+        let tag: Option<Tag> = self.base.db().select((TABLE, pure_id)).await?;
         Ok(tag)
     }
 
@@ -81,8 +82,9 @@ impl TagRepository {
 
     /// Update a tag
     pub async fn update(&self, id: &str, data: TagUpdate) -> RepoResult<Tag> {
+        let pure_id = strip_table_prefix(TABLE, id);
         let existing = self
-            .find_by_id(id)
+            .find_by_id(pure_id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Tag {} not found", id)))?;
 
@@ -94,35 +96,28 @@ impl TagRepository {
             return Err(RepoError::Duplicate(format!("Tag '{}' already exists", new_name)));
         }
 
-        let updated: Option<Tag> = self
-            .base
+        let thing = make_thing(TABLE, pure_id);
+        self.base
             .db()
-            .update((TABLE, id))
-            .merge(data)
+            .query("UPDATE $thing MERGE $data")
+            .bind(("thing", thing))
+            .bind(("data", data))
             .await?;
 
-        updated.ok_or_else(|| RepoError::NotFound(format!("Tag {} not found", id)))
-    }
-
-    /// Soft delete a tag (set is_active = false)
-    pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let result: Option<Tag> = self
-            .base
-            .db()
-            .update((TABLE, id))
-            .merge(TagUpdate {
-                name: None,
-                color: None,
-                display_order: None,
-                is_active: Some(false),
-            })
-            .await?;
-        Ok(result.is_some())
+        self.find_by_id(pure_id)
+            .await?
+            .ok_or_else(|| RepoError::NotFound(format!("Tag {} not found", id)))
     }
 
     /// Hard delete a tag
-    pub async fn hard_delete(&self, id: &str) -> RepoResult<bool> {
-        let result: Option<Tag> = self.base.db().delete((TABLE, id)).await?;
-        Ok(result.is_some())
+    pub async fn delete(&self, id: &str) -> RepoResult<bool> {
+        let pure_id = strip_table_prefix(TABLE, id);
+        let thing = make_thing(TABLE, pure_id);
+        self.base
+            .db()
+            .query("DELETE $thing")
+            .bind(("thing", thing))
+            .await?;
+        Ok(true)
     }
 }

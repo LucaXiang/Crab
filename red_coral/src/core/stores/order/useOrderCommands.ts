@@ -28,7 +28,6 @@ import type {
   CartItemInput,
   ItemChanges,
   SplitItem,
-  SurchargeConfig,
   PaymentMethod,
 } from '@/core/domain/types/orderEvent';
 
@@ -43,7 +42,6 @@ export interface OpenTableParams {
   zoneName?: string;
   guestCount?: number;
   isRetail: boolean;
-  surcharge?: SurchargeConfig;
 }
 
 export interface PaymentInput {
@@ -157,7 +155,6 @@ export function useOrderCommands() {
         zone_name: params.zoneName || null,
         guest_count: params.guestCount ?? 1,
         is_retail: params.isRetail,
-        surcharge: params.surcharge,
       });
 
       return sendCommand(command);
@@ -404,22 +401,6 @@ export function useOrderCommands() {
   // ==================== Order Settings ====================
 
   /**
-   * Set surcharge exemption
-   */
-  const setSurchargeExempt = useCallback(
-    async (orderId: string, exempt: boolean): Promise<CommandResponse> => {
-      const command = createCommand({
-        type: 'SET_SURCHARGE_EXEMPT',
-        order_id: orderId,
-        exempt,
-      });
-
-      return sendCommand(command);
-    },
-    []
-  );
-
-  /**
    * Update order info (receipt number, guest count, etc.)
    */
   const updateOrderInfo = useCallback(
@@ -469,7 +450,6 @@ export function useOrderCommands() {
     mergeOrders,
 
     // Order Settings
-    setSurchargeExempt,
     updateOrderInfo,
   };
 }

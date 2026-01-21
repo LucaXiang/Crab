@@ -6,9 +6,10 @@ import {
   useSettingsFormMeta,
   useSettingsStore,
 } from '@/core/stores/settings/useSettingsStore';
-import { createTauriClient, invokeApi } from '@/infrastructure/api';
+import { createTauriClient, invokeApi, ApiError } from '@/infrastructure/api';
 import { invoke } from '@tauri-apps/api/core';
 import { useProductStore, useZones, useCategoryStore } from '@/core/stores/resources';
+import { getErrorMessage } from '@/utils/error';
 
 const api = createTauriClient();
 import { toast } from '@/presentation/components/Toast';
@@ -64,43 +65,66 @@ export const EntityFormModal: React.FC = React.memo(() => {
       }
       // Auto-select first category if none selected and creating a new product
       if (categories.length > 0 && modal.action === 'CREATE' && !formData.categoryId && !defaultCategorySet.current) {
-        setFormData({ categoryId: categories[0].id as unknown as number });
+        setFormData({ categoryId: categories[0].id ?? '' });
         defaultCategorySet.current = true;
       }
     }
   }, [modal.open, modal.entity, modal.action, categories.length, categoryStore.isLoaded]);
 
-  // Load product attributes when editing a product
+  // Load full product data (specs, attributes, tags) when editing a product
   useEffect(() => {
     if (modal.open && modal.entity === 'PRODUCT' && modal.action === 'EDIT' && modal.data?.id) {
-      const loadProductAttributes = async () => {
+      const loadProductFullData = async () => {
         try {
-          const resp = await api.fetchProductAttributes(String(modal.data.id));
-          const productAttributes = resp.data?.product_attributes ?? [];
-          const attributeIds = productAttributes.map((attr: { out: string }) => attr.out);
+          const resp = await api.getProductFull(String(modal.data.id));
+          const productFull = resp.data?.product;
+          if (!productFull) {
+            console.error('Failed to load product full data');
+            return;
+          }
+
+          // Extract attribute bindings
+          const attributeIds = productFull.attributes.map((binding) => binding.attribute.id).filter(Boolean) as string[];
 
           // Identify inherited attributes (from global or category bindings)
-          // Note: ProductAttribute.id format may indicate source
           const inherited: string[] = [];
           setInheritedAttributeIds(inherited);
 
-          // Load default options
+          // Load default options from attribute bindings
           const defaultOptions: Record<string, string[]> = {};
-          productAttributes.forEach((binding: { out: string; default_option_idx?: number | null }) => {
-            if (binding.default_option_idx !== null && binding.default_option_idx !== undefined) {
-              defaultOptions[binding.out] = [String(binding.default_option_idx)];
+          productFull.attributes.forEach((binding) => {
+            const attrId = binding.attribute.id;
+            if (attrId && binding.default_option_idx !== null && binding.default_option_idx !== undefined) {
+              defaultOptions[attrId] = [String(binding.default_option_idx)];
             }
           });
 
+          // Extract tag IDs from full tag objects
+          const tagIds = productFull.tags.map((tag) => tag.id).filter(Boolean) as string[];
+
+          // Get price and externalId from default spec (is_default=true)
+          const defaultSpec = productFull.specs.find((s) => s.is_default === true) ?? productFull.specs[0];
+          const price = defaultSpec?.price ?? 0;
+          const externalId = defaultSpec?.external_id ?? undefined;
+
           setAsyncFormData({
             selectedAttributeIds: attributeIds,
-            attributeDefaultOptions: defaultOptions
+            attributeDefaultOptions: defaultOptions,
+            // Store specs for ProductForm to use
+            loadedSpecs: productFull.specs,
+            // Store tag IDs
+            selectedTagIds: tagIds,
+            // Load price and externalId from root spec
+            price,
+            externalId,
+            // Determine hasMultiSpec from specs count (specs.length > 1)
+            hasMultiSpec: productFull.specs.length > 1,
           });
         } catch (error) {
-          console.error('Failed to load product attributes:', error);
+          console.error('Failed to load product full data:', error, JSON.stringify(error));
         }
       };
-      loadProductAttributes();
+      loadProductFullData();
     }
   }, [modal.open, modal.entity, modal.action, modal.data?.id]);
 
@@ -141,22 +165,22 @@ export const EntityFormModal: React.FC = React.memo(() => {
   const getTitle = () => {
     const titles: Record<string, Record<string, string>> = {
       CREATE: {
-        TABLE: t('settings.table.action.add'),
-        ZONE: t('settings.zone.action.add'),
-        PRODUCT: t('settings.product.action.add'),
-        CATEGORY: t('settings.category.action.add')
+        TABLE: t('settings.table.addTable'),
+        ZONE: t('settings.zone.addZone'),
+        PRODUCT: t('settings.product.addProduct'),
+        CATEGORY: t('settings.category.addCategory')
       },
       EDIT: {
-        TABLE: t('settings.table.action.edit'),
-        ZONE: t('settings.zone.action.edit'),
-        PRODUCT: t('settings.product.action.edit'),
-        CATEGORY: t('settings.category.action.edit')
+        TABLE: t('settings.table.editTable'),
+        ZONE: t('settings.zone.editZone'),
+        PRODUCT: t('settings.product.editProduct'),
+        CATEGORY: t('settings.category.editCategory')
       },
       DELETE: {
-        TABLE: t('settings.table.action.delete'),
-        ZONE: t('settings.zone.action.delete'),
-        PRODUCT: t('settings.product.action.delete'),
-        CATEGORY: t('settings.category.action.delete')
+        TABLE: t('settings.table.deleteTable'),
+        ZONE: t('settings.zone.deleteZone'),
+        PRODUCT: t('settings.product.deleteProduct'),
+        CATEGORY: t('settings.category.deleteCategory')
       }
     };
     return titles[action]?.[entity] || '';
@@ -194,40 +218,36 @@ export const EntityFormModal: React.FC = React.memo(() => {
       if (entity === 'TABLE') {
         await api.deleteTable(String(data.id));
         clearZoneTableCache(); // Invalidate tables cache
-        toast.success(t('settings.table.action.deleted'));
+        toast.success(t('settings.table.tableDeleted'));
       } else if (entity === 'ZONE') {
         try {
           await api.deleteZone(String(data.id));
           clearZoneTableCache(); // Invalidate zones cache
-          toast.success(t('settings.zone.action.deleted'));
+          toast.success(t('settings.zone.zoneDeleted'));
         } catch (e: any) {
-          const msg = String(e);
-          if (msg.includes('ZONE_HAS_TABLES')) {
-            toast.error(t('settings.zone.deleteBlocked'));
-            return;
-          }
-          toast.error(t('settings.zone.deleteFailed'));
+          // Use getErrorMessage to get localized message from error_code
+          toast.error(getErrorMessage(e));
           return;
         }
       } else if (entity === 'PRODUCT') {
-        await api.deleteProduct(String(data.id));
-        // Optimistic update: remove from ProductStore
-        useProductStore.getState().optimisticRemove(data.id);
-        toast.success(t('settings.product.action.deleted'));
+        try {
+          await api.deleteProduct(String(data.id));
+          // Optimistic update: remove from ProductStore
+          useProductStore.getState().optimisticRemove(data.id);
+          toast.success(t('settings.product.productDeleted'));
+        } catch (e: any) {
+          toast.error(getErrorMessage(e));
+          return;
+        }
       } else if (entity === 'CATEGORY') {
         try {
           await api.deleteCategory(String(data.id));
           // Refresh products and categories from resources stores
           useProductStore.getState().fetchAll();
           useCategoryStore.getState().fetchAll();
-          toast.success(t('settings.category.action.deleted'));
+          toast.success(t('settings.category.categoryDeleted'));
         } catch (e: any) {
-          const msg = String(e);
-          if (msg.includes('CATEGORY_HAS_PRODUCTS')) {
-            toast.error(t('settings.category.deleteBlocked'));
-            return;
-          }
-          toast.error(t('settings.category.deleteFailed'));
+          toast.error(getErrorMessage(e));
           return;
         }
       }
@@ -240,7 +260,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
   const handleSave = async () => {
     const hasError = Object.values(formErrors).some(Boolean);
     if (hasError) {
-      toast.error(t('common.invalidForm'));
+      toast.error(t('common.message.invalidForm'));
       return;
     }
     try {
@@ -315,47 +335,84 @@ export const EntityFormModal: React.FC = React.memo(() => {
 
         let productId: string;
         if (action === 'CREATE') {
-          // Send price as float (backend will convert to cents for storage)
+          // Create product with embedded specs (price is in specs, not on product)
           const resp = await api.createProduct({
             name: productData.name,
-            category: productData.categoryId,
-            price: productData.price,
+            category: String(productData.categoryId),
             image: productData.image,
-            has_multi_spec: false,
             tax_rate: productData.taxRate || 0,
             sort_order: productData.sortOrder || 0,
             receipt_name: productData.receiptName,
             kitchen_print_name: productData.kitchenPrintName,
-            kitchen_printer: productData.kitchenPrinterId,
+            kitchen_printer: productData.kitchenPrinterId ? String(productData.kitchenPrinterId) : undefined,
             is_kitchen_print_enabled: productData.isKitchenPrintEnabled,
             is_label_print_enabled: productData.isLabelPrintEnabled,
+            // Price is embedded in specs
+            specs: [{
+              name: productData.name,
+              price: productData.price ?? 0,
+              display_order: 0,
+              is_default: true,
+              is_active: true,
+              external_id: productData.externalId ?? null,
+            }],
           });
           const created = resp.data?.product;
           productId = created?.id || '';
+
           // Optimistic update: add to resources ProductStore
           if (created) {
             useProductStore.getState().optimisticAdd(created as any);
           }
           toast.success(t("settings.product.message.created"));
         } else {
-          // Send price as float (backend will convert to cents for storage)
+          // Update product with embedded specs (price and external_id are in specs now)
           await api.updateProduct(String(data.id), {
             name: productData.name,
-            category: productData.categoryId,
-            price: productData.price,
+            category: String(productData.categoryId),
             image: productData.image,
-            has_multi_spec: false,
             tax_rate: productData.taxRate || 0,
             sort_order: productData.sortOrder || 0,
             receipt_name: productData.receiptName,
             kitchen_print_name: productData.kitchenPrintName,
-            kitchen_printer: productData.kitchenPrinterId,
+            kitchen_printer: productData.kitchenPrinterId ? String(productData.kitchenPrinterId) : undefined,
             is_kitchen_print_enabled: productData.isKitchenPrintEnabled,
             is_label_print_enabled: productData.isLabelPrintEnabled,
+            // Update specs with price and external_id
+            specs: [{
+              name: productData.name,
+              price: productData.price ?? 0,
+              display_order: 0,
+              is_default: true,
+              is_active: true,
+              external_id: productData.externalId ?? null,
+            }],
           });
           productId = data.id;
-          // Optimistic update: update ProductStore cache
-          useProductStore.getState().optimisticUpdate(data.id, (p) => ({ ...p, ...productData as any }));
+
+          // Optimistic update: update ProductStore cache with snake_case fields
+          useProductStore.getState().optimisticUpdate(data.id, (p) => ({
+            ...p,
+            name: productData.name,
+            image: productData.image,
+            category: String(productData.categoryId),
+            tax_rate: productData.taxRate ?? p.tax_rate,
+            sort_order: productData.sortOrder ?? p.sort_order,
+            receipt_name: productData.receiptName ?? null,
+            kitchen_print_name: productData.kitchenPrintName ?? null,
+            kitchen_printer: productData.kitchenPrinterId ? String(productData.kitchenPrinterId) : null,
+            is_kitchen_print_enabled: productData.isKitchenPrintEnabled ?? p.is_kitchen_print_enabled,
+            is_label_print_enabled: productData.isLabelPrintEnabled ?? p.is_label_print_enabled,
+            // Update embedded specs
+            specs: [{
+              name: productData.name,
+              price: productData.price ?? 0,
+              display_order: 0,
+              is_default: true,
+              is_active: true,
+              external_id: productData.externalId ?? null,
+            }],
+          }));
           toast.success(t("settings.product.message.updated"));
         }
 
@@ -370,7 +427,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             const productAttrs = resp.data?.product_attributes ?? [];
             // Transform to expected format
             existingBindings = productAttrs.map((pa: any) => ({
-              attributeId: pa.out,
+              attributeId: pa.to,
               id: pa.id
             }));
           } catch (error) {
@@ -390,42 +447,31 @@ export const EntityFormModal: React.FC = React.memo(() => {
               attribute_id: attrId,
               is_required: false,
               display_order: index,
-              default_option_id: defaultOptionIds?.[0]
+              default_option_idx: defaultOptionIds?.[0] !== undefined ? Number(defaultOptionIds[0]) : undefined
             });
           }
         );
 
         // Handle specifications (for CREATE mode with temp specifications)
-        if (action === 'CREATE' && formData.hasMultiSpec && formData.tempSpecifications) {
+        // Specs are now embedded in product, so update the product with all specs
+        if (action === 'CREATE' && formData.hasMultiSpec && formData.tempSpecifications && formData.tempSpecifications.length > 0) {
           try {
-            // First enable multi-spec for the product
-            await invokeApi('update_product', {
-              id: productId,
-              data: { has_multi_spec: true },
+            // Build embedded specs array from temp specifications
+            const embeddedSpecs = formData.tempSpecifications.map((spec: { name: string; price: number; isDefault?: boolean; receiptName?: string }, idx: number) => ({
+              name: spec.name,
+              price: spec.price,
+              display_order: idx,
+              is_default: spec.isDefault ?? false,
+              is_active: true,
+              external_id: null,
+            }));
+
+            // Update product with all embedded specs
+            await api.updateProduct(productId, {
+              specs: embeddedSpecs,
             });
-
-            // Then create all specifications
-            for (const spec of formData.tempSpecifications) {
-              await invokeApi('create_spec', {
-                data: {
-                  product_id: productId,
-                  name: spec.name,
-                  receipt_name: spec.receiptName || null,
-                  price: spec.price,
-                },
-              });
-            }
-
-            // Set default specification if any
-            const defaultSpec = formData.tempSpecifications?.find((s: { isDefault?: boolean }) => s.isDefault);
-            if (defaultSpec) {
-              await invokeApi('update_spec', {
-                id: defaultSpec.id,
-                data: { is_default: true },
-              });
-            }
           } catch (error) {
-            console.error('Failed to create specifications:', error);
+            console.error('Failed to update specifications:', error);
             toast.error(t('settings.specification.message.partialCreateFailed'));
           }
         }
@@ -449,7 +495,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           // Trigger refresh of products store
           useProductStore.getState().fetchAll();
           refreshData(); // Trigger UI refresh
-          toast.success(t('settings.category.action.createSuccess'));
+          toast.success(t('settings.category.createCategorySuccess'));
         } else {
           categoryId = String(data.id);
           await api.updateCategory(categoryId, {
@@ -462,7 +508,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           // Trigger refresh of products store
           useProductStore.getState().fetchAll();
           refreshData(); // Trigger UI refresh
-          toast.success(t('settings.category.action.updateSuccess'));
+          toast.success(t('settings.category.updateCategorySuccess'));
         }
 
         // Handle attribute bindings
@@ -476,7 +522,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             const catAttrs = resp.data?.category_attributes || [];
             // Transform to expected format for syncAttributeBindings
             existingBindings = catAttrs.map((ca: any) => ({
-              attributeId: ca.out,
+              attributeId: ca.to,
               id: ca.id
             }));
           } catch (error) {
@@ -517,7 +563,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
          toast.error(t('settings.externalIdExists'));
          return;
       }
-      toast.error(t('common.na'));
+      toast.error(t('common.label.none'));
     }
   };
 
@@ -528,10 +574,10 @@ export const EntityFormModal: React.FC = React.memo(() => {
         filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
       });
       if (!file || Array.isArray(file)) return;
-      const saved = await invoke<string>('save_image', { sourcePath: file });
-      setFormField('image', saved);
+      const hash = await invoke<string>('save_image', { source_path: file });
+      setFormField('image', hash);
     } catch {
-      toast.error(t('common.na'));
+      toast.error(t('common.label.none'));
     }
   };
 
@@ -630,14 +676,14 @@ export const EntityFormModal: React.FC = React.memo(() => {
             onClick={handleClose}
             className="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors"
           >
-            {t('common.cancel')}
+            {t('common.action.cancel')}
           </button>
           {action === 'DELETE' ? (
             <button
               onClick={handleDelete}
               className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
             >
-              {t('common.delete')}
+              {t('common.action.delete')}
             </button>
           ) : (
             <button
@@ -645,7 +691,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
               disabled={isSaveDisabled}
               className={isSaveDisabled ? saveDisabledClass : saveEnabledClass}
             >
-              {action === 'CREATE' ? t('common.create') : t('common.save')}
+              {action === 'CREATE' ? t('common.action.create') : t('common.action.save')}
             </button>
           )}
         </div>
@@ -663,13 +709,13 @@ export const EntityFormModal: React.FC = React.memo(() => {
                   onClick={handleCancelDiscard}
                   className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors"
                 >
-                  {t('common.cancel')}
+                  {t('common.action.cancel')}
                 </button>
                 <button
                   onClick={handleConfirmDiscard}
                   className="w-full py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
                 >
-                  {t('common.confirm')}
+                  {t('common.action.confirm')}
                 </button>
               </div>
             </div>

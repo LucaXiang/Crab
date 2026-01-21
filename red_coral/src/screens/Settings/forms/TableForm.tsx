@@ -37,7 +37,7 @@ export const TableForm: React.FC<TableFormProps> = ({ formData, zones, onFieldCh
           />
         </FormField>
         <SelectField
-          label={t('table.common.zones')}
+          label={t('table.zones')}
           value={formData.zoneId}
           onChange={(value) => onFieldChange('zoneId', value as string)}
           options={zones.map((z) => ({ value: z.id, label: z.name }))}

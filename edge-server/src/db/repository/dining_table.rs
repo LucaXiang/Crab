@@ -1,6 +1,6 @@
 //! Dining Table Repository
 
-use super::{make_thing, BaseRepository, RepoError, RepoResult};
+use super::{make_thing, strip_table_prefix, BaseRepository, RepoError, RepoResult};
 use crate::db::models::{DiningTable, DiningTableCreate, DiningTableUpdate};
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
@@ -45,7 +45,8 @@ impl DiningTableRepository {
 
     /// Find table by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<DiningTable>> {
-        let table: Option<DiningTable> = self.base.db().select((TABLE, id)).await?;
+        let pure_id = strip_table_prefix(TABLE, id);
+        let table: Option<DiningTable> = self.base.db().select((TABLE, pure_id)).await?;
         Ok(table)
     }
 
@@ -102,8 +103,9 @@ impl DiningTableRepository {
 
     /// Update a dining table
     pub async fn update(&self, id: &str, data: DiningTableUpdate) -> RepoResult<DiningTable> {
+        let pure_id = strip_table_prefix(TABLE, id);
         let existing = self
-            .find_by_id(id)
+            .find_by_id(pure_id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Dining table {} not found", id)))?;
 
@@ -123,23 +125,28 @@ impl DiningTableRepository {
             }
         }
 
-        let updated: Option<DiningTable> = self.base.db().update((TABLE, id)).merge(data).await?;
-        updated.ok_or_else(|| RepoError::NotFound(format!("Dining table {} not found", id)))
+        let thing = make_thing(TABLE, pure_id);
+        self.base
+            .db()
+            .query("UPDATE $thing MERGE $data")
+            .bind(("thing", thing))
+            .bind(("data", data))
+            .await?;
+
+        self.find_by_id(pure_id)
+            .await?
+            .ok_or_else(|| RepoError::NotFound(format!("Dining table {} not found", id)))
     }
 
-    /// Soft delete a dining table
+    /// Hard delete a dining table
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let result: Option<DiningTable> = self
-            .base
+        let pure_id = strip_table_prefix(TABLE, id);
+        let thing = make_thing(TABLE, pure_id);
+        self.base
             .db()
-            .update((TABLE, id))
-            .merge(DiningTableUpdate {
-                name: None,
-                zone: None,
-                capacity: None,
-                is_active: Some(false),
-            })
+            .query("DELETE $thing")
+            .bind(("thing", thing))
             .await?;
-        Ok(result.is_some())
+        Ok(true)
     }
 }

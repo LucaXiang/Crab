@@ -73,7 +73,7 @@ export const VoidReasonModal: React.FC<VoidReasonModalProps> = ({
             onClick={onClose}
             className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-600 hover:bg-gray-200 transition-colors"
           >
-            {t('common.cancel')}
+            {t('common.action.cancel')}
           </button>
           <button
             onClick={() => {

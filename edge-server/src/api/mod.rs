@@ -30,6 +30,7 @@ pub mod tags;
 pub mod categories;
 pub mod products;
 pub mod attributes;
+pub mod has_attribute;
 pub mod zones;
 pub mod tables;
 pub mod price_rules;
