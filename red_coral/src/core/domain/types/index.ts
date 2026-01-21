@@ -89,10 +89,18 @@ export type {
 // ============================================================================
 
 /**
- * CartItem is now an alias for CartItemSnapshot (backend type)
- * Use backend type directly for consistency
+ * CartItem 临时扩展 (等待后端添加字段)
+ *
+ * TODO: 后端在 CartItemSnapshot 添加 product_id 和 external_id 后删除此扩展
+ * - product_id: 应该是 id 字段的别名（兼容性）
+ * - external_id: 应该从 Product 表关联查询
+ *
+ * 当前使用此扩展避免 TS2339 编译错误。
  */
-export type CartItem = import('./orderEvent').CartItemSnapshot;
+export type CartItem = import('./orderEvent').CartItemSnapshot & {
+  product_id?: string;  // TODO: 等待后端添加
+  external_id?: string; // TODO: 等待后端添加
+};
 
 export interface ItemAttributeSelection {
   attribute_id: string;  // SurrealDB string ID (attr_id)
@@ -118,15 +126,20 @@ export type OrderStatus = 'ACTIVE' | 'COMPLETED' | 'VOID' | 'MOVED' | 'MERGED';
 
 /**
  * HeldOrder is OrderSnapshot plus optional timeline
- * 
+ *
  * Timeline is optional and stores OrderEvent[] (服务端权威类型).
  * UI 层使用 Renderer 按需格式化，不存储转换后的数据。
+ *
+ * TODO: items 字段临时使用 CartItem[] (包含 product_id/external_id 扩展)
  */
-export type HeldOrder = import('./orderEvent').OrderSnapshot & {
+export type HeldOrder = Omit<import('./orderEvent').OrderSnapshot, 'items'> & {
+  // Override items to use CartItem (with temporary extensions)
+  items: CartItem[];
+
   // Legacy aliases for backward compatibility
   key?: string;                   // Alias for order_id
   id?: string;                    // Alias for order_id
-  
+
   // Timeline: 存储原始 OrderEvent[]，UI 层按需格式化
   timeline?: import('./orderEvent').OrderEvent[];
 };
