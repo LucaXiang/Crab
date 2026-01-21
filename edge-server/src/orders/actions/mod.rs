@@ -9,19 +9,27 @@ use shared::order::{OrderCommand, OrderCommandPayload};
 
 mod add_items;
 mod add_payment;
+mod cancel_payment;
 mod complete_order;
 mod modify_item;
+mod move_order;
 mod open_table;
 mod remove_item;
+mod restore_item;
+mod restore_order;
 mod update_order_info;
 mod void_order;
 
 pub use add_items::AddItemsAction;
 pub use add_payment::AddPaymentAction;
+pub use cancel_payment::CancelPaymentAction;
 pub use complete_order::CompleteOrderAction;
 pub use modify_item::ModifyItemAction;
+pub use move_order::MoveOrderAction;
 pub use open_table::OpenTableAction;
 pub use remove_item::RemoveItemAction;
+pub use restore_item::RestoreItemAction;
+pub use restore_order::RestoreOrderAction;
 pub use update_order_info::UpdateOrderInfoAction;
 pub use void_order::VoidOrderAction;
 
@@ -34,10 +42,14 @@ pub enum CommandAction {
     AddItems(AddItemsAction),
     ModifyItem(ModifyItemAction),
     RemoveItem(RemoveItemAction),
+    RestoreItem(RestoreItemAction),
     AddPayment(AddPaymentAction),
+    CancelPayment(CancelPaymentAction),
     CompleteOrder(CompleteOrderAction),
     UpdateOrderInfo(UpdateOrderInfoAction),
     VoidOrder(VoidOrderAction),
+    RestoreOrder(RestoreOrderAction),
+    MoveOrder(MoveOrderAction),
 }
 
 /// Convert OrderCommand to CommandAction
@@ -87,7 +99,20 @@ impl From<&OrderCommand> for CommandAction {
                     order_id: order_id.clone(),
                     payment: payment.clone(),
                 })
-            }
+            },
+            OrderCommandPayload::CancelPayment {
+                order_id,
+                payment_id,
+                reason,
+                authorizer_id,
+                authorizer_name,
+            } => CommandAction::CancelPayment(CancelPaymentAction {
+                order_id: order_id.clone(),
+                payment_id: payment_id.clone(),
+                reason: reason.clone(),
+                authorizer_id: authorizer_id.clone(),
+                authorizer_name: authorizer_name.clone(),
+            }),
             OrderCommandPayload::RemoveItem {
                 order_id,
                 instance_id,
@@ -115,7 +140,19 @@ impl From<&OrderCommand> for CommandAction {
                     order_id: order_id.clone(),
                     reason: reason.clone(),
                 })
-            }
+            },
+            OrderCommandPayload::RestoreOrder { order_id } => {
+                CommandAction::RestoreOrder(RestoreOrderAction {
+                    order_id: order_id.clone(),
+                })
+            },
+            OrderCommandPayload::RestoreItem {
+                order_id,
+                instance_id,
+            } => CommandAction::RestoreItem(RestoreItemAction {
+                order_id: order_id.clone(),
+                instance_id: instance_id.clone(),
+            }),
             OrderCommandPayload::UpdateOrderInfo {
                 order_id,
                 receipt_number,
@@ -128,6 +165,18 @@ impl From<&OrderCommand> for CommandAction {
                 guest_count: *guest_count,
                 table_name: table_name.clone(),
                 is_pre_payment: *is_pre_payment,
+            }),
+            OrderCommandPayload::MoveOrder {
+                order_id,
+                target_table_id,
+                target_table_name,
+                target_zone_name,
+            } => CommandAction::MoveOrder(MoveOrderAction {
+                order_id: order_id.clone(),
+                target_table_id: target_table_id.clone(),
+                target_table_name: target_table_name.clone(),
+                target_zone_id: None, // Not in OrderCommandPayload
+                target_zone_name: target_zone_name.clone(),
             }),
             // Other commands will be added here
             _ => todo!("Command not yet implemented"),
