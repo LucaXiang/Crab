@@ -10,14 +10,13 @@ import { AttributeDisplayTag } from '@/presentation/components/form/FormField/At
 interface CategoryFormProps {
   formData: {
     name: string;
-    kitchenPrinterId?: number;
-    isKitchenPrintEnabled?: boolean;
-    isLabelPrintEnabled?: boolean;
+    print_destinations?: number[];
+    is_label_print_enabled?: boolean;
     selectedAttributeIds?: string[];
     attributeDefaultOptions?: Record<string, string | string[]>;
-    isVirtual?: boolean;
-    tagIds?: string[];
-    matchMode?: 'any' | 'all';
+    is_virtual?: boolean;
+    tag_ids?: string[];
+    match_mode?: 'any' | 'all';
   };
   onFieldChange: (field: string, value: any) => void;
   t: (key: string) => string;
@@ -33,16 +32,20 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
   const getAttributeById = attributeHelpers.getAttributeById;
 
   // Virtual category state
-  const isVirtual = formData.isVirtual ?? false;
-  const selectedTagIds = formData.tagIds || [];
-  const matchMode = formData.matchMode || 'any';
+  const isVirtual = formData.is_virtual ?? false;
+  const selectedTagIds = formData.tag_ids || [];
+  const matchMode = formData.match_mode || 'any';
+
+  // Kitchen print state (derived from print_destinations array)
+  const isKitchenPrintEnabled = (formData.print_destinations?.length ?? 0) > 0;
+  const kitchenPrinterId = formData.print_destinations?.[0];
 
   // Toggle tag selection
   const handleTagToggle = (tagId: string) => {
     const newTagIds = selectedTagIds.includes(tagId)
       ? selectedTagIds.filter((id) => id !== tagId)
       : [...selectedTagIds, tagId];
-    onFieldChange('tagIds', newTagIds);
+    onFieldChange('tag_ids', newTagIds);
   };
 
   return (
@@ -67,7 +70,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
           <SelectField
             label={t('settings.category.form.isVirtual')}
             value={isVirtual ? 'true' : 'false'}
-            onChange={(value) => onFieldChange('isVirtual', value === 'true')}
+            onChange={(value) => onFieldChange('is_virtual', value === 'true')}
             options={[
               { value: 'false', label: t('settings.category.form.regularCategory') },
               { value: 'true', label: t('settings.category.form.virtualCategory') }
@@ -79,7 +82,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
               <SelectField
                 label={t('settings.category.form.matchMode')}
                 value={matchMode}
-                onChange={(value) => onFieldChange('matchMode', value)}
+                onChange={(value) => onFieldChange('match_mode', value)}
                 options={[
                   { value: 'any', label: t('settings.category.form.matchAny') },
                   { value: 'all', label: t('settings.category.form.matchAll') }
@@ -137,19 +140,27 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
         <div className="space-y-4">
           <SelectField
             label={t('settings.product.print.isKitchenPrintEnabled')}
-            value={formData.isKitchenPrintEnabled ? 'true' : 'false'}
-            onChange={(value) => onFieldChange('isKitchenPrintEnabled', value === 'true')}
+            value={isKitchenPrintEnabled ? 'true' : 'false'}
+            onChange={(value) => {
+              if (value === 'true') {
+                // Enable: set print_destinations with current printer or empty (will select later)
+                onFieldChange('print_destinations', kitchenPrinterId ? [kitchenPrinterId] : []);
+              } else {
+                // Disable: clear print_destinations
+                onFieldChange('print_destinations', []);
+              }
+            }}
             options={[
               { value: 'true', label: t('common.status.enabled') },
               { value: 'false', label: t('common.status.disabled') }
             ]}
           />
 
-          {formData.isKitchenPrintEnabled && (
+          {isKitchenPrintEnabled && (
             <div className="pl-4 border-l-2 border-teal-100">
               <KitchenPrinterSelector
-                value={formData.kitchenPrinterId}
-                onChange={(value) => onFieldChange('kitchenPrinterId', value)}
+                value={kitchenPrinterId}
+                onChange={(value) => onFieldChange('print_destinations', value ? [value] : [])}
                 t={t}
               />
             </div>
@@ -159,8 +170,8 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
 
           <SelectField
             label={t('settings.product.print.isLabelPrintEnabled')}
-            value={formData.isLabelPrintEnabled ? 'true' : 'false'}
-            onChange={(value) => onFieldChange('isLabelPrintEnabled', value === 'true')}
+            value={formData.is_label_print_enabled ? 'true' : 'false'}
+            onChange={(value) => onFieldChange('is_label_print_enabled', value === 'true')}
             options={[
               { value: 'true', label: t('common.status.enabled') },
               { value: 'false', label: t('common.status.disabled') }
