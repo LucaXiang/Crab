@@ -49,7 +49,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
     if (!modal.open) {
       setInheritedAttributeIds([]);
     }
-  }, [modal.open, modal.entity, modal.action, modal.data, formData.isKitchenPrintEnabled]);
+  }, [modal.open, modal.entity, modal.action, modal.data, formData.print_destinations]);
 
   // Ensure categories are loaded when opening product form
   useEffect(() => {
@@ -64,8 +64,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
         categoryStore.fetchAll();
       }
       // Auto-select first category if none selected and creating a new product
-      if (categories.length > 0 && modal.action === 'CREATE' && !formData.categoryId && !defaultCategorySet.current) {
-        setFormData({ categoryId: categories[0].id ?? '' });
+      if (categories.length > 0 && modal.action === 'CREATE' && !formData.category && !defaultCategorySet.current) {
+        setFormData({ category: categories[0].id ?? '' });
         defaultCategorySet.current = true;
       }
     }
@@ -278,32 +278,32 @@ export const EntityFormModal: React.FC = React.memo(() => {
     }
     try {
       if (entity === 'TABLE') {
-        const tableData = {
+        const tablePayload = {
           name: formData.name.trim(),
-          zoneId: formData.zoneId,
+          zone: formData.zone,
           capacity: Math.max(1, formData.capacity),
         };
         if (action === 'CREATE') {
-          await api.createTable({ name: tableData.name, zone: String(tableData.zoneId), capacity: Number(tableData.capacity) });
+          await api.createTable({ name: tablePayload.name, zone: String(tablePayload.zone), capacity: Number(tablePayload.capacity) });
           clearZoneTableCache(); // Invalidate tables cache
           toast.success(t("settings.table.message.created"));
         } else {
-          await api.updateTable(String(data.id), { name: tableData.name, capacity: Number(tableData.capacity) });
+          await api.updateTable(String(data.id), { name: tablePayload.name, capacity: Number(tablePayload.capacity) });
           clearZoneTableCache(); // Invalidate tables cache
           toast.success(t("settings.table.message.updated"));
         }
       } else if (entity === 'ZONE') {
-        const zoneData = {
+        const zonePayload = {
           name: formData.name.trim(),
-          surchargeType: formData.surchargeType !== 'none' ? formData.surchargeType : undefined,
-          surchargeAmount: formData.surchargeType !== 'none' ? formData.surchargeAmount : undefined,
+          description: formData.description,
+          // Note: surcharge_type and surcharge_amount are UI-only, may not be sent to API
         };
         if (action === 'CREATE') {
-          await api.createZone({ name: zoneData.name });
+          await api.createZone({ name: zonePayload.name });
           clearZoneTableCache(); // Invalidate zones cache
           toast.success(t("settings.zone.message.created"));
         } else {
-          await api.updateZone(String(data.id), { name: zoneData.name });
+          await api.updateZone(String(data.id), { name: zonePayload.name });
           clearZoneTableCache(); // Invalidate zones cache
           toast.success(t("settings.zone.message.updated"));
         }
@@ -316,7 +316,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           toast.error(t('settings.externalIdRequired'));
           return;
         }
-        if (!formData.categoryId) {
+        if (!formData.category) {
           if (categories.length === 0) {
             toast.error(t('settings.category.createFirst'));
           } else {
@@ -325,23 +325,25 @@ export const EntityFormModal: React.FC = React.memo(() => {
           return;
         }
 
-          const productData = {
-            name: formData.name.trim(),
-            receiptName: formData.receiptName?.trim() ?? undefined,
-            price: Math.max(0.01, formData.price),
-            categoryId: formData.categoryId,
-            image: formData.image?.trim() ?? '',
-            externalId: formData.externalId,
-            taxRate: formData.taxRate,
-            sortOrder: formData.sortOrder ?? undefined,
-            kitchenPrinterId: formData.kitchenPrinterId ?? undefined,
-            kitchenPrintName: formData.kitchenPrintName?.trim() ?? undefined,
-            isKitchenPrintEnabled: formData.isKitchenPrintEnabled ?? undefined,
-            isLabelPrintEnabled: formData.isLabelPrintEnabled ?? undefined,
-          };
+        const productPayload = {
+          name: formData.name.trim(),
+          category: formData.category,
+          image: formData.image?.trim() ?? '',
+          sort_order: formData.sort_order ?? 0,
+          tax_rate: formData.tax_rate ?? 0,
+          receipt_name: formData.receipt_name?.trim() ?? undefined,
+          kitchen_print_name: formData.kitchen_print_name?.trim() ?? undefined,
+          print_destinations: formData.print_destinations ?? [],
+          is_label_print_enabled: formData.is_label_print_enabled ?? undefined,
+          tags: formData.tags ?? [],
+          specs: formData.specs ?? [],
+          // These are used for the default spec
+          price: Math.max(0.01, formData.price),
+          externalId: formData.externalId,
+        };
 
         // Save the selected category for next time (lookup name by ID)
-        const category = categories.find(c => String(c.id) === String(productData.categoryId));
+        const category = categories.find(c => String(c.id) === String(productPayload.category));
         if (category) {
           setLastSelectedCategory(category.name);
         }
@@ -350,23 +352,23 @@ export const EntityFormModal: React.FC = React.memo(() => {
         if (action === 'CREATE') {
           // Create product with embedded specs (price is in specs, not on product)
           const created = await api.createProduct({
-            name: productData.name,
-            category: String(productData.categoryId),
-            image: productData.image,
-            tax_rate: productData.taxRate || 0,
-            sort_order: productData.sortOrder || 0,
-            receipt_name: productData.receiptName,
-            kitchen_print_name: productData.kitchenPrintName,
-            print_destinations: productData.kitchenPrinterId ? [String(productData.kitchenPrinterId)] : [],
-            is_label_print_enabled: productData.isLabelPrintEnabled,
+            name: productPayload.name,
+            category: String(productPayload.category),
+            image: productPayload.image,
+            tax_rate: productPayload.tax_rate,
+            sort_order: productPayload.sort_order,
+            receipt_name: productPayload.receipt_name,
+            kitchen_print_name: productPayload.kitchen_print_name,
+            print_destinations: productPayload.print_destinations,
+            is_label_print_enabled: productPayload.is_label_print_enabled,
             // Price is embedded in specs
             specs: [{
-              name: productData.name,
-              price: productData.price ?? 0,
+              name: productPayload.name,
+              price: productPayload.price ?? 0,
               display_order: 0,
               is_default: true,
               is_active: true,
-              external_id: productData.externalId ?? null,
+              external_id: productPayload.externalId ?? null,
             }],
           });
           productId = created?.id || '';
@@ -379,23 +381,23 @@ export const EntityFormModal: React.FC = React.memo(() => {
         } else {
           // Update product with embedded specs (price and external_id are in specs now)
           await api.updateProduct(String(data.id), {
-            name: productData.name,
-            category: String(productData.categoryId),
-            image: productData.image,
-            tax_rate: productData.taxRate || 0,
-            sort_order: productData.sortOrder || 0,
-            receipt_name: productData.receiptName,
-            kitchen_print_name: productData.kitchenPrintName,
-            print_destinations: productData.kitchenPrinterId ? [String(productData.kitchenPrinterId)] : [],
-            is_label_print_enabled: productData.isLabelPrintEnabled,
+            name: productPayload.name,
+            category: String(productPayload.category),
+            image: productPayload.image,
+            tax_rate: productPayload.tax_rate,
+            sort_order: productPayload.sort_order,
+            receipt_name: productPayload.receipt_name,
+            kitchen_print_name: productPayload.kitchen_print_name,
+            print_destinations: productPayload.print_destinations,
+            is_label_print_enabled: productPayload.is_label_print_enabled,
             // Update specs with price and external_id
             specs: [{
-              name: productData.name,
-              price: productData.price ?? 0,
+              name: productPayload.name,
+              price: productPayload.price ?? 0,
               display_order: 0,
               is_default: true,
               is_active: true,
-              external_id: productData.externalId ?? null,
+              external_id: productPayload.externalId ?? null,
             }],
           });
           productId = data.id;
@@ -403,23 +405,23 @@ export const EntityFormModal: React.FC = React.memo(() => {
           // Optimistic update: update ProductStore cache with snake_case fields
           useProductStore.getState().optimisticUpdate(data.id, (p) => ({
             ...p,
-            name: productData.name,
-            image: productData.image,
-            category: String(productData.categoryId),
-            tax_rate: productData.taxRate ?? p.tax_rate,
-            sort_order: productData.sortOrder ?? p.sort_order,
-            receipt_name: productData.receiptName ?? null,
-            kitchen_print_name: productData.kitchenPrintName ?? null,
-            print_destinations: productData.kitchenPrinterId ? [String(productData.kitchenPrinterId)] : p.print_destinations,
-            is_label_print_enabled: productData.isLabelPrintEnabled ?? p.is_label_print_enabled,
+            name: productPayload.name,
+            image: productPayload.image,
+            category: String(productPayload.category),
+            tax_rate: productPayload.tax_rate ?? p.tax_rate,
+            sort_order: productPayload.sort_order ?? p.sort_order,
+            receipt_name: productPayload.receipt_name ?? null,
+            kitchen_print_name: productPayload.kitchen_print_name ?? null,
+            print_destinations: productPayload.print_destinations ?? p.print_destinations,
+            is_label_print_enabled: productPayload.is_label_print_enabled ?? p.is_label_print_enabled,
             // Update embedded specs
             specs: [{
-              name: productData.name,
-              price: productData.price ?? 0,
+              name: productPayload.name,
+              price: productPayload.price ?? 0,
               display_order: 0,
               is_default: true,
               is_active: true,
-              external_id: productData.externalId ?? null,
+              external_id: productPayload.externalId ?? null,
             }],
           }));
           toast.success(t("settings.product.message.updated"));
@@ -484,25 +486,26 @@ export const EntityFormModal: React.FC = React.memo(() => {
           }
         }
       } else if (entity === 'CATEGORY') {
-        const categoryName = formData.name.trim();
-        // Backend expects print_destinations array and is_label_print_enabled boolean
-        const isLabelPrintEnabled = (formData.isLabelPrintEnabled as unknown) !== false;
-        const printDestinations = formData.kitchenPrinterId ? [String(formData.kitchenPrinterId)] : [];
-        // Virtual category fields (snake_case for API)
-        const isVirtual = formData.isVirtual ?? false;
-        const tagIds = formData.tagIds || [];
-        const matchMode = formData.matchMode || 'any';
+        const categoryPayload = {
+          name: formData.name.trim(),
+          sort_order: formData.sort_order ?? 0,
+          print_destinations: formData.print_destinations ?? [],
+          is_label_print_enabled: formData.is_label_print_enabled ?? true,
+          is_virtual: formData.is_virtual ?? false,
+          tag_ids: formData.tag_ids ?? [],
+          match_mode: formData.match_mode ?? 'any',
+        };
 
         let categoryId: string;
         if (action === 'CREATE') {
           const created = await api.createCategory({
-            name: categoryName,
-            sort_order: formData.sortOrder ?? 0,
-            print_destinations: printDestinations,
-            is_label_print_enabled: isLabelPrintEnabled,
-            is_virtual: isVirtual,
-            tag_ids: tagIds,
-            match_mode: matchMode,
+            name: categoryPayload.name,
+            sort_order: categoryPayload.sort_order,
+            print_destinations: categoryPayload.print_destinations,
+            is_label_print_enabled: categoryPayload.is_label_print_enabled,
+            is_virtual: categoryPayload.is_virtual,
+            tag_ids: categoryPayload.tag_ids,
+            match_mode: categoryPayload.match_mode,
           });
           categoryId = created?.id || '';
           // Trigger refresh of products store
@@ -512,13 +515,13 @@ export const EntityFormModal: React.FC = React.memo(() => {
         } else {
           categoryId = String(data.id);
           await api.updateCategory(categoryId, {
-            name: categoryName,
-            sort_order: formData.sortOrder ?? 0,
-            print_destinations: printDestinations,
-            is_label_print_enabled: isLabelPrintEnabled,
-            is_virtual: isVirtual,
-            tag_ids: tagIds,
-            match_mode: matchMode,
+            name: categoryPayload.name,
+            sort_order: categoryPayload.sort_order,
+            print_destinations: categoryPayload.print_destinations,
+            is_label_print_enabled: categoryPayload.is_label_print_enabled,
+            is_virtual: categoryPayload.is_virtual,
+            tag_ids: categoryPayload.tag_ids,
+            match_mode: categoryPayload.match_mode,
           });
           // Trigger refresh of products store
           useProductStore.getState().fetchAll();
@@ -561,23 +564,25 @@ export const EntityFormModal: React.FC = React.memo(() => {
           }
         );
       } else if (entity === 'TAG') {
-        const tagName = formData.name.trim();
-        const tagColor = formData.color || '#3B82F6';
-        const displayOrder = formData.displayOrder ?? 0;
+        const tagPayload = {
+          name: formData.name.trim(),
+          color: formData.color || '#3B82F6',
+          display_order: formData.display_order ?? 0,
+        };
 
         if (action === 'CREATE') {
           await api.createTag({
-            name: tagName,
-            color: tagColor,
-            display_order: displayOrder
+            name: tagPayload.name,
+            color: tagPayload.color,
+            display_order: tagPayload.display_order,
           });
           refreshData();
           toast.success(t('settings.tag.message.created'));
         } else {
           await api.updateTag(String(data.id), {
-            name: tagName,
-            color: tagColor,
-            display_order: displayOrder
+            name: tagPayload.name,
+            color: tagPayload.color,
+            display_order: tagPayload.display_order,
           });
           refreshData();
           toast.success(t('settings.tag.message.updated'));
@@ -658,9 +663,11 @@ export const EntityFormModal: React.FC = React.memo(() => {
           <CategoryForm
             formData={{
               ...formData,
-              isKitchenPrintEnabled: formData.isKitchenPrintEnabled !== 0 && (formData.isKitchenPrintEnabled as unknown) !== false,
-              isLabelPrintEnabled: formData.isLabelPrintEnabled !== 0 && (formData.isLabelPrintEnabled as unknown) !== false,
-              kitchenPrinterId: formData.kitchenPrinterId ?? undefined,
+              // Derive isKitchenPrintEnabled from print_destinations for UI
+              isKitchenPrintEnabled: (formData.print_destinations?.length ?? 0) > 0,
+              is_label_print_enabled: formData.is_label_print_enabled !== 0 && (formData.is_label_print_enabled as unknown) !== false,
+              // Derive kitchenPrinterId from print_destinations for UI
+              kitchenPrinterId: formData.print_destinations?.[0],
             }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onFieldChange={setFormField as (field: string, value: any) => void}
@@ -673,7 +680,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             formData={{
               name: formData.name,
               color: formData.color || '#3B82F6',
-              displayOrder: formData.displayOrder ?? 0,
+              display_order: formData.display_order ?? 0,
             }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onFieldChange={setFormField as (field: string, value: any) => void}
