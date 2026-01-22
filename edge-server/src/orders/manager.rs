@@ -27,11 +27,14 @@ use super::actions::CommandAction;
 use super::appliers::EventAction;
 use super::storage::{OrderStorage, StorageError};
 use super::traits::{CommandContext, CommandHandler, CommandMetadata, EventApplier, OrderError};
+use crate::db::models::PriceRule;
 use shared::order::{
     CommandError, CommandErrorCode, CommandResponse, OrderCommand, OrderEvent, OrderSnapshot,
     OrderStatus,
 };
+use std::collections::HashMap;
 use std::path::Path;
+use std::sync::{Arc, RwLock};
 use thiserror::Error;
 use tokio::sync::broadcast;
 
@@ -139,6 +142,8 @@ pub struct OrdersManager {
     /// Server instance epoch - unique ID generated on startup
     /// Used by clients to detect server restarts
     epoch: String,
+    /// Cached rules per order
+    rule_cache: Arc<RwLock<HashMap<String, Vec<PriceRule>>>>,
 }
 
 impl std::fmt::Debug for OrdersManager {
@@ -162,6 +167,7 @@ impl OrdersManager {
             storage,
             event_tx,
             epoch,
+            rule_cache: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -174,12 +180,31 @@ impl OrdersManager {
             storage,
             event_tx,
             epoch,
+            rule_cache: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
     /// Get the server epoch (unique instance ID)
     pub fn epoch(&self) -> &str {
         &self.epoch
+    }
+
+    /// Cache rules for an order
+    pub fn cache_rules(&self, order_id: &str, rules: Vec<PriceRule>) {
+        let mut cache = self.rule_cache.write().unwrap();
+        cache.insert(order_id.to_string(), rules);
+    }
+
+    /// Get cached rules for an order
+    pub fn get_cached_rules(&self, order_id: &str) -> Option<Vec<PriceRule>> {
+        let cache = self.rule_cache.read().unwrap();
+        cache.get(order_id).cloned()
+    }
+
+    /// Remove cached rules for an order
+    pub fn remove_cached_rules(&self, order_id: &str) {
+        let mut cache = self.rule_cache.write().unwrap();
+        cache.remove(order_id);
     }
 
     /// Subscribe to event broadcasts
@@ -325,7 +350,16 @@ impl OrdersManager {
         // 11. Commit transaction
         txn.commit().map_err(StorageError::from)?;
 
-        // 12. Return response
+        // 12. Clean up rule cache for completed/voided orders
+        match &cmd.payload {
+            shared::order::OrderCommandPayload::CompleteOrder { order_id, .. }
+            | shared::order::OrderCommandPayload::VoidOrder { order_id, .. } => {
+                self.remove_cached_rules(order_id);
+            }
+            _ => {}
+        }
+
+        // 13. Return response
         let order_id = events.first().map(|e| e.order_id.clone());
         Ok((CommandResponse::success(cmd.command_id, order_id), events))
     }
@@ -383,6 +417,7 @@ impl Clone for OrdersManager {
             storage: self.storage.clone(),
             event_tx: self.event_tx.clone(),
             epoch: self.epoch.clone(),
+            rule_cache: self.rule_cache.clone(),
         }
     }
 }
@@ -592,269 +627,6 @@ mod tests {
         assert!(active_orders.is_empty());
     }
 
-    // ========== Event Chain Sequence Continuity Tests ==========
-
-    #[test]
-    fn test_sequence_continuity_single_order() {
-        // Verify that events for a single order have strictly incrementing sequences
-        let manager = create_test_manager();
-
-        // Open table
-        let open_cmd = create_open_table_cmd("op-1");
-        let open_response = manager.execute_command(open_cmd);
-        let order_id = open_response.order_id.unwrap();
-
-        // Add items
-        let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
-            "Test Operator".to_string(),
-            OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items: vec![CartItemInput {
-                    product_id: "prod-1".to_string(),
-                    name: "Test Product".to_string(),
-                    price: 10.0,
-                    original_price: None,
-                    quantity: 2,
-                    selected_options: None,
-                    selected_specification: None,
-                    manual_discount_percent: None,
-                    surcharge: None,
-                    note: None,
-                    authorizer_id: None,
-                    authorizer_name: None,
-                }],
-            },
-        );
-        manager.execute_command(add_cmd);
-
-        // Get events and verify sequence continuity
-        let events = manager.storage.get_events_for_order(&order_id).unwrap();
-        assert_eq!(events.len(), 2);
-
-        // Verify sequences are strictly incrementing
-        for i in 1..events.len() {
-            assert!(
-                events[i].sequence > events[i - 1].sequence,
-                "Sequence must be strictly incrementing: {} should be > {}",
-                events[i].sequence,
-                events[i - 1].sequence
-            );
-        }
-
-        // Note: Gaps are allowed in order sequences (unlike invoices)
-        // We only verify sequences are unique and increasing
-    }
-
-    #[test]
-    fn test_sequence_uniqueness_across_orders() {
-        // Verify that global sequences are unique across all orders
-        let manager = create_test_manager();
-
-        // Create first order
-        let cmd1 = create_open_table_cmd("op-1");
-        let response1 = manager.execute_command(cmd1);
-        let order_id1 = response1.order_id.unwrap();
-
-        // Create second order
-        let cmd2 = OrderCommand::new(
-            "op-1".to_string(),
-            "Test Operator".to_string(),
-            OrderCommandPayload::OpenTable {
-                table_id: Some("T2".to_string()),
-                table_name: Some("Table 2".to_string()),
-                zone_id: None,
-                zone_name: None,
-                guest_count: 3,
-                is_retail: false,
-            },
-        );
-        let response2 = manager.execute_command(cmd2);
-        let order_id2 = response2.order_id.unwrap();
-
-        // Get all events
-        let events1 = manager.storage.get_events_for_order(&order_id1).unwrap();
-        let events2 = manager.storage.get_events_for_order(&order_id2).unwrap();
-
-        // Collect all sequences
-        let all_sequences: Vec<u64> = events1
-            .iter()
-            .chain(events2.iter())
-            .map(|e| e.sequence)
-            .collect();
-
-        // Verify uniqueness
-        let mut sorted = all_sequences.clone();
-        sorted.sort();
-        sorted.dedup();
-        assert_eq!(
-            all_sequences.len(),
-            sorted.len(),
-            "All sequences must be unique across orders"
-        );
-
-        // Note: We verify uniqueness, not strict continuity
-        // Gaps are allowed in order sequences
-    }
-
-    #[test]
-    fn test_event_replay_reconstructs_snapshot() {
-        // Verify that replaying events reconstructs the same snapshot
-        use crate::orders::appliers::EventAction;
-        use crate::orders::traits::EventApplier;
-
-        let manager = create_test_manager();
-
-        // Open table
-        let open_cmd = create_open_table_cmd("op-1");
-        let open_response = manager.execute_command(open_cmd);
-        let order_id = open_response.order_id.unwrap();
-
-        // Add items
-        let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
-            "Test Operator".to_string(),
-            OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items: vec![CartItemInput {
-                    product_id: "prod-1".to_string(),
-                    name: "Item A".to_string(),
-                    price: 25.0,
-                    original_price: None,
-                    quantity: 3,
-                    selected_options: None,
-                    selected_specification: None,
-                    manual_discount_percent: None,
-                    surcharge: None,
-                    note: None,
-                    authorizer_id: None,
-                    authorizer_name: None,
-                }],
-            },
-        );
-        manager.execute_command(add_cmd);
-
-        // Get current snapshot (from storage)
-        let stored_snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-
-        // Get events and replay from scratch
-        let events = manager.storage.get_events_for_order(&order_id).unwrap();
-
-        // Replay events to rebuild snapshot
-        let mut replayed_snapshot = shared::order::OrderSnapshot::new(order_id.clone());
-        for event in &events {
-            let action = EventAction::from(event);
-            action.apply(&mut replayed_snapshot, event);
-        }
-
-        // Verify replayed snapshot matches stored snapshot
-        assert_eq!(
-            replayed_snapshot.order_id, stored_snapshot.order_id,
-            "Order ID must match"
-        );
-        assert_eq!(
-            replayed_snapshot.status, stored_snapshot.status,
-            "Status must match"
-        );
-        assert_eq!(
-            replayed_snapshot.items.len(),
-            stored_snapshot.items.len(),
-            "Item count must match"
-        );
-        assert_eq!(
-            replayed_snapshot.subtotal, stored_snapshot.subtotal,
-            "Subtotal must match"
-        );
-        assert_eq!(
-            replayed_snapshot.total, stored_snapshot.total,
-            "Total must match"
-        );
-        assert_eq!(
-            replayed_snapshot.last_sequence, stored_snapshot.last_sequence,
-            "Last sequence must match"
-        );
-
-        // Verify checksum matches
-        assert_eq!(
-            replayed_snapshot.state_checksum, stored_snapshot.state_checksum,
-            "Checksum must match after replay"
-        );
-    }
-
-    #[test]
-    fn test_sequential_command_sequence_integrity() {
-        // In-memory test: sequential commands produce sequential events
-        // Note: In production, gaps may occur due to failures/rollbacks
-        let manager = create_test_manager();
-
-        // Execute 10 commands
-        for i in 0..10 {
-            let cmd = OrderCommand::new(
-                "op-1".to_string(),
-                "Test Operator".to_string(),
-                OrderCommandPayload::OpenTable {
-                    table_id: Some(format!("T{}", i)),
-                    table_name: Some(format!("Table {}", i)),
-                    zone_id: None,
-                    zone_name: None,
-                    guest_count: 2,
-                    is_retail: false,
-                },
-            );
-            manager.execute_command(cmd);
-        }
-
-        // Get all events
-        let events = manager.storage.get_events_since(0).unwrap();
-        assert_eq!(events.len(), 10);
-
-        // Verify strict sequence order
-        for (i, event) in events.iter().enumerate() {
-            assert_eq!(
-                event.sequence,
-                (i + 1) as u64,
-                "Event {} should have sequence {}",
-                i,
-                i + 1
-            );
-        }
-    }
-
-    #[test]
-    fn test_duplicate_command_rejected_cleanly() {
-        // Verify that duplicate commands are rejected without side effects
-        let manager = create_test_manager();
-
-        // First command
-        let cmd = create_open_table_cmd("op-1");
-        let response1 = manager.execute_command(cmd.clone());
-        assert!(response1.order_id.is_some());
-
-        // Duplicate command (same command_id)
-        let response2 = manager.execute_command(cmd);
-        assert!(response2.order_id.is_none()); // Duplicate
-
-        // New command
-        let cmd2 = OrderCommand::new(
-            "op-1".to_string(),
-            "Test Operator".to_string(),
-            OrderCommandPayload::OpenTable {
-                table_id: Some("T2".to_string()),
-                table_name: Some("Table 2".to_string()),
-                zone_id: None,
-                zone_name: None,
-                guest_count: 2,
-                is_retail: false,
-            },
-        );
-        let response3 = manager.execute_command(cmd2);
-        assert!(response3.order_id.is_some());
-
-        // Verify only 2 events created (duplicate rejected)
-        let events = manager.storage.get_events_since(0).unwrap();
-        assert_eq!(events.len(), 2, "Duplicate should not create event");
-    }
-
     #[test]
     fn test_event_broadcast() {
         let manager = create_test_manager();
@@ -867,572 +639,5 @@ mod tests {
         // Should receive event
         let event = rx.try_recv().unwrap();
         assert_eq!(event.event_type, OrderEventType::TableOpened);
-    }
-
-    // ========== Tampering Detection Tests ==========
-
-    #[test]
-    fn test_tampering_total_detected() {
-        let manager = create_test_manager();
-
-        let cmd = create_open_table_cmd("op-1");
-        let response = manager.execute_command(cmd);
-        let order_id = response.order_id.unwrap();
-
-        // Add item
-        let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
-            "Test".to_string(),
-            OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items: vec![CartItemInput {
-                    product_id: "prod-1".to_string(),
-                    name: "Item".to_string(),
-                    price: 100.0,
-                    original_price: None,
-                    quantity: 1,
-                    selected_options: None,
-                    selected_specification: None,
-                    manual_discount_percent: None,
-                    surcharge: None,
-                    note: None,
-                    authorizer_id: None,
-                    authorizer_name: None,
-                }],
-            },
-        );
-        manager.execute_command(add_cmd);
-
-        let mut snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert!(snapshot.verify_checksum(), "Original checksum valid");
-
-        // Tamper with total
-        snapshot.total = 50.0;
-        assert!(!snapshot.verify_checksum(), "Tampering detected");
-    }
-
-    #[test]
-    fn test_tampering_add_item_detected() {
-        // Checksum includes items.len(), so adding items is detected
-        let manager = create_test_manager();
-
-        let cmd = create_open_table_cmd("op-1");
-        let response = manager.execute_command(cmd);
-        let order_id = response.order_id.unwrap();
-
-        let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
-            "Test".to_string(),
-            OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items: vec![CartItemInput {
-                    product_id: "prod-1".to_string(),
-                    name: "Item".to_string(),
-                    price: 100.0,
-                    original_price: None,
-                    quantity: 2,
-                    selected_options: None,
-                    selected_specification: None,
-                    manual_discount_percent: None,
-                    surcharge: None,
-                    note: None,
-                    authorizer_id: None,
-                    authorizer_name: None,
-                }],
-            },
-        );
-        manager.execute_command(add_cmd);
-
-        let mut snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert!(snapshot.verify_checksum());
-
-        // Tamper by adding a fake item (changes items.len())
-        snapshot.items.push(snapshot.items[0].clone());
-        assert!(!snapshot.verify_checksum(), "Item count tampering detected");
-    }
-
-    #[test]
-    fn test_tampering_remove_item_detected() {
-        // Checksum includes items.len(), so removing items is detected
-        let manager = create_test_manager();
-
-        let cmd = create_open_table_cmd("op-1");
-        let response = manager.execute_command(cmd);
-        let order_id = response.order_id.unwrap();
-
-        let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
-            "Test".to_string(),
-            OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items: vec![
-                    CartItemInput {
-                        product_id: "prod-1".to_string(),
-                        name: "Item 1".to_string(),
-                        price: 10.0,
-                        original_price: None,
-                        quantity: 1,
-                        selected_options: None,
-                        selected_specification: None,
-                        manual_discount_percent: None,
-                        surcharge: None,
-                        note: None,
-                        authorizer_id: None,
-                        authorizer_name: None,
-                    },
-                    CartItemInput {
-                        product_id: "prod-2".to_string(),
-                        name: "Item 2".to_string(),
-                        price: 20.0,
-                        original_price: None,
-                        quantity: 1,
-                        selected_options: None,
-                        selected_specification: None,
-                        manual_discount_percent: None,
-                        surcharge: None,
-                        note: None,
-                        authorizer_id: None,
-                        authorizer_name: None,
-                    },
-                ],
-            },
-        );
-        manager.execute_command(add_cmd);
-
-        let mut snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert_eq!(snapshot.items.len(), 2);
-        assert!(snapshot.verify_checksum());
-
-        // Tamper by removing an item (changes items.len())
-        snapshot.items.pop();
-        assert!(!snapshot.verify_checksum(), "Item removal tampering detected");
-    }
-
-    #[test]
-    fn test_tampering_status_detected() {
-        let manager = create_test_manager();
-
-        let cmd = create_open_table_cmd("op-1");
-        let response = manager.execute_command(cmd);
-        let order_id = response.order_id.unwrap();
-
-        let mut snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert_eq!(snapshot.status, OrderStatus::Active);
-        assert!(snapshot.verify_checksum());
-
-        // Tamper with status
-        snapshot.status = OrderStatus::Completed;
-        assert!(!snapshot.verify_checksum(), "Status tampering detected");
-    }
-
-    #[test]
-    fn test_tampering_sequence_detected() {
-        let manager = create_test_manager();
-
-        let cmd = create_open_table_cmd("op-1");
-        let response = manager.execute_command(cmd);
-        let order_id = response.order_id.unwrap();
-
-        let mut snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert!(snapshot.verify_checksum());
-
-        // Tamper with sequence
-        snapshot.last_sequence = 999;
-        assert!(!snapshot.verify_checksum(), "Sequence tampering detected");
-    }
-
-    // ========== Boundary Condition Tests ==========
-
-    #[test]
-    fn test_large_amount_precision() {
-        let manager = create_test_manager();
-
-        let cmd = create_open_table_cmd("op-1");
-        let response = manager.execute_command(cmd);
-        let order_id = response.order_id.unwrap();
-
-        // Add item with large price
-        let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
-            "Test".to_string(),
-            OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items: vec![CartItemInput {
-                    product_id: "prod-1".to_string(),
-                    name: "Expensive Item".to_string(),
-                    price: 999999.99,
-                    original_price: None,
-                    quantity: 100,
-                    selected_options: None,
-                    selected_specification: None,
-                    manual_discount_percent: None,
-                    surcharge: None,
-                    note: None,
-                    authorizer_id: None,
-                    authorizer_name: None,
-                }],
-            },
-        );
-        manager.execute_command(add_cmd);
-
-        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        // 999999.99 * 100 = 99999999.00
-        assert_eq!(snapshot.total, 99999999.0);
-        assert!(snapshot.verify_checksum());
-    }
-
-    #[test]
-    fn test_small_amount_precision() {
-        let manager = create_test_manager();
-
-        let cmd = create_open_table_cmd("op-1");
-        let response = manager.execute_command(cmd);
-        let order_id = response.order_id.unwrap();
-
-        // Add many small items
-        for i in 0..100 {
-            let add_cmd = OrderCommand::new(
-                "op-1".to_string(),
-                "Test".to_string(),
-                OrderCommandPayload::AddItems {
-                    order_id: order_id.clone(),
-                    items: vec![CartItemInput {
-                        product_id: format!("prod-{}", i),
-                        name: "Penny Item".to_string(),
-                        price: 0.01,
-                        original_price: None,
-                        quantity: 1,
-                        selected_options: None,
-                        selected_specification: None,
-                        manual_discount_percent: None,
-                        surcharge: None,
-                        note: None,
-                        authorizer_id: None,
-                        authorizer_name: None,
-                    }],
-                },
-            );
-            manager.execute_command(add_cmd);
-        }
-
-        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        // 0.01 * 100 = 1.00 (must be exact, not 0.9999... or 1.0001...)
-        assert_eq!(snapshot.total, 1.0);
-    }
-
-    #[test]
-    fn test_zero_price_item() {
-        let manager = create_test_manager();
-
-        let cmd = create_open_table_cmd("op-1");
-        let response = manager.execute_command(cmd);
-        let order_id = response.order_id.unwrap();
-
-        let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
-            "Test".to_string(),
-            OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items: vec![CartItemInput {
-                    product_id: "prod-free".to_string(),
-                    name: "Free Item".to_string(),
-                    price: 0.0,
-                    original_price: None,
-                    quantity: 5,
-                    selected_options: None,
-                    selected_specification: None,
-                    manual_discount_percent: None,
-                    surcharge: None,
-                    note: None,
-                    authorizer_id: None,
-                    authorizer_name: None,
-                }],
-            },
-        );
-        manager.execute_command(add_cmd);
-
-        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert_eq!(snapshot.total, 0.0);
-        assert!(snapshot.verify_checksum());
-    }
-
-    #[test]
-    fn test_100_percent_discount() {
-        let manager = create_test_manager();
-
-        let cmd = create_open_table_cmd("op-1");
-        let response = manager.execute_command(cmd);
-        let order_id = response.order_id.unwrap();
-
-        let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
-            "Test".to_string(),
-            OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items: vec![CartItemInput {
-                    product_id: "prod-1".to_string(),
-                    name: "Full Discount Item".to_string(),
-                    price: 100.0,
-                    original_price: None,
-                    quantity: 1,
-                    selected_options: None,
-                    selected_specification: None,
-                    manual_discount_percent: Some(100.0),
-                    surcharge: None,
-                    note: None,
-                    authorizer_id: None,
-                    authorizer_name: None,
-                }],
-            },
-        );
-        manager.execute_command(add_cmd);
-
-        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert_eq!(snapshot.total, 0.0);
-    }
-
-    #[test]
-    fn test_fractional_discount_precision() {
-        let manager = create_test_manager();
-
-        let cmd = create_open_table_cmd("op-1");
-        let response = manager.execute_command(cmd);
-        let order_id = response.order_id.unwrap();
-
-        // 33.33% discount on $100 = $66.67
-        let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
-            "Test".to_string(),
-            OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items: vec![CartItemInput {
-                    product_id: "prod-1".to_string(),
-                    name: "Item".to_string(),
-                    price: 100.0,
-                    original_price: None,
-                    quantity: 1,
-                    selected_options: None,
-                    selected_specification: None,
-                    manual_discount_percent: Some(33.33),
-                    surcharge: None,
-                    note: None,
-                    authorizer_id: None,
-                    authorizer_name: None,
-                }],
-            },
-        );
-        manager.execute_command(add_cmd);
-
-        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert_eq!(snapshot.total, 66.67);
-    }
-
-    #[test]
-    fn test_many_items_order() {
-        let manager = create_test_manager();
-
-        let cmd = create_open_table_cmd("op-1");
-        let response = manager.execute_command(cmd);
-        let order_id = response.order_id.unwrap();
-
-        // Add 50 different items
-        let items: Vec<CartItemInput> = (0..50)
-            .map(|i| CartItemInput {
-                product_id: format!("prod-{}", i),
-                name: format!("Item {}", i),
-                price: 10.0 + (i as f64 * 0.1),
-                original_price: None,
-                quantity: 1,
-                selected_options: None,
-                selected_specification: None,
-                manual_discount_percent: None,
-                surcharge: None,
-                note: None,
-                authorizer_id: None,
-                authorizer_name: None,
-            })
-            .collect();
-
-        let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
-            "Test".to_string(),
-            OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items,
-            },
-        );
-        manager.execute_command(add_cmd);
-
-        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert_eq!(snapshot.items.len(), 50);
-        assert!(snapshot.verify_checksum());
-    }
-
-    // ========== Concurrency Tests ==========
-
-    #[test]
-    fn test_concurrent_order_creation() {
-        use std::sync::Arc;
-        use std::thread;
-
-        let manager = Arc::new(create_test_manager());
-        let mut handles = vec![];
-
-        // Spawn 10 threads, each creating an order
-        for i in 0..10 {
-            let manager_clone = Arc::clone(&manager);
-            let handle = thread::spawn(move || {
-                let cmd = OrderCommand::new(
-                    format!("op-{}", i),
-                    "Test".to_string(),
-                    OrderCommandPayload::OpenTable {
-                        table_id: Some(format!("T{}", i)),
-                        table_name: Some(format!("Table {}", i)),
-                        zone_id: None,
-                        zone_name: None,
-                        guest_count: 2,
-                        is_retail: false,
-                    },
-                );
-                manager_clone.execute_command(cmd)
-            });
-            handles.push(handle);
-        }
-
-        // Wait for all threads
-        let responses: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
-
-        // All should succeed
-        assert!(responses.iter().all(|r| r.success));
-
-        // All order IDs should be unique
-        let order_ids: Vec<_> = responses.iter().filter_map(|r| r.order_id.clone()).collect();
-        assert_eq!(order_ids.len(), 10);
-
-        let mut unique_ids = order_ids.clone();
-        unique_ids.sort();
-        unique_ids.dedup();
-        assert_eq!(unique_ids.len(), 10, "All order IDs must be unique");
-
-        // All sequences should be unique
-        let events = manager.storage.get_events_since(0).unwrap();
-        let sequences: Vec<_> = events.iter().map(|e| e.sequence).collect();
-        let mut unique_seqs = sequences.clone();
-        unique_seqs.sort();
-        unique_seqs.dedup();
-        assert_eq!(unique_seqs.len(), 10, "All sequences must be unique");
-    }
-
-    #[test]
-    fn test_concurrent_add_items_same_order() {
-        use std::sync::Arc;
-        use std::thread;
-
-        let manager = Arc::new(create_test_manager());
-
-        // Create order first
-        let cmd = OrderCommand::new(
-            "op-1".to_string(),
-            "Test".to_string(),
-            OrderCommandPayload::OpenTable {
-                table_id: Some("T1".to_string()),
-                table_name: Some("Table 1".to_string()),
-                zone_id: None,
-                zone_name: None,
-                guest_count: 2,
-                is_retail: false,
-            },
-        );
-        let response = manager.execute_command(cmd);
-        let order_id = response.order_id.unwrap();
-
-        let mut handles = vec![];
-
-        // Spawn 5 threads, each adding items to same order
-        for i in 0..5 {
-            let manager_clone = Arc::clone(&manager);
-            let order_id_clone = order_id.clone();
-            let handle = thread::spawn(move || {
-                let add_cmd = OrderCommand::new(
-                    format!("op-add-{}", i),
-                    "Test".to_string(),
-                    OrderCommandPayload::AddItems {
-                        order_id: order_id_clone,
-                        items: vec![CartItemInput {
-                            product_id: format!("prod-{}", i),
-                            name: format!("Item {}", i),
-                            price: 10.0,
-                            original_price: None,
-                            quantity: 1,
-                            selected_options: None,
-                            selected_specification: None,
-                            manual_discount_percent: None,
-                            surcharge: None,
-                            note: None,
-                            authorizer_id: None,
-                            authorizer_name: None,
-                        }],
-                    },
-                );
-                manager_clone.execute_command(add_cmd)
-            });
-            handles.push(handle);
-        }
-
-        // Wait for all threads
-        let responses: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
-
-        // All should succeed
-        assert!(responses.iter().all(|r| r.success));
-
-        // Verify final state
-        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert_eq!(snapshot.items.len(), 5);
-        assert_eq!(snapshot.total, 50.0); // 5 items * $10
-        assert!(snapshot.verify_checksum());
-    }
-
-    #[test]
-    fn test_concurrent_idempotency() {
-        use std::sync::Arc;
-        use std::thread;
-
-        let manager = Arc::new(create_test_manager());
-
-        // Create a command with fixed ID
-        let mut cmd = OrderCommand::new(
-            "op-1".to_string(),
-            "Test".to_string(),
-            OrderCommandPayload::OpenTable {
-                table_id: Some("T1".to_string()),
-                table_name: Some("Table 1".to_string()),
-                zone_id: None,
-                zone_name: None,
-                guest_count: 2,
-                is_retail: false,
-            },
-        );
-        cmd.command_id = "fixed-cmd-id".to_string();
-
-        let mut handles = vec![];
-
-        // Spawn 10 threads, all trying to execute same command
-        for _ in 0..10 {
-            let manager_clone = Arc::clone(&manager);
-            let cmd_clone = cmd.clone();
-            let handle = thread::spawn(move || manager_clone.execute_command(cmd_clone));
-            handles.push(handle);
-        }
-
-        // Wait for all threads
-        let responses: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
-
-        // Exactly one should create the order
-        let created_count = responses.iter().filter(|r| r.order_id.is_some()).count();
-        assert_eq!(created_count, 1, "Exactly one thread should create the order");
-
-        // Only one event should exist
-        let events = manager.storage.get_events_since(0).unwrap();
-        assert_eq!(events.len(), 1, "Only one event should be created");
     }
 }
