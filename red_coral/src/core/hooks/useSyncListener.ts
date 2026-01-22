@@ -10,15 +10,16 @@
 
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api';
 import { storeRegistry } from '@/core/stores/resources/registry';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import type { SyncResponse } from '@/core/domain/types/orderEvent';
 
 interface SyncPayload {
   resource: string;
-  action: string;
+  action: 'created' | 'updated' | 'deleted';
   id: string;
+  version: number;
   data: unknown | null;
 }
 
@@ -82,10 +83,42 @@ function parseLaggedPayload(payload: unknown): LaggedSyncPayload | null {
  *
  * 服务器权威：收到 Sync 信号直接全量刷新对应资源
  */
+/**
+ * 处理 sequence gap 检测触发的全量同步
+ */
+async function handleGapDetectedSync(): Promise<void> {
+  const { _fullSync, _setConnectionState, lastSequence } = useActiveOrdersStore.getState();
+
+  console.log(`[Sync] Gap detected recovery starting from lastSequence=${lastSequence}`);
+
+  try {
+    // 请求全量同步
+    const response = await invokeApi<SyncResponse>('order_sync_since', {
+      since_sequence: 0,
+    });
+
+    if (response) {
+      _fullSync(response.active_orders, response.server_sequence, response.server_epoch);
+      console.log(
+        `[Sync] Gap recovery complete - synced ${response.active_orders.length} orders, epoch=${response.server_epoch}`
+      );
+    }
+  } catch (err) {
+    console.error('[Sync] Gap recovery failed:', err);
+    _setConnectionState('disconnected');
+  }
+}
+
 export function useSyncListener() {
   useEffect(() => {
     let unlisten: UnlistenFn | undefined;
     let isMounted = true;
+
+    // 监听 sequence gap 检测事件
+    const handleGapEvent = () => {
+      handleGapDetectedSync();
+    };
+    window.addEventListener('order-sync-gap-detected', handleGapEvent);
 
     listen<ServerMessageEvent>('server-message', async (event) => {
       const message = event.payload;
@@ -106,7 +139,7 @@ export function useSyncListener() {
 
         try {
           // 请求从 sequence 0 开始的全量同步
-          const response = await invoke<SyncResponse>('order_sync_since', {
+          const response = await invokeApi<SyncResponse>('order_sync_since', {
             since_sequence: 0,
           });
 
@@ -126,14 +159,27 @@ export function useSyncListener() {
 
       // 常规资源同步
       const payload = message.payload as SyncPayload;
-      const { resource, id } = payload;
-      console.log(`[SyncListener] Received sync event: resource=${resource}, id=${id}`);
+      const { resource, id, version, action, data } = payload;
+      console.log(`[SyncListener] Received sync event: resource=${resource}, id=${id}, version=${version}`);
 
-      // 调用 resources store 的 applySync（传入 id 用于去重）
+      // 特殊处理: order_sync - 包含 event (时间线) + snapshot (状态)
+      if (resource === 'order_sync') {
+        if (data) {
+          const { event, snapshot } = data as {
+            event: import('@/core/domain/types/orderEvent').OrderEvent;
+            snapshot: import('@/core/domain/types/orderEvent').OrderSnapshot;
+          };
+          console.log(`[SyncListener] Order sync: ${event.event_type}, order=${snapshot.order_id}`);
+          useActiveOrdersStore.getState()._applyOrderSync(event, snapshot);
+        }
+        return;
+      }
+
+      // 调用 resources store 的 applySync（传入完整 payload）
       const store = storeRegistry[resource];
       if (store) {
         console.log(`[SyncListener] Found store for ${resource}, calling applySync`);
-        store.getState().applySync(id);
+        store.getState().applySync({ id, version, action, data });
       } else {
         console.warn(`[SyncListener] No store found for resource: ${resource}`);
       }
@@ -149,6 +195,7 @@ export function useSyncListener() {
     return () => {
       isMounted = false;
       unlisten?.();
+      window.removeEventListener('order-sync-gap-detected', handleGapEvent);
     };
   }, []);
 }
