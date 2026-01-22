@@ -115,6 +115,12 @@ pub struct ItemChanges {
     pub surcharge: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+    /// Selected options (None = no change, Some(vec) = replace options)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_options: Option<Vec<ItemOption>>,
+    /// Selected specification (None = no change, Some(spec) = replace specification)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_specification: Option<SpecificationInfo>,
 }
 
 /// Split item for split bill

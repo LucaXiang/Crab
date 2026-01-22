@@ -3,6 +3,7 @@
 //! Applies the ItemModified event to update items in the snapshot.
 //! Handles both full modifications and split scenarios.
 
+use crate::orders::money;
 use crate::orders::traits::EventApplier;
 use shared::order::{
     CartItemSnapshot, EventPayload, ItemChanges, ItemModificationResult, OrderEvent, OrderSnapshot,
@@ -27,8 +28,8 @@ impl EventApplier for ItemModifiedApplier {
             snapshot.last_sequence = event.sequence;
             snapshot.updated_at = event.timestamp;
 
-            // Recalculate totals
-            recalculate_totals(snapshot);
+            // Recalculate totals using precise decimal arithmetic
+            money::recalculate_totals(snapshot);
 
             // Update checksum
             snapshot.update_checksum();
@@ -73,12 +74,18 @@ fn apply_item_modified(
                     new_item.price = result.price;
                     new_item.discount_percent = result.discount_percent;
 
-                    // Apply additional changes (note, surcharge)
+                    // Apply additional changes (note, surcharge, options, specification)
                     if let Some(ref note) = changes.note {
                         new_item.note = Some(note.clone());
                     }
                     if let Some(surcharge) = changes.surcharge {
                         new_item.surcharge = Some(surcharge);
+                    }
+                    if let Some(ref options) = changes.selected_options {
+                        new_item.selected_options = Some(options.clone());
+                    }
+                    if let Some(ref specification) = changes.selected_specification {
+                        new_item.selected_specification = Some(specification.clone());
                     }
 
                     snapshot.items.push(new_item);
@@ -106,30 +113,12 @@ fn apply_changes_to_item(item: &mut CartItemSnapshot, changes: &ItemChanges) {
     if let Some(ref note) = changes.note {
         item.note = Some(note.clone());
     }
-}
-
-/// Recalculate totals from items
-fn recalculate_totals(snapshot: &mut OrderSnapshot) {
-    let subtotal: f64 = snapshot
-        .items
-        .iter_mut()
-        .map(|item| {
-            // Compute unpaid_quantity: quantity - paid_quantity
-            let paid_qty = snapshot
-                .paid_item_quantities
-                .get(&item.instance_id)
-                .copied()
-                .unwrap_or(0);
-            item.unpaid_quantity = (item.quantity - paid_qty).max(0);
-
-            let base_price = item.price * item.quantity as f64;
-            let discount = item.discount_percent.unwrap_or(0.0) / 100.0;
-            base_price * (1.0 - discount)
-        })
-        .sum();
-
-    snapshot.subtotal = subtotal;
-    snapshot.total = subtotal; // For now, total = subtotal (no tax/service charge)
+    if let Some(ref options) = changes.selected_options {
+        item.selected_options = Some(options.clone());
+    }
+    if let Some(ref specification) = changes.selected_specification {
+        item.selected_specification = Some(specification.clone());
+    }
 }
 
 #[cfg(test)]
@@ -578,6 +567,8 @@ mod tests {
             discount_percent: Some(15.0),
             surcharge: Some(3.0),
             note: Some("Test note".to_string()),
+            selected_options: None,
+            selected_specification: None,
         };
 
         apply_changes_to_item(&mut item, &changes);
@@ -610,5 +601,153 @@ mod tests {
         assert_eq!(item.discount_percent, Some(5.0)); // Unchanged
         assert_eq!(item.surcharge, Some(1.0)); // Unchanged
         assert_eq!(item.note, Some("Original note".to_string())); // Unchanged
+    }
+
+    #[test]
+    fn test_apply_changes_options() {
+        let mut item = create_test_item("item-1", "prod-1", "Product A", 10.0, 1);
+        assert!(item.selected_options.is_none());
+
+        let new_options = vec![shared::order::ItemOption {
+            attribute_id: "attr-1".to_string(),
+            attribute_name: "Size".to_string(),
+            option_idx: 1,
+            option_name: "Large".to_string(),
+            price_modifier: Some(2.0),
+        }];
+
+        let changes = ItemChanges {
+            selected_options: Some(new_options),
+            ..Default::default()
+        };
+
+        apply_changes_to_item(&mut item, &changes);
+
+        assert!(item.selected_options.is_some());
+        let options = item.selected_options.unwrap();
+        assert_eq!(options.len(), 1);
+        assert_eq!(options[0].option_name, "Large");
+        assert_eq!(options[0].price_modifier, Some(2.0));
+    }
+
+    #[test]
+    fn test_apply_changes_specification() {
+        let mut item = create_test_item("item-1", "prod-1", "Product A", 10.0, 1);
+        assert!(item.selected_specification.is_none());
+
+        let new_spec = shared::order::SpecificationInfo {
+            id: "spec-1".to_string(),
+            name: "Large".to_string(),
+            receipt_name: Some("L".to_string()),
+            price: Some(15.0),
+        };
+
+        let changes = ItemChanges {
+            selected_specification: Some(new_spec),
+            ..Default::default()
+        };
+
+        apply_changes_to_item(&mut item, &changes);
+
+        assert!(item.selected_specification.is_some());
+        let spec = item.selected_specification.unwrap();
+        assert_eq!(spec.name, "Large");
+        assert_eq!(spec.price, Some(15.0));
+    }
+
+    #[test]
+    fn test_item_modified_options_full() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 1));
+
+        let source = create_test_item("item-1", "prod-1", "Product A", 10.0, 1);
+
+        let new_options = vec![shared::order::ItemOption {
+            attribute_id: "attr-1".to_string(),
+            attribute_name: "Spicy".to_string(),
+            option_idx: 2,
+            option_name: "Extra Hot".to_string(),
+            price_modifier: None,
+        }];
+
+        let changes = ItemChanges {
+            selected_options: Some(new_options),
+            ..Default::default()
+        };
+        let results = vec![ItemModificationResult {
+            instance_id: "item-1".to_string(),
+            quantity: 1,
+            price: 10.0,
+            discount_percent: None,
+            action: "UPDATED".to_string(),
+        }];
+
+        let event = create_item_modified_event("order-1", 1, source, 1, changes, results);
+
+        let applier = ItemModifiedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        assert!(snapshot.items[0].selected_options.is_some());
+        let options = snapshot.items[0].selected_options.as_ref().unwrap();
+        assert_eq!(options.len(), 1);
+        assert_eq!(options[0].option_name, "Extra Hot");
+    }
+
+    #[test]
+    fn test_item_modified_split_with_options() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot
+            .items
+            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 3));
+
+        let source = create_test_item("item-1", "prod-1", "Product A", 10.0, 3);
+
+        let new_options = vec![shared::order::ItemOption {
+            attribute_id: "attr-1".to_string(),
+            attribute_name: "Spicy".to_string(),
+            option_idx: 1,
+            option_name: "Mild".to_string(),
+            price_modifier: None,
+        }];
+
+        let changes = ItemChanges {
+            selected_options: Some(new_options.clone()),
+            ..Default::default()
+        };
+
+        let results = vec![
+            ItemModificationResult {
+                instance_id: "item-1".to_string(),
+                quantity: 2,
+                price: 10.0,
+                discount_percent: None,
+                action: "UNCHANGED".to_string(),
+            },
+            ItemModificationResult {
+                instance_id: "item-1-spicy".to_string(),
+                quantity: 1,
+                price: 10.0,
+                discount_percent: None,
+                action: "CREATED".to_string(),
+            },
+        ];
+
+        let event = create_item_modified_event("order-1", 1, source, 1, changes, results);
+
+        let applier = ItemModifiedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Original item unchanged
+        assert_eq!(snapshot.items.len(), 2);
+        assert_eq!(snapshot.items[0].quantity, 2);
+        assert!(snapshot.items[0].selected_options.is_none());
+
+        // New item has options
+        assert_eq!(snapshot.items[1].quantity, 1);
+        assert!(snapshot.items[1].selected_options.is_some());
+        let options = snapshot.items[1].selected_options.as_ref().unwrap();
+        assert_eq!(options[0].option_name, "Mild");
     }
 }

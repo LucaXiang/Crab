@@ -92,6 +92,16 @@ impl CommandHandler for ModifyItemAction {
             } else {
                 None
             },
+            selected_options: if self.changes.selected_options.is_some() {
+                item.selected_options.clone()
+            } else {
+                None
+            },
+            selected_specification: if self.changes.selected_specification.is_some() {
+                item.selected_specification.clone()
+            } else {
+                None
+            },
         };
 
         // 6. Determine operation type for audit
@@ -138,6 +148,8 @@ fn determine_operation(changes: &ItemChanges) -> &'static str {
         "MODIFY_QUANTITY"
     } else if changes.surcharge.is_some() {
         "APPLY_SURCHARGE"
+    } else if changes.selected_options.is_some() || changes.selected_specification.is_some() {
+        "MODIFY_OPTIONS"
     } else if changes.note.is_some() {
         "MODIFY_NOTE"
     } else {
@@ -165,14 +177,22 @@ fn calculate_modification_results(
         let new_price = changes.price.unwrap_or(item.price);
         let new_discount = changes.discount_percent.or(item.discount_percent);
         let new_surcharge = changes.surcharge.or(item.surcharge);
+        let new_options = changes
+            .selected_options
+            .as_ref()
+            .or(item.selected_options.as_ref());
+        let new_specification = changes
+            .selected_specification
+            .as_ref()
+            .or(item.selected_specification.as_ref());
 
         // Generate new instance_id for the modified portion
         let new_instance_id = generate_instance_id(
             &item.id,
             new_price,
             new_discount,
-            &item.selected_options,
-            &item.selected_specification,
+            &new_options.cloned(),
+            &new_specification.cloned(),
             new_surcharge,
         );
 
@@ -687,7 +707,134 @@ mod tests {
             "MODIFY_NOTE"
         );
 
+        // Options
+        assert_eq!(
+            determine_operation(&ItemChanges {
+                selected_options: Some(vec![]),
+                ..Default::default()
+            }),
+            "MODIFY_OPTIONS"
+        );
+
+        // Specification
+        assert_eq!(
+            determine_operation(&ItemChanges {
+                selected_specification: Some(shared::order::SpecificationInfo {
+                    id: "spec-1".to_string(),
+                    name: "Large".to_string(),
+                    receipt_name: None,
+                    price: None,
+                }),
+                ..Default::default()
+            }),
+            "MODIFY_OPTIONS"
+        );
+
         // Empty changes
         assert_eq!(determine_operation(&ItemChanges::default()), "MODIFY_ITEM");
+    }
+
+    #[tokio::test]
+    async fn test_modify_item_options() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "prod-1", "Test Product", 10.0, 1);
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let new_options = vec![shared::order::ItemOption {
+            attribute_id: "attr-1".to_string(),
+            attribute_name: "Size".to_string(),
+            option_idx: 1,
+            option_name: "Large".to_string(),
+            price_modifier: Some(2.0),
+        }];
+
+        let action = ModifyItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            affected_quantity: None,
+            changes: ItemChanges {
+                selected_options: Some(new_options.clone()),
+                ..Default::default()
+            },
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::ItemModified {
+            operation,
+            changes,
+            previous_values,
+            ..
+        } = &events[0].payload
+        {
+            assert_eq!(operation, "MODIFY_OPTIONS");
+            assert!(changes.selected_options.is_some());
+            assert_eq!(changes.selected_options.as_ref().unwrap().len(), 1);
+            assert!(previous_values.selected_options.is_none()); // Was None before
+        } else {
+            panic!("Expected ItemModified payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_modify_item_specification() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "prod-1", "Test Product", 10.0, 1);
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let new_spec = shared::order::SpecificationInfo {
+            id: "spec-1".to_string(),
+            name: "Large".to_string(),
+            receipt_name: Some("L".to_string()),
+            price: Some(15.0),
+        };
+
+        let action = ModifyItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            affected_quantity: None,
+            changes: ItemChanges {
+                selected_specification: Some(new_spec.clone()),
+                ..Default::default()
+            },
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::ItemModified {
+            operation,
+            changes,
+            previous_values,
+            ..
+        } = &events[0].payload
+        {
+            assert_eq!(operation, "MODIFY_OPTIONS");
+            assert!(changes.selected_specification.is_some());
+            assert_eq!(
+                changes.selected_specification.as_ref().unwrap().name,
+                "Large"
+            );
+            assert!(previous_values.selected_specification.is_none());
+        } else {
+            panic!("Expected ItemModified payload");
+        }
     }
 }
