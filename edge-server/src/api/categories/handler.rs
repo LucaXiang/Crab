@@ -152,7 +152,8 @@ pub async fn batch_update_sort_order(
                 CategoryUpdate {
                     name: None,
                     sort_order: Some(update.sort_order),
-                    print_destinations: None,
+                    kitchen_print_destinations: None,
+                    label_print_destinations: None,
                     is_kitchen_print_enabled: None,
                     is_label_print_enabled: None,
                     is_active: None,

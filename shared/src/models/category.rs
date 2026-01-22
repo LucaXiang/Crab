@@ -8,9 +8,12 @@ pub struct Category {
     pub id: Option<String>,
     pub name: String,
     pub sort_order: i32,
-    /// Print destination references (String IDs)
+    /// Kitchen print destination references (String IDs)
     #[serde(default)]
-    pub print_destinations: Vec<String>,
+    pub kitchen_print_destinations: Vec<String>,
+    /// Label print destination references (String IDs)
+    #[serde(default)]
+    pub label_print_destinations: Vec<String>,
     /// Whether kitchen printing is enabled for this category
     #[serde(default)]
     pub is_kitchen_print_enabled: bool,
@@ -36,9 +39,12 @@ fn default_match_mode() -> String {
 pub struct CategoryCreate {
     pub name: String,
     pub sort_order: Option<i32>,
-    /// Print destination IDs (strings)
+    /// Kitchen print destination IDs
     #[serde(default)]
-    pub print_destinations: Vec<String>,
+    pub kitchen_print_destinations: Vec<String>,
+    /// Label print destination IDs
+    #[serde(default)]
+    pub label_print_destinations: Vec<String>,
     /// Whether kitchen printing is enabled
     pub is_kitchen_print_enabled: Option<bool>,
     pub is_label_print_enabled: Option<bool>,
@@ -56,9 +62,12 @@ pub struct CategoryCreate {
 pub struct CategoryUpdate {
     pub name: Option<String>,
     pub sort_order: Option<i32>,
-    /// Print destination IDs (strings)
+    /// Kitchen print destination IDs
     #[serde(default)]
-    pub print_destinations: Option<Vec<String>>,
+    pub kitchen_print_destinations: Option<Vec<String>>,
+    /// Label print destination IDs
+    #[serde(default)]
+    pub label_print_destinations: Option<Vec<String>>,
     /// Whether kitchen printing is enabled
     pub is_kitchen_print_enabled: Option<bool>,
     pub is_label_print_enabled: Option<bool>,

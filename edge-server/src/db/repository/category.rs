@@ -32,12 +32,12 @@ impl CategoryRepository {
         Ok(categories)
     }
 
-    /// Find all categories with print_destinations fetched
+    /// Find all categories with print destinations fetched
     pub async fn find_all_with_destinations(&self) -> RepoResult<Vec<Category>> {
         let categories: Vec<Category> = self
             .base
             .db()
-            .query("SELECT * FROM category WHERE is_active = true ORDER BY sort_order FETCH print_destinations")
+            .query("SELECT * FROM category WHERE is_active = true ORDER BY sort_order FETCH kitchen_print_destinations, label_print_destinations")
             .await?
             .take(0)?;
         Ok(categories)
@@ -74,8 +74,14 @@ impl CategoryRepository {
             )));
         }
 
-        let print_destinations: Vec<Thing> = data
-            .print_destinations
+        let kitchen_print_destinations: Vec<Thing> = data
+            .kitchen_print_destinations
+            .iter()
+            .map(|id| make_thing("print_destination", id))
+            .collect();
+
+        let label_print_destinations: Vec<Thing> = data
+            .label_print_destinations
             .iter()
             .map(|id| make_thing("print_destination", id))
             .collect();
@@ -90,7 +96,8 @@ impl CategoryRepository {
             id: None,
             name: data.name,
             sort_order: data.sort_order.unwrap_or(0),
-            print_destinations,
+            kitchen_print_destinations,
+            label_print_destinations,
             is_kitchen_print_enabled: data.is_kitchen_print_enabled.unwrap_or(true),
             is_label_print_enabled: data.is_label_print_enabled.unwrap_or(true),
             is_active: true,
@@ -128,7 +135,9 @@ impl CategoryRepository {
             #[serde(skip_serializing_if = "Option::is_none")]
             sort_order: Option<i32>,
             #[serde(skip_serializing_if = "Option::is_none")]
-            print_destinations: Option<Vec<Thing>>,
+            kitchen_print_destinations: Option<Vec<Thing>>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            label_print_destinations: Option<Vec<Thing>>,
             #[serde(skip_serializing_if = "Option::is_none")]
             is_kitchen_print_enabled: Option<bool>,
             #[serde(skip_serializing_if = "Option::is_none")]
@@ -146,7 +155,12 @@ impl CategoryRepository {
         let update_data = CategoryUpdateDb {
             name: data.name,
             sort_order: data.sort_order,
-            print_destinations: data.print_destinations.map(|ids| {
+            kitchen_print_destinations: data.kitchen_print_destinations.map(|ids| {
+                ids.iter()
+                    .map(|id| make_thing("print_destination", id))
+                    .collect()
+            }),
+            label_print_destinations: data.label_print_destinations.map(|ids| {
                 ids.iter()
                     .map(|id| make_thing("print_destination", id))
                     .collect()

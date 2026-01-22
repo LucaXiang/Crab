@@ -103,6 +103,7 @@ interface FormData {
 
   // === Category ===
   is_kitchen_print_enabled?: PrintState;  // Category: 0=禁用, 1=启用 (无继承)
+  label_print_destinations?: string[];  // Category: Label PrintDestination IDs
   is_virtual?: boolean;
   tag_ids?: string[];      // Virtual category tag filter
   match_mode?: 'any' | 'all';
@@ -268,7 +269,8 @@ export const useSettingsStore = create<SettingsStore>()(
             ...formData,
             name: categoryData?.name || '',
             sort_order: categoryData?.sort_order,
-            print_destinations: categoryData?.print_destinations || [],
+            print_destinations: categoryData?.kitchen_print_destinations || [],  // Form uses print_destinations for kitchen
+            label_print_destinations: categoryData?.label_print_destinations || [],
             is_kitchen_print_enabled: categoryData?.is_kitchen_print_enabled ? 1 : 0,  // Category: bool → 0/1
             is_label_print_enabled: categoryData?.is_label_print_enabled ? 1 : 0,  // Category: bool → 0/1
             is_active: categoryData?.is_active ?? true,  // Default to active for new categories

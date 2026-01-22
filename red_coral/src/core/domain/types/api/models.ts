@@ -46,7 +46,10 @@ export interface Category {
   id: string | null;
   name: string;
   sort_order: number;
-  print_destinations: string[];
+  /** Kitchen print destination IDs */
+  kitchen_print_destinations: string[];
+  /** Label print destination IDs */
+  label_print_destinations: string[];
   /** Whether kitchen printing is enabled for this category */
   is_kitchen_print_enabled: boolean;
   is_label_print_enabled: boolean;
@@ -62,7 +65,10 @@ export interface Category {
 export interface CategoryCreate {
   name: string;
   sort_order?: number;
-  print_destinations?: string[];
+  /** Kitchen print destination IDs */
+  kitchen_print_destinations?: string[];
+  /** Label print destination IDs */
+  label_print_destinations?: string[];
   /** Whether kitchen printing is enabled */
   is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
@@ -77,7 +83,10 @@ export interface CategoryCreate {
 export interface CategoryUpdate {
   name?: string;
   sort_order?: number;
-  print_destinations?: string[];
+  /** Kitchen print destination IDs */
+  kitchen_print_destinations?: string[];
+  /** Label print destination IDs */
+  label_print_destinations?: string[];
   /** Whether kitchen printing is enabled */
   is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;

@@ -266,8 +266,9 @@ ItemsAdded 事件
 
 ### 5. 数据清理
 
-- **订单关闭时**：清理该订单的 KitchenOrder + LabelPrintRecord
-- **启动时**：清理超过 24 小时的记录（兜底）
+- **保留 3 天**：KitchenOrder + LabelPrintRecord 不随订单关闭删除
+- **启动时**：清理超过 3 天（72 小时）的记录
+- **定时清理**：可选，每小时检查一次
 
 ## 打印机配置
 

@@ -13,9 +13,12 @@ pub struct Category {
     pub name: String,
     #[serde(default)]
     pub sort_order: i32,
-    /// Record links to print_destination
+    /// Kitchen print destination references
     #[serde(default)]
-    pub print_destinations: Vec<Thing>,
+    pub kitchen_print_destinations: Vec<Thing>,
+    /// Label print destination references
+    #[serde(default)]
+    pub label_print_destinations: Vec<Thing>,
     /// Whether kitchen printing is enabled for this category
     #[serde(
         default = "default_true",
@@ -57,7 +60,8 @@ impl Category {
             id: None,
             name,
             sort_order: 0,
-            print_destinations: Vec::new(),
+            kitchen_print_destinations: Vec::new(),
+            label_print_destinations: Vec::new(),
             is_kitchen_print_enabled: true,
             is_label_print_enabled: true,
             is_active: true,
@@ -72,9 +76,12 @@ impl Category {
 pub struct CategoryCreate {
     pub name: String,
     pub sort_order: Option<i32>,
-    /// Print destination IDs (strings)
+    /// Kitchen print destination IDs
     #[serde(default)]
-    pub print_destinations: Vec<String>,
+    pub kitchen_print_destinations: Vec<String>,
+    /// Label print destination IDs
+    #[serde(default)]
+    pub label_print_destinations: Vec<String>,
     /// Whether kitchen printing is enabled
     pub is_kitchen_print_enabled: Option<bool>,
     pub is_label_print_enabled: Option<bool>,
@@ -91,9 +98,12 @@ pub struct CategoryCreate {
 pub struct CategoryUpdate {
     pub name: Option<String>,
     pub sort_order: Option<i32>,
-    /// Print destination IDs (strings)
+    /// Kitchen print destination IDs
     #[serde(default)]
-    pub print_destinations: Option<Vec<String>>,
+    pub kitchen_print_destinations: Option<Vec<String>>,
+    /// Label print destination IDs
+    #[serde(default)]
+    pub label_print_destinations: Option<Vec<String>>,
     /// Whether kitchen printing is enabled
     pub is_kitchen_print_enabled: Option<bool>,
     pub is_label_print_enabled: Option<bool>,

@@ -210,14 +210,18 @@ export interface CategoryListData {
 export interface CreateCategoryRequest {
   name: string;
   sort_order?: number;
-  print_destinations?: string[];
+  kitchen_print_destinations?: string[];
+  label_print_destinations?: string[];
+  is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
 }
 
 export interface UpdateCategoryRequest {
   name?: string;
   sort_order?: number;
-  print_destinations?: string[];
+  kitchen_print_destinations?: string[];
+  label_print_destinations?: string[];
+  is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
 }
 

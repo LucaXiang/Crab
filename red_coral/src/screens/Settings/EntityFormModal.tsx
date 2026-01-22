@@ -519,7 +519,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
         const categoryPayload = {
           name: formData.name.trim(),
           sort_order: formData.sort_order ?? 0,
-          print_destinations: formData.print_destinations ?? [],
+          kitchen_print_destinations: formData.print_destinations ?? [],  // Form field maps to kitchen
+          label_print_destinations: formData.label_print_destinations ?? [],
           is_kitchen_print_enabled: kitchenEnabled,
           is_label_print_enabled: labelEnabled,
           is_active: formData.is_active ?? true,
@@ -533,7 +534,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
           const created = await api.createCategory({
             name: categoryPayload.name,
             sort_order: categoryPayload.sort_order,
-            print_destinations: categoryPayload.print_destinations,
+            kitchen_print_destinations: categoryPayload.kitchen_print_destinations,
+            label_print_destinations: categoryPayload.label_print_destinations,
             is_kitchen_print_enabled: categoryPayload.is_kitchen_print_enabled,
             is_label_print_enabled: categoryPayload.is_label_print_enabled,
             is_virtual: categoryPayload.is_virtual,
@@ -550,7 +552,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
           await api.updateCategory(categoryId, {
             name: categoryPayload.name,
             sort_order: categoryPayload.sort_order,
-            print_destinations: categoryPayload.print_destinations,
+            kitchen_print_destinations: categoryPayload.kitchen_print_destinations,
+            label_print_destinations: categoryPayload.label_print_destinations,
             is_kitchen_print_enabled: categoryPayload.is_kitchen_print_enabled,
             is_label_print_enabled: categoryPayload.is_label_print_enabled,
             is_active: categoryPayload.is_active,
