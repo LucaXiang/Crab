@@ -233,61 +233,49 @@ export const useSettingsStore = create<SettingsStore>()(
           formData = {
             ...formData,
             name: tableData?.name || '',
+            zone: tableData?.zone || tableData?.defaultZoneId || '',
             capacity: tableData?.capacity ?? 4,
-            // DiningTable API 返回 'zone' 字段，创建时使用 'defaultZoneId'
-            zoneId: tableData?.zone || tableData?.defaultZoneId || '',
           };
         } else if (entity === 'ZONE') {
           const zoneData = data as ZoneEditData | null;
           formData = {
             ...formData,
             name: zoneData?.name || '',
-            surchargeType: zoneData?.surchargeType || 'none',
-            surchargeAmount: zoneData?.surchargeAmount || 0,
+            description: zoneData?.description || '',
+            surcharge_type: zoneData?.surchargeType || 'none',
+            surcharge_amount: zoneData?.surchargeAmount || 0,
           };
         } else if (entity === 'PRODUCT') {
           const productData = data as ProductEditData | null;
-          // Product 数据使用 snake_case 字段名，需要转换
-          const printDests = productData?.print_destinations || [];
-          const hasKitchenPrint = printDests.length > 0;
-          // 从 specs 中获取默认规格的价格
-          const defaultSpec = productData?.specs?.find((s) => s.is_default) ?? productData?.specs?.[0];
           formData = {
             ...formData,
             id: productData?.id ?? undefined,
             name: productData?.name || '',
-            receiptName: productData?.receipt_name ?? '',
-            price: defaultSpec?.price ?? 0,
+            category: productData?.category ?? productData?.defaultCategoryId,
             image: productData?.image || '',
-            categoryId: productData?.category ?? productData?.defaultCategoryId,
-            externalId: defaultSpec?.external_id ?? undefined,
-            taxRate: productData?.tax_rate ?? 10,
-            sortOrder: productData?.sort_order,
-            kitchenPrinterId: hasKitchenPrint ? printDests[0] : undefined,
-            kitchenPrintName: productData?.kitchen_print_name ?? '',
-            isKitchenPrintEnabled: hasKitchenPrint ? 1 : (productData?.print_destinations ? 0 : -1),
-            isLabelPrintEnabled: normalizeKitchenPrintTri(productData?.is_label_print_enabled),
-            hasMultiSpec: (productData?.specs?.length ?? 0) > 1,
-            tempSpecifications: productData?.specs || [],
+            sort_order: productData?.sort_order,
+            tax_rate: productData?.tax_rate ?? 10,
+            receipt_name: productData?.receipt_name ?? '',
+            kitchen_print_name: productData?.kitchen_print_name ?? '',
+            print_destinations: productData?.print_destinations || [],
+            is_label_print_enabled: !!productData?.is_label_print_enabled,
+            tags: productData?.tags || [],
+            specs: productData?.specs || [],
+            has_multi_spec: (productData?.specs?.length ?? 0) > 1,
           };
         } else if (entity === 'CATEGORY') {
           const categoryData = data as CategoryEditData | null;
-          // Category 数据中使用 print_destinations 数组，需要转换为表单字段
-          const printDests = categoryData?.print_destinations || [];
-          const hasKitchenPrint = printDests.length > 0;
           formData = {
             ...formData,
             name: categoryData?.name || '',
-            // 从 print_destinations[0] 获取厨房打印机 ID
-            kitchenPrinterId: hasKitchenPrint ? printDests[0] : undefined,
-            // 根据 print_destinations 是否有值判断是否启用厨房打印 (1=启用, 0=禁用)
-            isKitchenPrintEnabled: hasKitchenPrint ? 1 : 0,
-            isLabelPrintEnabled: categoryData?.is_label_print_enabled ? 1 : 0,
-            selectedAttributeIds: categoryData?.selectedAttributeIds || [],
-            attributeDefaultOptions: categoryData?.attributeDefaultOptions || {},
-            isVirtual: categoryData?.is_virtual ?? false,
-            tagIds: categoryData?.tag_ids ?? [],
-            matchMode: categoryData?.match_mode ?? 'any',
+            sort_order: categoryData?.sort_order,
+            print_destinations: categoryData?.print_destinations || [],
+            is_label_print_enabled: !!categoryData?.is_label_print_enabled,
+            is_virtual: categoryData?.is_virtual ?? false,
+            tag_ids: categoryData?.tag_ids ?? [],
+            match_mode: categoryData?.match_mode ?? 'any',
+            selected_attribute_ids: categoryData?.selectedAttributeIds || [],
+            attribute_default_options: categoryData?.attributeDefaultOptions || {},
           };
         } else if (entity === 'TAG') {
           const tagData = data as TagEditData | null;
@@ -295,8 +283,7 @@ export const useSettingsStore = create<SettingsStore>()(
             ...formData,
             name: tagData?.name || '',
             color: tagData?.color || '#3B82F6',
-            // Tag API 返回 display_order (snake_case)
-            displayOrder: tagData?.display_order ?? 0,
+            display_order: tagData?.display_order ?? 0,
           };
         }
 
