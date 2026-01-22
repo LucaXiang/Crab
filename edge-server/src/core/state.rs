@@ -114,6 +114,9 @@ pub struct ServerState {
     pub orders_manager: Arc<OrdersManager>,
     /// 价格规则引擎
     pub price_rule_engine: PriceRuleEngine,
+    /// 服务器实例 epoch (启动时生成的 UUID)
+    /// 用于客户端检测服务器重启
+    pub epoch: String,
 }
 
 impl ServerState {
@@ -132,6 +135,7 @@ impl ServerState {
         resource_versions: Arc<ResourceVersions>,
         orders_manager: Arc<OrdersManager>,
         price_rule_engine: PriceRuleEngine,
+        epoch: String,
     ) -> Self {
         Self {
             config,
@@ -144,6 +148,7 @@ impl ServerState {
             resource_versions,
             orders_manager,
             price_rule_engine,
+            epoch,
         }
     }
 
@@ -197,6 +202,9 @@ impl ServerState {
         // 4. Initialize PriceRuleEngine
         let price_rule_engine = PriceRuleEngine::new(db.clone());
 
+        // 5. Generate epoch (UUID for server restart detection)
+        let epoch = uuid::Uuid::new_v4().to_string();
+
         let state = Self::new(
             config.clone(),
             db,
@@ -208,6 +216,7 @@ impl ServerState {
             resource_versions,
             orders_manager,
             price_rule_engine,
+            epoch,
         );
 
         // 3. Late initialization for HttpsService (needs state)
@@ -231,32 +240,51 @@ impl ServerState {
         self.start_order_event_forwarder();
     }
 
-    /// 启动订单事件转发器
+    /// 启动订单同步转发器
     ///
-    /// 订阅 OrdersManager 的事件流，转发到 MessageBus 以广播给所有客户端
+    /// 订阅 OrdersManager 的事件流，转发到 MessageBus：
+    /// - order_sync: 包含 event (时间线) + snapshot (状态)
     fn start_order_event_forwarder(&self) {
         let mut event_rx = self.orders_manager.subscribe();
         let message_bus = self.message_bus.bus().clone();
+        let orders_manager = self.orders_manager.clone();
 
         tokio::spawn(async move {
-            tracing::info!("📦 Order event forwarder started");
+            tracing::info!("📦 Order sync forwarder started");
             loop {
                 match event_rx.recv().await {
                     Ok(event) => {
-                        // Convert OrderEvent to BusMessage (as Sync)
-                        let payload = SyncPayload {
-                            resource: "order_event".to_string(),
-                            version: event.sequence,
-                            action: event.event_type.to_string(),
-                            id: event.order_id.clone(),
-                            data: serde_json::to_value(&event).ok(),
-                        };
-                        if let Err(e) = message_bus.publish(BusMessage::sync(&payload)).await {
-                            tracing::warn!("Failed to forward order event: {}", e);
+                        let order_id = event.order_id.clone();
+                        let sequence = event.sequence;
+                        let action = event.event_type.to_string();
+
+                        // 获取快照，打包 event + snapshot 一起推送
+                        match orders_manager.get_snapshot(&order_id) {
+                            Ok(Some(snapshot)) => {
+                                let payload = SyncPayload {
+                                    resource: "order_sync".to_string(),
+                                    version: sequence,
+                                    action,
+                                    id: order_id,
+                                    data: serde_json::json!({
+                                        "event": event,
+                                        "snapshot": snapshot
+                                    }).into(),
+                                };
+                                if let Err(e) = message_bus.publish(BusMessage::sync(&payload)).await {
+                                    tracing::warn!("Failed to forward order sync: {}", e);
+                                }
+                            }
+                            Ok(None) => {
+                                tracing::warn!("Order {} not found after event", order_id);
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to get snapshot for {}: {}", order_id, e);
+                            }
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!("Order event forwarder lagged, skipped {} events", n);
+                        tracing::warn!("Order forwarder lagged, skipped {} events", n);
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
                         tracing::info!("Order event channel closed, forwarder stopping");
