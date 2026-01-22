@@ -49,6 +49,8 @@ pub fn build_app() -> Router<ServerState> {
         .merge(crate::api::employees::router())
         .merge(crate::api::orders::router())
         .merge(crate::api::system_state::router())
+        // Sync API
+        .merge(crate::api::sync::router())
 }
 
 #[derive(Clone, Debug)]
