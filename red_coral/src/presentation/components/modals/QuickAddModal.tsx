@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { X, ShoppingBag, Plus, Trash2, Minus, Search } from 'lucide-react';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency } from '@/utils/currency/formatCurrency';
 import { CartItem } from '@/core/domain/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useCategories, useCategoryStore } from '@/core/stores/resources/useCategoryStore';
 import { useProducts, useProductStore } from '@/core/stores/resources/useProductStore';
-import { ProductCard } from '@/presentation/components/ProductCard';
+import { ProductCard, ProductWithPrice } from '@/presentation/components/ProductCard';
 import clsx from 'clsx';
 
 interface QuickAddModalProps {
@@ -31,22 +31,19 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     useProductStore.getState().fetchAll();
   }, []);
 
-  // Convert store Product to display format
-  interface ProductForDisplay {
-    id: string;
-    name: string;
-    price?: number;
-    image?: string | null;
-    category?: string | null;
-  }
-  const domainProducts: ProductForDisplay[] = useMemo(() => {
-    return products.map((p: any): ProductForDisplay => ({
-      id: String(p.id),
-      name: p.name,
-      image: p.image,
-      category: p.category ?? p.category_id ?? null,
-      price: p.price ?? 0,
-    }));
+  // Convert store Product to ProductWithPrice (compute price from default spec)
+  const domainProducts: ProductWithPrice[] = useMemo(() => {
+    return products.map((p): ProductWithPrice => {
+      // Get price from default spec or first spec
+      const defaultSpec = p.specs?.find(s => s.is_default) ?? p.specs?.[0];
+      const price = defaultSpec?.price ?? 0;
+      const external_id = defaultSpec?.external_id ?? undefined;
+      return {
+        ...p,
+        price,
+        external_id,
+      };
+    });
   }, [products]);
 
   // Filter products
@@ -72,7 +69,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     return result;
   }, [domainProducts, selectedCategoryId, searchQuery, categories]);
 
-  const handleAddProduct = (product: ProductForDisplay) => {
+  const handleAddProduct = (product: ProductWithPrice) => {
     // Convert domain Product to CartItem
     const newItem: CartItem = {
       id: String(product.id),
@@ -125,7 +122,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
         <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <ShoppingBag className="text-red-500" />
-            {t('pos.quickAdd.title')}
+            {t('pos.quick_add.title')}
           </h2>
           <button
             onClick={onClose}
@@ -145,7 +142,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
                   type="text"
-                  placeholder={t('pos.searchProduct')}
+                  placeholder={t('pos.search_product')}
                   className="w-full pl-10 pr-4 py-2 bg-gray-100 border-none rounded-lg focus:ring-2 focus:ring-red-500/20 text-gray-800 placeholder:text-gray-400"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
@@ -163,7 +160,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
                       : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
                   )}
                 >
-                  {t('pos.allCategories')}
+                  {t('pos.all_categories')}
                 </button>
                 {categories.map(cat => (
                   <button
@@ -186,14 +183,14 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
             <div className="flex-1 overflow-y-auto p-4">
               {filteredProducts.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                  <p className="text-lg">{t('pos.quickAdd.noProducts')}</p>
+                  <p className="text-lg">{t('pos.quick_add.no_products')}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-3 lg:grid-cols-4 gap-3">
                   {filteredProducts.map(product => (
                     <ProductCard
                       key={product.id}
-                      product={product as any}
+                      product={product}
                       onAdd={() => handleAddProduct(product)}
                     />
                   ))}
@@ -205,14 +202,14 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
           {/* Right Side: Cart (30%) */}
           <div className="w-[30%] flex flex-col bg-white">
             <div className="p-4 border-b border-gray-100 bg-gray-50">
-              <h3 className="font-bold text-gray-700">{t('pos.quickAdd.selectedItems')} ({tempItems.length})</h3>
+              <h3 className="font-bold text-gray-700">{t('pos.quick_add.selected_items')} ({tempItems.length})</h3>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {tempItems.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-400">
                   <ShoppingBag size={48} className="mb-2 opacity-20" />
-                  <p>{t('pos.quickAdd.selectPrompt')}</p>
+                  <p>{t('pos.quick_add.select_prompt')}</p>
                 </div>
               ) : (
                 tempItems.map((item) => (
@@ -223,7 +220,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
                     </div>
 
                     <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-500">{formatCurrency(item.price)} {t('pos.quickAdd.perUnit')}</span>
+                      <span className="text-xs text-gray-500">{formatCurrency(item.price)} {t('pos.quick_add.per_unit')}</span>
                       <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-1">
                         <button
                           onClick={() => updateQuantity(item.instance_id, -1)}
@@ -256,7 +253,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
                 disabled={tempItems.length === 0}
                 className="w-full py-3 bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-lg shadow-red-500/30 transition-all active:scale-[0.98]"
               >
-                {t('pos.quickAdd.confirm')}
+                {t('pos.quick_add.confirm')}
               </button>
             </div>
           </div>

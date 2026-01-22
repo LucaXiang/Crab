@@ -53,7 +53,7 @@ const ZoneList: React.FC = React.memo(() => {
   const handleBatchDelete = (items: ZoneItem[]) => {
     setConfirmDialog({
       isOpen: true,
-      title: t('settings.batchDelete.confirmTitle'),
+      title: t('settings.batch_delete.confirm_title'),
       description: t('settings.batchDelete.confirmDeleteZones', { count: items.length }) || `确定要删除选中的 ${items.length} 个区域吗？此操作无法撤销。`,
       onConfirm: async () => {
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
@@ -125,7 +125,7 @@ const ZoneList: React.FC = React.memo(() => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t('common.hint.searchPlaceholder')}
+              placeholder={t('common.hint.search_placeholder')}
               className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
             />
           </div>
@@ -150,7 +150,7 @@ const ZoneList: React.FC = React.memo(() => {
         onEdit={canManageZones ? (item) => openModal('ZONE', 'EDIT', item) : undefined}
         onDelete={canManageZones ? (item) => openModal('ZONE', 'DELETE', item) : undefined}
         onBatchDelete={canManageZones ? handleBatchDelete : undefined}
-        emptyText={t('common.empty.noData')}
+        emptyText={t('common.empty.no_data')}
         themeColor="purple"
       />
 
@@ -233,7 +233,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
   const handleBatchDelete = (items: TableItem[]) => {
     setConfirmDialog({
       isOpen: true,
-      title: t('settings.batchDelete.confirmTitle'),
+      title: t('settings.batch_delete.confirm_title'),
       description: t('settings.batchDelete.confirmDeleteTables', { count: items.length }) || `确定要删除选中的 ${items.length} 个桌台吗？此操作无法撤销。`,
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
@@ -304,10 +304,10 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
             </div>
             <div>
               <h2 className="text-lg font-bold text-gray-900">
-                {t('settings.table.zoneManagement')}
+                {t('settings.table.zone_management')}
               </h2>
               <p className="text-sm text-gray-500 mt-1">
-                {t('settings.table.zoneManagementDesc')}
+                {t('settings.table.zone_management_desc')}
               </p>
             </div>
           </div>
@@ -318,7 +318,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-blue-600/20 hover:bg-blue-700 hover:shadow-blue-600/30 transition-all"
               >
                 <Plus size={16} />
-                <span>{t('settings.table.addTable')}</span>
+                <span>{t('settings.table.add_table')}</span>
               </button>
             </ProtectedGate>
           ) : (
@@ -328,7 +328,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-purple-600/20 hover:bg-purple-700 hover:shadow-purple-600/30 transition-all"
               >
                 <Plus size={16} />
-                <span>{t('settings.zone.addZone')}</span>
+                <span>{t('settings.zone.add_zone')}</span>
               </button>
             </ProtectedGate>
           )}
@@ -375,7 +375,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
                 <label className="text-sm text-gray-600">{t('table.zones')}:</label>
                 <select
                   value={zoneFilter}
-                  onChange={(e) => setZoneFilter(e.target.value as any)}
+                  onChange={(e) => setZoneFilter(e.target.value)}
                   className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors min-w-[140px]"
                 >
                   <option value="all">{t('table.filter.all')}</option>
@@ -397,7 +397,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
                     setSearchQuery(e.target.value);
                     setPagination(1, total);
                   }}
-                  placeholder={t('common.hint.searchPlaceholder')}
+                  placeholder={t('common.hint.search_placeholder')}
                   className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 />
               </div>
@@ -417,7 +417,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
             onEdit={canManageTables ? (item) => openModal('TABLE', 'EDIT', item) : undefined}
             onDelete={canManageTables ? (item) => openModal('TABLE', 'DELETE', item) : undefined}
             onBatchDelete={canManageTables ? handleBatchDelete : undefined}
-            emptyText={t('common.empty.noData')}
+            emptyText={t('common.empty.no_data')}
             pageSize={5}
             totalItems={filteredTables.length}
             currentPage={page}

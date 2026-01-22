@@ -292,7 +292,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     // Draw cached background (Paper)
     renderBackground();
     if (backgroundCanvasRef.current) {
-      ctx.drawImage(backgroundCanvasRef.current as any, paperX, paperY);
+      ctx.drawImage(backgroundCanvasRef.current, paperX, paperY);
     }
 
     // Draw grid relative to the content origin (now fixed at 0,0)
@@ -768,7 +768,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
         <button
           onClick={() => setViewState(s => ({ ...s, scale: s.scale * 1.2 }))}
           className="p-1 hover:bg-gray-100 rounded"
-          title={t("settings.label.zoomIn")}
+          title={t("settings.label.zoom_in")}
         >
           <span className="text-xl font-bold text-gray-600">+</span>
         </button>
@@ -780,7 +780,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
         <button
           onClick={() => setViewState(s => ({ ...s, scale: s.scale / 1.2 }))}
           className="p-1 hover:bg-gray-100 rounded"
-          title={t("settings.label.zoomOut")}
+          title={t("settings.label.zoom_out")}
         >
           <span className="text-xl font-bold text-gray-600">-</span>
         </button>
@@ -806,7 +806,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
             setViewState({ x, y, scale: s });
           }}
           className="p-1 hover:bg-gray-100 rounded text-xs font-mono text-gray-600"
-          title={t("settings.label.fitToScreen")}
+          title={t("settings.label.fit_to_screen")}
         >
           FIT
         </button>

@@ -19,7 +19,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
   if (!field) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 text-center text-gray-500">
-        {t("settings.label.selectFieldHint")}
+        {t("settings.label.select_field_hint")}
       </div>
     );
   }
@@ -57,7 +57,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
           ) : (
             <ImageIcon size={18} className="text-blue-600" />
           )}
-          <h3 className="text-lg font-semibold text-gray-800">{t("settings.label.fieldProperties")}</h3>
+          <h3 className="text-lg font-semibold text-gray-800">{t("settings.label.field_properties")}</h3>
         </div>
         <button
           onClick={onClose}
@@ -70,7 +70,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
       <div className="p-4 space-y-4 flex-1 overflow-y-auto">
         {/* Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.displayLabel")}</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.display_label")}</label>
           <input
             type="text"
             value={field.name || ''}
@@ -83,7 +83,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
         {/* Position */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.xPosition")}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.x_position")}</label>
             <NumberInput
               value={isSeparatorField ? 0 : parseFloat(field.x.toFixed(2))}
               disabled={isSeparatorField}
@@ -94,7 +94,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.yPosition")}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.y_position")}</label>
             <NumberInput
               value={parseFloat(field.y.toFixed(2))}
               onValueChange={(val) => handleUpdate({ y: val })}
@@ -136,7 +136,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
           <>
             <div className="grid grid-cols-2 gap-3">
                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.fontSize")}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.font_size")}</label>
                   <NumberInput
                     value={field.fontSize}
                     onValueChange={(val) => handleUpdate({ fontSize: val })}
@@ -146,36 +146,36 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                   />
                </div>
                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.fontFamily")}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.font_family")}</label>
                   <select
                     value={field.fontFamily || 'Arial'}
                     onChange={(e) => handleUpdate({ fontFamily: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="Arial">{t('fonts.arial')}</option>
-                    <option value="Microsoft YaHei">{t('fonts.microsoftYaHei')}</option>
-                    <option value="Segoe UI">{t('fonts.segoeUI')}</option>
-                    <option value="Times New Roman">{t('fonts.timesNewRoman')}</option>
-                    <option value="Courier New">{t('fonts.courierNew')}</option>
+                    <option value="Microsoft YaHei">{t('fonts.microsoft_ya_hei')}</option>
+                    <option value="Segoe UI">{t('fonts.segoe_u_i')}</option>
+                    <option value="Times New Roman">{t('fonts.times_new_roman')}</option>
+                    <option value="Courier New">{t('fonts.courier_new')}</option>
                   </select>
                </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.fontStyle")}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.font_style")}</label>
               <select
                 value={field.fontWeight || 'normal'}
                 onChange={(e) => handleUpdate({ fontWeight: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="normal">{t("settings.label.styleRegular")}</option>
-                <option value="bold">{t("settings.label.styleBold")}</option>
+                <option value="normal">{t("settings.label.style_regular")}</option>
+                <option value="bold">{t("settings.label.style_bold")}</option>
               </select>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.textAlign")}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.text_align")}</label>
                   <div className="flex gap-1">
                     {(['left', 'center', 'right'] as TextAlign[]).map((align) => (
                       <button
@@ -195,7 +195,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.verticalAlign")}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.vertical_align")}</label>
                   <div className="flex gap-1">
                     {(['top', 'middle', 'bottom'] as VerticalAlign[]).map((align) => (
                       <button
@@ -203,7 +203,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                         onClick={() => handleUpdate({ verticalAlign: align })}
                         title={t(`settings.align${align.charAt(0).toUpperCase() + align.slice(1)}`) || align}
                         className={`flex-1 p-2 rounded-lg border transition-all flex items-center justify-center ${
-                          ((field as any).verticalAlign || 'top') === align
+                          (field.verticalAlign ?? 'top') === align
                             ? 'border-blue-500 bg-blue-50 text-blue-600'
                             : 'border-gray-300 text-gray-500 hover:border-gray-400 hover:bg-gray-50'
                         }`}
@@ -223,7 +223,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
              {/* Data Source */}
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">
-                 {t("settings.label.contentTemplate")}
+                 {t("settings.label.content_template")}
                </label>
                <input
                   type="text"
@@ -233,7 +233,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                   placeholder="{product_code}"
                />
                <p className="mt-1 text-xs text-gray-500">
-                  {t("settings.label.imageTemplateHint")}
+                  {t("settings.label.image_template_hint")}
                </p>
              </div>
           </div>
@@ -242,7 +242,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
         {/* Separator-specific properties */}
         {isSeparatorField && (
            <div className="bg-gray-50 p-3 rounded-lg text-sm text-gray-500">
-             {t("settings.label.separatorHint")}
+             {t("settings.label.separator_hint")}
            </div>
         )}
       </div>

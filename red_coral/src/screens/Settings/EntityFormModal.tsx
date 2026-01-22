@@ -7,7 +7,7 @@ import {
   useSettingsStore,
 } from '@/core/stores/settings/useSettingsStore';
 import { createTauriClient, invokeApi } from '@/infrastructure/api';
-import type { Attribute } from '@/core/domain/types/api';
+import type { Attribute, Product } from '@/core/domain/types/api';
 import { useProductStore, useZones, useCategoryStore } from '@/core/stores/resources';
 import { getErrorMessage } from '@/utils/error';
 
@@ -352,7 +352,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           receipt_name: formData.receipt_name?.trim() ?? undefined,
           kitchen_print_name: formData.kitchen_print_name?.trim() ?? undefined,
           print_destinations: formData.print_destinations ?? [],
-          is_label_print_enabled: formData.is_label_print_enabled ? 1 : 0,
+          is_label_print_enabled: formData.is_label_print_enabled ?? -1,
           is_active: formData.is_active ?? true,
           tags: formData.tags ?? [],
           specs: formData.specs ?? [],
@@ -393,8 +393,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
           productId = created?.id || '';
 
           // Optimistic update: add to resources ProductStore
-          if (created) {
-            useProductStore.getState().optimisticAdd(created as any);
+          if (created?.id) {
+            useProductStore.getState().optimisticAdd(created as Product & { id: string });
           }
           toast.success(t("settings.product.message.created"));
         } else {
@@ -515,7 +515,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           name: formData.name.trim(),
           sort_order: formData.sort_order ?? 0,
           print_destinations: validDestinations,
-          is_label_print_enabled: formData.is_label_print_enabled ?? true,
+          is_label_print_enabled: formData.is_label_print_enabled !== 0,  // 0=禁用, 其他=启用
           is_active: formData.is_active ?? true,
           is_virtual: formData.is_virtual ?? false,
           tag_ids: formData.tag_ids ?? [],
@@ -666,7 +666,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
               zone: formData.zone ?? '',
               is_active: formData.is_active ?? true,
             }}
-            zones={zones as any}
+            zones={zones}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onFieldChange={setFormField as (field: string, value: any) => void}
             t={t}
@@ -703,7 +703,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
               attribute_default_options: formData.attribute_default_options,
               print_destinations: formData.print_destinations,
               kitchen_print_name: formData.kitchen_print_name,
-              is_label_print_enabled: formData.is_label_print_enabled ? 1 : 0,
+              is_label_print_enabled: formData.is_label_print_enabled ?? -1,
               is_active: formData.is_active ?? true,
               specs: formData.specs,
               selected_tag_ids: formData.tags,
@@ -723,7 +723,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             formData={{
               name: formData.name,
               print_destinations: formData.print_destinations,
-              is_label_print_enabled: formData.is_label_print_enabled ?? true,
+              is_label_print_enabled: formData.is_label_print_enabled !== 0,  // 0=禁用, 其他=启用
               is_active: formData.is_active ?? true,
               selected_attribute_ids: formData.selected_attribute_ids,
               attribute_default_options: formData.attribute_default_options,

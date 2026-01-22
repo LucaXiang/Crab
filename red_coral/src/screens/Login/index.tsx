@@ -6,6 +6,10 @@ import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useBridgeStore, useAppState, AppStateHelpers, type LoginMode } from '@/core/stores/bridge';
 import { useI18n } from '@/hooks/useI18n';
 
+interface LocationState {
+  from?: { pathname: string };
+}
+
 export const LoginScreen: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -63,7 +67,7 @@ export const LoginScreen: React.FC = () => {
   // Navigate when authenticated (check both appState AND isAuthenticated)
   useEffect(() => {
     if (AppStateHelpers.canAccessPOS(appState) && isAuthenticated) {
-      const from = (location.state as any)?.from?.pathname || '/pos';
+      const from = (location.state as LocationState)?.from?.pathname || '/pos';
       navigate(from, { replace: true });
     }
   }, [appState, isAuthenticated, navigate, location]);
@@ -74,7 +78,7 @@ export const LoginScreen: React.FC = () => {
     setLoginMode(null);
 
     if (!username.trim() || !password.trim()) {
-      setError(t('auth.login.error.emptyFields'));
+      setError(t('auth.login.error.empty_fields'));
       return;
     }
 
@@ -116,10 +120,10 @@ export const LoginScreen: React.FC = () => {
 
         // Navigation handled by useEffect
       } else {
-        setError(response.error || t('auth.login.error.invalidCredentials'));
+        setError(response.error || t('auth.login.error.invalid_credentials'));
       }
     } catch (err: any) {
-      setError(err.message || t('auth.login.error.invalidCredentials'));
+      setError(err.message || t('auth.login.error.invalid_credentials'));
     }
   };
 
@@ -168,7 +172,7 @@ export const LoginScreen: React.FC = () => {
           </h2>
 
           <p className="text-lg text-white/70 leading-relaxed mb-12">
-            {t('auth.login.subtitleDesc')}
+            {t('auth.login.subtitle_desc')}
           </p>
 
           {/* Feature Highlights */}
@@ -176,15 +180,15 @@ export const LoginScreen: React.FC = () => {
             <div className="flex items-center gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 transition-transform hover:translate-x-2">
               <Store className="text-white/80" />
               <div>
-                <h3 className="font-semibold">{t('auth.login.feature.multiZone')}</h3>
-                <p className="text-sm text-white/60">{t('auth.login.feature.multiZoneDesc')}</p>
+                <h3 className="font-semibold">{t('auth.login.feature.multi_zone')}</h3>
+                <p className="text-sm text-white/60">{t('auth.login.feature.multi_zone_desc')}</p>
               </div>
             </div>
             <div className="flex items-center gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 transition-transform hover:translate-x-2">
               <Terminal className="text-white/80" />
               <div>
-                <h3 className="font-semibold">{t('auth.login.feature.fastCheckout')}</h3>
-                <p className="text-sm text-white/60">{t('auth.login.feature.fastCheckoutDesc')}</p>
+                <h3 className="font-semibold">{t('auth.login.feature.fast_checkout')}</h3>
+                <p className="text-sm text-white/60">{t('auth.login.feature.fast_checkout_desc')}</p>
               </div>
             </div>
           </div>
@@ -196,7 +200,7 @@ export const LoginScreen: React.FC = () => {
         <button
           onClick={handleCloseApp}
           className="absolute top-6 right-6 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-20"
-          title={t('common.dialog.closeApp')}
+          title={t('common.dialog.close_app')}
         >
           <Power size={24} />
         </button>
@@ -208,7 +212,7 @@ export const LoginScreen: React.FC = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-[#FF5E5E] rounded-2xl shadow-lg mb-4 text-white">
               <span className="text-3xl">🐚</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('app.brand.fullName')}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('app.brand.full_name')}</h1>
           </div>
 
           {/* Mode/Tenant Info Card */}
@@ -284,7 +288,7 @@ export const LoginScreen: React.FC = () => {
               {t('auth.login.title')}
             </h2>
             <p className="text-gray-500">
-              {t('auth.login.enterDetails')}
+              {t('auth.login.enter_details')}
             </p>
           </div>
 
@@ -315,7 +319,7 @@ export const LoginScreen: React.FC = () => {
                   onChange={(e) => setUsername(e.target.value)}
                   onFocus={() => setFocusedField('username')}
                   onBlur={() => setFocusedField(null)}
-                  placeholder={t('auth.login.usernamePlaceholder')}
+                  placeholder={t('auth.login.username_placeholder')}
                   className="w-full px-4 py-3.5 bg-transparent focus:outline-none text-gray-900 placeholder-gray-400"
                   disabled={isLoading}
                 />
@@ -354,7 +358,7 @@ export const LoginScreen: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
-                  placeholder={t('auth.login.passwordPlaceholder')}
+                  placeholder={t('auth.login.password_placeholder')}
                   className="w-full px-4 py-3.5 bg-transparent focus:outline-none text-gray-900 placeholder-gray-400"
                   disabled={isLoading}
                 />
