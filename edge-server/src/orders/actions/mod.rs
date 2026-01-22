@@ -227,6 +227,10 @@ impl From<&OrderCommand> for CommandAction {
                 payment_method: payment_method.clone(),
                 items: items.clone(),
             }),
+            OrderCommandPayload::ToggleRuleSkip { .. } => {
+                // TODO: Implement in Task 4.2
+                todo!("ToggleRuleSkip action not yet implemented")
+            }
         }
     }
 }

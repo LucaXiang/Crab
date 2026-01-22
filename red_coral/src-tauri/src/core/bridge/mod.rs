@@ -1249,6 +1249,9 @@ impl ClientBridge {
                             shared::order::OrderCommandPayload::UpdateOrderInfo { .. } => {
                                 "order.update_info"
                             }
+                            shared::order::OrderCommandPayload::ToggleRuleSkip { .. } => {
+                                "order.toggle_rule_skip"
+                            }
                         };
 
                         // Build RequestCommand message with full command (preserves command_id, operator info)
