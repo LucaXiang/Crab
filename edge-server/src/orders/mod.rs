@@ -30,6 +30,7 @@
 pub mod actions;
 pub mod appliers;
 pub mod manager;
+pub mod money;
 pub mod reducer;
 pub mod storage;
 pub mod sync;
