@@ -351,8 +351,10 @@ export const EntityFormModal: React.FC = React.memo(() => {
           tax_rate: formData.tax_rate ?? 0,
           receipt_name: formData.receipt_name?.trim() ?? undefined,
           kitchen_print_name: formData.kitchen_print_name?.trim() ?? undefined,
-          print_destinations: formData.print_destinations ?? [],
-          is_label_print_enabled: formData.is_label_print_enabled ?? -1,
+          kitchen_print_destinations: formData.print_destinations ?? [],  // Form field maps to kitchen
+          label_print_destinations: formData.label_print_destinations ?? [],
+          is_kitchen_print_enabled: formData.is_kitchen_print_enabled ?? -1,  // 默认继承
+          is_label_print_enabled: formData.is_label_print_enabled ?? -1,  // 默认继承
           is_active: formData.is_active ?? true,
           tags: formData.tags ?? [],
           specs: formData.specs ?? [],
@@ -378,7 +380,9 @@ export const EntityFormModal: React.FC = React.memo(() => {
             sort_order: productPayload.sort_order,
             receipt_name: productPayload.receipt_name,
             kitchen_print_name: productPayload.kitchen_print_name,
-            print_destinations: productPayload.print_destinations,
+            kitchen_print_destinations: productPayload.kitchen_print_destinations,
+            label_print_destinations: productPayload.label_print_destinations,
+            is_kitchen_print_enabled: productPayload.is_kitchen_print_enabled,
             is_label_print_enabled: productPayload.is_label_print_enabled,
             // Price is embedded in specs
             specs: [{
@@ -408,7 +412,9 @@ export const EntityFormModal: React.FC = React.memo(() => {
             sort_order: productPayload.sort_order,
             receipt_name: productPayload.receipt_name,
             kitchen_print_name: productPayload.kitchen_print_name,
-            print_destinations: productPayload.print_destinations,
+            kitchen_print_destinations: productPayload.kitchen_print_destinations,
+            label_print_destinations: productPayload.label_print_destinations,
+            is_kitchen_print_enabled: productPayload.is_kitchen_print_enabled,
             is_label_print_enabled: productPayload.is_label_print_enabled,
             is_active: productPayload.is_active,
             // Update specs with price and external_id
@@ -434,7 +440,9 @@ export const EntityFormModal: React.FC = React.memo(() => {
             sort_order: productPayload.sort_order ?? p.sort_order,
             receipt_name: productPayload.receipt_name ?? null,
             kitchen_print_name: productPayload.kitchen_print_name ?? null,
-            print_destinations: productPayload.print_destinations ?? p.print_destinations,
+            kitchen_print_destinations: productPayload.kitchen_print_destinations ?? p.kitchen_print_destinations,
+            label_print_destinations: productPayload.label_print_destinations ?? p.label_print_destinations,
+            is_kitchen_print_enabled: productPayload.is_kitchen_print_enabled ?? p.is_kitchen_print_enabled,
             is_label_print_enabled: productPayload.is_label_print_enabled ?? p.is_label_print_enabled,
             is_active: productPayload.is_active ?? p.is_active,
             // Update embedded specs

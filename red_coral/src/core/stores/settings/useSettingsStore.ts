@@ -101,9 +101,9 @@ interface FormData {
   specs?: EmbeddedSpec[];  // 嵌入式规格
   has_multi_spec?: boolean; // UI only: 是否多规格
 
-  // === Category ===
-  is_kitchen_print_enabled?: PrintState;  // Category: 0=禁用, 1=启用 (无继承)
-  label_print_destinations?: string[];  // Category: Label PrintDestination IDs
+  // === Category & Product shared ===
+  is_kitchen_print_enabled?: PrintState;  // Product: -1=继承, 0=禁用, 1=启用; Category: 0=禁用, 1=启用
+  label_print_destinations?: string[];  // Label PrintDestination IDs
   is_virtual?: boolean;
   tag_ids?: string[];      // Virtual category tag filter
   match_mode?: 'any' | 'all';
@@ -256,7 +256,9 @@ export const useSettingsStore = create<SettingsStore>()(
             tax_rate: productData?.tax_rate ?? 10,
             receipt_name: productData?.receipt_name ?? '',
             kitchen_print_name: productData?.kitchen_print_name ?? '',
-            print_destinations: productData?.print_destinations || [],
+            print_destinations: productData?.kitchen_print_destinations || [],  // Form uses print_destinations for kitchen
+            label_print_destinations: productData?.label_print_destinations || [],
+            is_kitchen_print_enabled: productData?.is_kitchen_print_enabled ?? -1,  // 默认继承分类
             is_label_print_enabled: productData?.is_label_print_enabled ?? -1,  // 默认继承分类
             is_active: productData?.is_active ?? true,  // Default to active for new products
             tags: productData?.tags || [],

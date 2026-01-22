@@ -44,9 +44,16 @@ pub struct Product {
     pub tax_rate: i32,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    /// 打印目的地
+    /// 厨房打印目的地
     #[serde(default)]
-    pub print_destinations: Vec<Thing>,
+    pub kitchen_print_destinations: Vec<Thing>,
+    /// 标签打印目的地
+    #[serde(default)]
+    pub label_print_destinations: Vec<Thing>,
+    /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
+    #[serde(default = "default_inherit")]
+    pub is_kitchen_print_enabled: i32,
+    /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
     #[serde(default = "default_inherit")]
     pub is_label_print_enabled: i32,
     #[serde(
@@ -81,7 +88,9 @@ impl Product {
             tax_rate: 0,
             receipt_name: None,
             kitchen_print_name: None,
-            print_destinations: vec![],
+            kitchen_print_destinations: vec![],
+            label_print_destinations: vec![],
+            is_kitchen_print_enabled: -1,
             is_label_print_enabled: -1,
             is_active: true,
             tags: vec![],
@@ -102,8 +111,15 @@ pub struct ProductCreate {
     pub tax_rate: Option<i32>,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
+    /// 厨房打印目的地
     #[serde(default, with = "serde_thing::option_vec")]
-    pub print_destinations: Option<Vec<Thing>>,
+    pub kitchen_print_destinations: Option<Vec<Thing>>,
+    /// 标签打印目的地
+    #[serde(default, with = "serde_thing::option_vec")]
+    pub label_print_destinations: Option<Vec<Thing>>,
+    /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
+    pub is_kitchen_print_enabled: Option<i32>,
+    /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_label_print_enabled: Option<i32>,
     #[serde(default, with = "serde_thing::option_vec")]
     pub tags: Option<Vec<Thing>>,
@@ -131,12 +147,24 @@ pub struct ProductUpdate {
     pub receipt_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kitchen_print_name: Option<String>,
+    /// 厨房打印目的地
     #[serde(
         default,
         with = "serde_thing::option_vec",
         skip_serializing_if = "Option::is_none"
     )]
-    pub print_destinations: Option<Vec<Thing>>,
+    pub kitchen_print_destinations: Option<Vec<Thing>>,
+    /// 标签打印目的地
+    #[serde(
+        default,
+        with = "serde_thing::option_vec",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub label_print_destinations: Option<Vec<Thing>>,
+    /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_kitchen_print_enabled: Option<i32>,
+    /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_label_print_enabled: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
