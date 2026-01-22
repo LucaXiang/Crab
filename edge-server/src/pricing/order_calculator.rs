@@ -127,7 +127,7 @@ mod tests {
     fn make_rule(
         rule_type: RuleType,
         adjustment_type: AdjustmentType,
-        value: i32,
+        value: f64,
         priority: i32,
         stackable: bool,
         exclusive: bool,
@@ -170,7 +170,7 @@ mod tests {
         let rule = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             0,
             true,
             false,
@@ -243,7 +243,7 @@ mod tests {
         let discount = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             0,
             true,
             false,
@@ -251,7 +251,7 @@ mod tests {
         let surcharge = make_rule(
             RuleType::Surcharge,
             AdjustmentType::Percentage,
-            5,
+            5.0,
             0,
             true,
             false,
@@ -288,7 +288,7 @@ mod tests {
         let rule = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            150,
+            150.0,
             0,
             true,
             false,
@@ -317,7 +317,7 @@ mod tests {
         let rule = make_rule(
             RuleType::Surcharge,
             AdjustmentType::Percentage,
-            8,
+            8.0,
             0,
             true,
             false,
@@ -336,11 +336,11 @@ mod tests {
 
     #[test]
     fn test_fixed_discount_rule() {
-        // $100 subtotal with $15 fixed discount (1500 cents) = $85 final
+        // $100 subtotal with $15 fixed discount = $85 final
         let rule = make_rule(
             RuleType::Discount,
             AdjustmentType::FixedAmount,
-            1500, // $15 in cents
+            15.0,
             0,
             true,
             false,

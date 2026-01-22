@@ -243,9 +243,9 @@ pub fn apply_discount_rules(
         }
     }
 
-    // Simple addition for fixed discounts
+    // Simple addition for fixed discounts (value is already in currency units)
     for rule in &stackable_fixed {
-        let amount = to_decimal(rule.adjustment_value) / hundred;
+        let amount = to_decimal(rule.adjustment_value);
         total_discount += amount;
         applied_rules.push(AppliedRule::from_rule(
             &to_shared_rule(rule),
