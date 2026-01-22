@@ -7,7 +7,7 @@ interface TableFormProps {
   formData: {
     name: string;
     capacity: number;
-    zoneId: string;
+    zone: string;
   };
   zones: Zone[];
   onFieldChange: (field: string, value: any) => void;
@@ -38,8 +38,8 @@ export const TableForm: React.FC<TableFormProps> = ({ formData, zones, onFieldCh
         </FormField>
         <SelectField
           label={t('table.zones')}
-          value={formData.zoneId}
-          onChange={(value) => onFieldChange('zoneId', value as string)}
+          value={formData.zone}
+          onChange={(value) => onFieldChange('zone', value as string)}
           options={zones.map((z) => ({ value: z.id, label: z.name }))}
           required
         />
