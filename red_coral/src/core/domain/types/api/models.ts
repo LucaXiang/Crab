@@ -262,9 +262,12 @@ export type HasAttribute = AttributeBinding;
 // ============ Embedded Printer ============
 
 export type PrinterType = 'network' | 'driver';
+export type PrinterFormat = 'escpos' | 'label';
 
 export interface EmbeddedPrinter {
   printer_type: PrinterType;
+  /** Printer format: escpos (厨房单/小票) | label (标签) */
+  printer_format: PrinterFormat;
   ip?: string;
   port?: number;
   driver_name?: string;

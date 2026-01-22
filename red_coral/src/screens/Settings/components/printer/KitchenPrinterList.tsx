@@ -26,6 +26,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
       // Build printers array from printerName (system driver printer)
       const printers = data.printerName ? [{
         printer_type: 'driver' as const,
+        printer_format: 'escpos' as const,
         driver_name: data.printerName,
         priority: 1,
         is_active: true,

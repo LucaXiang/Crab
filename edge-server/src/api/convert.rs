@@ -147,6 +147,7 @@ impl From<db::EmbeddedPrinter> for api::EmbeddedPrinter {
     fn from(p: db::EmbeddedPrinter) -> Self {
         Self {
             printer_type: p.printer_type,
+            printer_format: p.printer_format,
             ip: p.ip,
             port: p.port,
             driver_name: p.driver_name,

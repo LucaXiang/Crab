@@ -5,11 +5,18 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbeddedPrinter {
     pub printer_type: String, // "network" | "driver"
+    /// Printer format: "escpos" (厨房单/小票) | "label" (标签)
+    #[serde(default = "default_printer_format")]
+    pub printer_format: String,
     pub ip: Option<String>,
     pub port: Option<u16>,
     pub driver_name: Option<String>,
     pub priority: i32,
     pub is_active: bool,
+}
+
+fn default_printer_format() -> String {
+    "escpos".to_string()
 }
 
 /// Print destination entity
