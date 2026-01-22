@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**现阶段项目是开发阶段, 不要适配层,不要兼容性,不要留下技术债,不要留下历史包裹**
+
 ## Crab - 分布式餐饮管理系统
 
 Rust workspace 架构，专注离线优先、边缘计算、mTLS 安全通信。
