@@ -19,7 +19,8 @@ pub struct OrderItemAttribute {
     pub attr_id: String,
     pub option_idx: i32,
     pub name: String,
-    pub price: i32,
+    /// Price in currency unit
+    pub price: f64,
 }
 
 /// Order item
@@ -29,11 +30,14 @@ pub struct OrderItem {
     pub spec: String,
     pub name: String,
     pub spec_name: Option<String>,
-    pub price: i32,
+    /// Price in currency unit
+    pub price: f64,
     pub quantity: i32,
     pub attributes: Vec<OrderItemAttribute>,
-    pub discount_amount: i32,
-    pub surcharge_amount: i32,
+    /// Discount amount in currency unit
+    pub discount_amount: f64,
+    /// Surcharge amount in currency unit
+    pub surcharge_amount: f64,
     pub note: Option<String>,
     pub is_sent: bool,
 }
@@ -42,7 +46,8 @@ pub struct OrderItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderPayment {
     pub method: String,
-    pub amount: i32,
+    /// Amount in currency unit
+    pub amount: f64,
     pub time: String,
     pub reference: Option<String>,
 }
@@ -58,10 +63,14 @@ pub struct Order {
     pub start_time: String,
     pub end_time: Option<String>,
     pub guest_count: Option<i32>,
-    pub total_amount: i32,
-    pub paid_amount: i32,
-    pub discount_amount: i32,
-    pub surcharge_amount: i32,
+    /// Total amount in currency unit
+    pub total_amount: f64,
+    /// Paid amount in currency unit
+    pub paid_amount: f64,
+    /// Discount amount in currency unit
+    pub discount_amount: f64,
+    /// Surcharge amount in currency unit
+    pub surcharge_amount: f64,
     pub items: Vec<OrderItem>,
     pub payments: Vec<OrderPayment>,
     pub prev_hash: String,
@@ -113,7 +122,8 @@ pub struct OrderAddItem {
     pub spec: String,
     pub name: String,
     pub spec_name: Option<String>,
-    pub price: i32,
+    /// Price in currency unit
+    pub price: f64,
     pub quantity: i32,
     pub attributes: Option<Vec<OrderItemAttribute>>,
     pub note: Option<String>,
@@ -123,16 +133,20 @@ pub struct OrderAddItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderAddPayment {
     pub method: String,
-    pub amount: i32,
+    /// Amount in currency unit
+    pub amount: f64,
     pub reference: Option<String>,
 }
 
 /// Update totals payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderUpdateTotals {
-    pub total_amount: i32,
-    pub discount_amount: i32,
-    pub surcharge_amount: i32,
+    /// Total amount in currency unit
+    pub total_amount: f64,
+    /// Discount amount in currency unit
+    pub discount_amount: f64,
+    /// Surcharge amount in currency unit
+    pub surcharge_amount: f64,
 }
 
 /// Update status payload

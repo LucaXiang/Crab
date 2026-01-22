@@ -1,9 +1,9 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, Type, Printer, Settings2 } from 'lucide-react';
 import { useI18n } from '../../../hooks/useI18n';
 import { useOptionActions } from '@/core/stores/resources';
 import type { AttributeOption } from '@/core/domain/types/api';
-import { FormField, inputClass } from './FormField';
+import { FormField, FormSection, CheckboxField, inputClass } from './FormField';
 import { useFormInitialization } from '../../../hooks/useFormInitialization';
 import { usePriceInput } from '../../../hooks/usePriceInput';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
@@ -85,7 +85,7 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
     {
       validationRules: (data) => {
         if (!data.name.trim()) {
-          return t('settings.attribute.option.form.nameRequired');
+          return t('settings.attribute.option.form.name_required');
         }
         return null;
       },
@@ -97,6 +97,7 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
           attributeId,
           name: data.name.trim(),
           receipt_name: data.receiptName?.trim() || undefined,
+          kitchen_print_name: data.kitchenPrintName?.trim() || undefined,
           price_modifier: data.priceModifier,
           display_order: data.displayOrder,
         });
@@ -110,6 +111,7 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
           index: editingOption!.index,
           name: data.name.trim(),
           receipt_name: data.receiptName?.trim() || undefined,
+          kitchen_print_name: data.kitchenPrintName?.trim() || undefined,
           price_modifier: data.priceModifier,
           display_order: data.displayOrder,
           is_active: data.isActive,
@@ -131,16 +133,16 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200"
+        className="bg-gray-50 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 bg-linear-to-r from-teal-50 to-white">
+        <div className="px-6 py-4 border-b border-gray-200 bg-white">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900">
               {editingOption
-                ? (t('settings.attribute.option.editOption'))
-                : (t('settings.attribute.option.addOption'))
+                ? t('settings.attribute.option.edit_option')
+                : t('settings.attribute.option.add_option')
               }
             </h2>
             <button
@@ -153,33 +155,16 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
         </div>
 
         {/* Content */}
-        <div className="p-6">
-          <div className="space-y-4">
+        <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          {/* 基本信息 */}
+          <FormSection title={t('settings.attribute.section.basic')} icon={Type}>
             <FormField label={t('settings.attribute.option.form.name')} required>
               <input
                 value={formData.name}
                 onChange={(e) => handleFieldChange('name', e.target.value)}
-                placeholder={t('settings.attribute.option.form.namePlaceholder')}
+                placeholder={t('settings.attribute.option.form.name_placeholder')}
                 className={inputClass}
                 autoFocus
-              />
-            </FormField>
-
-            <FormField label={t('settings.attribute.option.form.receiptName')}>
-              <input
-                value={formData.receiptName}
-                onChange={(e) => handleFieldChange('receiptName', e.target.value)}
-                placeholder={t('settings.attribute.option.form.receiptNamePlaceholder')}
-                className={inputClass}
-              />
-            </FormField>
-
-            <FormField label={t('settings.attribute.option.form.kitchenPrintName')}>
-              <input
-                value={formData.kitchenPrintName}
-                onChange={(e) => handleFieldChange('kitchenPrintName', e.target.value)}
-                placeholder={t('settings.attribute.option.form.kitchenPrintNamePlaceholder')}
-                className={inputClass}
               />
             </FormField>
 
@@ -199,40 +184,57 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
                 />
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                {t('settings.attribute.option.form.priceHint')}
+                {t('settings.attribute.option.form.price_hint')}
               </p>
             </FormField>
+          </FormSection>
 
+          {/* 打印设置 */}
+          <FormSection title={t('settings.attribute.section.print')} icon={Printer}>
+            <FormField label={t('settings.attribute.option.form.receipt_name')}>
+              <input
+                value={formData.receiptName}
+                onChange={(e) => handleFieldChange('receiptName', e.target.value)}
+                placeholder={t('settings.attribute.option.form.receipt_name_placeholder')}
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label={t('settings.attribute.option.form.kitchen_print_name')}>
+              <input
+                value={formData.kitchenPrintName}
+                onChange={(e) => handleFieldChange('kitchenPrintName', e.target.value)}
+                placeholder={t('settings.attribute.option.form.kitchen_print_name_placeholder')}
+                className={inputClass}
+              />
+            </FormField>
+          </FormSection>
+
+          {/* 高级设置 */}
+          <FormSection title={t('settings.attribute.section.advanced')} icon={Settings2} defaultCollapsed>
             <FormField label={t('settings.attribute.option.form.sort')}>
               <input
                 type="number"
                 value={formData.displayOrder}
                 onChange={(e) => handleFieldChange('displayOrder', parseInt(e.target.value) || 0)}
-                placeholder={t('settings.form.placeholder.sortOrder')}
+                placeholder={t('settings.form.placeholder.sort_order')}
                 className={inputClass}
               />
             </FormField>
 
             {editingOption && (
-              <FormField label={t('settings.attribute.option.form.status')}>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isActive}
-                    onChange={(e) => handleFieldChange('isActive', e.target.checked)}
-                    className="w-4 h-4 text-teal-600 bg-gray-100 border-gray-300 rounded focus:ring-teal-500"
-                  />
-                  <span className="text-sm text-gray-700">
-                    {t('common.status.active')}
-                  </span>
-                </label>
-              </FormField>
+              <CheckboxField
+                id="isActive"
+                label={t('common.status.active')}
+                checked={formData.isActive}
+                onChange={(checked) => handleFieldChange('isActive', checked)}
+              />
             )}
-          </div>
+          </FormSection>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-gray-200 bg-white flex justify-end gap-3">
           <button
             onClick={onClose}
             className="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors"
@@ -245,8 +247,8 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
             className="px-5 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors shadow-lg shadow-teal-600/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-teal-600"
           >
             {editingOption
-              ? (t('common.action.save'))
-              : (t('common.action.create'))
+              ? t('common.action.save')
+              : t('common.action.create')
             }
           </button>
         </div>

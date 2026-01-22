@@ -32,7 +32,7 @@ const ProductGridInner: React.FC<ProductGridProps> = ({
 	            <div className="w-16 h-16 border-2 border-gray-200 border-dashed rounded-xl mb-2 flex items-center justify-center">
 	              <PlusSquare className="opacity-20" size={32} />
 	            </div>
-	            <p>{t('app.emptyCategory')}</p>
+	            <p>{t('app.empty_category')}</p>
 	          </div>
 	        ) : (
           products.map((product, index) => (

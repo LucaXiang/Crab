@@ -85,7 +85,7 @@ export const TagManagement: React.FC = React.memo(() => {
       await tagStore.fetchAll();
     } catch (e) {
       console.error(e);
-      toast.error(t('settings.reorderFailed'));
+      toast.error(t('settings.reorder_failed'));
       // Revert to server data
       await tagStore.fetchAll();
     }
@@ -150,8 +150,8 @@ export const TagManagement: React.FC = React.memo(() => {
         ),
       },
       {
-        key: 'displayOrder',
-        header: t('settings.tag.displayOrder'),
+        key: 'display_order',
+        header: t('settings.tag.display_order'),
         width: '100px',
         align: 'center',
         render: (item) => (
@@ -168,7 +168,7 @@ export const TagManagement: React.FC = React.memo(() => {
         icon={Tags}
         title={t('settings.tag.title')}
         description={t('settings.tag.description')}
-        addButtonText={t('settings.tag.addTag')}
+        addButtonText={t('settings.tag.add_tag')}
         onAdd={() => openModal('TAG', 'CREATE')}
         themeColor="indigo"
         permission={Permission.MANAGE_CATEGORIES}
@@ -177,7 +177,7 @@ export const TagManagement: React.FC = React.memo(() => {
       <FilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder={t('common.hint.searchPlaceholder')}
+        searchPlaceholder={t('common.hint.search_placeholder')}
         totalCount={filteredItems.length}
         countUnit={t('settings.tag.unit')}
         themeColor="indigo"
@@ -190,7 +190,7 @@ export const TagManagement: React.FC = React.memo(() => {
         getRowKey={(item) => item.id || item.name}
         onEdit={canManageTags ? (item) => openModal('TAG', 'EDIT', item) : undefined}
         onDelete={canManageTags ? (item) => openModal('TAG', 'DELETE', item) : undefined}
-        emptyText={t('common.empty.noData')}
+        emptyText={t('common.empty.no_data')}
         themeColor="indigo"
       />
     </div>

@@ -114,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
          <div className="bg-gray-50 rounded-lg p-4">
            <div className="flex items-center gap-2 text-gray-600 mb-2">
             <Calendar size={16} />
-            <span className="text-sm font-medium">{t('statistics.dateRange')}</span>
+            <span className="text-sm font-medium">{t('statistics.date_range')}</span>
           </div>
           <div className="text-sm text-gray-500" suppressHydrationWarning>
             {getDateRangeLabel()}

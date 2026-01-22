@@ -41,6 +41,8 @@ import type {
   ProductAttributeListData,
   EmployeeResponse,
   PriceRule,
+  PriceRuleCreate,
+  PriceRuleUpdate,
   CreateProductAttributeRequest,
   CreateCategoryAttributeRequest,
 } from '@/core/domain/types/api';
@@ -365,6 +367,22 @@ export class TauriApiClient {
   async listPriceRules(): Promise<PriceRule[]> {
     const data = await invokeAndUnwrap<{ rules: PriceRule[] }>('list_price_rules');
     return data.rules;
+  }
+
+  async getPriceRule(id: string): Promise<PriceRule> {
+    return invokeAndUnwrap<PriceRule>('get_price_rule', { id });
+  }
+
+  async createPriceRule(data: PriceRuleCreate): Promise<PriceRule> {
+    return invokeAndUnwrap<PriceRule>('create_price_rule', { data });
+  }
+
+  async updatePriceRule(id: string, data: PriceRuleUpdate): Promise<PriceRule> {
+    return invokeAndUnwrap<PriceRule>('update_price_rule', { id, data });
+  }
+
+  async deletePriceRule(id: string): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('delete_price_rule', { id });
   }
 
   // ============ Roles ============

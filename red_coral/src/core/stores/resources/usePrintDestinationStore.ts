@@ -47,8 +47,9 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
     set({ isLoading: true, error: null });
     try {
       const destinations = await api.listPrintDestinations() as PrintDestinationEntity[];
-      destinations.sort((a, b) => a.name.localeCompare(b.name));
-      set({ items: destinations, isLoading: false, isLoaded: true });
+      const safeDestinations = destinations ?? [];
+      safeDestinations.sort((a, b) => a.name.localeCompare(b.name));
+      set({ items: safeDestinations, isLoading: false, isLoaded: true });
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to fetch print destinations';
       set({ error: errorMsg, isLoading: false });

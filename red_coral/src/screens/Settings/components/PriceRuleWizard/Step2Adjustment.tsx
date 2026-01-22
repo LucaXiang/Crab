@@ -1,0 +1,102 @@
+import React from 'react';
+import { Calculator, Percent, DollarSign } from 'lucide-react';
+import { useI18n } from '@/hooks/useI18n';
+import type { WizardState } from './index';
+import { FormSection, FormField, inputClass } from '../../forms/FormField';
+
+interface Step2AdjustmentProps {
+  state: WizardState;
+  updateState: (updates: Partial<WizardState>) => void;
+}
+
+export const Step2Adjustment: React.FC<Step2AdjustmentProps> = ({ state, updateState }) => {
+  const { t } = useI18n();
+
+  const isDiscount = state.rule_type === 'DISCOUNT';
+  const isPercentage = state.adjustment_type === 'PERCENTAGE';
+
+  return (
+    <FormSection title={t('settings.price_rule.wizard.step2_section')} icon={Calculator}>
+      <p className="text-sm text-gray-600 mb-6">
+        {t('settings.price_rule.wizard.step2_desc')}
+      </p>
+
+      {/* Adjustment Type Selection */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          {t('settings.price_rule.wizard.adjustment_type')}
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => updateState({ adjustment_type: 'PERCENTAGE' })}
+            className={`flex items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${
+              isPercentage
+                ? 'border-teal-500 bg-teal-50 text-teal-700'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            <Percent size={20} />
+            <span className="font-medium">{t('settings.price_rule.adjustment.percentage')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => updateState({ adjustment_type: 'FIXED_AMOUNT' })}
+            className={`flex items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${
+              !isPercentage
+                ? 'border-teal-500 bg-teal-50 text-teal-700'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            <DollarSign size={20} />
+            <span className="font-medium">{t('settings.price_rule.adjustment.fixed')}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Value Input */}
+      <FormField
+        label={isDiscount
+          ? t('settings.price_rule.wizard.discount_value')
+          : t('settings.price_rule.wizard.surcharge_value')}
+        required
+      >
+        <div className="relative">
+          <input
+            type="number"
+            min={1}
+            max={isPercentage ? 100 : undefined}
+            value={state.adjustment_value}
+            onChange={(e) => updateState({ adjustment_value: parseFloat(e.target.value) || 0 })}
+            className={`${inputClass} pr-12`}
+            placeholder={isPercentage ? '10' : '500'}
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">
+            {isPercentage ? '%' : '¥'}
+          </span>
+        </div>
+        <p className="mt-1.5 text-xs text-gray-500">
+          {isPercentage
+            ? t('settings.price_rule.wizard.percentage_hint')
+            : t('settings.price_rule.wizard.fixed_hint')}
+        </p>
+      </FormField>
+
+      {/* Preview */}
+      <div className="mt-6 p-4 bg-gray-50 rounded-xl">
+        <p className="text-sm text-gray-600">
+          <span className="font-medium">{t('settings.price_rule.wizard.preview')}: </span>
+          {isDiscount ? (
+            isPercentage
+              ? t('settings.price_rule.wizard.preview_discount_percent', { value: state.adjustment_value })
+              : t('settings.price_rule.wizard.preview_discount_fixed', { value: state.adjustment_value.toFixed(2) })
+          ) : (
+            isPercentage
+              ? t('settings.price_rule.wizard.preview_surcharge_percent', { value: state.adjustment_value })
+              : t('settings.price_rule.wizard.preview_surcharge_fixed', { value: state.adjustment_value.toFixed(2) })
+          )}
+        </p>
+      </div>
+    </FormSection>
+  );
+};

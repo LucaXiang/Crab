@@ -2,7 +2,7 @@ import React from 'react';
 import { OrderSummary } from '@/hooks/useHistoryOrderList';
 import { useI18n } from '@/hooks/useI18n';
 import { Search, Clock, ChevronRight, ArrowLeft } from 'lucide-react';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface HistorySidebarProps {
   orders: OrderSummary[];
@@ -73,7 +73,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
         )}
         {filteredOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center text-gray-400 gap-4">
-            <span className="text-sm">{t('history.noOrders')}</span>
+            <span className="text-sm">{t('history.no_orders')}</span>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
@@ -113,7 +113,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                           ? t('history.status.moved').toUpperCase()
                           : isMerged
                           ? t('history.status.merged').toUpperCase()
-                          : t('checkout.amount.paidStatus').toUpperCase()}
+                          : t('checkout.amount.paid_status').toUpperCase()}
                       </span>
                     </div>
                     <div className="text-xs text-gray-400 font-mono">
@@ -137,7 +137,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
           disabled={page >= totalPages || loading}
           className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-default flex items-center gap-2"
         >
-          <span>{page < totalPages ? t('history.loadMore') : t('history.noMore')}</span>
+          <span>{page < totalPages ? t('history.load_more') : t('history.no_more')}</span>
           {page < totalPages && <ChevronRight size={16} />}
         </button>
       </div>

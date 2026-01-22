@@ -20,7 +20,7 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({ data }) => {
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-w-0">
-      <h3 className="text-lg font-bold text-gray-800 mb-6">{t('statistics.topProducts')}</h3>
+      <h3 className="text-lg font-bold text-gray-800 mb-6">{t('statistics.top_products')}</h3>
       <div className="min-w-0">
         {data.length > 0 ? (
           <ResponsiveContainer width="100%" height={250}>
@@ -41,7 +41,7 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({ data }) => {
           </ResponsiveContainer>
         ) : (
           <div className="flex items-center justify-center h-full text-gray-400">
-            {t('common.empty.noData')}
+            {t('common.empty.no_data')}
           </div>
         )}
       </div>

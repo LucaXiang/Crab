@@ -88,7 +88,7 @@ export const TableFilters: React.FC<TableFiltersProps> = React.memo(
         />
         <FilterButton
           type="PRE_PAYMENT"
-          label={t("table.filter.prePayment")}
+          label={t("table.filter.pre_payment")}
           icon={Receipt}
           colorClass="bg-purple-500 text-white border-purple-500"
           count={stats.PRE_PAYMENT}

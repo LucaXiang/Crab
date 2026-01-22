@@ -23,7 +23,7 @@ export const ConfirmButton: React.FC<ConfirmButtonProps> = ({
         className="w-full h-11 rounded-xl bg-[#FF5E5E] text-white text-base font-bold flex items-center justify-center gap-2 hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-lg shadow-red-200 transition-all active:scale-[0.98]"
       >
         <CheckCircle size={18} />
-        {isOccupied ? t('table.confirmAdd') : t('table.confirmOpen')}
+        {isOccupied ? t('table.confirm_add') : t('table.confirm_open')}
       </button>
     </div>
   );

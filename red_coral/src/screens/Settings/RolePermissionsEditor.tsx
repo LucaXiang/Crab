@@ -127,7 +127,7 @@ export const RolePermissionsEditor: React.FC = () => {
       setRolePermissions(rolePerms);
     } catch (err) {
       console.error(err);
-      toast.error(t('settings.roles.message.loadFailed'));
+      toast.error(t('settings.roles.message.load_failed'));
     } finally {
       setLoading(false);
     }
@@ -163,10 +163,10 @@ export const RolePermissionsEditor: React.FC = () => {
           permissions: rolePermissions[role.name] || []
         });
       }
-      toast.success(t('common.message.saveSuccess'));
+      toast.success(t('common.message.save_success'));
     } catch (err) {
       console.error(err);
-      toast.error(t('common.message.saveFailed'));
+      toast.error(t('common.message.save_failed'));
     } finally {
       setLoading(false);
     }
@@ -174,13 +174,13 @@ export const RolePermissionsEditor: React.FC = () => {
 
   const handleCreateRole = async () => {
     if (!newRoleName || !newRoleDisplayName) {
-      toast.error(t('settings.roles.form.errorEmpty'));
+      toast.error(t('settings.roles.form.error_empty'));
       return;
     }
     
     // Validate role name (lowercase alphanumeric)
     if (!/^[a-z0-9_]+$/.test(newRoleName)) {
-      toast.error(t('settings.roles.form.errorFormat'));
+      toast.error(t('settings.roles.form.error_format'));
       return;
     }
 
@@ -194,7 +194,7 @@ export const RolePermissionsEditor: React.FC = () => {
           is_active: true
         }
       });
-      toast.success(t('settings.roles.form.createSuccess'));
+      toast.success(t('settings.roles.form.create_success'));
       setIsCreateModalOpen(false);
       setNewRoleName('');
       setNewRoleDisplayName('');
@@ -211,7 +211,7 @@ export const RolePermissionsEditor: React.FC = () => {
 
     try {
       await invokeApi('delete_role', { id: confirmDelete.roleId });
-      toast.success(t('settings.roles.form.deleteSuccess'));
+      toast.success(t('settings.roles.form.delete_success'));
       setConfirmDelete(null);
       loadData();
     } catch (err) {
@@ -295,7 +295,7 @@ export const RolePermissionsEditor: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-800 text-lg">{getRoleDisplayName(selectedRole)}</h3>
-                  <p className="text-xs text-gray-500">{selectedRole.description || t('settings.roles.form.noDescription')}</p>
+                  <p className="text-xs text-gray-500">{selectedRole.description || t('settings.roles.form.no_description')}</p>
                 </div>
               </div>
               
@@ -324,8 +324,8 @@ export const RolePermissionsEditor: React.FC = () => {
                 <div className="mb-6 p-4 bg-purple-50 border border-purple-100 rounded-lg text-purple-800 flex items-start gap-3">
                   <Info size={18} className="mt-0.5 shrink-0" />
                   <div>
-                    <p className="font-medium">{t('settings.roles.adminLock.title')}</p>
-                    <p className="text-sm opacity-80 mt-1">{t('settings.roles.adminLock.desc')}</p>
+                    <p className="font-medium">{t('settings.roles.admin_lock.title')}</p>
+                    <p className="text-sm opacity-80 mt-1">{t('settings.roles.admin_lock.desc')}</p>
                   </div>
                 </div>
               )}
@@ -379,7 +379,7 @@ export const RolePermissionsEditor: React.FC = () => {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
             <Shield size={48} className="mb-4 opacity-20" />
-            <p>{t('settings.roles.selectRole')}</p>
+            <p>{t('settings.roles.select_role')}</p>
           </div>
         )}
       </div>
@@ -398,10 +398,10 @@ export const RolePermissionsEditor: React.FC = () => {
                   type="text"
                   value={newRoleName}
                   onChange={(e) => setNewRoleName(e.target.value.toLowerCase())}
-                  placeholder={t('settings.roles.form.idPlaceholder')}
+                  placeholder={t('settings.roles.form.id_placeholder')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 />
-                <p className="text-xs text-gray-500 mt-1">{t('settings.roles.form.idHint')}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('settings.roles.form.id_hint')}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -411,7 +411,7 @@ export const RolePermissionsEditor: React.FC = () => {
                   type="text"
                   value={newRoleDisplayName}
                   onChange={(e) => setNewRoleDisplayName(e.target.value)}
-                  placeholder={t('settings.roles.form.namePlaceholder')}
+                  placeholder={t('settings.roles.form.name_placeholder')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 />
               </div>
@@ -422,7 +422,7 @@ export const RolePermissionsEditor: React.FC = () => {
                 <textarea
                   value={newRoleDesc}
                   onChange={(e) => setNewRoleDesc(e.target.value)}
-                  placeholder={t('settings.roles.form.descPlaceholder')}
+                  placeholder={t('settings.roles.form.desc_placeholder')}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none"
                 />
@@ -449,7 +449,7 @@ export const RolePermissionsEditor: React.FC = () => {
       {/* Delete Confirmation */}
       <ConfirmDialog
         isOpen={!!confirmDelete}
-        title={t('settings.roles.form.deleteTitle')}
+        title={t('settings.roles.form.delete_title')}
         description={t('roles.delete.confirm', { name: confirmDelete?.roleName ?? '' }) || `确定要删除角色 "${confirmDelete?.roleName}" 吗？此操作无法撤销，且会影响已分配该角色的用户。`}
         onConfirm={handleDeleteRole}
         onCancel={() => setConfirmDelete(null)}

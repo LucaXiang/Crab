@@ -150,7 +150,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-lg font-bold text-gray-800 leading-tight">
-              {t('checkout.tableOrder')} {order.zone_name }-{order.table_name}
+              {t('checkout.table_order')} {order.zone_name }-{order.table_name}
             </h1>
             <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
               <span>
@@ -165,10 +165,10 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
             <button
               onClick={() => setShowQuickAdd(true)}
               className="px-3 py-2 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 transition-colors flex items-center gap-1.5"
-              title={t('pos.quickAdd.title')}
+              title={t('pos.quick_add.title')}
             >
               <ShoppingBag size={18} />
-              <span className="text-sm font-bold">{t('pos.quickAdd.title')}</span>
+              <span className="text-sm font-bold">{t('pos.quick_add.title')}</span>
             </button>
 
             {onManage && !order.is_retail && (

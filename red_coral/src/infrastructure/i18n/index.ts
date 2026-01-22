@@ -4,10 +4,10 @@
  * Loads translations from JSON files with nested structure support
  */
 
-export type Locale = 'zh-CN' | 'en-US';
+export type Locale = 'zh-CN';
 
-// Supported locales
-export const SUPPORTED_LOCALES = ['zh-CN', 'en-US'] as const;
+// Supported locales (en-US disabled for now)
+export const SUPPORTED_LOCALES = ['zh-CN'] as const;
 export type SupportedLocale = typeof SUPPORTED_LOCALES[number];
 
 // Default locale
@@ -19,7 +19,6 @@ let currentLocale: Locale = DEFAULT_LOCALE;
 // Flattened translations for quick lookup (loaded from JSON)
 const flattenedTranslations: Record<Locale, Record<string, string>> = {
   'zh-CN': {},
-  'en-US': {},
 };
 
 // Subscribers for locale changes
@@ -58,7 +57,6 @@ async function loadTranslations(): Promise<void> {
   } catch (error) {
     console.error('Failed to load translations:', error);
     flattenedTranslations['zh-CN'] = {};
-    flattenedTranslations['en-US'] = {};
   }
 }
 
@@ -98,12 +96,8 @@ export function initLocale(): void {
     return;
   }
 
-  const browserLang = navigator.language;
-  if (browserLang.startsWith('zh')) {
-    currentLocale = 'zh-CN';
-  } else {
-    currentLocale = 'en-US';
-  }
+  // Only zh-CN is supported for now
+  currentLocale = 'zh-CN';
 }
 
 /**

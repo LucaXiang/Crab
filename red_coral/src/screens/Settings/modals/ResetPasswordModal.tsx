@@ -29,26 +29,26 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
 
     // Validation
     if (!newPassword) {
-      toast.error(t("settings.user.form.passwordRequired"));
+      toast.error(t("settings.user.form.password_required"));
       return;
     }
     if (newPassword.length < 6) {
-      toast.error(t("settings.user.form.passwordTooShort"));
+      toast.error(t("settings.user.form.password_too_short"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error(t("settings.user.form.passwordMismatch"));
+      toast.error(t("settings.user.form.password_mismatch"));
       return;
     }
 
     setIsSubmitting(true);
     try {
       await resetPassword(user.id, newPassword);
-      toast.success(t("settings.user.message.resetPasswordSuccess"));
+      toast.success(t("settings.user.message.reset_password_success"));
       onClose();
     } catch (error: any) {
       console.error('Reset password error:', error);
-      toast.error(error || t("settings.user.message.resetPasswordFailed"));
+      toast.error(error || t("settings.user.message.reset_password_failed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -67,7 +67,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-bold text-gray-900">
-                {t('settings.resetPassword')}
+                {t('settings.reset_password')}
               </h2>
               <p className="text-sm text-gray-500">{user.display_name} (@{user.username})</p>
             </div>
@@ -87,7 +87,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <div className="flex items-center gap-2">
                 <Key size={14} />
-                <span>{t('settings.newPassword')}</span>
+                <span>{t('settings.new_password')}</span>
                 <span className="text-red-500">*</span>
               </div>
             </label>
@@ -97,7 +97,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 pr-10"
-                placeholder={t('settings.enterNewPassword')}
+                placeholder={t('settings.enter_new_password')}
               />
               <button
                 type="button"
@@ -112,7 +112,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              {t('settings.passwordMinLength')}
+              {t('settings.password_min_length')}
             </p>
           </div>
 
@@ -121,7 +121,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <div className="flex items-center gap-2">
                 <Key size={14} />
-                <span>{t('settings.confirmPassword')}</span>
+                <span>{t('settings.confirm_password')}</span>
                 <span className="text-red-500">*</span>
               </div>
             </label>
@@ -130,14 +130,14 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-              placeholder={t('settings.confirmPasswordPlaceholder')}
+              placeholder={t('settings.confirm_password_placeholder')}
             />
           </div>
 
           {/* Warning */}
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
             <p className="text-xs text-orange-700">
-              {t('settings.resetPasswordWarning')}
+              {t('settings.reset_password_warning')}
             </p>
           </div>
 

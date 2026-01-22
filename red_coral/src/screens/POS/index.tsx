@@ -268,13 +268,58 @@ export const POSScreen: React.FC = () => {
     async (product: Product, startRect?: DOMRect, skipQuickAdd: boolean = false) => {
       // Check if product has attributes or specifications
       try {
-        const productAttributes = await api.fetchProductAttributes(String(product.id));
+        // Use getProductFull to get complete product data including full attribute details
+        const productFull = await api.getProductFull(String(product.id));
+        const attrBindings = productFull?.attributes || [];
 
-        // Build options map from product attributes (need to fetch each attribute's options)
+        // Build set of product attribute IDs for deduplication
+        const productAttrIds = new Set(attrBindings.map(b => String(b.attribute.id)));
+
+        // Fetch category attributes (inherited)
+        let categoryAttributes: AttributeTemplate[] = [];
+        if (productFull.category) {
+          try {
+            categoryAttributes = await api.listCategoryAttributes(productFull.category);
+            // Filter out duplicates (product-level binding takes precedence)
+            categoryAttributes = categoryAttributes.filter(
+              attr => !productAttrIds.has(String(attr.id))
+            );
+          } catch (err) {
+            console.warn('Failed to load category attributes:', err);
+          }
+        }
+
+        // Extract attributes from product bindings
+        const productAttributeList: AttributeTemplate[] = attrBindings.map(binding => binding.attribute);
+        // Merge: product attributes first, then category attributes (inherited)
+        const attributeList: AttributeTemplate[] = [...productAttributeList, ...categoryAttributes];
+
+        // Build options map from all attributes
         const optionsMap = new Map<string, AttributeOption[]>();
-        // Note: ProductAttribute bindings don't include options directly,
-        // options are embedded in the Attribute itself. For now, we'll leave optionsMap empty
-        // and let ProductOptionsModal fetch options as needed.
+        attributeList.forEach(attr => {
+          if (attr.options && attr.options.length > 0) {
+            optionsMap.set(String(attr.id), attr.options);
+          }
+        });
+
+        // Build bindings including category attributes
+        const productBindings: ProductAttribute[] = attrBindings.map(binding => ({
+          id: binding.id,
+          from: String(product.id),
+          to: String(binding.attribute.id),
+          is_required: binding.is_required,
+          display_order: binding.display_order,
+          attribute: binding.attribute,
+        }));
+        const categoryBindings: ProductAttribute[] = categoryAttributes.map((attr, idx) => ({
+          id: null,
+          from: productFull.category,
+          to: String(attr.id),
+          is_required: false, // Category attributes are optional by default
+          display_order: 1000 + idx,
+          attribute: attr,
+        }));
+        const allBindings = [...productBindings, ...categoryBindings];
 
         // Specs are now embedded in Product (EmbeddedSpec[])
         const hasMultiSpec = product.specs.length > 1;
@@ -291,9 +336,9 @@ export const POSScreen: React.FC = () => {
                 product,
                 basePrice,
                 startRect,
-                attributes: [], // Attributes will be fetched by modal if needed
+                attributes: attributeList,
                 options: optionsMap,
-                bindings: productAttributes,
+                bindings: allBindings,
                 specifications,
                 hasMultiSpec,
             });
@@ -316,9 +361,9 @@ export const POSScreen: React.FC = () => {
                     product,
                     basePrice,
                     startRect,
-                    attributes: [], // Attributes will be fetched by modal if needed
+                    attributes: attributeList,
                     options: optionsMap,
-                    bindings: productAttributes,
+                    bindings: allBindings,
                     specifications,
                     hasMultiSpec,
                 });
@@ -328,16 +373,15 @@ export const POSScreen: React.FC = () => {
             // If default spec exists, we continue to check attributes
         }
 
-        if (hasMultiSpec || productAttributes.length > 0) {
+        if (hasMultiSpec || allBindings.length > 0) {
           // Has specifications or attributes -> Open Modal for selection
-          // Quick add logic requires fetching full attribute details which we skip for simplicity
           setSelectedProductForOptions({
             product,
             basePrice,
             startRect,
-            attributes: [], // Modal will fetch attributes as needed
+            attributes: attributeList,
             options: optionsMap,
-            bindings: productAttributes,
+            bindings: allBindings,
             specifications,
             hasMultiSpec,
           });
@@ -349,7 +393,7 @@ export const POSScreen: React.FC = () => {
         // (Fall through to outside try/catch)
 
       } catch (error) {
-        console.error('Failed to fetch product attributes:', error);
+        console.error('Failed to fetch product data:', error);
         // Continue with normal add if fetch fails
       }
 
@@ -423,10 +467,10 @@ export const POSScreen: React.FC = () => {
     try {
       const { openCashDrawer } = await import('@/infrastructure/print/printService');
       await openCashDrawer(selectedPrinter || undefined);
-      toast.success(t('app.action.cashDrawerOpened'));
+      toast.success(t('app.action.cash_drawer_opened'));
     } catch (error) {
       console.error('Failed to open cash drawer:', error);
-      toast.error(t('app.action.cashDrawerFailed'));
+      toast.error(t('app.action.cash_drawer_failed'));
     }
   }, [t, selectedPrinter]);
 

@@ -11,8 +11,9 @@ pub type ProductId = Thing;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbeddedSpec {
     pub name: String,
+    /// Price in currency unit (e.g., 10.50 = ¥10.50)
     #[serde(default)]
-    pub price: i64,
+    pub price: f64,
     #[serde(default)]
     pub display_order: i32,
     #[serde(default)]
@@ -90,7 +91,8 @@ pub struct ProductCreate {
     pub image: Option<String>,
     #[serde(with = "serde_thing")]
     pub category: Thing,
-    pub price: Option<i64>,
+    /// Price in currency unit (e.g., 10.50 = ¥10.50)
+    pub price: Option<f64>,
     pub sort_order: Option<i32>,
     pub tax_rate: Option<i32>,
     pub receipt_name: Option<String>,

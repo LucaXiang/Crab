@@ -79,7 +79,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   const handleConfirmFullCash = useCallback(
     async (tenderedAmount: number) => {
       if (Currency.lt(tenderedAmount, remaining)) {
-        toast.error(t('settings.payment.amountInsufficient'));
+        toast.error(t('settings.payment.amount_insufficient'));
         return;
       }
 
@@ -110,7 +110,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           onClose: handleComplete,
           onPrint: is_retail ? async () => {
             await printOrderReceipt(completed);
-            toast.success(t('settings.payment.receiptPrintSuccess'));
+            toast.success(t('settings.payment.receipt_print_success'));
           } : undefined,
           autoCloseDelay: is_retail ? 0 : 10000,
         });
@@ -129,7 +129,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
    */
   const handleFullCardPayment = useCallback(async () => {
     if (Currency.lte(remaining, 0)) {
-      toast.error(t('settings.payment.amountMustBePositive'));
+      toast.error(t('settings.payment.amount_must_be_positive'));
       return;
     }
 
@@ -151,7 +151,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         onClose: handleComplete,
         onPrint: is_retail ? async () => {
           await printOrderReceipt(completed);
-          toast.success(t('settings.payment.receiptPrintSuccess'));
+          toast.success(t('settings.payment.receipt_print_success'));
         } : undefined,
         autoCloseDelay: is_retail ? 0 : 5000,
       });
@@ -191,10 +191,10 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
       currentOrder.is_pre_payment = true;
       await printOrderReceipt(currentOrder);
-      toast.success(t('settings.payment.receiptPrintSuccess'));
+      toast.success(t('settings.payment.receipt_print_success'));
     } catch (error) {
       console.error('Pre-payment print failed:', error);
-      toast.error(t('settings.payment.receiptPrintFailed'));
+      toast.error(t('settings.payment.receipt_print_failed'));
     }
   }, [order, onUpdateOrder, t]);
 
@@ -212,7 +212,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           return {
             instance_id: instanceId,
             quantity: qty,
-            name: originalItem?.name || t('common.label.unknownItem'),
+            name: originalItem?.name || t('common.label.unknown_item'),
             price: originalItem?.price || 0,
           };
         });
@@ -264,7 +264,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                 onClose: handleComplete,
                 onPrint: is_retail ? async () => {
                   await printOrderReceipt(completed);
-                  toast.success(t('settings.payment.receiptPrintSuccess'));
+                  toast.success(t('settings.payment.receipt_print_success'));
                 } : undefined,
                 autoCloseDelay: is_retail ? 0 : 10000,
               });
@@ -275,7 +275,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                 onClose: handleComplete,
                 onPrint: is_retail ? async () => {
                   await printOrderReceipt(completed);
-                  toast.success(t('settings.payment.receiptPrintSuccess'));
+                  toast.success(t('settings.payment.receipt_print_success'));
                 } : undefined,
                 autoCloseDelay: is_retail ? 0 : 5000,
               });
@@ -433,7 +433,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                   className="flex items-center justify-center gap-3 py-4 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
                 >
                   <Banknote size={24} />
-                  {t('checkout.split.payCash')}
+                  {t('checkout.split.pay_cash')}
                 </button>
                 <button
                   onClick={() => handleSplitPayment('CARD')}
@@ -441,7 +441,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                   className="flex items-center justify-center gap-3 py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
                 >
                   <CreditCard size={24} />
-                  {t('checkout.split.payCard')}
+                  {t('checkout.split.pay_card')}
                 </button>
               </div>
             </div>
@@ -488,7 +488,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                       `}
                     >
                       <Utensils size={16} />
-                      {t('checkout.orderType.dineIn')}
+                      {t('checkout.order_type.dine_in')}
                     </button>
                     <button
                       onClick={() => setRetailServiceType('takeout')}
@@ -500,14 +500,14 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                       `}
                     >
                       <ShoppingBag size={16} />
-                      {t('checkout.orderType.takeout')}
+                      {t('checkout.order_type.takeout')}
                     </button>
                   </div>
                 )}
                 {!order.is_retail && (
                   <button onClick={handlePrintPrePayment} className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-medium transition-colors flex items-center gap-2">
                     <Printer size={20} />
-                    {t('checkout.prePayment.receipt')}
+                    {t('checkout.pre_payment.receipt')}
                   </button>
                 )}
                 {onVoid && !order.is_retail && (
@@ -554,12 +554,12 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
             <button onClick={handleFullCashPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
               <Coins size={48} />
               <div className="text-2xl font-bold">{t('checkout.method.cash')}</div>
-              <div className="text-sm opacity-90">{t('checkout.method.cashDesc')}</div>
+              <div className="text-sm opacity-90">{t('checkout.method.cash_desc')}</div>
             </button>
             <button onClick={handleFullCardPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
               <CreditCard size={48} />
               <div className="text-2xl font-bold">{t('checkout.method.card')}</div>
-              <div className="text-sm opacity-90">{t('checkout.method.cardDesc')}</div>
+              <div className="text-sm opacity-90">{t('checkout.method.card_desc')}</div>
             </button>
             <button onClick={() => setMode('ITEM_SPLIT')} disabled={isPaidInFull || isProcessing} className="h-40 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
               <Split size={48} />

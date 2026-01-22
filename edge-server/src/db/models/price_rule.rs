@@ -66,8 +66,8 @@ pub struct PriceRule {
     /// Zone scope: -1=all, 0=retail, >0=specific zone
     pub zone_scope: i32,
     pub adjustment_type: AdjustmentType,
-    /// Adjustment value (percentage: 30=30%, fixed: cents)
-    pub adjustment_value: i32,
+    /// Adjustment value (percentage: 30=30%, fixed: amount in currency unit e.g. 5.00)
+    pub adjustment_value: f64,
     #[serde(default)]
     pub priority: i32,
     #[serde(default, deserialize_with = "serde_helpers::bool_false")]
@@ -117,7 +117,7 @@ pub struct PriceRuleCreate {
     pub target: Option<Thing>,
     pub zone_scope: Option<i32>,
     pub adjustment_type: AdjustmentType,
-    pub adjustment_value: i32,
+    pub adjustment_value: f64,
     pub priority: Option<i32>,
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
@@ -151,7 +151,7 @@ pub struct PriceRuleUpdate {
     pub target: Option<Thing>,
     pub zone_scope: Option<i32>,
     pub adjustment_type: Option<AdjustmentType>,
-    pub adjustment_value: Option<i32>,
+    pub adjustment_value: Option<f64>,
     pub priority: Option<i32>,
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)

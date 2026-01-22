@@ -71,7 +71,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         <EscalatableGate 
           permission={Permission.OPEN_CASH_DRAWER}
           mode="intercept"
-          description={t('app.action.openCashDrawer')}
+          description={t('app.action.open_cash_drawer')}
           onAuthorized={onOpenCashDrawer}
         >
           <IconBtn icon={Archive} onClick={onOpenCashDrawer} onMouseDown={(e) => e.preventDefault()} />

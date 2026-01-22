@@ -2,7 +2,7 @@ import React from 'react';
 import { Euro, ShoppingCart, Users, CreditCard, Banknote, TrendingUp, Ban, Tag, Clock, UserCheck } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { OverviewStats, TimeRange } from '@/core/domain/types';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface StatsCardsProps {
   overview: OverviewStats;
@@ -70,7 +70,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
         <div className="text-2xl font-bold text-gray-800 mb-1">
           {formatCurrency(overview.average_order_value)}
         </div>
-        <div className="text-sm text-gray-500">{t("statistics.metric.avgOrderValue")}</div>
+        <div className="text-sm text-gray-500">{t("statistics.metric.avg_order_value")}</div>
       </div>
 
       {/* 5. Cash Revenue */}

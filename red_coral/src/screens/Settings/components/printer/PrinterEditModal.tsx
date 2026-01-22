@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Printer, Edit2, Plus, Save, X } from 'lucide-react';
+import { Printer, X } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
+import { FormField, FormSection, inputClass, selectClass } from '../../forms/FormField';
 
 interface PrinterFormData {
   name: string;
@@ -39,62 +40,75 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100">
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-          <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            {initialData ? <Edit2 size={18} className="text-blue-500" /> : <Plus size={18} className="text-blue-500" />}
-            {initialData ? (t('settings.printer.kitchenStation.editStation')) : (t('settings.printer.kitchenStation.addStation'))}
-          </h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4">
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">{t('common.label.name')}</label>
-            <input
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white"
-              placeholder={t('common.hint.namePlaceholder')}
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
-              autoFocus
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">{t('settings.printer.form.targetPrinter')}</label>
-            <div className="relative">
-              <select
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white appearance-none"
-                value={formData.printerName}
-                onChange={e => setFormData({ ...formData, printerName: e.target.value })}
-              >
-                <option value="">{t('settings.printer.form.selectSystemPrinter')}</option>
-                {systemPrinters.map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-              <Printer className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">{t('common.label.description')}</label>
-            <input
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all bg-gray-50 focus:bg-white"
-              placeholder={t('common.hint.descriptionPlaceholder')}
-              value={formData.description}
-              onChange={e => setFormData({ ...formData, description: e.target.value })}
-            />
+    <div
+      className="fixed inset-0 z-80 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-50 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200 bg-white">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-gray-900">
+              {initialData
+                ? t('settings.printer.kitchen_station.edit_station')
+                : t('settings.printer.kitchen_station.add_station')}
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+            >
+              <X size={18} className="text-gray-500" />
+            </button>
           </div>
         </div>
 
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        {/* Content */}
+        <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          <FormSection title={t('settings.attribute.section.basic')} icon={Printer}>
+            <FormField label={t('common.label.name')} required>
+              <input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder={t('common.hint.name_placeholder')}
+                className={inputClass}
+                autoFocus
+              />
+            </FormField>
+
+            <FormField label={t('settings.printer.form.target_printer')} required>
+              <div className="relative">
+                <select
+                  value={formData.printerName}
+                  onChange={(e) => setFormData({ ...formData, printerName: e.target.value })}
+                  className={selectClass}
+                >
+                  <option value="">{t('settings.printer.form.select_system_printer')}</option>
+                  {systemPrinters.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+            </FormField>
+
+            <FormField label={t('common.label.description')}>
+              <input
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder={t('common.hint.description_placeholder')}
+                className={inputClass}
+              />
+            </FormField>
+          </FormSection>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-200 bg-white flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-xl transition-colors"
+            className="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors"
           >
             {t('common.action.cancel')}
           </button>
@@ -105,9 +119,8 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
               }
             }}
             disabled={!formData.name}
-            className="px-4 py-2 text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center gap-2 disabled:opacity-50 disabled:shadow-none"
+            className="px-5 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors shadow-lg shadow-teal-600/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
           >
-            <Save size={16} />
             {t('common.action.save')}
           </button>
         </div>

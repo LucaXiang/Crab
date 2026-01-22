@@ -46,13 +46,13 @@ export function useFormSubmit<T extends Record<string, any>>(
         // Update mode
         await onUpdate(formData);
         toast.success(
-          successMessage?.update || t('settings.user.message.updateSuccess')
+          successMessage?.update || t('settings.user.message.update_success')
         );
       } else {
         // Create mode
         await onCreate(formData);
         toast.success(
-          successMessage?.create || t('settings.user.message.updateSuccess')
+          successMessage?.create || t('settings.user.message.update_success')
         );
       }
 
@@ -60,7 +60,7 @@ export function useFormSubmit<T extends Record<string, any>>(
       onSuccess?.();
     } catch (error: any) {
       console.error('Form submission error:', error);
-      const errorMessage = error.message || t('settings.user.message.updateFailed');
+      const errorMessage = error.message || t('settings.user.message.update_failed');
       toast.error(errorMessage);
     }
   };

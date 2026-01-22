@@ -23,10 +23,18 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
 
   const handleSave = async (data: { name: string; printerName: string; description: string }) => {
     try {
+      // Build printers array from printerName (system driver printer)
+      const printers = data.printerName ? [{
+        printer_type: 'driver' as const,
+        driver_name: data.printerName,
+        priority: 1,
+        is_active: true,
+      }] : [];
+
       if (editingItem) {
-        await update(editingItem.id, { name: data.name, description: data.description });
+        await update(editingItem.id, { name: data.name, description: data.description, printers });
       } else {
-        await create({ name: data.name, description: data.description });
+        await create({ name: data.name, description: data.description, printers });
       }
       setModalOpen(false);
       setEditingItem(null);
@@ -40,8 +48,15 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
     setModalOpen(true);
   };
 
-  const openEdit = (item: { id: string; name?: string; description?: string }) => {
-    setEditingItem({ id: item.id, name: item.name, description: item.description });
+  const openEdit = (item: typeof items[0]) => {
+    // Extract printerName from existing printers array
+    const activePrinter = item.printers?.find(p => p.is_active && p.printer_type === 'driver');
+    setEditingItem({
+      id: item.id!,
+      name: item.name,
+      printerName: activePrinter?.driver_name,
+      description: item.description,
+    });
     setModalOpen(true);
   };
 
@@ -66,7 +81,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
-          {t('settings.printer.kitchenStation.title')}
+          {t('settings.printer.kitchen_station.title')}
           <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
             {items.length}
           </span>
@@ -76,7 +91,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
           className="flex items-center gap-1.5 text-xs font-bold bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-black transition-all shadow-md active:scale-95"
         >
           <Plus size={14} />
-          {t('settings.printer.kitchenStation.addStation')}
+          {t('settings.printer.kitchen_station.add_station')}
         </button>
       </div>
 
@@ -108,7 +123,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
                   <div>
                     <div className="font-bold text-sm text-gray-900">{dest.name}</div>
                     <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">
-                       {dest.description || (t('settings.printer.kitchenStation.defaultName'))}
+                       {dest.description || (t('settings.printer.kitchen_station.default_name'))}
                     </div>
                   </div>
                 </div>
@@ -116,7 +131,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
                 <div className="bg-gray-50 rounded-lg px-3 py-2 flex items-center gap-2 text-xs border border-gray-100">
                   <Printer size={12} className={printerDisplay ? "text-gray-500" : "text-red-400"} />
                   <span className={`font-medium ${printerDisplay ? "text-gray-700" : "text-red-500"}`}>
-                    {printerDisplay || (t('settings.printer.message.noPrinter'))}
+                    {printerDisplay || (t('settings.printer.message.no_printer'))}
                   </span>
                 </div>
               </div>
@@ -133,7 +148,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
                <Plus size={24} className="text-gray-400 group-hover:text-blue-500" />
             </div>
             <p className="text-sm text-gray-500 font-medium group-hover:text-blue-600">
-              {t('settings.printer.kitchenStation.noData')}
+              {t('settings.printer.kitchen_station.no_data')}
             </p>
           </div>
         )}

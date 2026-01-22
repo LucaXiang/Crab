@@ -88,7 +88,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             onSuccess(selectedTargetTable.id as string);
         } catch (err) {
             console.error('Merge failed:', err);
-            toast.error(t('checkout.error.mergeFailed'));
+            toast.error(t('checkout.error.merge_failed'));
         }
     };
 
@@ -109,7 +109,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             onSuccess(selectedTargetTable.id as string);
         } catch (err) {
             console.error('Move failed:', err);
-            toast.error(t('checkout.error.moveFailed'));
+            toast.error(t('checkout.error.move_failed'));
         }
     };
 
@@ -123,7 +123,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                 return {
                     instance_id: instanceId,
                     quantity: qty,
-                    name: originalItem?.name || t('common.label.unknownItem'),
+                    name: originalItem?.name || t('common.label.unknown_item'),
                     price: originalItem?.price || 0
                 };
             });
@@ -255,7 +255,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                             className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
                         >
                             <Banknote size={18} />
-                            {t('checkout.split.payCash')}
+                            {t('checkout.split.pay_cash')}
                         </button>
                         <button
                             onClick={() => handleSplitPayment('CARD')}
@@ -263,7 +263,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                             className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
                         >
                             <CreditCard size={18} />
-                            {t('checkout.split.payCard')}
+                            {t('checkout.split.pay_card')}
                         </button>
                     </div>
                 </div>
@@ -276,14 +276,14 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             {hasPayments && (
                 <div className="col-span-2 bg-red-50 border border-red-100 text-red-600 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2">
                     <X size={14} />
-                    {t('table.warning.cannotMoveWithPayments')}
+                    {t('table.warning.cannot_move_with_payments')}
                 </div>
             )}
 
             <EscalatableGate
                 permission={Permission.MERGE_BILL}
                 mode="intercept"
-                description={t('table.authRequired.merge')}
+                description={t('table.auth_required.merge')}
                 onAuthorized={() => setMode('MERGE')}
             >
                 <button
@@ -299,7 +299,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                     </div>
                     <div>
                         <div className="font-bold text-gray-800 text-base mb-0.5">{t('table.action.merge')}</div>
-                        <div className="text-xs text-gray-500 font-medium">{t('table.combineDescription')}</div>
+                        <div className="text-xs text-gray-500 font-medium">{t('table.combine_description')}</div>
                     </div>
                 </button>
             </EscalatableGate>
@@ -307,7 +307,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             <EscalatableGate
                 permission={Permission.TRANSFER_TABLE}
                 mode="intercept"
-                description={t('table.authRequired.move')}
+                description={t('table.auth_required.move')}
                 onAuthorized={() => setMode('MOVE')}
             >
                 <button
@@ -340,7 +340,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             <div className="flex-1 flex flex-col bg-white">
                 <div className="p-3 bg-white border-b border-gray-100 flex justify-between items-center shadow-sm z-10">
                     <h3 className="font-bold text-gray-800 text-base">
-                        {mode === 'MERGE' ? t('table.action.merge') : t('table.action.move')} - {t('table.selectTarget')}
+                        {mode === 'MERGE' ? t('table.action.merge') : t('table.action.move')} - {t('table.select_target')}
                     </h3>
                     <button onClick={() => { setMode('MENU'); setSelectedTargetTable(null); }} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all">
                         <ArrowLeft size={14} /> {t('common.action.back')}
@@ -352,7 +352,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                             <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
                                 <LayoutGrid size={24} className="opacity-50" />
                             </div>
-                            <p className="text-sm font-medium">{t('table.noTables')}</p>
+                            <p className="text-sm font-medium">{t('table.no_tables')}</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">

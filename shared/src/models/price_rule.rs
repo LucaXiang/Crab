@@ -64,8 +64,8 @@ pub struct PriceRule {
     /// Zone scope: -1=all, 0=retail, >0=specific zone
     pub zone_scope: i32,
     pub adjustment_type: AdjustmentType,
-    /// Adjustment value (percentage: 30=30%, fixed: cents)
-    pub adjustment_value: i32,
+    /// Adjustment value (percentage: 30=30%, fixed: currency unit e.g. 5.00 = ¥5.00)
+    pub adjustment_value: f64,
     pub priority: i32,
     pub is_stackable: bool,
     /// Whether this rule is exclusive (cannot be combined with other rules)
@@ -109,7 +109,8 @@ pub struct PriceRuleCreate {
     pub target: Option<String>,
     pub zone_scope: Option<i32>,
     pub adjustment_type: AdjustmentType,
-    pub adjustment_value: i32,
+    /// Adjustment value (percentage: 30=30%, fixed: currency unit e.g. 5.00 = ¥5.00)
+    pub adjustment_value: f64,
     pub priority: Option<i32>,
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
@@ -143,7 +144,8 @@ pub struct PriceRuleUpdate {
     pub target: Option<String>,
     pub zone_scope: Option<i32>,
     pub adjustment_type: Option<AdjustmentType>,
-    pub adjustment_value: Option<i32>,
+    /// Adjustment value (percentage: 30=30%, fixed: currency unit e.g. 5.00 = ¥5.00)
+    pub adjustment_value: Option<f64>,
     pub priority: Option<i32>,
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
@@ -182,7 +184,7 @@ mod tests {
             target: None,
             zone_scope: -1,
             adjustment_type: AdjustmentType::Percentage,
-            adjustment_value: 10,
+            adjustment_value: 10.0,
             priority: 0,
             is_stackable: true,
             is_exclusive: false,

@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronRight,
   Menu,
+  Percent,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useSettingsCategory, useSettingsStore } from '@/core/stores/settings/useSettingsStore';
@@ -23,7 +24,7 @@ import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
 import { usePermission } from '@/hooks/usePermission';
 
-type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS';
+type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS';
 
 interface SettingsSidebarProps {
   onBack: () => void;
@@ -192,6 +193,13 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
                       label={t('settings.attribute.title')}
                     />
                   </ProtectedGate>
+                  <ProtectedGate permission={Permission.SYSTEM_SETTINGS}>
+                    <CategoryItem
+                      category="PRICE_RULES"
+                      icon={Percent}
+                      label={t('settings.price_rule.title')}
+                    />
+                  </ProtectedGate>
                 </CollapsibleGroup>
               )}
 
@@ -218,7 +226,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
                   <CategoryItem
                     category="DATA_TRANSFER"
                     icon={Database}
-                    label={t('settings.dataTransfer.title')}
+                    label={t('settings.data_transfer.title')}
                   />
                 </ProtectedGate>
               </div>

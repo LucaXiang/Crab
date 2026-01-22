@@ -32,7 +32,7 @@ export const CartFooterActions = React.memo<CartFooterActionsProps>(({
             className="flex-1 hover:bg-gray-50 transition-colors flex flex-col items-center justify-center gap-0.5 pt-1"
           >
             <List size={18} className="text-gray-500" />
-            <span className="text-xs">{t('pos.sidebar.getOrder')} ({heldOrdersCount})</span>
+            <span className="text-xs">{t('pos.sidebar.get_order')} ({heldOrdersCount})</span>
           </button>
           <button
             onClick={onRestoreDraft}
@@ -42,7 +42,7 @@ export const CartFooterActions = React.memo<CartFooterActionsProps>(({
             }`}
           >
             <RotateCcw size={18} />
-            <span className="text-xs">{draftOrdersCount > 0 ? `${t('pos.sidebar.drafts')} (${draftOrdersCount})` : t('pos.sidebar.noDrafts')}</span>
+            <span className="text-xs">{draftOrdersCount > 0 ? `${t('pos.sidebar.drafts')} (${draftOrdersCount})` : t('pos.sidebar.no_drafts')}</span>
           </button>
         </>
       ) : (

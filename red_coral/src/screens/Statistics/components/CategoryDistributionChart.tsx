@@ -36,7 +36,7 @@ export const CategoryDistributionChart: React.FC<CategoryDistributionChartProps>
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-w-0">
-      <h3 className="text-lg font-bold text-gray-800 mb-6">{t("statistics.chart.salesByCategory")}</h3>
+      <h3 className="text-lg font-bold text-gray-800 mb-6">{t("statistics.chart.sales_by_category")}</h3>
       <div className="min-w-0">
         {data.length > 0 ? (
           <ResponsiveContainer width="100%" height={300}>
@@ -61,7 +61,7 @@ export const CategoryDistributionChart: React.FC<CategoryDistributionChartProps>
           </ResponsiveContainer>
         ) : (
           <div className="flex items-center justify-center h-full text-gray-400">
-            {t('common.empty.noData')}
+            {t('common.empty.no_data')}
           </div>
         )}
       </div>

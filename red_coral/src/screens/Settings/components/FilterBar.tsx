@@ -38,7 +38,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   children
 }) => {
   const { t } = useI18n();
-  const placeholder = searchPlaceholder || t('common.hint.searchPlaceholder');
+  const placeholder = searchPlaceholder || t('common.hint.search_placeholder');
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">

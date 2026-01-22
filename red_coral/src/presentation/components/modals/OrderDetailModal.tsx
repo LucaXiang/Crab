@@ -23,7 +23,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
   const handleReprint = () => {
     // TODO: Implement reprint logic or connect to printer service
-    toast.success(t('common.message.sentToPrinter'));
+    toast.success(t('common.message.sent_to_printer'));
   };
 
   if (loading) {
@@ -67,7 +67,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                  />
              ) : (
                  <div className="flex items-center justify-center h-full text-gray-400">
-                     {error ? error : t('history.info.selectOrder')}
+                     {error ? error : t('history.info.select_order')}
                  </div>
              )}
         </div>

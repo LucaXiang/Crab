@@ -29,7 +29,7 @@ export const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({ name, en
         <AlertTriangle size={28} className="text-red-600" />
       </div>
       <h3 className="text-lg font-semibold text-gray-900 mb-2">
-        {t('common.dialog.confirmDelete')}
+        {t('common.dialog.confirm_delete')}
       </h3>
       <p className="text-sm text-gray-500 max-w-sm">
         {getDescription()}

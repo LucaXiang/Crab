@@ -6,8 +6,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbeddedSpec {
     pub name: String,
+    /// Price in currency unit (e.g., 10.50 = ¥10.50)
     #[serde(default)]
-    pub price: i64,
+    pub price: f64,
     #[serde(default)]
     pub display_order: i32,
     #[serde(default)]

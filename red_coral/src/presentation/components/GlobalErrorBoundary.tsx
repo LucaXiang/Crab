@@ -89,7 +89,7 @@ const ErrorBoundaryUI = ({
 
           {autoReloading && (
             <p className="text-sm text-gray-400 animate-pulse">
-              {t('error.action.autoReload')}
+              {t('error.action.auto_reload')}
             </p>
           )}
         </div>
@@ -101,7 +101,7 @@ const ErrorBoundaryUI = ({
             className="flex items-center justify-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors w-full py-2"
           >
             {showDetails ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            <span>{t('error.action.viewDetails')}</span>
+            <span>{t('error.action.view_details')}</span>
           </button>
 
           <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showDetails ? 'max-h-[500px] opacity-100 mt-4' : 'max-h-0 opacity-0'}`}>
@@ -110,7 +110,7 @@ const ErrorBoundaryUI = ({
                 <button 
                   onClick={copyError}
                   className="p-1.5 hover:bg-white rounded-md text-gray-400 hover:text-gray-600 transition-colors shadow-sm"
-                  title={t('error.action.copyDetails')}
+                  title={t('error.action.copy_details')}
                 >
                   {copied ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}
                 </button>

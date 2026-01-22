@@ -18,7 +18,7 @@ export const TimelinePreview: React.FC<TimelinePreviewProps> = ({
 
   const isAddingItems = cart.length > 0;
   const color = isAddingItems ? '#F97316' : '#3B82F6';
-  const title = isAddingItems ? t('table.addItems') : t('table.openTable');
+  const title = isAddingItems ? t('table.add_items') : t('table.open_table');
   const Icon = isAddingItems ? ShoppingBag : Utensils;
   const time = new Date().toLocaleTimeString([], {
     hour: '2-digit',

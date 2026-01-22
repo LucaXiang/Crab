@@ -4,7 +4,7 @@ import { SalesReportItem, TimeRange } from '@/core/domain/types';
 import { toast } from '@/presentation/components/Toast';
 import { Download, FileText, Loader2, AlertCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown } from 'lucide-react';
 import { OrderDetailModal } from '@/presentation/components/modals/OrderDetailModal';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency } from '@/utils/currency/formatCurrency';
 import { getSalesReport } from '@/infrastructure/apiValidator';
 
 interface SalesReportProps {
@@ -127,7 +127,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
       return (
         <div className="flex flex-col items-center justify-center h-96 text-gray-400">
           <FileText size={48} className="mb-4 opacity-20" />
-          <p>{t('common.empty.noData')}</p>
+          <p>{t('common.empty.no_data')}</p>
         </div>
       );
     }

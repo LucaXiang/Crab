@@ -19,10 +19,10 @@ export const VoidReasonModal: React.FC<VoidReasonModalProps> = ({
   if (!isOpen) return null;
 
   const reasons = [
-    { key: 'runaway', label: t('checkout.voidReason.runaway') },
-    { key: 'dineAndDash', label: t('checkout.voidReason.dineAndDash') },
-    { key: 'systemTest', label: t('checkout.voidReason.systemTest') },
-    { key: 'ownerTreat', label: t('checkout.voidReason.ownerTreat') },
+    { key: 'runaway', label: t('checkout.void_reason.runaway') },
+    { key: 'dineAndDash', label: t('checkout.void_reason.dine_and_dash') },
+    { key: 'systemTest', label: t('checkout.void_reason.system_test') },
+    { key: 'ownerTreat', label: t('checkout.void_reason.owner_treat') },
   ];
 
   return (

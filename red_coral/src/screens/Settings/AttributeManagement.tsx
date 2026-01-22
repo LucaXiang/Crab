@@ -114,14 +114,14 @@ export const AttributeManagement: React.FC = React.memo(() => {
     e.stopPropagation();
     setConfirmDialog({
       isOpen: true,
-      title: t('settings.attribute.deleteAttribute'),
+      title: t('settings.attribute.delete_attribute'),
       description:
         t('settings.attribute.confirm.delete', { name: attr.name }),
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
           await deleteAttribute(String(attr.id));
-          toast.success(t('settings.user.message.deleteSuccess'));
+          toast.success(t('settings.user.message.delete_success'));
         } catch (error) {
           console.error('Delete attribute error:', error);
           toast.error(getErrorMessage(error));
@@ -149,14 +149,14 @@ export const AttributeManagement: React.FC = React.memo(() => {
     e.stopPropagation();
     setConfirmDialog({
       isOpen: true,
-      title: t('settings.attribute.option.deleteOption'),
+      title: t('settings.attribute.option.delete_option'),
       description:
         t('settings.attribute.confirm.deleteOption', { name: option.name }),
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
           await deleteOption(option.attributeId, option.index);
-          toast.success(t('settings.user.message.deleteSuccess'));
+          toast.success(t('settings.user.message.delete_success'));
         } catch (error) {
           console.error('Delete option error:', error);
           toast.error(getErrorMessage(error));
@@ -167,10 +167,10 @@ export const AttributeManagement: React.FC = React.memo(() => {
 
   const getAttributeTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      SINGLE_REQUIRED: t('settings.attribute.type.singleRequired'),
-      SINGLE_OPTIONAL: t('settings.attribute.type.singleOptional'),
-      MULTI_REQUIRED: t('settings.attribute.type.multiRequired'),
-      MULTI_OPTIONAL: t('settings.attribute.type.multiOptional'),
+      SINGLE_REQUIRED: t('settings.attribute.type.single_required'),
+      SINGLE_OPTIONAL: t('settings.attribute.type.single_optional'),
+      MULTI_REQUIRED: t('settings.attribute.type.multi_required'),
+      MULTI_OPTIONAL: t('settings.attribute.type.multi_optional'),
     };
     return labels[type] || type;
   };
@@ -181,7 +181,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
         icon={Settings}
         title={t('settings.attribute.title')}
         description={t('settings.attribute.description')}
-        addButtonText={t('settings.attribute.addAttribute')}
+        addButtonText={t('settings.attribute.add_attribute')}
         onAdd={handleAddAttribute}
         themeColor="teal"
         permission={Permission.MANAGE_ATTRIBUTES}
@@ -190,7 +190,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
       <FilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder={t('common.hint.searchPlaceholder')}
+        searchPlaceholder={t('common.hint.search_placeholder')}
         totalCount={filteredAttributes.length}
         countUnit={t('settings.attribute.unit')}
         themeColor="teal"
@@ -214,11 +214,11 @@ export const AttributeManagement: React.FC = React.memo(() => {
               <Settings className="text-gray-300" size={32} />
             </div>
             <p className="text-gray-500 font-medium">
-              {searchQuery ? t('common.empty.noResults') : t('common.empty.noData')}
+              {searchQuery ? t('common.empty.no_results') : t('common.empty.no_data')}
             </p>
             {!searchQuery && (
               <p className="text-sm text-gray-400 mt-1">
-                {t('settings.attribute.hint.addFirst')}
+                {t('settings.attribute.hint.add_first')}
               </p>
             )}
           </div>
@@ -253,7 +253,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                               {attr.name}
                             </h3>
                             <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">
-                              {attr.is_multi_select ? t('settings.attribute.type.multiSelect') : t('settings.attribute.type.singleSelect')}
+                              {attr.is_multi_select ? t('settings.attribute.type.multi_select') : t('settings.attribute.type.single_select')}
                             </span>
                             {!attr.is_active && (
                               <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
@@ -273,7 +273,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                             <button
                               onClick={(e) => handleAddOption(attrId, e)}
                               className="p-2 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors"
-                              title={t('settings.attribute.option.addOption')}
+                              title={t('settings.attribute.option.add_option')}
                             >
                               <Plus size={16} />
                             </button>
@@ -305,12 +305,12 @@ export const AttributeManagement: React.FC = React.memo(() => {
                       {options.length === 0 ? (
                         <div className="p-8 text-sm text-gray-400 text-center flex flex-col items-center justify-center border-dashed border-2 border-gray-100 m-4 rounded-xl">
                           <span className="mb-2 block text-gray-300"><List size={24} /></span>
-                          {t('common.empty.noData')}
+                          {t('common.empty.no_data')}
                           <button
                             onClick={(e) => handleAddOption(attrId, e)}
                             className="mt-2 text-teal-600 hover:text-teal-700 font-medium text-xs hover:underline"
                           >
-                            {t('settings.attribute.option.hint.addFirst')}
+                            {t('settings.attribute.option.hint.add_first')}
                           </button>
                         </div>
                       ) : (

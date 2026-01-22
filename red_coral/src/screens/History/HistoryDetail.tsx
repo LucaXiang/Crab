@@ -47,7 +47,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
     return (
       <div className="h-full flex flex-col items-center justify-center text-gray-300">
         <Receipt size={64} className="mb-4 opacity-50" />
-        <p>{t('history.info.selectOrder')}</p>
+        <p>{t('history.info.select_order')}</p>
       </div>
     );
   }
@@ -165,7 +165,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
           </div>
         </div>
           <div className="text-right">
-          <div className="text-sm text-gray-500 uppercase font-bold tracking-wider mb-1">{t('history.info.totalAmount')}</div>
+          <div className="text-sm text-gray-500 uppercase font-bold tracking-wider mb-1">{t('history.info.total_amount')}</div>
           <div className={`text-3xl font-bold ${isVoid || isMerged ? 'text-gray-400 line-through' : 'text-[#FF5E5E]'}`}>{formatCurrency(order.total)}</div>
         </div>
       </div>
@@ -176,11 +176,11 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
             <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between font-bold text-gray-700">
               <div className="flex items-center gap-2">
                 <Receipt size={18} />
-                <span>{t('history.info.orderItems')}</span>
+                <span>{t('history.info.order_items')}</span>
               </div>
               <button
                 onClick={toggleAll}
-                title={expandedItems.size === order.items.length ? t('common.action.collapseAll') : t('common.action.expandAll')}
+                title={expandedItems.size === order.items.length ? t('common.action.collapse_all') : t('common.action.expand_all')}
                 className="p-1.5 text-gray-500 hover:text-gray-700 transition-colors rounded hover:bg-gray-200"
               >
                 {expandedItems.size === order.items.length ? <ChevronsUp size={18} /> : <ChevronsDown size={18} />}
@@ -206,7 +206,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                 <>
                   <div className="p-3 bg-red-50 text-red-800 text-xs font-bold uppercase tracking-wider border-y border-red-100 flex items-center gap-2">
                     <Trash2 size={14} />
-                    {t('history.info.removedItems')}
+                    {t('history.info.removed_items')}
                   </div>
                   {removedItems.map((item) => {
                     const idx = itemIndexMap.get(item.instance_id) ?? -1;
@@ -241,7 +241,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
             </div>
             <div className="divide-y divide-gray-100">
               {paymentEvents.length === 0 ? (
-                <div className="p-4 text-center text-gray-400 text-sm">{t('history.payment.noPayments')}</div>
+                <div className="p-4 text-center text-gray-400 text-sm">{t('history.payment.no_payments')}</div>
               ) : (
                 paymentEvents.map((event, idx) => (
                   <PaymentEventRow key={event.event_id || `${event.event_type}-${event.timestamp}-${idx}`} event={event} t={t} />
@@ -334,7 +334,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
                 ) : (
                   <span>{formatCurrency(finalUnitPrice)}</span>
                 )}
-                <span>/ {t('checkout.amount.unitPrice')}</span>
+                <span>/ {t('checkout.amount.unit_price')}</span>
                 {hasAttributes && (
                   <span className="flex items-center gap-1 ml-2 text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">
                     {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
@@ -389,7 +389,7 @@ export const PaymentEventRow: React.FC<PaymentEventRowProps> = React.memo(({ eve
   if (event.event_type === 'ORDER_SPLIT' && payload.type === 'ORDER_SPLIT') {
     methodRaw = payload.payment_method || '';
     amountNum = payload.split_amount || 0;
-    note = t('timeline.splitBill');
+    note = t('timeline.split_bill');
   } else if (event.event_type === 'PAYMENT_ADDED' && payload.type === 'PAYMENT_ADDED') {
     methodRaw = payload.method || '';
     amountNum = payload.amount || 0;

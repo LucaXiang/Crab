@@ -30,7 +30,7 @@ import type {
   OrderInfoUpdatedPayload,
   RuleSkipToggledPayload,
 } from '@/core/domain/types/orderEvent';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency } from '@/utils/currency/formatCurrency';
 import {
   Utensils, ShoppingBag, Coins, CheckCircle,
   Edit3, Trash2, Ban, Tag, ArrowRight, ArrowLeft, Split
@@ -71,8 +71,8 @@ interface EventRenderer<T> {
 const TableOpenedRenderer: EventRenderer<TableOpenedPayload> = {
   render(event, payload, t) {
     return {
-      title: t('timeline.tableOrder'),
-      summary: t('timeline.guestsCount', { n: payload.guest_count }),
+      title: t('timeline.table_order'),
+      summary: t('timeline.guests_count', { n: payload.guest_count }),
       details: [],
       icon: Utensils,
       colorClass: 'bg-blue-500',
@@ -94,8 +94,8 @@ const ItemsAddedRenderer: EventRenderer<ItemsAddedPayload> = {
     });
 
     return {
-      title: t('timeline.addItems'),
-      summary: t('timeline.addedItems', { n: totalQty }),
+      title: t('timeline.add_items'),
+      summary: t('timeline.added_items', { n: totalQty }),
       details,
       icon: ShoppingBag,
       colorClass: 'bg-orange-500',
@@ -132,7 +132,7 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
     formatChange('surcharge', 'timeline.labels.surcharge', v => formatCurrency(v || 0));
 
     return {
-      title: t('timeline.itemModified'),
+      title: t('timeline.item_modified'),
       summary: payload.source.name || '',
       details,
       icon: Edit3,
@@ -146,7 +146,7 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
 const ItemRemovedRenderer: EventRenderer<ItemRemovedPayload> = {
   render(event, payload, t) {
     return {
-      title: t('timeline.itemRemoved'),
+      title: t('timeline.item_removed'),
       summary: payload.item_name || payload.reason || '',
       details: [],
       icon: Trash2,
@@ -160,7 +160,7 @@ const ItemRemovedRenderer: EventRenderer<ItemRemovedPayload> = {
 const ItemRestoredRenderer: EventRenderer<ItemRestoredPayload> = {
   render(event, payload, t) {
     return {
-      title: t('timeline.itemRestored'),
+      title: t('timeline.item_restored'),
       summary: payload.instance_id,
       details: [],
       icon: Utensils,
@@ -199,7 +199,7 @@ const PaymentAddedRenderer: EventRenderer<PaymentAddedPayload> = {
 const PaymentCancelledRenderer: EventRenderer<PaymentCancelledPayload> = {
   render(event, payload, t) {
     return {
-      title: t('timeline.paymentCancelled'),
+      title: t('timeline.payment_cancelled'),
       summary: payload.reason || '',
       details: [],
       icon: Ban,
@@ -216,7 +216,7 @@ const OrderSplitRenderer: EventRenderer<OrderSplitPayload> = {
     );
 
     return {
-      title: t('timeline.splitBill'),
+      title: t('timeline.split_bill'),
       summary: `${formatCurrency(payload.split_amount)} (${payload.payment_method})`,
       details,
       icon: Split,
@@ -229,9 +229,9 @@ const OrderSplitRenderer: EventRenderer<OrderSplitPayload> = {
 const OrderCompletedRenderer: EventRenderer<OrderCompletedPayload> = {
   render(event, payload, t) {
     return {
-      title: t('timeline.orderCompleted'),
+      title: t('timeline.order_completed'),
       summary: payload.receipt_number
-        ? t('timeline.receiptNo', { n: payload.receipt_number })
+        ? t('timeline.receipt_no', { n: payload.receipt_number })
         : formatCurrency(payload.final_total),
       details: [],
       icon: CheckCircle,
@@ -244,7 +244,7 @@ const OrderCompletedRenderer: EventRenderer<OrderCompletedPayload> = {
 const OrderVoidedRenderer: EventRenderer<OrderVoidedPayload> = {
   render(event, payload, t) {
     return {
-      title: t('timeline.orderVoided'),
+      title: t('timeline.order_voided'),
       summary: payload.reason || '',
       details: [],
       icon: Ban,
@@ -257,7 +257,7 @@ const OrderVoidedRenderer: EventRenderer<OrderVoidedPayload> = {
 const OrderRestoredRenderer: EventRenderer<OrderRestoredPayload> = {
   render(event, payload, t) {
     return {
-      title: t('timeline.orderRestored'),
+      title: t('timeline.order_restored'),
       details: [],
       icon: CheckCircle,
       colorClass: 'bg-blue-400',
@@ -269,7 +269,7 @@ const OrderRestoredRenderer: EventRenderer<OrderRestoredPayload> = {
 const OrderMergedRenderer: EventRenderer<OrderMergedPayload> = {
   render(event, payload, t) {
     return {
-      title: t('timeline.orderMerged'),
+      title: t('timeline.order_merged'),
       summary: `${t('timeline.from')} ${payload.source_table_name}`,
       details: [],
       icon: ArrowLeft,
@@ -282,7 +282,7 @@ const OrderMergedRenderer: EventRenderer<OrderMergedPayload> = {
 const OrderMovedRenderer: EventRenderer<OrderMovedPayload> = {
   render(event, payload, t) {
     return {
-      title: t('timeline.tableMoved'),
+      title: t('timeline.table_moved'),
       summary: `${payload.source_table_name} → ${payload.target_table_name}`,
       details: [],
       icon: ArrowRight,
@@ -295,7 +295,7 @@ const OrderMovedRenderer: EventRenderer<OrderMovedPayload> = {
 const OrderMovedOutRenderer: EventRenderer<OrderMovedOutPayload> = {
   render(event, payload, t) {
     return {
-      title: t('timeline.movedOut'),
+      title: t('timeline.moved_out'),
       summary: `${t('timeline.to')} ${payload.target_table_name}`,
       details: [],
       icon: ArrowRight,
@@ -308,7 +308,7 @@ const OrderMovedOutRenderer: EventRenderer<OrderMovedOutPayload> = {
 const OrderMergedOutRenderer: EventRenderer<OrderMergedOutPayload> = {
   render(event, payload, t) {
     return {
-      title: t('timeline.mergedOut'),
+      title: t('timeline.merged_out'),
       summary: `${t('timeline.to')} ${payload.target_table_name}`,
       details: [],
       icon: ArrowRight,
@@ -321,7 +321,7 @@ const OrderMergedOutRenderer: EventRenderer<OrderMergedOutPayload> = {
 const TableReassignedRenderer: EventRenderer<TableReassignedPayload> = {
   render(event, payload, t) {
     return {
-      title: t('timeline.tableReassigned'),
+      title: t('timeline.table_reassigned'),
       summary: `${payload.source_table_name} → ${payload.target_table_name}`,
       details: [],
       icon: ArrowRight,
@@ -339,7 +339,7 @@ const OrderInfoUpdatedRenderer: EventRenderer<OrderInfoUpdatedPayload> = {
     if (payload.table_name) details.push(`${t('timeline.labels.table')}: ${payload.table_name}`);
 
     return {
-      title: t('timeline.orderInfoUpdated'),
+      title: t('timeline.order_info_updated'),
       details,
       icon: Edit3,
       colorClass: 'bg-blue-400',

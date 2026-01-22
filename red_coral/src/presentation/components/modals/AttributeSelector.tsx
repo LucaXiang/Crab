@@ -2,7 +2,7 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import { AttributeTemplate, AttributeOption } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface AttributeSelectorProps {
   attribute: AttributeTemplate;
@@ -48,8 +48,8 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
 
   const getAttributeTypeLabel = () => {
     return attribute.is_multi_select
-      ? t('settings.attribute.type.multiOptional')
-      : t('settings.attribute.type.singleOptional');
+      ? t('settings.attribute.type.multi_optional')
+      : t('settings.attribute.type.single_optional');
   };
 
   if (activeOptions.length === 0) {

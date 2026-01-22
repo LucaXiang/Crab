@@ -101,13 +101,13 @@ export const UserManagement: React.FC = React.memo(() => {
   const handleDeleteUser = (user: User) => {
     // Prevent deleting own account
     if (currentUser && user.id === currentUser.id) {
-      toast.error(t('settings.user.message.cannotDeleteSelf'));
+      toast.error(t('settings.user.message.cannot_delete_self'));
       return;
     }
 
     // Prevent deleting admin users
     if (user.username === 'admin') {
-      toast.error(t('settings.user.message.cannotDeleteAdmin'));
+      toast.error(t('settings.user.message.cannot_delete_admin'));
       return;
     }
 
@@ -115,18 +115,18 @@ export const UserManagement: React.FC = React.memo(() => {
       // Disable user logic
       setConfirmDialog({
         isOpen: true,
-        title: t('settings.user.disableUser'),
+        title: t('settings.user.disable_user'),
         description: t('settings.user.confirm.disable', { name: user.display_name || user.username }),
         onConfirm: async () => {
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
           try {
             await updateUserAction(user.id, { isActive: false });
-            toast.success(t('settings.user.message.updateSuccess'));
+            toast.success(t('settings.user.message.update_success'));
             const updatedUsers = await fetchUsers();
             setUsers(updatedUsers);
           } catch (error: any) {
             console.error('Disable user error:', error);
-            toast.error(error || t('settings.user.message.updateFailed'));
+            toast.error(error || t('settings.user.message.update_failed'));
           }
         },
       });
@@ -134,18 +134,18 @@ export const UserManagement: React.FC = React.memo(() => {
       // Permanent delete logic
       setConfirmDialog({
         isOpen: true,
-        title: t('settings.user.deletePermanentlyUser'),
+        title: t('settings.user.delete_permanently_user'),
         description: t('settings.user.confirm.deletePermanently', { name: user.display_name || user.username }),
         onConfirm: async () => {
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
           try {
             await deleteUserAction(user.id);
-            toast.success(t('settings.user.message.deleteSuccess'));
+            toast.success(t('settings.user.message.delete_success'));
             const updatedUsers = await fetchUsers();
             setUsers(updatedUsers);
           } catch (error: any) {
             console.error('Delete user error:', error);
-            toast.error(error || t('settings.user.message.deleteFailed'));
+            toast.error(error || t('settings.user.message.delete_failed'));
           }
         },
       });
@@ -223,7 +223,7 @@ export const UserManagement: React.FC = React.memo(() => {
       },
       {
         key: 'createdAt',
-        header: t('settings.user.column.createdAt'),
+        header: t('settings.user.column.created_at'),
         width: '120px',
         render: (user) => (
           <div className="flex items-center gap-1.5 text-sm text-gray-600">
@@ -256,7 +256,7 @@ export const UserManagement: React.FC = React.memo(() => {
                   handleResetPassword(user);
                 }}
                 className="p-2 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors border border-orange-200/50"
-                title={t('settings.user.resetPasswordUser')}
+                title={t('settings.user.reset_password_user')}
               >
                 <Key size={14} />
               </button>
@@ -271,7 +271,7 @@ export const UserManagement: React.FC = React.memo(() => {
                         ? 'bg-amber-50 text-amber-600 border-amber-200/50 hover:bg-amber-100'
                         : 'bg-red-50 text-red-600 border-red-200/50 hover:bg-red-100'
                     }`}
-                    title={user.is_active ? t('settings.user.disableUser') : t('settings.user.deletePermanentlyUser')}
+                    title={user.is_active ? t('settings.user.disable_user') : t('settings.user.delete_permanently_user')}
                   >
                     {user.is_active ? <Ban size={14} /> : <Trash2 size={14} />}
                   </button>
@@ -322,7 +322,7 @@ export const UserManagement: React.FC = React.memo(() => {
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-blue-600/20 hover:bg-blue-700 hover:shadow-blue-600/30 transition-all"
             >
               <Plus size={16} />
-              <span>{t('settings.user.addUser')}</span>
+              <span>{t('settings.user.add_user')}</span>
             </button>
           </ProtectedGate>
         </div>
@@ -368,7 +368,7 @@ export const UserManagement: React.FC = React.memo(() => {
             <label className="text-sm text-gray-600">{t('auth.user.role')}:</label>
             <select
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as any)}
+              onChange={(e) => setRoleFilter(e.target.value)}
               className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors min-w-[140px]"
             >
               <option value="all">{t('table.filter.all')}</option>
@@ -398,7 +398,7 @@ export const UserManagement: React.FC = React.memo(() => {
               checked={showInactive}
               onChange={(e) => setShowInactive(e.target.checked)}
             />
-            <span className="text-sm text-gray-600">{t('settings.user.filter.showInactive')}</span>
+            <span className="text-sm text-gray-600">{t('settings.user.filter.show_inactive')}</span>
           </label>
 
           <div className="h-5 w-px bg-gray-200 ml-2" />
@@ -408,7 +408,7 @@ export const UserManagement: React.FC = React.memo(() => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t('common.hint.searchPlaceholder')}
+              placeholder={t('common.hint.search_placeholder')}
               className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             />
           </div>
@@ -425,7 +425,7 @@ export const UserManagement: React.FC = React.memo(() => {
         columns={columns}
         loading={isLoading}
         getRowKey={(user) => String(user.id)}
-        emptyText={t('common.empty.noData')}
+        emptyText={t('common.empty.no_data')}
         themeColor="blue"
       />
         </>

@@ -28,7 +28,7 @@ export const KitchenPrinterSelector: React.FC<KitchenPrinterSelectorProps> = ({
   };
 
   return (
-    <FormField label={label || t('settings.kitchenPrinter')}>
+    <FormField label={label || t('settings.kitchen_printer')}>
       <div className="relative">
         <select
           value={value || ''}

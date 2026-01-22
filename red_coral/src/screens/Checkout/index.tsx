@@ -165,7 +165,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         }}
         onSuccess={handleSupervisorSuccess}
         requiredPermission={Permission.VOID_ORDER}
-        actionDescription={t('checkout.void.authRequired')}
+        actionDescription={t('checkout.void.auth_required')}
       />
 
       {/* Confirm Dialog */}

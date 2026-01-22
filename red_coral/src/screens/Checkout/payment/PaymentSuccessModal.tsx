@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Check, Coins, Printer } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface PaymentSuccessModalProps {
   isOpen: boolean;
@@ -57,7 +57,7 @@ const PaymentSuccessModalComponent: React.FC<PaymentSuccessModalProps> = ({
         </div>
         
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          {type === 'CASH' ? t('checkout.payment.success') : t('checkout.orderCompleted')}
+          {type === 'CASH' ? t('checkout.payment.success') : t('checkout.order_completed')}
         </h2>
         
         {type === 'CASH' && change !== undefined && (
@@ -96,7 +96,7 @@ const PaymentSuccessModalComponent: React.FC<PaymentSuccessModalProps> = ({
           </div>
         ) : (
           <div className="mt-8 text-sm text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" onClick={onClose}>
-             {t('common.hint.tapToClose')}
+             {t('common.hint.tap_to_close')}
              {autoCloseDelay > 0 && ` (${timeLeft}s)`}
           </div>
         )}

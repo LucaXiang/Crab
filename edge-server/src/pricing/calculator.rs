@@ -69,28 +69,26 @@ pub fn sort_rules_by_priority(rules: &mut [&PriceRule]) {
 
 /// Calculate adjustment from a single rule using Decimal precision
 fn calculate_single_adjustment(rule: &PriceRule, base_price: Decimal) -> (Decimal, Decimal, Decimal) {
-    let value = Decimal::from(rule.adjustment_value);
+    let value = to_decimal(rule.adjustment_value);
     let hundred = Decimal::ONE_HUNDRED;
 
     match (&rule.rule_type, &rule.adjustment_type) {
         (RuleType::Surcharge, AdjustmentType::Percentage) => {
-            // Surcharge as percentage of base price
+            // Surcharge as percentage of base price (e.g., value=10 means 10%)
             let amount = base_price * value / hundred;
             (amount, Decimal::ZERO, Decimal::ZERO)
         }
         (RuleType::Surcharge, AdjustmentType::FixedAmount) => {
-            // Surcharge as fixed amount (value is in cents, convert to dollars)
-            let amount = value / hundred;
-            (amount, Decimal::ZERO, Decimal::ZERO)
+            // Surcharge as fixed amount (e.g., value=5.00 means ¥5.00)
+            (value, Decimal::ZERO, Decimal::ZERO)
         }
         (RuleType::Discount, AdjustmentType::Percentage) => {
             // Discount as percentage (store the percentage value, not the amount)
             (Decimal::ZERO, value, Decimal::ZERO)
         }
         (RuleType::Discount, AdjustmentType::FixedAmount) => {
-            // Discount as fixed amount (value is in cents, convert to dollars)
-            let amount = value / hundred;
-            (Decimal::ZERO, Decimal::ZERO, amount)
+            // Discount as fixed amount (e.g., value=5.00 means ¥5.00)
+            (Decimal::ZERO, Decimal::ZERO, value)
         }
     }
 }
@@ -176,7 +174,7 @@ mod tests {
     fn make_rule(
         rule_type: RuleType,
         adjustment_type: AdjustmentType,
-        value: i32,
+        value: f64,
         priority: i32,
         stackable: bool,
     ) -> PriceRule {
@@ -212,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_percentage_discount() {
-        let rule = make_rule(RuleType::Discount, AdjustmentType::Percentage, 10, 0, true);
+        let rule = make_rule(RuleType::Discount, AdjustmentType::Percentage, 10.0, 0, true);
         let rules: Vec<&PriceRule> = vec![&rule];
         let adj = calculate_adjustments(&rules, 100.0);
 
@@ -222,11 +220,11 @@ mod tests {
 
     #[test]
     fn test_fixed_discount() {
-        // 500 cents = $5
+        // ¥5.00 fixed discount
         let rule = make_rule(
             RuleType::Discount,
             AdjustmentType::FixedAmount,
-            500,
+            5.0,
             0,
             true,
         );
@@ -239,7 +237,7 @@ mod tests {
 
     #[test]
     fn test_percentage_surcharge() {
-        let rule = make_rule(RuleType::Surcharge, AdjustmentType::Percentage, 10, 0, true);
+        let rule = make_rule(RuleType::Surcharge, AdjustmentType::Percentage, 10.0, 0, true);
         let rules: Vec<&PriceRule> = vec![&rule];
         let adj = calculate_adjustments(&rules, 100.0);
 
@@ -249,8 +247,8 @@ mod tests {
 
     #[test]
     fn test_stackable_rules() {
-        let rule1 = make_rule(RuleType::Discount, AdjustmentType::Percentage, 10, 1, true);
-        let rule2 = make_rule(RuleType::Discount, AdjustmentType::Percentage, 5, 0, true);
+        let rule1 = make_rule(RuleType::Discount, AdjustmentType::Percentage, 10.0, 1, true);
+        let rule2 = make_rule(RuleType::Discount, AdjustmentType::Percentage, 5.0, 0, true);
         let rules: Vec<&PriceRule> = vec![&rule1, &rule2];
         let adj = calculate_adjustments(&rules, 100.0);
 
@@ -261,8 +259,8 @@ mod tests {
 
     #[test]
     fn test_non_stackable_wins() {
-        let rule1 = make_rule(RuleType::Discount, AdjustmentType::Percentage, 10, 2, false); // Higher priority
-        let rule2 = make_rule(RuleType::Discount, AdjustmentType::Percentage, 20, 1, false);
+        let rule1 = make_rule(RuleType::Discount, AdjustmentType::Percentage, 10.0, 2, false); // Higher priority
+        let rule2 = make_rule(RuleType::Discount, AdjustmentType::Percentage, 20.0, 1, false);
         let rules: Vec<&PriceRule> = vec![&rule1, &rule2];
         let adj = calculate_adjustments(&rules, 100.0);
 
@@ -273,10 +271,10 @@ mod tests {
     #[test]
     fn test_combined_surcharge_and_discount() {
         // Surcharge 10% + Discount 20%
-        // $100 + $10 (surcharge) = $110
-        // $110 - 20% = $88
-        let surcharge = make_rule(RuleType::Surcharge, AdjustmentType::Percentage, 10, 0, true);
-        let discount = make_rule(RuleType::Discount, AdjustmentType::Percentage, 20, 0, true);
+        // ¥100 + ¥10 (surcharge) = ¥110
+        // ¥110 - 20% = ¥88
+        let surcharge = make_rule(RuleType::Surcharge, AdjustmentType::Percentage, 10.0, 0, true);
+        let discount = make_rule(RuleType::Discount, AdjustmentType::Percentage, 20.0, 0, true);
         let rules: Vec<&PriceRule> = vec![&surcharge, &discount];
         let adj = calculate_adjustments(&rules, 100.0);
 
@@ -285,25 +283,24 @@ mod tests {
         assert_eq!(adj.calculate_final_price(100.0), 88.0);
     }
 
-    // ========== New precision tests ==========
+    // ========== Precision tests ==========
 
     #[test]
     fn test_precision_third_discount() {
-        // 33% discount on $100 should be $67.00
-        // Note: adjustment_value is integer percentage, fractional not supported at rule level
-        let rule = make_rule(RuleType::Discount, AdjustmentType::Percentage, 33, 0, true);
+        // 33% discount on ¥100 should be ¥67.00
+        let rule = make_rule(RuleType::Discount, AdjustmentType::Percentage, 33.0, 0, true);
         let rules: Vec<&PriceRule> = vec![&rule];
         let adj = calculate_adjustments(&rules, 100.0);
 
         assert_eq!(adj.manual_discount_percent, 33.0);
-        // $100 * (1 - 0.33) = $67.00
+        // ¥100 * (1 - 0.33) = ¥67.00
         assert_eq!(adj.calculate_final_price(100.0), 67.0);
     }
 
     #[test]
     fn test_precision_small_amounts() {
-        // 1 cent surcharge
-        let rule = make_rule(RuleType::Surcharge, AdjustmentType::FixedAmount, 1, 0, true);
+        // ¥0.01 surcharge
+        let rule = make_rule(RuleType::Surcharge, AdjustmentType::FixedAmount, 0.01, 0, true);
         let rules: Vec<&PriceRule> = vec![&rule];
         let adj = calculate_adjustments(&rules, 0.01);
 
@@ -315,7 +312,7 @@ mod tests {
     fn test_precision_many_stackable_rules() {
         // Stack 10 rules of 1% each = 10% total
         let rules_owned: Vec<PriceRule> = (0..10)
-            .map(|i| make_rule(RuleType::Discount, AdjustmentType::Percentage, 1, i, true))
+            .map(|i| make_rule(RuleType::Discount, AdjustmentType::Percentage, 1.0, i, true))
             .collect();
         let rules: Vec<&PriceRule> = rules_owned.iter().collect();
         let adj = calculate_adjustments(&rules, 100.0);
@@ -326,13 +323,13 @@ mod tests {
 
     #[test]
     fn test_precision_complex_calculation() {
-        // $99.99 base
-        // 10% surcharge = $9.999 → $109.989
-        // 15% discount = $109.989 * 0.85 = $93.49065
-        // $5.55 fixed discount = $87.94065 → $87.94
-        let surcharge = make_rule(RuleType::Surcharge, AdjustmentType::Percentage, 10, 0, true);
-        let discount_pct = make_rule(RuleType::Discount, AdjustmentType::Percentage, 15, 0, true);
-        let discount_fixed = make_rule(RuleType::Discount, AdjustmentType::FixedAmount, 555, 0, true);
+        // ¥99.99 base
+        // 10% surcharge = ¥9.999 → ¥109.989
+        // 15% discount = ¥109.989 * 0.85 = ¥93.49065
+        // ¥5.55 fixed discount = ¥87.94065 → ¥87.94
+        let surcharge = make_rule(RuleType::Surcharge, AdjustmentType::Percentage, 10.0, 0, true);
+        let discount_pct = make_rule(RuleType::Discount, AdjustmentType::Percentage, 15.0, 0, true);
+        let discount_fixed = make_rule(RuleType::Discount, AdjustmentType::FixedAmount, 5.55, 0, true);
         let rules: Vec<&PriceRule> = vec![&surcharge, &discount_pct, &discount_fixed];
         let adj = calculate_adjustments(&rules, 99.99);
 
@@ -343,8 +340,8 @@ mod tests {
     #[test]
     fn test_precision_rounding_edge_case() {
         // Test that 0.005 rounds up to 0.01 (half-up rounding)
-        // $10.005 should become $10.01
-        let rule = make_rule(RuleType::Surcharge, AdjustmentType::FixedAmount, 5, 0, true);
+        // ¥10.005 should become ¥10.01
+        let rule = make_rule(RuleType::Surcharge, AdjustmentType::FixedAmount, 0.05, 0, true);
         let rules: Vec<&PriceRule> = vec![&rule];
         let adj = calculate_adjustments(&rules, 9.955);
 

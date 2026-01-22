@@ -82,6 +82,7 @@ export type {
   PaymentMethod,
   OrderConnectionState,
   AppliedRule,
+  OrderStatus,  // Event sourcing status: ACTIVE | COMPLETED | VOID | MOVED | MERGED
 } from './orderEvent';
 
 // ============================================================================
@@ -108,8 +109,6 @@ export type CartItem = import('./orderEvent').CartItemSnapshot & {
  * Use backend type directly for consistency
  */
 export type PaymentRecord = import('./orderEvent').PaymentRecord;
-
-export type OrderStatus = 'ACTIVE' | 'COMPLETED' | 'VOID' | 'MOVED' | 'MERGED';
 
 /**
  * HeldOrder is OrderSnapshot plus optional timeline

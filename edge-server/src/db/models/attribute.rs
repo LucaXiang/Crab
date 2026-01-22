@@ -13,9 +13,9 @@ pub type AttributeId = Thing;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeOption {
     pub name: String,
-    /// Price modifier in cents (positive=add, negative=subtract)
+    /// Price modifier in currency unit (positive=add, negative=subtract, e.g., 2.50 = ¥2.50)
     #[serde(default)]
-    pub price_modifier: i64,
+    pub price_modifier: f64,
     #[serde(default)]
     pub display_order: i32,
     #[serde(
@@ -35,7 +35,7 @@ impl AttributeOption {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            price_modifier: 0,
+            price_modifier: 0.0,
             display_order: 0,
             is_active: true,
             receipt_name: None,

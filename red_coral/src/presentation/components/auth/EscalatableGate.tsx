@@ -79,13 +79,13 @@ export const EscalatableGate: React.FC<EscalatableGateProps> = ({
         {t('common.auth.denied')}
       </h3>
       <p className="max-w-md mx-auto text-gray-500 mb-6">
-        {description || t('common.auth.deniedMessage')}
+        {description || t('common.auth.denied_message')}
       </p>
       <button
         onClick={handleEscalate}
         className="px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
       >
-        {t('common.auth.clickToAuthorize')}
+        {t('common.auth.click_to_authorize')}
       </button>
     </div>
   );

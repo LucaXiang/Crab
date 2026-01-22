@@ -22,7 +22,7 @@ export const GuestInputHeader: React.FC<GuestInputHeaderProps> = ({
     <div className="p-3 bg-gray-50 border-b border-gray-100 flex justify-between items-center shrink-0">
       <div>
         <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
-          {isOccupied ? t('table.addItems') : t('table.openTable')}
+          {isOccupied ? t('table.add_items') : t('table.open_table')}
           <span className="bg-gray-200 px-2 rounded text-xs text-gray-600">
             {selectedTable.name}
           </span>

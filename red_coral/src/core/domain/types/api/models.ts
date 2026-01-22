@@ -5,6 +5,16 @@
  * All IDs are strings (SurrealDB Thing format: "table:id")
  */
 
+// ============ Common Types ============
+
+/**
+ * Label print state for products (tri-state inheritance)
+ * -1 = inherit from category
+ *  0 = disabled
+ *  1 = enabled
+ */
+export type LabelPrintState = -1 | 0 | 1;
+
 // ============ Tag ============
 
 export interface Tag {
@@ -95,7 +105,7 @@ export interface Product {
   receipt_name: string | null;
   kitchen_print_name: string | null;
   print_destinations: string[];
-  is_label_print_enabled: number;
+  is_label_print_enabled: LabelPrintState;
   is_active: boolean;
   /** Tag references (String IDs) */
   tags: string[];
@@ -112,7 +122,7 @@ export interface ProductCreate {
   receipt_name?: string;
   kitchen_print_name?: string;
   print_destinations?: string[];
-  is_label_print_enabled?: number;
+  is_label_print_enabled?: LabelPrintState;
   tags?: string[];
   /** 嵌入式规格 */
   specs: EmbeddedSpec[];
@@ -127,7 +137,7 @@ export interface ProductUpdate {
   receipt_name?: string;
   kitchen_print_name?: string;
   print_destinations?: string[];
-  is_label_print_enabled?: number;
+  is_label_print_enabled?: LabelPrintState;
   is_active?: boolean;
   tags?: string[];
   /** 嵌入式规格 */
@@ -155,7 +165,7 @@ export interface ProductFull {
   receipt_name: string | null;
   kitchen_print_name: string | null;
   print_destinations: string[];
-  is_label_print_enabled: number;
+  is_label_print_enabled: LabelPrintState;
   is_active: boolean;
   /** Embedded specifications */
   specs: EmbeddedSpec[];
@@ -344,10 +354,17 @@ export interface PriceRule {
   adjustment_value: number;
   priority: number;
   is_stackable: boolean;
+  is_exclusive: boolean;
   time_mode: TimeMode;
   start_time: string | null;
   end_time: string | null;
   schedule_config: ScheduleConfig | null;
+  // Time fields (snake_case to match Rust)
+  valid_from: number | null;        // milliseconds since epoch
+  valid_until: number | null;       // milliseconds since epoch
+  active_days: number[] | null;     // [0=Sunday, 1=Monday, ...]
+  active_start_time: string | null; // HH:MM format
+  active_end_time: string | null;   // HH:MM format
   is_active: boolean;
   created_by: string | null;
 }
@@ -365,10 +382,17 @@ export interface PriceRuleCreate {
   adjustment_value: number;
   priority?: number;
   is_stackable?: boolean;
+  is_exclusive?: boolean;
   time_mode?: TimeMode;
   start_time?: string;
   end_time?: string;
   schedule_config?: ScheduleConfig;
+  // Time fields (snake_case to match Rust)
+  valid_from?: number;        // milliseconds since epoch
+  valid_until?: number;       // milliseconds since epoch
+  active_days?: number[];     // [0=Sunday, 1=Monday, ...]
+  active_start_time?: string; // HH:MM format
+  active_end_time?: string;   // HH:MM format
   created_by?: string;
 }
 
@@ -385,10 +409,17 @@ export interface PriceRuleUpdate {
   adjustment_value?: number;
   priority?: number;
   is_stackable?: boolean;
+  is_exclusive?: boolean;
   time_mode?: TimeMode;
   start_time?: string;
   end_time?: string;
   schedule_config?: ScheduleConfig;
+  // Time fields (snake_case to match Rust)
+  valid_from?: number;        // milliseconds since epoch
+  valid_until?: number;       // milliseconds since epoch
+  active_days?: number[];     // [0=Sunday, 1=Monday, ...]
+  active_start_time?: string; // HH:MM format
+  active_end_time?: string;   // HH:MM format
   is_active?: boolean;
 }
 
@@ -416,7 +447,8 @@ export interface EmployeeUpdate {
 
 // ============ Order ============
 
-export type OrderStatus = 'OPEN' | 'PAID' | 'VOID';
+/** REST API Order status (matches Rust backend) */
+export type OrderApiStatus = 'OPEN' | 'PAID' | 'VOID';
 
 export interface OrderItemAttribute {
   attr_id: string;
@@ -450,7 +482,7 @@ export interface Order {
   receipt_number: string;
   zone_name: string | null;
   table_name: string | null;
-  status: OrderStatus;
+  status: OrderApiStatus;
   start_time: string;
   end_time: string | null;
   guest_count: number | null;
@@ -517,7 +549,7 @@ export interface OrderUpdateTotals {
 }
 
 export interface OrderUpdateStatus {
-  status: OrderStatus;
+  status: OrderApiStatus;
 }
 
 export interface OrderUpdateHash {
@@ -561,11 +593,6 @@ export type TableUpdate = DiningTableUpdate;
 export type AttributeTemplate = Attribute;
 export type AttributeTemplateCreate = AttributeCreate;
 export type AttributeTemplateUpdate = AttributeUpdate;
-
-/** Alias for PriceRule (legacy name) */
-export type PriceAdjustmentRule = PriceRule;
-export type PriceAdjustmentRuleCreate = PriceRuleCreate;
-export type PriceAdjustmentRuleUpdate = PriceRuleUpdate;
 
 /** Alias for OrderPayment */
 export type Payment = OrderPayment;

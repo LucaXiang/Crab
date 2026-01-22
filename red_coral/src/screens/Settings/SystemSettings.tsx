@@ -50,10 +50,10 @@ export const SystemSettings: React.FC = () => {
               </div>
               <div>
                 <div className="font-bold text-gray-900 text-lg mb-1">
-                  {t('settings.system.performanceMode')}
+                  {t('settings.system.performance_mode')}
                 </div>
                 <div className="text-sm text-gray-500 max-w-lg leading-relaxed">
-                  {t('settings.system.performanceModeDesc')}
+                  {t('settings.system.performance_mode_desc')}
                 </div>
               </div>
             </div>
@@ -74,9 +74,9 @@ export const SystemSettings: React.FC = () => {
               <Type size={18} className="text-blue-600" />
             </div>
             <div>
-              <div className="font-bold mb-1 text-blue-900">{t('settings.system.fontOptimization.title')}</div>
+              <div className="font-bold mb-1 text-blue-900">{t('settings.system.font_optimization.title')}</div>
               <p className="leading-relaxed text-blue-800/80">
-                {t('settings.system.fontOptimization.description')}
+                {t('settings.system.font_optimization.description')}
               </p>
             </div>
           </div>
@@ -89,10 +89,10 @@ export const SystemSettings: React.FC = () => {
               </div>
               <div>
                 <div className="font-bold text-gray-900 text-lg mb-1">
-                  {t('settings.system.clearCache.title')}
+                  {t('settings.system.clear_cache.title')}
                 </div>
                 <div className="text-sm text-gray-500 max-w-lg leading-relaxed">
-                  {t('settings.system.clearCache.description')}
+                  {t('settings.system.clear_cache.description')}
                 </div>
               </div>
             </div>
@@ -110,8 +110,8 @@ export const SystemSettings: React.FC = () => {
 
       <ConfirmDialog
         isOpen={showClearCacheDialog}
-        title={t('settings.system.clearCache.confirmTitle')}
-        description={t('settings.system.clearCache.confirmDescription')}
+        title={t('settings.system.clear_cache.confirm_title')}
+        description={t('settings.system.clear_cache.confirm_description')}
         variant="danger"
         confirmText={t('common.action.confirm')}
         onConfirm={handleClearCache}

@@ -546,12 +546,10 @@ async fn handle_command(
                                 token.chars().take(16).collect::<String>() + "...";
                             *state = ClientState::Authenticated(authenticated);
                         }
-                        Err(e) => {
+                        Err((e, connected)) => {
                             tracing::error!("Login failed: {}", e);
-                            // 自动重连并保持 Connected 状态
-                            if ensure_connected(&client_state).await {
-                                tracing::info!("Reconnected. Please try login again.");
-                            }
+                            // 恢复 Connected 状态以便重试
+                            *state = ClientState::Connected(connected);
                         }
                     }
                 }

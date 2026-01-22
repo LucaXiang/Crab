@@ -124,18 +124,25 @@ impl CrabClient<Local, Connected> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Returns
+    /// - `Ok(Authenticated)` on success
+    /// - `Err((error, Connected))` on failure, returning the original client for retry
     pub async fn login(
         mut self,
         username: &str,
         password: &str,
-    ) -> Result<CrabClient<Local, Authenticated>, ClientError> {
-        let http = self
-            .oneshot_http
-            .as_ref()
-            .ok_or_else(|| ClientError::Config("HTTP client not configured".into()))?;
+    ) -> Result<CrabClient<Local, Authenticated>, (ClientError, Self)> {
+        let http = match self.oneshot_http.as_ref() {
+            Some(h) => h,
+            None => return Err((ClientError::Config("HTTP client not configured".into()), self)),
+        };
 
         tracing::info!("Employee login (local): {}", username);
-        let response = http.login(username, password).await?;
+        let response = match http.login(username, password).await {
+            Ok(r) => r,
+            Err(e) => return Err((e, self)),
+        };
 
         // Store session data
         self.session

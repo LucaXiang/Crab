@@ -1,6 +1,6 @@
 import React from 'react';
 import { useI18n } from '@/hooks/useI18n';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface CartCheckoutBarProps {
   total: number;

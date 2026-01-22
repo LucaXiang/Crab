@@ -150,7 +150,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
           {(activeTab === 'products' || activeTab === 'categories') && (
             <div className="flex flex-col items-center justify-center h-96 text-gray-400">
               <BarChartIcon size={48} className="mb-4 opacity-20" />
-              <p>{t("statistics.report.detailedComingSoon")}</p>
+              <p>{t("statistics.report.detailed_coming_soon")}</p>
             </div>
           )}
         </div>

@@ -4,7 +4,7 @@ import { HeldOrder, CartItem, PaymentRecord, CheckoutMode, DetailTab, PendingCas
 import {
   calculateRemaining,
   isPaidInFull as checkIsPaidInFull
-} from '@/utils/checkoutCalculations';
+} from '@/utils/formatting/checkoutCalculations';
 
 function calculateUnpaidItems(items: CartItem[], paidQuantities?: Record<string, number>): CartItem[] {
   if (!paidQuantities) return items;

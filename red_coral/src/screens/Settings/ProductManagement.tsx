@@ -67,13 +67,13 @@ export const ProductManagement: React.FC = React.memo(() => {
   const filteredProducts = useMemo(() => {
     let result = products;
     if (categoryFilter !== 'all') {
-      result = result.filter((p: any) => p.category === categoryFilter || p.categoryId === categoryFilter);
+      result = result.filter((p) => p.category === categoryFilter);
     }
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter((p: any) =>
+      result = result.filter((p) =>
         p.name?.toLowerCase().includes(query) ||
-        p.receiptName?.toLowerCase().includes(query)
+        p.receipt_name?.toLowerCase().includes(query)
       );
     }
     return result;
@@ -100,7 +100,7 @@ export const ProductManagement: React.FC = React.memo(() => {
   const handleBatchDelete = (items: ProductItem[]) => {
     setConfirmDialog({
       isOpen: true,
-      title: t('settings.product.list.batchDeleteTitle'),
+      title: t('settings.product.list.batch_delete_title'),
       description: t('settings.product.list.confirmBatchDelete', { count: items.length }) || `确定要删除选中的 ${items.length} 个菜品吗？此操作无法撤销。`,
       onConfirm: async () => {
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
@@ -111,10 +111,10 @@ export const ProductManagement: React.FC = React.memo(() => {
           items.forEach((item) => {
             useProductStore.getState().optimisticRemove(item.id);
           });
-          toast.success(t('settings.product.list.batchDeleteSuccess'));
+          toast.success(t('settings.product.list.batch_delete_success'));
         } catch (e) {
           console.error(e);
-          toast.error(t('settings.product.list.batchDeleteFailed'));
+          toast.error(t('settings.product.list.batch_delete_failed'));
         }
       },
     });
@@ -151,7 +151,7 @@ export const ProductManagement: React.FC = React.memo(() => {
       // Note: Price is in ProductSpecification, not Product. Price column removed.
       {
         key: 'kitchenPrinting',
-        header: t('settings.product.print.kitchenPrinting'),
+        header: t('settings.product.print.kitchen_printing'),
         width: '220px',
         render: (item) => {
           const isDefault =
@@ -178,7 +178,7 @@ export const ProductManagement: React.FC = React.memo(() => {
               </span>
               <span className="text-gray-400">
                 {item.kitchen_printer
-                  ? `${t('settings.kitchenPrinter')} #${item.kitchen_printer}`
+                  ? `${t('settings.kitchen_printer')} #${item.kitchen_printer}`
                   : t('common.label.default')}
               </span>
             </div>
@@ -187,7 +187,7 @@ export const ProductManagement: React.FC = React.memo(() => {
       },
       {
         key: 'labelPrinting',
-        header: t('settings.product.print.labelPrinting'),
+        header: t('settings.product.print.label_printing'),
         width: '120px',
         render: (item) => {
           const isDefault =
@@ -252,7 +252,7 @@ export const ProductManagement: React.FC = React.memo(() => {
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-orange-500/20 hover:bg-orange-600 hover:shadow-orange-500/30 transition-all"
             >
               <Plus size={16} />
-              <span>{t('settings.product.addProduct')}</span>
+              <span>{t('settings.product.add_product')}</span>
             </button>
           </ProtectedGate>
         </div>
@@ -270,7 +270,7 @@ export const ProductManagement: React.FC = React.memo(() => {
             <label className="text-sm text-gray-600">{t('settings.category.title')}:</label>
             <select
               value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value as any)}
+              onChange={(e) => setCategoryFilter(e.target.value)}
               className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors min-w-[140px]"
             >
               <option value="all">{t('common.status.all')}</option>
@@ -292,7 +292,7 @@ export const ProductManagement: React.FC = React.memo(() => {
                 setSearchQuery(e.target.value);
                 setPagination(1, filteredProducts.length);
               }}
-              placeholder={t('common.hint.searchPlaceholder')}
+              placeholder={t('common.hint.search_placeholder')}
               className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
             />
           </div>
@@ -312,7 +312,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         onEdit={canUpdateProduct ? (item) => openModal('PRODUCT', 'EDIT', item) : undefined}
         onDelete={canDeleteProduct ? (item) => openModal('PRODUCT', 'DELETE', item) : undefined}
         onBatchDelete={canDeleteProduct ? handleBatchDelete : undefined}
-        emptyText={t('common.empty.noData')}
+        emptyText={t('common.empty.no_data')}
         pageSize={5}
         totalItems={filteredProducts.length}
         currentPage={page}

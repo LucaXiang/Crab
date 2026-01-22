@@ -294,15 +294,25 @@ impl CrabClient<Remote, Connected> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Returns
+    /// - `Ok(Authenticated)` on success
+    /// - `Err((error, Connected))` on failure, returning the original client for retry
     pub async fn login(
         mut self,
         username: &str,
         password: &str,
-    ) -> Result<CrabClient<Remote, Authenticated>, ClientError> {
+    ) -> Result<CrabClient<Remote, Authenticated>, (ClientError, Self)> {
         // Use mTLS HTTP client to login to Edge Server (port 3000)
-        let edge_http = self.edge_http.take().ok_or_else(|| {
-            ClientError::Connection("mTLS HTTP client not available. Are you connected?".into())
-        })?;
+        let edge_http = match self.edge_http.take() {
+            Some(h) => h,
+            None => {
+                return Err((
+                    ClientError::Connection("mTLS HTTP client not available. Are you connected?".into()),
+                    self,
+                ))
+            }
+        };
 
         tracing::info!("Employee login: {}", username);
 
@@ -313,19 +323,27 @@ impl CrabClient<Remote, Connected> {
         };
 
         // Get Edge Server URL from config
-        let edge_url = self
-            .config
-            .edge_url
-            .clone()
-            .ok_or_else(|| ClientError::Config("Edge Server URL not configured".into()))?;
+        let edge_url = match self.config.edge_url.clone() {
+            Some(url) => url,
+            None => {
+                self.edge_http = Some(edge_http);
+                return Err((ClientError::Config("Edge Server URL not configured".into()), self));
+            }
+        };
 
         // Send login request via mTLS
-        let response = edge_http
+        let response = match edge_http
             .post(format!("{}/api/auth/login", edge_url))
             .json(&login_req)
             .send()
             .await
-            .map_err(|e| ClientError::Connection(format!("Login request failed: {}", e)))?;
+        {
+            Ok(r) => r,
+            Err(e) => {
+                self.edge_http = Some(edge_http);
+                return Err((ClientError::Connection(format!("Login request failed: {}", e)), self));
+            }
+        };
 
         // Parse response using AppResponse format (matches Edge Server)
         let status = response.status();
@@ -334,22 +352,37 @@ impl CrabClient<Remote, Connected> {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(ClientError::Auth(text));
+            self.edge_http = Some(edge_http);
+            return Err((ClientError::Auth(text), self));
         }
 
-        let resp: AppResponse<shared::client::LoginResponse> =
-            response.json().await.map_err(|e| {
-                ClientError::InvalidResponse(format!("Failed to parse login response: {}", e))
-            })?;
+        let resp: AppResponse<shared::client::LoginResponse> = match response.json().await {
+            Ok(r) => r,
+            Err(e) => {
+                self.edge_http = Some(edge_http);
+                return Err((
+                    ClientError::InvalidResponse(format!("Failed to parse login response: {}", e)),
+                    self,
+                ));
+            }
+        };
 
         if !resp.success {
             let error_msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
-            return Err(ClientError::Auth(error_msg));
+            self.edge_http = Some(edge_http);
+            return Err((ClientError::Auth(error_msg), self));
         }
 
-        let login_data = resp
-            .data
-            .ok_or_else(|| ClientError::InvalidResponse("Missing login data in response".into()))?;
+        let login_data = match resp.data {
+            Some(d) => d,
+            None => {
+                self.edge_http = Some(edge_http);
+                return Err((
+                    ClientError::InvalidResponse("Missing login data in response".into()),
+                    self,
+                ));
+            }
+        };
 
         // Store session data
         self.session

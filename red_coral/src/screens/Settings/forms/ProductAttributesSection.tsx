@@ -66,10 +66,10 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
 
   const getAttributeTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      SINGLE_REQUIRED: t('settings.attribute.type.singleRequired'),
-      SINGLE_OPTIONAL: t('settings.attribute.type.singleOptional'),
-      MULTI_REQUIRED: t('settings.attribute.type.multiRequired'),
-      MULTI_OPTIONAL: t('settings.attribute.type.multiOptional'),
+      SINGLE_REQUIRED: t('settings.attribute.type.single_required'),
+      SINGLE_OPTIONAL: t('settings.attribute.type.single_optional'),
+      MULTI_REQUIRED: t('settings.attribute.type.multi_required'),
+      MULTI_OPTIONAL: t('settings.attribute.type.multi_optional'),
     };
     return labels[type] || type;
   };
@@ -132,7 +132,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
             <div className="max-h-[240px] overflow-y-auto custom-scrollbar space-y-1">
               {filteredUnselected.length === 0 ? (
                 <div className="text-center py-4 text-xs text-gray-400">
-                  {unselectedAttributes.length === 0 ? (t('settings.allAttributesSelected')) : (t('common.empty.noResults'))}
+                  {unselectedAttributes.length === 0 ? (t('settings.all_attributes_selected')) : (t('common.empty.no_results'))}
                 </div>
               ) : (
                 filteredUnselected.map(attr => (
@@ -156,7 +156,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
         {selectedAttributes.length === 0 ? (
            <div className="flex flex-col items-center justify-center py-10 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200 mx-1">
              <Sliders size={32} className="opacity-20 mb-2" />
-             <p className="text-sm">{t('settings.product.attribute.noSelected')}</p>
+             <p className="text-sm">{t('settings.product.attribute.no_selected')}</p>
              <button
                onClick={() => setShowAddPanel(true)}
                className="mt-3 text-teal-600 text-sm font-medium hover:underline"
@@ -179,7 +179,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-gray-800">{attr.name}</span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded border bg-blue-50 text-blue-600 border-blue-100">
-                      {attr.is_multi_select ? t('settings.attribute.type.multiSelect') : t('settings.attribute.type.singleSelect')}
+                      {attr.is_multi_select ? t('settings.attribute.type.multi_select') : t('settings.attribute.type.single_select')}
                     </span>
                   </div>
                   {inheritedAttributeIds.includes(attrId) ? (
@@ -200,7 +200,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                 {/* Options Area */}
                 <div className="p-4">
                   {options.length === 0 ? (
-                    <div className="text-sm text-gray-400 italic py-2 text-center">{t('common.empty.noData')}</div>
+                    <div className="text-sm text-gray-400 italic py-2 text-center">{t('common.empty.no_data')}</div>
                   ) : (
                     <div className="flex flex-wrap gap-2 max-h-[220px] overflow-y-auto custom-scrollbar content-start">
                       {options.map((opt) => {
@@ -248,18 +248,18 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                   {/* Validation/Hint Status */}
                   <div className="mt-3 flex items-center justify-between text-xs">
                      <span className="text-gray-400">
-                        {isMulti ? (t('settings.product.attribute.hint.multiSelect')) : (t('settings.product.attribute.hint.singleSelect'))}
+                        {isMulti ? (t('settings.product.attribute.hint.multi_select')) : (t('settings.product.attribute.hint.single_select'))}
                      </span>
                      {!hasDefault && (
                        <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
                          <AlertCircle size={10} />
-                         {t('settings.product.attribute.hint.noDefault')}
+                         {t('settings.product.attribute.hint.no_default')}
                        </span>
                      )}
                      {hasDefault && (
                         <span className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
                           <Check size={10} />
-                          {t('settings.product.attribute.hint.defaultSet')}
+                          {t('settings.product.attribute.hint.default_set')}
                         </span>
                      )}
                   </div>

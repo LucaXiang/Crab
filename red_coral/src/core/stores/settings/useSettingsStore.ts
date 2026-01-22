@@ -1,7 +1,7 @@
 import { persist } from 'zustand/middleware';
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import type { EmbeddedSpec, Category, Product, Tag, DiningTable, Zone } from '@/core/domain/types';
+import type { EmbeddedSpec, Category, Product, Tag, DiningTable, Zone, LabelPrintState } from '@/core/domain/types';
 
 /**
  * Settings UI Store - 纯 UI 状态管理
@@ -10,7 +10,7 @@ import type { EmbeddedSpec, Category, Product, Tag, DiningTable, Zone } from '@/
  * 本 Store 仅管理: 导航、Modal、表单、筛选/分页 UI 状态
  */
 
-type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS';
+type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS';
 type ModalAction = 'CREATE' | 'EDIT' | 'DELETE';
 type ModalEntity = 'TABLE' | 'ZONE' | 'PRODUCT' | 'CATEGORY' | 'TAG';
 
@@ -96,7 +96,7 @@ interface FormData {
   receipt_name?: string;
   kitchen_print_name?: string;
   print_destinations?: string[];  // PrintDestination IDs
-  is_label_print_enabled?: boolean;
+  is_label_print_enabled?: LabelPrintState;  // -1=继承, 0=禁用, 1=启用
   tags?: string[];         // Tag IDs
   specs?: EmbeddedSpec[];  // 嵌入式规格
   has_multi_spec?: boolean; // UI only: 是否多规格
@@ -179,7 +179,7 @@ const initialFormData: FormData = {
   receipt_name: '',
   kitchen_print_name: '',
   print_destinations: [],
-  is_label_print_enabled: false,
+  is_label_print_enabled: -1,  // 默认继承分类
   tags: [],
   specs: [],
   has_multi_spec: false,
@@ -254,7 +254,7 @@ export const useSettingsStore = create<SettingsStore>()(
             receipt_name: productData?.receipt_name ?? '',
             kitchen_print_name: productData?.kitchen_print_name ?? '',
             print_destinations: productData?.print_destinations || [],
-            is_label_print_enabled: !!productData?.is_label_print_enabled,
+            is_label_print_enabled: productData?.is_label_print_enabled ?? -1,  // 默认继承分类
             is_active: productData?.is_active ?? true,  // Default to active for new products
             tags: productData?.tags || [],
             specs: productData?.specs || [],
@@ -267,7 +267,7 @@ export const useSettingsStore = create<SettingsStore>()(
             name: categoryData?.name || '',
             sort_order: categoryData?.sort_order,
             print_destinations: categoryData?.print_destinations || [],
-            is_label_print_enabled: !!categoryData?.is_label_print_enabled,
+            is_label_print_enabled: categoryData?.is_label_print_enabled ? 1 : 0,  // Category: bool → 0/1
             is_active: categoryData?.is_active ?? true,  // Default to active for new categories
             is_virtual: categoryData?.is_virtual ?? false,
             tag_ids: categoryData?.tag_ids ?? [],

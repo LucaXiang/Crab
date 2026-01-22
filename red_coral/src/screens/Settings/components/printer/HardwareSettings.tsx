@@ -34,13 +34,13 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
       <div className="xl:col-span-1 space-y-6">
         <div className="flex items-center gap-2 text-gray-800 font-bold text-lg mb-2">
           <Settings size={20} className="text-gray-400" />
-          {t('settings.printer.form.mainStation')}
+          {t('settings.printer.form.main_station')}
         </div>
 
         <div className="space-y-4">
           <PrinterSelect
-            label={t('settings.printer.form.receiptPrinter')}
-            description={t('settings.printer.form.receiptPrinterDesc')}
+            label={t('settings.printer.form.receipt_printer')}
+            description={t('settings.printer.form.receipt_printer_desc')}
             icon={Printer}
             value={receiptPrinter}
             onChange={setReceiptPrinter}
@@ -57,8 +57,8 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
                   <Tag size={20} />
                 </div>
                 <div>
-                   <div className="font-bold text-gray-800">{t('settings.printer.labelPrinting')}</div>
-                   <div className="text-xs text-gray-500 mt-0.5">{t('settings.printer.form.labelPrinterDesc')}</div>
+                   <div className="font-bold text-gray-800">{t('settings.printer.label_printing')}</div>
+                   <div className="text-xs text-gray-500 mt-0.5">{t('settings.printer.form.label_printer_desc')}</div>
                 </div>
               </div>
 
@@ -79,16 +79,16 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
                     {loading ? (
                       <div className="w-full border border-gray-100 rounded-xl p-2.5 bg-gray-50 text-gray-400 text-sm flex items-center gap-2">
                          <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
-                         {t('settings.printer.message.loadingPrinters')}
+                         {t('settings.printer.message.loading_printers')}
                       </div>
                     ) : printers.length === 0 ? (
                       <div className="w-full border border-amber-200 rounded-xl p-2.5 bg-amber-50 text-amber-600 text-sm flex items-center gap-2">
-                        <AlertCircle size={16} /> {t('settings.printer.message.noPrinters')}
+                        <AlertCircle size={16} /> {t('settings.printer.message.no_printers')}
                       </div>
                     ) : (
                       <>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                          {t('settings.printer.form.targetPrinter')}
+                          {t('settings.printer.form.target_printer')}
                           <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 rounded uppercase font-bold tracking-wider">{t('settings.printer.badge.label')}</span>
                         </label>
                         <select
@@ -96,7 +96,7 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
                           onChange={(e) => setLabelPrinter(e.target.value || null)}
                           className="w-full border border-gray-200 rounded-xl p-2.5 pl-3 pr-10 bg-gray-50 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-500 transition-all cursor-pointer hover:bg-white appearance-none"
                         >
-                          <option value="">{t('settings.printer.form.selectPrinterPlaceholder')}</option>
+                          <option value="">{t('settings.printer.form.select_printer_placeholder')}</option>
                           {printers.map((p) => (
                             <option key={p} value={p}>
                               {p}
@@ -113,7 +113,7 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
                   {labelPrinter && !loading && !printers.includes(labelPrinter) && (
                     <div className="mt-2 text-xs text-red-600 flex items-center gap-1.5 bg-red-50 p-2 rounded-lg border border-red-100 animate-pulse">
                       <AlertCircle size={14} />
-                      {t('settings.printer.message.printerUnavailable')}
+                      {t('settings.printer.message.printer_unavailable')}
                     </div>
                   )}
                </div>
@@ -127,7 +127,7 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-gray-800 font-bold text-lg">
             <ChefHat size={20} className="text-gray-400" />
-            {t('settings.printer.kitchenPrinting.title')}
+            {t('settings.printer.kitchen_printing.title')}
           </div>
 
           {/* Toggle Switch */}
@@ -158,13 +158,13 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-blue-900">{t('settings.printer.routingSystem.title')}</h4>
+                        <h4 className="text-sm font-bold text-blue-900">{t('settings.printer.routing_system.title')}</h4>
                         <span className="text-[10px] text-blue-500 uppercase font-bold tracking-wider border border-blue-200 px-1.5 rounded bg-white">
                           {showHierarchyInfo ? (t('common.action.hide')) : (t('common.label.details'))}
                         </span>
                     </div>
                     <p className="text-xs text-blue-700 mt-1">
-                      {t('settings.printer.routingSystem.summary')}
+                      {t('settings.printer.routing_system.summary')}
                     </p>
                   </div>
                 </div>
@@ -173,19 +173,19 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
                 {showHierarchyInfo && (
                   <div className="mt-4 pl-11 pr-2 pb-2 text-xs text-blue-800 space-y-3 animate-in fade-in duration-200">
                     <div className="p-3 bg-white/60 rounded-xl border border-blue-100">
-                      <p className="font-bold mb-1 text-blue-900">{t('settings.printer.routingSystem.hierarchy')}</p>
+                      <p className="font-bold mb-1 text-blue-900">{t('settings.printer.routing_system.hierarchy')}</p>
                       <div className="flex items-center gap-2 text-blue-600/80">
-                          <span className="font-mono bg-blue-50 px-1 rounded">{t('settings.printer.routingSystem.levelProduct')}</span>
+                          <span className="font-mono bg-blue-50 px-1 rounded">{t('settings.printer.routing_system.level_product')}</span>
                           <span className="text-gray-400">→</span>
-                          <span className="font-mono bg-blue-50 px-1 rounded">{t('settings.printer.routingSystem.levelCategory')}</span>
+                          <span className="font-mono bg-blue-50 px-1 rounded">{t('settings.printer.routing_system.level_category')}</span>
                           <span className="text-gray-400">→</span>
-                          <span className="font-mono bg-blue-50 px-1 rounded">{t('settings.printer.routingSystem.levelGlobal')}</span>
+                          <span className="font-mono bg-blue-50 px-1 rounded">{t('settings.printer.routing_system.level_global')}</span>
                       </div>
                     </div>
                     <div className="p-3 bg-white/60 rounded-xl border border-blue-100">
-                        <p className="font-bold mb-1 text-blue-900">{t('settings.printer.routingSystem.priority')}</p>
+                        <p className="font-bold mb-1 text-blue-900">{t('settings.printer.routing_system.priority')}</p>
                         <p className="opacity-80">
-                          {t('settings.printer.routingSystem.switchHierarchy')}
+                          {t('settings.printer.routing_system.switch_hierarchy')}
                         </p>
                     </div>
                   </div>
@@ -194,8 +194,8 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
 
               <div className="p-6 space-y-8">
                 <PrinterSelect
-                  label={t('settings.printer.form.defaultGlobalPrinter')}
-                  description={t('settings.printer.form.defaultGlobalPrinterDesc')}
+                  label={t('settings.printer.form.default_global_printer')}
+                  description={t('settings.printer.form.default_global_printer_desc')}
                   icon={Printer}
                   value={kitchenPrinter}
                   onChange={setKitchenPrinter}
@@ -209,7 +209,7 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
                     <div className="w-full border-t border-gray-100"></div>
                   </div>
                   <div className="relative flex justify-center">
-                    <span className="bg-white px-3 text-xs font-medium text-gray-400 uppercase tracking-wider">{t('settings.printer.routingSystem.stations')}</span>
+                    <span className="bg-white px-3 text-xs font-medium text-gray-400 uppercase tracking-wider">{t('settings.printer.routing_system.stations')}</span>
                   </div>
                 </div>
 
@@ -221,9 +221,9 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
                 <ChefHat size={32} />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">{t('settings.printer.kitchenPrinting.disabled')}</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">{t('settings.printer.kitchen_printing.disabled')}</h3>
               <p className="text-gray-500 max-w-md mx-auto mb-6">
-                {t('settings.printer.kitchenPrinting.enableToConfigure')}
+                {t('settings.printer.kitchen_printing.enable_to_configure')}
               </p>
               <button
                 onClick={() => setIsKitchenPrintEnabled(true)}

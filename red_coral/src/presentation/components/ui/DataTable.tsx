@@ -361,7 +361,7 @@ export function DataTable<T>({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Trash2 size={14} />
-              <span>{t('common.action.batchDelete')}</span>
+              <span>{t('common.action.batch_delete')}</span>
             </button>
             <button
               onClick={exitSelectionMode}
@@ -409,7 +409,7 @@ export function DataTable<T>({
                 <button
                   onClick={() => setIsSelectionMode(true)}
                   className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors border border-transparent ${theme.selectBtn}`}
-                  title={t('common.selection.selectMode')}
+                  title={t('common.selection.select_mode')}
                 >
                   <ListChecks size={14} />
                   <span className="hidden sm:inline scale-90 origin-left">{t('common.action.select')}</span>
@@ -422,7 +422,7 @@ export function DataTable<T>({
         {/* Hint for interactive actions */}
         {onEdit && (
           <div className="px-4 pb-2 text-[10px] text-gray-400 text-center">
-            💡 {t('common.hint.longPressToEdit')}
+            💡 {t('common.hint.long_press_to_edit')}
           </div>
         )}
       </div>

@@ -171,10 +171,10 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
       newField = {
         id: generateId(),
         type: 'text',
-        name: t("settings.label.field.newText"),
+        name: t("settings.label.field.new_text"),
         x: 10, y: 10, width: 100, height: 20,
         fontSize: 12, fontWeight: 'normal', alignment: 'left',
-        template: t("settings.label.field.defaultText"),
+        template: t("settings.label.field.default_text"),
         dataSource: '',
         visible: true,
       };
@@ -182,7 +182,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
       newField = {
         id: generateId(),
         type: 'image',
-        name: t("settings.label.field.newImage"),
+        name: t("settings.label.field.new_image"),
         x: 10, y: 10, width: 80, height: 80,
         fontSize: 12,
         maintainAspectRatio: true, dataKey: '',
@@ -194,7 +194,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
        newField = {
          id: generateId(),
          type: 'separator',
-         name: t("settings.label.field.defaultSeparator"),
+         name: t("settings.label.field.default_separator"),
          x: 8, y: 50, width: 100, height: 2,
          fontSize: 12,
          dataSource: '',
@@ -224,7 +224,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
   const handlePrintTest = async () => {
       try {
         if (!labelPrinter) {
-          alert(t("settings.label.selectPrinterFirst"));
+          alert(t("settings.label.select_printer_first"));
           return;
         }
 
@@ -236,7 +236,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           }
         } catch (e) {
           console.warn("Invalid test data JSON:", e);
-          alert(t("settings.label.invalidJson"));
+          alert(t("settings.label.invalid_json"));
           return;
         }
 
@@ -341,7 +341,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         setDialogConfig({
           isOpen: true,
           title: t('common.message.success'),
-          description: (t("settings.label.testSent")).replace('{printer}', String(labelPrinter.selectedPrinterId ?? '')),
+          description: (t("settings.label.test_sent")).replace('{printer}', String(labelPrinter.selectedPrinterId ?? '')),
           variant: 'info'
         });
       } catch (e) {
@@ -350,7 +350,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         setDialogConfig({
           isOpen: true,
           title: t('common.message.error'),
-          description: (t("settings.label.testFailed")).replace('{error}', errorMsg),
+          description: (t("settings.label.test_failed")).replace('{error}', errorMsg),
           variant: 'danger'
         });
       }
@@ -371,7 +371,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           case 'image': return field.dataKey || field.name;
           case 'barcode': return field.dataKey || field.name;
           case 'qrcode': return field.dataKey || field.name;
-          case 'separator': return t("settings.label.horizontalLine");
+          case 'separator': return t("settings.label.horizontal_line");
           default: return '';
       }
   };
@@ -395,7 +395,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
              className={`p-2 rounded-lg transition-all flex items-center gap-2 ${
                showLayers ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50'
              }`}
-             title={t('settings.label.toggleLayers')}
+             title={t('settings.label.toggle_layers')}
            >
              <Layers size={20} />
              <span className="text-sm font-medium hidden md:inline">{t('settings.label.layers')}</span>
@@ -415,7 +415,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
              className={`p-2 rounded-lg transition-all flex items-center gap-2 ${
                showProperties ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50'
              }`}
-             title={t('settings.label.toggleProperties')}
+             title={t('settings.label.toggle_properties')}
            >
              <Settings size={20} />
              <span className="text-sm font-medium hidden md:inline">{t('settings.common.properties')}</span>
@@ -426,7 +426,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           <button
             onClick={handlePrintTest}
             className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-            title={t('settings.label.printTestLabel')}
+            title={t('settings.label.print_test_label')}
           >
             <Printer size={20} />
           </button>
@@ -434,7 +434,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           <button
             onClick={() => setShowHelper(true)}
             className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-            title={t('settings.supportedFields')}
+            title={t('settings.supported_fields')}
           >
             <HelpCircle size={20} />
           </button>
@@ -533,7 +533,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
             
             {template.fields.length === 0 && (
               <div className="text-center py-8 text-gray-400 text-xs">
-                {t("settings.label.noLayers")}
+                {t("settings.label.no_layers")}
               </div>
             )}
           </div>
@@ -556,7 +556,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                
                <div className="space-y-4">
                  <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.templateName")}</label>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.template_name")}</label>
                    <input
                      type="text"
                      value={template.name}
@@ -567,7 +567,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                  
                  <div className="grid grid-cols-2 gap-3">
                    <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.widthMm")}</label>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.width_mm")}</label>
                      <NumberInput
                        value={template.widthMm ?? 0}
                        onValueChange={(val) => handleTemplateChange({ ...template, widthMm: val })}
@@ -575,7 +575,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                      />
                    </div>
                    <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.heightMm")}</label>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.height_mm")}</label>
                      <NumberInput
                        value={template.heightMm ?? 0}
                        onValueChange={(val) => handleTemplateChange({ ...template, heightMm: val })}
@@ -586,7 +586,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
 
                  <div className="grid grid-cols-2 gap-3">
                    <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.paddingX")}</label>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.padding_x")}</label>
                      <NumberInput
                        value={template.paddingMmX || 0}
                        onValueChange={(val) => handleTemplateChange({ ...template, paddingMmX: val })}
@@ -595,7 +595,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                      />
                    </div>
                    <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.paddingY")}</label>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.padding_y")}</label>
                      <NumberInput
                        value={template.paddingMmY || 0}
                        onValueChange={(val) => handleTemplateChange({ ...template, paddingMmY: val })}
@@ -614,12 +614,12 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
                     />
                     <label htmlFor="showOffsetBorder" className="text-sm text-gray-600 select-none cursor-pointer">
-                      {t("settings.label.showOffsetBorder")}
+                      {t("settings.label.show_offset_border")}
                     </label>
                  </div>
 
                  <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.renderDpi")}</label>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.render_dpi")}</label>
                    <NumberInput
                      value={template.renderDpi || 203}
                      onValueChange={(val) => handleTemplateChange({ ...template, renderDpi: val })}
@@ -627,17 +627,17 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                      step="1"
                    />
                    <p className="text-xs text-gray-400 mt-1">
-                     {t("settings.label.renderDpiHint")}
+                     {t("settings.label.render_dpi_hint")}
                    </p>
                  </div>
 
                  <div className="pt-4 border-t border-gray-100">
                     <p className="text-xs text-gray-500 mb-4">
-                      {t("settings.label.selectElementHint")}
+                      {t("settings.label.select_element_hint")}
                     </p>
 
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-700">{t("settings.label.testDataJson")}</label>
+                      <label className="text-sm font-medium text-gray-700">{t("settings.label.test_data_json")}</label>
                       <button
                         onClick={() => {
                           const sampleData = SUPPORTED_LABEL_FIELDS.reduce((acc, field) => {
@@ -648,7 +648,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                         }}
                         className="text-xs text-blue-600 hover:text-blue-700 font-medium hover:underline"
                       >
-                        {t("settings.label.fillSample")}
+                        {t("settings.label.fill_sample")}
                       </button>
                     </div>
                     <JsonEditor
@@ -658,7 +658,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                       placeholder='{"price": "€10.00", "item_name": "Test Item"}'
                     />
                     <p className="text-xs text-gray-400 mt-2">
-                      💡 {t("settings.label.testDataHint")}
+                      💡 {t("settings.label.test_data_hint")}
                     </p>
                  </div>
                </div>

@@ -107,14 +107,14 @@ export const LabelTemplateManager: React.FC = () => {
 
   const handleDeleteTemplate = (templateId: string) => {
     if (templates.length === 1) {
-      toast.error(t('settings.printer.alert.deleteLastTemplate'));
+      toast.error(t('settings.printer.alert.delete_last_template'));
       return;
     }
 
     setConfirmDialog({
       isOpen: true,
-      title: t('settings.printer.alert.confirmDelete'),
-      description: t('settings.printer.alert.confirmDeleteDesc'),
+      title: t('settings.printer.alert.confirm_delete'),
+      description: t('settings.printer.alert.confirm_delete_desc'),
       onConfirm: () => {
         const updatedTemplates = templates.filter((tmpl) => tmpl.id !== templateId);
         setTemplates(updatedTemplates);
@@ -197,7 +197,7 @@ export const LabelTemplateManager: React.FC = () => {
                     handleDuplicateTemplate(template);
                   }}
                   className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  title={t('settings.printer.template.duplicateTemplate')}
+                  title={t('settings.printer.template.duplicate_template')}
                 >
                   <Copy size={16} />
                 </button>
@@ -232,7 +232,7 @@ export const LabelTemplateManager: React.FC = () => {
               }`}
             >
               <Edit2 size={16} />
-              {t('settings.printer.template.editDesign')}
+              {t('settings.printer.template.edit_design')}
             </button>
           </div>
         );
@@ -246,7 +246,7 @@ export const LabelTemplateManager: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm">
             <Plus size={24} />
           </div>
-          <span className="font-medium">{t('settings.printer.template.createTemplate')}</span>
+          <span className="font-medium">{t('settings.printer.template.create_template')}</span>
         </button>
       </div>
 
@@ -261,14 +261,14 @@ export const LabelTemplateManager: React.FC = () => {
                 <input
                   value={templateName}
                   onChange={(e) => setTemplateName(e.target.value)}
-                  placeholder={t('settings.printer.template.form.namePlaceholder')}
+                  placeholder={t('settings.printer.template.form.name_placeholder')}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                   autoFocus
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">{t('settings.printer.template.form.widthMm')}</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">{t('settings.printer.template.form.width_mm')}</label>
                   <input
                     type="number"
                     value={templateWidth}
@@ -277,7 +277,7 @@ export const LabelTemplateManager: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">{t('settings.printer.template.form.heightMm')}</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">{t('settings.printer.template.form.height_mm')}</label>
                   <input
                     type="number"
                     value={templateHeight}

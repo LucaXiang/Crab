@@ -5,7 +5,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { AttributeSelector } from './AttributeSelector';
 import { ItemActionPanel } from '../ui/ItemActionPanel';
 import { AttributeTemplate, AttributeOption, ProductAttribute, EmbeddedSpec } from '@/core/domain/types';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface ItemConfiguratorModalProps {
   isOpen: boolean;
@@ -130,7 +130,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                     <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
                       <div className="mb-3">
                         <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                          <span>{t('pos.product.selectSpecification')}</span>
+                          <span>{t('pos.product.select_specification')}</span>
                           <span className="text-xs text-red-500">*</span>
                         </h3>
                       </div>
@@ -208,7 +208,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                       <div className="p-4 bg-gray-50 rounded-full">
                         <Check size={32} className="text-gray-300" />
                       </div>
-                      <p>{t('pos.product.noOptions')}</p>
+                      <p>{t('pos.product.no_options')}</p>
                     </div>
                   )}
                 </div>

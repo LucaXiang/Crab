@@ -59,8 +59,27 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
             // Extract attributes from ProductFull.attributes (ProductAttributeBinding[])
             const attrBindings = productFull?.attributes || [];
 
+            // Build set of product attribute IDs for deduplication
+            const productAttrIds = new Set(attrBindings.map(b => String(b.attribute.id)));
+
+            // Fetch category attributes (inherited)
+            let categoryAttributes: AttributeTemplate[] = [];
+            if (productFull.category) {
+                try {
+                    categoryAttributes = await api.listCategoryAttributes(productFull.category);
+                    // Filter out duplicates (product-level binding takes precedence)
+                    categoryAttributes = categoryAttributes.filter(
+                        attr => !productAttrIds.has(String(attr.id))
+                    );
+                } catch (err) {
+                    console.warn('Failed to load category attributes:', err);
+                }
+            }
+
             // Extract Attribute objects directly (AttributeTemplate = Attribute)
-            const attributeList: AttributeTemplate[] = attrBindings.map(binding => binding.attribute);
+            const productAttributeList: AttributeTemplate[] = attrBindings.map(binding => binding.attribute);
+            // Merge: product attributes first, then category attributes (inherited)
+            const attributeList: AttributeTemplate[] = [...productAttributeList, ...categoryAttributes];
             setAttributes(attributeList);
 
             // Convert ProductAttributeBinding[] to ProductAttribute[] (HasAttribute relation)
@@ -72,13 +91,28 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
               display_order: binding.display_order,
               attribute: binding.attribute,
             }));
-            setBindings(productBindings);
+            // Add category attributes as bindings (inherited, not required by default)
+            const categoryBindings: ProductAttribute[] = categoryAttributes.map((attr, idx) => ({
+              id: null, // No binding ID for inherited attributes
+              from: productFull.category,
+              to: String(attr.id),
+              is_required: false, // Category attributes are optional by default
+              display_order: 1000 + idx, // Place after product attributes
+              attribute: attr,
+            }));
+            setBindings([...productBindings, ...categoryBindings]);
 
             // Process options from attributes array (unified structure)
             // Options are stored as arrays, the index IS the option ID
             const optionsMap = new Map<string, AttributeOption[]>();
             attrBindings.forEach(binding => {
                 const attr = binding.attribute;
+                if (attr.options && attr.options.length > 0) {
+                    optionsMap.set(String(attr.id), attr.options);
+                }
+            });
+            // Add category attribute options
+            categoryAttributes.forEach(attr => {
                 if (attr.options && attr.options.length > 0) {
                     optionsMap.set(String(attr.id), attr.options);
                 }
@@ -118,7 +152,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
 
         } catch (err) {
             console.error(err);
-            toast.error(t('error.loadAttributes'));
+            toast.error(t('error.load_attributes'));
         } finally {
             if (mounted) setIsLoadingAttributes(false);
         }
@@ -201,7 +235,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     <ItemConfiguratorModal
       isOpen={true} 
       onClose={onClose}
-      title={t('pos.cart.editItem')}
+      title={t('pos.cart.edit_item')}
       productName={item.external_id ? `${item.external_id} ${item.name}` : item.name}
       isLoading={isLoadingAttributes}
       attributes={attributes}

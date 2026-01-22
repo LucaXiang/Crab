@@ -194,7 +194,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
             <div className="bg-gray-50/80 border border-gray-100 rounded-2xl p-4 space-y-2">
               <div className="flex justify-between items-center text-sm">
                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500">{t('pos.cart.unitPrice')}</span>
+                    <span className="text-gray-500">{t('pos.cart.unit_price')}</span>
                     {discount > 0 && (
                         <span className="text-xs font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
                             -{discount}%
@@ -218,7 +218,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
               {/* Collapsed Details - Only show if relevant */}
               {(optionsModifier !== 0) && (
                   <div className="pt-2 border-t border-gray-200/50 flex justify-between text-xs text-gray-400">
-                    <span>{t('pos.cart.basePrice')}: {formatCurrency(basePrice)}</span>
+                    <span>{t('pos.cart.base_price')}: {formatCurrency(basePrice)}</span>
                     <span className={optionsModifier > 0 ? 'text-orange-500' : 'text-green-600'}>
                         {t('pos.product.options')}: {optionsModifier > 0 ? '+' : ''}{formatCurrency(optionsModifier)}
                     </span>
@@ -273,7 +273,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                             <EscalatableGate
                                 permission={Permission.APPLY_DISCOUNT}
                                 mode="intercept"
-                                description={t('pos.cart.enterDiscount')}
+                                description={t('pos.cart.enter_discount')}
                                 onAuthorized={(user) => openNumpad('DISC', { id: String(user.id), username: user.username })}
                             >
                                 <button
@@ -403,7 +403,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
           <div className="flex items-center justify-between p-6 bg-white shadow-sm z-10">
             <div>
                 <span className="block font-bold text-gray-900 text-lg">
-                    {editMode === 'QTY' ? (t('common.label.quantity')) : editMode === 'PRICE' ? (t('pos.cart.unitPrice')) : (t('checkout.cart.discount'))}
+                    {editMode === 'QTY' ? (t('common.label.quantity')) : editMode === 'PRICE' ? (t('pos.cart.unit_price')) : (t('checkout.cart.discount'))}
                 </span>
                 <span className="text-xs text-gray-500">
                      {editMode === 'QTY' ? (t('pos.cart.input.quantity')) : editMode === 'PRICE' ? (t('pos.cart.input.price')) : (t('pos.cart.input.discount'))}

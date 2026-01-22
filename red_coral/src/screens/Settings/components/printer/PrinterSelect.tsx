@@ -49,11 +49,11 @@ export const PrinterSelect: React.FC<PrinterSelectProps> = ({
         {loading ? (
           <div className="w-full border border-gray-100 rounded-xl p-2.5 bg-gray-50 text-gray-400 text-sm flex items-center gap-2">
              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
-             {t('settings.printer.message.loadingPrinters')}
+             {t('settings.printer.message.loading_printers')}
           </div>
         ) : printers.length === 0 ? (
           <div className="w-full border border-amber-200 rounded-xl p-2.5 bg-amber-50 text-amber-600 text-sm flex items-center gap-2">
-            <AlertCircle size={16} /> {t('settings.printer.message.noPrinters')}
+            <AlertCircle size={16} /> {t('settings.printer.message.no_printers')}
           </div>
         ) : (
           <>
@@ -62,7 +62,7 @@ export const PrinterSelect: React.FC<PrinterSelectProps> = ({
               onChange={(e) => onChange(e.target.value || null)}
               className="w-full border border-gray-200 rounded-xl p-2.5 pl-3 pr-10 bg-gray-50 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition-all cursor-pointer hover:bg-white appearance-none"
             >
-              <option value="">{t('settings.printer.form.selectPrinterPlaceholder')}</option>
+              <option value="">{t('settings.printer.form.select_printer_placeholder')}</option>
               {printers.map((p) => (
                 <option key={p} value={p}>
                   {p}
@@ -79,7 +79,7 @@ export const PrinterSelect: React.FC<PrinterSelectProps> = ({
       {!isSelectedAvailable && value && !loading && (
         <div className="mt-2 text-xs text-red-600 flex items-center gap-1.5 bg-red-50 p-2 rounded-lg border border-red-100 animate-pulse">
           <AlertCircle size={14} />
-          {t('settings.printer.message.printerUnavailable')}
+          {t('settings.printer.message.printer_unavailable')}
         </div>
       )}
     </div>

@@ -226,7 +226,7 @@ pub fn apply_discount_rules(
     if !stackable_pct.is_empty() {
         let mut remaining_multiplier = Decimal::ONE;
         for rule in &stackable_pct {
-            let rate = Decimal::from(rule.adjustment_value) / hundred;
+            let rate = to_decimal(rule.adjustment_value) / hundred;
             remaining_multiplier *= Decimal::ONE - rate;
         }
         // Total percentage discount amount
@@ -235,7 +235,7 @@ pub fn apply_discount_rules(
 
         // Record each rule's individual contribution
         for rule in &stackable_pct {
-            let individual_amount = price_basis * Decimal::from(rule.adjustment_value) / hundred;
+            let individual_amount = price_basis * to_decimal(rule.adjustment_value) / hundred;
             applied_rules.push(AppliedRule::from_rule(
                 &to_shared_rule(rule),
                 to_f64(individual_amount),
@@ -245,7 +245,7 @@ pub fn apply_discount_rules(
 
     // Simple addition for fixed discounts
     for rule in &stackable_fixed {
-        let amount = Decimal::from(rule.adjustment_value) / hundred;
+        let amount = to_decimal(rule.adjustment_value) / hundred;
         total_discount += amount;
         applied_rules.push(AppliedRule::from_rule(
             &to_shared_rule(rule),
@@ -261,12 +261,12 @@ pub fn apply_discount_rules(
 
 /// Calculate discount amount for a single rule
 fn calculate_single_discount(rule: &PriceRule, price_basis: Decimal) -> Decimal {
-    let value = Decimal::from(rule.adjustment_value);
+    let value = to_decimal(rule.adjustment_value);
     let hundred = Decimal::ONE_HUNDRED;
 
     match rule.adjustment_type {
         AdjustmentType::Percentage => price_basis * value / hundred,
-        AdjustmentType::FixedAmount => value / hundred, // cents to dollars
+        AdjustmentType::FixedAmount => value, // direct currency amount
     }
 }
 
@@ -365,12 +365,12 @@ pub fn apply_surcharge_rules(
 
 /// Calculate surcharge amount for a single rule
 fn calculate_single_surcharge(rule: &PriceRule, price_basis: Decimal) -> Decimal {
-    let value = Decimal::from(rule.adjustment_value);
+    let value = to_decimal(rule.adjustment_value);
     let hundred = Decimal::ONE_HUNDRED;
 
     match rule.adjustment_type {
         AdjustmentType::Percentage => price_basis * value / hundred,
-        AdjustmentType::FixedAmount => value / hundred, // cents to dollars
+        AdjustmentType::FixedAmount => value, // direct currency amount
     }
 }
 
@@ -500,7 +500,7 @@ mod tests {
     fn make_rule(
         rule_type: RuleType,
         adjustment_type: AdjustmentType,
-        value: i32,
+        value: f64,
         priority: i32,
         stackable: bool,
         exclusive: bool,
@@ -538,7 +538,7 @@ mod tests {
     fn make_rule_with_scope(
         rule_type: RuleType,
         adjustment_type: AdjustmentType,
-        value: i32,
+        value: f64,
         priority: i32,
         stackable: bool,
         exclusive: bool,
@@ -555,11 +555,11 @@ mod tests {
 
     #[test]
     fn test_simple_discount() {
-        // 10% discount on $100 = $10 discount, $90 final
+        // 10% discount on ¥100 = ¥10 discount, ¥90 final
         let rule = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             0,
             true,
             false,
@@ -580,13 +580,13 @@ mod tests {
 
     #[test]
     fn test_manual_then_rule_discount() {
-        // $100 base
-        // 10% manual discount -> $90
-        // 10% rule discount on $90 -> $9 discount -> $81 final
+        // ¥100 base
+        // 10% manual discount -> ¥90
+        // 10% rule discount on ¥90 -> ¥9 discount -> ¥81 final
         let rule = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             0,
             true,
             false,
@@ -609,7 +609,7 @@ mod tests {
         let exclusive = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            20,
+            20.0,
             0,
             false,
             true,
@@ -617,7 +617,7 @@ mod tests {
         let non_exclusive = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            30,
+            30.0,
             0,
             true,
             false,
@@ -635,13 +635,13 @@ mod tests {
     #[test]
     fn test_surcharge_based_on_base() {
         // Surcharge should be calculated on base price, not after discounts
-        // $100 base, 10% manual discount -> $90
-        // 10% surcharge on $100 base = $10
-        // Final = $90 + $10 = $100
+        // ¥100 base, 10% manual discount -> ¥90
+        // 10% surcharge on ¥100 base = ¥10
+        // Final = ¥90 + ¥10 = ¥100
         let rule = make_rule(
             RuleType::Surcharge,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             0,
             true,
             false,
@@ -661,12 +661,12 @@ mod tests {
 
     #[test]
     fn test_options_modifier() {
-        // $10 base + $2 options = $12 base
-        // 10% discount = $1.20
+        // ¥10 base + ¥2 options = ¥12 base
+        // 10% discount = ¥1.20
         let rule = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             0,
             true,
             false,
@@ -685,12 +685,12 @@ mod tests {
     #[test]
     fn test_stackable_percentage_capitalist_mode() {
         // Two 10% stackable discounts in "capitalist mode"
-        // $100 * (1 - 0.10) * (1 - 0.10) = $100 * 0.9 * 0.9 = $81
-        // Total discount = $100 - $81 = $19
+        // ¥100 * (1 - 0.10) * (1 - 0.10) = ¥100 * 0.9 * 0.9 = ¥81
+        // Total discount = ¥100 - ¥81 = ¥19
         let rule1 = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             0,
             true,
             false,
@@ -698,7 +698,7 @@ mod tests {
         let rule2 = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             0,
             true,
             false,
@@ -714,11 +714,11 @@ mod tests {
 
     #[test]
     fn test_stackable_fixed_addition() {
-        // Two fixed discounts: $5 + $3 = $8 total
+        // Two fixed discounts: ¥5 + ¥3 = ¥8 total
         let rule1 = make_rule(
             RuleType::Discount,
             AdjustmentType::FixedAmount,
-            500, // $5 in cents
+            5.0,
             0,
             true,
             false,
@@ -726,7 +726,7 @@ mod tests {
         let rule2 = make_rule(
             RuleType::Discount,
             AdjustmentType::FixedAmount,
-            300, // $3 in cents
+            3.0,
             0,
             true,
             false,
@@ -745,7 +745,7 @@ mod tests {
         let winner = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            15,
+            15.0,
             10, // Higher priority
             false,
             false,
@@ -753,7 +753,7 @@ mod tests {
         let loser = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            25,
+            25.0,
             5, // Lower priority
             false,
             false,
@@ -774,7 +774,7 @@ mod tests {
         let non_stackable = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             0,
             false,
             false,
@@ -782,7 +782,7 @@ mod tests {
         let stackable = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            5,
+            5.0,
             0,
             true,
             false,
@@ -808,7 +808,7 @@ mod tests {
         let global_rule = make_rule_with_scope(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             5,
             true,
             false,
@@ -821,7 +821,7 @@ mod tests {
         let specific_rule = make_rule_with_scope(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             5,
             true,
             false,
@@ -834,7 +834,7 @@ mod tests {
         let retail_rule = make_rule_with_scope(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             5,
             true,
             false,
@@ -850,7 +850,7 @@ mod tests {
         let global = make_rule_with_scope(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            30, // Higher discount
+            30.0, // Higher discount
             100, // Higher user priority
             false,
             false,
@@ -860,7 +860,7 @@ mod tests {
         let specific = make_rule_with_scope(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10, // Lower discount
+            10.0, // Lower discount
             0,  // Lower user priority
             false,
             false,
@@ -884,7 +884,7 @@ mod tests {
         let exclusive = make_rule(
             RuleType::Surcharge,
             AdjustmentType::Percentage,
-            15,
+            15.0,
             0,
             false,
             true,
@@ -892,7 +892,7 @@ mod tests {
         let stackable = make_rule(
             RuleType::Surcharge,
             AdjustmentType::Percentage,
-            5,
+            5.0,
             0,
             true,
             false,
@@ -911,7 +911,7 @@ mod tests {
         let rule1 = make_rule(
             RuleType::Surcharge,
             AdjustmentType::Percentage,
-            5,
+            5.0,
             0,
             true,
             false,
@@ -919,7 +919,7 @@ mod tests {
         let rule2 = make_rule(
             RuleType::Surcharge,
             AdjustmentType::Percentage,
-            5,
+            5.0,
             0,
             true,
             false,
@@ -936,14 +936,14 @@ mod tests {
 
     #[test]
     fn test_discount_and_surcharge_combined() {
-        // $100 base
-        // 10% discount on base -> $10 discount -> $90
-        // 5% surcharge on base -> $5 surcharge
-        // Final = $90 + $5 = $95
+        // ¥100 base
+        // 10% discount on base -> ¥10 discount -> ¥90
+        // 5% surcharge on base -> ¥5 surcharge
+        // Final = ¥90 + ¥5 = ¥95
         let discount = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             0,
             true,
             false,
@@ -951,7 +951,7 @@ mod tests {
         let surcharge = make_rule(
             RuleType::Surcharge,
             AdjustmentType::Percentage,
-            5,
+            5.0,
             0,
             true,
             false,
@@ -968,15 +968,15 @@ mod tests {
 
     #[test]
     fn test_full_calculation_flow() {
-        // $50 original + $5 options = $55 base
-        // 20% manual discount -> $11 -> $44
-        // 10% rule discount on $44 -> $4.40 -> $39.60
-        // 5% surcharge on $55 base -> $2.75
-        // Final = $39.60 + $2.75 = $42.35
+        // ¥50 original + ¥5 options = ¥55 base
+        // 20% manual discount -> ¥11 -> ¥44
+        // 10% rule discount on ¥44 -> ¥4.40 -> ¥39.60
+        // 5% surcharge on ¥55 base -> ¥2.75
+        // Final = ¥39.60 + ¥2.75 = ¥42.35
         let discount = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            10,
+            10.0,
             0,
             true,
             false,
@@ -984,7 +984,7 @@ mod tests {
         let surcharge = make_rule(
             RuleType::Surcharge,
             AdjustmentType::Percentage,
-            5,
+            5.0,
             0,
             true,
             false,
@@ -1016,11 +1016,11 @@ mod tests {
 
     #[test]
     fn test_discount_cannot_go_negative() {
-        // 150% discount should result in $0, not negative
+        // 150% discount should result in ¥0, not negative
         let rule = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            150,
+            150.0,
             0,
             true,
             false,
@@ -1034,12 +1034,12 @@ mod tests {
     }
 
     #[test]
-    fn test_fixed_discount_in_cents() {
-        // 550 cents = $5.50 discount
+    fn test_fixed_discount() {
+        // ¥5.50 fixed discount
         let rule = make_rule(
             RuleType::Discount,
             AdjustmentType::FixedAmount,
-            550,
+            5.5,
             0,
             true,
             false,
@@ -1054,12 +1054,12 @@ mod tests {
 
     #[test]
     fn test_precision_rounding() {
-        // $99.99 base with 33% discount
-        // $99.99 * 0.33 = $32.9967 -> $33.00
+        // ¥99.99 base with 33% discount
+        // ¥99.99 * 0.33 = ¥32.9967 -> ¥33.00
         let rule = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
-            33,
+            33.0,
             0,
             true,
             false,

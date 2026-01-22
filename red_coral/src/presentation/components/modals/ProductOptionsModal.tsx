@@ -105,7 +105,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
     // Validate specification selection if multi-spec is enabled
     if (hasMultiSpec && specifications && specifications.length > 0) {
       if (!selectedSpecId) {
-        toast.error(t('pos.product.specificationRequired'));
+        toast.error(t('pos.product.specification_required'));
         return;
       }
     }
@@ -173,7 +173,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
     <ItemConfiguratorModal
       isOpen={isOpen}
       onClose={onClose}
-      title={t('pos.product.selectOptions')}
+      title={t('pos.product.select_options')}
       productName={productName}
       attributes={attributes}
       allOptions={allOptions}

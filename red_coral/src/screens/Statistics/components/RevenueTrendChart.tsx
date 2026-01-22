@@ -11,7 +11,7 @@ import {
 import { useI18n } from '@/hooks/useI18n';
 import { RevenueTrendPoint, TimeRange } from '@/core/domain/types';
 import { CustomTooltip } from './CustomTooltip';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface RevenueTrendChartProps {
   data: RevenueTrendPoint[];
@@ -29,7 +29,7 @@ export const RevenueTrendChart: React.FC<RevenueTrendChartProps> = ({
   return (
     <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-w-0">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-bold text-gray-800">{t("statistics.chart.revenueTrend")}</h3>
+        <h3 className="text-lg font-bold text-gray-800">{t("statistics.chart.revenue_trend")}</h3>
       </div>
       <div className="min-w-0">
         {data.length > 0 ? (
@@ -68,7 +68,7 @@ export const RevenueTrendChart: React.FC<RevenueTrendChartProps> = ({
           </ResponsiveContainer>
         ) : (
           <div className="flex items-center justify-center h-full text-gray-400">
-            {t('common.empty.noData')}
+            {t('common.empty.no_data')}
           </div>
         )}
       </div>

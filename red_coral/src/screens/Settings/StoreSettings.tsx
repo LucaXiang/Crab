@@ -61,11 +61,11 @@ export const StoreSettings: React.FC = () => {
             <div className="col-span-2">
               <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-6 flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-gray-400" />
-                {t('settings.store.form.basicInfo')}
+                {t('settings.store.form.basic_info')}
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                  <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.store.form.establishmentName')}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.store.form.establishment_name')}</label>
                   <div className="relative">
                     <input
                     type="text"
@@ -79,7 +79,7 @@ export const StoreSettings: React.FC = () => {
                 </div>
 
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.store.form.logoUrl')}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.store.form.logo_url')}</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <ImageIcon className="h-4 w-4 text-gray-400" />
@@ -90,12 +90,12 @@ export const StoreSettings: React.FC = () => {
                       value={formData.logoUrl || ''}
                       onChange={onInputChange}
                       autoComplete="new-password"
-                      placeholder={t('settings.store.form.logoHelp')}
+                      placeholder={t('settings.store.form.logo_help')}
                       className="block w-full pl-10 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2.5 border transition-colors"
                     />
                   </div>
                   <p className="mt-1.5 text-xs text-gray-500">
-                    {t('settings.store.form.logoHelp')}
+                    {t('settings.store.form.logo_help')}
                   </p>
                 </div>
               </div>
@@ -107,7 +107,7 @@ export const StoreSettings: React.FC = () => {
             <div className="col-span-2">
               <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-6 flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-gray-400" />
-                {t('settings.store.form.contactInfo')}
+                {t('settings.store.form.contact_info')}
               </h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -127,7 +127,7 @@ export const StoreSettings: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     <div className="flex items-center gap-2">
                       <CreditCard className="w-3.5 h-3.5 text-gray-400" />
-                      {t('settings.store.form.taxId')}
+                      {t('settings.store.form.tax_id')}
                     </div>
                   </label>
                   <input

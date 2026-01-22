@@ -4,7 +4,7 @@ import { Permission as PermissionValues } from '@/core/domain/types';
 import { X, Clock, RotateCcw, Trash2, ClipboardList } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { EscalatableGate } from './auth/EscalatableGate';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface DraftListModalProps {
   draftOrders: DraftOrder[];

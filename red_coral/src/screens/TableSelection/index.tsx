@@ -268,7 +268,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
                     </div>
                   ) : zoneTables.length === 0 ? (
                     <div className="text-center text-gray-400 text-sm py-8">
-                      {t('table.noTables')}
+                      {t('table.no_tables')}
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pb-10">

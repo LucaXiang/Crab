@@ -7,14 +7,12 @@ import { createTauriClient, invokeApi } from '@/infrastructure/api';
 import { getErrorMessage } from '@/utils/error';
 
 const api = createTauriClient();
-import { useProductStore, useCategoryStore } from '@/core/stores/resources';
-import { useZoneTableStore } from '@/hooks/useZonesAndTables';
+import { useProductStore, useCategoryStore, useZoneStore, useTableStore } from '@/core/stores/resources';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 
 export const DataTransfer: React.FC = () => {
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
-  const clearZoneTableCache = useZoneTableStore((state) => state.clearCache);
   const refreshData = useSettingsStore((state) => state.refreshData);
 
   const handleExport = async () => {
@@ -31,7 +29,7 @@ export const DataTransfer: React.FC = () => {
 
       setLoading(true);
       await invokeApi('export_data', { path });
-      toast.success(t('settings.dataTransfer.export.success'));
+      toast.success(t('settings.data_transfer.export.success'));
     } catch (error) {
       console.error('Export failed:', error);
       toast.error(getErrorMessage(error));
@@ -58,13 +56,14 @@ export const DataTransfer: React.FC = () => {
       await invokeApi('import_data', { path: selectedPath });
 
       // Clear all caches to force reload
-      useProductStore.getState().fetchAll();
-      useCategoryStore.getState().fetchAll();
-      clearZoneTableCache();
+      useProductStore.getState().fetchAll(true);
+      useCategoryStore.getState().fetchAll(true);
+      useZoneStore.getState().fetchAll(true);
+      useTableStore.getState().fetchAll(true);
 
       // Increment dataVersion to trigger reload in all components
       refreshData();
-      toast.success(t('settings.dataTransfer.import.success'));
+      toast.success(t('settings.data_transfer.import.success'));
     } catch (error) {
       console.error('[DataTransfer] Import failed:', error);
       toast.error(getErrorMessage(error));
@@ -77,10 +76,10 @@ export const DataTransfer: React.FC = () => {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          {t('settings.dataTransfer.title')}
+          {t('settings.data_transfer.title')}
         </h2>
         <p className="text-gray-500">
-          {t('settings.dataTransfer.description')}
+          {t('settings.data_transfer.description')}
         </p>
       </div>
 
@@ -92,11 +91,11 @@ export const DataTransfer: React.FC = () => {
               <Download size={24} />
             </div>
             <h3 className="text-lg font-bold text-gray-800">
-              {t('settings.dataTransfer.export.title')}
+              {t('settings.data_transfer.export.title')}
             </h3>
           </div>
           <p className="text-gray-600 mb-6 min-h-[48px]">
-            {t('settings.dataTransfer.export.description')}
+            {t('settings.data_transfer.export.description')}
           </p>
           <button
             onClick={handleExport}
@@ -108,7 +107,7 @@ export const DataTransfer: React.FC = () => {
             ) : (
               <FileArchive size={20} />
             )}
-            {t('settings.dataTransfer.export.button')}
+            {t('settings.data_transfer.export.button')}
           </button>
         </div>
 
@@ -119,11 +118,11 @@ export const DataTransfer: React.FC = () => {
               <Upload size={24} />
             </div>
             <h3 className="text-lg font-bold text-gray-800">
-              {t('settings.dataTransfer.import.title')}
+              {t('settings.data_transfer.import.title')}
             </h3>
           </div>
           <p className="text-gray-600 mb-6 min-h-[48px]">
-            {t('settings.dataTransfer.import.description')}
+            {t('settings.data_transfer.import.description')}
           </p>
           <button
             onClick={handleImport}
@@ -135,18 +134,18 @@ export const DataTransfer: React.FC = () => {
             ) : (
               <FileArchive size={20} />
             )}
-            {t('settings.dataTransfer.import.button')}
+            {t('settings.data_transfer.import.button')}
           </button>
         </div>
       </div>
 
       <div className="mt-8 p-4 bg-yellow-50 border border-yellow-100 rounded-lg text-yellow-800 text-sm">
         <div className="flex gap-2">
-            <span className="font-bold">{t('settings.dataTransfer.warning.title')}:</span>
+            <span className="font-bold">{t('settings.data_transfer.warning.title')}:</span>
             <ul className="list-disc list-inside space-y-1">
-                <li>{t('settings.dataTransfer.warning.item1')}</li>
-                <li>{t('settings.dataTransfer.warning.item2')}</li>
-                <li>{t('settings.dataTransfer.warning.item3')}</li>
+                <li>{t('settings.data_transfer.warning.item1')}</li>
+                <li>{t('settings.data_transfer.warning.item2')}</li>
+                <li>{t('settings.data_transfer.warning.item3')}</li>
             </ul>
         </div>
       </div>

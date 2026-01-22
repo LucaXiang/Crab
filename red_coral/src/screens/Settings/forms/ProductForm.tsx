@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Image as ImageIcon, Tag, Hash, FileText, Layers, MoreHorizontal, Printer } from 'lucide-react';
-import { FormField, inputClass, selectClass } from './FormField';
+import { Image as ImageIcon, Tag, Hash, FileText, Layers, ImagePlus, Printer, Settings } from 'lucide-react';
+import { FormField, FormSection, inputClass, selectClass } from './FormField';
 import { AttributeSelectionModal } from './AttributeSelectionModal';
 import { ProductImage } from '@/presentation/components/ProductImage';
 import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions } from '@/core/stores/resources';
@@ -9,7 +9,7 @@ import { usePriceInput } from '@/hooks/usePriceInput';
 import { SelectField } from '@/presentation/components/form/FormField/SelectField';
 import { KitchenPrinterSelector } from '@/presentation/components/form/FormField/KitchenPrinterSelector';
 import { AttributeDisplayTag } from '@/presentation/components/form/FormField/AttributeDisplayTag';
-import { Category, EmbeddedSpec } from '@/core/domain/types';
+import { Category, EmbeddedSpec, LabelPrintState } from '@/core/domain/types';
 
 interface ProductFormProps {
   formData: {
@@ -21,13 +21,14 @@ interface ProductFormProps {
     image: string;
     externalId?: number;
     tax_rate: number;
-    selectedAttributeIds?: string[];
-    attributeDefaultOptions?: Record<string, string[]>; // Product-level default options (array for multi-select)
-    print_destinations?: number[];
+    selected_attribute_ids?: string[];
+    attribute_default_options?: Record<string, string[]>; // Product-level default options (array for multi-select)
+    print_destinations?: string[];
     kitchen_print_name?: string;
-    is_label_print_enabled?: number | null;
+    is_label_print_enabled?: LabelPrintState;
+    is_active?: boolean;
     specs?: EmbeddedSpec[]; // Embedded specifications
-    selectedTagIds?: string[]; // Tag IDs loaded from getProductFull API
+    selected_tag_ids?: string[]; // Tag IDs loaded from getProductFull API
   };
   categories: Category[];
   onFieldChange: (field: string, value: any) => void;
@@ -56,12 +57,31 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     formData.price || 0,
     {
       minValue: 0,
-      onCommit: (value) => onFieldChange('price', value)
+      onCommit: (value) => {
+        // Update price in default spec (specs is the source of truth)
+        const currentSpecs = formData.specs || [];
+        if (currentSpecs.length === 0) {
+          onFieldChange('specs', [{
+            name: formData.name,
+            price: value,
+            display_order: 0,
+            is_default: true,
+            is_active: true,
+            external_id: formData.externalId ?? null,
+          }]);
+        } else {
+          const newSpecs = currentSpecs.map(s =>
+            s.is_default ? { ...s, price: value } : s
+          );
+          // If no spec is marked as default, update the first one
+          if (!newSpecs.some(s => s.is_default)) {
+            newSpecs[0] = { ...newSpecs[0], price: value };
+          }
+          onFieldChange('specs', newSpecs);
+        }
+      }
     }
   );
-
-  useEffect(() => {
-  }, [formData.print_destinations]);
 
   useEffect(() => {
     if (allAttributes.length === 0) {
@@ -71,45 +91,39 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
   // Ensure options are loaded for selected attributes so we can display default values
   useEffect(() => {
-    if (formData.selectedAttributeIds) {
-      formData.selectedAttributeIds.forEach(id => {
+    if (formData.selected_attribute_ids) {
+      formData.selected_attribute_ids.forEach(id => {
         const options = optionsMap.get(id);
         if (!options || options.length === 0) {
           loadOptions(id);
         }
       });
     }
-  }, [formData.selectedAttributeIds]);
+  }, [formData.selected_attribute_ids]);
 
   const TAX_RATES = [
-    { value: 21, label: t('settings.product.form.taxRateGeneral') },
-    { value: 10, label: t('settings.product.form.taxRateReduced') },
-    { value: 4, label: t('settings.product.form.taxRateSuperReduced') },
-    { value: 0, label: t('settings.product.form.taxRateExempt') },
+    { value: 21, label: t('settings.product.form.tax_rate_general') },
+    { value: 10, label: t('settings.product.form.tax_rate_reduced') },
+    { value: 4, label: t('settings.product.form.tax_rate_super_reduced') },
+    { value: 0, label: t('settings.product.form.tax_rate_exempt') },
   ];
 
   // Get selected attribute objects for display
   const selectedAttributes = allAttributes.filter(attr =>
-    formData.selectedAttributeIds?.includes(attr.id)
+    formData.selected_attribute_ids?.includes(attr.id)
   );
 
   return (
-    <div className="space-y-6">
-      {/* Block 1: Basic Info (Required) */}
-      <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-4 shadow-sm">
-        <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 pb-2 border-b border-gray-100">
-          <Tag size={16} className="text-orange-500" />
-          {t('settings.form.basicInfo')}
-          <span className="text-xs font-normal text-gray-400 ml-auto">{t('common.label.required')}</span>
-        </h3>
-
+    <div className="space-y-4">
+      {/* Basic Info */}
+      <FormSection title={t('settings.attribute.section.basic')} icon={Tag}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="col-span-1 md:col-span-2">
             <FormField label={t('settings.product.form.name')} required>
               <input
                 value={formData.name}
                 onChange={(e) => onFieldChange('name', e.target.value)}
-                placeholder={t('settings.product.form.namePlaceholder')}
+                placeholder={t('settings.product.form.name_placeholder')}
                 className={inputClass}
               />
             </FormField>
@@ -120,14 +134,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             value={formData.category ?? ''}
             onChange={(value) => onFieldChange('category', value)}
             options={categories.map(c => ({ value: c.id ?? '', label: c.name }))}
-            placeholder={t('settings.product.form.selectCategory')}
+            placeholder={t('settings.product.form.select_category')}
             required
           />
 
-          <FormField
-            label={t('settings.product.form.price')}
-            required
-          >
+          <FormField label={t('settings.product.form.price')} required>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">€</span>
               <input
@@ -145,7 +156,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           </FormField>
 
           <SelectField
-            label={t('settings.product.form.taxRate')}
+            label={t('settings.product.form.tax_rate')}
             value={formData.tax_rate?.toString() || '10'}
             onChange={(value) => {
               const val = parseInt(value as string, 10);
@@ -155,7 +166,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             required
           />
 
-          <FormField label={t('settings.product.form.externalId')} required>
+          <FormField label={t('settings.product.form.external_id')}>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 <Hash size={14} />
@@ -165,257 +176,238 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 value={formData.externalId ?? ''}
                 onChange={(e) => {
                   const val = e.target.value;
-                  onFieldChange('externalId', val ? parseInt(val, 10) : undefined);
+                  const newExternalId = val ? parseInt(val, 10) : null;
+                  // Update external_id in default spec (specs is the source of truth)
+                  const currentSpecs = formData.specs || [];
+                  if (currentSpecs.length === 0) {
+                    onFieldChange('specs', [{
+                      name: formData.name,
+                      price: formData.price ?? 0,
+                      display_order: 0,
+                      is_default: true,
+                      is_active: true,
+                      external_id: newExternalId,
+                    }]);
+                  } else {
+                    const newSpecs = currentSpecs.map(s =>
+                      s.is_default ? { ...s, external_id: newExternalId } : s
+                    );
+                    if (!newSpecs.some(s => s.is_default)) {
+                      newSpecs[0] = { ...newSpecs[0], external_id: newExternalId };
+                    }
+                    onFieldChange('specs', newSpecs);
+                  }
                 }}
-                placeholder={t('settings.product.form.externalIdPlaceholder')}
+                placeholder={t('settings.product.form.external_id_placeholder')}
                 className={`${inputClass} pl-9`}
               />
             </div>
           </FormField>
         </div>
-      </section>
+      </FormSection>
 
-      {/* Block 2: Print Settings */}
-      <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-6 shadow-sm">
-        <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 pb-2 border-b border-gray-100">
-          <Printer size={16} className="text-teal-500" />
-          {t('settings.product.print.settings')}
-          <span className="text-xs font-normal text-gray-400 ml-auto">{t('common.label.optional')}</span>
-        </h3>
-
-        <div className="space-y-4">
-          {/* Kitchen Printing Group */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-              {t('settings.product.print.kitchenPrinting')}
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label={t('settings.product.print.isKitchenPrintEnabled')}>
-                <div className="relative">
-                  <select
-                    value={
-                      formData.print_destinations === undefined
-                        ? '-1'
-                        : (formData.print_destinations.length > 0 ? '1' : '0')
-                    }
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (raw === '-1') {
-                        // Default: remove print_destinations to inherit from category
-                        onFieldChange('print_destinations', undefined);
-                      } else if (raw === '1') {
-                        // Enabled: set print_destinations with a default printer (or empty array to be filled by printer selector)
-                        onFieldChange('print_destinations', formData.print_destinations?.length ? formData.print_destinations : []);
-                      } else {
-                        // Disabled: set empty array
-                        onFieldChange('print_destinations', []);
-                      }
-                    }}
-                    className={selectClass}
-                  >
-                    <option value="-1">{t('common.label.default')}</option>
-                    <option value="1">{t('common.status.enabled')}</option>
-                    <option value="0">{t('common.status.disabled')}</option>
-                  </select>
-                  {formData.print_destinations === undefined && (
-                    <div className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-                      <span>
-                        {t('settings.product.print.effectiveState')}: {
-                          (() => {
-                            if (!isGlobalKitchenEnabled) return (t('common.status.disabledGlobal'));
-                            const cat = categories.find(c => String(c.id) === String(formData.category));
-                            // Kitchen printing is enabled if category has print_destinations
-                            const isEnabled = cat ? (cat.print_destinations && cat.print_destinations.length > 0) : false;
-                            return isEnabled ? (t('common.status.enabled')) : (t('common.status.disabled'));
-                          })()
-                        }
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </FormField>
-
-              <KitchenPrinterSelector
-                value={formData.print_destinations?.[0] ?? null}
-                onChange={(value) => {
-                  if (value === null) {
-                    onFieldChange('print_destinations', []);
-                  } else {
-                    onFieldChange('print_destinations', [value]);
+      {/* Print Settings */}
+      <FormSection title={t('settings.attribute.section.print')} icon={Printer}>
+        {/* Kitchen Printing */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+            {t('settings.product.print.kitchen_printing')}
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label={t('settings.product.print.is_kitchen_print_enabled')}>
+              <div className="relative">
+                <select
+                  value={
+                    formData.print_destinations === undefined
+                      ? '-1'
+                      : (formData.print_destinations.length > 0 ? '1' : '0')
                   }
-                }}
-                t={t}
-              />
-
-              <div className="col-span-1 md:col-span-2">
-                <FormField label={t('settings.product.print.kitchenPrintName')}>
-                  <input
-                    value={formData.kitchen_print_name || ''}
-                    onChange={(e) => onFieldChange('kitchen_print_name', e.target.value)}
-                    placeholder={t('settings.product.print.kitchenPrintNamePlaceholder')}
-                    className={inputClass}
-                  />
-                </FormField>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-100"></div>
-
-          {/* Label Printing Group */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-              {t('settings.product.print.labelPrinting')}
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label={t('settings.product.print.isLabelPrintEnabled')}>
-                <div className="relative">
-                  <select
-                    value={
-                      formData.is_label_print_enabled === undefined || formData.is_label_print_enabled === null || formData.is_label_print_enabled === -1
-                        ? '-1'
-                        : String(formData.is_label_print_enabled)
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '-1') {
+                      onFieldChange('print_destinations', undefined);
+                    } else if (raw === '1') {
+                      onFieldChange('print_destinations', formData.print_destinations?.length ? formData.print_destinations : []);
+                    } else {
+                      onFieldChange('print_destinations', []);
                     }
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      const num = parseInt(raw, 10);
-                      const next = isNaN(num) ? -1 : (num === 1 ? 1 : num === 0 ? 0 : -1);
-                      onFieldChange('is_label_print_enabled', next as any);
-                    }}
-                    className={selectClass}
-                  >
-                    <option value="-1">{t('common.label.default')}</option>
-                    <option value="1">{t('common.status.enabled')}</option>
-                    <option value="0">{t('common.status.disabled')}</option>
-                  </select>
-                  {(formData.is_label_print_enabled === undefined || formData.is_label_print_enabled === null || formData.is_label_print_enabled === -1) && (
-                    <div className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-                      <span>
-                        {t('settings.product.print.effectiveState')}: {
-                          (() => {
-                            if (!isGlobalLabelEnabled) return (t('common.status.disabledGlobal'));
-                            const cat = categories.find(c => String(c.id) === String(formData.category));
-                            const isEnabled = cat ? (cat.is_label_print_enabled !== false) : true;
-                            return isEnabled ? (t('common.status.enabled')) : (t('common.status.disabled'));
-                          })()
-                        }
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </FormField>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-100"></div>
-
-          {/* Receipt Printing Group */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-              {t('settings.product.print.receiptPrinting')}
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="col-span-1 md:col-span-2">
-                <FormField label={t('settings.product.print.receiptName')}>
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <FileText size={14} />
-                    </div>
-                    <input
-                      value={formData.receipt_name || ''}
-                      onChange={(e) => onFieldChange('receipt_name', e.target.value)}
-                      placeholder={t('settings.product.print.receiptNamePlaceholder')}
-                      className={`${inputClass} pl-9`}
-                    />
+                  }}
+                  className={selectClass}
+                >
+                  <option value="-1">{t('common.label.default')}</option>
+                  <option value="1">{t('common.status.enabled')}</option>
+                  <option value="0">{t('common.status.disabled')}</option>
+                </select>
+                {formData.print_destinations === undefined && (
+                  <div className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                    <span>
+                      {t('settings.product.print.effective_state')}: {
+                        (() => {
+                          if (!isGlobalKitchenEnabled) return t('common.status.disabled_global');
+                          const cat = categories.find(c => String(c.id) === String(formData.category));
+                          const isEnabled = cat ? (cat.print_destinations && cat.print_destinations.length > 0) : false;
+                          return isEnabled ? t('common.status.enabled') : t('common.status.disabled');
+                        })()
+                      }
+                    </span>
                   </div>
-                </FormField>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Block 3: Extended Info (Optional) */}
-      <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-4 shadow-sm">
-        <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 pb-2 border-b border-gray-100">
-          <MoreHorizontal size={16} className="text-blue-500" />
-          {t('settings.form.extendedInfo')}
-          <span className="text-xs font-normal text-gray-400 ml-auto">{t('common.label.optional')}</span>
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-          {/* Image Upload - Compact Row Style */}
-          <div className="col-span-1 md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t('settings.product.form.image')}
-            </label>
-            <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-              <div
-                className="w-16 h-16 shrink-0 bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden cursor-pointer hover:border-orange-300 transition-colors"
-                onClick={onSelectImage}
-              >
-                {formData.image ? (
-                  <ProductImage
-                    src={formData.image}
-                    alt="preview"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <ImageIcon size={24} className="text-gray-300" />
                 )}
               </div>
+            </FormField>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={onSelectImage}
-                    className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    {formData.image ? (t('common.action.change')) : (t('common.action.uploadImage'))}
-                  </button>
-                  {formData.image && (
-                    <button
-                      type="button"
-                      onClick={() => onFieldChange('image', '')}
-                      className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded-lg hover:bg-red-100 transition-colors"
-                    >
-                      {t('common.action.remove')}
-                    </button>
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-gray-400 truncate">
-                  {t('settings.product.form.imageHint')}
-                </p>
-              </div>
+            <KitchenPrinterSelector
+              value={formData.print_destinations?.[0] ?? null}
+              onChange={(value) => {
+                onFieldChange('print_destinations', value === null ? [] : [value]);
+              }}
+              t={t}
+            />
+
+            <div className="col-span-1 md:col-span-2">
+              <FormField label={t('settings.product.print.kitchen_print_name')}>
+                <input
+                  value={formData.kitchen_print_name || ''}
+                  onChange={(e) => onFieldChange('kitchen_print_name', e.target.value)}
+                  placeholder={t('settings.product.print.kitchen_print_name_placeholder')}
+                  className={inputClass}
+                />
+              </FormField>
             </div>
           </div>
         </div>
-      </section>
 
-      {/* Block 4: Attributes (Optional) */}
-      <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-4 shadow-sm">
-        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900">
-            <Layers size={16} className="text-teal-500" />
-            {t('settings.product.attribute.title')}
-          </h3>
+        <div className="border-t border-gray-100 pt-3 mt-3" />
+
+        {/* Label Printing */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+            {t('settings.product.print.label_printing')}
+          </h4>
+          <FormField label={t('settings.product.print.is_label_print_enabled')}>
+            <div className="relative">
+              <select
+                value={
+                  formData.is_label_print_enabled === undefined || formData.is_label_print_enabled === null || formData.is_label_print_enabled === -1
+                    ? '-1'
+                    : String(formData.is_label_print_enabled)
+                }
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const num = parseInt(raw, 10);
+                  const next: LabelPrintState = isNaN(num) ? -1 : (num === 1 ? 1 : num === 0 ? 0 : -1);
+                  onFieldChange('is_label_print_enabled', next);
+                }}
+                className={selectClass}
+              >
+                <option value="-1">{t('common.label.default')}</option>
+                <option value="1">{t('common.status.enabled')}</option>
+                <option value="0">{t('common.status.disabled')}</option>
+              </select>
+              {(formData.is_label_print_enabled === undefined || formData.is_label_print_enabled === null || formData.is_label_print_enabled === -1) && (
+                <div className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                  <span>
+                    {t('settings.product.print.effective_state')}: {
+                      (() => {
+                        if (!isGlobalLabelEnabled) return t('common.status.disabled_global');
+                        const cat = categories.find(c => String(c.id) === String(formData.category));
+                        const isEnabled = cat ? (cat.is_label_print_enabled !== false) : true;
+                        return isEnabled ? t('common.status.enabled') : t('common.status.disabled');
+                      })()
+                    }
+                  </span>
+                </div>
+              )}
+            </div>
+          </FormField>
+        </div>
+
+        <div className="border-t border-gray-100 pt-3 mt-3" />
+
+        {/* Receipt Printing */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+            {t('settings.product.print.receipt_printing')}
+          </h4>
+          <FormField label={t('settings.product.print.receipt_name')}>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <FileText size={14} />
+              </div>
+              <input
+                value={formData.receipt_name || ''}
+                onChange={(e) => onFieldChange('receipt_name', e.target.value)}
+                placeholder={t('settings.product.print.receipt_name_placeholder')}
+                className={`${inputClass} pl-9`}
+              />
+            </div>
+          </FormField>
+        </div>
+      </FormSection>
+
+      {/* Image */}
+      <FormSection title={t('settings.product.form.image')} icon={ImagePlus} defaultCollapsed>
+        <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+          <div
+            className="w-16 h-16 shrink-0 bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden cursor-pointer hover:border-teal-300 transition-colors"
+            onClick={onSelectImage}
+          >
+            {formData.image ? (
+              <ProductImage
+                src={formData.image}
+                alt="preview"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <ImageIcon size={24} className="text-gray-300" />
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onSelectImage}
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                {formData.image ? t('common.action.change') : t('common.action.upload_image')}
+              </button>
+              {formData.image && (
+                <button
+                  type="button"
+                  onClick={() => onFieldChange('image', '')}
+                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded-lg hover:bg-red-100 transition-colors"
+                >
+                  {t('common.action.remove')}
+                </button>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-gray-400 truncate">
+              {t('settings.product.form.image_hint')}
+            </p>
+          </div>
+        </div>
+      </FormSection>
+
+      {/* Attributes */}
+      <FormSection title={t('settings.product.attribute.title')} icon={Layers}>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-gray-500">{t('settings.product.attribute.description')}</p>
           <button
             type="button"
             onClick={() => setShowAttributeModal(true)}
-            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-all shadow-sm"
+            className="text-xs font-bold text-teal-600 hover:text-teal-700 hover:underline"
           >
             {t('settings.product.attribute.manage')}
           </button>
         </div>
 
-        <div className={`rounded-xl border ${selectedAttributes.length > 0 ? 'border-gray-100 bg-white' : 'border-dashed border-gray-200 bg-gray-50/50'} min-h-[80px] p-4 transition-all`}>
+        <div className="min-h-[60px]">
           {selectedAttributes.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {selectedAttributes.map((attr) => {
-                const rawDefaults = formData.attributeDefaultOptions?.[attr.id];
+                const rawDefaults = formData.attribute_default_options?.[attr.id];
                 const defaultOptionIds = Array.isArray(rawDefaults)
                   ? rawDefaults
                   : (rawDefaults ? [rawDefaults] : []);
@@ -432,28 +424,40 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               })}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-2 text-gray-400 gap-2">
-              <Layers size={20} className="text-gray-300" />
-              <p className="text-sm">{t('settings.product.attribute.noSelected')}</p>
+            <div className="flex flex-col items-center justify-center py-4 text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+              <p className="text-sm">{t('settings.product.attribute.no_selected')}</p>
             </div>
           )}
         </div>
-      </section>
+      </FormSection>
 
       <AttributeSelectionModal
         isOpen={showAttributeModal}
         onClose={() => setShowAttributeModal(false)}
-        selectedAttributeIds={formData.selectedAttributeIds || []}
-        attributeDefaultOptions={formData.attributeDefaultOptions || {}}
-        onChange={(ids) => onFieldChange('selectedAttributeIds', ids)}
+        selectedAttributeIds={formData.selected_attribute_ids || []}
+        attributeDefaultOptions={formData.attribute_default_options || {}}
+        onChange={(ids) => onFieldChange('selected_attribute_ids', ids)}
         onDefaultOptionChange={(attrId, optionIds) => {
-          const newDefaults = { ...formData.attributeDefaultOptions, [attrId]: optionIds };
+          const newDefaults = { ...formData.attribute_default_options, [attrId]: optionIds };
           if (!optionIds || optionIds.length === 0) delete newDefaults[attrId];
-          onFieldChange('attributeDefaultOptions', newDefaults);
+          onFieldChange('attribute_default_options', newDefaults);
         }}
         t={t}
         inheritedAttributeIds={inheritedAttributeIds}
       />
+
+      {/* Status Settings */}
+      <FormSection title={t('common.label.status')} icon={Settings}>
+        <SelectField
+          label={t('common.label.is_active')}
+          value={formData.is_active !== false ? 'true' : 'false'}
+          onChange={(value) => onFieldChange('is_active', value === 'true')}
+          options={[
+            { value: 'true', label: t('common.status.enabled') },
+            { value: 'false', label: t('common.status.disabled') },
+          ]}
+        />
+      </FormSection>
     </div>
   );
 };

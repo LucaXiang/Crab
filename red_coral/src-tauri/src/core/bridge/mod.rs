@@ -754,8 +754,9 @@ impl ClientBridge {
                                 tracing::info!(username = %username, "Employee logged in via CrabClient (local)");
                                 Ok(session)
                             }
-                            Err(e) => {
-                                *client = None;
+                            Err((e, connected)) => {
+                                // 登录失败，恢复 Connected 状态
+                                *client = Some(LocalClientState::Connected(connected));
                                 Err(BridgeError::Client(e))
                             }
                         }
@@ -789,8 +790,9 @@ impl ClientBridge {
                                 tracing::info!(username = %username, "Employee re-logged in via CrabClient (local)");
                                 Ok(session)
                             }
-                            Err(e) => {
-                                *client = None;
+                            Err((e, connected)) => {
+                                // 登录失败，恢复 Connected 状态
+                                *client = Some(LocalClientState::Connected(connected));
                                 Err(BridgeError::Client(e))
                             }
                         }
@@ -829,8 +831,9 @@ impl ClientBridge {
                                 tracing::info!(username = %username, "Employee logged in via CrabClient (remote)");
                                 Ok(session)
                             }
-                            Err(e) => {
-                                *client = None;
+                            Err((e, connected)) => {
+                                // 登录失败，恢复 Connected 状态
+                                *client = Some(RemoteClientState::Connected(connected));
                                 Err(BridgeError::Client(e))
                             }
                         }
@@ -864,8 +867,9 @@ impl ClientBridge {
                                 tracing::info!(username = %username, "Employee re-logged in via CrabClient (remote)");
                                 Ok(session)
                             }
-                            Err(e) => {
-                                *client = None;
+                            Err((e, connected)) => {
+                                // 登录失败，恢复 Connected 状态
+                                *client = Some(RemoteClientState::Connected(connected));
                                 Err(BridgeError::Client(e))
                             }
                         }

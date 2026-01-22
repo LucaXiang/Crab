@@ -64,7 +64,7 @@ export const SupervisorAuthModal: React.FC<SupervisorAuthModalProps> = ({
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-800">
-                {t('auth.supervisorApproval')}
+                {t('auth.supervisor_approval')}
               </h2>
               {actionDescription && (
                 <p className="text-sm text-gray-500 mt-0.5">{actionDescription}</p>

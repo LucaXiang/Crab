@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeOption {
     pub name: String,
-    /// Price modifier in cents (positive=add, negative=subtract)
-    pub price_modifier: i64,
+    /// Price modifier in currency unit (positive=add, negative=subtract, e.g., 2.50 = ¥2.50)
+    pub price_modifier: f64,
     pub display_order: i32,
     pub is_active: bool,
     pub receipt_name: Option<String>,

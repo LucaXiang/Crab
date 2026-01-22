@@ -72,7 +72,9 @@
       "name_placeholder": "请输入名称",
       "description_placeholder": "请输入描述",
       "long_press_to_edit": "提示：长按或双击行即可编辑",
-      "tap_to_close": "点击关闭"
+      "tap_to_close": "点击关闭",
+      "please_select": "请选择",
+      "tip": "提示"
     },
     "empty": {
       "no_data": "暂无数据",
@@ -453,6 +455,124 @@
       "general": "通用设置",
       "data": "数据管理",
       "system": "系统设置"
+    },
+    "price_rule": {
+      "title": "价格规则",
+      "description": "管理折扣、加价等价格调整规则",
+      "unit": "条规则",
+      "add_rule": "添加规则",
+      "edit_rule": "编辑规则",
+      "delete_rule": "删除规则",
+      "rule_deleted": "规则已删除",
+      "type": {
+        "discount": "折扣",
+        "surcharge": "加价"
+      },
+      "scope": {
+        "global": "全部商品",
+        "category": "按分类",
+        "tag": "按标签",
+        "product": "指定商品"
+      },
+      "time": {
+        "always": "永久生效",
+        "schedule": "定时生效",
+        "onetime": "一次性"
+      },
+      "zone": {
+        "all": "所有区域",
+        "retail": "零售区"
+      },
+      "adjustment": {
+        "percentage": "百分比",
+        "fixed": "固定金额"
+      },
+      "form": {
+        "name": "规则名称",
+        "display_name": "显示名称",
+        "receipt_name": "小票名称",
+        "description": "规则描述",
+        "priority": "优先级",
+        "is_stackable": "可叠加",
+        "is_exclusive": "互斥规则"
+      },
+      "confirm": {
+        "delete": "确定要删除此规则吗？"
+      },
+      "message": {
+        "created": "规则创建成功",
+        "updated": "规则更新成功"
+      },
+      "wizard": {
+        "title": "创建价格规则",
+        "edit_title": "编辑价格规则",
+        "step1_title": "选择类型",
+        "step2_title": "设置金额",
+        "step3_title": "适用范围",
+        "step4_title": "生效时间",
+        "step5_title": "规则命名",
+        "step6_title": "高级设置",
+        "step1_section": "规则类型",
+        "step2_section": "调整方式",
+        "step3_section": "适用范围",
+        "step4_section": "生效时间",
+        "step5_section": "规则命名",
+        "step6_section": "高级设置",
+        "step1_desc": "选择您要创建的价格规则类型",
+        "step2_desc": "设置折扣或加价的计算方式和数值",
+        "step3_desc": "选择规则适用的商品范围和区域",
+        "step4_desc": "设置规则的生效时间条件",
+        "step5_desc": "为规则设置名称和描述信息",
+        "step6_desc": "配置规则的优先级和叠加行为",
+        "rule_type": "选择规则类型",
+        "discount_option": "折扣优惠",
+        "surcharge_option": "附加收费",
+        "discount_desc": "降低商品价格，如促销折扣、会员优惠等",
+        "surcharge_desc": "增加额外费用，如服务费、打包费等",
+        "adjustment_type": "计算方式",
+        "discount_value": "折扣数值",
+        "surcharge_value": "加价数值",
+        "percentage_hint": "输入 1-100 之间的整数，例如 10 表示 10%",
+        "fixed_hint": "输入金额（分），例如 500 表示 ¥5.00",
+        "preview": "预览",
+        "preview_discount_percent": "商品将享受 {value}% 折扣",
+        "preview_discount_fixed": "每件商品减免 ¥{value}",
+        "preview_surcharge_percent": "商品将增加 {value}% 费用",
+        "preview_surcharge_fixed": "每件商品加收 ¥{value}",
+        "product_scope": "商品范围",
+        "scope_global_desc": "适用于所有商品",
+        "scope_category_desc": "适用于指定分类",
+        "scope_tag_desc": "适用于带特定标签的商品",
+        "scope_product_desc": "仅适用于指定商品",
+        "select_category": "选择分类",
+        "select_tag": "选择标签",
+        "select_product": "选择商品",
+        "zone_scope": "区域范围",
+        "zone_scope_desc": "选择规则生效的区域，留空则全部区域生效",
+        "time_always_desc": "规则始终生效，无时间限制",
+        "time_schedule_desc": "按每周固定时段重复生效",
+        "time_onetime_desc": "仅在指定时间段内生效一次",
+        "active_days": "生效日期",
+        "start_time": "开始时间",
+        "end_time": "结束时间",
+        "valid_from": "开始日期",
+        "valid_until": "结束日期",
+        "name_hint": "内部使用的唯一标识，建议使用英文和下划线",
+        "display_name_placeholder": "如：午市特惠",
+        "display_name_hint": "在 POS 界面显示的名称",
+        "receipt_name_placeholder": "如：午市折扣",
+        "receipt_name_hint": "打印在小票上的名称",
+        "description_placeholder": "添加规则说明...",
+        "summary_title": "规则概要",
+        "priority_hint": "数字越大优先级越高，相同优先级按创建时间排序",
+        "stackable_hint": "允许与其他规则同时生效",
+        "exclusive_hint": "启用后，此规则不会与其他规则同时生效",
+        "advanced_tip": "大多数情况下保持默认设置即可。只有在需要精细控制规则行为时才需要调整这些选项。",
+        "next": "下一步",
+        "prev": "上一步",
+        "finish": "完成创建",
+        "save": "保存修改"
+      }
     },
     "zone": {
       "title": "区域管理",

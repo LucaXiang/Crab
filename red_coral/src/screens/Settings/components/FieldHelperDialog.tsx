@@ -37,7 +37,7 @@ export const FieldHelperDialog: React.FC<FieldHelperDialogProps> = ({
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden animate-scale-in border border-gray-100 flex flex-col max-h-[85vh]">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
           <h3 className="font-bold text-gray-800 text-lg">
-            {t('settings.supportedFields')}
+            {t('settings.supported_fields')}
           </h3>
           <button
             onClick={onClose}
@@ -51,7 +51,7 @@ export const FieldHelperDialog: React.FC<FieldHelperDialogProps> = ({
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-50 text-gray-600 font-semibold sticky top-0 z-10 shadow-sm">
               <tr>
-                <th className="p-4 pb-3 w-32">{t("settings.label.fieldKey")}</th>
+                <th className="p-4 pb-3 w-32">{t("settings.label.field_key")}</th>
                 <th className="p-4 pb-3">{t("settings.label.description")}</th>
                 <th className="p-4 pb-3">{t("settings.label.example")}</th>
                 <th className="p-4 pb-3 w-16"></th>
@@ -91,7 +91,7 @@ export const FieldHelperDialog: React.FC<FieldHelperDialogProps> = ({
         </div>
 
         <div className="p-4 border-t border-gray-100 bg-gray-50 text-xs text-gray-500 text-center">
-           {t("settings.label.fieldHelperHint")}
+           {t("settings.label.field_helper_hint")}
         </div>
       </div>
     </div>

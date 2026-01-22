@@ -22,15 +22,15 @@ pub struct OrderItem {
     pub name: String,
     /// Snapshot: specification name
     pub spec_name: Option<String>,
-    /// Price in cents
-    pub price: i32,
+    /// Price in currency unit (e.g., 10.50 = ¥10.50)
+    pub price: f64,
     pub quantity: i32,
     /// Selected attributes: [{ attr_id, option_idx, name, price }]
     pub attributes: Vec<OrderItemAttribute>,
-    /// Item-level discount amount
-    pub discount_amount: i32,
-    /// Item-level surcharge amount
-    pub surcharge_amount: i32,
+    /// Item-level discount amount in currency unit
+    pub discount_amount: f64,
+    /// Item-level surcharge amount in currency unit
+    pub surcharge_amount: f64,
     /// Notes
     pub note: Option<String>,
     /// Sent to kitchen
@@ -43,15 +43,16 @@ pub struct OrderItemAttribute {
     pub attr_id: Thing,
     pub option_idx: i32,
     pub name: String,
-    pub price: i32,
+    /// Price in currency unit (e.g., 2.50 = ¥2.50)
+    pub price: f64,
 }
 
 /// Embedded payment record
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderPayment {
     pub method: String,
-    /// Amount in cents
-    pub amount: i32,
+    /// Amount in currency unit (e.g., 50.00 = ¥50.00)
+    pub amount: f64,
     pub time: String,
     pub reference: Option<String>,
 }
@@ -69,14 +70,14 @@ pub struct Order {
     pub start_time: String,
     pub end_time: Option<String>,
     pub guest_count: Option<i32>,
-    /// Total amount in cents
-    pub total_amount: i32,
-    /// Paid amount in cents
-    pub paid_amount: i32,
-    /// Discount amount in cents
-    pub discount_amount: i32,
-    /// Surcharge amount in cents
-    pub surcharge_amount: i32,
+    /// Total amount in currency unit
+    pub total_amount: f64,
+    /// Paid amount in currency unit
+    pub paid_amount: f64,
+    /// Discount amount in currency unit
+    pub discount_amount: f64,
+    /// Surcharge amount in currency unit
+    pub surcharge_amount: f64,
     /// Embedded order items
     pub items: Vec<OrderItem>,
     /// Embedded payments
@@ -140,7 +141,8 @@ pub struct OrderAddItem {
     pub spec: Thing,
     pub name: String,
     pub spec_name: Option<String>,
-    pub price: i32,
+    /// Price in currency unit (e.g., 10.50 = ¥10.50)
+    pub price: f64,
     pub quantity: i32,
     pub attributes: Option<Vec<OrderItemAttribute>>,
     pub note: Option<String>,
@@ -150,6 +152,7 @@ pub struct OrderAddItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderAddPayment {
     pub method: String,
-    pub amount: i32,
+    /// Amount in currency unit (e.g., 50.00 = ¥50.00)
+    pub amount: f64,
     pub reference: Option<String>,
 }
