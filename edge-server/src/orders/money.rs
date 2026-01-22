@@ -27,12 +27,12 @@ pub fn to_f64(value: Decimal) -> f64 {
 
 /// Calculate item line total with precise decimal arithmetic
 ///
-/// Formula: (price * quantity) * (1 - discount_percent/100)
+/// Formula: (price * quantity) * (1 - manual_discount_percent/100)
 pub fn calculate_item_total(item: &CartItemSnapshot) -> Decimal {
     let price = to_decimal(item.price);
     let quantity = Decimal::from(item.quantity);
     let discount_rate = item
-        .discount_percent
+        .manual_discount_percent
         .map(|d| to_decimal(d) / Decimal::ONE_HUNDRED)
         .unwrap_or(Decimal::ZERO);
 
@@ -141,7 +141,10 @@ mod tests {
             unpaid_quantity: 3,
             selected_options: None,
             selected_specification: None,
-            discount_percent: None,
+            manual_discount_percent: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
             surcharge: None,
             note: None,
             authorizer_id: None,
@@ -164,7 +167,10 @@ mod tests {
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
-            discount_percent: Some(33.33), // Tricky percentage
+            manual_discount_percent: Some(33.33), // Tricky percentage
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
             surcharge: None,
             note: None,
             authorizer_id: None,
@@ -188,7 +194,10 @@ mod tests {
             unpaid_quantity: 1,
             selected_options: None,
             selected_specification: None,
-            discount_percent: Some(33.0),
+            manual_discount_percent: Some(33.0),
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
             surcharge: None,
             note: None,
             authorizer_id: None,
@@ -241,7 +250,10 @@ mod tests {
                 unpaid_quantity: 1,
                 selected_options: None,
                 selected_specification: None,
-                discount_percent: None,
+                manual_discount_percent: None,
+                rule_discount_amount: None,
+                rule_surcharge_amount: None,
+                applied_rules: None,
                 surcharge: None,
                 note: None,
                 authorizer_id: None,

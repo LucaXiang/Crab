@@ -14,7 +14,7 @@ use shared::order::CartItemSnapshot;
 /// The instance_id is a hash of the item's properties that affect its identity:
 /// - product_id
 /// - price
-/// - discount_percent
+/// - manual_discount_percent
 /// - selected_options
 /// - selected_specification
 /// - surcharge
@@ -23,7 +23,7 @@ use shared::order::CartItemSnapshot;
 pub fn generate_instance_id(
     product_id: &str,
     price: f64,
-    discount_percent: Option<f64>,
+    manual_discount_percent: Option<f64>,
     options: &Option<Vec<shared::order::ItemOption>>,
     specification: &Option<shared::order::SpecificationInfo>,
     surcharge: Option<f64>,
@@ -35,7 +35,7 @@ pub fn generate_instance_id(
     hasher.update(product_id.as_bytes());
     hasher.update(price.to_be_bytes());
 
-    if let Some(discount) = discount_percent {
+    if let Some(discount) = manual_discount_percent {
         hasher.update(discount.to_be_bytes());
     }
 
@@ -63,7 +63,7 @@ pub fn input_to_snapshot(input: &shared::order::CartItemInput) -> CartItemSnapsh
     let instance_id = generate_instance_id(
         &input.product_id,
         input.price,
-        input.discount_percent,
+        input.manual_discount_percent,
         &input.selected_options,
         &input.selected_specification,
         input.surcharge,
@@ -79,7 +79,10 @@ pub fn input_to_snapshot(input: &shared::order::CartItemInput) -> CartItemSnapsh
         unpaid_quantity: input.quantity, // Initially all unpaid
         selected_options: input.selected_options.clone(),
         selected_specification: input.selected_specification.clone(),
-        discount_percent: input.discount_percent,
+        manual_discount_percent: input.manual_discount_percent,
+        rule_discount_amount: None,
+        rule_surcharge_amount: None,
+        applied_rules: None,
         surcharge: input.surcharge,
         note: input.note.clone(),
         authorizer_id: input.authorizer_id.clone(),
@@ -130,7 +133,7 @@ mod tests {
             quantity: 2,
             selected_options: None,
             selected_specification: None,
-            discount_percent: Some(10.0),
+            manual_discount_percent: Some(10.0),
             surcharge: None,
             note: Some("Test note".to_string()),
             authorizer_id: None,
@@ -144,7 +147,7 @@ mod tests {
         assert_eq!(snapshot.price, 10.0);
         assert_eq!(snapshot.quantity, 2);
         assert_eq!(snapshot.unpaid_quantity, 2);
-        assert_eq!(snapshot.discount_percent, Some(10.0));
+        assert_eq!(snapshot.manual_discount_percent, Some(10.0));
         assert_eq!(snapshot.note, Some("Test note".to_string()));
         assert!(!snapshot.instance_id.is_empty());
     }

@@ -77,8 +77,8 @@ impl CommandHandler for ModifyItemAction {
             } else {
                 None
             },
-            discount_percent: if self.changes.discount_percent.is_some() {
-                item.discount_percent
+            manual_discount_percent: if self.changes.manual_discount_percent.is_some() {
+                item.manual_discount_percent
             } else {
                 None
             },
@@ -140,7 +140,7 @@ impl CommandHandler for ModifyItemAction {
 
 /// Determine the operation type based on changes
 fn determine_operation(changes: &ItemChanges) -> &'static str {
-    if changes.discount_percent.is_some() {
+    if changes.manual_discount_percent.is_some() {
         "APPLY_DISCOUNT"
     } else if changes.price.is_some() {
         "MODIFY_PRICE"
@@ -169,13 +169,13 @@ fn calculate_modification_results(
             instance_id: item.instance_id.clone(),
             quantity: item.quantity,
             price: changes.price.unwrap_or(item.price),
-            discount_percent: changes.discount_percent.or(item.discount_percent),
+            manual_discount_percent: changes.manual_discount_percent.or(item.manual_discount_percent),
             action: "UPDATED".to_string(),
         }]
     } else {
         // Partial modification: split into unchanged + modified portions
         let new_price = changes.price.unwrap_or(item.price);
-        let new_discount = changes.discount_percent.or(item.discount_percent);
+        let new_discount = changes.manual_discount_percent.or(item.manual_discount_percent);
         let new_surcharge = changes.surcharge.or(item.surcharge);
         let new_options = changes
             .selected_options
@@ -202,7 +202,7 @@ fn calculate_modification_results(
                 instance_id: item.instance_id.clone(),
                 quantity: item.quantity - affected_qty,
                 price: item.price,
-                discount_percent: item.discount_percent,
+                manual_discount_percent: item.manual_discount_percent,
                 action: "UNCHANGED".to_string(),
             },
             // Modified portion (new item)
@@ -210,7 +210,7 @@ fn calculate_modification_results(
                 instance_id: new_instance_id,
                 quantity: affected_qty,
                 price: new_price,
-                discount_percent: new_discount,
+                manual_discount_percent: new_discount,
                 action: "CREATED".to_string(),
             },
         ]
@@ -250,8 +250,11 @@ mod tests {
             unpaid_quantity: quantity,
             selected_options: None,
             selected_specification: None,
-            discount_percent: None,
+            manual_discount_percent: None,
             surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -340,7 +343,7 @@ mod tests {
             instance_id: "item-1".to_string(),
             affected_quantity: Some(2), // Partial: only 2 of 5
             changes: ItemChanges {
-                discount_percent: Some(10.0),
+                manual_discount_percent: Some(10.0),
                 ..Default::default()
             },
             authorizer_id: Some("manager-1".to_string()),
@@ -368,13 +371,13 @@ mod tests {
             assert_eq!(results[0].action, "UNCHANGED");
             assert_eq!(results[0].quantity, 3); // 5 - 2
             assert_eq!(results[0].instance_id, "item-1");
-            assert_eq!(results[0].discount_percent, None);
+            assert_eq!(results[0].manual_discount_percent, None);
 
             // Second result: modified portion (new item)
             assert_eq!(results[1].action, "CREATED");
             assert_eq!(results[1].quantity, 2);
             assert_ne!(results[1].instance_id, "item-1"); // New instance_id
-            assert_eq!(results[1].discount_percent, Some(10.0));
+            assert_eq!(results[1].manual_discount_percent, Some(10.0));
 
             assert_eq!(authorizer_id.as_deref(), Some("manager-1"));
             assert_eq!(authorizer_name.as_deref(), Some("Manager"));
@@ -400,7 +403,7 @@ mod tests {
             instance_id: "item-1".to_string(),
             affected_quantity: None,
             changes: ItemChanges {
-                discount_percent: Some(20.0),
+                manual_discount_percent: Some(20.0),
                 ..Default::default()
             },
             authorizer_id: None,
@@ -418,8 +421,8 @@ mod tests {
         } = &events[0].payload
         {
             assert_eq!(operation, "APPLY_DISCOUNT");
-            assert_eq!(previous_values.discount_percent, None); // Was None before
-            assert_eq!(results[0].discount_percent, Some(20.0));
+            assert_eq!(previous_values.manual_discount_percent, None); // Was None before
+            assert_eq!(results[0].manual_discount_percent, Some(20.0));
         } else {
             panic!("Expected ItemModified payload");
         }
@@ -665,7 +668,7 @@ mod tests {
         assert_eq!(
             determine_operation(&ItemChanges {
                 price: Some(10.0),
-                discount_percent: Some(5.0),
+                manual_discount_percent: Some(5.0),
                 ..Default::default()
             }),
             "APPLY_DISCOUNT"

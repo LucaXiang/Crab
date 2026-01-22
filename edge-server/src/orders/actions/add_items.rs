@@ -90,7 +90,7 @@ mod tests {
             quantity,
             selected_options: None,
             selected_specification: None,
-            discount_percent: None,
+            manual_discount_percent: None,
             surcharge: None,
             note: None,
             authorizer_id: None,

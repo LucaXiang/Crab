@@ -67,8 +67,11 @@ mod tests {
             unpaid_quantity: quantity,
             selected_options: None,
             selected_specification: None,
-            discount_percent: None,
+            manual_discount_percent: None,
             surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -185,7 +188,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
 
         let mut item = create_test_item("item-1", "Product A", 100.0, 1);
-        item.discount_percent = Some(20.0); // 20% discount
+        item.manual_discount_percent = Some(20.0); // 20% discount
 
         let items = vec![item];
         let event = create_items_added_event("order-1", 1, items);

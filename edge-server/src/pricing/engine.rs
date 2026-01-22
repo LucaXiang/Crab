@@ -68,7 +68,7 @@ impl PriceRuleEngine {
     /// * `current_time` - Current timestamp for time-based rule validation
     ///
     /// # Returns
-    /// Cart items with price rules applied (surcharge and discount_percent set)
+    /// Cart items with price rules applied (surcharge and manual_discount_percent set)
     pub async fn apply_rules(
         &self,
         items: Vec<CartItemInput>,
@@ -146,18 +146,18 @@ impl PriceRuleEngine {
         let adjustment = calculate_adjustments(&matched_rules, price_with_options);
 
         // Apply adjustments to item
-        // Note: We store the surcharge and discount_percent, and let the reducer calculate final price
+        // Note: We store the surcharge and manual_discount_percent, and let the reducer calculate final price
         if adjustment.surcharge > 0.0 {
             item.surcharge = Some(item.surcharge.unwrap_or(0.0) + adjustment.surcharge);
         }
 
         // For percentage discount from price rules
-        if adjustment.discount_percent > 0.0 {
+        if adjustment.manual_discount_percent > 0.0 {
             // Combine with any existing discount (manual discount from cart)
-            let existing = item.discount_percent.unwrap_or(0.0);
+            let existing = item.manual_discount_percent.unwrap_or(0.0);
             // We need to track price rule discount separately or combine
             // For simplicity, we'll add them together (both are percentages)
-            item.discount_percent = Some(existing + adjustment.discount_percent);
+            item.manual_discount_percent = Some(existing + adjustment.manual_discount_percent);
         }
 
         // For fixed discount, we convert to surcharge (negative surcharge = discount)

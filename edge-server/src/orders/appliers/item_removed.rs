@@ -88,8 +88,11 @@ mod tests {
             unpaid_quantity: quantity,
             selected_options: None,
             selected_specification: None,
-            discount_percent: None,
+            manual_discount_percent: None,
             surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -196,7 +199,7 @@ mod tests {
     fn test_item_removed_with_discount() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         let mut item = create_test_item("item-1", "prod-1", "Product A", 100.0, 2);
-        item.discount_percent = Some(10.0);
+        item.manual_discount_percent = Some(10.0);
         snapshot.items.push(item);
         // 100 * 2 * 0.9 = 180
         snapshot.subtotal = 180.0;

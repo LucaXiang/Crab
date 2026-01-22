@@ -30,7 +30,7 @@ pub struct PriceAdjustment {
     /// Surcharge amount (from SURCHARGE rules)
     pub surcharge: f64,
     /// Discount percentage (from DISCOUNT rules, percentage type)
-    pub discount_percent: f64,
+    pub manual_discount_percent: f64,
     /// Discount fixed amount (from DISCOUNT rules, fixed type)
     pub discount_fixed: f64,
     /// Applied rule names for display
@@ -45,7 +45,7 @@ impl PriceAdjustment {
     pub fn calculate_final_price(&self, base_price: f64) -> f64 {
         let base = to_decimal(base_price);
         let surcharge = to_decimal(self.surcharge);
-        let discount_pct = to_decimal(self.discount_percent);
+        let discount_pct = to_decimal(self.manual_discount_percent);
         let discount_fixed = to_decimal(self.discount_fixed);
 
         // Step 1: Add surcharge
@@ -101,7 +101,7 @@ fn calculate_single_adjustment(rule: &PriceRule, base_price: Decimal) -> (Decima
 /// - Stackable rules accumulate their effects
 /// - Non-stackable rules compete - highest priority wins per type
 ///
-/// Returns: PriceAdjustment with surcharge, discount_percent, discount_fixed
+/// Returns: PriceAdjustment with surcharge, manual_discount_percent, discount_fixed
 pub fn calculate_adjustments(rules: &[&PriceRule], base_price: f64) -> PriceAdjustment {
     if rules.is_empty() {
         return PriceAdjustment::default();
@@ -162,7 +162,7 @@ pub fn calculate_adjustments(rules: &[&PriceRule], base_price: f64) -> PriceAdju
 
     PriceAdjustment {
         surcharge: to_f64(surcharge_acc),
-        discount_percent: to_f64(discount_pct_acc),
+        manual_discount_percent: to_f64(discount_pct_acc),
         discount_fixed: to_f64(discount_fixed_acc),
         applied_rules,
     }
@@ -216,7 +216,7 @@ mod tests {
         let rules: Vec<&PriceRule> = vec![&rule];
         let adj = calculate_adjustments(&rules, 100.0);
 
-        assert_eq!(adj.discount_percent, 10.0);
+        assert_eq!(adj.manual_discount_percent, 10.0);
         assert_eq!(adj.calculate_final_price(100.0), 90.0);
     }
 
@@ -255,7 +255,7 @@ mod tests {
         let adj = calculate_adjustments(&rules, 100.0);
 
         // 10% + 5% = 15% total discount
-        assert_eq!(adj.discount_percent, 15.0);
+        assert_eq!(adj.manual_discount_percent, 15.0);
         assert_eq!(adj.calculate_final_price(100.0), 85.0);
     }
 
@@ -267,7 +267,7 @@ mod tests {
         let adj = calculate_adjustments(&rules, 100.0);
 
         // Higher priority (10%) wins, lower priority (20%) ignored
-        assert_eq!(adj.discount_percent, 10.0);
+        assert_eq!(adj.manual_discount_percent, 10.0);
     }
 
     #[test]
@@ -281,7 +281,7 @@ mod tests {
         let adj = calculate_adjustments(&rules, 100.0);
 
         assert_eq!(adj.surcharge, 10.0);
-        assert_eq!(adj.discount_percent, 20.0);
+        assert_eq!(adj.manual_discount_percent, 20.0);
         assert_eq!(adj.calculate_final_price(100.0), 88.0);
     }
 
@@ -295,7 +295,7 @@ mod tests {
         let rules: Vec<&PriceRule> = vec![&rule];
         let adj = calculate_adjustments(&rules, 100.0);
 
-        assert_eq!(adj.discount_percent, 33.0);
+        assert_eq!(adj.manual_discount_percent, 33.0);
         // $100 * (1 - 0.33) = $67.00
         assert_eq!(adj.calculate_final_price(100.0), 67.0);
     }
@@ -320,7 +320,7 @@ mod tests {
         let rules: Vec<&PriceRule> = rules_owned.iter().collect();
         let adj = calculate_adjustments(&rules, 100.0);
 
-        assert_eq!(adj.discount_percent, 10.0);
+        assert_eq!(adj.manual_discount_percent, 10.0);
         assert_eq!(adj.calculate_final_price(100.0), 90.0);
     }
 

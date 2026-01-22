@@ -72,7 +72,7 @@ fn apply_item_modified(
                     new_item.quantity = result.quantity;
                     new_item.unpaid_quantity = result.quantity;
                     new_item.price = result.price;
-                    new_item.discount_percent = result.discount_percent;
+                    new_item.manual_discount_percent = result.manual_discount_percent;
 
                     // Apply additional changes (note, surcharge, options, specification)
                     if let Some(ref note) = changes.note {
@@ -104,8 +104,8 @@ fn apply_changes_to_item(item: &mut CartItemSnapshot, changes: &ItemChanges) {
         item.quantity = quantity;
         item.unpaid_quantity = quantity; // Reset unpaid quantity
     }
-    if let Some(discount) = changes.discount_percent {
-        item.discount_percent = Some(discount);
+    if let Some(discount) = changes.manual_discount_percent {
+        item.manual_discount_percent = Some(discount);
     }
     if let Some(surcharge) = changes.surcharge {
         item.surcharge = Some(surcharge);
@@ -143,8 +143,11 @@ mod tests {
             unpaid_quantity: quantity,
             selected_options: None,
             selected_specification: None,
-            discount_percent: None,
+            manual_discount_percent: None,
             surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -198,7 +201,7 @@ mod tests {
             instance_id: "item-1".to_string(),
             quantity: 2,
             price: 15.0,
-            discount_percent: None,
+            manual_discount_percent: None,
             action: "UPDATED".to_string(),
         }];
 
@@ -227,14 +230,14 @@ mod tests {
 
         let source = create_test_item("item-1", "prod-1", "Product A", 100.0, 1);
         let changes = ItemChanges {
-            discount_percent: Some(20.0),
+            manual_discount_percent: Some(20.0),
             ..Default::default()
         };
         let results = vec![ItemModificationResult {
             instance_id: "item-1".to_string(),
             quantity: 1,
             price: 100.0,
-            discount_percent: Some(20.0),
+            manual_discount_percent: Some(20.0),
             action: "UPDATED".to_string(),
         }];
 
@@ -243,7 +246,7 @@ mod tests {
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(snapshot.items[0].discount_percent, Some(20.0));
+        assert_eq!(snapshot.items[0].manual_discount_percent, Some(20.0));
         // 100.0 * 1 * (1 - 0.20) = 80.0
         assert_eq!(snapshot.subtotal, 80.0);
         assert_eq!(snapshot.total, 80.0);
@@ -260,7 +263,7 @@ mod tests {
 
         let source = create_test_item("item-1", "prod-1", "Product A", 10.0, 5);
         let changes = ItemChanges {
-            discount_percent: Some(10.0),
+            manual_discount_percent: Some(10.0),
             ..Default::default()
         };
         let results = vec![
@@ -268,14 +271,14 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 quantity: 3,
                 price: 10.0,
-                discount_percent: None,
+                manual_discount_percent: None,
                 action: "UNCHANGED".to_string(),
             },
             ItemModificationResult {
                 instance_id: "item-2-split".to_string(),
                 quantity: 2,
                 price: 10.0,
-                discount_percent: Some(10.0),
+                manual_discount_percent: Some(10.0),
                 action: "CREATED".to_string(),
             },
         ];
@@ -291,12 +294,12 @@ mod tests {
         // Original item with reduced quantity
         assert_eq!(snapshot.items[0].instance_id, "item-1");
         assert_eq!(snapshot.items[0].quantity, 3);
-        assert_eq!(snapshot.items[0].discount_percent, None);
+        assert_eq!(snapshot.items[0].manual_discount_percent, None);
 
         // New split item with discount
         assert_eq!(snapshot.items[1].instance_id, "item-2-split");
         assert_eq!(snapshot.items[1].quantity, 2);
-        assert_eq!(snapshot.items[1].discount_percent, Some(10.0));
+        assert_eq!(snapshot.items[1].manual_discount_percent, Some(10.0));
 
         // Totals: 10.0 * 3 + 10.0 * 2 * 0.9 = 30.0 + 18.0 = 48.0
         assert!((snapshot.subtotal - 48.0).abs() < 0.001);
@@ -318,7 +321,7 @@ mod tests {
             instance_id: "item-1".to_string(),
             quantity: 1,
             price: 10.0,
-            discount_percent: None,
+            manual_discount_percent: None,
             action: "UPDATED".to_string(),
         }];
 
@@ -346,7 +349,7 @@ mod tests {
             instance_id: "item-1".to_string(),
             quantity: 1,
             price: 10.0,
-            discount_percent: None,
+            manual_discount_percent: None,
             action: "UPDATED".to_string(),
         }];
 
@@ -376,7 +379,7 @@ mod tests {
             instance_id: "item-1".to_string(),
             quantity: 5,
             price: 10.0,
-            discount_percent: None,
+            manual_discount_percent: None,
             action: "UPDATED".to_string(),
         }];
 
@@ -407,7 +410,7 @@ mod tests {
             instance_id: "item-1".to_string(),
             quantity: 1,
             price: 15.0,
-            discount_percent: None,
+            manual_discount_percent: None,
             action: "UPDATED".to_string(),
         }];
 
@@ -436,7 +439,7 @@ mod tests {
             instance_id: "item-1".to_string(),
             quantity: 1,
             price: 15.0,
-            discount_percent: None,
+            manual_discount_percent: None,
             action: "UPDATED".to_string(),
         }];
 
@@ -466,7 +469,7 @@ mod tests {
             instance_id: "nonexistent".to_string(),
             quantity: 1,
             price: 15.0,
-            discount_percent: None,
+            manual_discount_percent: None,
             action: "UPDATED".to_string(),
         }];
 
@@ -490,7 +493,7 @@ mod tests {
         let source = create_test_item("item-1", "prod-1", "Product A", 10.0, 2);
         let changes = ItemChanges {
             price: Some(15.0),
-            discount_percent: Some(10.0),
+            manual_discount_percent: Some(10.0),
             surcharge: Some(2.0),
             note: Some("Special order".to_string()),
             ..Default::default()
@@ -499,7 +502,7 @@ mod tests {
             instance_id: "item-1".to_string(),
             quantity: 2,
             price: 15.0,
-            discount_percent: Some(10.0),
+            manual_discount_percent: Some(10.0),
             action: "UPDATED".to_string(),
         }];
 
@@ -509,7 +512,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         assert_eq!(snapshot.items[0].price, 15.0);
-        assert_eq!(snapshot.items[0].discount_percent, Some(10.0));
+        assert_eq!(snapshot.items[0].manual_discount_percent, Some(10.0));
         assert_eq!(snapshot.items[0].surcharge, Some(2.0));
         assert_eq!(snapshot.items[0].note, Some("Special order".to_string()));
         // 15.0 * 2 * 0.9 = 27.0
@@ -533,14 +536,14 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 quantity: 2,
                 price: 10.0,
-                discount_percent: None,
+                manual_discount_percent: None,
                 action: "UNCHANGED".to_string(),
             },
             ItemModificationResult {
                 instance_id: "item-1-spicy".to_string(),
                 quantity: 1,
                 price: 10.0,
-                discount_percent: None,
+                manual_discount_percent: None,
                 action: "CREATED".to_string(),
             },
         ];
@@ -564,7 +567,7 @@ mod tests {
         let changes = ItemChanges {
             price: Some(20.0),
             quantity: Some(5),
-            discount_percent: Some(15.0),
+            manual_discount_percent: Some(15.0),
             surcharge: Some(3.0),
             note: Some("Test note".to_string()),
             selected_options: None,
@@ -576,7 +579,7 @@ mod tests {
         assert_eq!(item.price, 20.0);
         assert_eq!(item.quantity, 5);
         assert_eq!(item.unpaid_quantity, 5);
-        assert_eq!(item.discount_percent, Some(15.0));
+        assert_eq!(item.manual_discount_percent, Some(15.0));
         assert_eq!(item.surcharge, Some(3.0));
         assert_eq!(item.note, Some("Test note".to_string()));
     }
@@ -584,7 +587,7 @@ mod tests {
     #[test]
     fn test_apply_changes_partial() {
         let mut item = create_test_item("item-1", "prod-1", "Product A", 10.0, 2);
-        item.discount_percent = Some(5.0);
+        item.manual_discount_percent = Some(5.0);
         item.surcharge = Some(1.0);
         item.note = Some("Original note".to_string());
 
@@ -598,7 +601,7 @@ mod tests {
 
         assert_eq!(item.price, 20.0);
         assert_eq!(item.quantity, 2); // Unchanged
-        assert_eq!(item.discount_percent, Some(5.0)); // Unchanged
+        assert_eq!(item.manual_discount_percent, Some(5.0)); // Unchanged
         assert_eq!(item.surcharge, Some(1.0)); // Unchanged
         assert_eq!(item.note, Some("Original note".to_string())); // Unchanged
     }
@@ -680,7 +683,7 @@ mod tests {
             instance_id: "item-1".to_string(),
             quantity: 1,
             price: 10.0,
-            discount_percent: None,
+            manual_discount_percent: None,
             action: "UPDATED".to_string(),
         }];
 
@@ -722,14 +725,14 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 quantity: 2,
                 price: 10.0,
-                discount_percent: None,
+                manual_discount_percent: None,
                 action: "UNCHANGED".to_string(),
             },
             ItemModificationResult {
                 instance_id: "item-1-spicy".to_string(),
                 quantity: 1,
                 price: 10.0,
-                discount_percent: None,
+                manual_discount_percent: None,
                 action: "CREATED".to_string(),
             },
         ];
