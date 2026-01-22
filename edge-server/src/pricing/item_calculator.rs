@@ -54,13 +54,13 @@ impl Default for ItemCalculationResult {
 
 /// Convert f64 to Decimal for calculation
 #[inline]
-fn to_decimal(value: f64) -> Decimal {
+pub fn to_decimal(value: f64) -> Decimal {
     Decimal::from_f64(value).unwrap_or_default()
 }
 
 /// Convert Decimal back to f64 for storage, rounded to 2 decimal places
 #[inline]
-fn to_f64(value: Decimal) -> f64 {
+pub fn to_f64(value: Decimal) -> f64 {
     value
         .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
         .to_f64()
@@ -129,11 +129,11 @@ fn select_winner<'a>(rules: &[&'a PriceRule]) -> Option<&'a PriceRule> {
 // ==================== Discount Application ====================
 
 /// Result of applying discount rules
-struct DiscountResult {
+pub struct DiscountResult {
     /// Total discount amount
-    amount: Decimal,
+    pub amount: Decimal,
     /// Rules that were applied
-    applied: Vec<AppliedRule>,
+    pub applied: Vec<AppliedRule>,
 }
 
 /// Apply discount rules with stacking logic:
@@ -143,7 +143,7 @@ struct DiscountResult {
 /// 4. Stackable fixed: Simple addition
 ///
 /// All discounts are calculated based on `price_basis`.
-fn apply_discount_rules(
+pub fn apply_discount_rules(
     rules: &[&PriceRule],
     price_basis: Decimal,
 ) -> DiscountResult {
@@ -273,16 +273,16 @@ fn calculate_single_discount(rule: &PriceRule, price_basis: Decimal) -> Decimal 
 // ==================== Surcharge Application ====================
 
 /// Result of applying surcharge rules
-struct SurchargeResult {
+pub struct SurchargeResult {
     /// Total surcharge amount
-    amount: Decimal,
+    pub amount: Decimal,
     /// Rules that were applied
-    applied: Vec<AppliedRule>,
+    pub applied: Vec<AppliedRule>,
 }
 
 /// Apply surcharge rules with same stacking logic as discounts.
 /// Surcharges are calculated based on `price_basis` (typically the base price).
-fn apply_surcharge_rules(
+pub fn apply_surcharge_rules(
     rules: &[&PriceRule],
     price_basis: Decimal,
 ) -> SurchargeResult {

@@ -7,8 +7,10 @@ mod calculator;
 mod engine;
 mod item_calculator;
 mod matcher;
+mod order_calculator;
 
 pub use calculator::*;
 pub use engine::PriceRuleEngine;
 pub use item_calculator::*;
 pub use matcher::*;
+pub use order_calculator::*;
