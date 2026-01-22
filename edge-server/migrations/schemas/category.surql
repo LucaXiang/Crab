@@ -19,6 +19,12 @@ DEFINE FIELD OVERWRITE print_destinations ON category TYPE array<record<print_de
     DEFAULT []
     PERMISSIONS FULL;
 
+-- 厨房打印开关
+DEFINE FIELD OVERWRITE is_kitchen_print_enabled ON category TYPE bool
+    DEFAULT true
+    PERMISSIONS FULL;
+
+-- 标签打印开关
 DEFINE FIELD OVERWRITE is_label_print_enabled ON category TYPE bool
     DEFAULT true
     PERMISSIONS FULL;

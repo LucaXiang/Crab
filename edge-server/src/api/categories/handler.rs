@@ -57,11 +57,12 @@ pub async fn create(
         .as_ref()
         .map(|t| t.id.to_string())
         .unwrap_or_default();
+    let api_category: SharedCategory = category.into();
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&category))
+        .broadcast_sync(RESOURCE, "created", &id, Some(&api_category))
         .await;
 
-    Ok(Json(category.into()))
+    Ok(Json(api_category))
 }
 
 /// PUT /api/categories/:id - 更新分类
@@ -77,11 +78,12 @@ pub async fn update(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
+    let api_category: SharedCategory = category.into();
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&category))
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&api_category))
         .await;
 
-    Ok(Json(category.into()))
+    Ok(Json(api_category))
 }
 
 /// DELETE /api/categories/:id - 删除分类 (软删除)
@@ -151,6 +153,7 @@ pub async fn batch_update_sort_order(
                     name: None,
                     sort_order: Some(update.sort_order),
                     print_destinations: None,
+                    is_kitchen_print_enabled: None,
                     is_label_print_enabled: None,
                     is_active: None,
                     is_virtual: None,

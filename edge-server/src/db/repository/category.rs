@@ -91,6 +91,7 @@ impl CategoryRepository {
             name: data.name,
             sort_order: data.sort_order.unwrap_or(0),
             print_destinations,
+            is_kitchen_print_enabled: data.is_kitchen_print_enabled.unwrap_or(true),
             is_label_print_enabled: data.is_label_print_enabled.unwrap_or(true),
             is_active: true,
             is_virtual: data.is_virtual.unwrap_or(false),
@@ -129,6 +130,8 @@ impl CategoryRepository {
             #[serde(skip_serializing_if = "Option::is_none")]
             print_destinations: Option<Vec<Thing>>,
             #[serde(skip_serializing_if = "Option::is_none")]
+            is_kitchen_print_enabled: Option<bool>,
+            #[serde(skip_serializing_if = "Option::is_none")]
             is_label_print_enabled: Option<bool>,
             #[serde(skip_serializing_if = "Option::is_none")]
             is_active: Option<bool>,
@@ -148,6 +151,7 @@ impl CategoryRepository {
                     .map(|id| make_thing("print_destination", id))
                     .collect()
             }),
+            is_kitchen_print_enabled: data.is_kitchen_print_enabled,
             is_label_print_enabled: data.is_label_print_enabled,
             is_active: data.is_active,
             is_virtual: data.is_virtual,

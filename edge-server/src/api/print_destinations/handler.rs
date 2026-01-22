@@ -56,11 +56,12 @@ pub async fn create(
         .as_ref()
         .map(|t| t.id.to_string())
         .unwrap_or_default();
+    let api_item: SharedPrintDestination = item.into();
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&item))
+        .broadcast_sync(RESOURCE, "created", &id, Some(&api_item))
         .await;
 
-    Ok(Json(item.into()))
+    Ok(Json(api_item))
 }
 
 /// PUT /api/print-destinations/:id - 更新打印目的地
@@ -76,11 +77,12 @@ pub async fn update(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
+    let api_item: SharedPrintDestination = item.into();
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&item))
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&api_item))
         .await;
 
-    Ok(Json(item.into()))
+    Ok(Json(api_item))
 }
 
 /// DELETE /api/print-destinations/:id - 删除打印目的地

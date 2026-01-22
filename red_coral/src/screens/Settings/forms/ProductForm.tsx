@@ -9,7 +9,7 @@ import { usePriceInput } from '@/hooks/usePriceInput';
 import { SelectField } from '@/presentation/components/form/FormField/SelectField';
 import { KitchenPrinterSelector } from '@/presentation/components/form/FormField/KitchenPrinterSelector';
 import { AttributeDisplayTag } from '@/presentation/components/form/FormField/AttributeDisplayTag';
-import { Category, EmbeddedSpec, LabelPrintState } from '@/core/domain/types';
+import { Category, EmbeddedSpec, PrintState } from '@/core/domain/types';
 
 interface ProductFormProps {
   formData: {
@@ -25,7 +25,7 @@ interface ProductFormProps {
     attribute_default_options?: Record<string, string[]>; // Product-level default options (array for multi-select)
     print_destinations?: string[];
     kitchen_print_name?: string;
-    is_label_print_enabled?: LabelPrintState;
+    is_label_print_enabled?: PrintState;
     is_active?: boolean;
     specs?: EmbeddedSpec[]; // Embedded specifications
     selected_tag_ids?: string[]; // Tag IDs loaded from getProductFull API
@@ -299,7 +299,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 onChange={(e) => {
                   const raw = e.target.value;
                   const num = parseInt(raw, 10);
-                  const next: LabelPrintState = isNaN(num) ? -1 : (num === 1 ? 1 : num === 0 ? 0 : -1);
+                  const next: PrintState = isNaN(num) ? -1 : (num === 1 ? 1 : num === 0 ? 0 : -1);
                   onFieldChange('is_label_print_enabled', next);
                 }}
                 className={selectClass}

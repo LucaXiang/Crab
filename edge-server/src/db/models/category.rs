@@ -16,6 +16,12 @@ pub struct Category {
     /// Record links to print_destination
     #[serde(default)]
     pub print_destinations: Vec<Thing>,
+    /// Whether kitchen printing is enabled for this category
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
+    pub is_kitchen_print_enabled: bool,
     #[serde(
         default = "default_true",
         deserialize_with = "serde_helpers::bool_true"
@@ -52,6 +58,7 @@ impl Category {
             name,
             sort_order: 0,
             print_destinations: Vec::new(),
+            is_kitchen_print_enabled: true,
             is_label_print_enabled: true,
             is_active: true,
             is_virtual: false,
@@ -68,6 +75,8 @@ pub struct CategoryCreate {
     /// Print destination IDs (strings)
     #[serde(default)]
     pub print_destinations: Vec<String>,
+    /// Whether kitchen printing is enabled
+    pub is_kitchen_print_enabled: Option<bool>,
     pub is_label_print_enabled: Option<bool>,
     /// Whether this is a virtual category
     pub is_virtual: Option<bool>,
@@ -85,6 +94,8 @@ pub struct CategoryUpdate {
     /// Print destination IDs (strings)
     #[serde(default)]
     pub print_destinations: Option<Vec<String>>,
+    /// Whether kitchen printing is enabled
+    pub is_kitchen_print_enabled: Option<bool>,
     pub is_label_print_enabled: Option<bool>,
     pub is_active: Option<bool>,
     /// Whether this is a virtual category

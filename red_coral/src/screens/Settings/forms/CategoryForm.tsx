@@ -7,11 +7,14 @@ import { SelectField } from '@/presentation/components/form/FormField/SelectFiel
 import { KitchenPrinterSelector } from '@/presentation/components/form/FormField/KitchenPrinterSelector';
 import { AttributeDisplayTag } from '@/presentation/components/form/FormField/AttributeDisplayTag';
 
+import type { PrintState } from '@/core/domain/types';
+
 interface CategoryFormProps {
   formData: {
     name: string;
     print_destinations?: string[];
-    is_label_print_enabled?: boolean;
+    is_kitchen_print_enabled?: PrintState;  // 0=禁用, 1=启用
+    is_label_print_enabled?: PrintState;    // 0=禁用, 1=启用
     is_active?: boolean;
     selected_attribute_ids?: string[];
     attribute_default_options?: Record<string, string | string[]>;
@@ -37,12 +40,12 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
   const selectedTagIds = formData.tag_ids || [];
   const matchMode = formData.match_mode || 'any';
 
-  // Kitchen print state
-  // Use a special marker value ['-1'] to indicate "enabled but no printer selected"
+  // Kitchen print state - PrintState: 0=禁用, 1=启用
   const printDestinations = formData.print_destinations ?? [];
-  const hasMarkerOrPrinter = printDestinations.length > 0;
-  const kitchenPrinterId = printDestinations[0] !== '-1' ? printDestinations[0] : undefined;
-  const isKitchenPrintEnabled = hasMarkerOrPrinter;
+  const kitchenPrinterId = printDestinations[0];
+  // 默认启用(1)，0是禁用所以不能用 ?? 因为0是falsy
+  const isKitchenPrintEnabled: PrintState = formData.is_kitchen_print_enabled === 0 ? 0 : (formData.is_kitchen_print_enabled ?? 1);
+  const isLabelPrintEnabled: PrintState = formData.is_label_print_enabled === 0 ? 0 : (formData.is_label_print_enabled ?? 1);
 
   // Toggle tag selection
   const handleTagToggle = (tagId: string) => {
@@ -130,24 +133,18 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
       <FormSection title={t('settings.product.print.settings')} icon={Printer}>
         <SelectField
           label={t('settings.product.print.is_kitchen_print_enabled')}
-          value={isKitchenPrintEnabled ? 'true' : 'false'}
-          onChange={(value) => {
-            if (value === 'true') {
-              onFieldChange('print_destinations', kitchenPrinterId ? [kitchenPrinterId] : ['-1']);
-            } else {
-              onFieldChange('print_destinations', []);
-            }
-          }}
+          value={String(isKitchenPrintEnabled)}
+          onChange={(value) => onFieldChange('is_kitchen_print_enabled', Number(value) as PrintState)}
           options={[
-            { value: 'true', label: t('common.status.enabled') },
-            { value: 'false', label: t('common.status.disabled') }
+            { value: '1', label: t('common.status.enabled') },
+            { value: '0', label: t('common.status.disabled') }
           ]}
         />
 
-        <SubField show={isKitchenPrintEnabled}>
+        <SubField show={isKitchenPrintEnabled === 1}>
           <KitchenPrinterSelector
             value={kitchenPrinterId}
-            onChange={(value) => onFieldChange('print_destinations', value ? [value] : ['-1'])}
+            onChange={(value) => onFieldChange('print_destinations', value ? [value] : [])}
             t={t}
           />
         </SubField>
@@ -155,11 +152,11 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
         <div className="border-t border-gray-100 pt-3">
           <SelectField
             label={t('settings.product.print.is_label_print_enabled')}
-            value={formData.is_label_print_enabled ? 'true' : 'false'}
-            onChange={(value) => onFieldChange('is_label_print_enabled', value === 'true')}
+            value={String(isLabelPrintEnabled)}
+            onChange={(value) => onFieldChange('is_label_print_enabled', Number(value) as PrintState)}
             options={[
-              { value: 'true', label: t('common.status.enabled') },
-              { value: 'false', label: t('common.status.disabled') }
+              { value: '1', label: t('common.status.enabled') },
+              { value: '0', label: t('common.status.disabled') }
             ]}
           />
         </div>

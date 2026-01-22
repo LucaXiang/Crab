@@ -1,7 +1,7 @@
 import { persist } from 'zustand/middleware';
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import type { EmbeddedSpec, Category, Product, Tag, DiningTable, Zone, LabelPrintState } from '@/core/domain/types';
+import type { EmbeddedSpec, Category, Product, Tag, DiningTable, Zone, PrintState } from '@/core/domain/types';
 
 /**
  * Settings UI Store - 纯 UI 状态管理
@@ -96,12 +96,13 @@ interface FormData {
   receipt_name?: string;
   kitchen_print_name?: string;
   print_destinations?: string[];  // PrintDestination IDs
-  is_label_print_enabled?: LabelPrintState;  // -1=继承, 0=禁用, 1=启用
+  is_label_print_enabled?: PrintState;  // Product: -1=继承, 0=禁用, 1=启用
   tags?: string[];         // Tag IDs
   specs?: EmbeddedSpec[];  // 嵌入式规格
   has_multi_spec?: boolean; // UI only: 是否多规格
 
   // === Category ===
+  is_kitchen_print_enabled?: PrintState;  // Category: 0=禁用, 1=启用 (无继承)
   is_virtual?: boolean;
   tag_ids?: string[];      // Virtual category tag filter
   match_mode?: 'any' | 'all';
@@ -184,6 +185,7 @@ const initialFormData: FormData = {
   specs: [],
   has_multi_spec: false,
   // Category
+  is_kitchen_print_enabled: 1,  // 默认启用
   is_virtual: false,
   tag_ids: [],
   match_mode: 'any',
@@ -267,6 +269,7 @@ export const useSettingsStore = create<SettingsStore>()(
             name: categoryData?.name || '',
             sort_order: categoryData?.sort_order,
             print_destinations: categoryData?.print_destinations || [],
+            is_kitchen_print_enabled: categoryData?.is_kitchen_print_enabled ? 1 : 0,  // Category: bool → 0/1
             is_label_print_enabled: categoryData?.is_label_print_enabled ? 1 : 0,  // Category: bool → 0/1
             is_active: categoryData?.is_active ?? true,  // Default to active for new categories
             is_virtual: categoryData?.is_virtual ?? false,
@@ -471,7 +474,8 @@ function computeIsDirty(entity: ModalEntity, next: FormData, initial: FormData):
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'CATEGORY') {
     const keys: (keyof FormData)[] = [
-      'name', 'sort_order', 'print_destinations', 'is_label_print_enabled',
+      'name', 'sort_order', 'print_destinations',
+      'is_kitchen_print_enabled', 'is_label_print_enabled',
       'is_active', 'is_virtual', 'tag_ids', 'match_mode',
       'selected_attribute_ids', 'attribute_default_options',
     ];

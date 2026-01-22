@@ -47,6 +47,7 @@ impl From<db::Category> for api::Category {
             name: c.name,
             sort_order: c.sort_order,
             print_destinations: things_to_strings(&c.print_destinations),
+            is_kitchen_print_enabled: c.is_kitchen_print_enabled,
             is_label_print_enabled: c.is_label_print_enabled,
             is_active: c.is_active,
             is_virtual: c.is_virtual,

@@ -513,15 +513,15 @@ export const EntityFormModal: React.FC = React.memo(() => {
           }
         }
       } else if (entity === 'CATEGORY') {
-        // Filter out marker value ['-1'] from print_destinations
-        const rawDestinations = formData.print_destinations ?? [];
-        const validDestinations = rawDestinations.filter((d) => d !== '-1');
-
+        // PrintState 转 boolean: 1=true, 0=false (Category API 使用 boolean)
+        const kitchenEnabled = formData.is_kitchen_print_enabled === 0 ? false : true;
+        const labelEnabled = formData.is_label_print_enabled === 0 ? false : true;
         const categoryPayload = {
           name: formData.name.trim(),
           sort_order: formData.sort_order ?? 0,
-          print_destinations: validDestinations,
-          is_label_print_enabled: formData.is_label_print_enabled !== 0,  // 0=禁用, 其他=启用
+          print_destinations: formData.print_destinations ?? [],
+          is_kitchen_print_enabled: kitchenEnabled,
+          is_label_print_enabled: labelEnabled,
           is_active: formData.is_active ?? true,
           is_virtual: formData.is_virtual ?? false,
           tag_ids: formData.tag_ids ?? [],
@@ -534,6 +534,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             name: categoryPayload.name,
             sort_order: categoryPayload.sort_order,
             print_destinations: categoryPayload.print_destinations,
+            is_kitchen_print_enabled: categoryPayload.is_kitchen_print_enabled,
             is_label_print_enabled: categoryPayload.is_label_print_enabled,
             is_virtual: categoryPayload.is_virtual,
             tag_ids: categoryPayload.tag_ids,
@@ -550,6 +551,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             name: categoryPayload.name,
             sort_order: categoryPayload.sort_order,
             print_destinations: categoryPayload.print_destinations,
+            is_kitchen_print_enabled: categoryPayload.is_kitchen_print_enabled,
             is_label_print_enabled: categoryPayload.is_label_print_enabled,
             is_active: categoryPayload.is_active,
             is_virtual: categoryPayload.is_virtual,
@@ -729,7 +731,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
             formData={{
               name: formData.name,
               print_destinations: formData.print_destinations,
-              is_label_print_enabled: formData.is_label_print_enabled !== 0,  // 0=禁用, 其他=启用
+              is_kitchen_print_enabled: formData.is_kitchen_print_enabled,  // PrintState: 0=禁用, 1=启用
+              is_label_print_enabled: formData.is_label_print_enabled,      // PrintState: 0=禁用, 1=启用
               is_active: formData.is_active ?? true,
               selected_attribute_ids: formData.selected_attribute_ids,
               attribute_default_options: formData.attribute_default_options,

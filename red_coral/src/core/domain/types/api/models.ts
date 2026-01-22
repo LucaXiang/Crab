@@ -8,12 +8,12 @@
 // ============ Common Types ============
 
 /**
- * Label print state for products (tri-state inheritance)
- * -1 = inherit from category
+ * Print state (tri-state for products, binary for categories)
+ * -1 = inherit from category (products only)
  *  0 = disabled
  *  1 = enabled
  */
-export type LabelPrintState = -1 | 0 | 1;
+export type PrintState = -1 | 0 | 1;
 
 // ============ Tag ============
 
@@ -47,6 +47,8 @@ export interface Category {
   name: string;
   sort_order: number;
   print_destinations: string[];
+  /** Whether kitchen printing is enabled for this category */
+  is_kitchen_print_enabled: boolean;
   is_label_print_enabled: boolean;
   is_active: boolean;
   /** Whether this is a virtual category (filters by tags instead of direct assignment) */
@@ -61,6 +63,8 @@ export interface CategoryCreate {
   name: string;
   sort_order?: number;
   print_destinations?: string[];
+  /** Whether kitchen printing is enabled */
+  is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
   /** Whether this is a virtual category */
   is_virtual?: boolean;
@@ -74,6 +78,8 @@ export interface CategoryUpdate {
   name?: string;
   sort_order?: number;
   print_destinations?: string[];
+  /** Whether kitchen printing is enabled */
+  is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
   is_active?: boolean;
   /** Whether this is a virtual category */
@@ -111,7 +117,7 @@ export interface Product {
   receipt_name: string | null;
   kitchen_print_name: string | null;
   print_destinations: string[];
-  is_label_print_enabled: LabelPrintState;
+  is_label_print_enabled: PrintState;
   is_active: boolean;
   /** Tag references (String IDs) */
   tags: string[];
@@ -128,7 +134,7 @@ export interface ProductCreate {
   receipt_name?: string;
   kitchen_print_name?: string;
   print_destinations?: string[];
-  is_label_print_enabled?: LabelPrintState;
+  is_label_print_enabled?: PrintState;
   tags?: string[];
   /** 嵌入式规格 */
   specs: EmbeddedSpec[];
@@ -143,7 +149,7 @@ export interface ProductUpdate {
   receipt_name?: string;
   kitchen_print_name?: string;
   print_destinations?: string[];
-  is_label_print_enabled?: LabelPrintState;
+  is_label_print_enabled?: PrintState;
   is_active?: boolean;
   tags?: string[];
   /** 嵌入式规格 */
@@ -175,7 +181,7 @@ export interface ProductFull {
   receipt_name: string | null;
   kitchen_print_name: string | null;
   print_destinations: string[];
-  is_label_print_enabled: LabelPrintState;
+  is_label_print_enabled: PrintState;
   is_active: boolean;
   /** Embedded specifications */
   specs: EmbeddedSpec[];

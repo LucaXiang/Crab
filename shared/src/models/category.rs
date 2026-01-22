@@ -11,6 +11,9 @@ pub struct Category {
     /// Print destination references (String IDs)
     #[serde(default)]
     pub print_destinations: Vec<String>,
+    /// Whether kitchen printing is enabled for this category
+    #[serde(default)]
+    pub is_kitchen_print_enabled: bool,
     pub is_label_print_enabled: bool,
     pub is_active: bool,
     /// Whether this is a virtual category (filters by tags instead of direct assignment)
@@ -36,6 +39,8 @@ pub struct CategoryCreate {
     /// Print destination IDs (strings)
     #[serde(default)]
     pub print_destinations: Vec<String>,
+    /// Whether kitchen printing is enabled
+    pub is_kitchen_print_enabled: Option<bool>,
     pub is_label_print_enabled: Option<bool>,
     /// Whether this is a virtual category
     pub is_virtual: Option<bool>,
@@ -54,6 +59,8 @@ pub struct CategoryUpdate {
     /// Print destination IDs (strings)
     #[serde(default)]
     pub print_destinations: Option<Vec<String>>,
+    /// Whether kitchen printing is enabled
+    pub is_kitchen_print_enabled: Option<bool>,
     pub is_label_print_enabled: Option<bool>,
     pub is_active: Option<bool>,
     /// Whether this is a virtual category

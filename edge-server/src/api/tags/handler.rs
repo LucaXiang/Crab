@@ -6,41 +6,42 @@ use axum::{
 };
 
 use crate::core::ServerState;
-use crate::db::models::{Tag, TagCreate, TagUpdate};
+use crate::db::models::{TagCreate, TagUpdate};
 use crate::db::repository::TagRepository;
 use crate::utils::{AppError, AppResult};
+use shared::models::Tag as SharedTag;
 
 const RESOURCE: &str = "tag";
 
 /// GET /api/tags - 获取所有标签
-pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Tag>>> {
+pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<SharedTag>>> {
     let repo = TagRepository::new(state.db.clone());
     let tags = repo
         .find_all()
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(tags))
+    Ok(Json(tags.into_iter().map(Into::into).collect()))
 }
 
 /// GET /api/tags/:id - 获取单个标签
 pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<String>,
-) -> AppResult<Json<Tag>> {
+) -> AppResult<Json<SharedTag>> {
     let repo = TagRepository::new(state.db.clone());
     let tag = repo
         .find_by_id(&id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?
         .ok_or_else(|| AppError::not_found(format!("Tag {} not found", id)))?;
-    Ok(Json(tag))
+    Ok(Json(tag.into()))
 }
 
 /// POST /api/tags - 创建标签
 pub async fn create(
     State(state): State<ServerState>,
     Json(payload): Json<TagCreate>,
-) -> AppResult<Json<Tag>> {
+) -> AppResult<Json<SharedTag>> {
     let repo = TagRepository::new(state.db.clone());
     let tag = repo
         .create(payload)
@@ -53,11 +54,12 @@ pub async fn create(
         .as_ref()
         .map(|t| t.id.to_string())
         .unwrap_or_default();
+    let api_tag: SharedTag = tag.into();
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&tag))
+        .broadcast_sync(RESOURCE, "created", &id, Some(&api_tag))
         .await;
 
-    Ok(Json(tag))
+    Ok(Json(api_tag))
 }
 
 /// PUT /api/tags/:id - 更新标签
@@ -65,7 +67,7 @@ pub async fn update(
     State(state): State<ServerState>,
     Path(id): Path<String>,
     Json(payload): Json<TagUpdate>,
-) -> AppResult<Json<Tag>> {
+) -> AppResult<Json<SharedTag>> {
     let repo = TagRepository::new(state.db.clone());
     let tag = repo
         .update(&id, payload)
@@ -73,11 +75,12 @@ pub async fn update(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
+    let api_tag: SharedTag = tag.into();
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&tag))
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&api_tag))
         .await;
 
-    Ok(Json(tag))
+    Ok(Json(api_tag))
 }
 
 /// DELETE /api/tags/:id - 删除标签 (软删除)
