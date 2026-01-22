@@ -693,15 +693,14 @@ impl ClientBridge {
 
         match &*mode_guard {
             ClientMode::Client {
-                client, edge_url, ..
-            } => match client {
-                Some(RemoteClientState::Authenticated(auth)) => {
-                    let http = auth.edge_http_client()?.clone();
-                    let token = auth.token()?.to_string();
-                    Some((edge_url.clone(), http, token))
-                }
-                _ => None,
-            },
+                client: Some(RemoteClientState::Authenticated(auth)),
+                edge_url,
+                ..
+            } => {
+                let http = auth.edge_http_client()?.clone();
+                let token = auth.token()?.to_string();
+                Some((edge_url.clone(), http, token))
+            }
             _ => None,
         }
     }

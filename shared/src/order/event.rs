@@ -147,9 +147,9 @@ pub enum EventPayload {
         /// Number of items affected
         affected_quantity: i32,
         /// Changes applied
-        changes: ItemChanges,
+        changes: Box<ItemChanges>,
         /// Previous values for comparison
-        previous_values: ItemChanges,
+        previous_values: Box<ItemChanges>,
         /// Resulting items after modification
         results: Vec<ItemModificationResult>,
         /// Authorizer info

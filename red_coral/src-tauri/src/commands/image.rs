@@ -4,7 +4,7 @@
 //! 支持批量操作以减少 IPC 开销。
 
 use std::io::Cursor;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock;
@@ -275,7 +275,7 @@ pub async fn save_image(
 }
 
 /// Server 模式：本地处理并保存图片
-async fn save_image_server(data: &[u8], work_dir: &PathBuf) -> Result<String, String> {
+async fn save_image_server(data: &[u8], work_dir: &Path) -> Result<String, String> {
     // 1. 加载并验证图片
     let img = image::load_from_memory(data).map_err(|e| format!("Invalid image: {}", e))?;
 

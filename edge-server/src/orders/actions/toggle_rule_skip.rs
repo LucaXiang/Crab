@@ -34,11 +34,11 @@ impl CommandHandler for ToggleRuleSkipAction {
         let rule_found = snapshot.items.iter().any(|item| {
             item.applied_rules
                 .as_ref()
-                .map_or(false, |rules| rules.iter().any(|r| r.rule_id == self.rule_id))
+                .is_some_and(|rules| rules.iter().any(|r| r.rule_id == self.rule_id))
         }) || snapshot
             .order_applied_rules
             .as_ref()
-            .map_or(false, |rules| rules.iter().any(|r| r.rule_id == self.rule_id));
+            .is_some_and(|rules| rules.iter().any(|r| r.rule_id == self.rule_id));
 
         if !rule_found {
             return Err(OrderError::InvalidOperation(format!(

@@ -192,25 +192,25 @@ impl RequestCommandProcessor {
 
         // 如果是 OpenTable 且成功执行，加载并缓存价格规则
         if response.success {
-            if let Some((zone_id, is_retail)) = open_table_info {
-                if let Some(ref order_id) = response.order_id {
-                    // 加载匹配的价格规则
-                    let rules = load_matching_rules(
-                        &self.state.get_db(),
-                        zone_id.as_deref(),
-                        is_retail,
-                    )
-                    .await;
+            if let Some((zone_id, is_retail)) = open_table_info
+                && let Some(ref order_id) = response.order_id
+            {
+                // 加载匹配的价格规则
+                let rules = load_matching_rules(
+                    &self.state.get_db(),
+                    zone_id.as_deref(),
+                    is_retail,
+                )
+                .await;
 
-                    // 缓存到 OrdersManager
-                    if !rules.is_empty() {
-                        tracing::debug!(
-                            order_id = %order_id,
-                            rule_count = rules.len(),
-                            "缓存订单价格规则"
-                        );
-                        self.state.orders_manager().cache_rules(order_id, rules);
-                    }
+                // 缓存到 OrdersManager
+                if !rules.is_empty() {
+                    tracing::debug!(
+                        order_id = %order_id,
+                        rule_count = rules.len(),
+                        "缓存订单价格规则"
+                    );
+                    self.state.orders_manager().cache_rules(order_id, rules);
                 }
             }
 
