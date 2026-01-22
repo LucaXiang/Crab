@@ -5,8 +5,8 @@ import { SelectField } from '@/presentation/components/form/FormField/SelectFiel
 interface ZoneFormProps {
   formData: {
     name: string;
-    surchargeType: 'none' | 'fixed' | 'percentage';
-    surchargeAmount: number;
+    surcharge_type: 'none' | 'fixed' | 'percentage';
+    surcharge_amount: number;
   };
   onFieldChange: (field: string, value: any) => void;
   t: (key: string) => string;
@@ -26,8 +26,8 @@ export const ZoneForm: React.FC<ZoneFormProps> = ({ formData, onFieldChange, t }
       <div className="grid grid-cols-2 gap-4">
         <SelectField
           label={t('settings.table.zone.form.surchargeType')}
-          value={formData.surchargeType}
-          onChange={(value) => onFieldChange('surchargeType', value as string)}
+          value={formData.surcharge_type}
+          onChange={(value) => onFieldChange('surcharge_type', value as string)}
           options={[
             { value: 'none', label: t('common.dialog.none') },
             { value: 'fixed', label: t("settings.table.zone.form.surchargeFixed") },
@@ -35,18 +35,18 @@ export const ZoneForm: React.FC<ZoneFormProps> = ({ formData, onFieldChange, t }
           ]}
         />
 
-        {formData.surchargeType !== 'none' && (
+        {formData.surcharge_type !== 'none' && (
           <FormField label={t('settings.table.zone.form.surchargeAmount')}>
             <div className="relative">
               <input
                 type="number"
-                value={formData.surchargeAmount}
-                onChange={(e) => onFieldChange('surchargeAmount', parseFloat(e.target.value))}
+                value={formData.surcharge_amount}
+                onChange={(e) => onFieldChange('surcharge_amount', parseFloat(e.target.value))}
                 className={`${inputClass} pl-8`}
-                step={formData.surchargeType === 'percentage' ? '1' : '0.01'}
+                step={formData.surcharge_type === 'percentage' ? '1' : '0.01'}
               />
               <span className="absolute left-3 top-2.5 text-gray-500">
-                {formData.surchargeType === 'percentage' ? '%' : '€'}
+                {formData.surcharge_type === 'percentage' ? '%' : '€'}
               </span>
             </div>
           </FormField>

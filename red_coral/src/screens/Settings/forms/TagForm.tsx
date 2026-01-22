@@ -5,7 +5,7 @@ interface TagFormProps {
   formData: {
     name: string;
     color: string;
-    displayOrder?: number;
+    display_order?: number;
   };
   onFieldChange: (field: string, value: any) => void;
   t: (key: string) => string;
