@@ -29,6 +29,7 @@ pub mod attributes;
 pub mod categories;
 pub mod employees;
 pub mod has_attribute;
+pub mod kitchen_orders;
 pub mod orders;
 pub mod price_rules;
 pub mod print_destinations;

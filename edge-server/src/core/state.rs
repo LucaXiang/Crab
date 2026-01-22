@@ -12,6 +12,7 @@ use crate::db::DbService;
 use crate::orders::OrdersManager;
 use crate::orders::actions::open_table::load_matching_rules;
 use crate::pricing::PriceRuleEngine;
+use crate::printing::{KitchenPrintService, PrintConfigCache, PrintStorage};
 use crate::services::{
     ActivationService, CertService, HttpsService, MessageBusService, ProvisioningService,
 };
@@ -115,6 +116,8 @@ pub struct ServerState {
     pub orders_manager: Arc<OrdersManager>,
     /// 价格规则引擎
     pub price_rule_engine: PriceRuleEngine,
+    /// 厨房/标签打印服务
+    pub kitchen_print_service: Arc<KitchenPrintService>,
     /// 服务器实例 epoch (启动时生成的 UUID)
     /// 用于客户端检测服务器重启
     pub epoch: String,
@@ -136,6 +139,7 @@ impl ServerState {
         resource_versions: Arc<ResourceVersions>,
         orders_manager: Arc<OrdersManager>,
         price_rule_engine: PriceRuleEngine,
+        kitchen_print_service: Arc<KitchenPrintService>,
         epoch: String,
     ) -> Self {
         Self {
@@ -149,6 +153,7 @@ impl ServerState {
             resource_versions,
             orders_manager,
             price_rule_engine,
+            kitchen_print_service,
             epoch,
         }
     }
@@ -203,7 +208,17 @@ impl ServerState {
         // 4. Initialize PriceRuleEngine
         let price_rule_engine = PriceRuleEngine::new(db.clone());
 
-        // 5. Generate epoch (UUID for server restart detection)
+        // 5. Initialize KitchenPrintService
+        let print_db_path = db_dir.join("print.redb");
+        let print_storage =
+            PrintStorage::open(&print_db_path).expect("Failed to initialize print storage");
+        let print_config_cache = PrintConfigCache::new();
+        let kitchen_print_service = Arc::new(KitchenPrintService::new(
+            print_storage,
+            print_config_cache,
+        ));
+
+        // 6. Generate epoch (UUID for server restart detection)
         let epoch = uuid::Uuid::new_v4().to_string();
 
         let state = Self::new(
@@ -217,6 +232,7 @@ impl ServerState {
             resource_versions,
             orders_manager,
             price_rule_engine,
+            kitchen_print_service,
             epoch,
         );
 
@@ -454,6 +470,11 @@ impl ServerState {
     /// 获取订单管理器
     pub fn orders_manager(&self) -> &Arc<OrdersManager> {
         &self.orders_manager
+    }
+
+    /// 获取厨房打印服务
+    pub fn kitchen_print_service(&self) -> &Arc<KitchenPrintService> {
+        &self.kitchen_print_service
     }
 
     /// 检查是否已激活
