@@ -83,8 +83,8 @@ pub fn is_time_valid(rule: &PriceRule, current_time: i64) -> bool {
 
     // Check active_days (0=Sunday, 1=Monday, ..., 6=Saturday)
     if let Some(ref days) = rule.active_days {
-        let datetime = chrono::DateTime::from_timestamp_millis(current_time)
-            .unwrap_or_else(chrono::Utc::now);
+        let datetime =
+            chrono::DateTime::from_timestamp_millis(current_time).unwrap_or_else(chrono::Utc::now);
         // chrono's weekday: Mon=0, Tue=1, ..., Sun=6
         // We need: Sun=0, Mon=1, ..., Sat=6
         let weekday = datetime.weekday().num_days_from_sunday() as u8;
@@ -95,8 +95,8 @@ pub fn is_time_valid(rule: &PriceRule, current_time: i64) -> bool {
 
     // Check active_start_time/active_end_time ("HH:MM" format)
     if rule.active_start_time.is_some() || rule.active_end_time.is_some() {
-        let datetime = chrono::DateTime::from_timestamp_millis(current_time)
-            .unwrap_or_else(chrono::Utc::now);
+        let datetime =
+            chrono::DateTime::from_timestamp_millis(current_time).unwrap_or_else(chrono::Utc::now);
         let current_time_str = datetime.format("%H:%M").to_string();
 
         if let Some(ref start) = rule.active_start_time
@@ -214,7 +214,7 @@ mod tests {
             }),
             zone_scope: -1,
             adjustment_type: AdjustmentType::Percentage,
-            adjustment_value: 10,
+            adjustment_value: 10.0,
             priority: 0,
             is_stackable: true,
             is_exclusive: false,
