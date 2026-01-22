@@ -75,12 +75,12 @@ pub mod types;
 pub use cert::{CertError, CertManager, Credential, CredentialStorage};
 
 // Re-export client types
+#[cfg(feature = "in-process")]
+pub use client::OneshotHttpClient;
 pub use client::{
     CrabClient, HttpClient, InMemoryMessageClient, MessageClientConfig, NetworkHttpClient,
     NetworkMessageClient,
 };
-#[cfg(feature = "in-process")]
-pub use client::OneshotHttpClient;
 
 // Re-export type markers
 pub use types::{

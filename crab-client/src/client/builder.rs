@@ -139,13 +139,13 @@ impl RemoteClientBuilder {
 // ============================================================================
 
 #[cfg(feature = "in-process")]
+use crate::types::Local;
+#[cfg(feature = "in-process")]
 use axum::Router;
 #[cfg(feature = "in-process")]
 use shared::message::BusMessage;
 #[cfg(feature = "in-process")]
 use tokio::sync::broadcast;
-#[cfg(feature = "in-process")]
-use crate::types::Local;
 
 /// Builder for `CrabClient<Local>`.
 ///
@@ -239,19 +239,20 @@ impl LocalClientBuilder {
             .router
             .ok_or_else(|| ClientError::Config("router is required for local mode".into()))?;
 
-        let client_tx = self
-            .client_tx
-            .ok_or_else(|| ClientError::Config("message channels are required for local mode".into()))?;
+        let client_tx = self.client_tx.ok_or_else(|| {
+            ClientError::Config("message channels are required for local mode".into())
+        })?;
 
-        let server_tx = self
-            .server_tx
-            .ok_or_else(|| ClientError::Config("message channels are required for local mode".into()))?;
+        let server_tx = self.server_tx.ok_or_else(|| {
+            ClientError::Config("message channels are required for local mode".into())
+        })?;
 
         // Create oneshot HTTP client
         let oneshot_http = super::http_oneshot::OneshotHttpClient::new(router);
 
         // Create in-memory message client with bidirectional channels
-        let memory_message = super::message::InMemoryMessageClient::with_channels(client_tx, server_tx);
+        let memory_message =
+            super::message::InMemoryMessageClient::with_channels(client_tx, server_tx);
 
         Ok(CrabClient {
             marker: StateMarker::new(),

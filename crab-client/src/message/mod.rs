@@ -54,7 +54,7 @@ pub struct MessageClientConfig {
 impl Default for MessageClientConfig {
     fn default() -> Self {
         Self {
-            request_timeout: Duration::from_secs(5),  // 局域网 5 秒足够
+            request_timeout: Duration::from_secs(5), // 局域网 5 秒足够
             auto_reconnect: true,
             reconnect_delay: Duration::from_secs(1),
         }
@@ -88,7 +88,7 @@ mod tests {
     #[tokio::test]
     async fn test_config_default() {
         let config = MessageClientConfig::default();
-        assert_eq!(config.request_timeout, Duration::from_secs(5));  // 局域网默认 5 秒
+        assert_eq!(config.request_timeout, Duration::from_secs(5)); // 局域网默认 5 秒
         assert!(config.auto_reconnect);
     }
 
@@ -111,12 +111,10 @@ mod tests {
         let (server_tx, _) = broadcast::channel(16);
         let client = InMemoryMessageClient::new(client_tx, server_tx);
 
-        let request = BusMessage::request_command(
-            &shared::message::RequestCommandPayload {
-                action: "test.action".to_string(),
-                params: None,
-            },
-        );
+        let request = BusMessage::request_command(&shared::message::RequestCommandPayload {
+            action: "test.action".to_string(),
+            params: None,
+        });
 
         // 使用 request 发送请求并等待响应
         let _response = client.request(&request, Duration::from_secs(1)).await;

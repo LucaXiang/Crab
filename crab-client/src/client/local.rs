@@ -10,7 +10,7 @@
 
 use std::time::Duration;
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use shared::message::BusMessage;
 use tokio::sync::broadcast;
 
@@ -138,7 +138,8 @@ impl CrabClient<Local, Connected> {
         let response = http.login(username, password).await?;
 
         // Store session data
-        self.session.set_login(response.token.clone(), response.user);
+        self.session
+            .set_login(response.token.clone(), response.user);
 
         // Set token in oneshot client for subsequent requests
         if let Some(ref http) = self.oneshot_http {

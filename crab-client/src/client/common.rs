@@ -5,22 +5,22 @@
 
 use crate::cert::CertManager;
 use crate::error::{ClientError, ClientResult};
-use crate::types::{
-    Authenticated, ClientMode, ClientState, ClientStatus, Disconnected, Remote,
-    SessionData, StateMarker,
-};
 #[cfg(feature = "in-process")]
 use crate::types::Local;
+use crate::types::{
+    Authenticated, ClientMode, ClientState, ClientStatus, Disconnected, Remote, SessionData,
+    StateMarker,
+};
 
-use super::builder::{ClientConfig, RemoteClientBuilder};
 #[cfg(feature = "in-process")]
 use super::builder::LocalClientBuilder;
+use super::builder::{ClientConfig, RemoteClientBuilder};
 use super::http::NetworkHttpClient;
-use super::message::NetworkMessageClient;
 #[cfg(feature = "in-process")]
 use super::http_oneshot::OneshotHttpClient;
 #[cfg(feature = "in-process")]
 use super::message::InMemoryMessageClient;
+use super::message::NetworkMessageClient;
 
 // ============================================================================
 // Core CrabClient Definition
@@ -274,7 +274,7 @@ impl<S: ClientState> CrabClient<Local, S> {
     pub fn status(&self) -> ClientStatus {
         ClientStatus {
             has_tenant_credential: false, // Local mode doesn't use tenant credentials
-            has_certificates: false,       // Local mode doesn't use certificates
+            has_certificates: false,      // Local mode doesn't use certificates
             is_connected: self.is_connected(),
             is_authenticated: self.is_authenticated(),
         }

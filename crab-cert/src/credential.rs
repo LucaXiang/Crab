@@ -128,9 +128,10 @@ impl Credential {
     /// # Returns
     /// Ok(()) if signature is valid, Err otherwise
     pub fn verify_signature(&self, ca_cert_pem: &str) -> Result<()> {
-        let sig_b64 = self.signature.as_ref().ok_or_else(|| {
-            CertError::VerificationFailed("Credential is not signed".into())
-        })?;
+        let sig_b64 = self
+            .signature
+            .as_ref()
+            .ok_or_else(|| CertError::VerificationFailed("Credential is not signed".into()))?;
 
         let sig_bytes = base64_decode(sig_b64).map_err(|e| {
             CertError::VerificationFailed(format!("Invalid signature encoding: {}", e))
@@ -152,7 +153,9 @@ impl Credential {
     ) -> Result<()> {
         // Check expiration
         if self.is_expired() {
-            return Err(CertError::VerificationFailed("Credential has expired".into()));
+            return Err(CertError::VerificationFailed(
+                "Credential has expired".into(),
+            ));
         }
 
         // Check hardware binding if required
@@ -199,7 +202,8 @@ impl Credential {
     ///
     /// Also verifies the timestamp signature if entity_cert_pem is provided.
     pub fn check_clock_tampering(&self) -> Result<()> {
-        let (last_verified, sig) = match (&self.last_verified_at, &self.last_verified_at_signature) {
+        let (last_verified, sig) = match (&self.last_verified_at, &self.last_verified_at_signature)
+        {
             (Some(ts), Some(sig)) => (*ts, sig.clone()),
             (None, _) => return Ok(()), // No timestamp recorded yet
             (Some(_), None) => {
@@ -248,7 +252,7 @@ impl Credential {
             _ => {
                 return Err(CertError::VerificationFailed(
                     "Timestamp/signature mismatch".into(),
-                ))
+                ));
             }
         };
 
@@ -264,8 +268,9 @@ impl Credential {
             self.tenant_id,
             self.device_id.as_deref().unwrap_or("")
         );
-        crate::crypto::verify(tenant_ca_cert_pem, data.as_bytes(), &sig_bytes)
-            .map_err(|e| CertError::VerificationFailed(format!("Timestamp signature invalid: {}", e)))
+        crate::crypto::verify(tenant_ca_cert_pem, data.as_bytes(), &sig_bytes).map_err(|e| {
+            CertError::VerificationFailed(format!("Timestamp signature invalid: {}", e))
+        })
     }
 }
 
@@ -451,8 +456,7 @@ mod tests {
 
     #[test]
     fn test_credential_validation_device_mismatch() {
-        let cred = Credential::new("c", "t", "tok", None)
-            .with_device_id("hw-12345");
+        let cred = Credential::new("c", "t", "tok", None).with_device_id("hw-12345");
 
         let result = cred.validate(None, Some("hw-99999"));
         assert!(result.is_err());
@@ -488,8 +492,8 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let storage = CredentialStorage::new(temp_dir.path(), "credential.json");
 
-        let cred = Credential::new("test-client", "tenant-1", "test-token", None)
-            .with_device_id("hw-001");
+        let cred =
+            Credential::new("test-client", "tenant-1", "test-token", None).with_device_id("hw-001");
 
         // Save
         storage.save(&cred).unwrap();

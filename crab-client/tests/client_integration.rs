@@ -2,7 +2,7 @@
 //!
 //! These tests verify the client API and credential management.
 
-use crab_client::{CertManager, Credential, CredentialStorage, CrabClient};
+use crab_client::{CertManager, CrabClient, Credential, CredentialStorage};
 use tempfile::TempDir;
 
 // ============================================================================
@@ -168,9 +168,7 @@ mod local_tests {
         let (sender, _) = broadcast::channel::<BusMessage>(16);
 
         // Missing router
-        let result = CrabClient::local()
-            .with_message_sender(sender)
-            .build();
+        let result = CrabClient::local().with_message_sender(sender).build();
         assert!(result.is_err());
     }
 
@@ -179,9 +177,7 @@ mod local_tests {
         let router: Router = Router::new();
 
         // Missing message_sender
-        let result = CrabClient::local()
-            .with_router(router)
-            .build();
+        let result = CrabClient::local().with_router(router).build();
         assert!(result.is_err());
     }
 
