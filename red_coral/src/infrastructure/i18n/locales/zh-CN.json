@@ -461,6 +461,15 @@
       "title": "价格规则",
       "description": "管理折扣、加价等价格调整规则",
       "unit": "条规则",
+      "search_placeholder": "搜索规则名称...",
+      "column": {
+        "name": "规则名称",
+        "type": "类型",
+        "value": "调整值",
+        "scope": "适用范围",
+        "time": "生效时间",
+        "status": "状态"
+      },
       "add_rule": "添加规则",
       "edit_rule": "编辑规则",
       "delete_rule": "删除规则",
