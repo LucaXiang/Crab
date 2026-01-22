@@ -1,88 +1,19 @@
 import { createCrudResourceStore } from '../factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
-import type { Product } from '@/core/domain/types/api';
+import type { Product, ProductCreate, ProductUpdate } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
 // Product with guaranteed id
 type ProductEntity = Product & { id: string };
 
-// Create product input type
-interface CreateProductInput {
-  name: string;
-  receipt_name?: string;
-  price: number;
-  category_id: string;
-  image?: string;
-  external_id?: number;
-  tax_rate?: number;
-  sort_order?: number;
-  is_kitchen_print_enabled?: boolean;
-  is_label_print_enabled?: boolean;
-  kitchen_printer_id?: string | null;
-}
-
-// Update product input type
-interface UpdateProductInput {
-  name?: string;
-  receipt_name?: string;
-  price?: number;
-  category_id?: string;
-  image?: string;
-  external_id?: number;
-  tax_rate?: number;
-  sort_order?: number;
-  is_kitchen_print_enabled?: boolean;
-  is_label_print_enabled?: boolean;
-  kitchen_printer_id?: string | null;
-}
-
-async function fetchProducts(): Promise<ProductEntity[]> {
-  const response = await api.listProducts();
-  // Handle both formats: direct array or { data: { products: [...] } }
-  if (Array.isArray(response)) {
-    return response as ProductEntity[];
-  }
-  if (response.data?.products) {
-    return response.data.products as ProductEntity[];
-  }
-  throw new Error(response.message || 'Failed to fetch products');
-}
-
-async function createProduct(data: CreateProductInput): Promise<ProductEntity> {
-  const response = await api.createProduct(data as any);
-  if (response.data?.product) {
-    return response.data.product as ProductEntity;
-  }
-  throw new Error(response.message || 'Failed to create product');
-}
-
-async function updateProduct(id: string, data: UpdateProductInput): Promise<ProductEntity> {
-  const response = await api.updateProduct(id, data as any);
-  if (response.data?.product) {
-    return response.data.product as unknown as ProductEntity;
-  }
-  // Some APIs return the updated product directly
-  if (response.data && 'id' in response.data) {
-    return response.data as unknown as ProductEntity;
-  }
-  throw new Error(response.message || 'Failed to update product');
-}
-
-async function deleteProduct(id: string): Promise<void> {
-  const response = await api.deleteProduct(id);
-  if (!response.data?.deleted && response.error_code) {
-    throw new Error(response.message || 'Failed to delete product');
-  }
-}
-
-export const useProductStore = createCrudResourceStore<ProductEntity, CreateProductInput, UpdateProductInput>(
+export const useProductStore = createCrudResourceStore<ProductEntity, ProductCreate, ProductUpdate>(
   'product',
-  fetchProducts,
+  () => api.listProducts() as Promise<ProductEntity[]>,
   {
-    create: createProduct,
-    update: updateProduct,
-    remove: deleteProduct,
+    create: (data) => api.createProduct(data) as Promise<ProductEntity>,
+    update: (id, data) => api.updateProduct(id, data) as Promise<ProductEntity>,
+    remove: (id) => api.deleteProduct(id),
   }
 );
 

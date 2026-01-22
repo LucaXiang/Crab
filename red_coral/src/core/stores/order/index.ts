@@ -11,13 +11,13 @@ export { useReceiptStore } from './useReceiptStore';
 // ============================================================================
 
 // Active Orders Store - Main store for server-synced orders
-export { useHeldOrders, useHeldOrdersCount } from './useOrderStore';
+export { useHeldOrders, useHeldOrdersCount } from './useActiveOrdersStore';
 
 // Draft Orders (Local Client State)
 export { useDraftOrders, useDraftOrdersCount } from './useDraftOrderStore';
 
 // Order Actions - Combined hook for all order manipulation (draft, checkout, operations)
-export { useOrderActions } from './useOrderStore';
+export { useOrderActions } from './useOrderActions';
 
 // Order Operations - Async command functions
 export * as orderOps from './useOrderOperations';

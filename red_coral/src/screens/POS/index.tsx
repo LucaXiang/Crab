@@ -268,10 +268,7 @@ export const POSScreen: React.FC = () => {
     async (product: Product, startRect?: DOMRect, skipQuickAdd: boolean = false) => {
       // Check if product has attributes or specifications
       try {
-        const productWithAttrs = await api.fetchProductAttributes(String(product.id));
-
-        // ProductAttributeListData has product_attributes, not attributes
-        const productAttributes = productWithAttrs.data?.product_attributes || [];
+        const productAttributes = await api.fetchProductAttributes(String(product.id));
 
         // Build options map from product attributes (need to fetch each attribute's options)
         const optionsMap = new Map<string, AttributeOption[]>();

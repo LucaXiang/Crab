@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api';
 import { ArrowLeft, Save, Layers, Type, Image as ImageIcon, Trash2, GripVertical, Settings, Minus, Printer, HelpCircle } from 'lucide-react';
 import { LabelTemplate, LabelField, SUPPORTED_LABEL_FIELDS } from '@/core/domain/types/print';
 import { convertTemplateToRust } from '@/infrastructure/print';
@@ -337,7 +337,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         };
 
         // Backend command print_label_cmd(ticket: LabelTicketData) expects 'ticket' argument
-        await invoke('print_label_cmd', { ticket: ticketData });
+        await invokeApi('print_label_cmd', { ticket: ticketData });
         setDialogConfig({
           isOpen: true,
           title: t('common.message.success'),

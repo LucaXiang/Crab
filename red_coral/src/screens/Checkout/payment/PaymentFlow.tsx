@@ -36,7 +36,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   const serviceType = useRetailServiceType();
 
   // Calculate payment state from order (server state)
-  const totalPaid = order.paid_amount || 0;
+  const totalPaid = order.paid_amount;
   const remaining = Math.max(0, order.total - totalPaid);
   const isPaidInFull = remaining <= 0.01;
 
@@ -90,7 +90,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
         // Create payment record
         const payment: PaymentRecord = {
-          id: `pay-${Date.now()}`,
+          payment_id: `pay-${Date.now()}`,
           method: 'Cash',
           amount: remaining,
           timestamp: Date.now(),
@@ -136,7 +136,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     setIsProcessing(true);
     try {
       const payment: PaymentRecord = {
-        id: `pay-${Date.now()}`,
+        payment_id: `pay-${Date.now()}`,
         method: 'VISA',
         amount: remaining,
         timestamp: Date.now(),
@@ -169,7 +169,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   const handlePrintPrePayment = useCallback(async () => {
     try {
       const store = useActiveOrdersStore.getState();
-      const existingSnapshot = store.getOrder(order.key);
+      const existingSnapshot = store.getOrder(order.order_id);
       let currentOrder = existingSnapshot ? existingSnapshot : { ...order };
 
       if (!currentOrder.receipt_number || !currentOrder.receipt_number.startsWith('FAC')) {
@@ -334,7 +334,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     (Object.entries(splitItems) as [string, number][]).forEach(([instanceId, qty]) => {
       const item = order.items.find(i => i.instance_id === instanceId);
       if (item) {
-        total += (item.price || 0) * qty;
+        total += item.price * qty;
       }
     });
     return total;
@@ -390,7 +390,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                           {item.selected_options.map(opt => opt.option_name).join(', ')}
                         </div>
                       )}
-                      <div className="text-gray-500">{formatCurrency(item.price || 0)}</div>
+                      <div className="text-gray-500">{formatCurrency(item.price)}</div>
                     </div>
 
                     <div className="flex items-center gap-4 bg-gray-50 rounded-lg p-1.5 border border-gray-100">

@@ -7,8 +7,6 @@
 
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { HeldOrder, CartItem, PaymentRecord, Table, Zone } from '@/core/domain/types';
-import { Currency } from '@/utils/currency';
-import { calculateDiscountAmount, calculateItemFinalPrice } from '@/utils/pricing';
 import { useActiveOrdersStore } from './useActiveOrdersStore';
 import { useReceiptStore } from './useReceiptStore';
 import { useCheckoutStore } from './useCheckoutStore';
@@ -67,6 +65,17 @@ async function sendCommand(command: OrderCommand): Promise<CommandResponse> {
 }
 
 /**
+ * Helper to ensure command succeeded, throws on failure
+ */
+function ensureSuccess(response: CommandResponse, context: string): void {
+  if (!response.success) {
+    const message = response.error?.message || `${context} failed`;
+    console.error(`[OrderOps] ${context}:`, message);
+    throw new Error(message);
+  }
+}
+
+/**
  * Convert CartItem to CartItemInput for backend
  */
 function toCartItemInput(item: CartItem): CartItemInput {
@@ -114,7 +123,8 @@ const handleMergeToOrder = async (
     items: cart.map(toCartItemInput),
   });
 
-  await sendCommand(command);
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Add items to order');
   return 'MERGED';
 };
 
@@ -137,12 +147,13 @@ const handleCreateNewOrder = async (
   });
 
   const openResponse = await sendCommand(openCommand);
-  if (!openResponse.success) {
-    throw new Error(openResponse.error?.message || 'Failed to open table');
-  }
+  ensureSuccess(openResponse, 'Open table');
 
-  // Get the created order_id from response
-  const orderId = openResponse.order_id || tableId;
+  // Get the created order_id from response (required for OPEN_TABLE success)
+  const orderId = openResponse.order_id;
+  if (!orderId) {
+    throw new Error('OPEN_TABLE command succeeded but no order_id returned');
+  }
 
   // Add items (Price Rules will be applied by backend)
   const addCommand = createCommand({
@@ -151,7 +162,8 @@ const handleCreateNewOrder = async (
     items: cart.map(toCartItemInput),
   });
 
-  await sendCommand(addCommand);
+  const addResponse = await sendCommand(addCommand);
+  ensureSuccess(addResponse, 'Add items to order');
   return 'CREATED';
 };
 
@@ -167,8 +179,6 @@ export const handleTableSelect = async (
   guestCount: number,
   cart: CartItem[],
   _totalAmount: number,
-  _enableIndividualMode?: boolean,
-  _isIndividualMode?: boolean,
   zone?: Zone
 ): Promise<'MERGED' | 'CREATED' | 'RETRIEVED' | 'EMPTY'> => {
   const tableId = String(table.id);
@@ -206,7 +216,7 @@ export const completeOrder = async (
   const receiptStore = useReceiptStore.getState();
   const store = useActiveOrdersStore.getState();
 
-  const orderId = order.id || order.key || String(order.table_id || '');
+  const orderId = order.order_id;
 
   // Ensure receipt number
   let finalReceiptNumber = order.receipt_number;
@@ -224,7 +234,8 @@ export const completeOrder = async (
       tendered: payment.tendered ?? null,
       note: payment.note ?? null,
     });
-    await sendCommand(paymentCommand);
+    const paymentResponse = await sendCommand(paymentCommand);
+    ensureSuccess(paymentResponse, 'Add payment');
   }
 
   // Complete order
@@ -233,7 +244,8 @@ export const completeOrder = async (
     order_id: orderId,
     receipt_number: finalReceiptNumber,
   });
-  await sendCommand(completeCommand);
+  const completeResponse = await sendCommand(completeCommand);
+  ensureSuccess(completeResponse, 'Complete order');
 
   // Return updated order (may take a moment for event to arrive)
   const snapshot = store.getOrder(orderId);
@@ -248,14 +260,15 @@ export const voidOrder = async (
   reason?: string
 ): Promise<HeldOrder> => {
   const store = useActiveOrdersStore.getState();
-  const orderId = order.id || order.key || String(order.table_id || '');
+  const orderId = order.order_id;
 
   const command = createCommand({
     type: 'VOID_ORDER',
     order_id: orderId,
     reason: reason || null,
   });
-  await sendCommand(command);
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Void order');
 
   const snapshot = store.getOrder(orderId);
   return snapshot ? snapshot : order;
@@ -271,7 +284,7 @@ export const partialSettle = async (
   const store = useActiveOrdersStore.getState();
   const checkoutStore = useCheckoutStore.getState();
 
-  const orderId = order.id || order.key || String(order.table_id || '');
+  const orderId = order.order_id;
 
   // Add payments
   for (const payment of newPayments) {
@@ -283,14 +296,15 @@ export const partialSettle = async (
       tendered: payment.tendered ?? null,
       note: payment.note ?? null,
     });
-    await sendCommand(command);
+    const response = await sendCommand(command);
+    ensureSuccess(response, 'Add payment');
   }
 
   // Sync checkout store
   const snapshot = store.getOrder(orderId);
   const updatedOrder = snapshot ? snapshot : order;
 
-  if (checkoutStore.checkoutOrder?.key === orderId) {
+  if (checkoutStore.checkoutOrder?.order_id === orderId) {
     checkoutStore.setCheckoutOrder(updatedOrder);
   }
 
@@ -320,7 +334,7 @@ export const splitOrder = async (
   }
 ): Promise<HeldOrder> => {
   const store = useActiveOrdersStore.getState();
-  const orderId = order.id || order.key || String(order.table_id || '');
+  const orderId = order.order_id;
 
   const command = createCommand({
     type: 'SPLIT_ORDER',
@@ -334,7 +348,8 @@ export const splitOrder = async (
     })),
   });
 
-  await sendCommand(command);
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Split order');
 
   const snapshot = store.getOrder(orderId);
   return snapshot ? snapshot : order;
@@ -353,7 +368,7 @@ export const updateOrderInfo = async (
   }
 ): Promise<HeldOrder> => {
   const store = useActiveOrdersStore.getState();
-  const orderId = order.id || order.key || String(order.table_id || '');
+  const orderId = order.order_id;
 
   const command = createCommand({
     type: 'UPDATE_ORDER_INFO',
@@ -364,7 +379,8 @@ export const updateOrderInfo = async (
     is_pre_payment: info.is_pre_payment ?? null,
   });
 
-  await sendCommand(command);
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Update order info');
 
   const snapshot = store.getOrder(orderId);
   return snapshot ? snapshot : order;
@@ -380,7 +396,7 @@ export const moveOrder = async (
   targetZoneName?: string
 ): Promise<HeldOrder> => {
   const store = useActiveOrdersStore.getState();
-  const orderId = order.id || order.key || String(order.table_id || '');
+  const orderId = order.order_id;
 
   const command = createCommand({
     type: 'MOVE_ORDER',
@@ -390,7 +406,8 @@ export const moveOrder = async (
     target_zone_name: targetZoneName ?? null,
   });
 
-  await sendCommand(command);
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Move order');
 
   // Order will be at new table ID after move
   const snapshot = store.getOrder(targetTableId);
@@ -405,8 +422,8 @@ export const mergeOrders = async (
   targetOrder: HeldOrder
 ): Promise<HeldOrder> => {
   const store = useActiveOrdersStore.getState();
-  const sourceId = sourceOrder.id || sourceOrder.key || String(sourceOrder.table_id || '');
-  const targetId = targetOrder.id || targetOrder.key || String(targetOrder.table_id || '');
+  const sourceId = sourceOrder.order_id;
+  const targetId = targetOrder.order_id;
 
   const command = createCommand({
     type: 'MERGE_ORDERS',
@@ -414,7 +431,8 @@ export const mergeOrders = async (
     target_order_id: targetId,
   });
 
-  await sendCommand(command);
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Merge orders');
 
   const snapshot = store.getOrder(targetId);
   return snapshot ? snapshot : targetOrder;
@@ -437,7 +455,8 @@ export const addItems = async (
     items: items.map(toCartItemInput),
   });
 
-  await sendCommand(command);
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Add items');
 };
 
 /**
@@ -467,7 +486,8 @@ export const modifyItem = async (
     },
   });
 
-  await sendCommand(command);
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Modify item');
 };
 
 /**
@@ -487,5 +507,6 @@ export const removeItem = async (
     quantity: quantity ?? null,
   });
 
-  await sendCommand(command);
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Remove item');
 };

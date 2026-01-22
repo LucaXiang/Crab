@@ -4,20 +4,9 @@ import type { Table } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
-async function fetchTables(): Promise<Table[]> {
-  const response = await api.listTables();
-  if (Array.isArray(response)) {
-    return response;
-  }
-  if (response.data?.tables) {
-    return response.data.tables;
-  }
-  throw new Error(response.message || 'Failed to fetch tables');
-}
-
 export const useTableStore = createResourceStore<Table & { id: string }>(
   'table',
-  fetchTables as () => Promise<(Table & { id: string })[]>
+  () => api.listTables() as Promise<(Table & { id: string })[]>
 );
 
 // Convenience hooks

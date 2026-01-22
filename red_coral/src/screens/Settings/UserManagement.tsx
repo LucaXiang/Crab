@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Users, Plus, Filter, Search, Shield, Calendar, Key, Lock, Check, Edit3, Trash2, Ban } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api';
 import { useI18n } from '@/hooks/useI18n';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission, User, Role } from '@/core/domain/types';
@@ -51,7 +51,7 @@ export const UserManagement: React.FC = React.memo(() => {
         .catch(console.error)
         .finally(() => setIsLoading(false));
       
-      invoke<Role[]>('fetch_roles')
+      invokeApi<Role[]>('fetch_roles')
         .then(setRoles)
         .catch(console.error);
     }

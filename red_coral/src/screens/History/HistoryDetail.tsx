@@ -191,7 +191,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                 const idx = itemIndexMap.get(item.instance_id) ?? -1;
                 return (
                   <OrderItemRow
-                    key={item.instance_id || `${item.id}-${idx}`}
+                    key={item.instance_id}
                     item={item}
                     index={idx}
                     isExpanded={expandedItems.has(idx)}
@@ -212,7 +212,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                     const idx = itemIndexMap.get(item.instance_id) ?? -1;
                     return (
                       <OrderItemRow
-                        key={item.instance_id || `${item.id}-${idx}`}
+                        key={item.instance_id}
                         item={item}
                         index={idx}
                         isExpanded={expandedItems.has(idx)}

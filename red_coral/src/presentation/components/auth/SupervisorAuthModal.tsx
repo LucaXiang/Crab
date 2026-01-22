@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api';
 import { X, Shield, Lock, User as UserIcon, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { User } from '@/core/domain/types';
@@ -35,10 +35,10 @@ export const SupervisorAuthModal: React.FC<SupervisorAuthModalProps> = ({
     setError(null);
 
     try {
-      const supervisor = await invoke<User>('verify_supervisor_auth', {
+      const supervisor = await invokeApi<User>('verify_supervisor_auth', {
         username,
         password,
-        requiredPermission,
+        required_permission: requiredPermission,
       });
       
       onSuccess(supervisor);

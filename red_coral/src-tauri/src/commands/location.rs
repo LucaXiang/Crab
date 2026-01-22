@@ -22,7 +22,10 @@ pub async fn list_zones(
     let bridge = bridge.read().await;
     match bridge.get::<Vec<Zone>>("/api/zones").await {
         Ok(zones) => Ok(ApiResponse::success(ZoneListData { zones })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -37,7 +40,10 @@ pub async fn get_zone(
         .await
     {
         Ok(zone) => Ok(ApiResponse::success(zone)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::ZoneNotFound, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::ZoneNotFound,
+            e.to_string(),
+        )),
     }
 }
 
@@ -49,7 +55,10 @@ pub async fn create_zone(
     let bridge = bridge.read().await;
     match bridge.post::<Zone, _>("/api/zones", &data).await {
         Ok(zone) => Ok(ApiResponse::success(zone)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -65,7 +74,10 @@ pub async fn update_zone(
         .await
     {
         Ok(zone) => Ok(ApiResponse::success(zone)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -82,7 +94,10 @@ pub async fn delete_zone(
         Ok(success) => Ok(ApiResponse::success(crate::core::DeleteData {
             deleted: success,
         })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -95,7 +110,10 @@ pub async fn list_tables(
     let bridge = bridge.read().await;
     match bridge.get::<Vec<DiningTable>>("/api/tables").await {
         Ok(tables) => Ok(ApiResponse::success(TableListData { tables })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -110,7 +128,10 @@ pub async fn list_tables_by_zone(
         .await
     {
         Ok(tables) => Ok(ApiResponse::success(TableListData { tables })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -125,7 +146,10 @@ pub async fn get_table(
         .await
     {
         Ok(table) => Ok(ApiResponse::success(table)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::TableNotFound, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::TableNotFound,
+            e.to_string(),
+        )),
     }
 }
 
@@ -137,7 +161,10 @@ pub async fn create_table(
     let bridge = bridge.read().await;
     match bridge.post::<DiningTable, _>("/api/tables", &data).await {
         Ok(table) => Ok(ApiResponse::success(table)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -153,7 +180,10 @@ pub async fn update_table(
         .await
     {
         Ok(table) => Ok(ApiResponse::success(table)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -170,6 +200,9 @@ pub async fn delete_table(
         Ok(success) => Ok(ApiResponse::success(crate::core::DeleteData {
             deleted: success,
         })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }

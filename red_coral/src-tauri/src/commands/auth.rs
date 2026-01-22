@@ -4,8 +4,8 @@ use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock;
 
-use crate::core::{ApiResponse, AuthData, ClientBridge};
 use crate::core::response::ErrorCode;
+use crate::core::{ApiResponse, AuthData, ClientBridge};
 
 /// 统一登录命令 (使用 ClientBridge)
 ///
@@ -25,7 +25,10 @@ pub async fn login_employee(
             mode: session.login_mode,
             session: Some(session),
         })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::InvalidCredentials, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::InvalidCredentials,
+            e.to_string(),
+        )),
     }
 }
 
@@ -37,6 +40,9 @@ pub async fn logout_employee(
     let bridge = bridge.read().await;
     match bridge.logout_employee().await {
         Ok(_) => Ok(ApiResponse::success(())),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::InternalError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::InternalError,
+            e.to_string(),
+        )),
     }
 }

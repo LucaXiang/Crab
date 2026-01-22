@@ -4,20 +4,12 @@ import type { Role } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
-async function fetchRoles(): Promise<Role[]> {
-  const response = await api.listRoles();
-  if (Array.isArray(response)) {
-    return response;
-  }
-  if (response.data?.roles) {
-    return response.data.roles;
-  }
-  throw new Error(response.message || 'Failed to fetch roles');
-}
-
 export const useRoleStore = createResourceStore<Role & { id: string }>(
   'role',
-  fetchRoles as () => Promise<(Role & { id: string })[]>
+  async () => {
+    const data = await api.listRoles();
+    return data.roles as (Role & { id: string })[];
+  }
 );
 
 // Convenience hooks

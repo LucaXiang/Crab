@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { CartItem, DraftOrder } from '@/core/domain/types';
+import { CartItem, DraftOrder, PaymentRecord, OrderEvent } from '@/core/domain/types';
 import { useCartStore } from '@/core/stores/cart/useCartStore';
 
 interface UseDraftHandlersParams {
@@ -25,18 +25,34 @@ export function useDraftHandlers(params: UseDraftHandlersParams) {
 
   const handleSaveDraft = useCallback(() => {
     const { cart, totalAmount } = useCartStore.getState();
+    const draftId = `draft-${Date.now()}`;
+    const now = Date.now();
     const draft: DraftOrder = {
-      id: `draft-${Date.now()}`,
+      // Required fields from OrderSnapshot
+      order_id: draftId,
+      table_id: null,
+      table_name: null,
+      zone_id: null,
+      zone_name: null,
+      guest_count: 0,
+      is_retail: true,
+      status: 'ACTIVE',
       items: cart,
-      total: totalAmount,
+      payments: [] as PaymentRecord[],
       subtotal: totalAmount,
       tax: 0,
       discount: 0,
-      payments: [],
-      guest_count: 0,
-      created_at: Date.now(),
-      updated_at: Date.now(),
-      timeline: [],
+      total: totalAmount,
+      paid_amount: 0,
+      paid_item_quantities: {},
+      receipt_number: null,
+      is_pre_payment: false,
+      start_time: now,
+      end_time: null,
+      created_at: now,
+      updated_at: now,
+      last_sequence: 0,
+      timeline: [] as OrderEvent[],
     };
     saveDraft(draft);
     clearCart();

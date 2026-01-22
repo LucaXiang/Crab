@@ -8,7 +8,7 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TimelineList } from './TimelineList';
-import type { OrderEvent } from '@/core/domain/types/orderEvent';
+import type { OrderEvent, EventPayload } from '@/core/domain/types/orderEvent';
 
 // Mock translation
 vi.mock('@/hooks/useI18n', () => ({
@@ -22,6 +22,20 @@ vi.mock('@/hooks/useI18n', () => ({
   }),
 }));
 
+// Helper to create properly typed mock OrderEvent
+const createMockEvent = (event_type: string, payload: EventPayload, overrides?: Partial<OrderEvent>): OrderEvent => ({
+  event_id: `evt-${event_type}`,
+  sequence: 1,
+  order_id: 'order-test-1',
+  timestamp: Date.now(),
+  operator_id: 'op-1',
+  operator_name: 'Test Operator',
+  command_id: 'cmd-1',
+  event_type: event_type as OrderEvent['event_type'],
+  payload,
+  ...overrides,
+});
+
 describe('TimelineList Integration Tests', () => {
   describe('Basic Rendering', () => {
     it('should render without errors when given empty array', () => {
@@ -30,20 +44,15 @@ describe('TimelineList Integration Tests', () => {
 
     it('should render timeline items for valid events', () => {
       const events: OrderEvent[] = [
-        {
-          event_id: 'evt-1',
-          event_type: 'TABLE_OPENED',
-          timestamp: Date.now(),
-          payload: {
-            table_id: 'T1',
-            table_name: 'Table 1',
-            zone_id: 'Z1',
-            zone_name: 'Main',
-            guest_count: 2,
-            is_retail: false,
-          },
-          sequence: 1,
-        },
+        createMockEvent('TABLE_OPENED', {
+          type: 'TABLE_OPENED',
+          table_id: 'T1',
+          table_name: 'Table 1',
+          zone_id: 'Z1',
+          zone_name: 'Main',
+          guest_count: 2,
+          is_retail: false,
+        }),
       ];
 
       const { container } = render(<TimelineList events={events} />);
@@ -55,34 +64,24 @@ describe('TimelineList Integration Tests', () => {
 
     it('should render multiple events', () => {
       const events: OrderEvent[] = [
-        {
-          event_id: 'evt-1',
-          event_type: 'TABLE_OPENED',
-          timestamp: Date.now() - 2000,
-          payload: {
-            table_id: 'T1',
-            table_name: 'Table 1',
-            zone_id: 'Z1',
-            zone_name: 'Main',
-            guest_count: 2,
-            is_retail: false,
-          },
-          sequence: 1,
-        },
-        {
-          event_id: 'evt-2',
-          event_type: 'PAYMENT_ADDED',
-          timestamp: Date.now() - 1000,
-          payload: {
-            payment_id: 'pay-1',
-            method: 'CASH',
-            amount: 1000,
-            tendered: null,
-            change: null,
-            note: null,
-          },
-          sequence: 2,
-        },
+        createMockEvent('TABLE_OPENED', {
+          type: 'TABLE_OPENED',
+          table_id: 'T1',
+          table_name: 'Table 1',
+          zone_id: 'Z1',
+          zone_name: 'Main',
+          guest_count: 2,
+          is_retail: false,
+        }, { event_id: 'evt-1', timestamp: Date.now() - 2000, sequence: 1 }),
+        createMockEvent('PAYMENT_ADDED', {
+          type: 'PAYMENT_ADDED',
+          payment_id: 'pay-1',
+          method: 'cash',
+          amount: 1000,
+          tendered: null,
+          change: null,
+          note: null,
+        }, { event_id: 'evt-2', timestamp: Date.now() - 1000, sequence: 2 }),
       ];
 
       const { container } = render(<TimelineList events={events} />);
@@ -98,26 +97,21 @@ describe('TimelineList Integration Tests', () => {
   describe('Event Type Support', () => {
     it('should render items added event', () => {
       const events: OrderEvent[] = [
-        {
-          event_id: 'evt-1',
-          event_type: 'ITEMS_ADDED',
-          timestamp: Date.now(),
-          payload: {
-            items: [
-              {
-                id: 'item-1',
-                name: 'Test Pizza',
-                price: 1000,
-                original_price: 1000,
-                quantity: 2,
-                unpaid_quantity: 2,
-                instance_id: 'inst-1',
-                selected_options: [],
-              },
-            ],
-          },
-          sequence: 1,
-        },
+        createMockEvent('ITEMS_ADDED', {
+          type: 'ITEMS_ADDED',
+          items: [
+            {
+              id: 'item-1',
+              name: 'Test Pizza',
+              price: 1000,
+              original_price: 1000,
+              quantity: 2,
+              unpaid_quantity: 2,
+              instance_id: 'inst-1',
+              selected_options: [],
+            },
+          ],
+        }),
       ];
 
       const { container } = render(<TimelineList events={events} />);
@@ -126,20 +120,15 @@ describe('TimelineList Integration Tests', () => {
 
     it('should render payment added event', () => {
       const events: OrderEvent[] = [
-        {
-          event_id: 'evt-1',
-          event_type: 'PAYMENT_ADDED',
-          timestamp: Date.now(),
-          payload: {
-            payment_id: 'pay-1',
-            method: 'CASH',
-            amount: 5000,
-            tendered: null,
-            change: null,
-            note: 'Test payment note',
-          },
-          sequence: 1,
-        },
+        createMockEvent('PAYMENT_ADDED', {
+          type: 'PAYMENT_ADDED',
+          payment_id: 'pay-1',
+          method: 'cash',
+          amount: 5000,
+          tendered: null,
+          change: null,
+          note: 'Test payment note',
+        }),
       ];
 
       const { container } = render(<TimelineList events={events} />);
@@ -148,16 +137,12 @@ describe('TimelineList Integration Tests', () => {
 
     it('should render completion event', () => {
       const events: OrderEvent[] = [
-        {
-          event_id: 'evt-1',
-          event_type: 'ORDER_COMPLETED',
-          timestamp: Date.now(),
-          payload: {
-            final_total: 10000,
-            receipt_number: 'FAC-2026-001',
-          },
-          sequence: 1,
-        },
+        createMockEvent('ORDER_COMPLETED', {
+          type: 'ORDER_COMPLETED',
+          final_total: 10000,
+          receipt_number: 'FAC-2026-001',
+          payment_summary: [],
+        }),
       ];
 
       const { container } = render(<TimelineList events={events} />);
@@ -166,15 +151,10 @@ describe('TimelineList Integration Tests', () => {
 
     it('should render void event', () => {
       const events: OrderEvent[] = [
-        {
-          event_id: 'evt-1',
-          event_type: 'ORDER_VOIDED',
-          timestamp: Date.now(),
-          payload: {
-            reason: 'Test cancellation',
-          },
-          sequence: 1,
-        },
+        createMockEvent('ORDER_VOIDED', {
+          type: 'ORDER_VOIDED',
+          reason: 'Test cancellation',
+        }),
       ];
 
       const { container } = render(<TimelineList events={events} />);
@@ -185,51 +165,34 @@ describe('TimelineList Integration Tests', () => {
   describe('Error Handling', () => {
     it('should handle main event types without crashing', () => {
       const mainEventTypes: OrderEvent[] = [
-        {
-          event_id: 'evt-1',
-          event_type: 'TABLE_OPENED',
-          timestamp: Date.now(),
-          payload: {
-            table_id: 'T1',
-            table_name: 'Table 1',
-            zone_id: 'Z1',
-            zone_name: 'Main',
-            guest_count: 2,
-            is_retail: false,
-          },
-          sequence: 1,
-        },
-        {
-          event_id: 'evt-2',
-          event_type: 'ITEMS_ADDED',
-          timestamp: Date.now(),
-          payload: { items: [] },
-          sequence: 2,
-        },
-        {
-          event_id: 'evt-3',
-          event_type: 'PAYMENT_ADDED',
-          timestamp: Date.now(),
-          payload: {
-            payment_id: 'pay-1',
-            method: 'CASH',
-            amount: 1000,
-            tendered: null,
-            change: null,
-            note: null,
-          },
-          sequence: 3,
-        },
-        {
-          event_id: 'evt-4',
-          event_type: 'ORDER_COMPLETED',
-          timestamp: Date.now(),
-          payload: {
-            final_total: 1000,
-            receipt_number: 'FAC-001',
-          },
-          sequence: 4,
-        },
+        createMockEvent('TABLE_OPENED', {
+          type: 'TABLE_OPENED',
+          table_id: 'T1',
+          table_name: 'Table 1',
+          zone_id: 'Z1',
+          zone_name: 'Main',
+          guest_count: 2,
+          is_retail: false,
+        }, { event_id: 'evt-1', sequence: 1 }),
+        createMockEvent('ITEMS_ADDED', {
+          type: 'ITEMS_ADDED',
+          items: [],
+        }, { event_id: 'evt-2', sequence: 2 }),
+        createMockEvent('PAYMENT_ADDED', {
+          type: 'PAYMENT_ADDED',
+          payment_id: 'pay-1',
+          method: 'cash',
+          amount: 1000,
+          tendered: null,
+          change: null,
+          note: null,
+        }, { event_id: 'evt-3', sequence: 3 }),
+        createMockEvent('ORDER_COMPLETED', {
+          type: 'ORDER_COMPLETED',
+          final_total: 1000,
+          receipt_number: 'FAC-001',
+          payment_summary: [],
+        }, { event_id: 'evt-4', sequence: 4 }),
       ];
 
       // Should render without throwing
@@ -237,13 +200,18 @@ describe('TimelineList Integration Tests', () => {
     });
 
     it('should handle gracefully malformed events', () => {
+      // Create a minimally valid event structure with unknown type
       const events: OrderEvent[] = [
         {
           event_id: 'evt-bad',
-          event_type: 'UNKNOWN_TYPE' as any,
-          timestamp: Date.now(),
-          payload: {} as any,
           sequence: 1,
+          order_id: 'order-test-1',
+          timestamp: Date.now(),
+          operator_id: 'op-1',
+          operator_name: 'Test Operator',
+          command_id: 'cmd-1',
+          event_type: 'UNKNOWN_TYPE' as any,
+          payload: {} as any,
         },
       ];
 
@@ -254,20 +222,21 @@ describe('TimelineList Integration Tests', () => {
 
   describe('Performance', () => {
     it('should handle rendering many events efficiently', () => {
-      const manyEvents: OrderEvent[] = Array.from({ length: 100 }, (_, i) => ({
-        event_id: `evt-${i}`,
-        event_type: 'PAYMENT_ADDED',
-        timestamp: Date.now() - i * 1000,
-        payload: {
+      const manyEvents: OrderEvent[] = Array.from({ length: 100 }, (_, i) =>
+        createMockEvent('PAYMENT_ADDED', {
+          type: 'PAYMENT_ADDED',
           payment_id: `pay-${i}`,
-          method: 'CASH',
+          method: 'cash',
           amount: 1000 + i,
           tendered: null,
           change: null,
           note: null,
-        },
-        sequence: i + 1,
-      }));
+        }, {
+          event_id: `evt-${i}`,
+          timestamp: Date.now() - i * 1000,
+          sequence: i + 1,
+        })
+      );
 
       const startTime = performance.now();
       render(<TimelineList events={manyEvents} />);

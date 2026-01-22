@@ -1,69 +1,19 @@
 import { createCrudResourceStore } from '../factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
-import type { Category } from '@/core/domain/types/api';
+import type { Category, CategoryCreate, CategoryUpdate } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
 // Category with guaranteed id
 type CategoryEntity = Category & { id: string };
 
-// Create category input type
-interface CreateCategoryInput {
-  name: string;
-  sort_order?: number;
-  is_active?: boolean;
-}
-
-// Update category input type
-interface UpdateCategoryInput {
-  name?: string;
-  sort_order?: number;
-  is_active?: boolean;
-}
-
-async function fetchCategories(): Promise<CategoryEntity[]> {
-  const response = await api.listCategories();
-  console.log('[CategoryStore] listCategories response:', response);
-  // Handle both formats: direct array or { data: { categories: [...] } }
-  if (Array.isArray(response)) {
-    return response as CategoryEntity[];
-  }
-  if (response.data?.categories) {
-    return response.data.categories as CategoryEntity[];
-  }
-  throw new Error(response.message || 'Failed to fetch categories');
-}
-
-async function createCategory(data: CreateCategoryInput): Promise<CategoryEntity> {
-  const response = await api.createCategory(data as any);
-  if (response.data?.category) {
-    return response.data.category as CategoryEntity;
-  }
-  throw new Error(response.message || 'Failed to create category');
-}
-
-async function updateCategory(id: string, data: UpdateCategoryInput): Promise<CategoryEntity> {
-  const response = await api.updateCategory(id, data);
-  if (response.data?.category) {
-    return response.data.category as CategoryEntity;
-  }
-  throw new Error(response.message || 'Failed to update category');
-}
-
-async function deleteCategory(id: string): Promise<void> {
-  const response = await api.deleteCategory(id);
-  if (!response.data?.deleted && response.error_code) {
-    throw new Error(response.message || 'Failed to delete category');
-  }
-}
-
-export const useCategoryStore = createCrudResourceStore<CategoryEntity, CreateCategoryInput, UpdateCategoryInput>(
+export const useCategoryStore = createCrudResourceStore<CategoryEntity, CategoryCreate, CategoryUpdate>(
   'category',
-  fetchCategories,
+  () => api.listCategories() as Promise<CategoryEntity[]>,
   {
-    create: createCategory,
-    update: updateCategory,
-    remove: deleteCategory,
+    create: (data) => api.createCategory(data) as Promise<CategoryEntity>,
+    update: (id, data) => api.updateCategory(id, data) as Promise<CategoryEntity>,
+    remove: (id) => api.deleteCategory(id),
   }
 );
 
@@ -82,7 +32,6 @@ export const useCategoryActions = () => ({
 });
 
 // Virtual/Regular category selectors
-// Virtual categories: is_virtual=true, is_active=true, sorted by sort_order
 export const useVirtualCategories = () =>
   useCategoryStore((state) =>
     state.items
@@ -90,7 +39,6 @@ export const useVirtualCategories = () =>
       .sort((a, b) => a.sort_order - b.sort_order)
   );
 
-// Regular categories: is_virtual=false, sorted by sort_order
 export const useRegularCategories = () =>
   useCategoryStore((state) =>
     state.items
@@ -98,7 +46,6 @@ export const useRegularCategories = () =>
       .sort((a, b) => a.sort_order - b.sort_order)
   );
 
-// Get category by name (useful for POS filtering)
 export const useCategoryByName = (name: string) =>
   useCategoryStore((state) => state.items.find((c) => c.name === name));
 

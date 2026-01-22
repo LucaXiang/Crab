@@ -4,21 +4,9 @@ import type { Tag } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
-async function fetchTags(): Promise<Tag[]> {
-  const response = await api.listTags();
-  // Handle both formats: direct array or { data: { tags: [...] } }
-  if (Array.isArray(response)) {
-    return response;
-  }
-  if (response.data?.tags) {
-    return response.data.tags;
-  }
-  throw new Error(response.message || 'Failed to fetch tags');
-}
-
 export const useTagStore = createResourceStore<Tag & { id: string }>(
   'tag',
-  fetchTags as () => Promise<(Tag & { id: string })[]>
+  () => api.listTags() as Promise<(Tag & { id: string })[]>
 );
 
 // Convenience hooks

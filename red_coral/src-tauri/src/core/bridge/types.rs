@@ -108,8 +108,8 @@ pub struct ModeInfo {
 // Internal state enums (pub(crate) for use within bridge module)
 // ============================================================================
 
-use std::sync::Arc;
 use edge_server::ServerState;
+use std::sync::Arc;
 
 /// Server 模式的客户端状态
 #[allow(dead_code)]

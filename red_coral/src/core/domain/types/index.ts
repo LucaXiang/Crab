@@ -4,13 +4,10 @@
  * Unified type definitions for the application.
  * All types are organized into subdirectories by domain.
  *
- * Note: Some types with conflicting names exist in different submodules.
  * Import from specific submodules when needed:
  * - '@/core/domain/types/api' - Backend API types (matches Rust server)
- * - '@/core/domain/types/events' - Client-side event sourcing types (legacy)
- * - '@/core/domain/types/orderEvent' - Server-side event sourcing types (new)
+ * - '@/core/domain/types/orderEvent' - Event sourcing types (commands, events, snapshots)
  * - '@/core/domain/types/print' - Print and label types
- * - '@/core/domain/types/pricing' - Frontend pricing adjustment types
  */
 
 // API types (models, requests, responses) - primary source
@@ -100,6 +97,7 @@ export type {
 export type CartItem = import('./orderEvent').CartItemSnapshot & {
   product_id?: string;  // TODO: 等待后端添加
   external_id?: string; // TODO: 等待后端添加
+  original_instance_id?: string; // For tracking split items
 };
 
 /**
@@ -121,10 +119,6 @@ export type OrderStatus = 'ACTIVE' | 'COMPLETED' | 'VOID' | 'MOVED' | 'MERGED';
 export type HeldOrder = Omit<import('./orderEvent').OrderSnapshot, 'items'> & {
   // Override items to use CartItem (with temporary extensions)
   items: CartItem[];
-
-  // Legacy aliases for backward compatibility
-  key?: string;                   // Alias for order_id
-  id?: string;                    // Alias for order_id
 
   // Timeline: 存储原始 OrderEvent[]，UI 层按需格式化
   timeline?: import('./orderEvent').OrderEvent[];

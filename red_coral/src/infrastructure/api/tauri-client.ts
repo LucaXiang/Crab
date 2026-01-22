@@ -46,50 +46,44 @@ import type {
   CreateCategoryAttributeRequest,
 } from '@/core/domain/types/api';
 
-// API Error class (与原 client.ts 保持一致)
+// API Error class - aligned with shared::error::ErrorCode (u16)
 export class ApiError extends Error {
-  code: string;
-  httpStatus: number;
+  code: number;
+  details?: Record<string, unknown>;
 
-  constructor(code: string, message: string, httpStatus: number = 500) {
+  constructor(code: number, message: string, details?: Record<string, unknown>) {
     super(message);
     this.code = code;
-    this.httpStatus = httpStatus;
+    this.details = details;
     this.name = 'ApiError';
+  }
+
+  /** Check if this is a specific error code */
+  is(errorCode: number): boolean {
+    return this.code === errorCode;
   }
 }
 
 /**
- * Generic helper to invoke Tauri command and unwrap ApiResponse
- *
- * Used by stores/services to get data directly or throw structured errors.
+ * 调用 Tauri command 并自动解包 ApiResponse
+ * 返回 data 字段，错误时抛出 ApiError
  */
-export async function invokeApi<T>(command: string, args?: any): Promise<T> {
+export async function invokeApi<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {
     const response = await invoke<ApiResponse<T>>(command, args);
-    if (response.error_code) {
-      throw new ApiError(response.error_code, response.message);
+    if (response.code && response.code > 0) {
+      throw new ApiError(response.code, response.message, response.details ?? undefined);
     }
-    // For void success (ApiResponse<()>), data might be undefined/null
     return response.data as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
     const message = error instanceof Error ? error.message : String(error);
-    throw new ApiError('INVOKE_ERROR', message);
+    throw new ApiError(9001, message); // 9001 = InternalError
   }
 }
 
-/**
- * 包装 Tauri invoke 调用，统一错误处理
- */
-async function invokeCommand<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  try {
-    return await invoke<T>(command, args);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new ApiError('INVOKE_ERROR', message, 500);
-  }
-}
+// Alias for internal use
+const invokeAndUnwrap = invokeApi;
 
 /**
  * Tauri API Client
@@ -99,13 +93,9 @@ async function invokeCommand<T>(command: string, args?: Record<string, unknown>)
 export class TauriApiClient {
   // ============ Health ============
 
-  async getHealth() {
-    return invokeCommand<{ status: string }>('api_get', { path: '/health' });
-  }
-
   async isAvailable(): Promise<boolean> {
     try {
-      await this.getHealth();
+      await invoke('health_check');
       return true;
     } catch {
       return false;
@@ -114,273 +104,281 @@ export class TauriApiClient {
 
   // ============ Auth ============
 
-  async login(data: { username: string; password: string }): Promise<ApiResponse<LoginResponseData>> {
-    return invokeCommand<ApiResponse<LoginResponseData>>('login_employee', {
+  async login(data: { username: string; password: string }): Promise<LoginResponseData> {
+    return invokeAndUnwrap<LoginResponseData>('login_employee', {
       username: data.username,
-      password: data.password
+      password: data.password,
     });
   }
 
   async logout(): Promise<void> {
-    return invokeCommand<void>('logout_employee');
+    await invokeAndUnwrap<void>('logout_employee');
   }
 
   // ============ Tags ============
 
-  async listTags(): Promise<ApiResponse<TagListData>> {
-    return invokeCommand<ApiResponse<TagListData>>('list_tags');
+  async listTags(): Promise<Tag[]> {
+    const data = await invokeAndUnwrap<TagListData>('list_tags');
+    return data.tags;
   }
 
-  async getTag(id: string): Promise<ApiResponse<{ tag: Tag }>> {
-    return invokeCommand<ApiResponse<{ tag: Tag }>>('get_tag', { id });
+  async getTag(id: string): Promise<Tag> {
+    const data = await invokeAndUnwrap<{ tag: Tag }>('get_tag', { id });
+    return data.tag;
   }
 
-  async createTag(data: TagCreate): Promise<ApiResponse<{ tag: Tag }>> {
-    return invokeCommand<ApiResponse<{ tag: Tag }>>('create_tag', { data });
+  async createTag(data: TagCreate): Promise<Tag> {
+    const result = await invokeAndUnwrap<{ tag: Tag }>('create_tag', { data });
+    return result.tag;
   }
 
-  async updateTag(id: string, data: TagUpdate): Promise<ApiResponse<{ tag: Tag }>> {
-    return invokeCommand<ApiResponse<{ tag: Tag }>>('update_tag', { id, data });
+  async updateTag(id: string, data: TagUpdate): Promise<Tag> {
+    const result = await invokeAndUnwrap<{ tag: Tag }>('update_tag', { id, data });
+    return result.tag;
   }
 
-  async deleteTag(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_tag', { id });
+  async deleteTag(id: string): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('delete_tag', { id });
   }
 
   // ============ Categories ============
 
-  async listCategories(): Promise<ApiResponse<CategoryListData>> {
-    return invokeCommand<ApiResponse<CategoryListData>>('list_categories');
+  async listCategories(): Promise<Category[]> {
+    const data = await invokeAndUnwrap<CategoryListData>('list_categories');
+    return data.categories;
   }
 
-  async createCategory(data: CategoryCreate): Promise<ApiResponse<{ category: Category }>> {
-    return invokeCommand<ApiResponse<{ category: Category }>>('create_category', { data });
+  async createCategory(data: CategoryCreate): Promise<Category> {
+    const result = await invokeAndUnwrap<{ category: Category }>('create_category', { data });
+    return result.category;
   }
 
-  async updateCategory(id: string, data: CategoryUpdate): Promise<ApiResponse<{ category: Category }>> {
-    return invokeCommand<ApiResponse<{ category: Category }>>('update_category', { id, data });
+  async updateCategory(id: string, data: CategoryUpdate): Promise<Category> {
+    const result = await invokeAndUnwrap<{ category: Category }>('update_category', { id, data });
+    return result.category;
   }
 
-  async deleteCategory(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_category', { id });
+  async deleteCategory(id: string): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('delete_category', { id });
   }
 
-  async batchUpdateCategorySortOrder(updates: { id: string; sort_order: number }[]): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('batch_update_category_sort_order', { updates });
+  async batchUpdateCategorySortOrder(updates: { id: string; sort_order: number }[]): Promise<void> {
+    await invokeAndUnwrap<{ updated: boolean }>('batch_update_category_sort_order', { updates });
   }
 
   // ============ Products ============
 
-  async listProducts(): Promise<ApiResponse<ProductListData>> {
-    return invokeCommand<ApiResponse<ProductListData>>('list_products');
+  async listProducts(): Promise<Product[]> {
+    const data = await invokeAndUnwrap<ProductListData>('list_products');
+    return data.products;
   }
 
-  async getProductFull(id: string): Promise<ApiResponse<{ product: ProductFull }>> {
-    return invokeCommand<ApiResponse<{ product: ProductFull }>>('get_product_full', { id });
+  async getProductFull(id: string): Promise<ProductFull> {
+    const data = await invokeAndUnwrap<{ product: ProductFull }>('get_product_full', { id });
+    return data.product;
   }
 
-  async createProduct(data: ProductCreate): Promise<ApiResponse<{ product: Product }>> {
-    return invokeCommand<ApiResponse<{ product: Product }>>('create_product', { data });
+  async createProduct(data: ProductCreate): Promise<Product> {
+    const result = await invokeAndUnwrap<{ product: Product }>('create_product', { data });
+    return result.product;
   }
 
-  async updateProduct(id: string, data: ProductUpdate): Promise<ApiResponse<{ product: Product }>> {
-    return invokeCommand<ApiResponse<{ product: Product }>>('update_product', { id, data });
+  async updateProduct(id: string, data: ProductUpdate): Promise<Product> {
+    const result = await invokeAndUnwrap<{ product: Product }>('update_product', { id, data });
+    return result.product;
   }
 
-  async deleteProduct(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_product', { id });
+  async deleteProduct(id: string): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('delete_product', { id });
   }
 
-  async bulkDeleteProducts(ids: (string | number)[]): Promise<ApiResponse<{ deleted: boolean }>> {
-    // Delete products one by one (bulk delete may not be implemented in backend)
+  async bulkDeleteProducts(ids: (string | number)[]): Promise<void> {
     for (const id of ids) {
       await this.deleteProduct(String(id));
     }
-    return { data: { deleted: true } } as ApiResponse<{ deleted: boolean }>;
   }
 
   // ============ Product Attributes ============
 
-  async fetchProductAttributes(productId: string): Promise<ApiResponse<ProductAttributeListData>> {
-    return invokeCommand<ApiResponse<ProductAttributeListData>>('list_product_attributes', { product_id: productId });
+  async fetchProductAttributes(productId: string): Promise<ProductAttribute[]> {
+    const data = await invokeAndUnwrap<ProductAttributeListData>('list_product_attributes', { product_id: productId });
+    return data.product_attributes;
   }
 
-  async bindProductAttribute(data: CreateProductAttributeRequest): Promise<ApiResponse<{ binding: ProductAttribute }>> {
-    return invokeCommand<ApiResponse<{ binding: ProductAttribute }>>('bind_product_attribute', { data });
+  async bindProductAttribute(data: CreateProductAttributeRequest): Promise<ProductAttribute> {
+    const result = await invokeAndUnwrap<{ binding: ProductAttribute }>('bind_product_attribute', { data });
+    return result.binding;
   }
 
-  async unbindProductAttribute(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('unbind_product_attribute', { id });
+  async unbindProductAttribute(id: string): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('unbind_product_attribute', { id });
   }
 
   // ============ Category Attributes ============
 
-  async listCategoryAttributes(categoryId?: string | number): Promise<ApiResponse<{ category_attributes: unknown[] }>> {
-    return invokeCommand<ApiResponse<{ category_attributes: unknown[] }>>('list_category_attributes', { category_id: categoryId ? String(categoryId) : undefined });
+  async listCategoryAttributes(categoryId?: string | number): Promise<unknown[]> {
+    const data = await invokeAndUnwrap<{ category_attributes: unknown[] }>('list_category_attributes', { category_id: categoryId ? String(categoryId) : undefined });
+    return data.category_attributes;
   }
 
-  async bindCategoryAttribute(data: CreateCategoryAttributeRequest): Promise<ApiResponse<{ binding: unknown }>> {
-    return invokeCommand<ApiResponse<{ binding: unknown }>>('bind_category_attribute', { data });
+  async bindCategoryAttribute(data: CreateCategoryAttributeRequest): Promise<unknown> {
+    const result = await invokeAndUnwrap<{ binding: unknown }>('bind_category_attribute', { data });
+    return result.binding;
   }
 
-  async unbindCategoryAttribute(categoryId: string, attributeId: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('unbind_category_attribute', { category_id: categoryId, attribute_id: attributeId });
+  async unbindCategoryAttribute(categoryId: string, attributeId: string): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('unbind_category_attribute', { category_id: categoryId, attribute_id: attributeId });
   }
 
   // ============ Attributes ============
 
-  async listAttributeTemplates(): Promise<ApiResponse<AttributeTemplateListData>> {
-    return invokeCommand<ApiResponse<AttributeTemplateListData>>('list_attributes');
+  async listAttributeTemplates(): Promise<Attribute[]> {
+    const data = await invokeAndUnwrap<AttributeTemplateListData>('list_attributes');
+    return data.templates;
   }
 
-  async getAttributeTemplate(id: string): Promise<ApiResponse<{ template: Attribute }>> {
-    return invokeCommand<ApiResponse<{ template: Attribute }>>('get_attribute', { id });
+  async getAttributeTemplate(id: string): Promise<Attribute> {
+    const data = await invokeAndUnwrap<{ template: Attribute }>('get_attribute', { id });
+    return data.template;
   }
 
-  async createAttribute(data: AttributeCreate): Promise<ApiResponse<{ attribute: Attribute }>> {
-    return invokeCommand<ApiResponse<{ attribute: Attribute }>>('create_attribute', { data });
+  async createAttribute(data: AttributeCreate): Promise<Attribute> {
+    const result = await invokeAndUnwrap<{ attribute: Attribute }>('create_attribute', { data });
+    return result.attribute;
   }
 
-  async updateAttribute(id: string, data: AttributeUpdate): Promise<ApiResponse<{ attribute: Attribute }>> {
-    return invokeCommand<ApiResponse<{ attribute: Attribute }>>('update_attribute', { id, data });
+  async updateAttribute(id: string, data: AttributeUpdate): Promise<Attribute> {
+    const result = await invokeAndUnwrap<{ attribute: Attribute }>('update_attribute', { id, data });
+    return result.attribute;
   }
 
-  async deleteAttribute(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_attribute', { id });
+  async deleteAttribute(id: string): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('delete_attribute', { id });
   }
 
   // ============ Attribute Options ============
 
-  async addAttributeOption(attributeId: string, data: { name: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string }): Promise<ApiResponse<{ template: Attribute }>> {
-    return invokeCommand<ApiResponse<{ template: Attribute }>>('add_attribute_option', { attribute_id: attributeId, data });
+  async addAttributeOption(attributeId: string, data: { name: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string }): Promise<Attribute> {
+    const result = await invokeAndUnwrap<{ template: Attribute }>('add_attribute_option', { attribute_id: attributeId, data });
+    return result.template;
   }
 
-  async updateAttributeOption(attributeId: string, index: number, data: { name?: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string }): Promise<ApiResponse<{ template: Attribute }>> {
-    return invokeCommand<ApiResponse<{ template: Attribute }>>('update_attribute_option', { attribute_id: attributeId, index, data });
+  async updateAttributeOption(attributeId: string, index: number, data: { name?: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string }): Promise<Attribute> {
+    const result = await invokeAndUnwrap<{ template: Attribute }>('update_attribute_option', { attribute_id: attributeId, index, data });
+    return result.template;
   }
 
-  async deleteAttributeOption(attributeId: string, index: number): Promise<ApiResponse<{ template: Attribute }>> {
-    return invokeCommand<ApiResponse<{ template: Attribute }>>('delete_attribute_option', { attribute_id: attributeId, index });
+  async deleteAttributeOption(attributeId: string, index: number): Promise<Attribute> {
+    const result = await invokeAndUnwrap<{ template: Attribute }>('delete_attribute_option', { attribute_id: attributeId, index });
+    return result.template;
   }
 
   // ============ Zones ============
 
-  async listZones(): Promise<ApiResponse<ZoneListData>> {
-    return invokeCommand<ApiResponse<ZoneListData>>('list_zones');
+  async listZones(): Promise<Zone[]> {
+    const data = await invokeAndUnwrap<ZoneListData>('list_zones');
+    return data.zones;
   }
 
-  async createZone(data: { name: string; description?: string }): Promise<ApiResponse<{ zone: Zone }>> {
-    return invokeCommand<ApiResponse<{ zone: Zone }>>('create_zone', { data });
+  async createZone(data: { name: string; description?: string }): Promise<Zone> {
+    const result = await invokeAndUnwrap<{ zone: Zone }>('create_zone', { data });
+    return result.zone;
   }
 
-  async updateZone(id: string | number, data: { name?: string; description?: string; is_active?: boolean }): Promise<ApiResponse<{ zone: Zone }>> {
-    return invokeCommand<ApiResponse<{ zone: Zone }>>('update_zone', { id: String(id), data });
+  async updateZone(id: string | number, data: { name?: string; description?: string; is_active?: boolean }): Promise<Zone> {
+    const result = await invokeAndUnwrap<{ zone: Zone }>('update_zone', { id: String(id), data });
+    return result.zone;
   }
 
-  async deleteZone(id: string | number): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_zone', { id: String(id) });
+  async deleteZone(id: string | number): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('delete_zone', { id: String(id) });
   }
 
   // ============ Tables ============
 
-  async listTables(): Promise<ApiResponse<TableListData>> {
-    return invokeCommand<ApiResponse<TableListData>>('list_tables');
+  async listTables(): Promise<Table[]> {
+    const data = await invokeAndUnwrap<TableListData>('list_tables');
+    return data.tables;
   }
 
-  async createTable(data: { name: string; zone: string; capacity?: number }): Promise<ApiResponse<{ table: Table }>> {
-    return invokeCommand<ApiResponse<{ table: Table }>>('create_table', { data });
+  async createTable(data: { name: string; zone: string; capacity?: number }): Promise<Table> {
+    const result = await invokeAndUnwrap<{ table: Table }>('create_table', { data });
+    return result.table;
   }
 
-  async updateTable(id: string | number, data: { name?: string; zone?: string; capacity?: number; is_active?: boolean }): Promise<ApiResponse<{ table: Table }>> {
-    return invokeCommand<ApiResponse<{ table: Table }>>('update_table', { id: String(id), data });
+  async updateTable(id: string | number, data: { name?: string; zone?: string; capacity?: number; is_active?: boolean }): Promise<Table> {
+    const result = await invokeAndUnwrap<{ table: Table }>('update_table', { id: String(id), data });
+    return result.table;
   }
 
-  async deleteTable(id: string | number): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_table', { id: String(id) });
+  async deleteTable(id: string | number): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('delete_table', { id: String(id) });
   }
 
   // ============ Print Destinations ============
 
-  async listPrintDestinations(): Promise<ApiResponse<PrintDestinationListData>> {
-    return invokeCommand<ApiResponse<PrintDestinationListData>>('list_print_destinations');
+  async listPrintDestinations(): Promise<PrintDestination[]> {
+    const data = await invokeAndUnwrap<PrintDestinationListData>('list_print_destinations');
+    return data.destinations;
   }
 
-  async createPrintDestination(data: PrintDestinationCreate): Promise<ApiResponse<{ destination: PrintDestination }>> {
-    return invokeCommand<ApiResponse<{ destination: PrintDestination }>>('create_print_destination', { data });
+  async createPrintDestination(data: PrintDestinationCreate): Promise<PrintDestination> {
+    const result = await invokeAndUnwrap<{ destination: PrintDestination }>('create_print_destination', { data });
+    return result.destination;
   }
 
-  async updatePrintDestination(id: string, data: PrintDestinationUpdate): Promise<ApiResponse<{ destination: PrintDestination }>> {
-    return invokeCommand<ApiResponse<{ destination: PrintDestination }>>('update_print_destination', { id, data });
+  async updatePrintDestination(id: string, data: PrintDestinationUpdate): Promise<PrintDestination> {
+    const result = await invokeAndUnwrap<{ destination: PrintDestination }>('update_print_destination', { id, data });
+    return result.destination;
   }
 
-  async deletePrintDestination(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_print_destination', { id });
+  async deletePrintDestination(id: string): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('delete_print_destination', { id });
   }
 
   // ============ Employees ============
 
-  async listEmployees(): Promise<ApiResponse<{ employees: EmployeeResponse[] }>> {
-    return invokeCommand<ApiResponse<{ employees: EmployeeResponse[] }>>('list_employees');
+  async listEmployees(): Promise<EmployeeResponse[]> {
+    const data = await invokeAndUnwrap<{ employees: EmployeeResponse[] }>('list_employees');
+    return data.employees;
   }
 
-  async createEmployee(data: { username: string; password: string; role: string }): Promise<ApiResponse<{ employee: EmployeeResponse }>> {
-    return invokeCommand<ApiResponse<{ employee: EmployeeResponse }>>('create_employee', { data });
+  async createEmployee(data: { username: string; password: string; role: string }): Promise<EmployeeResponse> {
+    const result = await invokeAndUnwrap<{ employee: EmployeeResponse }>('create_employee', { data });
+    return result.employee;
   }
 
-  async updateEmployee(id: string, data: { password?: string; role?: string; is_active?: boolean }): Promise<ApiResponse<{ employee: EmployeeResponse }>> {
-    return invokeCommand<ApiResponse<{ employee: EmployeeResponse }>>('update_employee', { id, data });
+  async updateEmployee(id: string, data: { password?: string; role?: string; is_active?: boolean }): Promise<EmployeeResponse> {
+    const result = await invokeAndUnwrap<{ employee: EmployeeResponse }>('update_employee', { id, data });
+    return result.employee;
   }
 
-  async deleteEmployee(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return invokeCommand<ApiResponse<{ deleted: boolean }>>('delete_employee', { id });
+  async deleteEmployee(id: string): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('delete_employee', { id });
   }
 
   // ============ Price Rules ============
 
-  async listPriceRules(): Promise<ApiResponse<{ rules: PriceRule[] }>> {
-    return invokeCommand<ApiResponse<{ rules: PriceRule[] }>>('list_price_rules');
+  async listPriceRules(): Promise<PriceRule[]> {
+    const data = await invokeAndUnwrap<{ rules: PriceRule[] }>('list_price_rules');
+    return data.rules;
   }
 
   // ============ Roles ============
 
-  async listRoles(): Promise<ApiResponse<RoleListData>> {
-    return invokeCommand<ApiResponse<RoleListData>>('list_roles');
+  async listRoles(): Promise<RoleListData> {
+    return invokeAndUnwrap<RoleListData>('list_roles');
   }
 
-  async getRolePermissions(roleId: string): Promise<ApiResponse<RolePermissionListData>> {
-    return invokeCommand<ApiResponse<RolePermissionListData>>('get_role_permissions', { role_id: roleId });
+  async getRolePermissions(roleId: string): Promise<RolePermissionListData> {
+    return invokeAndUnwrap<RolePermissionListData>('get_role_permissions', { role_id: roleId });
   }
 
   // ============ Token Management ============
-  // Note: In Tauri mode, authentication is handled by ClientBridge
-  // These methods are provided for API compatibility but don't manage local tokens
+  // In Tauri mode, authentication is handled by ClientBridge on Rust side
 
-  /**
-   * Set access token (no-op in Tauri mode - auth is handled by ClientBridge)
-   */
-  setAccessToken(_token: string): void {
-    // In Tauri mode, the ClientBridge manages authentication state
-    // This is a no-op for API compatibility
-  }
-
-  /**
-   * Clear access token (no-op in Tauri mode - auth is handled by ClientBridge)
-   */
-  clearAccessToken(): void {
-    // In Tauri mode, the ClientBridge manages authentication state
-    // This is a no-op for API compatibility
-  }
-
-  /**
-   * Refresh token - delegates to Tauri command
-   */
-  async refreshToken(): Promise<{ data?: { access_token: string } }> {
-    try {
-      const result = await invokeCommand<{ access_token: string }>('refresh_token', {});
-      return { data: result };
-    } catch {
-      return { data: undefined };
-    }
+  async refreshToken(): Promise<void> {
+    await invokeAndUnwrap<void>('refresh_token');
   }
 }
 

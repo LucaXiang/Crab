@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api/tauri-client';
 
 interface ReportErrorOptions {
   source?: string;
@@ -15,7 +15,7 @@ export async function reportError(
   const err = error instanceof Error ? error : new Error(String(error));
 
   let authState: { user?: { id?: number; username?: string; role_name?: string } | null } | null = null;
-  let checkoutState: { currentOrderKey?: string | null; checkoutOrder?: { key?: string; receipt_number?: string; table_name?: string; zone_name?: string } | null } | null = null;
+  let checkoutState: { currentOrderKey?: string | null; checkoutOrder?: { order_id?: string; receipt_number?: string; table_name?: string; zone_name?: string } | null } | null = null;
 
   try {
     const { useAuthStore } = await import('@/core/stores/auth/useAuthStore');
@@ -31,7 +31,7 @@ export async function reportError(
     // Store not available
   }
 
-  const activeOrderKey = checkoutState?.currentOrderKey ?? checkoutState?.checkoutOrder?.key ?? null;
+  const activeOrderKey = checkoutState?.currentOrderKey ?? checkoutState?.checkoutOrder?.order_id ?? null;
   const receiptNumber = checkoutState?.checkoutOrder?.receipt_number ?? null;
   const tableName = checkoutState?.checkoutOrder?.table_name ?? null;
   const zone_name = checkoutState?.checkoutOrder?.zone_name ?? null;
@@ -56,6 +56,8 @@ export async function reportError(
   }
 
   try {
-    await invoke('record_error_cmd', { payload });
-  } catch {}
+    await invokeApi('record_error_cmd', { payload });
+  } catch {
+    // Silently fail - error reporting should not cause errors
+  }
 }

@@ -95,7 +95,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       propOnVoid(reason);
       setIsVoidModalOpen(false);
     } else {
-      const orderKey = order.key || order.order_id || String(order.table_id || '');
+      const orderKey = order.order_id;
 
       // Execute async command
       const response = await voidOrder(orderKey, reason);

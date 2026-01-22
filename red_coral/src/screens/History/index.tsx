@@ -34,7 +34,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({ isVisible, onBack,
     if (!selectedOrder) return;
     try {
       const { reprintReceipt } = await import('@/infrastructure/print/printService');
-      await reprintReceipt(selectedOrder.key);
+      await reprintReceipt(selectedOrder.order_id);
     } catch {}
   };
 

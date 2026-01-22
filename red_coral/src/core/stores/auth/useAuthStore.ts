@@ -52,50 +52,34 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
 
         try {
-          const request: LoginRequest = { username, password };
-          const response = await api.login(request);
+          const { access_token, user: userData } = await api.login({ username, password });
 
-          if (response.data) {
-            const { access_token, user: userData } = response.data;
+          // 将 API 用户数据转换为本地 User 类型
+          const user: User = {
+            id: userData.id,
+            uuid: userData.uuid,
+            username: userData.username,
+            display_name: userData.display_name,
+            role_id: userData.role_id,
+            avatar: userData.avatar,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
 
-            // 将 API 用户数据转换为本地 User 类型
-            // 注意：API 使用 snake_case，User 类型也使用 snake_case
-            const user: User = {
-              id: userData.id,
-              uuid: userData.uuid,
-              username: userData.username,
-              display_name: userData.display_name,
-              role_id: userData.role_id,
-              avatar: userData.avatar,
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            };
-
-            // 设置访问令牌 (同时存储到 localStorage 供其他 API 客户端使用)
-            api.setAccessToken(access_token);
-
-            // 获取权限 - API 返回 RolePermission[]，提取 permission 字段
-            // 注意：TauriApiClient 期望 string，ApiClient 期望 number，统一使用 string
-            const rolePermissions = await api.getRolePermissions(String(userData.role_id));
-            const permissions = rolePermissions.data?.permissions.map(p => p.permission) || [];
-
-            set({
-              user,
-              permissions,
-              isAuthenticated: true,
-              isLoading: false,
-              error: null,
-            });
-
-            return true;
-          }
+          // 获取权限 - API 返回 RolePermission[]，提取 permission 字段
+          const rolePermissions = await api.getRolePermissions(String(userData.role_id));
+          const permissions = rolePermissions.permissions.map(p => p.permission);
 
           set({
+            user,
+            permissions,
+            isAuthenticated: true,
             isLoading: false,
-            error: 'Login failed',
+            error: null,
           });
-          return false;
+
+          return true;
         } catch (error: any) {
           console.error('Login failed:', error);
           set({
@@ -110,7 +94,6 @@ export const useAuthStore = create<AuthStore>()(
        * Logout current user
        */
       logout: () => {
-        api.clearAccessToken(); // This now also clears localStorage
         set({ user: null, permissions: [], isAuthenticated: false, error: null });
       },
 
@@ -130,9 +113,8 @@ export const useAuthStore = create<AuthStore>()(
        */
       fetchUserPermissions: async (roleId: number) => {
         try {
-          const response = await api.getRolePermissions(String(roleId));
-          // API 返回 RolePermission[]，提取 permission 字段
-          const permissions = response.data?.permissions.map(p => p.permission) || [];
+          const rolePermissions = await api.getRolePermissions(String(roleId));
+          const permissions = rolePermissions.permissions.map(p => p.permission);
           set({ permissions });
         } catch (error) {
           console.error('Failed to fetch permissions:', error);
@@ -141,17 +123,12 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       /**
-       * Refresh token
+       * Refresh token (handled by Rust ClientBridge)
        */
       refreshToken: async () => {
         try {
-          const response = await api.refreshToken();
-          if (response.data?.access_token) {
-            api.setAccessToken(response.data.access_token);
-          }
-        } catch (error) {
-          console.error('Failed to refresh token:', error);
-          // If refresh fails, logout
+          await api.refreshToken();
+        } catch {
           get().logout();
         }
       },
@@ -184,14 +161,13 @@ export const useAuthStore = create<AuthStore>()(
       // ==================== User Management ====================
 
       fetchUsers: async () => {
-        const response = await api.listEmployees();
-        const employees = response.data?.employees || [];
+        const employees = await api.listEmployees();
         // 转换 EmployeeResponse -> User
         return employees.map((e) => ({
           id: parseInt(e.id) || 0,
           uuid: e.id,
           username: e.username,
-          display_name: e.username, // backend doesn't have display_name
+          display_name: e.username,
           role_id: parseInt(e.role) || 0,
           role_name: undefined,
           avatar: null,
@@ -202,13 +178,11 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       createUser: async (data: { username: string; password: string; displayName?: string; role: string }) => {
-        const response = await api.createEmployee({
+        const result = await api.createEmployee({
           username: data.username,
           password: data.password,
           role: data.role,
         });
-        const result = response.data?.employee;
-        if (!result) throw new Error('Failed to create employee');
         return {
           id: parseInt(result.id) || 0,
           uuid: result.id,
@@ -223,12 +197,10 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       updateUser: async (userId: number, data: { displayName?: string; role?: string; isActive?: boolean }) => {
-        const response = await api.updateEmployee(String(userId), {
+        const result = await api.updateEmployee(String(userId), {
           role: data.role,
           is_active: data.isActive,
         });
-        const result = response.data?.employee;
-        if (!result) throw new Error('Failed to update employee');
         return {
           id: parseInt(result.id) || userId,
           uuid: result.id,

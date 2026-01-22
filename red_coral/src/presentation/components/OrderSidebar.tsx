@@ -47,10 +47,10 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
 
   const handleSaveItem = React.useCallback(async (index: number, updates: Partial<CartItem>, _options?: { userId?: string }) => {
     const item = order.items[index];
-    const instanceId = item.instance_id || `item-${index}`;
+    const instanceId = item.instance_id;
 
     // Send command to backend - state will be updated via event (Server Authority)
-    await orderOps.modifyItem(order.key, instanceId, {
+    await orderOps.modifyItem(order.order_id, instanceId, {
       price: updates.price,
       quantity: updates.quantity,
       discount_percent: updates.discount_percent,
@@ -63,7 +63,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
 
   const handleDeleteItem = React.useCallback(async (index: number, _options?: { userId?: string }) => {
     const item = order.items[index];
-    const instanceId = item.instance_id || `item-${index}`;
+    const instanceId = item.instance_id;
     const paidQty = order.paid_item_quantities?.[instanceId] || 0;
 
     // Case 1: Partially paid item - Remove unpaid portion
@@ -71,13 +71,13 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       const qtyToRemove = item.quantity - paidQty;
 
       // Send command to backend - state will be updated via event (Server Authority)
-      await orderOps.removeItem(order.key, instanceId, 'Removed unpaid portion', qtyToRemove);
+      await orderOps.removeItem(order.order_id, instanceId, 'Removed unpaid portion', qtyToRemove);
       return;
     }
 
     // Case 2: Fully paid or Unpaid - Remove (Soft Delete)
     // Send command to backend - state will be updated via event (Server Authority)
-    await orderOps.removeItem(order.key, instanceId, 'Removed from payment screen');
+    await orderOps.removeItem(order.order_id, instanceId, 'Removed from payment screen');
 
     setEditingItem(null);
   }, [order]);
@@ -284,7 +284,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           onClose={() => setShowQuickAdd(false)}
           onConfirm={async (items) => {
             // Send command to backend - state will be updated via event (Server Authority)
-            await orderOps.addItems(order.key, items);
+            await orderOps.addItems(order.order_id, items);
             setShowQuickAdd(false);
           }}
         />

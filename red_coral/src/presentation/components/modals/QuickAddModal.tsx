@@ -88,17 +88,20 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     setTempItems(prev => [...prev, newItem]);
   };
 
-  const updateQuantity = (index: number, delta: number) => {
+  const updateQuantity = (instanceId: string, delta: number) => {
     setTempItems(prev => {
-      const newItems = [...prev];
-      const item = newItems[index];
+      const idx = prev.findIndex(item => item.instance_id === instanceId);
+      if (idx === -1) return prev;
+
+      const item = prev[idx];
       const newQty = item.quantity + delta;
-      
+
       if (newQty <= 0) {
-        return prev.filter((_, i) => i !== index);
+        return prev.filter(i => i.instance_id !== instanceId);
       }
-      
-      newItems[index] = { ...item, quantity: newQty };
+
+      const newItems = [...prev];
+      newItems[idx] = { ...item, quantity: newQty };
       return newItems;
     });
   };
@@ -212,8 +215,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
                   <p>{t('pos.quickAdd.selectPrompt')}</p>
                 </div>
               ) : (
-                tempItems.map((item, index) => (
-                  <div key={item.instance_id || index} className="flex flex-col p-3 bg-white border border-gray-100 rounded-xl shadow-sm gap-2">
+                tempItems.map((item) => (
+                  <div key={item.instance_id} className="flex flex-col p-3 bg-white border border-gray-100 rounded-xl shadow-sm gap-2">
                     <div className="flex justify-between items-start">
                       <span className="font-bold text-gray-800 line-clamp-2">{item.name}</span>
                       <span className="font-bold text-gray-900">{formatCurrency(item.price * item.quantity)}</span>
@@ -222,15 +225,15 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-gray-500">{formatCurrency(item.price)} {t('pos.quickAdd.perUnit')}</span>
                       <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-1">
-                        <button 
-                          onClick={() => updateQuantity(index, -1)}
+                        <button
+                          onClick={() => updateQuantity(item.instance_id, -1)}
                           className="p-1 hover:bg-white rounded-md shadow-sm text-gray-600 transition-all"
                         >
                           {item.quantity === 1 ? <Trash2 size={14} className="text-red-500" /> : <Minus size={14} />}
                         </button>
                         <span className="font-bold w-6 text-center text-sm">{item.quantity}</span>
-                        <button 
-                          onClick={() => updateQuantity(index, 1)}
+                        <button
+                          onClick={() => updateQuantity(item.instance_id, 1)}
                           className="p-1 hover:bg-white rounded-md shadow-sm text-gray-600 transition-all"
                         >
                           <Plus size={14} />

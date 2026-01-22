@@ -11,8 +11,6 @@ interface UseOrderHandlersParams {
     guestCount: number,
     cart: CartItem[],
     totalAmount: number,
-    enableIndividualMode?: boolean,
-    isIndividualMode?: boolean,
     zone?: Zone
   ) => Promise<'MERGED' | 'CREATED' | 'RETRIEVED' | 'EMPTY'>;
   voidOrder: (order: HeldOrder, reason?: string) => Promise<HeldOrder>;
@@ -36,7 +34,6 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
     async (
       table: Table,
       guestCount: number,
-      enableIndividualMode?: boolean,
       zone?: Zone
     ) => {
       const { cart, totalAmount } = useCartStore.getState();
@@ -46,8 +43,6 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
         guestCount,
         cart,
         totalAmount,
-        enableIndividualMode,
-        undefined,
         zone
       );
 
@@ -107,8 +102,6 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
           1,
           cart,
           0,
-          false,
-          false,
           undefined
         );
 
@@ -123,7 +116,7 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
           if (retailOrder) {
             const heldOrder = retailOrder;
             checkout.setCheckoutOrder(heldOrder);
-            setCurrentOrderKey(heldOrder.order_id || '');
+            setCurrentOrderKey(heldOrder.order_id);
             setViewMode('checkout');
           }
         }

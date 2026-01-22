@@ -4,20 +4,9 @@ import type { PriceRule } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
-async function fetchPriceRules(): Promise<PriceRule[]> {
-  const response = await api.listPriceRules();
-  if (Array.isArray(response)) {
-    return response as PriceRule[];
-  }
-  if (response.data?.rules) {
-    return response.data.rules;
-  }
-  throw new Error(response.message || 'Failed to fetch price rules');
-}
-
 export const usePriceRuleStore = createResourceStore<PriceRule & { id: string }>(
   'price_rule',
-  fetchPriceRules as () => Promise<(PriceRule & { id: string })[]>
+  () => api.listPriceRules() as Promise<(PriceRule & { id: string })[]>
 );
 
 // Convenience hooks

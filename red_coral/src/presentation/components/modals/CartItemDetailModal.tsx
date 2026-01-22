@@ -20,7 +20,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
   const [quantity, setQuantity] = useState(item.quantity);
   const [discount, setDiscount] = useState(item.discount_percent || 0);
   const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; username: string } | undefined>();
-  
+
   // Specification State
   const [specifications, setSpecifications] = useState<EmbeddedSpec[]>([]);
   const [selectedSpecId, setSelectedSpecId] = useState<string | undefined>(item.selected_specification?.id);
@@ -38,50 +38,49 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     const load = async () => {
         setIsLoadingAttributes(true);
         try {
-            const [attrData, productResp] = await Promise.all([
-                api.fetchProductAttributes(String(item.id)),
-                api.getProductFull(String(item.id))
-            ]);
+            // ProductFull contains specs, attributes (with full Attribute data), and tags
+            const productFull = await api.getProductFull(String(item.id));
 
             if (!mounted) return;
 
             // Get specs from product (embedded specs)
-            const specs = productResp.data?.product?.specs || [];
+            const specs = productFull?.specs || [];
             setSpecifications(specs);
 
             // If we have specs but none selected (or current selection invalid), select default
             if (specs.length > 1) {
-                 const currentSpecIdx = specs.findIndex((s, idx) => String(idx) === selectedSpecId);
+                 const currentSpecIdx = specs.findIndex((_s, idx) => String(idx) === selectedSpecId);
                  if (currentSpecIdx < 0) {
                      const defaultIdx = specs.findIndex(s => s.is_default);
                      setSelectedSpecId(String(defaultIdx >= 0 ? defaultIdx : 0));
                  }
             }
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            setAttributes((attrData as any).attributes as unknown as AttributeTemplate[]);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            setBindings((attrData as any).bindings as unknown as ProductAttribute[]);
+            // Extract attributes from ProductFull.attributes (ProductAttributeBinding[])
+            const attrBindings = productFull?.attributes || [];
+
+            // Extract Attribute objects directly (AttributeTemplate = Attribute)
+            const attributeList: AttributeTemplate[] = attrBindings.map(binding => binding.attribute);
+            setAttributes(attributeList);
+
+            // Convert ProductAttributeBinding[] to ProductAttribute[] (HasAttribute relation)
+            const productBindings: ProductAttribute[] = attrBindings.map(binding => ({
+              id: binding.id,
+              from: String(item.id),
+              to: String(binding.attribute.id),
+              is_required: binding.is_required,
+              display_order: binding.display_order,
+              attribute: binding.attribute,
+            }));
+            setBindings(productBindings);
 
             // Process options from attributes array (unified structure)
+            // Options are stored as arrays, the index IS the option ID
             const optionsMap = new Map<string, AttributeOption[]>();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (attrData as any).attributes?.forEach((attr: any) => {
-                if (attr.options) {
-                    optionsMap.set(String(attr.id), attr.options.map((opt: any) => ({
-                        id: opt.id,
-                        uuid: '',
-                        attribute_id: attr.id,
-                        name: opt.name,
-                        value_code: opt.value_code || '',
-                        price_modifier: opt.price_modifier ?? 0,
-                        is_default: opt.is_default ?? false,
-                        display_order: 0,
-                        is_active: opt.is_active ?? true,
-                        receipt_name: opt.receipt_name,
-                        created_at: '',
-                        updated_at: '',
-                    })));
+            attrBindings.forEach(binding => {
+                const attr = binding.attribute;
+                if (attr.options && attr.options.length > 0) {
+                    optionsMap.set(String(attr.id), attr.options);
                 }
             });
             setAllOptions(optionsMap);
@@ -96,34 +95,20 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                 initialSelections.set(attrKey, [...current, String(sel.option_idx)]);
             });
 
-            // 2. If no selection for an attribute (and we have defaults), maybe fill?
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if ((!item.selected_options || item.selected_options.length === 0) && (attrData as any).attributes?.length > 0) {
-                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                 ((attrData as any).attributes as Array<{id: string; defaultOptionIds?: string[]; type?: string}>).forEach((attr) => {
-                     if (!initialSelections.has(attr.id)) {
-                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                         const binding = (attrData as any).bindings?.find((b: any) => b.attributeId === attr.id);
-
-                         let defaultIds: string[] = [];
-
-                         // Priority 1: Product binding defaults
-                         if (binding?.defaultOptionIds && binding.defaultOptionIds.length > 0) {
-                             defaultIds = binding.defaultOptionIds;
-                         }
-
-                         // Priority 2: Attribute defaults
-                         if (defaultIds.length === 0 && attr.defaultOptionIds) {
-                             defaultIds = attr.defaultOptionIds;
-                         }
-
-                         // Single choice constraint
-                         if (attr.type?.startsWith('SINGLE') && defaultIds.length > 1) {
-                             defaultIds = [defaultIds[0]];
-                         }
-
-                         if (defaultIds.length > 0) {
-                             initialSelections.set(attr.id, defaultIds);
+            // 2. If no selection for an attribute (and we have defaults), fill with defaults
+            if ((!item.selected_options || item.selected_options.length === 0) && attributeList.length > 0) {
+                 attributeList.forEach(attr => {
+                     const attrId = String(attr.id);
+                     if (!initialSelections.has(attrId)) {
+                         // Check default from attribute's default_option_idx
+                         if (attr.default_option_idx != null) {
+                             // Single choice constraint
+                             const isMulti = attr.is_multi_select;
+                             if (!isMulti) {
+                                 initialSelections.set(attrId, [String(attr.default_option_idx)]);
+                             } else {
+                                 initialSelections.set(attrId, [String(attr.default_option_idx)]);
+                             }
                          }
                      }
                  });

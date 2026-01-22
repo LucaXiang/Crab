@@ -45,8 +45,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         const loadTables = async () => {
             if (!activeZoneId) return;
             try {
-                const resp = await api.listTables();
-                const tables = resp.data?.tables || [];
+                const tables = await api.listTables();
                 setZoneTables(tables);
             } catch { }
         };
@@ -57,19 +56,19 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
     useEffect(() => {
         if (!zones || zones.length === 0) return;
         if (activeZoneId) return;
-        const sourceOrder = heldOrders.find(o => o.key === sourceTable.id);
+        const sourceOrder = heldOrders.find(o => o.table_id === sourceTable.id);
         const preferZone = sourceOrder?.zone_name ? zones.find(z => z.name === sourceOrder.zone_name) : undefined;
         const nextZoneId = preferZone?.id || zones[0].id;
         if (nextZoneId) setActiveZoneId(nextZoneId);
     }, [zones, heldOrders, sourceTable.id, activeZoneId]);
 
     // Get source order from active store or fallback to prop
-    const sourceOrderSnapshot = useActiveOrdersStore(state => state.orders[sourceTable.id as string]);
-    const sourceOrder = sourceOrderSnapshot ? sourceOrderSnapshot : heldOrders.find(o => o.key === sourceTable.id);
+    const sourceOrderSnapshot = useActiveOrdersStore(state => state.getOrderByTable(sourceTable.id as string));
+    const sourceOrder = sourceOrderSnapshot ? sourceOrderSnapshot : heldOrders.find(o => o.table_id === sourceTable.id);
 
     const hasPayments = useMemo(() => {
         if (!sourceOrder) return false;
-        const hasPaidAmount = (sourceOrder.paid_amount || 0) > 0;
+        const hasPaidAmount = sourceOrder.paid_amount > 0;
         const hasPaidItems = sourceOrder.paid_item_quantities && Object.keys(sourceOrder.paid_item_quantities).length > 0;
         return hasPaidAmount || hasPaidItems;
     }, [sourceOrder]);
@@ -165,7 +164,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         (Object.entries(splitItems) as [string, number][]).forEach(([id, qty]) => {
             const item = sourceOrder.items.find(i => i.id === id);
             if (item) {
-                total += (item.price || 0) * qty;
+                total += item.price * qty;
             }
         });
         return total;
@@ -176,7 +175,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         return zoneTables.filter(table => {
             if (table.id === sourceTable.id) return false; // Don't show self
 
-            const isOccupied = heldOrders.some(o => o.key === table.id);
+            const isOccupied = heldOrders.some(o => o.table_id === table.id);
 
             if (mode === 'MERGE') {
                 return isOccupied;
@@ -217,7 +216,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                                             {item.name}
                                             {paidQty > 0 && <span className="text-xs text-green-600 ml-2 font-medium">({t('checkout.paidQty', { qty: paidQty })})</span>}
                                         </div>
-                                        <div className="text-sm text-gray-500">${(item.price || 0).toFixed(2)}</div>
+                                        <div className="text-sm text-gray-500">${item.price.toFixed(2)}</div>
                                     </div>
 
                                     <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-1 border border-gray-100">
@@ -358,7 +357,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                     ) : (
                         <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
                             {displayedTables.map(table => {
-                                const order = heldOrders.find(o => o.key === table.id);
+                                const order = heldOrders.find(o => o.table_id === table.id);
                                 const isOccupied = !!order;
                                 const isSelected = selectedTargetTable?.id === table.id;
 

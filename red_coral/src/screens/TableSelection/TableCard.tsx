@@ -45,7 +45,7 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
       // Update every minute for accurate time display
       const timer = setInterval(updateTime, 60 * 1000);
       return () => clearInterval(timer);
-    }, [isOccupied, order?.key]);
+    }, [isOccupied, order?.order_id]);
 
     return (
       <button

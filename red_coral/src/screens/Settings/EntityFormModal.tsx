@@ -7,7 +7,6 @@ import {
   useSettingsStore,
 } from '@/core/stores/settings/useSettingsStore';
 import { createTauriClient, invokeApi, ApiError } from '@/infrastructure/api';
-import { invoke } from '@tauri-apps/api/core';
 import { useProductStore, useZones, useCategoryStore } from '@/core/stores/resources';
 import { getErrorMessage } from '@/utils/error';
 
@@ -77,8 +76,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
     if (modal.open && modal.entity === 'PRODUCT' && modal.action === 'EDIT' && modal.data?.id) {
       const loadProductFullData = async () => {
         try {
-          const resp = await api.getProductFull(String(modal.data.id));
-          const productFull = resp.data?.product;
+          const productFull = await api.getProductFull(String(modal.data.id));
           if (!productFull) {
             console.error('Failed to load product full data');
             return;
@@ -135,8 +133,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
     if (modal.open && modal.entity === 'CATEGORY' && modal.action === 'EDIT' && modal.data?.id) {
       const loadCategoryAttributes = async () => {
         try {
-          const resp = await api.listCategoryAttributes(modal.data.id ? String(modal.data.id) : undefined);
-          const catAttrs = resp.data?.category_attributes || [];
+          const catAttrs = await api.listCategoryAttributes(modal.data.id ? String(modal.data.id) : undefined);
           const attributeIds = catAttrs.map((ca: any) => ca.attribute_id);
 
           // Load default options from category attributes
@@ -230,8 +227,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
           await api.deleteZone(String(data.id));
           clearZoneTableCache(); // Invalidate zones cache
           toast.success(t('settings.zone.zoneDeleted'));
-        } catch (e: any) {
-          // Use getErrorMessage to get localized message from error_code
+        } catch (e: unknown) {
+          // Use getErrorMessage to get localized message from numeric error code
           toast.error(getErrorMessage(e));
           return;
         }
@@ -352,7 +349,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
         let productId: string;
         if (action === 'CREATE') {
           // Create product with embedded specs (price is in specs, not on product)
-          const resp = await api.createProduct({
+          const created = await api.createProduct({
             name: productData.name,
             category: String(productData.categoryId),
             image: productData.image,
@@ -372,7 +369,6 @@ export const EntityFormModal: React.FC = React.memo(() => {
               external_id: productData.externalId ?? null,
             }],
           });
-          const created = resp.data?.product;
           productId = created?.id || '';
 
           // Optimistic update: add to resources ProductStore
@@ -436,8 +432,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
         let existingBindings: any[] = [];
         if (action === 'EDIT') {
           try {
-            const resp = await api.fetchProductAttributes(productId);
-            const productAttrs = resp.data?.product_attributes ?? [];
+            const productAttrs = await api.fetchProductAttributes(productId);
             // Transform to expected format
             existingBindings = productAttrs.map((pa: any) => ({
               attributeId: pa.to,
@@ -500,7 +495,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
 
         let categoryId: string;
         if (action === 'CREATE') {
-          const resp = await api.createCategory({
+          const created = await api.createCategory({
             name: categoryName,
             sort_order: formData.sortOrder ?? 0,
             print_destinations: printDestinations,
@@ -509,7 +504,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             tag_ids: tagIds,
             match_mode: matchMode,
           });
-          categoryId = resp.data?.category?.id || '';
+          categoryId = created?.id || '';
           // Trigger refresh of products store
           useProductStore.getState().fetchAll();
           refreshData(); // Trigger UI refresh
@@ -538,8 +533,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
         let existingBindings: any[] = [];
         if (action === 'EDIT') {
           try {
-            const resp = await api.listCategoryAttributes(categoryId);
-            const catAttrs = resp.data?.category_attributes || [];
+            const catAttrs = await api.listCategoryAttributes(categoryId);
             // Transform to expected format for syncAttributeBindings
             existingBindings = catAttrs.map((ca: any) => ({
               attributeId: ca.to,
@@ -595,17 +589,9 @@ export const EntityFormModal: React.FC = React.memo(() => {
       // - Other UPDATE operations: no refresh needed (optimistic update)
       // All operations now use optimistic updates
       closeModal();
-    } catch (e: any) {
-      const msg = String(e);
-      if (msg.includes('CATEGORY_EXISTS')) {
-        toast.error(t("settings.category.message.exists"));
-        return;
-      }
-      if (msg.includes('EXTERNAL_ID_EXISTS')) {
-         toast.error(t('settings.externalIdExists'));
-         return;
-      }
-      toast.error(t('common.label.none'));
+    } catch (e: unknown) {
+      // Use getErrorMessage for localized error display
+      toast.error(getErrorMessage(e));
     }
   };
 
@@ -616,7 +602,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
         filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
       });
       if (!file || Array.isArray(file)) return;
-      const hash = await invoke<string>('save_image', { source_path: file });
+      const hash = await invokeApi<string>('save_image', { source_path: file });
       setFormField('image', hash);
     } catch {
       toast.error(t('common.label.none'));

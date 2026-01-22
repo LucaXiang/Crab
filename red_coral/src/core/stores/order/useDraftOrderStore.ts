@@ -21,22 +21,19 @@ export const useDraftOrderStore = create<DraftOrderState>()(
       },
 
       restoreDraft: (id: string) => {
-        const draft = get().draftOrders.find(d => d.id === id);
+        const draft = get().draftOrders.find(d => d.order_id === id);
         if (draft) {
           set((state) => ({
-            draftOrders: state.draftOrders.filter(d => d.id !== id)
+            draftOrders: state.draftOrders.filter(d => d.order_id !== id)
           }));
-          return draft.items.map(i => ({
-            ...i,
-            instance_id: i.instance_id || `restored-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-          }));
+          return draft.items;
         }
         return [];
       },
 
       deleteDraft: (id: string) => {
         set((state) => ({
-          draftOrders: state.draftOrders.filter(d => d.id !== id)
+          draftOrders: state.draftOrders.filter(d => d.order_id !== id)
         }));
       }
     }),

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createTauriClient } from '@/infrastructure/api';
-import type { PrintDestination, PrintDestinationCreate, PrintDestinationUpdate, PrintDestinationListData } from '@/core/domain/types/api';
+import type { PrintDestination, PrintDestinationCreate, PrintDestinationUpdate } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
@@ -40,19 +40,13 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
 
   // Core actions
   fetchAll: async (force = false) => {
-    // Guard: skip if already loading, or already loaded (unless forced)
     const state = get();
     if (state.isLoading) return;
     if (state.isLoaded && !force) return;
 
     set({ isLoading: true, error: null });
     try {
-      const response = await api.listPrintDestinations();
-      // Handle both formats: direct array or { data: { destinations: [...] } }
-      const destinations = Array.isArray(response)
-        ? (response as PrintDestinationEntity[])
-        : ((response.data?.destinations || []) as PrintDestinationEntity[]);
-      // Sort by name
+      const destinations = await api.listPrintDestinations() as PrintDestinationEntity[];
       destinations.sort((a, b) => a.name.localeCompare(b.name));
       set({ items: destinations, isLoading: false, isLoaded: true });
     } catch (e: unknown) {
@@ -64,7 +58,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
 
   applySync: () => {
     if (get().isLoaded) {
-      get().fetchAll(true);  // Force refresh on sync
+      get().fetchAll(true);
     }
   },
 
@@ -76,9 +70,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
   create: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.createPrintDestination(data);
-      const newDestination = response.data?.destination as PrintDestinationEntity;
-      // Refresh to get latest data
+      const newDestination = await api.createPrintDestination(data) as PrintDestinationEntity;
       await get().fetchAll(true);
       return newDestination || get().items[get().items.length - 1];
     } catch (e: unknown) {
@@ -93,7 +85,6 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
     set({ isLoading: true, error: null });
     try {
       await api.updatePrintDestination(id, data);
-      // Refresh to get latest data
       await get().fetchAll(true);
       const updated = get().items.find((p) => p.id === id);
       return updated!;

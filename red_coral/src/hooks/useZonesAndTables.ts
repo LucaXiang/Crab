@@ -80,8 +80,7 @@ export const useZoneTableStore = create<ZoneTableStore>((set, get) => ({
     set({ isLoadingZones: true, error: null });
 
     try {
-      const resp = await api.listZones();
-      const zones = resp.data?.zones || [];
+      const zones = await api.listZones();
 
       // Store in cache
       if (CACHE_CONFIG.ENABLE_CACHE) {
@@ -121,8 +120,7 @@ export const useZoneTableStore = create<ZoneTableStore>((set, get) => ({
     set({ isLoadingTables: true, error: null });
 
     try {
-      const tsResp = await api.listTables();
-      const tables = tsResp.data?.tables || [];
+      const tables = await api.listTables();
 
       // Store in cache
       if (CACHE_CONFIG.ENABLE_CACHE) {

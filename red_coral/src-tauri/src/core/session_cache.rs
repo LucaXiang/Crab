@@ -167,7 +167,10 @@ impl SessionCache {
         username: &str,
         password: &str,
     ) -> Result<EmployeeSession, SessionCacheError> {
-        let cached = self.data.employees.get(username)
+        let cached = self
+            .data
+            .employees
+            .get(username)
             .ok_or_else(|| SessionCacheError::EmployeeNotFound(username.to_string()))?;
 
         // 验证密码
@@ -231,12 +234,16 @@ impl SessionCache {
 
     /// 保存当前活动会话 (用于刷新后恢复登录状态)
     pub fn save_current_session(&self, session: &EmployeeSession) -> Result<(), SessionCacheError> {
-        let path = self.file_path.parent()
+        let path = self
+            .file_path
+            .parent()
             .map(|p| p.join("current_session.json"))
-            .ok_or_else(|| SessionCacheError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Invalid session cache path"
-            )))?;
+            .ok_or_else(|| {
+                SessionCacheError::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "Invalid session cache path",
+                ))
+            })?;
 
         let content = serde_json::to_string_pretty(session)?;
         std::fs::write(&path, content)?;
@@ -246,12 +253,16 @@ impl SessionCache {
 
     /// 加载当前活动会话
     pub fn load_current_session(&self) -> Result<Option<EmployeeSession>, SessionCacheError> {
-        let path = self.file_path.parent()
+        let path = self
+            .file_path
+            .parent()
             .map(|p| p.join("current_session.json"))
-            .ok_or_else(|| SessionCacheError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Invalid session cache path"
-            )))?;
+            .ok_or_else(|| {
+                SessionCacheError::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "Invalid session cache path",
+                ))
+            })?;
 
         if !path.exists() {
             return Ok(None);
@@ -281,12 +292,16 @@ impl SessionCache {
 
     /// 清除当前活动会话
     pub fn clear_current_session(&self) -> Result<(), SessionCacheError> {
-        let path = self.file_path.parent()
+        let path = self
+            .file_path
+            .parent()
             .map(|p| p.join("current_session.json"))
-            .ok_or_else(|| SessionCacheError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Invalid session cache path"
-            )))?;
+            .ok_or_else(|| {
+                SessionCacheError::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "Invalid session cache path",
+                ))
+            })?;
 
         if path.exists() {
             std::fs::remove_file(&path)?;

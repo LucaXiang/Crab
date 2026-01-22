@@ -28,7 +28,10 @@ pub async fn order_execute_command(
     let bridge = bridge.read().await;
     match bridge.execute_order_command(command).await {
         Ok(response) => Ok(ApiResponse::success(response)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -46,7 +49,10 @@ pub async fn order_execute(
     let command = OrderCommand::new(operator_id, operator_name, payload);
     match bridge.execute_order_command(command).await {
         Ok(response) => Ok(ApiResponse::success(response)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -62,7 +68,10 @@ pub async fn order_get_active_orders(
     let bridge = bridge.read().await;
     match bridge.get_active_orders().await {
         Ok(snapshots) => Ok(ApiResponse::success(OrderSnapshotListData { snapshots })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -75,7 +84,10 @@ pub async fn order_get_snapshot(
     let bridge = bridge.read().await;
     match bridge.get_order_snapshot(&order_id).await {
         Ok(snapshot) => Ok(ApiResponse::success(snapshot)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::OrderNotFound, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::OrderNotFound,
+            e.to_string(),
+        )),
     }
 }
 
@@ -92,7 +104,10 @@ pub async fn order_sync_since(
     let bridge = bridge.read().await;
     match bridge.sync_orders_since(since_sequence).await {
         Ok(response) => Ok(ApiResponse::success(response)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -107,7 +122,10 @@ pub async fn order_get_events_since(
     let bridge = bridge.read().await;
     match bridge.get_active_events_since(since_sequence).await {
         Ok(events) => Ok(ApiResponse::success(OrderEventListData { events })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -122,6 +140,9 @@ pub async fn order_get_events_for_order(
     let bridge = bridge.read().await;
     match bridge.get_events_for_order(&order_id).await {
         Ok(events) => Ok(ApiResponse::success(OrderEventListData { events })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }

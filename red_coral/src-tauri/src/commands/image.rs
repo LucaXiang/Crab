@@ -24,9 +24,7 @@ const MAX_FILE_SIZE: usize = 5 * 1024 * 1024;
 const JPEG_QUALITY: u8 = 85;
 
 /// 内部辅助: 获取当前模式的图片访问上下文
-async fn get_image_context(
-    bridge: &ClientBridge,
-) -> Result<ImageContext, String> {
+async fn get_image_context(bridge: &ClientBridge) -> Result<ImageContext, String> {
     let mode_info = bridge.get_mode_info().await;
     let tenant_manager = bridge.tenant_manager().read().await;
 
@@ -85,14 +83,20 @@ pub async fn get_image_path(
     let ctx = get_image_context(&bridge).await?;
 
     match ctx {
-        ImageContext::Server { tenant_path, work_dir } => {
+        ImageContext::Server {
+            tenant_path,
+            work_dir,
+        } => {
             let image_cache = ImageCacheService::new(&tenant_path);
             image_cache
                 .get_server_image_path(&hash, &work_dir)
                 .map(|p| p.to_string_lossy().to_string())
                 .map_err(|e| e.to_string())
         }
-        ImageContext::Client { tenant_path, download_ctx } => {
+        ImageContext::Client {
+            tenant_path,
+            download_ctx,
+        } => {
             let image_cache = ImageCacheService::new(&tenant_path);
             image_cache
                 .get_client_image_path(&hash, &download_ctx)
@@ -120,11 +124,17 @@ pub async fn resolve_image_paths(
     let ctx = get_image_context(&bridge).await?;
 
     match ctx {
-        ImageContext::Server { tenant_path, work_dir } => {
+        ImageContext::Server {
+            tenant_path,
+            work_dir,
+        } => {
             let image_cache = ImageCacheService::new(&tenant_path);
             Ok(image_cache.resolve_server_image_paths(&hashes, &work_dir))
         }
-        ImageContext::Client { tenant_path, download_ctx } => {
+        ImageContext::Client {
+            tenant_path,
+            download_ctx,
+        } => {
             let image_cache = ImageCacheService::new(&tenant_path);
             Ok(image_cache
                 .resolve_client_image_paths(&hashes, &download_ctx)
@@ -155,7 +165,10 @@ pub async fn prefetch_images(
                 already_cached: hashes.len() as u32,
             })
         }
-        ImageContext::Client { tenant_path, download_ctx } => {
+        ImageContext::Client {
+            tenant_path,
+            download_ctx,
+        } => {
             let image_cache = ImageCacheService::new(&tenant_path);
             image_cache
                 .prefetch_images(&hashes, &download_ctx)
@@ -264,8 +277,7 @@ pub async fn save_image(
 /// Server 模式：本地处理并保存图片
 async fn save_image_server(data: &[u8], work_dir: &PathBuf) -> Result<String, String> {
     // 1. 加载并验证图片
-    let img = image::load_from_memory(data)
-        .map_err(|e| format!("Invalid image: {}", e))?;
+    let img = image::load_from_memory(data).map_err(|e| format!("Invalid image: {}", e))?;
 
     // 2. 压缩为 JPEG
     let mut buffer = Vec::new();

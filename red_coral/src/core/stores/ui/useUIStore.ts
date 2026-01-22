@@ -51,7 +51,7 @@ export const useUIStore = create<UIStore>((set) => ({
   showDebugMenu: false,
   showTableScreen: false,
   showDraftModal: false,
-  receiptPrinter: (typeof window !== 'undefined' && typeof localStorage?.getItem === 'function' ? (localStorage.getItem('printer_receipt') || localStorage.getItem('printerName')) : null) || null,
+  receiptPrinter: (typeof window !== 'undefined' && typeof localStorage?.getItem === 'function' ? localStorage.getItem('printer_receipt') : null) || null,
   kitchenPrinter: (typeof window !== 'undefined' && typeof localStorage?.getItem === 'function' ? localStorage.getItem('printer_kitchen') : null) || null,
   isKitchenPrintEnabled: (typeof window !== 'undefined' && typeof localStorage?.getItem === 'function' ? localStorage.getItem('kitchen_print_enabled') !== 'false' : true),
   labelPrinter: (typeof window !== 'undefined' && typeof localStorage?.getItem === 'function' ? localStorage.getItem('printer_label') : null) || null,
@@ -74,10 +74,8 @@ export const useUIStore = create<UIStore>((set) => ({
     if (typeof window !== 'undefined') {
       if (name) {
         localStorage.setItem('printer_receipt', name);
-        localStorage.setItem('printerName', name); // Keep legacy sync for safety
       } else {
         localStorage.removeItem('printer_receipt');
-        localStorage.removeItem('printerName');
       }
     }
     set({ receiptPrinter: name });
@@ -178,7 +176,6 @@ export const useUIActions = () => useUIStore(
     setShowDebugMenu: state.setShowDebugMenu,
     setShowTableScreen: state.setShowTableScreen,
     setShowDraftModal: state.setShowDraftModal,
-    setSelectedPrinter: state.setReceiptPrinter, // Deprecated alias
     setReceiptPrinter: state.setReceiptPrinter,
     setKitchenPrinter: state.setKitchenPrinter,
     setIsKitchenPrintEnabled: state.setIsKitchenPrintEnabled,

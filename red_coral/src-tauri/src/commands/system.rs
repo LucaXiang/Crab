@@ -40,7 +40,10 @@ pub async fn get_system_state(
     let bridge = bridge.read().await;
     match bridge.get("/api/system-state").await {
         Ok(state) => Ok(ApiResponse::success(state)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -52,7 +55,10 @@ pub async fn update_system_state(
     let bridge = bridge.read().await;
     match bridge.put("/api/system-state", &data).await {
         Ok(state) => Ok(ApiResponse::success(state)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -64,7 +70,10 @@ pub async fn init_genesis(
     let bridge = bridge.read().await;
     match bridge.post("/api/system-state/genesis", &data).await {
         Ok(state) => Ok(ApiResponse::success(state)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -76,7 +85,10 @@ pub async fn update_last_order(
     let bridge = bridge.read().await;
     match bridge.put("/api/system-state/last-order", &data).await {
         Ok(state) => Ok(ApiResponse::success(state)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -88,7 +100,10 @@ pub async fn update_sync_state(
     let bridge = bridge.read().await;
     match bridge.put("/api/system-state/sync-state", &data).await {
         Ok(state) => Ok(ApiResponse::success(state)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -102,7 +117,10 @@ pub async fn get_pending_sync_orders(
         .await
     {
         Ok(orders) => Ok(ApiResponse::success(OrderListData { orders })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -115,7 +133,10 @@ pub async fn list_employees(
     let bridge = bridge.read().await;
     match bridge.get::<Vec<EmployeeResponse>>("/api/employees").await {
         Ok(employees) => Ok(ApiResponse::success(EmployeeListData { employees })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -129,7 +150,10 @@ pub async fn list_all_employees(
         .await
     {
         Ok(employees) => Ok(ApiResponse::success(EmployeeListData { employees })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -141,7 +165,10 @@ pub async fn get_employee(
     let bridge = bridge.read().await;
     match bridge.get(&format!("/api/employees/{}", encode(&id))).await {
         Ok(employee) => Ok(ApiResponse::success(employee)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::EmployeeNotFound, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::EmployeeNotFound,
+            e.to_string(),
+        )),
     }
 }
 
@@ -153,7 +180,10 @@ pub async fn create_employee(
     let bridge = bridge.read().await;
     match bridge.post("/api/employees", &data).await {
         Ok(employee) => Ok(ApiResponse::success(employee)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -169,7 +199,10 @@ pub async fn update_employee(
         .await
     {
         Ok(employee) => Ok(ApiResponse::success(employee)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -184,7 +217,10 @@ pub async fn delete_employee(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -197,7 +233,10 @@ pub async fn list_price_rules(
     let bridge = bridge.read().await;
     match bridge.get::<Vec<PriceRule>>("/api/price-rules").await {
         Ok(rules) => Ok(ApiResponse::success(PriceRuleListData { rules })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -211,7 +250,10 @@ pub async fn list_active_price_rules(
         .await
     {
         Ok(rules) => Ok(ApiResponse::success(PriceRuleListData { rules })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -226,7 +268,10 @@ pub async fn get_price_rule(
         .await
     {
         Ok(rule) => Ok(ApiResponse::success(rule)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::NotFound, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::NotFound,
+            e.to_string(),
+        )),
     }
 }
 
@@ -238,7 +283,10 @@ pub async fn create_price_rule(
     let bridge = bridge.read().await;
     match bridge.post("/api/price-rules", &data).await {
         Ok(rule) => Ok(ApiResponse::success(rule)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -254,7 +302,10 @@ pub async fn update_price_rule(
         .await
     {
         Ok(rule) => Ok(ApiResponse::success(rule)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -269,7 +320,10 @@ pub async fn delete_price_rule(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -282,7 +336,10 @@ pub async fn list_roles(
     let bridge = bridge.read().await;
     match bridge.get::<Vec<Role>>("/api/roles").await {
         Ok(roles) => Ok(ApiResponse::success(RoleListData { roles })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -294,7 +351,10 @@ pub async fn get_role(
     let bridge = bridge.read().await;
     match bridge.get(&format!("/api/roles/{}", encode(&id))).await {
         Ok(role) => Ok(ApiResponse::success(role)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::RoleNotFound, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::RoleNotFound,
+            e.to_string(),
+        )),
     }
 }
 
@@ -306,7 +366,10 @@ pub async fn create_role(
     let bridge = bridge.read().await;
     match bridge.post("/api/roles", &data).await {
         Ok(role) => Ok(ApiResponse::success(role)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -322,7 +385,10 @@ pub async fn update_role(
         .await
     {
         Ok(role) => Ok(ApiResponse::success(role)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -337,7 +403,10 @@ pub async fn delete_role(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -352,7 +421,10 @@ pub async fn get_role_permissions(
         .await
     {
         Ok(permissions) => Ok(ApiResponse::success(RolePermissionListData { permissions })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -363,7 +435,10 @@ pub async fn get_all_permissions(
     let bridge = bridge.read().await;
     match bridge.get::<Vec<String>>("/api/permissions").await {
         Ok(permissions) => Ok(ApiResponse::success(permissions)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -382,6 +457,9 @@ pub async fn update_role_permissions(
         .await
     {
         Ok(_) => Ok(ApiResponse::success(())),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }

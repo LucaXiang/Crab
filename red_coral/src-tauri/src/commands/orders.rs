@@ -53,7 +53,10 @@ pub async fn fetch_order_list(
                 page: params.page,
             }))
         }
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -71,7 +74,10 @@ pub async fn list_orders(
         .await
     {
         Ok(orders) => Ok(ApiResponse::success(OrderListData { orders })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -82,7 +88,10 @@ pub async fn list_open_orders(
     let bridge = bridge.read().await;
     match bridge.get::<Vec<Order>>("/api/orders/open").await {
         Ok(orders) => Ok(ApiResponse::success(OrderListData { orders })),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -97,7 +106,10 @@ pub async fn get_order(
         .await
     {
         Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::OrderNotFound, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::OrderNotFound,
+            e.to_string(),
+        )),
     }
 }
 
@@ -112,7 +124,10 @@ pub async fn get_order_by_receipt(
         .await
     {
         Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::OrderNotFound, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::OrderNotFound,
+            e.to_string(),
+        )),
     }
 }
 
@@ -123,7 +138,10 @@ pub async fn get_last_order(
     let bridge = bridge.read().await;
     match bridge.get::<Option<Order>>("/api/orders/last").await {
         Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
 
@@ -139,7 +157,9 @@ pub async fn verify_order_chain(
     };
     match bridge.get::<bool>(&query).await {
         Ok(valid) => Ok(ApiResponse::success(valid)),
-        Err(e) => Ok(ApiResponse::error_with_code(ErrorCode::DatabaseError, e.to_string())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
     }
 }
-

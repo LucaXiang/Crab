@@ -42,7 +42,7 @@ export const DraftListModal = React.memo<DraftListModalProps>(({
           ) : (
             draftOrders.map(draft => (
               <div
-                key={draft.id}
+                key={draft.order_id}
                 className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow"
               >
                 <div className="flex-1">
@@ -67,17 +67,17 @@ export const DraftListModal = React.memo<DraftListModalProps>(({
                     permission={PermissionValues.RESTORE_ORDER}
                     mode="intercept"
                     description={t('draft.action.restore')}
-                    onAuthorized={() => draft.id && onRestore(draft.id)}
+                    onAuthorized={() => draft.order_id && onRestore(draft.order_id)}
                   >
                     <button
-                      onClick={() => draft.id && onRestore(draft.id)}
+                      onClick={() => draft.order_id && onRestore(draft.order_id)}
                       className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg font-bold hover:bg-blue-100 transition-colors flex items-center gap-1 text-sm"
                     >
                       <RotateCcw size={16} /> {t('draft.action.restore')}
                     </button>
                   </EscalatableGate>
                   <button
-                    onClick={() => draft.id && onDelete(draft.id)}
+                    onClick={() => draft.order_id && onDelete(draft.order_id)}
                     className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     <Trash2 size={18} />

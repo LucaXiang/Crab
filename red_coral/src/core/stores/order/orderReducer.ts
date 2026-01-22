@@ -92,18 +92,6 @@ function simpleHash(seed: bigint, value: bigint): bigint {
 }
 
 /**
- * Verify that a snapshot's checksum matches its computed value
- * @returns true if checksum is valid or not present, false if drift detected
- */
-export function verifyChecksum(snapshot: OrderSnapshot): boolean {
-  if (!snapshot.state_checksum) {
-    // No checksum to verify - assume valid
-    return true;
-  }
-  return snapshot.state_checksum === computeChecksum(snapshot);
-}
-
-/**
  * Create an empty order snapshot with default values
  */
 export function createEmptySnapshot(orderId: string): OrderSnapshot {

@@ -1,56 +1,56 @@
 /**
- * Print Service
- * Provides receipt and label printing functionality
+ * Print Service - Re-exports from printService
  */
 
-import { invoke } from '@tauri-apps/api/core';
-import type { LabelTemplate } from '@/core/domain/types/print';
+import type { LabelTemplate, LabelField } from '@/core/domain/types/print';
+
+export { printService, printService as default } from './printService';
+export type { PrintService } from './printService';
+
+// Re-export commonly used functions
+export {
+  printReceipt,
+  reprintReceipt,
+  printKitchenTicket,
+  openCashDrawer,
+  listPrinters,
+} from './printService';
 
 /**
- * Print a receipt
+ * Convert a LabelField from camelCase to snake_case for Rust backend
  */
-export async function printReceipt(orderId: string): Promise<void> {
-  return invoke('print_receipt', { orderId });
+function convertFieldToRust(field: LabelField): Record<string, unknown> {
+  return {
+    id: field.id,
+    name: field.name,
+    field_type: field.type,
+    x: field.x,
+    y: field.y,
+    width: field.width,
+    height: field.height,
+    font_size: field.fontSize,
+    font_weight: field.fontWeight,
+    font_family: field.fontFamily,
+    color: field.color,
+    rotate: field.rotate,
+    alignment: field.alignment,
+    data_source: field.dataSource,
+    format: field.format,
+    visible: field.visible,
+    label: field.label,
+    template: field.template,
+    data_key: field.dataKey,
+    source_type: field.sourceType,
+    maintain_aspect_ratio: field.maintainAspectRatio,
+    style: field.style,
+    align: field.align,
+    vertical_align: field.verticalAlign,
+    line_style: field.lineStyle,
+  };
 }
 
 /**
- * Reprint a receipt
- */
-export async function reprintReceipt(orderId: string): Promise<void> {
-  return invoke('reprint_receipt', { orderId });
-}
-
-/**
- * Open cash drawer
- */
-export async function openCashDrawer(): Promise<void> {
-  return invoke('open_cash_drawer');
-}
-
-/**
- * Print kitchen ticket
- */
-export async function printKitchenTicket(orderId: string): Promise<void> {
-  return invoke('print_kitchen_ticket', { orderId });
-}
-
-/**
- * List available printers
- */
-export async function listPrinters(): Promise<Array<{ name: string; type: string }>> {
-  return invoke('list_printers');
-}
-
-/**
- * Print item label
- */
-export async function printItemLabel(itemId: string, templateId?: string): Promise<void> {
-  return invoke('print_item_label', { itemId, templateId });
-}
-
-/**
- * Convert label template to Rust format
- * Converts camelCase to snake_case for backend compatibility
+ * Convert a LabelTemplate from camelCase to snake_case for Rust backend
  */
 export function convertTemplateToRust(template: LabelTemplate): Record<string, unknown> {
   return {
@@ -60,25 +60,16 @@ export function convertTemplateToRust(template: LabelTemplate): Record<string, u
     width: template.width,
     height: template.height,
     padding: template.padding,
-    fields: template.fields.map(field => ({
-      id: field.id,
-      name: field.name,
-      type: field.type,
-      x: field.x,
-      y: field.y,
-      width: field.width,
-      height: field.height,
-      font_size: field.fontSize,
-      font_weight: field.fontWeight,
-      font_family: field.fontFamily,
-      color: field.color,
-      rotate: field.rotate,
-      alignment: field.alignment,
-      data_source: field.dataSource,
-      format: field.format,
-      visible: field.visible,
-    })),
+    fields: template.fields.map(convertFieldToRust),
     is_default: template.isDefault,
     is_active: template.isActive,
+    created_at: template.createdAt,
+    updated_at: template.updatedAt,
+    width_mm: template.widthMm,
+    height_mm: template.heightMm,
+    padding_mm_x: template.paddingMmX,
+    padding_mm_y: template.paddingMmY,
+    render_dpi: template.renderDpi,
+    test_data: template.testData,
   };
 }

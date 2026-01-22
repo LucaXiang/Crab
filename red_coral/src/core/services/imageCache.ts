@@ -6,8 +6,8 @@
  * - 自动处理 hash 到路径的转换
  */
 
-import { invoke } from '@tauri-apps/api/core';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api/tauri-client';
 
 // 内存缓存: hash -> base64 data URL
 const cache = new Map<string, string>();
@@ -98,7 +98,7 @@ async function loadImage(imageRef: string): Promise<string> {
 
     if (isHash(imageRef)) {
       // hash -> 调用 Tauri 获取完整路径
-      filePath = await invoke<string>('get_image_path', { hash: imageRef });
+      filePath = await invokeApi<string>('get_image_path', { hash: imageRef });
     } else {
       // 已经是完整路径
       filePath = imageRef;

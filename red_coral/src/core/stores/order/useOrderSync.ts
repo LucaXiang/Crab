@@ -18,7 +18,6 @@
  */
 
 import { useCallback, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { invokeApi } from '@/infrastructure/api';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { useActiveOrdersStore } from './useActiveOrdersStore';
@@ -31,11 +30,32 @@ import type { SyncResponse, OrderEvent } from '@/core/domain/types/orderEvent';
 /** Maximum event gap before requiring full sync */
 const MAX_EVENT_GAP = 1000;
 
-/** Reconnection retry delay (ms) */
-const RECONNECT_DELAY = 3000;
+/** Exponential backoff configuration */
+const BACKOFF_BASE_DELAY = 1000;     // Start with 1 second
+const BACKOFF_MULTIPLIER = 1.5;      // Multiply by 1.5 each attempt
+const BACKOFF_MAX_DELAY = 30000;     // Cap at 30 seconds
+const BACKOFF_JITTER = 0.1;          // Add 10% random jitter
 
 /** Maximum reconnection attempts */
-const MAX_RECONNECT_ATTEMPTS = 5;
+const MAX_RECONNECT_ATTEMPTS = 10;   // Increased due to exponential backoff
+
+/**
+ * Calculate exponential backoff delay with jitter
+ * @param attempt - Current attempt number (0-indexed)
+ * @returns Delay in milliseconds
+ */
+function calculateBackoffDelay(attempt: number): number {
+  // Calculate base exponential delay: base * multiplier^attempt
+  const exponentialDelay = BACKOFF_BASE_DELAY * Math.pow(BACKOFF_MULTIPLIER, attempt);
+
+  // Cap at max delay
+  const cappedDelay = Math.min(exponentialDelay, BACKOFF_MAX_DELAY);
+
+  // Add jitter (±10%) to prevent thundering herd
+  const jitter = cappedDelay * BACKOFF_JITTER * (Math.random() * 2 - 1);
+
+  return Math.round(cappedDelay + jitter);
+}
 
 // ============================================================================
 // Hook Implementation
@@ -133,7 +153,9 @@ export function useOrderSync() {
   }, [syncOrders]);
 
   /**
-   * Attempt reconnection with retry logic
+   * Attempt reconnection with exponential backoff retry logic
+   *
+   * Backoff sequence (with jitter): ~1s, ~1.5s, ~2.25s, ~3.4s, ~5s, ~7.6s, ~11s, ~17s, ~26s, ~30s (capped)
    */
   const reconnectWithRetry = useCallback(async (): Promise<boolean> => {
     let attempts = 0;
@@ -144,12 +166,14 @@ export function useOrderSync() {
 
       attempts++;
       if (attempts < MAX_RECONNECT_ATTEMPTS) {
-        // Wait before retry
-        await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY));
+        // Calculate exponential backoff delay
+        const delay = calculateBackoffDelay(attempts - 1);
+        console.log(`[Sync] Reconnect attempt ${attempts}/${MAX_RECONNECT_ATTEMPTS} failed, retrying in ${delay}ms`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
-    console.error(`Failed to reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts`);
+    console.error(`[Sync] Failed to reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts`);
     return false;
   }, [reconnect]);
 
@@ -263,7 +287,7 @@ export async function setupOrderEventListeners(): Promise<() => void> {
       _setConnectionState('syncing');
 
       try {
-        const response = await invoke<SyncResponse>('order_sync_since', {
+        const response = await invokeApi<SyncResponse>('order_sync_since', {
           since_sequence: lastSequence,
         });
 

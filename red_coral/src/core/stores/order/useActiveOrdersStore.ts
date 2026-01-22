@@ -24,7 +24,7 @@ import type {
   OrderEvent,
   OrderConnectionState,
 } from '@/core/domain/types/orderEvent';
-import { applyEvent, createEmptySnapshot, verifyChecksum, computeChecksum } from './orderReducer';
+import { applyEvent, createEmptySnapshot } from './orderReducer';
 
 // ============================================================================
 // Store Interface
@@ -80,9 +80,17 @@ interface ActiveOrdersActions {
 
   /**
    * Apply a single event to update state
-   * Called when receiving 'order-event' from Tauri
+   * Called when receiving 'order-event' from Tauri (Server Mode local)
    */
   _applyEvent: (event: OrderEvent) => void;
+
+  /**
+   * Apply order sync (Server Authority Model)
+   * Called when receiving 'order_sync' from MessageBus
+   * - event: 追加到时间线 (用于 UI)
+   * - snapshot: 替换状态 (服务端权威，无本地计算)
+   */
+  _applyOrderSync: (event: OrderEvent, snapshot: OrderSnapshot) => void;
 
   /**
    * Apply multiple events in sequence
@@ -115,28 +123,6 @@ interface ActiveOrdersActions {
    * Reset store to initial state (for logout/tenant switch)
    */
   _reset: () => void;
-
-  // ==================== Drift Detection ====================
-
-  /**
-   * Verify that all local snapshots have valid checksums
-   * Returns list of order IDs with checksum mismatches
-   * Called periodically or after applying multiple events
-   */
-  _detectLocalDrift: () => string[];
-
-  /**
-   * Compare local checksum with server-provided checksum
-   * Returns true if checksums match, false if drift detected
-   * Use this when receiving a snapshot from server to verify reducer consistency
-   */
-  _verifyServerChecksum: (orderId: string, serverChecksum: string) => boolean;
-
-  /**
-   * Get orders that need full sync due to checksum mismatch
-   * Returns list of order IDs where local checksum differs from stored server checksum
-   */
-  _getDriftedOrders: () => string[];
 }
 
 type ActiveOrdersStore = ActiveOrdersState & ActiveOrdersActions;
@@ -233,6 +219,39 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
     });
   },
 
+  _applyOrderSync: (event: OrderEvent, snapshot: OrderSnapshot) => {
+    set((state) => {
+      // Gap 检测：如果 sequence 跳跃超过 1，说明丢失了消息
+      const expectedSequence = state.lastSequence + 1;
+      if (event.sequence > expectedSequence) {
+        console.warn(
+          `[OrderSync] Sequence gap detected: expected ${expectedSequence}, got ${event.sequence}. ` +
+          `Missed ${event.sequence - expectedSequence} events. Triggering full sync...`
+        );
+        // 标记需要全量同步（设置 syncing 状态，让 useOrderSync 检测并触发）
+        // 注意：这里不直接调用 sync，因为我们在 set() 回调中
+        setTimeout(() => {
+          const syncState = useActiveOrdersStore.getState();
+          if (syncState.connectionState === 'connected') {
+            syncState._setConnectionState('syncing');
+            // 触发全量同步（通过 custom event）
+            window.dispatchEvent(new CustomEvent('order-sync-gap-detected'));
+          }
+        }, 0);
+      }
+
+      // 服务端权威：直接替换快照，无需本地计算
+      const orders = new Map(state.orders);
+      orders.set(snapshot.order_id, snapshot);
+
+      return {
+        ...state,
+        orders,
+        lastSequence: Math.max(state.lastSequence, snapshot.last_sequence),
+      };
+    });
+  },
+
   _applyEvents: (events: OrderEvent[]) => {
     if (events.length === 0) return;
 
@@ -296,64 +315,6 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
 
   _reset: () => {
     set(initialState);
-  },
-
-  // ==================== Drift Detection ====================
-
-  _detectLocalDrift: () => {
-    const orders = get().orders;
-    const driftedOrders: string[] = [];
-
-    for (const [orderId, snapshot] of orders) {
-      // Compute current checksum and compare with stored
-      const currentChecksum = computeChecksum(snapshot);
-      if (snapshot.state_checksum && snapshot.state_checksum !== currentChecksum) {
-        console.warn(
-          `[DriftDetection] Local checksum mismatch for order ${orderId}: ` +
-            `stored=${snapshot.state_checksum}, computed=${currentChecksum}`
-        );
-        driftedOrders.push(orderId);
-      }
-    }
-
-    return driftedOrders;
-  },
-
-  _verifyServerChecksum: (orderId: string, serverChecksum: string) => {
-    const snapshot = get().orders.get(orderId);
-    if (!snapshot) {
-      // Order doesn't exist locally - need sync
-      return false;
-    }
-
-    const localChecksum = computeChecksum(snapshot);
-    const match = localChecksum === serverChecksum;
-
-    if (!match) {
-      console.warn(
-        `[DriftDetection] Server checksum mismatch for order ${orderId}: ` +
-          `local=${localChecksum}, server=${serverChecksum}`
-      );
-    }
-
-    return match;
-  },
-
-  _getDriftedOrders: () => {
-    const orders = get().orders;
-    const drifted: string[] = [];
-
-    for (const [orderId, snapshot] of orders) {
-      // If order has a server checksum but local computation differs
-      if (snapshot.state_checksum) {
-        const localChecksum = computeChecksum(snapshot);
-        if (localChecksum !== snapshot.state_checksum) {
-          drifted.push(orderId);
-        }
-      }
-    }
-
-    return drifted;
   },
 }));
 
@@ -446,10 +407,30 @@ export const useOrderStoreInternal = () =>
   useActiveOrdersStore(
     useShallow((state) => ({
       _applyEvent: state._applyEvent,
+      _applyOrderSync: state._applyOrderSync,
       _applyEvents: state._applyEvents,
       _fullSync: state._fullSync,
       _setConnectionState: state._setConnectionState,
       _setInitialized: state._setInitialized,
       _reset: state._reset,
     }))
+  );
+
+// ============================================================================
+// Legacy Selectors (for backwards compatibility)
+// ============================================================================
+
+/**
+ * Alias for useActiveOrders - returns all held (active) orders
+ */
+export const useHeldOrders = () => {
+  return useActiveOrdersStore(useShallow((state) => state.getActiveOrders()));
+};
+
+/**
+ * Count of non-retail held orders
+ */
+export const useHeldOrdersCount = () =>
+  useActiveOrdersStore((state) =>
+    state.getActiveOrders().filter((o) => o.is_retail !== true).length
   );

@@ -13,10 +13,8 @@ interface GuestInputPanelProps {
   selectedTable: Table;
   isOccupied: boolean;
   guestInput: string;
-  enableIndividualMode: boolean;
   cart: CartItem[];
   onGuestInputChange: (value: string) => void;
-  onIndividualModeToggle: () => void;
   onConfirm: () => void;
   onBack: () => void;
   onManage?: () => void;

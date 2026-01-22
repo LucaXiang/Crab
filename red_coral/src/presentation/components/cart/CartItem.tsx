@@ -30,7 +30,7 @@ export const CartItem = React.memo<CartItemProps>(({
     e.stopPropagation();
     const newQty = item.quantity + delta;
     if (newQty >= 1) {
-      onQuantityChange(item.instance_id || item.id, delta);
+      onQuantityChange(item.instance_id, delta);
     }
   };
 

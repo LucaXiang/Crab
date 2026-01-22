@@ -7,7 +7,6 @@ export interface TableSelectionScreenProps {
   onSelectTable: (
     table: Table,
     guestCount: number,
-    enableIndividualMode?: boolean,
     zone?: Zone
   ) => void;
   onClose: () => void;

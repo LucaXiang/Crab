@@ -144,8 +144,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const resp = await api.listProducts();
-      const allProducts = resp.data?.products || [];
+      const allProducts = await api.listProducts();
       // Filter by category locally
       const filteredProducts = allProducts.filter(p => p.category === category);
       setProducts(filteredProducts);

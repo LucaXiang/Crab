@@ -9,8 +9,7 @@ import {
 function calculateUnpaidItems(items: CartItem[], paidQuantities?: Record<string, number>): CartItem[] {
   if (!paidQuantities) return items;
   return items.map(item => {
-      const key = item.instance_id || `${item.id}`;
-      const paidQty = paidQuantities[key] || 0;
+      const paidQty = paidQuantities[item.instance_id] || 0;
       const remainingQty = item.quantity - paidQty;
       if (remainingQty <= 0) return null;
       return { ...item, quantity: remainingQty };
@@ -45,16 +44,6 @@ interface CheckoutState {
   noteInput: string;
   recentCustomers: string[];
 
-  // Split Bill State
-  splitGuestCount: number;
-  payingShares: Record<number, boolean>;
-  stickySplitAmount: number | null;
-  splitStrategyEvent: string | null;
-  usedSplitByShares: boolean;
-  usedCustomAmount: boolean;
-  splitStartingRemaining: number | null;
-  lastAmountSubmodeUsed: string | null;
-
   // Actions
   initialize: (order: HeldOrder) => void;
   setOrder: (order: HeldOrder) => void;
@@ -74,17 +63,6 @@ interface CheckoutState {
   setNoteInput: (note: string) => void;
   setRecentCustomers: (updater: string[] | ((prev: string[]) => string[])) => void;
 
-  // Strategy Injection (策略模式)
-  _computeStrategy?: (state: CheckoutState) => {
-    previousPaid: number;
-    currentSessionPaid: number;
-    totalPaid: number;
-    remaining: number;
-    isPaidInFull: boolean;
-    isPartialPaymentMade: boolean;
-  };
-  setComputeStrategy: (fn: CheckoutState['_computeStrategy']) => void;
-  
   // Computed
   getComputed: () => {
     previousPaid: number;
@@ -101,7 +79,6 @@ interface CheckoutState {
  * 全局单例的结账状态管理（Zustand），实现：
  * - 单例模式：模块级创建，保证全局唯一
  * - 观察者模式：通过 subscribeWithSelector 精准订阅状态变化
- * - 策略模式：可注入可替换的计算策略（例如剩余金额计算）
  */
 export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((set, get) => ({
   // Initial State
@@ -120,15 +97,6 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
   customerCount: 1,
   noteInput: 'Customer 1',
   recentCustomers: ['Customer 1'],
-
-  splitGuestCount: 1,
-  payingShares: {},
-  stickySplitAmount: null,
-  splitStrategyEvent: null,
-  usedSplitByShares: false,
-  usedCustomAmount: false,
-  splitStartingRemaining: null,
-  lastAmountSubmodeUsed: null,
 
   // Actions
   initialize: (order) => set({
@@ -175,14 +143,6 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
     pendingCashTx: null,
     isCompleting: false,
     customerCount: 1,
-
-    payingShares: {},
-    stickySplitAmount: null,
-    splitStrategyEvent: null,
-    usedSplitByShares: false,
-    usedCustomAmount: false,
-    splitStartingRemaining: null,
-    lastAmountSubmodeUsed: null,
   }),
   
   setMode: (mode) => set({ mode }),
@@ -214,22 +174,6 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
     recentCustomers: typeof updater === 'function' ? updater(state.recentCustomers) : updater
   })),
 
-  // 可替换的计算策略（策略模式）
-  // 允许外部设置不同的计算策略以适配业务变化
-  // 默认不设置时，使用内置计算逻辑
-  _computeStrategy: undefined as
-    | undefined
-    | ((state: CheckoutState) => {
-        previousPaid: number;
-        currentSessionPaid: number;
-        totalPaid: number;
-        remaining: number;
-        isPaidInFull: boolean;
-        isPartialPaymentMade: boolean;
-      }),
-
-  setComputeStrategy: (fn) => set({ _computeStrategy: fn }),
-
   getComputed: () => {
     const state = get();
     const order = state.order;
@@ -241,18 +185,14 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
         isPaidInFull: false,
         isPartialPaymentMade: false
     };
-    // 使用自定义策略（如果有）
-    if (state._computeStrategy) {
-      return state._computeStrategy(state);
-    }
 
-    const previousPaid = order.paid_amount || 0; // From previous split payments
+    const previousPaid = order.paid_amount; // From previous split payments
     const currentSessionPaid = state.paymentRecords.reduce((sum, p) => sum + p.amount, 0);
     const totalPaid = previousPaid + currentSessionPaid;
     const remaining = calculateRemaining(order.total, totalPaid);
     const isPaidInFull = checkIsPaidInFull(order.total, totalPaid);
     const isPartialPaymentMade = totalPaid > 0 && remaining > 0.005;
-    
+
     return {
         previousPaid,
         currentSessionPaid,
@@ -285,14 +225,6 @@ export const useCheckoutIsCompleting = () => useCheckoutStore((s) => s.isComplet
 export const useCheckoutCustomerCount = () => useCheckoutStore((s) => s.customerCount);
 export const useCheckoutNoteInput = () => useCheckoutStore((s) => s.noteInput);
 export const useCheckoutRecentCustomers = () => useCheckoutStore((s) => s.recentCustomers);
-export const useCheckoutSplitGuestCount = () => useCheckoutStore((s) => s.splitGuestCount);
-export const useCheckoutPayingShares = () => useCheckoutStore((s) => s.payingShares);
-export const useCheckoutStickyAmount = () => useCheckoutStore((s) => s.stickySplitAmount);
-export const useCheckoutSplitStrategyEvent = () => useCheckoutStore((s) => s.splitStrategyEvent);
-export const useCheckoutUsedSplitByShares = () => useCheckoutStore((s) => s.usedSplitByShares);
-export const useCheckoutUsedCustomAmount = () => useCheckoutStore((s) => s.usedCustomAmount);
-export const useCheckoutSplitStartingRemaining = () => useCheckoutStore((s) => s.splitStartingRemaining);
-export const useCheckoutLastAmountSubmodeUsed = () => useCheckoutStore((s) => s.lastAmountSubmodeUsed);
 export const useCurrentOrderKey = () => useCheckoutStore((s) => s.currentOrderKey);
 export const useCheckoutOrder = () => useCheckoutStore((s) => s.checkoutOrder);
 
@@ -317,7 +249,6 @@ export function useCheckoutActions() {
     setCustomerCount: store.setCustomerCount,
     setNoteInput: store.setNoteInput,
     setRecentCustomers: store.setRecentCustomers,
-    setComputeStrategy: store.setComputeStrategy,
   };
 }
 

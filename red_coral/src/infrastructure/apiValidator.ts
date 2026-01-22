@@ -1,11 +1,11 @@
 /**
  * API Response Validator
  *
- * Provides Zod validation wrapper for direct Tauri invoke calls.
+ * Provides Zod validation wrapper for API calls.
  * All API responses should be validated before use to ensure data integrity.
  */
 
-import { invoke } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { z } from 'zod';
 import { logger } from '@/utils/logger';
 
@@ -35,13 +35,13 @@ export class ApiValidationError extends Error {
 // ============================================================================
 
 /**
- * Validates API response against a schema and returns parsed data
+ * Validates data against a schema and returns parsed data
  */
-async function validateApiResponse<T extends z.ZodType>(
+function validateData<T extends z.ZodType>(
   schema: T,
   apiName: string,
   data: unknown
-): Promise<z.infer<T>> {
+): z.infer<T> {
   const result = schema.safeParse(data);
   if (!result.success) {
     const errorMsg = `Invalid response from ${apiName}: ${result.error.message}`;
@@ -52,15 +52,15 @@ async function validateApiResponse<T extends z.ZodType>(
 }
 
 /**
- * Type-safe wrapper for invoke with validation
+ * Type-safe wrapper for invokeApi with Zod validation
  */
 async function invokeWithValidation<T extends z.ZodType>(
   schema: T,
   command: string,
   args?: Record<string, unknown>
 ): Promise<z.infer<T>> {
-  const data = await invoke(command, args);
-  return validateApiResponse(schema, command, data);
+  const data = await invokeApi(command, args);
+  return validateData(schema, command, data);
 }
 
 // ============================================================================
@@ -133,23 +133,21 @@ export async function getAdjustmentRule(id: number): Promise<z.infer<typeof adju
 export async function createAdjustmentRule(
   params: Record<string, unknown>
 ): Promise<z.infer<typeof adjustmentRuleSchema>> {
-  const data = await invoke('create_price_adjustment_rule', params);
-  return validateApiResponse(adjustmentRuleSchema, 'create_price_adjustment_rule', data);
+  return invokeWithValidation(adjustmentRuleSchema, 'create_price_adjustment_rule', params);
 }
 
 export async function updateAdjustmentRule(
   params: Record<string, unknown>
 ): Promise<z.infer<typeof adjustmentRuleSchema>> {
-  const data = await invoke('update_price_adjustment_rule', params);
-  return validateApiResponse(adjustmentRuleSchema, 'update_price_adjustment_rule', data);
+  return invokeWithValidation(adjustmentRuleSchema, 'update_price_adjustment_rule', params);
 }
 
 export async function toggleAdjustmentRule(id: number): Promise<void> {
-  return invoke('toggle_price_adjustment_rule', { id });
+  return invokeApi('toggle_price_adjustment_rule', { id });
 }
 
 export async function deleteAdjustmentRule(id: number): Promise<void> {
-  return invoke('delete_price_adjustment_rule', { id });
+  return invokeApi('delete_price_adjustment_rule', { id });
 }
 
 export async function getApplicableAdjustmentRules(

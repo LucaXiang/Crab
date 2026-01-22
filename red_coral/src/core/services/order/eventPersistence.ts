@@ -4,7 +4,7 @@
  * 负责将事件保存到数据库和从数据库加载事件
  */
 
-import { invoke } from '@tauri-apps/api/core';
+import { invokeApi } from '@/infrastructure/api/tauri-client';
 import type { OrderEvent, OrderEventType, PaymentAddedPayload, OrderSplitPayload } from '@/core/domain/types/orderEvent';
 import { HeldOrder } from '@/core/domain/types';
 import { PaymentRecord } from '@/core/domain/types';
@@ -41,7 +41,7 @@ export const saveCompletedOrder = async (
           if (ev.event_type === 'PAYMENT_ADDED') {
             const p = ev.payload as PaymentAddedPayload;
             return {
-              payment_id: p.payment_id || `pay-${order.key}-${ev.timestamp}`,
+              payment_id: p.payment_id || `pay-${order.order_id}-${ev.timestamp}`,
               method: p.method,
               amount: Number(p.amount || 0),
               timestamp: Number(ev.timestamp || order.end_time || Date.now()),
@@ -53,7 +53,7 @@ export const saveCompletedOrder = async (
             // ORDER_SPLIT
             const data = ev.payload as OrderSplitPayload;
             return {
-              payment_id: `split-${order.key}-${ev.timestamp}`,
+              payment_id: `split-${order.order_id}-${ev.timestamp}`,
               method: `Split ${data.payment_method}`,
               amount: Number(data.split_amount || 0),
               timestamp: Number(ev.timestamp || order.end_time || Date.now()),
@@ -67,7 +67,7 @@ export const saveCompletedOrder = async (
   
   while (attempts < maxAttempts) {
     try {
-      await invoke('save_order', {
+      await invokeApi('save_order', {
         params: {
           order: persistedOrder,
           payments: derivedPayments,
@@ -78,12 +78,12 @@ export const saveCompletedOrder = async (
       return;
     } catch (error) {
       attempts++;
-      logger.error(`Failed to save completed order (Attempt ${attempts}/${maxAttempts})`, error, { component: 'eventPersistence', action: 'saveCompletedOrder', orderKey: persistedOrder.key, attempt: attempts });
+      logger.error(`Failed to save completed order (Attempt ${attempts}/${maxAttempts})`, error, { component: 'eventPersistence', action: 'saveCompletedOrder', orderKey: persistedOrder.order_id, attempt: attempts });
 
       if (attempts >= maxAttempts) {
         // Final failure
         // In a real app, we might want to save to a "failed_sync_queue" in localStorage here
-        logger.error(`Giving up on saving order after ${maxAttempts} attempts`, error, { component: 'eventPersistence', action: 'saveCompletedOrder', orderKey: persistedOrder.key });
+        logger.error(`Giving up on saving order after ${maxAttempts} attempts`, error, { component: 'eventPersistence', action: 'saveCompletedOrder', orderKey: persistedOrder.order_id });
       } else {
         // Wait before retry (500ms, 1000ms, etc.)
         await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempts - 1)));

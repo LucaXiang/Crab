@@ -4,6 +4,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { useSettingsModal, useDataVersion, useSettingsFilters } from '@/core/stores/settings/useSettingsStore';
 import { useZoneStore, useTableStore } from '@/core/stores/resources';
 import { createTauriClient } from '@/infrastructure/api';
+import { getErrorMessage } from '@/utils/error';
 
 const api = createTauriClient();
 import { DataTable, Column } from '@/presentation/components/ui/DataTable';
@@ -77,16 +78,10 @@ const ZoneList: React.FC = React.memo(() => {
           }
 
           if (failures.length > 0) {
-            const hasTableError = failures.some((f) => String(f.error).includes('ZONE_HAS_TABLES'));
-            if (hasTableError) {
-              toast.error(t('settings.batchDelete.zonesBlocked'));
-            } else {
-              toast.error(t('settings.batchDelete.zonesFailed'));
-            }
+            toast.error(getErrorMessage(failures[0].error));
           }
         } catch (e) {
-          console.error(e);
-          toast.error(t('settings.batchDelete.zonesFailed'));
+          toast.error(getErrorMessage(e));
         }
       },
     });
@@ -248,8 +243,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
           await tableStore.fetchAll();
           setPagination(1, tableStore.items.length);
         } catch (e) {
-          console.error(e);
-          toast.error(t('settings.batchDelete.failed'));
+          toast.error(getErrorMessage(e));
         }
       },
     });

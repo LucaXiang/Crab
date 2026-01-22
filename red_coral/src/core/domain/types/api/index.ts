@@ -1,4 +1,3 @@
-export * from './error';
 export * from './models';
 
 // Import types used in this file
@@ -20,11 +19,13 @@ import type {
   EmbeddedSpec,
 } from './models';
 
-// API Response types - aligned with Rust server
+// API Response types - aligned with Rust server (src-tauri/src/core/response.rs)
 export interface ApiResponse<T> {
-  error_code: string | null;
+  /** Error code: 0 = success, >0 = error code from shared::error::ErrorCode */
+  code: number | null;
   message: string;
   data?: T;
+  details?: Record<string, unknown>;
 }
 
 export interface DeleteResponse {

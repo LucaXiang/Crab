@@ -114,11 +114,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const response = await api.listAttributeTemplates();
-      // Handle both formats: direct array or { data: { templates: [...] } }
-      const attributes = Array.isArray(response)
-        ? (response as AttributeEntity[])
-        : ((response.data?.templates || []) as AttributeEntity[]);
+      const attributes = await api.listAttributeTemplates() as AttributeEntity[];
       set({ items: attributes, isLoading: false, isLoaded: true });
     } catch (e: any) {
       const errorMsg = e.message || 'Failed to fetch attributes';
@@ -149,8 +145,8 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       // Options are embedded in Attribute, fetch the attribute to get its options
-      const response = await api.getAttributeTemplate(attributeId);
-      const opts = (response.data?.template?.options || []) as AttributeOption[];
+      const template = await api.getAttributeTemplate(attributeId);
+      const opts = (template.options || []) as AttributeOption[];
       const optionsWithIndex: AttributeOptionWithIndex[] = opts.map((opt, index) => ({
         ...opt,
         index,
@@ -179,11 +175,8 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   // CRUD operations
   createAttribute: async (params) => {
     try {
-      const response = await api.createAttribute(params);
-      if (response.data?.attribute) {
-        // Refresh list after creation
-        await get().fetchAll(true);
-      }
+      await api.createAttribute(params);
+      await get().fetchAll(true);
     } catch (e: any) {
       console.error('[Store] createAttribute failed:', e.message);
       throw e;
@@ -192,11 +185,8 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   updateAttribute: async (params) => {
     try {
       const { id, ...data } = params;
-      const response = await api.updateAttribute(id, data);
-      if (response.data?.attribute) {
-        // Refresh list after update
-        await get().fetchAll(true);
-      }
+      await api.updateAttribute(id, data);
+      await get().fetchAll(true);
     } catch (e: any) {
       console.error('[Store] updateAttribute failed:', e.message);
       throw e;
@@ -205,7 +195,6 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   deleteAttribute: async (id) => {
     try {
       await api.deleteAttribute(id);
-      // Refresh list after deletion
       await get().fetchAll(true);
     } catch (e: any) {
       console.error('[Store] deleteAttribute failed:', e.message);
@@ -215,22 +204,19 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   createOption: async (params) => {
     try {
       const { attributeId, ...data } = params;
-      const response = await api.addAttributeOption(attributeId, data);
-      if (response.data?.template) {
-        // Update local options cache
-        const opts = (response.data.template.options || []).map((opt, index) => ({
-          ...opt,
-          index,
-          attributeId,
-        }));
-        set((state) => {
-          const newOptions = new Map(state.options);
-          newOptions.set(attributeId, opts);
-          return { options: newOptions };
-        });
-        // Refresh attributes list
-        await get().fetchAll(true);
-      }
+      const template = await api.addAttributeOption(attributeId, data);
+      // Update local options cache
+      const opts = (template.options || []).map((opt, index) => ({
+        ...opt,
+        index,
+        attributeId,
+      }));
+      set((state) => {
+        const newOptions = new Map(state.options);
+        newOptions.set(attributeId, opts);
+        return { options: newOptions };
+      });
+      await get().fetchAll(true);
     } catch (e: any) {
       console.error('[Store] createOption failed:', e.message);
       throw e;
@@ -239,22 +225,19 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   updateOption: async (params) => {
     try {
       const { attributeId, index, ...data } = params;
-      const response = await api.updateAttributeOption(attributeId, index, data);
-      if (response.data?.template) {
-        // Update local options cache
-        const opts = (response.data.template.options || []).map((opt, idx) => ({
-          ...opt,
-          index: idx,
-          attributeId,
-        }));
-        set((state) => {
-          const newOptions = new Map(state.options);
-          newOptions.set(attributeId, opts);
-          return { options: newOptions };
-        });
-        // Refresh attributes list
-        await get().fetchAll(true);
-      }
+      const template = await api.updateAttributeOption(attributeId, index, data);
+      // Update local options cache
+      const opts = (template.options || []).map((opt, idx) => ({
+        ...opt,
+        index: idx,
+        attributeId,
+      }));
+      set((state) => {
+        const newOptions = new Map(state.options);
+        newOptions.set(attributeId, opts);
+        return { options: newOptions };
+      });
+      await get().fetchAll(true);
     } catch (e: any) {
       console.error('[Store] updateOption failed:', e.message);
       throw e;
@@ -262,22 +245,19 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   },
   deleteOption: async (attributeId, index) => {
     try {
-      const response = await api.deleteAttributeOption(attributeId, index);
-      if (response.data?.template) {
-        // Update local options cache
-        const opts = (response.data.template.options || []).map((opt, idx) => ({
-          ...opt,
-          index: idx,
-          attributeId,
-        }));
-        set((state) => {
-          const newOptions = new Map(state.options);
-          newOptions.set(attributeId, opts);
-          return { options: newOptions };
-        });
-        // Refresh attributes list
-        await get().fetchAll(true);
-      }
+      const template = await api.deleteAttributeOption(attributeId, index);
+      // Update local options cache
+      const opts = (template.options || []).map((opt, idx) => ({
+        ...opt,
+        index: idx,
+        attributeId,
+      }));
+      set((state) => {
+        const newOptions = new Map(state.options);
+        newOptions.set(attributeId, opts);
+        return { options: newOptions };
+      });
+      await get().fetchAll(true);
     } catch (e: any) {
       console.error('[Store] deleteOption failed:', e.message);
       throw e;

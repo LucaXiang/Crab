@@ -4,21 +4,9 @@ import type { Zone } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
-async function fetchZones(): Promise<Zone[]> {
-  const response = await api.listZones();
-  // Handle both formats: direct array or { data: { zones: [...] } }
-  if (Array.isArray(response)) {
-    return response;
-  }
-  if (response.data?.zones) {
-    return response.data.zones;
-  }
-  throw new Error(response.message || 'Failed to fetch zones');
-}
-
 export const useZoneStore = createResourceStore<Zone & { id: string }>(
   'zone',
-  fetchZones as () => Promise<(Zone & { id: string })[]>
+  () => api.listZones() as Promise<(Zone & { id: string })[]>
 );
 
 // Convenience hooks

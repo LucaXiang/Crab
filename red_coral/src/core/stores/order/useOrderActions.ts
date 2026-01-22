@@ -1,31 +1,19 @@
+/**
+ * Order Actions Hook
+ *
+ * Combines actions from multiple stores for convenient use in UI components.
+ * This is a facade pattern - it doesn't manage state itself.
+ */
+
 import { useShallow } from 'zustand/react/shallow';
-import { useActiveOrdersStore } from './useActiveOrdersStore';
-import * as orderOps from './useOrderOperations';
-
-// Re-export sub-stores
-export {
-  useDraftOrders,
-  useDraftOrdersCount
-} from './useDraftOrderStore';
-
-// Import stores for combined selectors
 import { useDraftOrderStore } from './useDraftOrderStore';
 import { useCheckoutStore } from './useCheckoutStore';
 import { useReceiptStore } from './useReceiptStore';
+import * as orderOps from './useOrderOperations';
 
-// --- Selectors ---
-
-// Active Orders (uses new event-sourcing store)
-export const useHeldOrders = () => {
-  const snapshots = useActiveOrdersStore(useShallow((state) => state.getActiveOrders()));
-  return snapshots;
-};
-
-export const useHeldOrdersCount = () => useActiveOrdersStore((state) =>
-  state.getActiveOrders().filter(o => o.is_retail !== true).length
-);
-
-// Combined actions selector
+/**
+ * Combined actions selector for order operations
+ */
 export const useOrderActions = () => {
   const draftActions = useDraftOrderStore(
     useShallow((state) => ({

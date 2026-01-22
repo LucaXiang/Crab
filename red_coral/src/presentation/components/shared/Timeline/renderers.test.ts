@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { renderEvent } from './renderers';
-import type { OrderEvent } from '@/core/domain/types/orderEvent';
+import type { OrderEvent, EventPayload } from '@/core/domain/types/orderEvent';
 
 // Mock translation function
 const mockT = (key: string, params?: Record<string, string | number>): string => {
@@ -17,69 +17,66 @@ const mockT = (key: string, params?: Record<string, string | number>): string =>
   return key;
 };
 
+// Helper to create properly typed mock OrderEvent
+const createMockEvent = (event_type: string, payload: EventPayload, overrides?: Partial<OrderEvent>): OrderEvent => ({
+  event_id: `evt-${event_type}`,
+  sequence: 1,
+  order_id: 'order-test-1',
+  timestamp: Date.now(),
+  operator_id: 'op-1',
+  operator_name: 'Test Operator',
+  command_id: 'cmd-1',
+  event_type: event_type as OrderEvent['event_type'],
+  payload,
+  ...overrides,
+});
+
 describe('Timeline Renderers - Architecture Tests', () => {
   describe('Renderer Registration', () => {
     it('should have renderer for all main event types', () => {
-      const mainEventTypes: Array<{ type: string; payload: any }> = [
-        {
+      const mainEvents: OrderEvent[] = [
+        createMockEvent('TABLE_OPENED', {
           type: 'TABLE_OPENED',
-          payload: {
-            table_id: 'T1',
-            table_name: 'Table 1',
-            zone_id: 'Z1',
-            zone_name: 'Main',
-            guest_count: 2,
-            is_retail: false,
-          },
-        },
-        {
+          table_id: 'T1',
+          table_name: 'Table 1',
+          zone_id: 'Z1',
+          zone_name: 'Main',
+          guest_count: 2,
+          is_retail: false,
+        }),
+        createMockEvent('ITEMS_ADDED', {
           type: 'ITEMS_ADDED',
-          payload: { items: [] },
-        },
-        {
+          items: [],
+        }),
+        createMockEvent('ITEM_REMOVED', {
           type: 'ITEM_REMOVED',
-          payload: {
-            instance_id: 'inst-1',
-            item_name: 'Item',
-            reason: null,
-            quantity: null,
-          },
-        },
-        {
+          instance_id: 'inst-1',
+          item_name: 'Item',
+          reason: null,
+          quantity: null,
+        }),
+        createMockEvent('PAYMENT_ADDED', {
           type: 'PAYMENT_ADDED',
-          payload: {
-            payment_id: 'pay-1',
-            method: 'CASH',
-            amount: 1000,
-            tendered: null,
-            change: null,
-            note: null,
-          },
-        },
-        {
+          payment_id: 'pay-1',
+          method: 'cash',
+          amount: 1000,
+          tendered: null,
+          change: null,
+          note: null,
+        }),
+        createMockEvent('ORDER_COMPLETED', {
           type: 'ORDER_COMPLETED',
-          payload: {
-            final_total: 1000,
-            receipt_number: 'R1',
-          },
-        },
-        {
+          final_total: 1000,
+          receipt_number: 'R1',
+          payment_summary: [],
+        }),
+        createMockEvent('ORDER_VOIDED', {
           type: 'ORDER_VOIDED',
-          payload: {
-            reason: null,
-          },
-        },
+          reason: null,
+        }),
       ];
 
-      mainEventTypes.forEach(({ type, payload }) => {
-        const event: OrderEvent = {
-          event_id: `evt-${type}`,
-          event_type: type as any,
-          timestamp: Date.now(),
-          payload: payload as any,
-          sequence: 1,
-        };
-
+      mainEvents.forEach(event => {
         // Should not throw
         expect(() => renderEvent(event, mockT)).not.toThrow();
 
@@ -96,20 +93,15 @@ describe('Timeline Renderers - Architecture Tests', () => {
 
   describe('Data Structure Validation', () => {
     it('should return TimelineDisplayData structure', () => {
-      const event: OrderEvent = {
-        event_id: 'evt-1',
-        event_type: 'TABLE_OPENED',
-        timestamp: Date.now(),
-        payload: {
-          table_id: 'T1',
-          table_name: 'Table 1',
-          zone_id: 'Z1',
-          zone_name: 'Main',
-          guest_count: 2,
-          is_retail: false,
-        },
-        sequence: 1,
-      };
+      const event = createMockEvent('TABLE_OPENED', {
+        type: 'TABLE_OPENED',
+        table_id: 'T1',
+        table_name: 'Table 1',
+        zone_id: 'Z1',
+        zone_name: 'Main',
+        guest_count: 2,
+        is_retail: false,
+      });
 
       const result = renderEvent(event, mockT);
 
@@ -123,27 +115,19 @@ describe('Timeline Renderers - Architecture Tests', () => {
 
     it('should return non-empty title for all events', () => {
       const events: OrderEvent[] = [
-        {
-          event_id: 'evt-1',
-          event_type: 'ITEMS_ADDED',
-          timestamp: Date.now(),
-          payload: { items: [] },
-          sequence: 1,
-        },
-        {
-          event_id: 'evt-2',
-          event_type: 'PAYMENT_ADDED',
-          timestamp: Date.now(),
-          payload: {
-            payment_id: 'pay-1',
-            method: 'CASH',
-            amount: 1000,
-            tendered: null,
-            change: null,
-            note: null,
-          },
-          sequence: 2,
-        },
+        createMockEvent('ITEMS_ADDED', {
+          type: 'ITEMS_ADDED',
+          items: [],
+        }),
+        createMockEvent('PAYMENT_ADDED', {
+          type: 'PAYMENT_ADDED',
+          payment_id: 'pay-1',
+          method: 'cash',
+          amount: 1000,
+          tendered: null,
+          change: null,
+          note: null,
+        }),
       ];
 
       events.forEach(event => {
@@ -155,13 +139,10 @@ describe('Timeline Renderers - Architecture Tests', () => {
 
   describe('Edge Cases', () => {
     it('should handle empty payload gracefully', () => {
-      const event: OrderEvent = {
-        event_id: 'evt-empty',
-        event_type: 'ITEMS_ADDED',
-        timestamp: Date.now(),
-        payload: { items: [] },
-        sequence: 1,
-      };
+      const event = createMockEvent('ITEMS_ADDED', {
+        type: 'ITEMS_ADDED',
+        items: [],
+      });
 
       expect(() => renderEvent(event, mockT)).not.toThrow();
       const result = renderEvent(event, mockT);
@@ -169,40 +150,30 @@ describe('Timeline Renderers - Architecture Tests', () => {
     });
 
     it('should handle missing optional fields', () => {
-      const event: OrderEvent = {
-        event_id: 'evt-minimal',
-        event_type: 'PAYMENT_ADDED',
-        timestamp: Date.now(),
-        payload: {
-          payment_id: 'pay-1',
-          method: 'CASH',
-          amount: 1000,
-          tendered: null,
-          change: null,
-          note: null,
-        },
-        sequence: 1,
-      };
+      const event = createMockEvent('PAYMENT_ADDED', {
+        type: 'PAYMENT_ADDED',
+        payment_id: 'pay-1',
+        method: 'cash',
+        amount: 1000,
+        tendered: null,
+        change: null,
+        note: null,
+      });
 
       expect(() => renderEvent(event, mockT)).not.toThrow();
     });
 
     it('should preserve timestamp from event', () => {
       const timestamp = Date.now();
-      const event: OrderEvent = {
-        event_id: 'evt-time',
-        event_type: 'TABLE_OPENED',
-        timestamp,
-        payload: {
-          table_id: 'T1',
-          table_name: 'Table 1',
-          zone_id: 'Z1',
-          zone_name: 'Main',
-          guest_count: 2,
-          is_retail: false,
-        },
-        sequence: 1,
-      };
+      const event = createMockEvent('TABLE_OPENED', {
+        type: 'TABLE_OPENED',
+        table_id: 'T1',
+        table_name: 'Table 1',
+        zone_id: 'Z1',
+        zone_name: 'Main',
+        guest_count: 2,
+        is_retail: false,
+      }, { timestamp });
 
       const result = renderEvent(event, mockT);
       expect(result.timestamp).toBe(timestamp);
@@ -211,25 +182,17 @@ describe('Timeline Renderers - Architecture Tests', () => {
 
   describe('Color Classes', () => {
     it('should assign unique color classes to different event types', () => {
-      const events: Array<{ type: string; payload: any }> = [
-        { type: 'TABLE_OPENED', payload: { table_id: 'T1', table_name: 'T1', zone_id: 'Z1', zone_name: 'Z', guest_count: 2, is_retail: false } },
-        { type: 'ITEMS_ADDED', payload: { items: [] } },
-        { type: 'PAYMENT_ADDED', payload: { payment_id: 'p1', method: 'CASH', amount: 100, tendered: null, change: null, note: null } },
-        { type: 'ORDER_COMPLETED', payload: { final_total: 100, receipt_number: 'R1' } },
-        { type: 'ORDER_VOIDED', payload: { reason: null } },
+      const events: OrderEvent[] = [
+        createMockEvent('TABLE_OPENED', { type: 'TABLE_OPENED', table_id: 'T1', table_name: 'T1', zone_id: 'Z1', zone_name: 'Z', guest_count: 2, is_retail: false }),
+        createMockEvent('ITEMS_ADDED', { type: 'ITEMS_ADDED', items: [] }),
+        createMockEvent('PAYMENT_ADDED', { type: 'PAYMENT_ADDED', payment_id: 'p1', method: 'cash', amount: 100, tendered: null, change: null, note: null }),
+        createMockEvent('ORDER_COMPLETED', { type: 'ORDER_COMPLETED', final_total: 100, receipt_number: 'R1', payment_summary: [] }),
+        createMockEvent('ORDER_VOIDED', { type: 'ORDER_VOIDED', reason: null }),
       ];
 
       const colors = new Set<string>();
 
-      events.forEach(({ type, payload }) => {
-        const event: OrderEvent = {
-          event_id: `evt-${type}`,
-          event_type: type as any,
-          timestamp: Date.now(),
-          payload: payload as any,
-          sequence: 1,
-        };
-
+      events.forEach(event => {
         const result = renderEvent(event, mockT);
         expect(result.colorClass).toMatch(/^bg-/);
         colors.add(result.colorClass);
@@ -248,20 +211,15 @@ describe('Timeline Renderers - Architecture Tests', () => {
         return mockT(key, params);
       };
 
-      const event: OrderEvent = {
-        event_id: 'evt-1',
-        event_type: 'TABLE_OPENED',
-        timestamp: Date.now(),
-        payload: {
-          table_id: 'T1',
-          table_name: 'Table 1',
-          zone_id: 'Z1',
-          zone_name: 'Main',
-          guest_count: 2,
-          is_retail: false,
-        },
-        sequence: 1,
-      };
+      const event = createMockEvent('TABLE_OPENED', {
+        type: 'TABLE_OPENED',
+        table_id: 'T1',
+        table_name: 'Table 1',
+        zone_id: 'Z1',
+        zone_name: 'Main',
+        guest_count: 2,
+        is_retail: false,
+      });
 
       renderEvent(event, trackingT);
 
@@ -274,20 +232,15 @@ describe('Timeline Renderers - Architecture Tests', () => {
   describe('Robustness', () => {
     it('should handle renderer lookup without errors', () => {
       // Test that the renderer system doesn't crash on lookups
-      const validEvent: OrderEvent = {
-        event_id: 'evt-valid',
-        event_type: 'TABLE_OPENED',
-        timestamp: Date.now(),
-        payload: {
-          table_id: 'T1',
-          table_name: 'Table 1',
-          zone_id: 'Z1',
-          zone_name: 'Main',
-          guest_count: 2,
-          is_retail: false,
-        },
-        sequence: 1,
-      };
+      const validEvent = createMockEvent('TABLE_OPENED', {
+        type: 'TABLE_OPENED',
+        table_id: 'T1',
+        table_name: 'Table 1',
+        zone_id: 'Z1',
+        zone_name: 'Main',
+        guest_count: 2,
+        is_retail: false,
+      });
 
       // Multiple lookups should work
       expect(() => renderEvent(validEvent, mockT)).not.toThrow();
@@ -295,20 +248,15 @@ describe('Timeline Renderers - Architecture Tests', () => {
     });
 
     it('should handle concurrent rendering calls', () => {
-      const event: OrderEvent = {
-        event_id: 'evt-concurrent',
-        event_type: 'TABLE_OPENED',
-        timestamp: Date.now(),
-        payload: {
-          table_id: 'T1',
-          table_name: 'Table 1',
-          zone_id: 'Z1',
-          zone_name: 'Main',
-          guest_count: 2,
-          is_retail: false,
-        },
-        sequence: 1,
-      };
+      const event = createMockEvent('TABLE_OPENED', {
+        type: 'TABLE_OPENED',
+        table_id: 'T1',
+        table_name: 'Table 1',
+        zone_id: 'Z1',
+        zone_name: 'Main',
+        guest_count: 2,
+        is_retail: false,
+      });
 
       // Simulate concurrent calls
       const results = Array.from({ length: 10 }, () => renderEvent(event, mockT));

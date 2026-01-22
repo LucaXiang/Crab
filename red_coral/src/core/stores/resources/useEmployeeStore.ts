@@ -4,20 +4,9 @@ import type { EmployeeResponse } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
-async function fetchEmployees(): Promise<EmployeeResponse[]> {
-  const response = await api.listEmployees();
-  if (Array.isArray(response)) {
-    return response as EmployeeResponse[];
-  }
-  if (response.data?.employees) {
-    return response.data.employees as EmployeeResponse[];
-  }
-  throw new Error(response.message || 'Failed to fetch employees');
-}
-
 export const useEmployeeStore = createResourceStore<EmployeeResponse>(
   'employee',
-  fetchEmployees
+  () => api.listEmployees()
 );
 
 // Convenience hooks
