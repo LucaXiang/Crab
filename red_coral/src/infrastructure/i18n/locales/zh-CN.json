@@ -21,10 +21,10 @@
       "change": "更换",
       "enable": "启用",
       "hide": "隐藏",
-      "expandAll": "全部展开",
-      "collapseAll": "全部收起",
-      "batchDelete": "批量删除",
-      "uploadImage": "上传图片"
+      "expand_all": "全部展开",
+      "collapse_all": "全部收起",
+      "batch_delete": "批量删除",
+      "upload_image": "上传图片"
     },
     "status": {
       "all": "全部",
@@ -33,7 +33,7 @@
       "void": "作废",
       "enabled": "已启用",
       "disabled": "已禁用",
-      "disabledGlobal": "禁用 (全局关闭)"
+      "disabled_global": "禁用 (全局关闭)"
     },
     "label": {
       "name": "名称",
@@ -50,7 +50,7 @@
       "to": "至",
       "quantity": "数量",
       "items": "项",
-      "unknownItem": "未知项目",
+      "unknown_item": "未知项目",
       "none": "N/A"
     },
     "message": {
@@ -59,40 +59,40 @@
       "error": "错误",
       "submitting": "提交中...",
       "processing": "处理中",
-      "saveSuccess": "保存成功",
-      "saveFailed": "保存失败",
-      "deleteFailed": "删除失败",
-      "loadFailed": "加载数据失败",
-      "invalidForm": "表单无效",
-      "sentToPrinter": "已发送至打印机",
+      "save_success": "保存成功",
+      "save_failed": "保存失败",
+      "delete_failed": "删除失败",
+      "load_failed": "加载数据失败",
+      "invalid_form": "表单无效",
+      "sent_to_printer": "已发送至打印机",
       "exported": "已导出"
     },
     "hint": {
-      "searchPlaceholder": "搜索...",
-      "namePlaceholder": "请输入名称",
-      "descriptionPlaceholder": "请输入描述",
-      "longPressToEdit": "提示：长按或双击行即可编辑",
-      "tapToClose": "点击关闭"
+      "search_placeholder": "搜索...",
+      "name_placeholder": "请输入名称",
+      "description_placeholder": "请输入描述",
+      "long_press_to_edit": "提示：长按或双击行即可编辑",
+      "tap_to_close": "点击关闭"
     },
     "empty": {
-      "noData": "暂无数据",
-      "noResults": "无结果"
+      "no_data": "暂无数据",
+      "no_results": "无结果"
     },
     "auth": {
       "required": "需要授权",
       "denied": "访问被拒绝",
-      "deniedMessage": "您没有权限执行此操作",
-      "clickToAuthorize": "点击授权"
+      "denied_message": "您没有权限执行此操作",
+      "click_to_authorize": "点击授权"
     },
     "selection": {
       "selected": "已选择",
-      "selectMode": "多选模式",
+      "select_mode": "多选模式",
       "showing": "显示"
     },
     "dialog": {
       "ok": "我知道了",
-      "closeApp": "关闭应用",
-      "confirmDelete": "确认删除吗？",
+      "close_app": "关闭应用",
+      "confirm_delete": "确认删除吗？",
       "yes": "是",
       "no": "否",
       "none": "无"
@@ -105,23 +105,23 @@
   "app": {
     "brand": {
       "name": "RedCoral",
-      "fullName": "RedCoral POS"
+      "full_name": "RedCoral POS"
     },
     "nav": {
       "pos": "收银",
       "history": "历史"
     },
     "action": {
-      "openCashDrawer": "打开钱箱",
-      "cashDrawerOpened": "钱箱已打开",
-      "cashDrawerFailed": "打开钱箱失败"
+      "open_cash_drawer": "打开钱箱",
+      "cash_drawer_opened": "钱箱已打开",
+      "cash_drawer_failed": "打开钱箱失败"
     },
     "logout": {
       "blocked": "无法登出",
       "description": "以下桌台仍未结单：",
       "hint": "请先结账或清空桌台后再登出"
     },
-    "emptyCategory": "此分类暂无商品",
+    "empty_category": "此分类暂无商品",
     "status": {
       "loading": "加载中..."
     }
@@ -139,33 +139,33 @@
     "login": {
       "title": "登录",
       "subtitle": "欢迎使用 RedCoral POS",
-      "subtitleDesc": "请输入您的凭据以继续",
-      "enterDetails": "请输入登录信息",
+      "subtitle_desc": "请输入您的凭据以继续",
+      "enter_details": "请输入登录信息",
       "username": "用户名",
-      "usernamePlaceholder": "请输入用户名",
+      "username_placeholder": "请输入用户名",
       "password": "密码",
-      "passwordPlaceholder": "请输入密码",
+      "password_placeholder": "请输入密码",
       "submit": "登录",
       "error": {
-        "emptyFields": "请填写所有字段",
-        "invalidCredentials": "用户名或密码错误"
+        "empty_fields": "请填写所有字段",
+        "invalid_credentials": "用户名或密码错误"
       },
       "feature": {
-        "multiZone": "多区域管理",
-        "multiZoneDesc": "支持多个营业区域",
-        "fastCheckout": "快速结账",
-        "fastCheckoutDesc": "高效收银体验"
+        "multi_zone": "多区域管理",
+        "multi_zone_desc": "支持多个营业区域",
+        "fast_checkout": "快速结账",
+        "fast_checkout_desc": "高效收银体验"
       }
     },
-    "supervisorApproval": "需要主管审批"
+    "supervisor_approval": "需要主管审批"
   },
   "pos": {
-    "searchProduct": "搜索商品...",
-    "allCategories": "全部分类",
+    "search_product": "搜索商品...",
+    "all_categories": "全部分类",
     "sidebar": {
-      "getOrder": "获取订单",
+      "get_order": "获取订单",
       "drafts": "草稿",
-      "noDrafts": "无草稿",
+      "no_drafts": "无草稿",
       "hold": "挂单",
       "save": "保存",
       "clear": "清空",
@@ -175,12 +175,12 @@
       "empty": "购物车为空",
       "original": "原价",
       "surcharge": "附加费",
-      "unitPrice": "单价",
-      "basePrice": "基础价",
+      "unit_price": "单价",
+      "base_price": "基础价",
       "custom": "自定义",
       "subtotal": "小计",
-      "enterDiscount": "输入折扣金额",
-      "editItem": "编辑项目",
+      "enter_discount": "输入折扣金额",
+      "edit_item": "编辑项目",
       "input": {
         "quantity": "输入数量",
         "price": "输入价格",
@@ -189,17 +189,17 @@
     },
     "product": {
       "options": "选项",
-      "specificationRequired": "请选择规格",
-      "selectOptions": "选择选项",
-      "selectSpecification": "选择规格",
-      "noOptions": "暂无可用选项"
+      "specification_required": "请选择规格",
+      "select_options": "选择选项",
+      "select_specification": "选择规格",
+      "no_options": "暂无可用选项"
     },
-    "quickAdd": {
+    "quick_add": {
       "title": "快速添加",
-      "noProducts": "暂无可用商品",
-      "selectedItems": "已选项目",
-      "selectPrompt": "请从左侧选择商品",
-      "perUnit": "/份",
+      "no_products": "暂无可用商品",
+      "selected_items": "已选项目",
+      "select_prompt": "请从左侧选择商品",
+      "per_unit": "/份",
       "confirm": "确认添加"
     }
   },
@@ -207,8 +207,8 @@
     "method": {
       "cash": "现金",
       "card": "刷卡",
-      "cashDesc": "现金支付",
-      "cardDesc": "银行卡支付"
+      "cash_desc": "现金支付",
+      "card_desc": "银行卡支付"
     },
     "amount": {
       "due": "应付金额",
@@ -217,28 +217,28 @@
       "tendered": "已收金额",
       "remaining": "待付金额",
       "total": "订单总额",
-      "paidStatus": "已付",
-      "unitPrice": "单价"
+      "paid_status": "已付",
+      "unit_price": "单价"
     },
     "split": {
       "title": "分单",
       "total": "分单金额",
       "success": "分单成功",
       "failed": "分单失败",
-      "payCash": "现金支付",
-      "payCard": "刷卡支付",
+      "pay_cash": "现金支付",
+      "pay_card": "刷卡支付",
       "desc": "拆分订单分别支付"
     },
-    "orderType": {
-      "dineIn": "堂食",
+    "order_type": {
+      "dine_in": "堂食",
       "takeout": "外卖"
     },
-    "prePayment": {
+    "pre_payment": {
       "receipt": "预付小票"
     },
     "void": {
       "title": "作废订单",
-      "authRequired": "作废订单需要主管审批",
+      "auth_required": "作废订单需要主管审批",
       "confirm": "确定要作废此订单吗？",
       "reason": "选择作废原因"
     },
@@ -246,11 +246,11 @@
       "title": "结账错误",
       "hint": "结账区域加载失败，请重试",
       "insufficient": "金额不足",
-      "mergeFailed": "合并订单失败",
-      "moveFailed": "转台失败"
+      "merge_failed": "合并订单失败",
+      "move_failed": "转台失败"
     },
-    "tableOrder": "桌台订单",
-    "orderCompleted": "订单完成",
+    "table_order": "桌台订单",
+    "order_completed": "订单完成",
     "payment": {
       "confirm": "确认支付",
       "failed": "支付失败",
@@ -264,11 +264,11 @@
     "cart": {
       "discount": "折扣"
     },
-    "voidReason": {
+    "void_reason": {
       "runaway": "顾客逃单",
-      "dineAndDash": "吃完就跑",
-      "systemTest": "系统测试",
-      "ownerTreat": "老板请客"
+      "dine_and_dash": "吃完就跑",
+      "system_test": "系统测试",
+      "owner_treat": "老板请客"
     },
     "timeline": {
       "label": "标签",
@@ -280,9 +280,9 @@
       "all": "全部",
       "empty": "空闲",
       "occupied": "占用",
-      "prePayment": "预付"
+      "pre_payment": "预付"
     },
-    "noTables": "没有可用的桌台",
+    "no_tables": "没有可用的桌台",
     "action": {
       "manage": "管理",
       "merge": "合并",
@@ -291,36 +291,36 @@
     "description": {
       "move": "将订单转移到其他桌台"
     },
-    "authRequired": {
+    "auth_required": {
       "merge": "合并桌台需要主管审批",
       "move": "转移桌台需要主管审批"
     },
     "warning": {
-      "cannotMoveWithPayments": "存在已支付项目，无法转移"
+      "cannot_move_with_payments": "存在已支付项目，无法转移"
     },
-    "combineDescription": "将两个桌台的订单合并",
+    "combine_description": "将两个桌台的订单合并",
     "selection": {
       "back": "返回",
       "title": "选择桌台",
       "retrieve": "取单"
     },
-    "selectTarget": "选择目标桌台",
+    "select_target": "选择目标桌台",
     "zones": "区域",
     "guests": "位客人",
-    "ghostOrders": "幽灵订单",
-    "addItems": "加单",
-    "openTable": "开台",
-    "confirmAdd": "确认加单",
-    "confirmOpen": "确认开台"
+    "ghost_orders": "幽灵订单",
+    "add_items": "加单",
+    "open_table": "开台",
+    "confirm_add": "确认加单",
+    "confirm_open": "确认开台"
   },
   "history": {
     "sidebar": {
       "title": "历史订单",
       "search": "搜索订单..."
     },
-    "noOrders": "暂无历史订单",
-    "loadMore": "加载更多",
-    "noMore": "没有更多了",
+    "no_orders": "暂无历史订单",
+    "load_more": "加载更多",
+    "no_more": "没有更多了",
     "status": {
       "voided": "已作废",
       "moved": "已转移",
@@ -330,17 +330,17 @@
       "reprint": "重新打印"
     },
     "info": {
-      "selectOrder": "请选择要查看的订单",
+      "select_order": "请选择要查看的订单",
       "table": "桌台",
-      "totalAmount": "总金额",
-      "orderItems": "订单项目",
-      "removedItems": "已删除项目",
-      "orderId": "订单号",
+      "total_amount": "总金额",
+      "order_items": "订单项目",
+      "removed_items": "已删除项目",
+      "order_id": "订单号",
       "status": "状态"
     },
     "payment": {
       "details": "支付详情",
-      "noPayments": "暂无支付记录"
+      "no_payments": "暂无支付记录"
     }
   },
   "statistics": {
@@ -352,8 +352,8 @@
     "time": {
       "today": "今天"
     },
-    "dateRange": "日期范围",
-    "topProducts": "热销商品",
+    "date_range": "日期范围",
+    "top_products": "热销商品",
     "error": {
       "load": "加载统计数据失败"
     },
@@ -361,21 +361,21 @@
       "sales": "销售报告",
       "product": "商品报告",
       "category": "分类报告",
-      "detailedComingSoon": "详细报告即将推出"
+      "detailed_coming_soon": "详细报告即将推出"
     },
     "chart": {
-      "revenueTrend": "收入趋势",
-      "salesByCategory": "分类销售"
+      "revenue_trend": "收入趋势",
+      "sales_by_category": "分类销售"
     },
     "metric": {
-      "avgOrderValue": "客单价",
-      "cashRevenue": "现金收入",
-      "cardRevenue": "银行卡收入",
-      "otherRevenue": "其他收入",
-      "avgGuestSpend": "人均消费",
-      "avgDiningTime": "平均用餐时间",
-      "voidedOrders": "作废订单数",
-      "totalDiscount": "总折扣",
+      "avg_order_value": "客单价",
+      "cash_revenue": "现金收入",
+      "card_revenue": "银行卡收入",
+      "other_revenue": "其他收入",
+      "avg_guest_spend": "人均消费",
+      "avg_dining_time": "平均用餐时间",
+      "voided_orders": "作废订单数",
+      "total_discount": "总折扣",
       "orders": "订单"
     },
     "status": {
@@ -385,25 +385,40 @@
     }
   },
   "timeline": {
-    "addItems": "加单",
+    "add_items": "加单",
+    "added_items": "添加了 {n} 项",
     "empty": "暂无时间线记录",
+    "guests_count": "{n} 位客人",
+    "receipt_no": "小票号: {n}",
     "payment": "支付",
-    "splitBill": "分单",
-    "itemModified": "项目修改",
-    "itemRemoved": "删除项目",
-    "orderCompleted": "订单完成",
-    "orderVoided": "订单作废",
-    "tableOrder": "桌台订单",
-    "itemRestored": "恢复项目",
-    "paymentCancelled": "取消支付",
-    "orderRestored": "恢复订单",
-    "orderMerged": "合并订单",
-    "orderMoved": "转移订单",
-    "orderMovedOut": "转出订单",
-    "orderMergedOut": "转出合并",
-    "prePaymentPrinted": "预付小票",
-    "prePaymentNote": "预付备注",
-    "surchargeExempt": "免除附加费"
+    "split_bill": "分单",
+    "item_modified": "项目修改",
+    "item_removed": "删除项目",
+    "order_completed": "订单完成",
+    "order_voided": "订单作废",
+    "table_order": "桌台订单",
+    "item_restored": "恢复项目",
+    "payment_cancelled": "取消支付",
+    "order_restored": "恢复订单",
+    "order_merged": "合并订单",
+    "order_moved": "转移订单",
+    "order_moved_out": "转出订单",
+    "order_merged_out": "转出合并",
+    "pre_payment_printed": "预付小票",
+    "pre_payment_note": "预付备注",
+    "surcharge_exempt": "免除附加费",
+    "from": "从",
+    "to": "至",
+    "table_moved": "桌台转移",
+    "table_reassigned": "桌台重新分配",
+    "order_info_updated": "订单信息更新",
+    "merged_out": "合并转出",
+    "moved_out": "转移转出",
+    "labels": {
+      "guests": "客人",
+      "receipt": "小票",
+      "table": "桌台"
+    }
   },
   "draft": {
     "action": {
@@ -415,16 +430,16 @@
     }
   },
   "error": {
-    "loadAttributes": "加载属性失败",
+    "load_attributes": "加载属性失败",
     "message": {
       "title": "出错了",
       "description": "发生了未知错误，请稍后重试。"
     },
     "action": {
       "reload": "重新加载",
-      "autoReload": "自动重新加载",
-      "viewDetails": "查看详情",
-      "copyDetails": "复制详情"
+      "auto_reload": "自动重新加载",
+      "view_details": "查看详情",
+      "copy_details": "复制详情"
     },
     "status": {
       "reloading": "正在重新加载..."
@@ -445,10 +460,10 @@
         "name": "区域名称"
       },
       "unit": "个区域",
-      "addZone": "添加区域",
-      "editZone": "编辑区域",
-      "deleteZone": "删除区域",
-      "zoneDeleted": "区域已删除",
+      "add_zone": "添加区域",
+      "edit_zone": "编辑区域",
+      "delete_zone": "删除区域",
+      "zone_deleted": "区域已删除",
       "message": {
         "created": "区域创建成功",
         "updated": "区域更新成功"
@@ -458,22 +473,22 @@
       "title": "店铺信息",
       "description": "管理您的店铺基本信息和联系方式",
       "form": {
-        "basicInfo": "基本信息",
-        "establishmentName": "店铺名称",
-        "logoUrl": "Logo 地址",
-        "logoHelp": "输入本地文件路径（如 C:\\Users\\Admin\\logo.png）或网络地址（http://...）",
-        "contactInfo": "联系方式",
+        "basic_info": "基本信息",
+        "establishment_name": "店铺名称",
+        "logo_url": "Logo 地址",
+        "logo_help": "输入本地文件路径（如 C:\\Users\\Admin\\logo.png）或网络地址（http://...）",
+        "contact_info": "联系方式",
         "address": "店铺地址",
-        "taxId": "税号 / 营业执照",
+        "tax_id": "税号 / 营业执照",
         "phone": "联系电话",
         "email": "电子邮箱",
         "website": "官方网站"
       }
     },
-    "batchDelete": {
-      "confirmTitle": "确认批量删除",
-      "zonesBlocked": "无法删除包含桌台的区域",
-      "zonesFailed": "批量删除区域失败",
+    "batch_delete": {
+      "confirm_title": "确认批量删除",
+      "zones_blocked": "无法删除包含桌台的区域",
+      "zones_failed": "批量删除区域失败",
       "failed": "批量删除失败"
     },
     "product": {
@@ -484,40 +499,40 @@
       },
       "form": {
         "name": "菜品名称",
-        "namePlaceholder": "请输入菜品名称",
-        "nameRequired": "请输入商品名称",
+        "name_placeholder": "请输入菜品名称",
+        "name_required": "请输入商品名称",
         "category": "分类",
-        "selectCategory": "选择分类",
+        "select_category": "选择分类",
         "price": "价格",
-        "priceBaseHint": "此价格将作为默认规格的价格",
-        "taxRate": "税率 (%)",
-        "taxRateGeneral": "标准税率 (21%)",
-        "taxRateReduced": "降低税率 (10%)",
-        "taxRateSuperReduced": "超低税率 (4%)",
-        "taxRateExempt": "零税率 (0%)",
-        "externalId": "菜品编号",
-        "externalIdPlaceholder": "输入编号",
+        "price_base_hint": "此价格将作为默认规格的价格",
+        "tax_rate": "税率 (%)",
+        "tax_rate_general": "标准税率 (21%)",
+        "tax_rate_reduced": "降低税率 (10%)",
+        "tax_rate_super_reduced": "超低税率 (4%)",
+        "tax_rate_exempt": "零税率 (0%)",
+        "external_id": "菜品编号",
+        "external_id_placeholder": "输入编号",
         "image": "图片",
-        "imageHint": "支持 JPG, PNG, WEBP 格式"
+        "image_hint": "支持 JPG, PNG, WEBP 格式"
       },
-      "noProducts": "暂无商品",
+      "no_products": "暂无商品",
       "print": {
         "settings": "打印设置",
-        "kitchenPrinting": "厨房打印",
-        "labelPrinting": "标签打印",
-        "receiptPrinting": "小票打印",
-        "isKitchenPrintEnabled": "启用厨房打印",
-        "isLabelPrintEnabled": "启用标签打印",
-        "kitchenPrintName": "厨房打印名称",
-        "kitchenPrintNamePlaceholder": "如为空则使用菜品名称",
-        "effectiveState": "当前生效",
-        "receiptName": "小票名称",
-        "receiptNamePlaceholder": "如为空则使用菜品名称"
+        "kitchen_printing": "厨房打印",
+        "label_printing": "标签打印",
+        "receipt_printing": "小票打印",
+        "is_kitchen_print_enabled": "启用厨房打印",
+        "is_label_print_enabled": "启用标签打印",
+        "kitchen_print_name": "厨房打印名称",
+        "kitchen_print_name_placeholder": "如为空则使用菜品名称",
+        "effective_state": "当前生效",
+        "receipt_name": "小票名称",
+        "receipt_name_placeholder": "如为空则使用菜品名称"
       },
       "specification": {
         "title": "产品规格",
         "manage": "管理规格",
-        "noConfigured": "暂无规格配置",
+        "no_configured": "暂无规格配置",
         "disabled": "多规格功能未启用",
         "hint": "请点击上方\"管理规格\"按钮进行配置",
         "label": {
@@ -527,26 +542,27 @@
       "attribute": {
         "title": "产品属性",
         "manage": "管理属性",
-        "noSelected": "未选择任何属性",
+        "no_selected": "未选择任何属性",
         "add": "添加属性",
         "select": "选择属性",
         "inherited": "继承自分类",
+        "description": "配置产品的可选规格和属性",
         "hint": {
-          "multiSelect": "可多选",
-          "singleSelect": "单选",
-          "noDefault": "未设置默认",
-          "defaultSet": "已设默认"
+          "multi_select": "可多选",
+          "single_select": "单选",
+          "no_default": "未设置默认",
+          "default_set": "已设默认"
         }
       },
       "list": {
-        "batchDeleteTitle": "确认批量删除",
-        "batchDeleteSuccess": "批量删除成功",
-        "batchDeleteFailed": "批量删除失败"
+        "batch_delete_title": "确认批量删除",
+        "batch_delete_success": "批量删除成功",
+        "batch_delete_failed": "批量删除失败"
       },
-      "addProduct": "添加菜品",
-      "editProduct": "编辑菜品",
-      "deleteProduct": "删除菜品",
-      "productDeleted": "菜品已删除",
+      "add_product": "添加菜品",
+      "edit_product": "编辑菜品",
+      "delete_product": "删除菜品",
+      "product_deleted": "菜品已删除",
       "header": {
         "category": "分类",
         "products": "菜品"
@@ -561,15 +577,15 @@
       "description": "管理商品标签",
       "unit": "个标签",
       "name": "标签名称",
-      "namePlaceholder": "请输入标签名称",
+      "name_placeholder": "请输入标签名称",
       "color": "标签颜色",
-      "displayOrder": "显示顺序",
-      "addTag": "添加标签",
-      "editTag": "编辑标签",
-      "deleteTag": "删除标签",
-      "tagDeleted": "标签已删除",
+      "display_order": "显示顺序",
+      "add_tag": "添加标签",
+      "edit_tag": "编辑标签",
+      "delete_tag": "删除标签",
+      "tag_deleted": "标签已删除",
       "preview": "预览",
-      "sampleTag": "示例标签",
+      "sample_tag": "示例标签",
       "confirm": {
         "delete": "确定要删除标签 \"{name}\" 吗？"
       },
@@ -588,103 +604,131 @@
       "header": {
         "sort": "排序"
       },
-      "addCategory": "添加分类",
-      "editCategory": "编辑分类",
-      "deleteCategory": "删除分类",
-      "adjustCategoryOrder": "调整排序",
-      "categoryDeleted": "分类已删除",
-      "createCategorySuccess": "分类创建成功",
-      "updateCategorySuccess": "分类更新成功",
+      "add_category": "添加分类",
+      "edit_category": "编辑分类",
+      "delete_category": "删除分类",
+      "adjust_category_order": "调整排序",
+      "category_deleted": "分类已删除",
+      "create_category_success": "分类创建成功",
+      "update_category_success": "分类更新成功",
+      "label": {
+        "virtual": "虚拟"
+      },
       "form": {
         "name": "分类名称",
-        "namePlaceholder": "请输入分类名称",
+        "name_placeholder": "请输入分类名称",
         "attributes": "分类属性",
-        "virtualSettings": "虚拟分类设置",
-        "isVirtual": "分类类型",
-        "regularCategory": "常规分类",
-        "virtualCategory": "虚拟分类（按标签筛选）",
-        "matchMode": "匹配模式",
-        "matchAny": "匹配任一标签",
-        "matchAll": "匹配全部标签",
-        "filterTags": "筛选标签",
-        "noTagsAvailable": "暂无可用标签",
-        "selectTagsHint": "请至少选择一个标签用于筛选产品"
+        "attributes_hint": "该分类下所有商品将继承这些属性",
+        "virtual_settings": "虚拟分类设置",
+        "is_virtual": "分类类型",
+        "regular_category": "常规分类",
+        "virtual_category": "虚拟分类（按标签筛选）",
+        "match_mode": "匹配模式",
+        "match_any": "匹配任一标签",
+        "match_all": "匹配全部标签",
+        "filter_tags": "筛选标签",
+        "no_tags_available": "暂无可用标签",
+        "select_tags_hint": "请至少选择一个标签用于筛选产品"
       },
       "message": {
         "exists": "分类已存在"
       },
       "required": "请选择分类",
-      "createFirst": "请先创建分类"
+      "create_first": "请先创建分类"
     },
     "attribute": {
       "title": "属性管理",
       "description": "管理商品属性和选项",
       "unit": "个属性",
       "hint": {
-        "addFirst": "请点击上方按钮添加第一个属性"
+        "add_first": "请点击上方按钮添加第一个属性"
+      },
+      "section": {
+        "basic": "基本信息",
+        "print": "打印设置",
+        "advanced": "高级设置"
       },
       "form": {
         "name": "属性名称",
-        "namePlaceholder": "请输入属性名称",
-        "nameRequired": "请输入属性名称",
+        "name_placeholder": "请输入属性名称",
+        "name_required": "请输入属性名称",
         "type": "属性类型",
-        "receiptName": "小票名称",
-        "receiptNamePlaceholder": "如为空则使用属性名称",
+        "receipt_name": "小票名称",
+        "receipt_name_placeholder": "如为空则使用属性名称",
         "sort": "排序",
-        "isGlobal": "全局属性",
-        "isGlobalDesc": "全局属性将自动应用到所有商品",
-        "kitchenPrinter": "厨房打印机",
-        "showOnReceipt": "显示在小票",
-        "showOnReceiptHint": "选择此项后，该属性的选项将显示在收据上",
-        "status": "状态"
+        "is_global": "全局属性",
+        "is_global_desc": "全局属性将自动应用到所有商品",
+        "kitchen_printer": "厨房打印机",
+        "show_on_receipt": "显示在小票",
+        "show_on_receipt_hint": "选择此项后，该属性的选项将显示在收据上",
+        "status": "状态",
+        "status_hint": "禁用后该属性将不会显示在 POS",
+        "is_multi_select": "多选",
+        "is_multi_select_desc": "允许选择多个选项",
+        "max_selections": "最大选择数",
+        "max_selections_placeholder": "留空表示无限制",
+        "max_selections_hint": "限制用户最多可以选择的选项数量，0 或留空表示无限制",
+        "kitchen_print_name": "厨房打印名称",
+        "kitchen_print_name_placeholder": "如为空则使用属性名称",
+        "scope": "作用范围",
+        "show_on_kitchen_print": "显示在厨房打印",
+        "show_on_kitchen_print_hint": "选择此项后，该属性的选项将显示在厨房小票上"
       },
       "type": {
-        "singleRequired": "单选必选",
-        "singleOptional": "单选可选",
-        "multiRequired": "多选必选",
-        "multiOptional": "多选可选"
+        "single_required": "单选必选",
+        "single_optional": "单选可选",
+        "multi_required": "多选必选",
+        "multi_optional": "多选可选",
+        "single_select": "单选",
+        "multi_select": "多选"
       },
-      "addAttribute": "添加属性",
-      "editAttribute": "编辑属性",
-      "deleteAttribute": "删除属性",
+      "add_attribute": "添加属性",
+      "edit_attribute": "编辑属性",
+      "delete_attribute": "删除属性",
       "option": {
         "title": "属性选项",
-        "deleteOption": "删除选项",
+        "delete_option": "删除选项",
         "hint": {
-          "addFirst": "请点击上方按钮添加第一个选项"
+          "add_first": "请点击上方按钮添加第一个选项"
         },
         "form": {
           "name": "选项名称",
-          "namePlaceholder": "请输入选项名称",
-          "nameRequired": "请输入选项名称",
-          "receiptName": "小票名称",
-          "receiptNamePlaceholder": "如为空则使用选项名称",
-          "valueCode": "选项编码",
-          "valueCodePlaceholder": "请输入编码",
+          "name_placeholder": "请输入选项名称",
+          "name_required": "请输入选项名称",
+          "receipt_name": "小票名称",
+          "receipt_name_placeholder": "如为空则使用选项名称",
+          "value_code": "选项编码",
+          "value_code_placeholder": "请输入编码",
           "price": "加价金额",
-          "priceHint": "可正可负，例如：+1.50 或 -0.50",
+          "price_hint": "可正可负，例如：+1.50 或 -0.50",
           "sort": "排序",
           "default": "默认选项",
-          "setAsDefault": "设为默认",
-          "status": "状态"
+          "set_as_default": "设为默认",
+          "status": "状态",
+          "kitchen_print_name": "厨房打印名称",
+          "kitchen_print_name_placeholder": "如为空则使用选项名称"
         },
-        "addOption": "添加选项",
-        "editOption": "编辑选项"
+        "add_option": "添加选项",
+        "edit_option": "编辑选项"
+      },
+      "scope": {
+        "global": "全局",
+        "inherited": "继承自分类"
       }
     },
     "table": {
       "title": "桌台管理",
-      "zoneManagement": "桌台与区域管理",
-      "zoneManagementDesc": "管理餐厅桌台和区域",
+      "zone_management": "桌台与区域管理",
+      "zone_management_desc": "管理餐厅桌台和区域",
       "form": {
         "name": "桌台名称",
-        "namePlaceholder": "请输入桌台名称",
+        "name_placeholder": "请输入桌台名称",
         "capacity": "容量"
       },
-      "addTable": "添加桌台",
-      "editTable": "编辑桌台",
-      "deleteTable": "删除桌台",
-      "tableDeleted": "桌台已删除",
+      "add_table": "添加桌台",
+      "edit_table": "编辑桌台",
+      "delete_table": "删除桌台",
+      "table_deleted": "桌台已删除",
       "confirm": {
         "delete": "确定要删除该桌台吗？删除后该桌台将无法恢复。"
       },
@@ -698,11 +742,9 @@
         },
         "form": {
           "name": "区域名称",
-          "namePlaceholder": "请输入区域名称",
-          "surchargeType": "附加费类型",
-          "surchargeFixed": "每项固定",
-          "surchargePercentage": "百分比",
-          "surchargeAmount": "附加费金额"
+          "name_placeholder": "请输入区域名称",
+          "description": "区域描述",
+          "description_placeholder": "请输入区域描述（可选）"
         }
       }
     },
@@ -711,60 +753,64 @@
       "description": "管理系统用户和权限",
       "list": "用户列表",
       "roles": "角色权限",
+      "section": {
+        "account": "账号信息",
+        "profile": "个人资料"
+      },
       "form": {
         "username": "用户名",
-        "usernamePlaceholder": "输入登录用户名",
-        "usernameCannotChange": "用户名不可修改",
+        "username_placeholder": "输入登录用户名",
+        "username_cannot_change": "用户名不可修改",
         "password": "密码",
-        "passwordPlaceholder": "输入登录密码",
-        "displayName": "显示名称",
-        "displayNamePlaceholder": "输入显示名称",
+        "password_placeholder": "输入登录密码",
+        "display_name": "显示名称",
+        "display_name_placeholder": "输入显示名称",
         "role": "角色",
-        "activeStatus": "启用账号",
-        "adminCannotDisable": "超级管理员不可禁用",
-        "adminRoleCannotChange": "超级管理员角色不可修改",
-        "passwordRequired": "请输入密码",
-        "passwordTooShort": "密码至少6位",
-        "passwordMismatch": "两次输入不一致",
-        "usernameRequired": "请输入用户名",
-        "displayNameRequired": "请输入显示名称"
+        "active_status": "启用账号",
+        "admin_cannot_disable": "超级管理员不可禁用",
+        "admin_role_cannot_change": "超级管理员角色不可修改",
+        "password_required": "请输入密码",
+        "password_too_short": "密码至少6位",
+        "password_mismatch": "两次输入不一致",
+        "username_required": "请输入用户名",
+        "display_name_required": "请输入显示名称"
       },
-      "addUser": "新增用户",
-      "editUser": "编辑用户",
-      "resetPasswordUser": "重置密码",
-      "disableUser": "禁用用户",
-      "deletePermanentlyUser": "永久删除用户",
+      "add_user": "新增用户",
+      "edit_user": "编辑用户",
+      "reset_password_user": "重置密码",
+      "disable_user": "禁用用户",
+      "delete_permanently_user": "永久删除用户",
       "column": {
         "user": "用户",
-        "createdAt": "创建时间",
+        "created_at": "创建时间",
         "actions": "操作"
       },
       "filter": {
-        "showInactive": "显示已禁用"
+        "show_inactive": "显示已禁用"
       },
       "message": {
-        "cannotDeleteSelf": "无法删除自己的账号",
-        "cannotDeleteAdmin": "无法删除管理员账号",
-        "updateSuccess": "用户更新成功",
-        "deleteSuccess": "删除成功",
-        "updateFailed": "更新失败",
-        "deleteFailed": "删除失败",
-        "loadRolesFailed": "无法加载角色列表",
-        "resetPasswordSuccess": "密码重置成功",
-        "resetPasswordFailed": "密码重置失败",
-        "createSuccess": "用户创建成功"
+        "cannot_delete_self": "无法删除自己的账号",
+        "cannot_delete_admin": "无法删除管理员账号",
+        "update_success": "用户更新成功",
+        "delete_success": "删除成功",
+        "update_failed": "更新失败",
+        "delete_failed": "删除失败",
+        "load_roles_failed": "无法加载角色列表",
+        "reset_password_success": "密码重置成功",
+        "reset_password_failed": "密码重置失败",
+        "create_success": "用户创建成功"
       },
       "unit": "个用户"
     },
     "printer": {
       "title": "打印机设置",
       "description": "管理硬件打印机、厨房路由和标签模板",
-      "kitchenPrinting": {
+      "kitchen_printing": {
         "title": "厨房打印",
         "disabled": "厨房打印已关闭",
-        "enableToConfigure": "启用厨房打印后，您可以配置多个工位、路由规则和小票格式"
+        "enable_to_configure": "启用厨房打印后，您可以配置多个工位、路由规则和小票格式"
       },
-      "labelPrinting": "标签打印",
+      "label_printing": "标签打印",
       "hardware": "硬件",
       "templates": "标签模板",
       "badge": {
@@ -773,59 +819,59 @@
         "fallback": "备用"
       },
       "message": {
-        "loadingPrinters": "正在加载打印机列表...",
-        "noPrinters": "未检测到打印机",
-        "noPrinter": "未分配打印机",
-        "printerUnavailable": "所选打印机不可用"
+        "loading_printers": "正在加载打印机列表...",
+        "no_printers": "未检测到打印机",
+        "no_printer": "未分配打印机",
+        "printer_unavailable": "所选打印机不可用"
       },
-      "kitchenStation": {
+      "kitchen_station": {
         "title": "厨房工位",
-        "noData": "创建您的第一个厨房工位",
-        "defaultName": "工位",
-        "addStation": "添加工位",
-        "editStation": "编辑工位"
+        "no_data": "创建您的第一个厨房工位",
+        "default_name": "工位",
+        "add_station": "添加工位",
+        "edit_station": "编辑工位"
       },
       "form": {
-        "targetPrinter": "目标打印机",
-        "selectSystemPrinter": "选择系统打印机...",
-        "selectPrinterPlaceholder": "选择打印机...",
-        "mainStation": "打印机",
-        "receiptPrinter": "收据打印机",
-        "receiptPrinterDesc": "顾客收据",
-        "labelPrinterDesc": "标签和贴纸",
-        "defaultGlobalPrinter": "默认厨房打印机",
-        "defaultGlobalPrinterDesc": "未指定具体工位时的备用打印机"
+        "target_printer": "目标打印机",
+        "select_system_printer": "选择系统打印机...",
+        "select_printer_placeholder": "选择打印机...",
+        "main_station": "打印机",
+        "receipt_printer": "收据打印机",
+        "receipt_printer_desc": "顾客收据",
+        "label_printer_desc": "标签和贴纸",
+        "default_global_printer": "默认厨房打印机",
+        "default_global_printer_desc": "未指定具体工位时的备用打印机"
       },
-      "routingSystem": {
+      "routing_system": {
         "title": "厨房路由系统",
         "summary": "根据商品和分类设置，订单会被智能路由到指定的打印机",
         "hierarchy": "路由优先级",
         "priority": "主开关",
-        "switchHierarchy": "全局开关优先一切，然后商品开关优先分类开关",
+        "switch_hierarchy": "全局开关优先一切，然后商品开关优先分类开关",
         "stations": "路由工位",
-        "levelProduct": "商品优先级",
-        "levelCategory": "分类优先级",
-        "levelGlobal": "全局优先级"
+        "level_product": "商品优先级",
+        "level_category": "分类优先级",
+        "level_global": "全局优先级"
       },
       "template": {
         "new": "新建模板",
-        "createTemplate": "创建新模板",
-        "editDesign": "编辑设计",
-        "duplicateTemplate": "复制",
+        "create_template": "创建新模板",
+        "edit_design": "编辑设计",
+        "duplicate_template": "复制",
         "form": {
           "name": "模板名称",
-          "namePlaceholder": "例如：商品标签 50x30mm",
-          "widthMm": "宽度 (mm)",
-          "heightMm": "高度 (mm)"
+          "name_placeholder": "例如：商品标签 50x30mm",
+          "width_mm": "宽度 (mm)",
+          "height_mm": "高度 (mm)"
         }
       },
       "alert": {
-        "deleteLastTemplate": "无法删除最后一个模板",
-        "confirmDelete": "确定要删除吗？",
-        "confirmDeleteDesc": "此操作无法撤销"
+        "delete_last_template": "无法删除最后一个模板",
+        "confirm_delete": "确定要删除吗？",
+        "confirm_delete_desc": "此操作无法撤销"
       }
     },
-    "dataTransfer": {
+    "data_transfer": {
       "title": "数据导入/导出",
       "description": "备份或迁移您的数据 (菜品, 分类, 区域, 桌台)",
       "export": {
@@ -856,18 +902,18 @@
     },
     "system": {
       "title": "系统设置",
-      "fontOptimization": {
+      "font_optimization": {
         "title": "字体优化",
         "description": "优化字体渲染，提升显示效果"
       },
-      "clearCache": {
+      "clear_cache": {
         "title": "清除缓存",
         "description": "清除本地缓存数据",
-        "confirmTitle": "确定要清除缓存吗？",
-        "confirmDescription": "清除后应用将重新加载，可能需要一些时间恢复数据"
+        "confirm_title": "确定要清除缓存吗？",
+        "confirm_description": "清除后应用将重新加载，可能需要一些时间恢复数据"
       },
-      "performanceMode": "性能模式",
-      "performanceModeDesc": "优化系统性能"
+      "performance_mode": "性能模式",
+      "performance_mode_desc": "优化系统性能"
     },
     "permissions": {
       "manage_users": "管理用户",
@@ -906,8 +952,8 @@
       "list": {
         "title": "角色列表"
       },
-      "selectRole": "请选择一个角色",
-      "adminLock": {
+      "select_role": "请选择一个角色",
+      "admin_lock": {
         "title": "管理员角色",
         "desc": "管理员角色是系统核心角色，拥有所有权限且无法被删除或修改权限配置"
       },
@@ -915,50 +961,50 @@
         "title": "创建角色",
         "add": "添加角色",
         "id": "角色ID",
-        "idPlaceholder": "输入角色ID（小写字母、数字、下划线）",
-        "idHint": "角色ID用于系统标识，创建后不可修改",
+        "id_placeholder": "输入角色ID（小写字母、数字、下划线）",
+        "id_hint": "角色ID用于系统标识，创建后不可修改",
         "name": "角色名称",
-        "namePlaceholder": "输入角色名称",
+        "name_placeholder": "输入角色名称",
         "desc": "角色描述",
-        "descPlaceholder": "输入角色描述（可选）",
+        "desc_placeholder": "输入角色描述（可选）",
         "submit": "创建",
-        "deleteTitle": "删除角色",
-        "errorEmpty": "角色ID和名称不能为空",
-        "errorFormat": "角色ID只能包含小写字母、数字和下划线",
-        "createSuccess": "角色创建成功",
-        "deleteSuccess": "角色删除成功",
-        "noDescription": "暂无描述"
+        "delete_title": "删除角色",
+        "error_empty": "角色ID和名称不能为空",
+        "error_format": "角色ID只能包含小写字母、数字和下划线",
+        "create_success": "角色创建成功",
+        "delete_success": "角色删除成功",
+        "no_description": "暂无描述"
       },
       "message": {
-        "loadFailed": "加载权限数据失败"
+        "load_failed": "加载权限数据失败"
       }
     },
     "form": {
       "placeholder": {
         "capacity": "4",
         "price": "0.00",
-        "sortOrder": "0"
+        "sort_order": "0"
       },
-      "basicInfo": "基本信息",
-      "extendedInfo": "扩展信息"
+      "basic_info": "基本信息",
+      "extended_info": "扩展信息"
     },
     "specification": {
       "list": "规格列表",
       "loading": "正在加载规格...",
-      "noSpecs": "暂无规格",
-      "createFirst": "创建您的第一个规格",
-      "addNew": "添加新规格",
+      "no_specs": "暂无规格",
+      "create_first": "创建您的第一个规格",
+      "add_new": "添加新规格",
       "edit": "编辑规格",
       "form": {
         "name": "规格名称",
-        "namePlaceholder": "例如：大份、微辣",
+        "name_placeholder": "例如：大份、微辣",
         "price": "价格",
-        "externalId": "POS 编号",
-        "externalIdPlaceholder": "输入编号",
-        "baseSpecPriceHint": "基础规格价格请在菜品信息中修改",
-        "setDefault": "设为默认规格",
-        "setDefaultHint": "点单时将作为默认选项",
-        "nameRequired": "请输入规格名称"
+        "external_id": "POS 编号",
+        "external_id_placeholder": "输入编号",
+        "base_spec_price_hint": "基础规格价格请在菜品信息中修改",
+        "set_default": "设为默认规格",
+        "set_default_hint": "点单时将作为默认选项",
+        "name_required": "请输入规格名称"
       },
       "action": {
         "save": "创建规格",
@@ -966,9 +1012,9 @@
         "delete": "删除"
       },
       "message": {
-        "loadFailed": "加载规格失败",
-        "rootCannotDelete": "基础规格不能删除",
-        "partialCreateFailed": "规格创建失败，但产品已成功创建",
+        "load_failed": "加载规格失败",
+        "root_cannot_delete": "基础规格不能删除",
+        "partial_create_failed": "规格创建失败，但产品已成功创建",
         "updated": "规格已更新",
         "created": "规格已创建",
         "deleted": "规格已删除"
@@ -979,13 +1025,13 @@
       "label": {
         "root": "基础",
         "default": "默认",
-        "setDefault": "设为默认",
-        "cancelDefault": "取消默认"
+        "set_default": "设为默认",
+        "cancel_default": "取消默认"
       },
       "manage": "管理规格",
-      "multiDisabled": "多规格功能未启用",
-      "enableMultiHint": "启用后可添加多个规格",
-      "enableMulti": "启用多规格"
+      "multi_disabled": "多规格功能未启用",
+      "enable_multi_hint": "启用后可添加多个规格",
+      "enable_multi": "启用多规格"
     },
     "status": {
       "saved": "已保存"
@@ -995,83 +1041,83 @@
       "width": "宽度",
       "height": "高度",
       "layers": "图层",
-      "toggleLayers": "切换图层",
-      "toggleProperties": "切换属性",
-      "printTestLabel": "打印测试标签",
-      "selectFieldHint": "请先选择字段",
-      "fieldProperties": "字段属性",
-      "displayLabel": "显示标签",
+      "toggle_layers": "切换图层",
+      "toggle_properties": "切换属性",
+      "print_test_label": "打印测试标签",
+      "select_field_hint": "请先选择字段",
+      "field_properties": "字段属性",
+      "display_label": "显示标签",
       "placeholder": "请输入标签",
-      "xPosition": "X 位置",
-      "yPosition": "Y 位置",
-      "fontSize": "字体大小",
-      "fontFamily": "字体",
-      "fontStyle": "字重",
-      "styleRegular": "常规",
-      "styleBold": "粗体",
-      "textAlign": "水平对齐",
-      "verticalAlign": "垂直对齐",
-      "contentTemplate": "内容模板",
-      "imageTemplateHint": "使用 {字段名} 引用数据",
-      "separatorHint": "分隔线用于分割标签内容",
+      "x_position": "X 位置",
+      "y_position": "Y 位置",
+      "font_size": "字体大小",
+      "font_family": "字体",
+      "font_style": "字重",
+      "style_regular": "常规",
+      "style_bold": "粗体",
+      "text_align": "水平对齐",
+      "vertical_align": "垂直对齐",
+      "content_template": "内容模板",
+      "image_template_hint": "使用 {字段名} 引用数据",
+      "separator_hint": "分隔线用于分割标签内容",
       "field": {
-        "newText": "新建文本",
-        "defaultText": "默认文本",
-        "newImage": "新建图片",
-        "defaultSeparator": "默认分隔线",
+        "new_text": "新建文本",
+        "default_text": "默认文本",
+        "new_image": "新建图片",
+        "default_separator": "默认分隔线",
         "text": "文本",
         "image": "图片",
         "line": "线条"
       },
-      "selectPrinterFirst": "请先选择打印机",
-      "invalidJson": "JSON 格式错误",
-      "testSent": "测试标签已发送",
-      "testFailed": "测试失败",
-      "horizontalLine": "水平线",
-      "noLayers": "暂无图层",
-      "templateName": "模板名称",
-      "widthMm": "宽度 (mm)",
-      "heightMm": "高度 (mm)",
-      "paddingX": "水平边距",
-      "paddingY": "垂直边距",
-      "showOffsetBorder": "显示偏移边框",
-      "renderDpi": "渲染 DPI",
-      "renderDpiHint": "通常 203 或 300",
-      "selectElementHint": "点击选择元素",
-      "testDataJson": "测试数据 (JSON)",
-      "fillSample": "填充示例数据",
-      "testDataHint": "使用 {字段名} 引用",
-      "zoomIn": "放大",
-      "zoomOut": "缩小",
-      "fitToScreen": "适应屏幕",
-      "fieldKey": "字段键",
+      "select_printer_first": "请先选择打印机",
+      "invalid_json": "JSON 格式错误",
+      "test_sent": "测试标签已发送",
+      "test_failed": "测试失败",
+      "horizontal_line": "水平线",
+      "no_layers": "暂无图层",
+      "template_name": "模板名称",
+      "width_mm": "宽度 (mm)",
+      "height_mm": "高度 (mm)",
+      "padding_x": "水平边距",
+      "padding_y": "垂直边距",
+      "show_offset_border": "显示偏移边框",
+      "render_dpi": "渲染 DPI",
+      "render_dpi_hint": "通常 203 或 300",
+      "select_element_hint": "点击选择元素",
+      "test_data_json": "测试数据 (JSON)",
+      "fill_sample": "填充示例数据",
+      "test_data_hint": "使用 {字段名} 引用",
+      "zoom_in": "放大",
+      "zoom_out": "缩小",
+      "fit_to_screen": "适应屏幕",
+      "field_key": "字段键",
       "description": "描述",
       "example": "示例",
-      "fieldHelperHint": "支持字段引用"
+      "field_helper_hint": "支持字段引用"
     },
     "payment": {
-      "amountInsufficient": "收款金额不足",
-      "amountMustBePositive": "支付金额必须大于 0",
-      "receiptPrintSuccess": "小票打印成功",
-      "receiptPrintFailed": "打印小票失败，请检查打印机连接"
+      "amount_insufficient": "收款金额不足",
+      "amount_must_be_positive": "支付金额必须大于 0",
+      "receipt_print_success": "小票打印成功",
+      "receipt_print_failed": "打印小票失败，请检查打印机连接"
     },
-    "supportedFields": "支持的字段",
-    "allAttributesSelected": "已选择所有属性",
-    "externalIdRequired": "请输入编号",
-    "externalIdExists": "编号已存在",
-    "unsavedConfirm": "有未保存的更改",
-    "unsavedConfirmHint": "确定要离开吗？",
-    "kitchenPrinter": "厨房打印机",
-    "resetPassword": "重置密码",
-    "newPassword": "新密码",
-    "enterNewPassword": "输入新密码",
-    "passwordMinLength": "最小6位",
-    "confirmPassword": "确认密码",
-    "confirmPasswordPlaceholder": "请再次输入密码",
-    "resetPasswordWarning": "密码将立即生效",
-    "reorderFailed": "排序失败",
-    "productOrder": "商品排序",
-    "dragToReorder": "拖拽排序",
+    "supported_fields": "支持的字段",
+    "all_attributes_selected": "已选择所有属性",
+    "external_id_required": "请输入编号",
+    "external_id_exists": "编号已存在",
+    "unsaved_confirm": "有未保存的更改",
+    "unsaved_confirm_hint": "确定要离开吗？",
+    "kitchen_printer": "厨房打印机",
+    "reset_password": "重置密码",
+    "new_password": "新密码",
+    "enter_new_password": "输入新密码",
+    "password_min_length": "最小6位",
+    "confirm_password": "确认密码",
+    "confirm_password_placeholder": "请再次输入密码",
+    "reset_password_warning": "密码将立即生效",
+    "reorder_failed": "排序失败",
+    "product_order": "商品排序",
+    "drag_to_reorder": "拖拽排序",
     "common": {
       "untitled": "未命名",
       "properties": "属性",
@@ -1151,9 +1197,9 @@
   },
   "fonts": {
     "arial": "Arial",
-    "microsoftYaHei": "微软雅黑",
-    "segoeUI": "Segoe UI",
-    "timesNewRoman": "Times New Roman",
-    "courierNew": "Courier New"
+    "microsoft_ya_hei": "微软雅黑",
+    "segoe_u_i": "Segoe UI",
+    "times_new_roman": "Times New Roman",
+    "courier_new": "Courier New"
   }
 }

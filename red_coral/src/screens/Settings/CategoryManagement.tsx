@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Tag, FolderOpen, ArrowUp, ArrowDown, List } from 'lucide-react';
+import { Tag, FolderOpen, ArrowUp, ArrowDown, List, Filter } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useSettingsModal, useDataVersion } from '@/core/stores/settings/useSettingsStore';
 import { useCategoryStore } from '@/core/stores/resources';
@@ -84,7 +84,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
       await categoryStore.fetchAll();
     } catch (e) {
       console.error(e);
-      toast.error(t('settings.reorderFailed'));
+      toast.error(t('settings.reorder_failed'));
       // Revert to server data
       await categoryStore.fetchAll();
     }
@@ -125,16 +125,31 @@ export const CategoryManagement: React.FC = React.memo(() => {
         header: t('settings.category.form.name'),
         render: (item) => (
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-linear-to-br from-teal-100 to-teal-200 rounded-lg flex items-center justify-center">
-              <FolderOpen size={16} className="text-teal-600" />
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+              item.is_virtual
+                ? 'bg-linear-to-br from-purple-100 to-purple-200'
+                : 'bg-linear-to-br from-teal-100 to-teal-200'
+            }`}>
+              {item.is_virtual ? (
+                <Filter size={16} className="text-purple-600" />
+              ) : (
+                <FolderOpen size={16} className="text-teal-600" />
+              )}
             </div>
-            <span className="font-medium text-gray-900">{item.name}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-900">{item.name}</span>
+              {item.is_virtual && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">
+                  {t('settings.category.label.virtual')}
+                </span>
+              )}
+            </div>
           </div>
         ),
       },
       {
         key: 'kitchenPrinting',
-        header: t('settings.product.print.kitchenPrinting'),
+        header: t('settings.product.print.kitchen_printing'),
         width: '120px',
         render: (item) => {
           // Kitchen printing is enabled if print_destinations array is not empty
@@ -152,7 +167,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
       },
       {
         key: 'labelPrinting',
-        header: t('settings.product.print.labelPrinting'),
+        header: t('settings.product.print.label_printing'),
         width: '120px',
         render: (item) => {
           const val = item.is_label_print_enabled;
@@ -190,7 +205,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-700 rounded-lg text-xs font-medium hover:bg-teal-100 transition-colors border border-teal-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <List size={14} />
-            <span>{t('settings.category.adjustCategoryOrder')}</span>
+            <span>{t('settings.category.adjust_category_order')}</span>
           </button>
         ),
       },
@@ -204,7 +219,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
         icon={Tag}
         title={t('settings.category.title')}
         description={t('settings.category.description')}
-        addButtonText={t('settings.category.addCategory')}
+        addButtonText={t('settings.category.add_category')}
         onAdd={() => openModal('CATEGORY', 'CREATE')}
         themeColor="teal"
         permission={Permission.MANAGE_CATEGORIES}
@@ -213,7 +228,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
       <FilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder={t('common.hint.searchPlaceholder')}
+        searchPlaceholder={t('common.hint.search_placeholder')}
         totalCount={filteredItems.length}
         countUnit={t('settings.category.unit')}
         themeColor="teal"
@@ -226,7 +241,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
         getRowKey={(item) => item.name}
         onEdit={canManageCategories ? (item) => openModal('CATEGORY', 'EDIT', item) : undefined}
         onDelete={canManageCategories ? (item) => openModal('CATEGORY', 'DELETE', item) : undefined}
-        emptyText={t('common.empty.noData')}
+        emptyText={t('common.empty.no_data')}
         themeColor="teal"
       />
 

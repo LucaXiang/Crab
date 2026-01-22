@@ -26,8 +26,7 @@ interface TableEditData extends Partial<DiningTable> {
 
 /** ZONE 编辑数据 */
 interface ZoneEditData extends Partial<Zone> {
-  surchargeType?: 'percentage' | 'fixed' | 'none';
-  surchargeAmount?: number;
+  // Zone now only uses standard fields from Zone type
 }
 
 /** PRODUCT 编辑数据 - API 返回 + 创建时默认值 */
@@ -114,10 +113,8 @@ interface FormData {
   display_order?: number;
   is_active?: boolean;
 
-  // === Zone (UI only, no API fields) ===
+  // === Zone ===
   description?: string;
-  surcharge_type?: 'percentage' | 'fixed' | 'none';
-  surcharge_amount?: number;
 }
 
 interface SettingsStore {
@@ -197,8 +194,6 @@ const initialFormData: FormData = {
   display_order: 0,
   // Zone
   description: '',
-  surcharge_type: 'none',
-  surcharge_amount: 0,
 };
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -244,8 +239,6 @@ export const useSettingsStore = create<SettingsStore>()(
             ...formData,
             name: zoneData?.name || '',
             description: zoneData?.description || '',
-            surcharge_type: zoneData?.surchargeType || 'none',
-            surcharge_amount: zoneData?.surchargeAmount || 0,
             is_active: zoneData?.is_active ?? true,  // Default to active for new zones
           };
         } else if (entity === 'PRODUCT') {
@@ -467,7 +460,7 @@ function computeIsDirty(entity: ModalEntity, next: FormData, initial: FormData):
     const keys: (keyof FormData)[] = ['name', 'zone', 'capacity', 'is_active'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'ZONE') {
-    const keys: (keyof FormData)[] = ['name', 'surcharge_type', 'surcharge_amount', 'is_active'];
+    const keys: (keyof FormData)[] = ['name', 'description', 'is_active'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'PRODUCT') {
     const keys: (keyof FormData)[] = [

@@ -45,6 +45,8 @@ interface AttributeStore {
   createAttribute: (params: {
     name: string;
     scope?: 'global' | 'inherited';
+    is_multi_select?: boolean;
+    max_selections?: number | null;
     display_order?: number;
     is_active?: boolean;
     show_on_receipt?: boolean;
@@ -56,6 +58,8 @@ interface AttributeStore {
     id: string;
     name?: string;
     scope?: 'global' | 'inherited';
+    is_multi_select?: boolean;
+    max_selections?: number | null;
     display_order?: number;
     is_active?: boolean;
     show_on_receipt?: boolean;
@@ -73,6 +77,7 @@ interface AttributeStore {
     display_order?: number;
     is_active?: boolean;
     receipt_name?: string;
+    kitchen_print_name?: string;
   }) => Promise<void>;
   updateOption: (params: {
     attributeId: string;
@@ -84,6 +89,7 @@ interface AttributeStore {
     display_order?: number;
     is_active?: boolean;
     receipt_name?: string;
+    kitchen_print_name?: string;
   }) => Promise<void>;
   deleteOption: (attributeId: string, index: number) => Promise<void>;
   reorderOptions: (attributeId: string, ids: string[]) => Promise<void>;
@@ -115,7 +121,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const attributes = await api.listAttributeTemplates() as AttributeEntity[];
-      set({ items: attributes, isLoading: false, isLoaded: true });
+      set({ items: attributes ?? [], isLoading: false, isLoaded: true });
     } catch (e: any) {
       const errorMsg = e.message || 'Failed to fetch attributes';
       set({ error: errorMsg, isLoading: false });

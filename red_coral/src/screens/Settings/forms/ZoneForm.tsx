@@ -6,6 +6,7 @@ import { SelectField } from '@/presentation/components/form/FormField/SelectFiel
 interface ZoneFormProps {
   formData: {
     name: string;
+    description?: string;
     is_active?: boolean;
   };
   onFieldChange: (field: string, value: any) => void;
@@ -21,6 +22,16 @@ export const ZoneForm: React.FC<ZoneFormProps> = ({ formData, onFieldChange, t }
           onChange={(e) => onFieldChange('name', e.target.value)}
           placeholder={t('settings.table.zone.form.name_placeholder')}
           className={inputClass}
+        />
+      </FormField>
+
+      <FormField label={t('settings.table.zone.form.description')}>
+        <textarea
+          value={formData.description || ''}
+          onChange={(e) => onFieldChange('description', e.target.value)}
+          placeholder={t('settings.table.zone.form.description_placeholder')}
+          className={`${inputClass} resize-none`}
+          rows={2}
         />
       </FormField>
 

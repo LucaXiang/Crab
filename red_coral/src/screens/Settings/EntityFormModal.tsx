@@ -301,15 +301,20 @@ export const EntityFormModal: React.FC = React.memo(() => {
       } else if (entity === 'ZONE') {
         const zonePayload = {
           name: formData.name.trim(),
+          description: formData.description?.trim() || undefined,
           is_active: formData.is_active ?? true,
         };
         if (action === 'CREATE') {
-          await api.createZone({ name: zonePayload.name });
+          await api.createZone({
+            name: zonePayload.name,
+            description: zonePayload.description,
+          });
           refreshZones(); // Refresh zones from server
           toast.success(t("settings.zone.message.created"));
         } else {
           await api.updateZone(String(data.id), {
             name: zonePayload.name,
+            description: zonePayload.description,
             is_active: zonePayload.is_active,
           });
           refreshZones(); // Refresh zones from server
@@ -672,6 +677,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           <ZoneForm
             formData={{
               name: formData.name,
+              description: formData.description ?? '',
               is_active: formData.is_active ?? true,
             }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
