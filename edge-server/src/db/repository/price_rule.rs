@@ -115,12 +115,19 @@ impl PriceRuleRepository {
             adjustment_value: data.adjustment_value,
             priority: data.priority.unwrap_or(0),
             is_stackable: data.is_stackable.unwrap_or(true),
+            is_exclusive: data.is_exclusive.unwrap_or(false),
             time_mode: data.time_mode.unwrap_or(TimeMode::Always),
             start_time: data.start_time,
             end_time: data.end_time,
             schedule_config: data.schedule_config,
+            valid_from: data.valid_from,
+            valid_until: data.valid_until,
+            active_days: data.active_days,
+            active_start_time: data.active_start_time,
+            active_end_time: data.active_end_time,
             is_active: true,
             created_by: data.created_by,
+            created_at: chrono::Utc::now().timestamp_millis(),
         };
 
         let created: Option<PriceRule> = self.base.db().create(TABLE).content(rule).await?;

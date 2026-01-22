@@ -194,12 +194,19 @@ mod tests {
             adjustment_value: value,
             priority,
             is_stackable: stackable,
+            is_exclusive: false,
             time_mode: TimeMode::Always,
             start_time: None,
             end_time: None,
             schedule_config: None,
+            valid_from: None,
+            valid_until: None,
+            active_days: None,
+            active_start_time: None,
+            active_end_time: None,
             is_active: true,
             created_by: None,
+            created_at: 0,
         }
     }
 

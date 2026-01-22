@@ -72,17 +72,33 @@ pub struct PriceRule {
     pub priority: i32,
     #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_stackable: bool,
+    /// Whether this rule is exclusive (cannot be combined with other rules)
+    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
+    pub is_exclusive: bool,
     #[serde(default)]
     pub time_mode: TimeMode,
     pub start_time: Option<String>,
     pub end_time: Option<String>,
     pub schedule_config: Option<ScheduleConfig>,
+    /// Valid from timestamp (milliseconds since epoch)
+    pub valid_from: Option<i64>,
+    /// Valid until timestamp (milliseconds since epoch)
+    pub valid_until: Option<i64>,
+    /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+    pub active_days: Option<Vec<u8>>,
+    /// Active start time (HH:MM format)
+    pub active_start_time: Option<String>,
+    /// Active end time (HH:MM format)
+    pub active_end_time: Option<String>,
     #[serde(
         default = "default_true",
         deserialize_with = "serde_helpers::bool_true"
     )]
     pub is_active: bool,
     pub created_by: Option<Thing>,
+    /// Created timestamp (milliseconds since epoch)
+    #[serde(default)]
+    pub created_at: i64,
 }
 
 fn default_true() -> bool {
@@ -104,10 +120,22 @@ pub struct PriceRuleCreate {
     pub adjustment_value: i32,
     pub priority: Option<i32>,
     pub is_stackable: Option<bool>,
+    /// Whether this rule is exclusive (cannot be combined with other rules)
+    pub is_exclusive: Option<bool>,
     pub time_mode: Option<TimeMode>,
     pub start_time: Option<String>,
     pub end_time: Option<String>,
     pub schedule_config: Option<ScheduleConfig>,
+    /// Valid from timestamp (milliseconds since epoch)
+    pub valid_from: Option<i64>,
+    /// Valid until timestamp (milliseconds since epoch)
+    pub valid_until: Option<i64>,
+    /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+    pub active_days: Option<Vec<u8>>,
+    /// Active start time (HH:MM format)
+    pub active_start_time: Option<String>,
+    /// Active end time (HH:MM format)
+    pub active_end_time: Option<String>,
     pub created_by: Option<Thing>,
 }
 
@@ -126,9 +154,21 @@ pub struct PriceRuleUpdate {
     pub adjustment_value: Option<i32>,
     pub priority: Option<i32>,
     pub is_stackable: Option<bool>,
+    /// Whether this rule is exclusive (cannot be combined with other rules)
+    pub is_exclusive: Option<bool>,
     pub time_mode: Option<TimeMode>,
     pub start_time: Option<String>,
     pub end_time: Option<String>,
     pub schedule_config: Option<ScheduleConfig>,
+    /// Valid from timestamp (milliseconds since epoch)
+    pub valid_from: Option<i64>,
+    /// Valid until timestamp (milliseconds since epoch)
+    pub valid_until: Option<i64>,
+    /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+    pub active_days: Option<Vec<u8>>,
+    /// Active start time (HH:MM format)
+    pub active_start_time: Option<String>,
+    /// Active end time (HH:MM format)
+    pub active_end_time: Option<String>,
     pub is_active: Option<bool>,
 }

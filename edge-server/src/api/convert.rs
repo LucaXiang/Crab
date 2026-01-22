@@ -259,12 +259,19 @@ impl From<db::PriceRule> for api::PriceRule {
             adjustment_value: r.adjustment_value,
             priority: r.priority,
             is_stackable: r.is_stackable,
+            is_exclusive: r.is_exclusive,
             time_mode: r.time_mode.into(),
             start_time: r.start_time,
             end_time: r.end_time,
             schedule_config: r.schedule_config.map(Into::into),
+            valid_from: r.valid_from,
+            valid_until: r.valid_until,
+            active_days: r.active_days,
+            active_start_time: r.active_start_time,
+            active_end_time: r.active_end_time,
             is_active: r.is_active,
             created_by: option_thing_to_string(&r.created_by),
+            created_at: r.created_at,
         }
     }
 }
