@@ -17,6 +17,12 @@ Rust workspace 架构，专注离线优先、边缘计算、mTLS 安全通信。
 | `crab-auth` | 认证服务器 (Port 3001) | [`crab-auth/CLAUDE.md`](crab-auth/CLAUDE.md) |
 | `red_coral` | **Tauri POS 前端** | [`red_coral/CLAUDE.md`](red_coral/CLAUDE.md) |
 
+## 技术文档
+
+| 主题 | 文档 |
+|------|------|
+| SurrealDB & SurrealQL | [`docs/SURREALDB.md`](docs/SURREALDB.md) |
+
 ## 命令
 
 ```bash
