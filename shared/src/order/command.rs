@@ -156,6 +156,13 @@ pub enum OrderCommandPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         is_pre_payment: Option<bool>,
     },
+
+    /// Toggle rule skip status
+    ToggleRuleSkip {
+        order_id: String,
+        rule_id: String,
+        skipped: bool,
+    },
 }
 
 fn default_guest_count() -> i32 {
@@ -193,6 +200,7 @@ impl OrderCommand {
                 source_order_id, ..
             } => Some(source_order_id),
             OrderCommandPayload::UpdateOrderInfo { order_id, .. } => Some(order_id),
+            OrderCommandPayload::ToggleRuleSkip { order_id, .. } => Some(order_id),
         }
     }
 }

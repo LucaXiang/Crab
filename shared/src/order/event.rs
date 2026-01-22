@@ -66,6 +66,9 @@ pub enum OrderEventType {
 
     // Other
     OrderInfoUpdated,
+
+    // Price Rules
+    RuleSkipToggled,
 }
 
 impl std::fmt::Display for OrderEventType {
@@ -88,6 +91,7 @@ impl std::fmt::Display for OrderEventType {
             OrderEventType::OrderMergedOut => write!(f, "ORDER_MERGED_OUT"),
             OrderEventType::TableReassigned => write!(f, "TABLE_REASSIGNED"),
             OrderEventType::OrderInfoUpdated => write!(f, "ORDER_INFO_UPDATED"),
+            OrderEventType::RuleSkipToggled => write!(f, "RULE_SKIP_TOGGLED"),
         }
     }
 }
@@ -255,6 +259,17 @@ pub enum EventPayload {
         table_name: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         is_pre_payment: Option<bool>,
+    },
+
+    // ========== Price Rules ==========
+    RuleSkipToggled {
+        rule_id: String,
+        skipped: bool,
+        /// Recalculated amounts after toggle
+        subtotal: f64,
+        discount: f64,
+        surcharge: f64,
+        total: f64,
     },
 }
 
