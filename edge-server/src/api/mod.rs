@@ -33,6 +33,7 @@ pub mod orders;
 pub mod price_rules;
 pub mod print_destinations;
 pub mod products;
+pub mod sync;
 pub mod system_state;
 pub mod tables;
 pub mod tags;
