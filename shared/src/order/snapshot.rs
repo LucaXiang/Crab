@@ -5,6 +5,7 @@
 //! to detect if the reducer logic has diverged.
 
 use super::types::{CartItemSnapshot, PaymentRecord};
+use super::AppliedRule;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
@@ -70,6 +71,26 @@ pub struct OrderSnapshot {
     /// Whether this is a pre-payment order
     #[serde(default)]
     pub is_pre_payment: bool,
+
+    // === Order-level Rule Adjustments ===
+    /// Order-level rule discount amount
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order_rule_discount_amount: Option<f64>,
+    /// Order-level rule surcharge amount
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order_rule_surcharge_amount: Option<f64>,
+    /// Order-level applied rules
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order_applied_rules: Option<Vec<AppliedRule>>,
+
+    // === Order-level Manual Adjustments (pick one) ===
+    /// Order-level manual discount percentage
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order_manual_discount_percent: Option<f64>,
+    /// Order-level manual discount fixed amount
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order_manual_discount_fixed: Option<f64>,
+
     /// Order start time
     pub start_time: i64,
     /// Order end time
@@ -112,6 +133,11 @@ impl OrderSnapshot {
             paid_item_quantities: std::collections::HashMap::new(),
             receipt_number: None,
             is_pre_payment: false,
+            order_rule_discount_amount: None,
+            order_rule_surcharge_amount: None,
+            order_applied_rules: None,
+            order_manual_discount_percent: None,
+            order_manual_discount_fixed: None,
             start_time: now,
             end_time: None,
             created_at: now,
@@ -205,5 +231,22 @@ impl OrderSnapshot {
 impl Default for OrderSnapshot {
     fn default() -> Self {
         Self::new(String::new())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_order_snapshot_rule_fields() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.order_rule_discount_amount = Some(10.0);
+        snapshot.order_rule_surcharge_amount = Some(5.0);
+        snapshot.order_manual_discount_percent = Some(5.0);
+
+        assert_eq!(snapshot.order_rule_discount_amount, Some(10.0));
+        assert_eq!(snapshot.order_rule_surcharge_amount, Some(5.0));
+        assert_eq!(snapshot.order_manual_discount_percent, Some(5.0));
     }
 }
