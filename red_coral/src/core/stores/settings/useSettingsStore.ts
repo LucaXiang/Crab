@@ -439,17 +439,13 @@ function validateSettingsForm(entity: ModalEntity, formData: FormData): Record<s
   const errors: Record<string, string | undefined> = {};
   if (entity === 'TABLE') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.table.nameRequired';
-    if (!formData.zoneId?.trim()) errors.zoneId = 'settings.errors.table.zoneRequired';
+    if (!formData.zone?.trim()) errors.zone = 'settings.errors.table.zoneRequired';
     if ((formData.capacity ?? 0) < 1) errors.capacity = 'settings.errors.table.capacityMin';
   } else if (entity === 'ZONE') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.zone.nameRequired';
   } else if (entity === 'PRODUCT') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.product.nameRequired';
-    if (!formData.categoryId) errors.categoryId = 'settings.errors.product.categoryRequired';
-    if ((formData.price ?? 0) <= 0) errors.price = 'settings.errors.product.pricePositive';
-    if (formData.externalId === undefined || formData.externalId === null) {
-      errors.externalId = 'settings.errors.product.externalIdRequired';
-    }
+    if (!formData.category) errors.category = 'settings.errors.product.categoryRequired';
   } else if (entity === 'CATEGORY') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.category.nameRequired';
   } else if (entity === 'TAG') {
@@ -462,26 +458,27 @@ function computeIsDirty(entity: ModalEntity, next: FormData, initial: FormData):
   const pick = (o: FormData, keys: (keyof FormData)[]) => keys.map((k) => o[k]);
 
   if (entity === 'TABLE') {
-    const keys: (keyof FormData)[] = ['name', 'zoneId', 'capacity'];
+    const keys: (keyof FormData)[] = ['name', 'zone', 'capacity'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'ZONE') {
-    const keys: (keyof FormData)[] = ['name', 'surchargeType', 'surchargeAmount'];
+    const keys: (keyof FormData)[] = ['name', 'surcharge_type', 'surcharge_amount'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'PRODUCT') {
     const keys: (keyof FormData)[] = [
-      'name', 'categoryId', 'price', 'externalId', 'receiptName', 'image', 'taxRate',
-      'sortOrder', 'kitchenPrinterId', 'kitchenPrintName', 'isKitchenPrintEnabled',
-      'isLabelPrintEnabled', 'hasMultiSpec', 'selectedAttributeIds', 'attributeDefaultOptions',
+      'name', 'category', 'image', 'tax_rate', 'receipt_name',
+      'sort_order', 'print_destinations', 'kitchen_print_name',
+      'is_label_print_enabled', 'has_multi_spec', 'tags', 'specs',
     ];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'CATEGORY') {
     const keys: (keyof FormData)[] = [
-      'name', 'kitchenPrinterId', 'isKitchenPrintEnabled', 'isLabelPrintEnabled',
-      'selectedAttributeIds', 'attributeDefaultOptions',
+      'name', 'sort_order', 'print_destinations', 'is_label_print_enabled',
+      'is_virtual', 'tag_ids', 'match_mode',
+      'selected_attribute_ids', 'attribute_default_options',
     ];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'TAG') {
-    const keys: (keyof FormData)[] = ['name', 'color', 'displayOrder'];
+    const keys: (keyof FormData)[] = ['name', 'color', 'display_order'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   }
   return false;
