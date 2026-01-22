@@ -11,6 +11,7 @@ pub mod location;
 pub mod mode;
 pub mod order_es;
 pub mod orders;
+pub mod sync;
 pub mod system;
 pub mod tenant;
 
@@ -23,5 +24,6 @@ pub use location::*;
 pub use mode::*;
 pub use order_es::*;
 pub use orders::*;
+pub use sync::*;
 pub use system::*;
 pub use tenant::*;

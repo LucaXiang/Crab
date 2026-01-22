@@ -254,6 +254,8 @@ pub async fn run() {
             commands::prefetch_images,
             commands::cleanup_image_cache,
             commands::save_image,
+            // Sync commands
+            commands::get_sync_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
