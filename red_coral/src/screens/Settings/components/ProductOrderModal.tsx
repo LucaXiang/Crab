@@ -150,7 +150,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
       setProducts(filteredProducts);
     } catch (e) {
       console.error(e);
-      toast.error(t('common.message.loadFailed'));
+      toast.error(t('common.message.load_failed'));
     } finally {
       setLoading(false);
     }
@@ -181,13 +181,18 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
   const handleSave = async () => {
     setSaving(true);
     try {
-      // API doesn't support batch reorder, skipping
+      // Build updates array with new sort_order based on array index
+      const updates = products.map((product, index) => ({
+        id: product.id,
+        sort_order: index,
+      }));
+      await api.batchUpdateProductSortOrder(updates);
       refreshData();
-      toast.success(t('common.message.saveSuccess'));
+      toast.success(t('common.message.save_success'));
       onClose();
     } catch (e) {
       console.error(e);
-      toast.error(t('common.message.saveFailed'));
+      toast.error(t('common.message.save_failed'));
     } finally {
       setSaving(false);
     }
@@ -201,14 +206,14 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
         <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white/80 backdrop-blur-sm sticky top-0 z-10">
           <div>
             <h3 className="text-2xl font-bold text-gray-900 tracking-tight">
-              {t('settings.productOrder')}
+              {t('settings.product_order')}
             </h3>
             <div className="flex items-center gap-3 mt-2">
                <span className="px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 text-xs font-semibold border border-teal-100">
                  {category}
                </span>
                <p className="text-xs text-gray-400">
-                {t('settings.dragToReorder')}
+                {t('settings.drag_to_reorder')}
                </p>
             </div>
           </div>
@@ -227,7 +232,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
             </div>
           ) : products.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
-              {t("settings.product.noProducts")}
+              {t("settings.product.no_products")}
             </div>
           ) : (
             <DndContext

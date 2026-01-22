@@ -165,6 +165,7 @@ pub async fn run() {
             commands::create_product,
             commands::update_product,
             commands::delete_product,
+            commands::batch_update_product_sort_order,
             commands::list_attributes,
             commands::get_attribute,
             commands::create_attribute,

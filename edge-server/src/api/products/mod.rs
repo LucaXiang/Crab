@@ -4,7 +4,7 @@ mod handler;
 
 use axum::{
     Router,
-    routing::{get, post},
+    routing::{get, post, put},
 };
 
 use crate::core::ServerState;
@@ -16,6 +16,7 @@ pub fn router() -> Router<ServerState> {
 fn product_routes() -> Router<ServerState> {
     Router::new()
         .route("/", get(handler::list).post(handler::create))
+        .route("/sort-order", put(handler::batch_update_sort_order))
         .route(
             "/{id}",
             get(handler::get_by_id)

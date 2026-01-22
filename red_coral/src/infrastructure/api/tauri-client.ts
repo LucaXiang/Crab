@@ -31,7 +31,6 @@ import type {
   PrintDestination,
   PrintDestinationCreate,
   PrintDestinationUpdate,
-  PrintDestinationListData,
   Attribute,
   AttributeCreate,
   AttributeUpdate,
@@ -198,6 +197,10 @@ export class TauriApiClient {
     }
   }
 
+  async batchUpdateProductSortOrder(updates: { id: string; sort_order: number }[]): Promise<void> {
+    await invokeAndUnwrap<{ updated: boolean }>('batch_update_product_sort_order', { updates });
+  }
+
   // ============ Product Attributes ============
 
   async fetchProductAttributes(productId: string): Promise<ProductAttribute[]> {
@@ -216,9 +219,9 @@ export class TauriApiClient {
 
   // ============ Category Attributes ============
 
-  async listCategoryAttributes(categoryId?: string | number): Promise<unknown[]> {
-    const data = await invokeAndUnwrap<{ category_attributes: unknown[] }>('list_category_attributes', { category_id: categoryId ? String(categoryId) : undefined });
-    return data.category_attributes;
+  async listCategoryAttributes(categoryId: string | number): Promise<Attribute[]> {
+    const data = await invokeAndUnwrap<{ templates: Attribute[] }>('list_category_attributes', { category_id: String(categoryId) });
+    return data.templates;
   }
 
   async bindCategoryAttribute(data: CreateCategoryAttributeRequest): Promise<unknown> {
@@ -258,12 +261,12 @@ export class TauriApiClient {
 
   // ============ Attribute Options ============
 
-  async addAttributeOption(attributeId: string, data: { name: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string }): Promise<Attribute> {
+  async addAttributeOption(attributeId: string, data: { name: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string; kitchen_print_name?: string }): Promise<Attribute> {
     const result = await invokeAndUnwrap<{ template: Attribute }>('add_attribute_option', { attribute_id: attributeId, data });
     return result.template;
   }
 
-  async updateAttributeOption(attributeId: string, index: number, data: { name?: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string }): Promise<Attribute> {
+  async updateAttributeOption(attributeId: string, index: number, data: { name?: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string; kitchen_print_name?: string }): Promise<Attribute> {
     const result = await invokeAndUnwrap<{ template: Attribute }>('update_attribute_option', { attribute_id: attributeId, index, data });
     return result.template;
   }
@@ -318,8 +321,8 @@ export class TauriApiClient {
   // ============ Print Destinations ============
 
   async listPrintDestinations(): Promise<PrintDestination[]> {
-    const data = await invokeAndUnwrap<PrintDestinationListData>('list_print_destinations');
-    return data.destinations;
+    const data = await invokeAndUnwrap<{ print_destinations: PrintDestination[] }>('list_print_destinations');
+    return data.print_destinations ?? [];
   }
 
   async createPrintDestination(data: PrintDestinationCreate): Promise<PrintDestination> {

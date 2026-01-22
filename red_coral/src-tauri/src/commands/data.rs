@@ -669,6 +669,32 @@ pub async fn batch_update_category_sort_order(
     }
 }
 
+/// Payload for batch product sort order update
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct ProductSortOrderUpdate {
+    pub id: String,
+    pub sort_order: i32,
+}
+
+/// Batch update product sort order
+#[tauri::command(rename_all = "snake_case")]
+pub async fn batch_update_product_sort_order(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    updates: Vec<ProductSortOrderUpdate>,
+) -> Result<ApiResponse<BatchUpdateResponse>, String> {
+    let bridge = bridge.read().await;
+    match bridge
+        .put::<BatchUpdateResponse, _>("/api/products/sort-order", &updates)
+        .await
+    {
+        Ok(result) => Ok(ApiResponse::success(result)),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
+    }
+}
+
 // ============ Print Destinations ============
 
 #[tauri::command(rename_all = "snake_case")]

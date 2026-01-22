@@ -267,3 +267,85 @@ pub async fn remove_product_tag(
 
     Ok(Json(api_product))
 }
+
+// =============================================================================
+// Batch Sort Order
+// =============================================================================
+
+use serde::Deserialize;
+
+/// Payload for batch sort order update
+#[derive(Debug, Deserialize)]
+pub struct SortOrderUpdate {
+    pub id: String,
+    pub sort_order: i32,
+}
+
+/// Response for batch update operation
+#[derive(Debug, serde::Serialize)]
+pub struct BatchUpdateResponse {
+    pub updated: usize,
+}
+
+/// PUT /api/products/sort-order - 批量更新商品排序
+pub async fn batch_update_sort_order(
+    State(state): State<ServerState>,
+    Json(updates): Json<Vec<SortOrderUpdate>>,
+) -> AppResult<Json<BatchUpdateResponse>> {
+    tracing::info!(
+        count = updates.len(),
+        "Batch update product sort order request received"
+    );
+
+    let repo = ProductRepository::new(state.db.clone());
+    let mut updated_count = 0;
+
+    for update in &updates {
+        tracing::debug!(id = %update.id, sort_order = update.sort_order, "Updating product sort order");
+
+        let result = repo
+            .update(
+                &update.id,
+                ProductUpdate {
+                    name: None,
+                    sort_order: Some(update.sort_order),
+                    image: None,
+                    category: None,
+                    tax_rate: None,
+                    receipt_name: None,
+                    kitchen_print_name: None,
+                    print_destinations: None,
+                    is_label_print_enabled: None,
+                    is_active: None,
+                    specs: None,
+                    tags: None,
+                },
+            )
+            .await;
+
+        match &result {
+            Ok(_) => {
+                tracing::debug!(id = %update.id, "Product sort order updated successfully");
+                updated_count += 1;
+            }
+            Err(e) => {
+                tracing::error!(id = %update.id, error = %e, "Failed to update product sort order");
+            }
+        }
+    }
+
+    tracing::info!(
+        updated = updated_count,
+        total = updates.len(),
+        "Batch update product sort order completed"
+    );
+
+    // 广播同步通知
+    state
+        .broadcast_sync::<()>(RESOURCE_PRODUCT, "updated", "batch", None)
+        .await;
+
+    Ok(Json(BatchUpdateResponse {
+        updated: updated_count,
+    }))
+}
