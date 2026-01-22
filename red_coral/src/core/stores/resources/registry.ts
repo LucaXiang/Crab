@@ -4,6 +4,7 @@
  * 用于 useSyncListener 根据资源类型分发同步信号。
  * key 必须与后端 broadcast_sync 的 resource 参数一致。
  */
+import type { SyncPayload } from '../factory/createResourceStore';
 import { useProductStore } from './useProductStore';
 import { useCategoryStore } from './useCategoryStore';
 import { useTagStore } from './useTagStore';
@@ -16,11 +17,16 @@ import { usePriceRuleStore } from './usePriceRuleStore';
 import { usePrintDestinationStore } from './usePrintDestinationStore';
 
 // Store interface for registry
+// Note: Uses SyncPayload<any> to be compatible with all typed stores (contravariance)
+// lastVersion and checkVersion are optional for legacy stores not yet updated
+// applySync payload is optional to support legacy stores that don't use version-based sync
 interface RegistryStore {
   getState: () => {
     isLoaded: boolean;
-    fetchAll: () => Promise<void>;
-    applySync: (id: string) => void;
+    lastVersion?: number;
+    fetchAll: (force?: boolean) => Promise<void>;
+    applySync: (payload?: SyncPayload<any>) => void;
+    checkVersion?: (serverVersion: number) => boolean;
     clear: () => void;
   };
 }
