@@ -2336,6 +2336,7 @@ dependencies = [
  "redb",
  "reqwest",
  "ring",
+ "rust_decimal",
  "rustls",
  "serde",
  "serde_json",

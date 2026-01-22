@@ -100,6 +100,9 @@ surrealdb = { version = "2.4", features = ["kv-rocksdb"] }
 surrealdb-migrations = "2.4"
 redb = "3.0"
 
+# ========== Decimal Precision ==========
+rust_decimal = "1.37"
+
 # ========== Utilities ==========
 enum_dispatch = "0.3"
 dotenv = "0.15"

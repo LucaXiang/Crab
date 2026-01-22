@@ -3,8 +3,10 @@
 //! Completes an order, validating payment sufficiency and generating receipt.
 
 use async_trait::async_trait;
+use rust_decimal::prelude::*;
 use std::collections::HashMap;
 
+use crate::orders::money::{is_payment_sufficient, to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, PaymentSummaryItem};
 
@@ -42,30 +44,35 @@ impl CommandHandler for CompleteOrderAction {
             }
         }
 
-        // 3. Calculate payment summary and total paid
-        let mut payment_summary_map: HashMap<String, f64> = HashMap::new();
-        let mut total_paid = 0.0_f64;
+        // 3. Calculate payment summary and total paid using precise decimal arithmetic
+        let mut payment_summary_map: HashMap<String, Decimal> = HashMap::new();
+        let mut total_paid = Decimal::ZERO;
         for payment in &snapshot.payments {
             if !payment.cancelled {
+                let amount = to_decimal(payment.amount);
                 *payment_summary_map
                     .entry(payment.method.clone())
-                    .or_insert(0.0) += payment.amount;
-                total_paid += payment.amount;
+                    .or_insert(Decimal::ZERO) += amount;
+                total_paid += amount;
             }
         }
 
-        // 4. Validate payment is sufficient (allow 0.01 tolerance for rounding)
-        if total_paid < snapshot.total - 0.01 {
+        // 4. Validate payment is sufficient (using precise comparison with tolerance)
+        let total_paid_f64 = to_f64(total_paid);
+        if !is_payment_sufficient(total_paid_f64, snapshot.total) {
             return Err(OrderError::InvalidOperation(format!(
                 "Payment insufficient: paid {:.2}, required {:.2}",
-                total_paid, snapshot.total
+                total_paid_f64, snapshot.total
             )));
         }
 
         // 5. Convert payment summary to Vec<PaymentSummaryItem>
         let payment_summary: Vec<PaymentSummaryItem> = payment_summary_map
             .into_iter()
-            .map(|(method, amount)| PaymentSummaryItem { method, amount })
+            .map(|(method, amount)| PaymentSummaryItem {
+                method,
+                amount: to_f64(amount),
+            })
             .collect();
 
         // 6. Allocate sequence number

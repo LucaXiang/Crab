@@ -7,6 +7,7 @@
 //! snapshot (or their quantity is reduced). For full audit trail support,
 //! a future enhancement could mark items as "voided" instead.
 
+use crate::orders::money;
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot};
 
@@ -27,8 +28,8 @@ impl EventApplier for ItemRemovedApplier {
             snapshot.last_sequence = event.sequence;
             snapshot.updated_at = event.timestamp;
 
-            // Recalculate totals
-            recalculate_totals(snapshot);
+            // Recalculate totals using precise decimal arithmetic
+            money::recalculate_totals(snapshot);
 
             // Update checksum
             snapshot.update_checksum();
@@ -64,33 +65,10 @@ fn apply_item_removed(snapshot: &mut OrderSnapshot, instance_id: &str, quantity:
     }
 }
 
-/// Recalculate totals from items
-fn recalculate_totals(snapshot: &mut OrderSnapshot) {
-    let subtotal: f64 = snapshot
-        .items
-        .iter_mut()
-        .map(|item| {
-            // Compute unpaid_quantity: quantity - paid_quantity
-            let paid_qty = snapshot
-                .paid_item_quantities
-                .get(&item.instance_id)
-                .copied()
-                .unwrap_or(0);
-            item.unpaid_quantity = (item.quantity - paid_qty).max(0);
-
-            let base_price = item.price * item.quantity as f64;
-            let discount = item.discount_percent.unwrap_or(0.0) / 100.0;
-            base_price * (1.0 - discount)
-        })
-        .sum();
-
-    snapshot.subtotal = subtotal;
-    snapshot.total = subtotal + snapshot.tax - snapshot.discount;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::orders::money::recalculate_totals;
     use shared::order::{CartItemSnapshot, OrderEventType};
 
     fn create_test_item(

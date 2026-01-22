@@ -17,7 +17,7 @@ pub fn matches_product_scope(
         ProductScope::Product => {
             if let Some(target) = &rule.target {
                 // target is Thing like "product:xxx"
-                let target_id = target.id.to_string();
+                let target_id = target.id.to_raw();
                 target_id == product_id || format!("product:{}", product_id) == target.to_string()
             } else {
                 false
@@ -25,7 +25,7 @@ pub fn matches_product_scope(
         }
         ProductScope::Category => {
             if let (Some(target), Some(cat_id)) = (&rule.target, category_id) {
-                let target_id = target.id.to_string();
+                let target_id = target.id.to_raw();
                 target_id == cat_id || format!("category:{}", cat_id) == target.to_string()
             } else {
                 false
@@ -33,7 +33,7 @@ pub fn matches_product_scope(
         }
         ProductScope::Tag => {
             if let Some(target) = &rule.target {
-                let target_id = target.id.to_string();
+                let target_id = target.id.to_raw();
                 tags.iter()
                     .any(|t| t == &target_id || format!("tag:{}", t) == target.to_string())
             } else {
@@ -178,6 +178,17 @@ mod tests {
     #[test]
     fn test_product_scope_matches_specific() {
         let rule = make_rule(ProductScope::Product, Some("product:123"));
+
+        // Debug: print what we're comparing
+        if let Some(target) = &rule.target {
+            eprintln!("target: {:?}", target);
+            eprintln!("target.to_string(): {}", target.to_string());
+            eprintln!("target.id: {:?}", target.id);
+            eprintln!("target.id.to_string(): {}", target.id.to_string());
+            eprintln!("target.id.to_raw(): {}", target.id.to_raw());
+            eprintln!("target.tb: {}", target.tb);
+        }
+
         assert!(matches_product_scope(&rule, "123", Some("cat1"), &[]));
         assert!(!matches_product_scope(&rule, "456", Some("cat1"), &[]));
     }

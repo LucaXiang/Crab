@@ -1,8 +1,28 @@
 //! Price Calculator
 //!
 //! Logic for calculating price adjustments from matched rules.
+//! Uses rust_decimal for precise calculations, stores as f64.
 
 use crate::db::models::{AdjustmentType, PriceRule, RuleType};
+use rust_decimal::prelude::*;
+
+/// Rounding strategy for monetary values (2 decimal places, half-up)
+const DECIMAL_PLACES: u32 = 2;
+
+/// Convert f64 to Decimal for calculation
+#[inline]
+fn to_decimal(value: f64) -> Decimal {
+    Decimal::from_f64(value).unwrap_or_default()
+}
+
+/// Convert Decimal back to f64 for storage, rounded to 2 decimal places
+#[inline]
+fn to_f64(value: Decimal) -> f64 {
+    value
+        .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
+        .to_f64()
+        .unwrap_or_default()
+}
 
 /// Calculated adjustment result
 #[derive(Debug, Clone, Default)]
@@ -20,18 +40,25 @@ pub struct PriceAdjustment {
 impl PriceAdjustment {
     /// Calculate the final price after applying adjustments
     /// Order: base_price + surcharge - (surcharge * discount%) - fixed_discount
+    ///
+    /// Uses Decimal internally for precise calculations
     pub fn calculate_final_price(&self, base_price: f64) -> f64 {
+        let base = to_decimal(base_price);
+        let surcharge = to_decimal(self.surcharge);
+        let discount_pct = to_decimal(self.discount_percent);
+        let discount_fixed = to_decimal(self.discount_fixed);
+
         // Step 1: Add surcharge
-        let price_with_surcharge = base_price + self.surcharge;
+        let price_with_surcharge = base + surcharge;
 
         // Step 2: Apply percentage discount
-        let after_percent_discount = price_with_surcharge * (1.0 - self.discount_percent / 100.0);
+        let discount_multiplier = Decimal::ONE - discount_pct / Decimal::ONE_HUNDRED;
+        let after_percent_discount = price_with_surcharge * discount_multiplier;
 
-        // Step 3: Apply fixed discount
-        let final_price = (after_percent_discount - self.discount_fixed).max(0.0);
+        // Step 3: Apply fixed discount (never go below zero)
+        let final_price = (after_percent_discount - discount_fixed).max(Decimal::ZERO);
 
-        // Round to 2 decimal places
-        (final_price * 100.0).round() / 100.0
+        to_f64(final_price)
     }
 }
 
@@ -40,29 +67,30 @@ pub fn sort_rules_by_priority(rules: &mut [&PriceRule]) {
     rules.sort_by(|a, b| b.priority.cmp(&a.priority));
 }
 
-/// Calculate adjustment from a single rule
-fn calculate_single_adjustment(rule: &PriceRule, base_price: f64) -> (f64, f64, f64) {
-    let value = rule.adjustment_value as f64;
+/// Calculate adjustment from a single rule using Decimal precision
+fn calculate_single_adjustment(rule: &PriceRule, base_price: Decimal) -> (Decimal, Decimal, Decimal) {
+    let value = Decimal::from(rule.adjustment_value);
+    let hundred = Decimal::ONE_HUNDRED;
 
     match (&rule.rule_type, &rule.adjustment_type) {
         (RuleType::Surcharge, AdjustmentType::Percentage) => {
             // Surcharge as percentage of base price
-            let amount = base_price * value / 100.0;
-            (amount, 0.0, 0.0)
+            let amount = base_price * value / hundred;
+            (amount, Decimal::ZERO, Decimal::ZERO)
         }
         (RuleType::Surcharge, AdjustmentType::FixedAmount) => {
             // Surcharge as fixed amount (value is in cents, convert to dollars)
-            let amount = value / 100.0;
-            (amount, 0.0, 0.0)
+            let amount = value / hundred;
+            (amount, Decimal::ZERO, Decimal::ZERO)
         }
         (RuleType::Discount, AdjustmentType::Percentage) => {
-            // Discount as percentage
-            (0.0, value, 0.0)
+            // Discount as percentage (store the percentage value, not the amount)
+            (Decimal::ZERO, value, Decimal::ZERO)
         }
         (RuleType::Discount, AdjustmentType::FixedAmount) => {
             // Discount as fixed amount (value is in cents, convert to dollars)
-            let amount = value / 100.0;
-            (0.0, 0.0, amount)
+            let amount = value / hundred;
+            (Decimal::ZERO, Decimal::ZERO, amount)
         }
     }
 }
@@ -73,17 +101,23 @@ fn calculate_single_adjustment(rule: &PriceRule, base_price: f64) -> (f64, f64, 
 /// - Stackable rules accumulate their effects
 /// - Non-stackable rules compete - highest priority wins per type
 ///
-/// Returns: (surcharge, discount_percent, discount_fixed, applied_rule_names)
+/// Returns: PriceAdjustment with surcharge, discount_percent, discount_fixed
 pub fn calculate_adjustments(rules: &[&PriceRule], base_price: f64) -> PriceAdjustment {
-    let mut result = PriceAdjustment::default();
-
     if rules.is_empty() {
-        return result;
+        return PriceAdjustment::default();
     }
+
+    let base_decimal = to_decimal(base_price);
 
     // Sort by priority (already done by caller, but ensure)
     let mut sorted_rules: Vec<&PriceRule> = rules.to_vec();
     sort_rules_by_priority(&mut sorted_rules);
+
+    // Accumulate using Decimal for precision
+    let mut surcharge_acc = Decimal::ZERO;
+    let mut discount_pct_acc = Decimal::ZERO;
+    let mut discount_fixed_acc = Decimal::ZERO;
+    let mut applied_rules = Vec::new();
 
     // Track if we've applied a non-stackable rule for each type
     let mut has_surcharge_non_stackable = false;
@@ -101,32 +135,37 @@ pub fn calculate_adjustments(rules: &[&PriceRule], base_price: f64) -> PriceAdju
             continue;
         }
 
-        // Calculate adjustment
+        // Calculate adjustment using Decimal
         let (surcharge, discount_pct, discount_fixed) =
-            calculate_single_adjustment(rule, base_price);
+            calculate_single_adjustment(rule, base_decimal);
 
         // Apply adjustment
         if rule.is_stackable {
-            result.surcharge += surcharge;
-            result.discount_percent += discount_pct;
-            result.discount_fixed += discount_fixed;
+            surcharge_acc += surcharge;
+            discount_pct_acc += discount_pct;
+            discount_fixed_acc += discount_fixed;
         } else {
             // Non-stackable replaces
             if is_surcharge {
-                result.surcharge = surcharge;
+                surcharge_acc = surcharge;
                 has_surcharge_non_stackable = true;
             }
             if is_discount {
-                result.discount_percent = discount_pct;
-                result.discount_fixed = discount_fixed;
+                discount_pct_acc = discount_pct;
+                discount_fixed_acc = discount_fixed;
                 has_discount_non_stackable = true;
             }
         }
 
-        result.applied_rules.push(rule.receipt_name.clone());
+        applied_rules.push(rule.receipt_name.clone());
     }
 
-    result
+    PriceAdjustment {
+        surcharge: to_f64(surcharge_acc),
+        discount_percent: to_f64(discount_pct_acc),
+        discount_fixed: to_f64(discount_fixed_acc),
+        applied_rules,
+    }
 }
 
 #[cfg(test)]
@@ -237,5 +276,73 @@ mod tests {
         assert_eq!(adj.surcharge, 10.0);
         assert_eq!(adj.discount_percent, 20.0);
         assert_eq!(adj.calculate_final_price(100.0), 88.0);
+    }
+
+    // ========== New precision tests ==========
+
+    #[test]
+    fn test_precision_third_discount() {
+        // 33% discount on $100 should be $67.00
+        // Note: adjustment_value is integer percentage, fractional not supported at rule level
+        let rule = make_rule(RuleType::Discount, AdjustmentType::Percentage, 33, 0, true);
+        let rules: Vec<&PriceRule> = vec![&rule];
+        let adj = calculate_adjustments(&rules, 100.0);
+
+        assert_eq!(adj.discount_percent, 33.0);
+        // $100 * (1 - 0.33) = $67.00
+        assert_eq!(adj.calculate_final_price(100.0), 67.0);
+    }
+
+    #[test]
+    fn test_precision_small_amounts() {
+        // 1 cent surcharge
+        let rule = make_rule(RuleType::Surcharge, AdjustmentType::FixedAmount, 1, 0, true);
+        let rules: Vec<&PriceRule> = vec![&rule];
+        let adj = calculate_adjustments(&rules, 0.01);
+
+        assert_eq!(adj.surcharge, 0.01);
+        assert_eq!(adj.calculate_final_price(0.01), 0.02);
+    }
+
+    #[test]
+    fn test_precision_many_stackable_rules() {
+        // Stack 10 rules of 1% each = 10% total
+        let rules_owned: Vec<PriceRule> = (0..10)
+            .map(|i| make_rule(RuleType::Discount, AdjustmentType::Percentage, 1, i, true))
+            .collect();
+        let rules: Vec<&PriceRule> = rules_owned.iter().collect();
+        let adj = calculate_adjustments(&rules, 100.0);
+
+        assert_eq!(adj.discount_percent, 10.0);
+        assert_eq!(adj.calculate_final_price(100.0), 90.0);
+    }
+
+    #[test]
+    fn test_precision_complex_calculation() {
+        // $99.99 base
+        // 10% surcharge = $9.999 → $109.989
+        // 15% discount = $109.989 * 0.85 = $93.49065
+        // $5.55 fixed discount = $87.94065 → $87.94
+        let surcharge = make_rule(RuleType::Surcharge, AdjustmentType::Percentage, 10, 0, true);
+        let discount_pct = make_rule(RuleType::Discount, AdjustmentType::Percentage, 15, 0, true);
+        let discount_fixed = make_rule(RuleType::Discount, AdjustmentType::FixedAmount, 555, 0, true);
+        let rules: Vec<&PriceRule> = vec![&surcharge, &discount_pct, &discount_fixed];
+        let adj = calculate_adjustments(&rules, 99.99);
+
+        let final_price = adj.calculate_final_price(99.99);
+        assert_eq!(final_price, 87.94);
+    }
+
+    #[test]
+    fn test_precision_rounding_edge_case() {
+        // Test that 0.005 rounds up to 0.01 (half-up rounding)
+        // $10.005 should become $10.01
+        let rule = make_rule(RuleType::Surcharge, AdjustmentType::FixedAmount, 5, 0, true);
+        let rules: Vec<&PriceRule> = vec![&rule];
+        let adj = calculate_adjustments(&rules, 9.955);
+
+        // 9.955 + 0.05 = 10.005 → rounds to 10.01
+        let final_price = adj.calculate_final_price(9.955);
+        assert_eq!(final_price, 10.01);
     }
 }
