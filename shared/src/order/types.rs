@@ -1,5 +1,6 @@
 //! Shared types for order event sourcing
 
+use super::AppliedRule;
 use serde::{Deserialize, Serialize};
 
 /// Cart item snapshot - complete snapshot for event recording
@@ -26,12 +27,26 @@ pub struct CartItemSnapshot {
     /// Selected specification
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_specification: Option<SpecificationInfo>,
-    /// Discount percentage (0-100)
+
+    // === Manual Adjustment ===
+    /// Manual discount percentage (0-100)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub discount_percent: Option<f64>,
+    pub manual_discount_percent: Option<f64>,
     /// Surcharge amount
     #[serde(skip_serializing_if = "Option::is_none")]
     pub surcharge: Option<f64>,
+
+    // === Rule Adjustments ===
+    /// Rule discount amount (calculated)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rule_discount_amount: Option<f64>,
+    /// Rule surcharge amount (calculated)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rule_surcharge_amount: Option<f64>,
+    /// Applied rules list
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub applied_rules: Option<Vec<AppliedRule>>,
+
     /// Item note
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
@@ -63,9 +78,9 @@ pub struct CartItemInput {
     /// Selected specification
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_specification: Option<SpecificationInfo>,
-    /// Discount percentage
+    /// Manual discount percentage
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub discount_percent: Option<f64>,
+    pub manual_discount_percent: Option<f64>,
     /// Surcharge amount
     #[serde(skip_serializing_if = "Option::is_none")]
     pub surcharge: Option<f64>,
@@ -109,8 +124,9 @@ pub struct ItemChanges {
     pub price: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quantity: Option<i32>,
+    /// Manual discount percentage
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub discount_percent: Option<f64>,
+    pub manual_discount_percent: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub surcharge: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -271,7 +287,38 @@ pub struct ItemModificationResult {
     pub quantity: i32,
     pub price: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub discount_percent: Option<f64>,
+    pub manual_discount_percent: Option<f64>,
     /// Action taken: "UNCHANGED", "CREATED", "UPDATED"
     pub action: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cart_item_snapshot_rule_fields() {
+        let item = CartItemSnapshot {
+            id: "prod-1".to_string(),
+            instance_id: "inst-1".to_string(),
+            name: "Test".to_string(),
+            price: 100.0,
+            original_price: Some(120.0),
+            quantity: 1,
+            unpaid_quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: Some(10.0),
+            surcharge: None,
+            rule_discount_amount: Some(5.0),
+            rule_surcharge_amount: Some(3.0),
+            applied_rules: Some(vec![]),
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        assert_eq!(item.manual_discount_percent, Some(10.0));
+        assert_eq!(item.rule_discount_amount, Some(5.0));
+    }
 }
