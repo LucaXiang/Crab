@@ -20,6 +20,7 @@ mod remove_item;
 mod restore_item;
 mod restore_order;
 mod split_order;
+mod toggle_rule_skip;
 mod update_order_info;
 mod void_order;
 
@@ -35,6 +36,7 @@ pub use remove_item::RemoveItemAction;
 pub use restore_item::RestoreItemAction;
 pub use restore_order::RestoreOrderAction;
 pub use split_order::SplitOrderAction;
+pub use toggle_rule_skip::ToggleRuleSkipAction;
 pub use update_order_info::UpdateOrderInfoAction;
 pub use void_order::VoidOrderAction;
 
@@ -54,6 +56,7 @@ pub enum CommandAction {
     MoveOrder(MoveOrderAction),
     MergeOrders(MergeOrdersAction),
     SplitOrder(SplitOrderAction),
+    ToggleRuleSkip(ToggleRuleSkipAction),
 }
 
 /// Manual implementation of CommandHandler for CommandAction
@@ -79,6 +82,7 @@ impl CommandHandler for CommandAction {
             CommandAction::MoveOrder(action) => action.execute(ctx, metadata).await,
             CommandAction::MergeOrders(action) => action.execute(ctx, metadata).await,
             CommandAction::SplitOrder(action) => action.execute(ctx, metadata).await,
+            CommandAction::ToggleRuleSkip(action) => action.execute(ctx, metadata).await,
         }
     }
 }
@@ -227,10 +231,15 @@ impl From<&OrderCommand> for CommandAction {
                 payment_method: payment_method.clone(),
                 items: items.clone(),
             }),
-            OrderCommandPayload::ToggleRuleSkip { .. } => {
-                // TODO: Implement in Task 4.2
-                todo!("ToggleRuleSkip action not yet implemented")
-            }
+            OrderCommandPayload::ToggleRuleSkip {
+                order_id,
+                rule_id,
+                skipped,
+            } => CommandAction::ToggleRuleSkip(ToggleRuleSkipAction {
+                order_id: order_id.clone(),
+                rule_id: rule_id.clone(),
+                skipped: *skipped,
+            }),
         }
     }
 }
