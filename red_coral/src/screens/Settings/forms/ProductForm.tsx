@@ -15,18 +15,17 @@ interface ProductFormProps {
   formData: {
     id?: string; // Product ID (for editing existing product)
     name: string;
-    receiptName?: string;
+    receipt_name?: string;
     price: number;
-    categoryId?: string | number;
+    category?: string | number;
     image: string;
     externalId?: number;
-    taxRate: number;
+    tax_rate: number;
     selectedAttributeIds?: string[];
     attributeDefaultOptions?: Record<string, string[]>; // Product-level default options (array for multi-select)
-    kitchenPrinterId?: number | null;
-    kitchenPrintName?: string;
-    isKitchenPrintEnabled?: number | null;
-    isLabelPrintEnabled?: number | null;
+    print_destinations?: number[];
+    kitchen_print_name?: string;
+    is_label_print_enabled?: number | null;
     specs?: EmbeddedSpec[]; // Embedded specifications
     selectedTagIds?: string[]; // Tag IDs loaded from getProductFull API
   };
@@ -62,7 +61,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   );
 
   useEffect(() => {
-  }, [formData.isKitchenPrintEnabled]);
+  }, [formData.print_destinations]);
 
   useEffect(() => {
     if (allAttributes.length === 0) {
@@ -118,8 +117,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
           <SelectField
             label={t('settings.product.form.category')}
-            value={formData.categoryId ?? ''}
-            onChange={(value) => onFieldChange('categoryId', value)}
+            value={formData.category ?? ''}
+            onChange={(value) => onFieldChange('category', value)}
             options={categories.map(c => ({ value: c.id ?? '', label: c.name }))}
             placeholder={t('settings.product.form.selectCategory')}
             required
@@ -147,10 +146,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
           <SelectField
             label={t('settings.product.form.taxRate')}
-            value={formData.taxRate?.toString() || '10'}
+            value={formData.tax_rate?.toString() || '10'}
             onChange={(value) => {
               const val = parseInt(value as string, 10);
-              onFieldChange('taxRate', isNaN(val) ? 10 : val);
+              onFieldChange('tax_rate', isNaN(val) ? 10 : val);
             }}
             options={TAX_RATES.map(rate => ({ value: rate.value.toString(), label: rate.label }))}
             required
@@ -195,15 +194,22 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 <div className="relative">
                   <select
                     value={
-                      formData.isKitchenPrintEnabled === undefined || formData.isKitchenPrintEnabled === null || formData.isKitchenPrintEnabled === -1
+                      formData.print_destinations === undefined
                         ? '-1'
-                        : String(formData.isKitchenPrintEnabled)
+                        : (formData.print_destinations.length > 0 ? '1' : '0')
                     }
                     onChange={(e) => {
                       const raw = e.target.value;
-                      const num = parseInt(raw, 10);
-                      const next = isNaN(num) ? -1 : (num === 1 ? 1 : num === 0 ? 0 : -1);
-                      onFieldChange('isKitchenPrintEnabled', next as any);
+                      if (raw === '-1') {
+                        // Default: remove print_destinations to inherit from category
+                        onFieldChange('print_destinations', undefined);
+                      } else if (raw === '1') {
+                        // Enabled: set print_destinations with a default printer (or empty array to be filled by printer selector)
+                        onFieldChange('print_destinations', formData.print_destinations?.length ? formData.print_destinations : []);
+                      } else {
+                        // Disabled: set empty array
+                        onFieldChange('print_destinations', []);
+                      }
                     }}
                     className={selectClass}
                   >
@@ -211,14 +217,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <option value="1">{t('common.status.enabled')}</option>
                     <option value="0">{t('common.status.disabled')}</option>
                   </select>
-                  {(formData.isKitchenPrintEnabled === undefined || formData.isKitchenPrintEnabled === null || formData.isKitchenPrintEnabled === -1) && (
+                  {formData.print_destinations === undefined && (
                     <div className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
                       <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
                       <span>
                         {t('settings.product.print.effectiveState')}: {
                           (() => {
                             if (!isGlobalKitchenEnabled) return (t('common.status.disabledGlobal'));
-                            const cat = categories.find(c => String(c.id) === String(formData.categoryId));
+                            const cat = categories.find(c => String(c.id) === String(formData.category));
                             // Kitchen printing is enabled if category has print_destinations
                             const isEnabled = cat ? (cat.print_destinations && cat.print_destinations.length > 0) : false;
                             return isEnabled ? (t('common.status.enabled')) : (t('common.status.disabled'));
@@ -231,16 +237,22 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               </FormField>
 
               <KitchenPrinterSelector
-                value={formData.kitchenPrinterId}
-                onChange={(value) => onFieldChange('kitchenPrinterId', value)}
+                value={formData.print_destinations?.[0] ?? null}
+                onChange={(value) => {
+                  if (value === null) {
+                    onFieldChange('print_destinations', []);
+                  } else {
+                    onFieldChange('print_destinations', [value]);
+                  }
+                }}
                 t={t}
               />
 
               <div className="col-span-1 md:col-span-2">
                 <FormField label={t('settings.product.print.kitchenPrintName')}>
                   <input
-                    value={formData.kitchenPrintName || ''}
-                    onChange={(e) => onFieldChange('kitchenPrintName', e.target.value)}
+                    value={formData.kitchen_print_name || ''}
+                    onChange={(e) => onFieldChange('kitchen_print_name', e.target.value)}
                     placeholder={t('settings.product.print.kitchenPrintNamePlaceholder')}
                     className={inputClass}
                   />
@@ -261,15 +273,15 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 <div className="relative">
                   <select
                     value={
-                      formData.isLabelPrintEnabled === undefined || formData.isLabelPrintEnabled === null || formData.isLabelPrintEnabled === -1
+                      formData.is_label_print_enabled === undefined || formData.is_label_print_enabled === null || formData.is_label_print_enabled === -1
                         ? '-1'
-                        : String(formData.isLabelPrintEnabled)
+                        : String(formData.is_label_print_enabled)
                     }
                     onChange={(e) => {
                       const raw = e.target.value;
                       const num = parseInt(raw, 10);
                       const next = isNaN(num) ? -1 : (num === 1 ? 1 : num === 0 ? 0 : -1);
-                      onFieldChange('isLabelPrintEnabled', next as any);
+                      onFieldChange('is_label_print_enabled', next as any);
                     }}
                     className={selectClass}
                   >
@@ -277,14 +289,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <option value="1">{t('common.status.enabled')}</option>
                     <option value="0">{t('common.status.disabled')}</option>
                   </select>
-                  {(formData.isLabelPrintEnabled === undefined || formData.isLabelPrintEnabled === null || formData.isLabelPrintEnabled === -1) && (
+                  {(formData.is_label_print_enabled === undefined || formData.is_label_print_enabled === null || formData.is_label_print_enabled === -1) && (
                     <div className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
                       <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
                       <span>
                         {t('settings.product.print.effectiveState')}: {
                           (() => {
                             if (!isGlobalLabelEnabled) return (t('common.status.disabledGlobal'));
-                            const cat = categories.find(c => String(c.id) === String(formData.categoryId));
+                            const cat = categories.find(c => String(c.id) === String(formData.category));
                             const isEnabled = cat ? (cat.is_label_print_enabled !== false) : true;
                             return isEnabled ? (t('common.status.enabled')) : (t('common.status.disabled'));
                           })()
@@ -312,8 +324,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       <FileText size={14} />
                     </div>
                     <input
-                      value={formData.receiptName || ''}
-                      onChange={(e) => onFieldChange('receiptName', e.target.value)}
+                      value={formData.receipt_name || ''}
+                      onChange={(e) => onFieldChange('receipt_name', e.target.value)}
                       placeholder={t('settings.product.print.receiptNamePlaceholder')}
                       className={`${inputClass} pl-9`}
                     />
