@@ -60,8 +60,65 @@ pub fn matches_zone_scope(rule: &PriceRule, zone_id: Option<&str>, is_retail: bo
     }
 }
 
-/// Check if a rule is currently active based on time constraints
+/// Check if rule is valid at the given timestamp
+///
+/// This function checks the new time control fields:
+/// - valid_from/valid_until: absolute validity period
+/// - active_days: days of week filter (0=Sunday, 1=Monday, ..., 6=Saturday)
+/// - active_start_time/active_end_time: time of day filter (HH:MM format)
 pub fn is_time_valid(rule: &PriceRule, current_time: i64) -> bool {
+    // Check valid_from
+    if let Some(from) = rule.valid_from
+        && current_time < from
+    {
+        return false;
+    }
+
+    // Check valid_until
+    if let Some(until) = rule.valid_until
+        && current_time > until
+    {
+        return false;
+    }
+
+    // Check active_days (0=Sunday, 1=Monday, ..., 6=Saturday)
+    if let Some(ref days) = rule.active_days {
+        let datetime = chrono::DateTime::from_timestamp_millis(current_time)
+            .unwrap_or_else(chrono::Utc::now);
+        // chrono's weekday: Mon=0, Tue=1, ..., Sun=6
+        // We need: Sun=0, Mon=1, ..., Sat=6
+        let weekday = datetime.weekday().num_days_from_sunday() as u8;
+        if !days.contains(&weekday) {
+            return false;
+        }
+    }
+
+    // Check active_start_time/active_end_time ("HH:MM" format)
+    if rule.active_start_time.is_some() || rule.active_end_time.is_some() {
+        let datetime = chrono::DateTime::from_timestamp_millis(current_time)
+            .unwrap_or_else(chrono::Utc::now);
+        let current_time_str = datetime.format("%H:%M").to_string();
+
+        if let Some(ref start) = rule.active_start_time
+            && current_time_str < *start
+        {
+            return false;
+        }
+
+        if let Some(ref end) = rule.active_end_time
+            && current_time_str > *end
+        {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Legacy time validation based on time_mode
+/// Kept for backward compatibility
+#[allow(dead_code)]
+pub fn is_time_valid_legacy(rule: &PriceRule, current_time: i64) -> bool {
     match rule.time_mode {
         TimeMode::Always => true,
         TimeMode::Schedule => check_schedule(rule, current_time),
@@ -214,5 +271,127 @@ mod tests {
         rule.zone_scope = 0;
         assert!(matches_zone_scope(&rule, None, true));
         assert!(!matches_zone_scope(&rule, Some("1"), false));
+    }
+
+    // ===========================================
+    // New time field tests
+    // ===========================================
+
+    #[test]
+    fn test_valid_from_future() {
+        // Rule not yet effective (valid_from is in the future)
+        let mut rule = make_rule(ProductScope::Global, None);
+        let now = chrono::Utc::now().timestamp_millis();
+        rule.valid_from = Some(now + 3600_000); // 1 hour in the future
+
+        assert!(!is_time_valid(&rule, now));
+    }
+
+    #[test]
+    fn test_valid_until_past() {
+        // Rule expired (valid_until is in the past)
+        let mut rule = make_rule(ProductScope::Global, None);
+        let now = chrono::Utc::now().timestamp_millis();
+        rule.valid_until = Some(now - 3600_000); // 1 hour ago
+
+        assert!(!is_time_valid(&rule, now));
+    }
+
+    #[test]
+    fn test_valid_within_range() {
+        // Rule within valid range
+        let mut rule = make_rule(ProductScope::Global, None);
+        let now = chrono::Utc::now().timestamp_millis();
+        rule.valid_from = Some(now - 3600_000); // 1 hour ago
+        rule.valid_until = Some(now + 3600_000); // 1 hour from now
+
+        assert!(is_time_valid(&rule, now));
+    }
+
+    #[test]
+    fn test_active_days() {
+        // Check day of week filter
+        let mut rule = make_rule(ProductScope::Global, None);
+
+        // Use a known timestamp: 2024-01-15 12:00:00 UTC is Monday (weekday=1)
+        let monday_noon = chrono::DateTime::parse_from_rfc3339("2024-01-15T12:00:00Z")
+            .unwrap()
+            .timestamp_millis();
+
+        // Only active on Monday (1)
+        rule.active_days = Some(vec![1]); // Monday
+        assert!(is_time_valid(&rule, monday_noon));
+
+        // Only active on Sunday (0)
+        rule.active_days = Some(vec![0]); // Sunday
+        assert!(!is_time_valid(&rule, monday_noon));
+
+        // Active on Monday and Friday
+        rule.active_days = Some(vec![1, 5]); // Monday and Friday
+        assert!(is_time_valid(&rule, monday_noon));
+    }
+
+    #[test]
+    fn test_active_time_range() {
+        // Check time of day filter
+        let mut rule = make_rule(ProductScope::Global, None);
+
+        // Use a known timestamp: 2024-01-15 14:30:00 UTC
+        let timestamp = chrono::DateTime::parse_from_rfc3339("2024-01-15T14:30:00Z")
+            .unwrap()
+            .timestamp_millis();
+
+        // Active from 10:00 to 18:00
+        rule.active_start_time = Some("10:00".to_string());
+        rule.active_end_time = Some("18:00".to_string());
+        assert!(is_time_valid(&rule, timestamp)); // 14:30 is within range
+
+        // Active from 16:00 to 20:00
+        rule.active_start_time = Some("16:00".to_string());
+        rule.active_end_time = Some("20:00".to_string());
+        assert!(!is_time_valid(&rule, timestamp)); // 14:30 is before 16:00
+
+        // Active from 08:00 to 12:00
+        rule.active_start_time = Some("08:00".to_string());
+        rule.active_end_time = Some("12:00".to_string());
+        assert!(!is_time_valid(&rule, timestamp)); // 14:30 is after 12:00
+    }
+
+    #[test]
+    fn test_combined_time_constraints() {
+        // Test combining valid_from/until with active_days and time range
+        let mut rule = make_rule(ProductScope::Global, None);
+
+        // 2024-01-15 14:30:00 UTC is Monday
+        let timestamp = chrono::DateTime::parse_from_rfc3339("2024-01-15T14:30:00Z")
+            .unwrap()
+            .timestamp_millis();
+
+        // Set all constraints to pass
+        rule.valid_from = Some(timestamp - 86400_000); // 1 day ago
+        rule.valid_until = Some(timestamp + 86400_000); // 1 day from now
+        rule.active_days = Some(vec![1]); // Monday
+        rule.active_start_time = Some("10:00".to_string());
+        rule.active_end_time = Some("18:00".to_string());
+
+        assert!(is_time_valid(&rule, timestamp));
+
+        // Now make one constraint fail - wrong day
+        rule.active_days = Some(vec![0]); // Sunday
+        assert!(!is_time_valid(&rule, timestamp));
+
+        // Reset day, make time fail
+        rule.active_days = Some(vec![1]); // Monday
+        rule.active_start_time = Some("16:00".to_string());
+        assert!(!is_time_valid(&rule, timestamp));
+    }
+
+    #[test]
+    fn test_no_time_constraints() {
+        // Rule with no time constraints should always be valid
+        let rule = make_rule(ProductScope::Global, None);
+        let now = chrono::Utc::now().timestamp_millis();
+
+        assert!(is_time_valid(&rule, now));
     }
 }
