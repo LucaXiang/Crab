@@ -112,6 +112,7 @@ impl From<&OrderCommand> for CommandAction {
                 CommandAction::AddItems(AddItemsAction {
                     order_id: order_id.clone(),
                     items: items.clone(),
+                    rules: vec![], // Rules will be injected by OrdersManager
                 })
             }
             OrderCommandPayload::ModifyItem {

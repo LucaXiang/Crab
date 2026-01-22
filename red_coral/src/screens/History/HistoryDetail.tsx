@@ -277,7 +277,7 @@ interface OrderItemRowProps {
 
 const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
   ({ item, index, isExpanded, onToggle, order, t, allocatedPaidQty }) => {
-    const discountPercent = item.discount_percent || 0;
+    const discountPercent = item.manual_discount_percent || 0;
     const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
     const baseUnitPrice = (item.original_price ?? item.price) + optionsModifier;
     const finalUnitPrice = calculateItemFinalPrice(item).toNumber();
@@ -318,8 +318,8 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
                 <span className="text-[10px] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded">
                   #{(item.original_instance_id || item.instance_id).slice(-5)}
                 </span>
-                {item.discount_percent ? (
-                  <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">-{item.discount_percent}%</span>
+                {item.manual_discount_percent ? (
+                  <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">-{item.manual_discount_percent}%</span>
                 ) : null}
                 {itemSurcharge > 0 ? (
                   <span className="text-[10px] font-bold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">+{formatCurrency(itemSurcharge)}</span>

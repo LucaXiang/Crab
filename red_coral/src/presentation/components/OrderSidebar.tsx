@@ -53,7 +53,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     await orderOps.modifyItem(order.order_id, instanceId, {
       price: updates.price,
       quantity: updates.quantity,
-      discount_percent: updates.discount_percent,
+      manual_discount_percent: updates.manual_discount_percent,
       surcharge: updates.surcharge,
       note: updates.note,
     });
@@ -96,8 +96,14 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
           const basePrice = (item.original_price ?? item.price) + optionsModifier;
 
-          const unitDiscount = calculateDiscountAmount(basePrice, item.discount_percent || 0).toNumber();
-          const unitSurcharge = item.surcharge || 0;
+          // 手动折扣
+          const manualDiscount = calculateDiscountAmount(basePrice, item.manual_discount_percent || 0).toNumber();
+          // 规则折扣
+          const ruleDiscount = item.rule_discount_amount || 0;
+          const unitDiscount = manualDiscount + ruleDiscount;
+
+          // 手动附加费 + 规则附加费
+          const unitSurcharge = (item.surcharge || 0) + (item.rule_surcharge_amount || 0);
 
           return {
             totalOriginalPrice: Currency.add(acc.totalOriginalPrice, Currency.mul(basePrice, quantity)).toNumber(),

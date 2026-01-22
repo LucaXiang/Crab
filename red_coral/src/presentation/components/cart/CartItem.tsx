@@ -20,7 +20,7 @@ export const CartItem = React.memo<CartItemProps>(({
   onClick
 }) => {
   const performanceMode = useSettingsStore(state => state.performanceMode);
-  const discountPercent = item.discount_percent || 0;
+  const discountPercent = item.manual_discount_percent || 0;
   const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
   const baseUnitPrice = (item.original_price ?? item.price) + optionsModifier;
   const finalUnitPrice = calculateItemFinalPrice(item).toNumber();

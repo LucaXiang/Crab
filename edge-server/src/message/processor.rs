@@ -135,52 +135,16 @@ impl RequestCommandProcessor {
 
     /// Apply price rules to items if the command is AddItems
     ///
-    /// This ensures price rules are applied regardless of how the command arrives
-    /// (local Tauri or remote MessageBus).
-    async fn apply_price_rules_if_needed(&self, mut command: OrderCommand) -> OrderCommand {
-        // Only process AddItems commands
-        if let OrderCommandPayload::AddItems { order_id, items } = &command.payload {
-            // Get order snapshot to find zone_id
-            let snapshot = match self.state.orders_manager().get_snapshot(order_id) {
-                Ok(Some(s)) => s,
-                Ok(None) | Err(_) => {
-                    // If order not found or error, return command unmodified
-                    return command;
-                }
-            };
-
-            // Determine if this is a retail order (no zone)
-            let is_retail = snapshot.zone_id.is_none();
-            let zone_id = snapshot.zone_id.as_deref();
-
-            // Load applicable price rules for this zone
-            let rules = self
-                .state
-                .price_rule_engine
-                .load_rules_for_zone(zone_id, is_retail)
-                .await;
-
-            if rules.is_empty() {
-                return command;
-            }
-
-            // Get current timestamp for time-based rule validation
-            let current_time = chrono::Utc::now().timestamp_millis();
-
-            // Apply price rules to items
-            let processed_items = self
-                .state
-                .price_rule_engine
-                .apply_rules(items.clone(), &rules, current_time)
-                .await;
-
-            // Update command with processed items
-            command.payload = OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items: processed_items,
-            };
-        }
-
+    /// NOTE: This is now a no-op. Price rules are applied in OrdersManager.process_command
+    /// which uses the cached rules loaded during OpenTable and applies them via
+    /// input_to_snapshot_with_rules for proper tracking of applied rules.
+    ///
+    /// The old approach modified CartItemInput directly, which lost information about
+    /// which rules were applied. The new approach properly tracks rule_discount_amount,
+    /// rule_surcharge_amount, and applied_rules in CartItemSnapshot.
+    async fn apply_price_rules_if_needed(&self, command: OrderCommand) -> OrderCommand {
+        // Rules are now applied in OrdersManager via input_to_snapshot_with_rules
+        // This ensures proper tracking of applied rules and their effects
         command
     }
 
@@ -207,6 +171,15 @@ impl RequestCommandProcessor {
         } = &command.payload
         {
             Some((zone_id.clone(), *is_retail))
+        } else {
+            None
+        };
+
+        // 检查是否是 RestoreOrder 命令
+        let restore_order_id = if let OrderCommandPayload::RestoreOrder { order_id } =
+            &command.payload
+        {
+            Some(order_id.clone())
         } else {
             None
         };
@@ -239,6 +212,15 @@ impl RequestCommandProcessor {
                         self.state.orders_manager().cache_rules(order_id, rules);
                     }
                 }
+            }
+
+            // 如果是 RestoreOrder 且成功执行，重新加载并缓存价格规则
+            if let Some(order_id) = restore_order_id {
+                tracing::debug!(
+                    order_id = %order_id,
+                    "订单恢复成功，重新加载价格规则"
+                );
+                self.state.load_rules_for_order(&order_id).await;
             }
         }
 

@@ -12,24 +12,39 @@ use crate::db::models::PriceRule;
 use crate::pricing::calculate_item_price;
 use shared::order::CartItemSnapshot;
 
-/// Generate a content-addressed instance_id from item properties
+/// Generate a content-addressed instance_id from CartItemInput
 ///
-/// The instance_id is a hash of the item's properties that affect its identity:
-/// - product_id
-/// - price
-/// - manual_discount_percent
-/// - selected_options
-/// - selected_specification
-/// - surcharge
+/// The instance_id is a hash of the item's identity-defining properties:
+/// - product_id: 商品唯一标识
+/// - price: 输入价格（直接使用 CartItemInput.price）
+/// - manual_discount_percent: 手动折扣
+/// - selected_options: 选项（attribute_id + option_idx）
+/// - selected_specification: 规格
 ///
 /// Items with the same instance_id can be merged (quantities added together).
-pub fn generate_instance_id(
+///
+/// 注意：instance_id 完全基于 CartItemInput 字段生成，不受规则计算结果影响。
+/// 这确保了同一商品在任何时刻（规则缓存是否存在）都能正确合并。
+pub fn generate_instance_id(input: &shared::order::CartItemInput) -> String {
+    generate_instance_id_from_parts(
+        &input.product_id,
+        input.price,
+        input.manual_discount_percent,
+        &input.selected_options,
+        &input.selected_specification,
+    )
+}
+
+/// Internal helper to generate instance_id from individual parts
+///
+/// This is used by `generate_instance_id` and also by modify_item when
+/// computing instance_id for modified item portions.
+pub(crate) fn generate_instance_id_from_parts(
     product_id: &str,
     price: f64,
     manual_discount_percent: Option<f64>,
     options: &Option<Vec<shared::order::ItemOption>>,
     specification: &Option<shared::order::SpecificationInfo>,
-    surcharge: Option<f64>,
 ) -> String {
     use sha2::{Digest, Sha256};
 
@@ -51,10 +66,6 @@ pub fn generate_instance_id(
 
     if let Some(spec) = specification {
         hasher.update(spec.id.as_bytes());
-    }
-
-    if let Some(s) = surcharge {
-        hasher.update(s.to_be_bytes());
     }
 
     let result = hasher.finalize();
@@ -98,15 +109,9 @@ pub fn input_to_snapshot_with_rules(
     // Calculate item price with rules
     let calc_result = calculate_item_price(base_price, options_modifier, manual_discount, rules);
 
-    // Generate instance_id using the calculated final price
-    let instance_id = generate_instance_id(
-        &input.product_id,
-        calc_result.item_final,
-        input.manual_discount_percent,
-        &input.selected_options,
-        &input.selected_specification,
-        input.surcharge,
-    );
+    // Generate instance_id directly from CartItemInput
+    // instance_id 完全基于 CartItemInput 字段生成，确保一致性
+    let instance_id = generate_instance_id(input);
 
     CartItemSnapshot {
         id: input.product_id.clone(),
@@ -146,10 +151,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_generate_instance_id() {
-        let id1 = generate_instance_id("product-1", 10.0, None, &None, &None, None);
-        let id2 = generate_instance_id("product-1", 10.0, None, &None, &None, None);
-        let id3 = generate_instance_id("product-1", 10.0, Some(50.0), &None, &None, None);
+    fn test_generate_instance_id_from_parts() {
+        let id1 = generate_instance_id_from_parts("product-1", 10.0, None, &None, &None);
+        let id2 = generate_instance_id_from_parts("product-1", 10.0, None, &None, &None);
+        let id3 = generate_instance_id_from_parts("product-1", 10.0, Some(50.0), &None, &None);
 
         // Same inputs should produce same ID
         assert_eq!(id1, id2);
@@ -160,18 +165,61 @@ mod tests {
 
     #[test]
     fn test_generate_instance_id_with_price_difference() {
-        let id1 = generate_instance_id("product-1", 10.0, None, &None, &None, None);
-        let id2 = generate_instance_id("product-1", 15.0, None, &None, &None, None);
+        let id1 = generate_instance_id_from_parts("product-1", 10.0, None, &None, &None);
+        let id2 = generate_instance_id_from_parts("product-1", 15.0, None, &None, &None);
 
         assert_ne!(id1, id2);
     }
 
     #[test]
-    fn test_generate_instance_id_with_surcharge() {
-        let id1 = generate_instance_id("product-1", 10.0, None, &None, &None, None);
-        let id2 = generate_instance_id("product-1", 10.0, None, &None, &None, Some(2.0));
+    fn test_generate_instance_id_with_options() {
+        let opts = Some(vec![shared::order::ItemOption {
+            attribute_id: "size".to_string(),
+            attribute_name: "Size".to_string(),
+            option_idx: 1,
+            option_name: "Large".to_string(),
+            price_modifier: Some(2.0),
+        }]);
+
+        let id1 = generate_instance_id_from_parts("product-1", 10.0, None, &None, &None);
+        let id2 = generate_instance_id_from_parts("product-1", 10.0, None, &opts, &None);
 
         assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn test_generate_instance_id_from_input() {
+        // Test the public API that takes CartItemInput
+        let input = shared::order::CartItemInput {
+            product_id: "product-1".to_string(),
+            name: "Test Product".to_string(),
+            price: 10.0,
+            original_price: None,
+            quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            surcharge: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let id1 = generate_instance_id(&input);
+        let id2 = generate_instance_id(&input);
+
+        // Same input should produce same ID
+        assert_eq!(id1, id2);
+
+        // Should match the from_parts version
+        let id_from_parts = generate_instance_id_from_parts(
+            &input.product_id,
+            input.price,
+            input.manual_discount_percent,
+            &input.selected_options,
+            &input.selected_specification,
+        );
+        assert_eq!(id1, id_from_parts);
     }
 
     #[test]
@@ -422,5 +470,73 @@ mod tests {
         assert_eq!(snapshot.price, 81.0);
         assert_eq!(snapshot.manual_discount_percent, Some(10.0));
         assert_eq!(snapshot.rule_discount_amount, Some(9.0));
+    }
+
+    #[test]
+    fn test_instance_id_consistent_with_or_without_rules() {
+        use crate::db::models::{AdjustmentType, ProductScope, RuleType, TimeMode};
+
+        // Same input for both cases
+        let input = shared::order::CartItemInput {
+            product_id: "product-1".to_string(),
+            name: "Test Product".to_string(),
+            price: 100.0,
+            original_price: None,
+            quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            surcharge: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        // Case 1: Without rules (e.g., cache miss)
+        let snapshot_no_rules = input_to_snapshot_with_rules(&input, &[]);
+
+        // Case 2: With a 10% discount rule
+        let discount_rule = PriceRule {
+            id: None,
+            name: "test_discount".to_string(),
+            display_name: "Test Discount".to_string(),
+            receipt_name: "TD".to_string(),
+            description: None,
+            rule_type: RuleType::Discount,
+            product_scope: ProductScope::Global,
+            target: None,
+            zone_scope: -1,
+            adjustment_type: AdjustmentType::Percentage,
+            adjustment_value: 10,
+            priority: 0,
+            is_stackable: true,
+            is_exclusive: false,
+            time_mode: TimeMode::Always,
+            start_time: None,
+            end_time: None,
+            schedule_config: None,
+            valid_from: None,
+            valid_until: None,
+            active_days: None,
+            active_start_time: None,
+            active_end_time: None,
+            is_active: true,
+            created_by: None,
+            created_at: 0,
+        };
+
+        let rules: Vec<&PriceRule> = vec![&discount_rule];
+        let snapshot_with_rules = input_to_snapshot_with_rules(&input, &rules);
+
+        // Prices are different (as expected)
+        assert_eq!(snapshot_no_rules.price, 100.0);
+        assert_eq!(snapshot_with_rules.price, 90.0);
+
+        // But instance_id MUST be the same!
+        // This ensures hash chain consistency regardless of rule cache state
+        assert_eq!(
+            snapshot_no_rules.instance_id, snapshot_with_rules.instance_id,
+            "instance_id should be the same regardless of rules applied"
+        );
     }
 }

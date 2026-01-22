@@ -95,7 +95,7 @@ function toCartItemInput(item: CartItem): CartItemInput {
     original_price: item.original_price ?? item.price,
     quantity: item.quantity,
     note: item.note ?? null,
-    discount_percent: item.discount_percent ?? null,
+    manual_discount_percent: item.manual_discount_percent ?? null,
     surcharge: item.surcharge ?? null,
     selected_options: selectedOptions,
     selected_specification: item.selected_specification ? {
@@ -468,7 +468,7 @@ export const modifyItem = async (
   changes: {
     price?: number;
     quantity?: number;
-    discount_percent?: number;
+    manual_discount_percent?: number;
     surcharge?: number;
     note?: string;
   }
@@ -480,7 +480,7 @@ export const modifyItem = async (
     changes: {
       price: changes.price ?? null,
       quantity: changes.quantity ?? null,
-      discount_percent: changes.discount_percent ?? null,
+      manual_discount_percent: changes.manual_discount_percent ?? null,
       surcharge: changes.surcharge ?? null,
       note: changes.note ?? null,
     },
@@ -509,4 +509,26 @@ export const removeItem = async (
 
   const response = await sendCommand(command);
   ensureSuccess(response, 'Remove item');
+};
+
+/**
+ * Toggle rule skip status for an order
+ * @param orderId Order ID
+ * @param ruleId Rule ID to toggle
+ * @param skipped Whether to skip (true) or apply (false) the rule
+ */
+export const toggleRuleSkip = async (
+  orderId: string,
+  ruleId: string,
+  skipped: boolean
+): Promise<void> => {
+  const command = createCommand({
+    type: 'TOGGLE_RULE_SKIP',
+    order_id: orderId,
+    rule_id: ruleId,
+    skipped,
+  });
+
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Toggle rule skip');
 };

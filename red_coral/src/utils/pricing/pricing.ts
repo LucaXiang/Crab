@@ -58,20 +58,28 @@ function applyDiscount(
 
 /**
  * 计算商品的最终单价
- * 顺序：原价 -> 应用属性选项 -> 应用折扣 -> 应用加价 -> 最终单价
+ *
+ * 如果商品有规则折扣/附加费（来自服务器），直接使用 item.price（服务器已计算好）
+ * 否则本地计算：原价 -> 应用属性选项 -> 应用手动折扣 -> 应用附加费 -> 最终单价
  *
  * @param item CartItem
  * @returns 最终单价
  */
 export function calculateItemFinalPrice(item: CartItem): Decimal {
+  // 如果有规则折扣或规则附加费，说明价格已由服务器计算，直接使用
+  if (item.rule_discount_amount || item.rule_surcharge_amount) {
+    return new Decimal(item.price);
+  }
+
+  // 本地计算（购物车未提交时）
   let basePrice = new Decimal(item.original_price ?? item.price);
 
   // 2. Apply attribute options modifier
   const optionsModifier = calculateOptionsModifier(item.selected_options);
   basePrice = Currency.add(basePrice, optionsModifier);
 
-  // 3. Apply discount
-  const afterDiscount = applyDiscount(basePrice, item.discount_percent || 0);
+  // 3. Apply manual discount
+  const afterDiscount = applyDiscount(basePrice, item.manual_discount_percent || 0);
 
   // 4. Apply surcharge
   const surchargeAmount = item.surcharge || 0;

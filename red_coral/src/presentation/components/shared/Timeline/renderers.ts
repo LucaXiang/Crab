@@ -28,6 +28,7 @@ import type {
   OrderMergedOutPayload,
   TableReassignedPayload,
   OrderInfoUpdatedPayload,
+  RuleSkipToggledPayload,
 } from '@/core/domain/types/orderEvent';
 import { formatCurrency } from '@/utils/formatCurrency';
 import {
@@ -87,7 +88,7 @@ const ItemsAddedRenderer: EventRenderer<ItemsAddedPayload> = {
     const details = items.map((item) => {
       const spec = item.selected_specification ? `(${item.selected_specification.name})` : '';
       const modifiers: string[] = [];
-      if (item.discount_percent) modifiers.push(`-${item.discount_percent}%`);
+      if (item.manual_discount_percent) modifiers.push(`-${item.manual_discount_percent}%`);
       if (item.surcharge) modifiers.push(`+${formatCurrency(item.surcharge)}`);
       return `${item.name} ${spec} x${item.quantity}${modifiers.length ? ` (${modifiers.join(', ')})` : ''}`;
     });
@@ -127,7 +128,7 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
 
     formatChange('price', 'timeline.labels.price', v => formatCurrency(v || 0));
     formatChange('quantity', 'timeline.labels.quantity');
-    formatChange('discount_percent', 'timeline.labels.discount', v => `${v}%`);
+    formatChange('manual_discount_percent', 'timeline.labels.discount', v => `${v}%`);
     formatChange('surcharge', 'timeline.labels.surcharge', v => formatCurrency(v || 0));
 
     return {
@@ -347,6 +348,23 @@ const OrderInfoUpdatedRenderer: EventRenderer<OrderInfoUpdatedPayload> = {
   }
 };
 
+const RuleSkipToggledRenderer: EventRenderer<RuleSkipToggledPayload> = {
+  render(event, payload, t) {
+    const action = payload.skipped ? 'Skipped' : 'Applied';
+
+    return {
+      title: 'Price Rule Toggled',
+      summary: `${action}: ${payload.rule_id}`,
+      details: [
+        `Total: ${formatCurrency(payload.total)}`,
+      ],
+      icon: Tag,
+      colorClass: payload.skipped ? 'bg-orange-400' : 'bg-green-400',
+      timestamp: event.timestamp,
+    };
+  }
+};
+
 // ============================================================================
 // Renderer Registry (类似 Rust trait object dispatch)
 // ============================================================================
@@ -376,6 +394,7 @@ export const EVENT_RENDERERS: Record<OrderEventType, EventRenderer<any>> = {
   TABLE_REASSIGNED: TableReassignedRenderer,
   ORDER_INFO_UPDATED: OrderInfoUpdatedRenderer,
   SURCHARGE_EXEMPT_SET: OrderInfoUpdatedRenderer, // Reuse for now
+  RULE_SKIP_TOGGLED: RuleSkipToggledRenderer,
 };
 
 /**

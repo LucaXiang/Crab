@@ -35,7 +35,8 @@ export type OrderEventType =
   | 'ORDER_MERGED_OUT'
   | 'TABLE_REASSIGNED'
   | 'SURCHARGE_EXEMPT_SET'
-  | 'ORDER_INFO_UPDATED';
+  | 'ORDER_INFO_UPDATED'
+  | 'RULE_SKIP_TOGGLED';
 
 /**
  * Order event structure (matches Rust OrderEvent)
@@ -89,7 +90,8 @@ export type EventPayload =
   | OrderMergedPayload
   | OrderMergedOutPayload
   | TableReassignedPayload
-  | OrderInfoUpdatedPayload;
+  | OrderInfoUpdatedPayload
+  | RuleSkipToggledPayload;
 
 export interface TableOpenedPayload {
   type: 'TABLE_OPENED';
@@ -147,7 +149,7 @@ export interface ItemModificationResult {
   instance_id: string;
   quantity: number;
   price: number;
-  discount_percent?: number | null;
+  manual_discount_percent?: number | null;
   action: string;
 }
 
@@ -239,6 +241,20 @@ export interface OrderInfoUpdatedPayload {
   is_pre_payment?: boolean | null;
 }
 
+export interface RuleSkipToggledPayload {
+  type: 'RULE_SKIP_TOGGLED';
+  rule_id: string;
+  skipped: boolean;
+  /** Recalculated subtotal */
+  subtotal: number;
+  /** Recalculated discount */
+  discount: number;
+  /** Recalculated surcharge */
+  surcharge: number;
+  /** Recalculated total */
+  total: number;
+}
+
 // ============================================================================
 // Command Types
 // ============================================================================
@@ -273,7 +289,8 @@ export type OrderCommandPayload =
   | SplitOrderCommand
   | MoveOrderCommand
   | MergeOrdersCommand
-  | UpdateOrderInfoCommand;
+  | UpdateOrderInfoCommand
+  | ToggleRuleSkipCommand;
 
 export interface OpenTableCommand {
   type: 'OPEN_TABLE';
@@ -374,6 +391,13 @@ export interface UpdateOrderInfoCommand {
   guest_count?: number | null;
   table_name?: string | null;
   is_pre_payment?: boolean | null;
+}
+
+export interface ToggleRuleSkipCommand {
+  type: 'TOGGLE_RULE_SKIP';
+  order_id: string;
+  rule_id: string;
+  skipped: boolean;
 }
 
 // ============================================================================
@@ -505,6 +529,7 @@ export interface CartItemSnapshot {
   /** Instance ID (unique identifier for this item) */
   instance_id: string;
   name: string;
+  /** Final price after all discounts */
   price: number;
   original_price?: number | null;
   quantity: number;
@@ -512,13 +537,46 @@ export interface CartItemSnapshot {
   unpaid_quantity: number;
   selected_options?: ItemOption[] | null;
   selected_specification?: SpecificationInfo | null;
-  discount_percent?: number | null;
+
+  // === Manual Adjustment ===
+  /** Manual discount percentage (0-100) */
+  manual_discount_percent?: number | null;
+  /** Manual surcharge amount */
   surcharge?: number | null;
+
+  // === Rule Adjustments ===
+  /** Rule discount amount (calculated from price rules) */
+  rule_discount_amount?: number | null;
+  /** Rule surcharge amount (calculated from price rules) */
+  rule_surcharge_amount?: number | null;
+  /** Applied price rules list */
+  applied_rules?: AppliedRule[] | null;
+
   note?: string | null;
   authorizer_id?: string | null;
   authorizer_name?: string | null;
   /** Internal: marks item as removed for soft delete */
   _removed?: boolean;
+}
+
+/**
+ * Applied price rule (matches Rust AppliedRule)
+ */
+export interface AppliedRule {
+  rule_id: string;
+  name: string;
+  display_name: string;
+  receipt_name: string;
+  rule_type: 'discount' | 'surcharge';
+  adjustment_type: 'percentage' | 'fixed';
+  product_scope: 'global' | 'category' | 'product';
+  zone_scope: number;
+  adjustment_value: number;
+  calculated_amount: number;
+  priority: number;
+  is_stackable: boolean;
+  is_exclusive: boolean;
+  skipped: boolean;
 }
 
 /**
@@ -532,7 +590,9 @@ export interface CartItemInput {
   quantity: number;
   selected_options?: ItemOption[] | null;
   selected_specification?: SpecificationInfo | null;
-  discount_percent?: number | null;
+  /** Manual discount percentage (0-100) */
+  manual_discount_percent?: number | null;
+  /** Manual surcharge amount */
   surcharge?: number | null;
   note?: string | null;
   authorizer_id?: string | null;
@@ -557,11 +617,12 @@ export interface SpecificationInfo {
 export interface ItemChanges {
   price?: number | null;
   quantity?: number | null;
-  discount_percent?: number | null;
+  /** Manual discount percentage (0-100) */
+  manual_discount_percent?: number | null;
   surcharge?: number | null;
   note?: string | null;
-  original_price?: number | null;
   selected_options?: ItemOption[] | null;
+  selected_specification?: SpecificationInfo | null;
 }
 
 export interface SplitItem {

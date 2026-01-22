@@ -53,7 +53,7 @@ const ActiveItemRow: React.FC<ActiveItemRowProps> = ({
     ...item,
     surcharge: surchargeExempt ? 0 : item.surcharge,
   }).toNumber();
-  const hasDiscount = (item.discount_percent || 0) > 0 || basePrice !== unitPrice;
+  const hasDiscount = (item.manual_discount_percent || 0) > 0 || basePrice !== unitPrice;
   const isSelectMode = mode === 'SELECT';
 
   const clickHandlers = useLongPress(
@@ -89,9 +89,9 @@ const ActiveItemRow: React.FC<ActiveItemRowProps> = ({
                 </div>
             )}
             </div>
-            {item.discount_percent ? (
+            {item.manual_discount_percent ? (
               <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">
-                -{item.discount_percent}%
+                -{item.manual_discount_percent}%
               </span>
             ) : null}
             {!surchargeExempt && item.surcharge ? (
@@ -307,7 +307,7 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
                 ...item,
                 surcharge: surchargeExempt ? 0 : item.surcharge,
               }).toNumber();
-              const hasDiscount = (item.discount_percent || 0) > 0 || basePrice !== unitPricePaid;
+              const hasDiscount = (item.manual_discount_percent || 0) > 0 || basePrice !== unitPricePaid;
 
               return (
                 <div 
@@ -336,9 +336,9 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
                           )}
                         </div>
                          {/* Tags */}
-                        {item.discount_percent ? (
+                        {item.manual_discount_percent ? (
                           <span className="text-[10px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
-                            -{item.discount_percent}%
+                            -{item.manual_discount_percent}%
                           </span>
                         ) : null}
                       </div>

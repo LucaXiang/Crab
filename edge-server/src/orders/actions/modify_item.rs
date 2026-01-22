@@ -8,7 +8,7 @@
 
 use async_trait::async_trait;
 
-use crate::orders::reducer::generate_instance_id;
+use crate::orders::reducer::generate_instance_id_from_parts;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{
     CartItemSnapshot, EventPayload, ItemChanges, ItemModificationResult, OrderEvent,
@@ -176,7 +176,6 @@ fn calculate_modification_results(
         // Partial modification: split into unchanged + modified portions
         let new_price = changes.price.unwrap_or(item.price);
         let new_discount = changes.manual_discount_percent.or(item.manual_discount_percent);
-        let new_surcharge = changes.surcharge.or(item.surcharge);
         let new_options = changes
             .selected_options
             .as_ref()
@@ -187,13 +186,12 @@ fn calculate_modification_results(
             .or(item.selected_specification.as_ref());
 
         // Generate new instance_id for the modified portion
-        let new_instance_id = generate_instance_id(
+        let new_instance_id = generate_instance_id_from_parts(
             &item.id,
             new_price,
             new_discount,
             &new_options.cloned(),
             &new_specification.cloned(),
-            new_surcharge,
         );
 
         vec![

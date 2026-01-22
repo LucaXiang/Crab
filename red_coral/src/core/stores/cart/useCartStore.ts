@@ -93,7 +93,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       // 5. Same specification (if any)
       const existingIndex = state.cart.findIndex(item =>
         item.id === String(product.id) &&
-        (item.discount_percent || 0) === discount &&
+        (item.manual_discount_percent || 0) === discount &&
         areOptionsEqual(item.selected_options, selectedOptions) &&
         areSpecificationsEqual(item.selected_specification, selectedSpecification) &&
         item.authorizer_id === authorizer?.id
@@ -119,7 +119,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
           unpaid_quantity: quantity,  // All items are unpaid when first added to cart
           price: effectivePrice,
           original_price: effectivePrice,
-          discount_percent: discount,
+          manual_discount_percent: discount,
           selected_options: selectedOptions && selectedOptions.length > 0 ? selectedOptions : undefined,
           selected_specification: selectedSpecification,
           instance_id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,

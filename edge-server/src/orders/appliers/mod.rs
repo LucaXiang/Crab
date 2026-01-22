@@ -19,6 +19,7 @@ mod order_voided;
 mod orders_merged;
 mod payment_added;
 mod payment_cancelled;
+mod rule_skip_toggled;
 mod table_opened;
 
 pub use item_modified::ItemModifiedApplier;
@@ -34,6 +35,7 @@ pub use order_voided::OrderVoidedApplier;
 pub use orders_merged::{OrderMergedApplier, OrderMergedOutApplier};
 pub use payment_added::PaymentAddedApplier;
 pub use payment_cancelled::PaymentCancelledApplier;
+pub use rule_skip_toggled::RuleSkipToggledApplier;
 pub use table_opened::TableOpenedApplier;
 
 /// EventAction enum - dispatches to concrete applier implementations
@@ -53,6 +55,7 @@ pub enum EventAction {
     OrderMerged(OrderMergedApplier),
     OrderMergedOut(OrderMergedOutApplier),
     OrderSplit(OrderSplitApplier),
+    RuleSkipToggled(RuleSkipToggledApplier),
 }
 
 /// Manual implementation of EventApplier for EventAction
@@ -74,6 +77,7 @@ impl EventApplier for EventAction {
             EventAction::OrderMerged(applier) => applier.apply(snapshot, event),
             EventAction::OrderMergedOut(applier) => applier.apply(snapshot, event),
             EventAction::OrderSplit(applier) => applier.apply(snapshot, event),
+            EventAction::RuleSkipToggled(applier) => applier.apply(snapshot, event),
         }
     }
 }
@@ -107,6 +111,9 @@ impl From<&OrderEvent> for EventAction {
                 EventAction::OrderMergedOut(OrderMergedOutApplier)
             }
             EventPayload::OrderSplit { .. } => EventAction::OrderSplit(OrderSplitApplier),
+            EventPayload::RuleSkipToggled { .. } => {
+                EventAction::RuleSkipToggled(RuleSkipToggledApplier)
+            }
             // Other events will be added here
             _ => todo!("Event applier not yet implemented"),
         }

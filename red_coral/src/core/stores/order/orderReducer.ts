@@ -31,6 +31,7 @@ import type {
   OrderMergedPayload,
   TableReassignedPayload,
   OrderInfoUpdatedPayload,
+  RuleSkipToggledPayload,
 } from '@/core/domain/types/orderEvent';
 
 // ============================================================================
@@ -195,6 +196,9 @@ export function applyEvent(
     case 'ORDER_INFO_UPDATED':
       result = applyOrderInfoUpdated(result, event.payload as OrderInfoUpdatedPayload);
       break;
+    case 'RULE_SKIP_TOGGLED':
+      result = applyRuleSkipToggled(result, event.payload as RuleSkipToggledPayload);
+      break;
     default:
       // Unknown event type - log and continue
       console.warn(`Unknown event type: ${event.event_type}`);
@@ -314,7 +318,7 @@ function applyItemModified(
           ...items[existingIndex],
           quantity: result.quantity,
           price: result.price,
-          discount_percent: result.discount_percent ?? items[existingIndex].discount_percent,
+          manual_discount_percent: result.manual_discount_percent ?? items[existingIndex].manual_discount_percent,
           // Also apply other changes from payload
           surcharge: payload.changes.surcharge ?? items[existingIndex].surcharge,
           note: payload.changes.note ?? items[existingIndex].note,
@@ -336,7 +340,7 @@ function applyItemModified(
           instance_id: result.instance_id,
           quantity: result.quantity,
           price: result.price,
-          discount_percent: result.discount_percent,
+          manual_discount_percent: result.manual_discount_percent,
         });
       }
     }
@@ -560,6 +564,35 @@ function applyOrderInfoUpdated(
   };
 }
 
+function applyRuleSkipToggled(
+  snapshot: OrderSnapshot,
+  payload: RuleSkipToggledPayload
+): OrderSnapshot {
+  // Update skipped status on all items' applied_rules with matching rule_id
+  const updatedItems = snapshot.items.map((item) => {
+    if (!item.applied_rules) return item;
+
+    const updatedRules = item.applied_rules.map((rule) => {
+      if (rule.rule_id === payload.rule_id) {
+        return { ...rule, skipped: payload.skipped };
+      }
+      return rule;
+    });
+
+    return { ...item, applied_rules: updatedRules };
+  });
+
+  // Update order-level totals from the recalculated values in the event
+  return {
+    ...snapshot,
+    items: updatedItems,
+    subtotal: payload.subtotal,
+    discount: payload.discount,
+    // Note: surcharge at order level if needed
+    total: payload.total,
+  };
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -605,37 +638,30 @@ function recalculateTotals(snapshot: OrderSnapshot): OrderSnapshot {
   let discount = Currency.toDecimal(0);
 
   for (const item of activeItems) {
-    const basePrice = item.original_price ?? item.price;
-    const itemTotal = Currency.mul(basePrice, item.quantity);
+    // item.price 是服务器计算后的最终单价（已含规则折扣/附加费）
+    const itemTotal = Currency.mul(item.price, item.quantity);
+    subtotal = Currency.add(subtotal, itemTotal);
 
-    // Apply item-level discount
-    if (item.discount_percent && item.discount_percent > 0) {
-      const itemDiscount = Currency.mul(itemTotal, item.discount_percent / 100);
+    // 累计手动折扣（用于显示）
+    if (item.manual_discount_percent && item.manual_discount_percent > 0) {
+      const basePrice = item.original_price ?? item.price;
+      const itemDiscount = Currency.mul(
+        Currency.mul(basePrice, item.quantity),
+        item.manual_discount_percent / 100
+      );
       discount = Currency.add(discount, itemDiscount);
-      subtotal = Currency.add(subtotal, Currency.sub(itemTotal, itemDiscount));
-    } else {
-      subtotal = Currency.add(subtotal, itemTotal);
     }
 
-    // Add item-level surcharge
-    if (item.surcharge && item.surcharge > 0) {
-      subtotal = Currency.add(subtotal, Currency.mul(item.surcharge, item.quantity));
-    }
-
-    // Add option price modifiers
-    if (item.selected_options) {
-      for (const option of item.selected_options) {
-        if (option.price_modifier) {
-          subtotal = Currency.add(
-            subtotal,
-            Currency.mul(option.price_modifier, item.quantity)
-          );
-        }
-      }
+    // 累计规则折扣（用于显示）
+    if (item.rule_discount_amount && item.rule_discount_amount > 0) {
+      discount = Currency.add(
+        discount,
+        Currency.mul(item.rule_discount_amount, item.quantity)
+      );
     }
   }
 
-  // Calculate total (surcharge is now per-item via Price Rules)
+  // Total = subtotal (item.price 已经是折扣后的价格)
   const total = Currency.floor2(subtotal).toNumber();
 
   // Calculate paid amount from non-cancelled payments

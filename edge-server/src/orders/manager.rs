@@ -292,7 +292,18 @@ impl OrdersManager {
         };
 
         // 5. Convert to action and execute (blocking async)
-        let action: CommandAction = (&cmd).into();
+        // For AddItems commands, inject cached price rules
+        let action: CommandAction = match &cmd.payload {
+            shared::order::OrderCommandPayload::AddItems { order_id, items } => {
+                let rules = self.get_cached_rules(order_id).unwrap_or_default();
+                CommandAction::AddItems(super::actions::AddItemsAction {
+                    order_id: order_id.clone(),
+                    items: items.clone(),
+                    rules,
+                })
+            }
+            _ => (&cmd).into(),
+        };
         let events = futures::executor::block_on(action.execute(&mut ctx, &metadata))
             .map_err(ManagerError::from)?;
 

@@ -18,7 +18,7 @@ interface CartItemDetailModalProps {
 export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item, onClose, onUpdate, onRemove, readOnlyAttributes = false }) => {
   const { t } = useI18n();
   const [quantity, setQuantity] = useState(item.quantity);
-  const [discount, setDiscount] = useState(item.discount_percent || 0);
+  const [discount, setDiscount] = useState(item.manual_discount_percent || 0);
   const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; username: string } | undefined>();
 
   // Specification State
@@ -181,7 +181,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
 
     onUpdate(item.instance_id, {
       quantity: finalQty,
-      discount_percent: finalDisc,
+      manual_discount_percent: finalDisc,
       selected_options: selectedOptions,
       selected_specification: selectedSpecification
     }, discountAuthorizer ? { userId: discountAuthorizer.id } : undefined);

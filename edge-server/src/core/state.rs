@@ -10,6 +10,7 @@ use crate::core::Config;
 use crate::core::config::migrate_legacy_structure;
 use crate::db::DbService;
 use crate::orders::OrdersManager;
+use crate::orders::actions::open_table::load_matching_rules;
 use crate::pricing::PriceRuleEngine;
 use crate::services::{
     ActivationService, CertService, HttpsService, MessageBusService, ProvisioningService,
@@ -230,14 +231,102 @@ impl ServerState {
     /// 必须在 `Server::run()` 之前调用
     ///
     /// 启动的任务：
+    /// - 价格规则缓存预热 (为活跃订单加载规则)
     /// - 消息总线处理器 (MessageHandler)
     /// - 订单事件转发器 (Order Event Forwarder)
     pub async fn start_background_tasks(&self) {
+        // Warmup: Load price rules for all active orders
+        self.warmup_active_order_rules().await;
+
         // Start MessageBus background tasks
         self.message_bus.start_background_tasks(self.clone());
 
         // Start order event forwarder (OrderEvent -> MessageBus)
         self.start_order_event_forwarder();
+    }
+
+    /// 预热活跃订单的价格规则缓存
+    ///
+    /// 服务器启动时调用，确保所有活跃订单都有规则缓存。
+    /// 这样 AddItems 命令可以立即使用缓存的规则。
+    pub async fn warmup_active_order_rules(&self) {
+        let active_orders = match self.orders_manager.get_active_orders() {
+            Ok(orders) => orders,
+            Err(e) => {
+                tracing::error!("Failed to get active orders for rule warmup: {:?}", e);
+                return;
+            }
+        };
+
+        if active_orders.is_empty() {
+            tracing::debug!("No active orders, skipping rule warmup");
+            return;
+        }
+
+        tracing::info!(
+            "🔥 Warming up price rules for {} active orders",
+            active_orders.len()
+        );
+
+        let mut loaded_count = 0;
+        for order in &active_orders {
+            let rules = load_matching_rules(
+                &self.db,
+                order.zone_id.as_deref(),
+                order.is_retail,
+            )
+            .await;
+
+            if !rules.is_empty() {
+                self.orders_manager.cache_rules(&order.order_id, rules);
+                loaded_count += 1;
+            }
+        }
+
+        tracing::info!(
+            "✅ Rule warmup complete: {}/{} orders have cached rules",
+            loaded_count,
+            active_orders.len()
+        );
+    }
+
+    /// 为单个订单加载并缓存价格规则
+    ///
+    /// 用于：
+    /// - RestoreOrder 后重新加载规则
+    /// - 手动刷新订单规则
+    pub async fn load_rules_for_order(&self, order_id: &str) -> bool {
+        let snapshot = match self.orders_manager.get_snapshot(order_id) {
+            Ok(Some(s)) => s,
+            Ok(None) => {
+                tracing::warn!("Order {} not found for rule loading", order_id);
+                return false;
+            }
+            Err(e) => {
+                tracing::error!("Failed to get order {} for rule loading: {:?}", order_id, e);
+                return false;
+            }
+        };
+
+        let rules = load_matching_rules(
+            &self.db,
+            snapshot.zone_id.as_deref(),
+            snapshot.is_retail,
+        )
+        .await;
+
+        if !rules.is_empty() {
+            tracing::debug!(
+                order_id = %order_id,
+                rule_count = rules.len(),
+                "Loaded rules for order"
+            );
+            self.orders_manager.cache_rules(order_id, rules);
+            true
+        } else {
+            // No rules to cache, but still valid
+            true
+        }
     }
 
     /// 启动订单同步转发器

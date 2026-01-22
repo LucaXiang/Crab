@@ -42,6 +42,7 @@ export type {
   OrderMergedOutPayload,
   TableReassignedPayload,
   OrderInfoUpdatedPayload,
+  RuleSkipToggledPayload,
   // Command types
   OrderCommand,
   OrderCommandPayload,
@@ -59,6 +60,7 @@ export type {
   MoveOrderCommand,
   MergeOrdersCommand,
   UpdateOrderInfoCommand,
+  ToggleRuleSkipCommand,
   // Response types
   CommandResponse,
   CommandError,
@@ -79,6 +81,7 @@ export type {
   PaymentRecord as ServerPaymentRecord,
   PaymentMethod,
   OrderConnectionState,
+  AppliedRule,
 } from './orderEvent';
 
 // ============================================================================

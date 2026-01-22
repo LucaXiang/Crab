@@ -4,7 +4,8 @@
 
 use async_trait::async_trait;
 
-use crate::orders::reducer::input_to_snapshot;
+use crate::db::models::PriceRule;
+use crate::orders::reducer::input_to_snapshot_with_rules;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{CartItemInput, EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -13,6 +14,8 @@ use shared::order::{CartItemInput, EventPayload, OrderEvent, OrderEventType, Ord
 pub struct AddItemsAction {
     pub order_id: String,
     pub items: Vec<CartItemInput>,
+    /// Matched price rules for this order (from cache)
+    pub rules: Vec<PriceRule>,
 }
 
 #[async_trait]
@@ -39,8 +42,13 @@ impl CommandHandler for AddItemsAction {
         // 3. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 4. Convert inputs to snapshots with generated instance_ids
-        let item_snapshots: Vec<_> = self.items.iter().map(input_to_snapshot).collect();
+        // 4. Convert inputs to snapshots with generated instance_ids and price rules applied
+        let rules_refs: Vec<&PriceRule> = self.rules.iter().collect();
+        let item_snapshots: Vec<_> = self
+            .items
+            .iter()
+            .map(|item| input_to_snapshot_with_rules(item, &rules_refs))
+            .collect();
 
         // 5. Create event
         let event = OrderEvent::new(
@@ -115,6 +123,7 @@ mod tests {
         let action = AddItemsAction {
             order_id: "order-1".to_string(),
             items: vec![create_cart_item_input("prod-1", "Test Product", 10.0, 2)],
+            rules: vec![],
         };
 
         let metadata = create_test_metadata();
@@ -154,6 +163,7 @@ mod tests {
         let action = AddItemsAction {
             order_id: "order-1".to_string(),
             items: vec![create_cart_item_input("prod-1", "Test", 10.0, 1)],
+            rules: vec![],
         };
 
         let metadata = create_test_metadata();
@@ -179,6 +189,7 @@ mod tests {
         let action = AddItemsAction {
             order_id: "order-1".to_string(),
             items: vec![create_cart_item_input("prod-1", "Test", 10.0, 1)],
+            rules: vec![],
         };
 
         let metadata = create_test_metadata();
@@ -198,6 +209,7 @@ mod tests {
         let action = AddItemsAction {
             order_id: "nonexistent".to_string(),
             items: vec![create_cart_item_input("prod-1", "Test", 10.0, 1)],
+            rules: vec![],
         };
 
         let metadata = create_test_metadata();
@@ -226,6 +238,7 @@ mod tests {
                 create_cart_item_input("prod-2", "Product B", 15.0, 1),
                 create_cart_item_input("prod-3", "Product C", 5.0, 3),
             ],
+            rules: vec![],
         };
 
         let metadata = create_test_metadata();
