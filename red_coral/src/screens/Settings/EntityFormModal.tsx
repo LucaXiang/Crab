@@ -108,17 +108,14 @@ export const EntityFormModal: React.FC = React.memo(() => {
           const externalId = defaultSpec?.external_id ?? undefined;
 
           setAsyncFormData({
-            selectedAttributeIds: attributeIds,
-            attributeDefaultOptions: defaultOptions,
+            selected_attribute_ids: attributeIds,
+            attribute_default_options: defaultOptions,
             // Store specs for ProductForm to use
-            loadedSpecs: productFull.specs,
+            specs: productFull.specs,
             // Store tag IDs
-            selectedTagIds: tagIds,
-            // Load price and externalId from root spec
-            price,
-            externalId,
-            // Determine hasMultiSpec from specs count (specs.length > 1)
-            hasMultiSpec: productFull.specs.length > 1,
+            tags: tagIds,
+            // Determine has_multi_spec from specs count (specs.length > 1)
+            has_multi_spec: productFull.specs.length > 1,
           });
         } catch (error) {
           console.error('Failed to load product full data:', error, JSON.stringify(error));
@@ -146,8 +143,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
           });
 
           setAsyncFormData({
-            selectedAttributeIds: attributeIds,
-            attributeDefaultOptions: defaultOptions
+            selected_attribute_ids: attributeIds,
+            attribute_default_options: defaultOptions
           });
         } catch (error) {
           console.error('Failed to load category attributes:', error);
@@ -312,7 +309,12 @@ export const EntityFormModal: React.FC = React.memo(() => {
           toast.error(t('settings.product.form.nameRequired'));
           return;
         }
-        if (formData.externalId === undefined) {
+        // Get price and externalId from default spec
+        const defaultSpec = formData.specs?.find(s => s.is_default) ?? formData.specs?.[0];
+        const price = defaultSpec?.price ?? 0;
+        const externalId = defaultSpec?.external_id;
+
+        if (externalId === undefined) {
           toast.error(t('settings.externalIdRequired'));
           return;
         }
@@ -334,12 +336,12 @@ export const EntityFormModal: React.FC = React.memo(() => {
           receipt_name: formData.receipt_name?.trim() ?? undefined,
           kitchen_print_name: formData.kitchen_print_name?.trim() ?? undefined,
           print_destinations: formData.print_destinations ?? [],
-          is_label_print_enabled: formData.is_label_print_enabled ?? undefined,
+          is_label_print_enabled: formData.is_label_print_enabled ? 1 : 0,
           tags: formData.tags ?? [],
           specs: formData.specs ?? [],
-          // These are used for the default spec
-          price: Math.max(0.01, formData.price),
-          externalId: formData.externalId,
+          // These are used for the default spec (extracted from formData.specs above)
+          price: Math.max(0.01, price),
+          externalId: externalId,
         };
 
         // Save the selected category for next time (lookup name by ID)
@@ -428,7 +430,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
         }
 
         // Handle attribute bindings
-        const selectedAttributeIds = formData.selectedAttributeIds || [];
+        const selectedAttributeIds = formData.selected_attribute_ids || [];
 
         // Get existing bindings (only for EDIT mode)
         let existingBindings: any[] = [];
@@ -448,7 +450,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
         // Handle attribute bindings using helper
         await syncAttributeBindings(
           selectedAttributeIds,
-          formData.attributeDefaultOptions || {},
+          formData.attribute_default_options || {},
           existingBindings,
           async (attrId) => api.unbindProductAttribute(String(attrId)),
           async (attrId, _defaultOptionIds, index) => {
@@ -462,18 +464,18 @@ export const EntityFormModal: React.FC = React.memo(() => {
           }
         );
 
-        // Handle specifications (for CREATE mode with temp specifications)
+        // Handle specifications (for CREATE mode with multi-spec)
         // Specs are now embedded in product, so update the product with all specs
-        if (action === 'CREATE' && formData.hasMultiSpec && formData.tempSpecifications && formData.tempSpecifications.length > 0) {
+        if (action === 'CREATE' && formData.has_multi_spec && formData.specs && formData.specs.length > 1) {
           try {
-            // Build embedded specs array from temp specifications
-            const embeddedSpecs = formData.tempSpecifications.map((spec: { name: string; price: number; isDefault?: boolean; receiptName?: string }, idx: number) => ({
+            // Build embedded specs array from specs
+            const embeddedSpecs = formData.specs.map((spec, idx: number) => ({
               name: spec.name,
               price: spec.price,
               display_order: idx,
-              is_default: spec.isDefault ?? false,
+              is_default: spec.is_default ?? false,
               is_active: true,
-              external_id: null,
+              external_id: spec.external_id ?? null,
             }));
 
             // Update product with all embedded specs
@@ -530,7 +532,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
         }
 
         // Handle attribute bindings
-        const selectedAttributeIds = formData.selectedAttributeIds || [];
+        const selectedAttributeIds = formData.selected_attribute_ids || [];
 
         // Get existing bindings (only for EDIT mode)
         let existingBindings: any[] = [];
@@ -550,7 +552,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
         // Handle attribute bindings using helper
         await syncAttributeBindings(
           selectedAttributeIds,
-          formData.attributeDefaultOptions || {},
+          formData.attribute_default_options || {},
           existingBindings,
           async (attrId) => api.unbindCategoryAttribute(categoryId, String(attrId)),
           async (attrId, defaultOptionIds, index) => {
@@ -630,7 +632,11 @@ export const EntityFormModal: React.FC = React.memo(() => {
       case 'TABLE':
         return (
           <TableForm
-            formData={formData}
+            formData={{
+              name: formData.name,
+              capacity: formData.capacity ?? 1,
+              zone: formData.zone ?? '',
+            }}
             zones={zones as any}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onFieldChange={setFormField as (field: string, value: any) => void}
@@ -640,16 +646,38 @@ export const EntityFormModal: React.FC = React.memo(() => {
       case 'ZONE':
         return (
           <ZoneForm
-            formData={formData}
+            formData={{
+              name: formData.name,
+              surcharge_type: formData.surcharge_type ?? 'none',
+              surcharge_amount: formData.surcharge_amount ?? 0,
+            }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onFieldChange={setFormField as (field: string, value: any) => void}
             t={t}
           />
         );
-      case 'PRODUCT':
+      case 'PRODUCT': {
+        // Get price and externalId from default spec for ProductForm
+        const productDefaultSpec = formData.specs?.find(s => s.is_default) ?? formData.specs?.[0];
         return (
           <ProductForm
-            formData={formData}
+            formData={{
+              id: formData.id,
+              name: formData.name,
+              receipt_name: formData.receipt_name,
+              price: productDefaultSpec?.price ?? 0,
+              category: formData.category,
+              image: formData.image ?? '',
+              externalId: productDefaultSpec?.external_id ?? undefined,
+              tax_rate: formData.tax_rate ?? 0,
+              selectedAttributeIds: formData.selected_attribute_ids,
+              attributeDefaultOptions: formData.attribute_default_options,
+              print_destinations: formData.print_destinations?.map(Number),
+              kitchen_print_name: formData.kitchen_print_name,
+              is_label_print_enabled: formData.is_label_print_enabled ? 1 : 0,
+              specs: formData.specs,
+              selectedTagIds: formData.tags,
+            }}
             categories={categories}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onFieldChange={setFormField as (field: string, value: any) => void}
@@ -658,16 +686,19 @@ export const EntityFormModal: React.FC = React.memo(() => {
             inheritedAttributeIds={inheritedAttributeIds}
           />
         );
+      }
       case 'CATEGORY':
         return (
           <CategoryForm
             formData={{
-              ...formData,
-              // Derive isKitchenPrintEnabled from print_destinations for UI
-              isKitchenPrintEnabled: (formData.print_destinations?.length ?? 0) > 0,
-              is_label_print_enabled: formData.is_label_print_enabled !== 0 && (formData.is_label_print_enabled as unknown) !== false,
-              // Derive kitchenPrinterId from print_destinations for UI
-              kitchenPrinterId: formData.print_destinations?.[0],
+              name: formData.name,
+              print_destinations: formData.print_destinations?.map(Number),
+              is_label_print_enabled: formData.is_label_print_enabled ?? true,
+              selectedAttributeIds: formData.selected_attribute_ids,
+              attributeDefaultOptions: formData.attribute_default_options,
+              is_virtual: formData.is_virtual,
+              tag_ids: formData.tag_ids,
+              match_mode: formData.match_mode,
             }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onFieldChange={setFormField as (field: string, value: any) => void}
