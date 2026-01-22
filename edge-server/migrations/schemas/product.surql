@@ -65,6 +65,8 @@ DEFINE FIELD OVERWRITE specs.*.display_order ON product TYPE int DEFAULT 0 PERMI
 DEFINE FIELD OVERWRITE specs.*.is_default ON product TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE specs.*.is_active ON product TYPE bool DEFAULT true PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE specs.*.external_id ON product TYPE option<int> PERMISSIONS FULL;
+DEFINE FIELD OVERWRITE specs.*.receipt_name ON product TYPE option<string> PERMISSIONS FULL;
+DEFINE FIELD OVERWRITE specs.*.is_root ON product TYPE bool DEFAULT false PERMISSIONS FULL;
 
 DEFINE INDEX OVERWRITE product_category ON product FIELDS category;
 DEFINE INDEX OVERWRITE product_sort_order ON product FIELDS sort_order;

@@ -20,6 +20,9 @@ pub struct Tag {
         deserialize_with = "serde_helpers::bool_true"
     )]
     pub is_active: bool,
+    /// System tag (e.g., "热卖", "新品"), cannot be deleted
+    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
+    pub is_system: bool,
 }
 
 fn default_color() -> String {
@@ -38,6 +41,7 @@ impl Tag {
             color: default_color(),
             display_order: 0,
             is_active: true,
+            is_system: false,
         }
     }
 }

@@ -195,6 +195,11 @@ export const UserManagement: React.FC = React.memo(() => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-medium text-gray-900">{user.display_name || user.username}</span>
+                {user.is_system && (
+                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
+                    {t('common.label.system')}
+                  </span>
+                )}
                 {!user.is_active && (
                   <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">
                     {t('common.status.inactive')}

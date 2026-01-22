@@ -1,4 +1,4 @@
-//! HasAttribute API Handlers - 产品属性绑定
+//! AttributeBinding API Handlers - 产品属性绑定
 
 use axum::{
     Json,
@@ -7,7 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
-use crate::db::models::{Attribute, HasAttribute};
+use crate::db::models::{Attribute, AttributeBinding};
 use crate::db::repository::AttributeRepository;
 use crate::utils::{AppError, AppResult};
 
@@ -20,6 +20,7 @@ pub struct CreateBindingRequest {
     pub is_required: bool,
     #[serde(default)]
     pub display_order: i32,
+    pub default_option_idx: Option<i32>,
 }
 
 /// 更新绑定的请求体
@@ -33,7 +34,7 @@ pub struct UpdateBindingRequest {
 /// 绑定响应 (包含属性详情)
 #[derive(Debug, Serialize)]
 pub struct BindingWithAttribute {
-    pub binding: HasAttribute,
+    pub binding: AttributeBinding,
     pub attribute: Attribute,
 }
 
@@ -41,7 +42,7 @@ pub struct BindingWithAttribute {
 pub async fn create(
     State(state): State<ServerState>,
     Json(payload): Json<CreateBindingRequest>,
-) -> AppResult<Json<HasAttribute>> {
+) -> AppResult<Json<AttributeBinding>> {
     let repo = AttributeRepository::new(state.db.clone());
 
     let binding = repo
@@ -50,6 +51,7 @@ pub async fn create(
             &payload.attribute_id,
             payload.is_required,
             payload.display_order,
+            payload.default_option_idx,
         )
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
@@ -61,7 +63,7 @@ pub async fn create(
 pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<String>,
-) -> AppResult<Json<HasAttribute>> {
+) -> AppResult<Json<AttributeBinding>> {
     // 通过 ID 查询 has_attribute 边
     let mut result = state
         .db
@@ -73,7 +75,7 @@ pub async fn get_by_id(
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    let bindings: Vec<HasAttribute> = result
+    let bindings: Vec<AttributeBinding> = result
         .take(0)
         .map_err(|e| AppError::database(e.to_string()))?;
 
@@ -89,7 +91,7 @@ pub async fn update(
     State(state): State<ServerState>,
     Path(id): Path<String>,
     Json(payload): Json<UpdateBindingRequest>,
-) -> AppResult<Json<HasAttribute>> {
+) -> AppResult<Json<AttributeBinding>> {
     let thing = crate::db::repository::make_thing("has_attribute", &id);
 
     let mut result = state
@@ -100,7 +102,7 @@ pub async fn update(
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    let bindings: Vec<HasAttribute> = result
+    let bindings: Vec<AttributeBinding> = result
         .take(0)
         .map_err(|e| AppError::database(e.to_string()))?;
 

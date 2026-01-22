@@ -1,5 +1,9 @@
 export * from './models';
 
+// Re-export with renamed types for API consistency
+export type { HasAttribute as AttributeBinding } from './models';
+export type { ProductAttributeBinding as AttributeBindingFull } from './models';
+
 // Import types used in this file
 import type {
   Product,
@@ -102,6 +106,7 @@ export interface CurrentUser {
   role_name: string;
   permissions: string[];
   avatar: string | null;
+  is_system?: boolean;
 }
 
 export interface RegisterRequest {
@@ -490,7 +495,7 @@ export interface CreateCategoryAttributeRequest {
   attribute_id: string | number;
   is_required?: boolean;
   display_order?: number;
-  default_option_id?: number;
+  default_option_idx?: number;
 }
 
 export interface UpdateCategoryAttributeRequest {
@@ -515,6 +520,7 @@ export interface CreateProductAttributeRequest {
   attribute_id: string;
   is_required?: boolean;
   display_order?: number;
+  default_option_idx?: number;
 }
 
 export interface UpdateProductAttributeRequest {

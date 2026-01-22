@@ -22,16 +22,6 @@ pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Attrib
     Ok(Json(attrs))
 }
 
-/// GET /api/attributes/global - 获取全局属性
-pub async fn list_global(State(state): State<ServerState>) -> AppResult<Json<Vec<Attribute>>> {
-    let repo = AttributeRepository::new(state.db.clone());
-    let attrs = repo
-        .find_global()
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(attrs))
-}
-
 /// GET /api/attributes/:id - 获取单个属性
 pub async fn get_by_id(
     State(state): State<ServerState>,

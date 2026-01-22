@@ -39,7 +39,7 @@ import type {
   RolePermissionListData,
   ProductAttribute,
   ProductAttributeListData,
-  EmployeeResponse,
+  Employee,
   PriceRule,
   PriceRuleCreate,
   PriceRuleUpdate,
@@ -343,18 +343,18 @@ export class TauriApiClient {
 
   // ============ Employees ============
 
-  async listEmployees(): Promise<EmployeeResponse[]> {
-    const data = await invokeAndUnwrap<{ employees: EmployeeResponse[] }>('list_employees');
+  async listEmployees(): Promise<Employee[]> {
+    const data = await invokeAndUnwrap<{ employees: Employee[] }>('list_employees');
     return data.employees;
   }
 
-  async createEmployee(data: { username: string; password: string; role: string }): Promise<EmployeeResponse> {
-    const result = await invokeAndUnwrap<{ employee: EmployeeResponse }>('create_employee', { data });
+  async createEmployee(data: { username: string; password: string; role: string }): Promise<Employee> {
+    const result = await invokeAndUnwrap<{ employee: Employee }>('create_employee', { data });
     return result.employee;
   }
 
-  async updateEmployee(id: string, data: { password?: string; role?: string; is_active?: boolean }): Promise<EmployeeResponse> {
-    const result = await invokeAndUnwrap<{ employee: EmployeeResponse }>('update_employee', { id, data });
+  async updateEmployee(id: string, data: { password?: string; role?: string; is_active?: boolean }): Promise<Employee> {
+    const result = await invokeAndUnwrap<{ employee: Employee }>('update_employee', { id, data });
     return result.employee;
   }
 

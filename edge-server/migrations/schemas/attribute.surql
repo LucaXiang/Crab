@@ -10,16 +10,6 @@ DEFINE FIELD OVERWRITE name ON attribute TYPE string
     ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
--- 作用域: "global" | "inherited"
-DEFINE FIELD OVERWRITE scope ON attribute TYPE string
-    DEFAULT "inherited"
-    PERMISSIONS FULL;
-
--- 排除的分类 (仅 global 生效)
-DEFINE FIELD OVERWRITE excluded_categories ON attribute TYPE array<record<category>>
-    DEFAULT []
-    PERMISSIONS FULL;
-
 -- 选择模式
 DEFINE FIELD OVERWRITE is_multi_select ON attribute TYPE bool
     DEFAULT false
@@ -84,6 +74,10 @@ DEFINE FIELD OVERWRITE is_required ON has_attribute TYPE bool
 
 DEFINE FIELD OVERWRITE display_order ON has_attribute TYPE int
     DEFAULT 0
+    PERMISSIONS FULL;
+
+-- 覆盖属性的默认选项索引
+DEFINE FIELD OVERWRITE default_option_idx ON has_attribute TYPE option<int>
     PERMISSIONS FULL;
 
 DEFINE INDEX OVERWRITE has_attr_unique ON has_attribute FIELDS in, out UNIQUE;

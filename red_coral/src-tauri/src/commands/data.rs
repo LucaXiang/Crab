@@ -23,7 +23,7 @@ use shared::models::{
     Category,
     CategoryCreate,
     CategoryUpdate,
-    HasAttribute,
+    AttributeBinding,
     // Print Destinations
     PrintDestination,
     PrintDestinationCreate,
@@ -588,7 +588,7 @@ pub struct BindCategoryAttributeData {
 pub async fn bind_category_attribute(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: BindCategoryAttributeData,
-) -> Result<ApiResponse<HasAttribute>, String> {
+) -> Result<ApiResponse<AttributeBinding>, String> {
     let bridge = bridge.read().await;
     // Build payload for API
     let payload = serde_json::json!({
@@ -597,7 +597,7 @@ pub async fn bind_category_attribute(
         "default_option_idx": data.default_option_id,
     });
     match bridge
-        .post::<HasAttribute, _>(
+        .post::<AttributeBinding, _>(
             &format!(
                 "/api/categories/{}/attributes/{}",
                 data.category_id, data.attribute_id

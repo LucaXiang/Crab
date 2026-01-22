@@ -12,7 +12,7 @@ use crate::db::repository::{AttributeRepository, ProductRepository, TagRepositor
 use crate::utils::{AppError, AppResult};
 
 // API 返回类型使用 shared::models (String ID)
-use shared::models::{EmbeddedSpec, Product, ProductAttributeBinding, ProductFull};
+use shared::models::{AttributeBindingFull, EmbeddedSpec, Product, ProductFull};
 
 const RESOURCE_PRODUCT: &str = "product";
 
@@ -97,13 +97,14 @@ pub async fn get_full(
     let specs: Vec<EmbeddedSpec> = product.specs.into_iter().map(Into::into).collect();
 
     // Convert attribute bindings
-    let attr_bindings: Vec<ProductAttributeBinding> = bindings
+    let attr_bindings: Vec<AttributeBindingFull> = bindings
         .into_iter()
-        .map(|(binding, attr)| ProductAttributeBinding {
+        .map(|(binding, attr)| AttributeBindingFull {
             id: binding.id.map(|t| t.to_raw()),
             attribute: attr.into(),
             is_required: binding.is_required,
             display_order: binding.display_order,
+            default_option_idx: binding.default_option_idx,
         })
         .collect();
 
@@ -201,7 +202,7 @@ pub async fn delete(
 pub async fn list_product_attributes(
     State(state): State<ServerState>,
     Path(id): Path<String>,
-) -> AppResult<Json<Vec<ProductAttributeBinding>>> {
+) -> AppResult<Json<Vec<AttributeBindingFull>>> {
     let attr_repo = AttributeRepository::new(state.db.clone());
 
     // Get attribute bindings for this product
@@ -211,13 +212,14 @@ pub async fn list_product_attributes(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // Convert to API type
-    let result: Vec<ProductAttributeBinding> = bindings
+    let result: Vec<AttributeBindingFull> = bindings
         .into_iter()
-        .map(|(binding, attr)| ProductAttributeBinding {
+        .map(|(binding, attr)| AttributeBindingFull {
             id: binding.id.map(|t| t.to_raw()),
             attribute: attr.into(),
             is_required: binding.is_required,
             display_order: binding.display_order,
+            default_option_idx: binding.default_option_idx,
         })
         .collect();
 

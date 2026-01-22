@@ -63,6 +63,7 @@ export const useAuthStore = create<AuthStore>()(
             role_id: userData.role_id,
             avatar: userData.avatar,
             is_active: true,
+            is_system: userData.is_system ?? false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
@@ -162,7 +163,7 @@ export const useAuthStore = create<AuthStore>()(
 
       fetchUsers: async () => {
         const employees = await api.listEmployees();
-        // 转换 EmployeeResponse -> User
+        // 转换 Employee -> User
         return employees.map((e) => ({
           id: parseInt(e.id) || 0,
           uuid: e.id,

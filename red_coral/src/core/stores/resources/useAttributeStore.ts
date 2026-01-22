@@ -44,7 +44,6 @@ interface AttributeStore {
   // CRUD operations
   createAttribute: (params: {
     name: string;
-    scope?: 'global' | 'inherited';
     is_multi_select?: boolean;
     max_selections?: number | null;
     display_order?: number;
@@ -57,7 +56,6 @@ interface AttributeStore {
   updateAttribute: (params: {
     id: string;
     name?: string;
-    scope?: 'global' | 'inherited';
     is_multi_select?: boolean;
     max_selections?: number | null;
     display_order?: number;

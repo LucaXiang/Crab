@@ -13,9 +13,9 @@ use crate::core::response::{
 };
 use crate::core::ClientBridge;
 use shared::models::{
-    EmployeeCreate,
     // Employees
-    EmployeeResponse,
+    Employee,
+    EmployeeCreate,
     EmployeeUpdate,
     InitGenesisRequest,
     // Order for pending sync
@@ -131,7 +131,7 @@ pub async fn list_employees(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<EmployeeListData>, String> {
     let bridge = bridge.read().await;
-    match bridge.get::<Vec<EmployeeResponse>>("/api/employees").await {
+    match bridge.get::<Vec<Employee>>("/api/employees").await {
         Ok(employees) => Ok(ApiResponse::success(EmployeeListData { employees })),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
@@ -146,7 +146,7 @@ pub async fn list_all_employees(
 ) -> Result<ApiResponse<EmployeeListData>, String> {
     let bridge = bridge.read().await;
     match bridge
-        .get::<Vec<EmployeeResponse>>("/api/employees/all")
+        .get::<Vec<Employee>>("/api/employees/all")
         .await
     {
         Ok(employees) => Ok(ApiResponse::success(EmployeeListData { employees })),
@@ -161,7 +161,7 @@ pub async fn list_all_employees(
 pub async fn get_employee(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
-) -> Result<ApiResponse<EmployeeResponse>, String> {
+) -> Result<ApiResponse<Employee>, String> {
     let bridge = bridge.read().await;
     match bridge.get(&format!("/api/employees/{}", encode(&id))).await {
         Ok(employee) => Ok(ApiResponse::success(employee)),
@@ -176,7 +176,7 @@ pub async fn get_employee(
 pub async fn create_employee(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: EmployeeCreate,
-) -> Result<ApiResponse<EmployeeResponse>, String> {
+) -> Result<ApiResponse<Employee>, String> {
     let bridge = bridge.read().await;
     match bridge.post("/api/employees", &data).await {
         Ok(employee) => Ok(ApiResponse::success(employee)),
@@ -192,7 +192,7 @@ pub async fn update_employee(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
     data: EmployeeUpdate,
-) -> Result<ApiResponse<EmployeeResponse>, String> {
+) -> Result<ApiResponse<Employee>, String> {
     let bridge = bridge.read().await;
     match bridge
         .put(&format!("/api/employees/{}", encode(&id)), &data)

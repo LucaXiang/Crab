@@ -73,14 +73,14 @@ RELATE [ ONLY ] @from -> @table -> @to
 **示例**:
 ```surql
 -- 创建关系
-RELATE product:1->attribute_binding->attribute:spicy
+RELATE product:1->has_attribute->attribute:spicy
     SET is_required = true, display_order = 0;
 
 -- 查询关系 (图遍历)
-SELECT ->attribute_binding->attribute.* FROM product:1;
+SELECT ->has_attribute->attribute.* FROM product:1;
 
 -- 双向查询
-SELECT <-attribute_binding<-product.* FROM attribute:spicy;
+SELECT <-has_attribute<-product.* FROM attribute:spicy;
 ```
 
 ### UPSERT (2.0+)
@@ -125,7 +125,7 @@ type::thing("table", $id)    -- 构造 Thing ID
 | 表类型 | 命名规则 | 示例 |
 |--------|----------|------|
 | 实体表 | 单数名词 | `product`, `category`, `order` |
-| 关系表 | 动词或描述性 | `attribute_binding`, `has_event` |
+| 关系表 | 动词或描述性 | `has_attribute`, `has_event` |
 
 ### ID 格式
 
@@ -205,14 +205,14 @@ db.query("DELETE $thing").bind(("thing", thing)).await?;
 **图遍历**:
 ```rust
 // 获取产品的所有属性
-db.query("SELECT ->attribute_binding->attribute.* FROM $prod")
+db.query("SELECT ->has_attribute->attribute.* FROM $prod")
     .bind(("prod", make_thing("product", id)))
     .await?;
 
 // 带条件的图查询
 db.query(r#"
     SELECT *, out.* as attr_data
-    FROM attribute_binding
+    FROM has_attribute
     WHERE in = $prod AND out.is_active = true
     ORDER BY display_order
 "#)
@@ -223,13 +223,13 @@ db.query(r#"
 ## 本项目的图关系
 
 ```
-┌──────────┐    attribute_binding    ┌───────────┐
+┌──────────┐    has_attribute    ┌───────────┐
 │ product  │ ───────────────────────>│ attribute │
 └──────────┘                         └───────────┘
       │
       │ (category field - record link)
       ▼
-┌──────────┐    attribute_binding    ┌───────────┐
+┌──────────┐    has_attribute    ┌───────────┐
 │ category │ ───────────────────────>│ attribute │
 └──────────┘                         └───────────┘
 
@@ -243,17 +243,17 @@ db.query(r#"
 **必须手动清理的关系**:
 ```rust
 // 删除 Product 前
-db.query("DELETE attribute_binding WHERE in = $product")
+db.query("DELETE has_attribute WHERE in = $product")
     .bind(("product", thing))
     .await?;
 
 // 删除 Category 前
-db.query("DELETE attribute_binding WHERE in = $category")
+db.query("DELETE has_attribute WHERE in = $category")
     .bind(("category", thing))
     .await?;
 
 // 删除 Attribute 前 (已在 repository 中实现)
-db.query("DELETE attribute_binding WHERE out = $attr")
+db.query("DELETE has_attribute WHERE out = $attr")
     .bind(("attr", thing))
     .await?;
 ```

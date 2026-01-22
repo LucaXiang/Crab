@@ -22,5 +22,10 @@ DEFINE FIELD OVERWRITE is_active ON tag TYPE bool
     DEFAULT true
     PERMISSIONS FULL;
 
+-- 系统标签 (热卖、新品等)，不可删除
+DEFINE FIELD OVERWRITE is_system ON tag TYPE bool
+    DEFAULT false
+    PERMISSIONS FULL;
+
 DEFINE INDEX OVERWRITE tag_name_unique ON tag FIELDS name UNIQUE;
 DEFINE INDEX OVERWRITE tag_display_order ON tag FIELDS display_order;

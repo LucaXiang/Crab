@@ -1,7 +1,7 @@
 //! Employee Repository
 
 use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
-use crate::db::models::{Employee, EmployeeCreate, EmployeeResponse, EmployeeUpdate};
+use crate::db::models::{Employee, EmployeeCreate, EmployeeUpdate};
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
 
@@ -20,25 +20,25 @@ impl EmployeeRepository {
     }
 
     /// Find all active employees (excluding system users)
-    pub async fn find_all(&self) -> RepoResult<Vec<EmployeeResponse>> {
+    pub async fn find_all(&self) -> RepoResult<Vec<Employee>> {
         let employees: Vec<Employee> = self
             .base
             .db()
             .query("SELECT * FROM employee WHERE is_active = true AND is_system = false ORDER BY username")
             .await?
             .take(0)?;
-        Ok(employees.into_iter().map(|e| e.into()).collect())
+        Ok(employees)
     }
 
     /// Find all employees including inactive (excluding system users)
-    pub async fn find_all_with_inactive(&self) -> RepoResult<Vec<EmployeeResponse>> {
+    pub async fn find_all_with_inactive(&self) -> RepoResult<Vec<Employee>> {
         let employees: Vec<Employee> = self
             .base
             .db()
             .query("SELECT * FROM employee WHERE is_system = false ORDER BY username")
             .await?
             .take(0)?;
-        Ok(employees.into_iter().map(|e| e.into()).collect())
+        Ok(employees)
     }
 
     /// Find employee by id
@@ -48,11 +48,11 @@ impl EmployeeRepository {
         Ok(emp)
     }
 
-    /// Find employee by id (returns EmployeeResponse without password)
-    pub async fn find_by_id_safe(&self, id: &str) -> RepoResult<Option<EmployeeResponse>> {
+    /// Find employee by id (returns Employee without password)
+    pub async fn find_by_id_safe(&self, id: &str) -> RepoResult<Option<Employee>> {
         let pure_id = strip_table_prefix(TABLE, id);
         let emp: Option<Employee> = self.base.db().select((TABLE, pure_id)).await?;
-        Ok(emp.map(|e| e.into()))
+        Ok(emp)
     }
 
     /// Find employee by username
@@ -69,7 +69,7 @@ impl EmployeeRepository {
     }
 
     /// Create a new employee
-    pub async fn create(&self, data: EmployeeCreate) -> RepoResult<EmployeeResponse> {
+    pub async fn create(&self, data: EmployeeCreate) -> RepoResult<Employee> {
         // Check duplicate username
         if self.find_by_username(&data.username).await?.is_some() {
             return Err(RepoError::Duplicate(format!(
@@ -82,9 +82,11 @@ impl EmployeeRepository {
         let hash_pass = Employee::hash_password(&data.password)
             .map_err(|e| RepoError::Database(format!("Failed to hash password: {}", e)))?;
 
+        let display_name = data.display_name.unwrap_or_else(|| data.username.clone());
         let employee = Employee {
             id: None,
             username: data.username,
+            display_name,
             hash_pass,
             role: data.role,
             is_system: false,
@@ -92,13 +94,11 @@ impl EmployeeRepository {
         };
 
         let created: Option<Employee> = self.base.db().create(TABLE).content(employee).await?;
-        created
-            .map(|e| e.into())
-            .ok_or_else(|| RepoError::Database("Failed to create employee".to_string()))
+        created.ok_or_else(|| RepoError::Database("Failed to create employee".to_string()))
     }
 
     /// Update an employee
-    pub async fn update(&self, id: &str, data: EmployeeUpdate) -> RepoResult<EmployeeResponse> {
+    pub async fn update(&self, id: &str, data: EmployeeUpdate) -> RepoResult<Employee> {
         let pure_id = strip_table_prefix(TABLE, id);
         let existing = self
             .find_by_id(pure_id)
@@ -128,6 +128,8 @@ impl EmployeeRepository {
         struct UpdateDoc {
             #[serde(skip_serializing_if = "Option::is_none")]
             username: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none", rename = "employee_name")]
+            display_name: Option<String>,
             #[serde(skip_serializing_if = "Option::is_none")]
             hash_pass: Option<String>,
             #[serde(skip_serializing_if = "Option::is_none")]
@@ -147,6 +149,7 @@ impl EmployeeRepository {
 
         let update_doc = UpdateDoc {
             username: data.username,
+            display_name: data.display_name,
             hash_pass,
             role: data.role,
             is_active: data.is_active,
@@ -162,7 +165,6 @@ impl EmployeeRepository {
 
         self.find_by_id(pure_id)
             .await?
-            .map(|e| e.into())
             .ok_or_else(|| RepoError::NotFound(format!("Employee {} not found", id)))
     }
 

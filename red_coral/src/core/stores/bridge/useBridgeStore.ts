@@ -128,6 +128,7 @@ export interface UserInfo {
   username: string;
   role: string;
   permissions: string[];
+  is_system?: boolean;
 }
 
 export interface EmployeeSession {

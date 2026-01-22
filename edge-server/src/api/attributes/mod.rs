@@ -16,7 +16,6 @@ pub fn router() -> Router<ServerState> {
 fn routes() -> Router<ServerState> {
     Router::new()
         .route("/", get(handler::list).post(handler::create))
-        .route("/global", get(handler::list_global))
         .route(
             "/{id}",
             get(handler::get_by_id)

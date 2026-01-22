@@ -4,7 +4,7 @@
 
 use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
 use crate::db::models::{
-    Attribute, AttributeCreate, AttributeOption, AttributeUpdate, HasAttribute,
+    Attribute, AttributeBinding, AttributeCreate, AttributeOption, AttributeUpdate,
 };
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
@@ -38,17 +38,6 @@ impl AttributeRepository {
         Ok(attrs)
     }
 
-    /// Find global attributes (apply to all products)
-    pub async fn find_global(&self) -> RepoResult<Vec<Attribute>> {
-        let attrs: Vec<Attribute> = self
-            .base
-            .db()
-            .query("SELECT * FROM attribute WHERE scope = 'global' AND is_active = true ORDER BY display_order")
-            .await?
-            .take(0)?;
-        Ok(attrs)
-    }
-
     /// Find attribute by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Attribute>> {
         // Extract pure id if it contains table prefix (e.g., "attribute:xxx" -> "xxx")
@@ -62,8 +51,6 @@ impl AttributeRepository {
         let attr = Attribute {
             id: None,
             name: data.name,
-            scope: data.scope.unwrap_or_else(|| "inherited".to_string()),
-            excluded_categories: data.excluded_categories.unwrap_or_default(),
             is_multi_select: data.is_multi_select.unwrap_or(false),
             max_selections: data.max_selections,
             default_option_idx: data.default_option_idx,
@@ -192,19 +179,21 @@ impl AttributeRepository {
         attr_id: &str,
         is_required: bool,
         display_order: i32,
-    ) -> RepoResult<HasAttribute> {
+        default_option_idx: Option<i32>,
+    ) -> RepoResult<AttributeBinding> {
         let mut result = self
             .base
             .db()
             .query(
-                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order",
+                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order, default_option_idx = $default_idx",
             )
             .bind(("from", make_thing("product", product_id)))
             .bind(("to", make_thing(TABLE, attr_id)))
             .bind(("req", is_required))
             .bind(("order", display_order))
+            .bind(("default_idx", default_option_idx))
             .await?;
-        let edges: Vec<HasAttribute> = result.take(0)?;
+        let edges: Vec<AttributeBinding> = result.take(0)?;
         edges
             .into_iter()
             .next()
@@ -218,19 +207,21 @@ impl AttributeRepository {
         attr_id: &str,
         is_required: bool,
         display_order: i32,
-    ) -> RepoResult<HasAttribute> {
+        default_option_idx: Option<i32>,
+    ) -> RepoResult<AttributeBinding> {
         let mut result = self
             .base
             .db()
             .query(
-                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order",
+                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order, default_option_idx = $default_idx",
             )
             .bind(("from", make_thing("category", category_id)))
             .bind(("to", make_thing(TABLE, attr_id)))
             .bind(("req", is_required))
             .bind(("order", display_order))
+            .bind(("default_idx", default_option_idx))
             .await?;
-        let edges: Vec<HasAttribute> = result.take(0)?;
+        let edges: Vec<AttributeBinding> = result.take(0)?;
         edges
             .into_iter()
             .next()
@@ -284,11 +275,11 @@ impl AttributeRepository {
     }
 
     /// Get product attribute bindings with full attribute data
-    /// Returns (HasAttribute, Attribute) pairs for a product
+    /// Returns (AttributeBinding, Attribute) pairs for a product
     pub async fn find_bindings_for_product(
         &self,
         product_id: &str,
-    ) -> RepoResult<Vec<(HasAttribute, Attribute)>> {
+    ) -> RepoResult<Vec<(AttributeBinding, Attribute)>> {
         // Query the has_attribute edge table and fetch the attribute
         let mut result = self
             .base
@@ -312,6 +303,7 @@ impl AttributeRepository {
             out: surrealdb::sql::Thing,
             is_required: bool,
             display_order: i32,
+            default_option_idx: Option<i32>,
             attr_data: Attribute,
         }
 
@@ -320,19 +312,20 @@ impl AttributeRepository {
         Ok(rows
             .into_iter()
             .map(|row| {
-                let binding = HasAttribute {
+                let binding = AttributeBinding {
                     id: row.id,
                     from: row.from,
                     to: row.out,
                     is_required: row.is_required,
                     display_order: row.display_order,
+                    default_option_idx: row.default_option_idx,
                 };
                 (binding, row.attr_data)
             })
             .collect())
     }
 
-    /// Get all attributes for a product (including inherited from category + global)
+    /// Get all attributes for a product (including inherited from category)
     pub async fn find_effective_for_product(&self, product_id: &str) -> RepoResult<Vec<Attribute>> {
         // Get product's category
         let pid_owned = product_id.to_string();
@@ -350,11 +343,8 @@ impl AttributeRepository {
                 -- Category attributes
                 LET $cat_attrs = SELECT ->has_attribute->attribute.* FROM $cat;
 
-                -- Global attributes (excluding those that exclude this category)
-                LET $global_attrs = SELECT * FROM attribute WHERE scope = 'global' AND is_active = true AND $cat NOT IN excluded_categories;
-
                 -- Combine and deduplicate
-                RETURN array::distinct(array::concat($prod_attrs, $cat_attrs, $global_attrs));
+                RETURN array::distinct(array::concat($prod_attrs, $cat_attrs));
                 "#
             )
             .bind(("pid", pid_owned))

@@ -77,6 +77,7 @@ impl TagRepository {
             color: data.color.unwrap_or_else(|| "#3B82F6".to_string()),
             display_order: data.display_order.unwrap_or(0),
             is_active: true,
+            is_system: false,
         };
 
         let created: Option<Tag> = self.base.db().create(TABLE).content(tag).await?;

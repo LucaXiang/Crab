@@ -29,10 +29,10 @@ pub mod order;
 pub mod system_state;
 
 // Re-exports
-pub use attribute::{Attribute, AttributeCreate, AttributeOption, AttributeUpdate, HasAttribute};
+pub use attribute::{Attribute, AttributeBinding, AttributeCreate, AttributeOption, AttributeUpdate};
 pub use category::{Category, CategoryCreate, CategoryUpdate};
 pub use dining_table::{DiningTable, DiningTableCreate, DiningTableUpdate};
-pub use employee::{Employee, EmployeeCreate, EmployeeId, EmployeeResponse, EmployeeUpdate};
+pub use employee::{Employee, EmployeeCreate, EmployeeId, EmployeeUpdate};
 pub use order::{
     HasEvent, Order, OrderAddItem, OrderAddPayment, OrderCreate, OrderEvent, OrderEventType,
     OrderItem, OrderItemAttribute, OrderPayment, OrderStatus,

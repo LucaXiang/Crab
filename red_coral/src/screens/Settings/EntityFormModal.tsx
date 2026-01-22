@@ -387,6 +387,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
               display_order: 0,
               is_default: true,
               is_active: true,
+              is_root: false,
               external_id: productPayload.externalId ?? null,
             }],
           });
@@ -417,6 +418,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
               display_order: 0,
               is_default: true,
               is_active: true,
+              is_root: false,
               external_id: productPayload.externalId ?? null,
             }],
           });
@@ -442,6 +444,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
               display_order: 0,
               is_default: true,
               is_active: true,
+              is_root: false,
               external_id: productPayload.externalId ?? null,
             }],
           }));
@@ -472,13 +475,15 @@ export const EntityFormModal: React.FC = React.memo(() => {
           formData.attribute_default_options || {},
           existingBindings,
           async (attrId) => api.unbindProductAttribute(String(attrId)),
-          async (attrId, _defaultOptionIds, index) => {
-            // Note: default_option_idx is now stored on the Attribute itself, not on the binding
+          async (attrId, defaultOptionIds, index) => {
+            // default_option_idx is stored on the AttributeBinding
+            const defaultOptionIdx = defaultOptionIds.length > 0 ? parseInt(defaultOptionIds[0], 10) : undefined;
             await api.bindProductAttribute({
               product_id: productId,
               attribute_id: attrId,
               is_required: false,
               display_order: index,
+              default_option_idx: !isNaN(defaultOptionIdx as number) ? defaultOptionIdx : undefined,
             });
           }
         );
@@ -494,6 +499,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
               display_order: idx,
               is_default: spec.is_default ?? false,
               is_active: true,
+              is_root: false,
               external_id: spec.external_id ?? null,
             }));
 
@@ -586,7 +592,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
               attribute_id: attrId,
               is_required: false,
               display_order: index,
-              default_option_id: defaultOptionIds?.[0] ? Number(defaultOptionIds[0]) : undefined
+              default_option_idx: defaultOptionIds?.[0] ? Number(defaultOptionIds[0]) : undefined
             });
           }
         );

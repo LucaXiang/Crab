@@ -48,12 +48,12 @@ pub struct ServerState {
 
 ### 数据库 RELATE 边
 
-- `attribute_binding`: product/category → attribute
+- `has_attribute`: product/category → attribute
 - `has_event`: order → order_event
 
 **删除规则**:
 - Order/OrderEvent **禁止删除**
-- 删除 Product/Category 时**必须清理** `attribute_binding` 边
+- 删除 Product/Category 时**必须清理** `has_attribute` 边
 
 ### 添加 API
 

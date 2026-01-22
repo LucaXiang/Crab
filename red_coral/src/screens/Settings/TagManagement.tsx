@@ -132,6 +132,11 @@ export const TagManagement: React.FC = React.memo(() => {
             >
               {item.name}
             </span>
+            {item.is_system && (
+              <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 rounded">
+                {t('common.label.system')}
+              </span>
+            )}
           </div>
         ),
       },

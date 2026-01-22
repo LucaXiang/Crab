@@ -123,8 +123,18 @@ impl ProductRepository {
             .ok_or_else(|| RepoError::NotFound(format!("Product {} not found", id)))
     }
 
-    /// Hard delete a product
+    /// Hard delete a product (also cleans up has_attribute edges)
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
+        let thing = make_thing(PRODUCT_TABLE, id);
+
+        // Clean up has_attribute edges first
+        self.base
+            .db()
+            .query("DELETE has_attribute WHERE in = $product")
+            .bind(("product", thing.clone()))
+            .await?;
+
+        // Then delete the product
         let result: Option<Product> = self.base.db().delete((PRODUCT_TABLE, id)).await?;
         Ok(result.is_some())
     }

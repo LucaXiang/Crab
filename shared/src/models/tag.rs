@@ -10,6 +10,9 @@ pub struct Tag {
     pub color: String,
     pub display_order: i32,
     pub is_active: bool,
+    /// 系统标签（"热卖"、"新品"等），不可删除/改名
+    #[serde(default)]
+    pub is_system: bool,
 }
 
 /// Create tag payload

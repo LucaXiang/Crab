@@ -198,8 +198,15 @@ impl CategoryRepository {
             ));
         }
 
-        // Hard delete
+        // Clean up has_attribute edges first
         let thing = make_thing(TABLE, pure_id);
+        self.base
+            .db()
+            .query("DELETE has_attribute WHERE in = $category")
+            .bind(("category", thing.clone()))
+            .await?;
+
+        // Hard delete
         self.base
             .db()
             .query("DELETE $thing")

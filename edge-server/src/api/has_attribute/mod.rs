@@ -1,4 +1,4 @@
-//! HasAttribute API 模块 - 产品属性绑定
+//! AttributeBinding API 模块 - 产品属性绑定
 
 mod handler;
 

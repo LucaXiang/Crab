@@ -50,14 +50,6 @@ pub struct Attribute {
     pub id: Option<AttributeId>,
     pub name: String,
 
-    // 作用域
-    /// Scope: "global" | "inherited"
-    #[serde(default = "default_scope")]
-    pub scope: String,
-    /// Excluded categories (only for global scope)
-    #[serde(default)]
-    pub excluded_categories: Vec<Thing>,
-
     // 选择模式
     #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_multi_select: bool,
@@ -91,17 +83,11 @@ pub struct Attribute {
     pub options: Vec<AttributeOption>,
 }
 
-fn default_scope() -> String {
-    "inherited".to_string()
-}
-
 impl Attribute {
     pub fn new(name: String) -> Self {
         Self {
             id: None,
             name,
-            scope: default_scope(),
-            excluded_categories: vec![],
             is_multi_select: false,
             max_selections: None,
             default_option_idx: None,
@@ -119,8 +105,6 @@ impl Attribute {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeCreate {
     pub name: String,
-    pub scope: Option<String>,
-    pub excluded_categories: Option<Vec<Thing>>,
     pub is_multi_select: Option<bool>,
     pub max_selections: Option<i32>,
     pub default_option_idx: Option<i32>,
@@ -135,8 +119,6 @@ pub struct AttributeCreate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeUpdate {
     pub name: Option<String>,
-    pub scope: Option<String>,
-    pub excluded_categories: Option<Vec<Thing>>,
     pub is_multi_select: Option<bool>,
     pub max_selections: Option<i32>,
     pub default_option_idx: Option<i32>,
@@ -151,7 +133,7 @@ pub struct AttributeUpdate {
 
 /// Edge relation: has_attribute (product/category -> attribute)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HasAttribute {
+pub struct AttributeBinding {
     pub id: Option<Thing>,
     #[serde(rename = "in")]
     pub from: Thing, // product or category
@@ -161,4 +143,6 @@ pub struct HasAttribute {
     pub is_required: bool,
     #[serde(default)]
     pub display_order: i32,
+    /// Override attribute's default option
+    pub default_option_idx: Option<i32>,
 }

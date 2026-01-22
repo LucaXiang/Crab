@@ -33,6 +33,7 @@ impl From<db::Tag> for api::Tag {
             color: t.color,
             display_order: t.display_order,
             is_active: t.is_active,
+            is_system: t.is_system,
         }
     }
 }
@@ -66,6 +67,8 @@ impl From<db::EmbeddedSpec> for api::EmbeddedSpec {
             is_default: s.is_default,
             is_active: s.is_active,
             external_id: s.external_id,
+            receipt_name: s.receipt_name,
+            is_root: s.is_root,
         }
     }
 }
@@ -110,8 +113,6 @@ impl From<db::Attribute> for api::Attribute {
         Self {
             id: option_thing_to_string(&a.id),
             name: a.name,
-            scope: a.scope,
-            excluded_categories: things_to_strings(&a.excluded_categories),
             is_multi_select: a.is_multi_select,
             max_selections: a.max_selections,
             default_option_idx: a.default_option_idx,
@@ -126,14 +127,15 @@ impl From<db::Attribute> for api::Attribute {
     }
 }
 
-impl From<db::HasAttribute> for api::HasAttribute {
-    fn from(h: db::HasAttribute) -> Self {
+impl From<db::AttributeBinding> for api::AttributeBinding {
+    fn from(h: db::AttributeBinding) -> Self {
         Self {
             id: option_thing_to_string(&h.id),
             from: thing_to_string(&h.from),
             to: thing_to_string(&h.to),
             is_required: h.is_required,
             display_order: h.display_order,
+            default_option_idx: h.default_option_idx,
         }
     }
 }
@@ -278,12 +280,14 @@ impl From<db::PriceRule> for api::PriceRule {
 
 // ============ Employee ============
 
-impl From<db::EmployeeResponse> for api::EmployeeResponse {
-    fn from(e: db::EmployeeResponse) -> Self {
+impl From<db::Employee> for api::Employee {
+    fn from(e: db::Employee) -> Self {
         Self {
-            id: e.id,
+            id: option_thing_to_string(&e.id),
             username: e.username,
-            role: e.role.to_string(),
+            display_name: e.display_name,
+            role: thing_to_string(&e.role),
+            is_system: e.is_system,
             is_active: e.is_active,
         }
     }

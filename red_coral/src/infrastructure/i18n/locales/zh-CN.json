@@ -51,7 +51,8 @@
       "quantity": "数量",
       "items": "项",
       "unknown_item": "未知项目",
-      "none": "N/A"
+      "none": "N/A",
+      "system": "系统"
     },
     "message": {
       "loading": "加载中...",
@@ -1124,7 +1125,11 @@
         "base_spec_price_hint": "基础规格价格请在菜品信息中修改",
         "set_default": "设为默认规格",
         "set_default_hint": "点单时将作为默认选项",
-        "name_required": "请输入规格名称"
+        "name_required": "请输入规格名称",
+        "receipt_name": "小票名称",
+        "receipt_name_placeholder": "小票上显示的名称",
+        "is_root": "基础规格",
+        "is_root_hint": "基础规格不能删除，通常是标准规格"
       },
       "action": {
         "save": "创建规格",

@@ -20,12 +20,6 @@ pub struct Attribute {
     pub id: Option<String>,
     pub name: String,
 
-    // 作用域
-    /// Scope: "global" | "inherited"
-    pub scope: String,
-    /// Excluded categories (only for global scope)
-    pub excluded_categories: Vec<String>,
-
     // 选择模式
     pub is_multi_select: bool,
     /// Max selections (null = unlimited)
@@ -54,8 +48,6 @@ pub struct Attribute {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeCreate {
     pub name: String,
-    pub scope: Option<String>,
-    pub excluded_categories: Option<Vec<String>>,
     pub is_multi_select: Option<bool>,
     pub max_selections: Option<i32>,
     pub default_option_idx: Option<i32>,
@@ -71,8 +63,6 @@ pub struct AttributeCreate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeUpdate {
     pub name: Option<String>,
-    pub scope: Option<String>,
-    pub excluded_categories: Option<Vec<String>>,
     pub is_multi_select: Option<bool>,
     pub max_selections: Option<i32>,
     pub default_option_idx: Option<i32>,
@@ -85,12 +75,33 @@ pub struct AttributeUpdate {
     pub options: Option<Vec<AttributeOption>>,
 }
 
-/// Has attribute relation (for querying product/category attributes)
+/// Attribute binding relation (product/category -> attribute)
+///
+/// 用于建立商品或分类与属性的关联关系
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HasAttribute {
+pub struct AttributeBinding {
     pub id: Option<String>,
+    /// Source: product ID or category ID
     pub from: String,
+    /// Target: attribute ID
     pub to: String,
     pub is_required: bool,
     pub display_order: i32,
+    /// Override attribute's default option (optional)
+    pub default_option_idx: Option<i32>,
+}
+
+/// Attribute binding with full attribute data (for API responses)
+///
+/// 查询 API 响应时使用，包含完整的属性对象
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttributeBindingFull {
+    /// Relation ID
+    pub id: Option<String>,
+    /// Full attribute object
+    pub attribute: Attribute,
+    pub is_required: bool,
+    pub display_order: i32,
+    /// Override attribute's default option (optional)
+    pub default_option_idx: Option<i32>,
 }

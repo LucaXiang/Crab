@@ -16,6 +16,11 @@ pub struct EmbeddedSpec {
     #[serde(default = "default_true")]
     pub is_active: bool,
     pub external_id: Option<i64>,
+    /// 小票显示名称（如 "L", "M", "大杯"）
+    pub receipt_name: Option<String>,
+    /// 根规格，不可删除（每个商品至少保留一个）
+    #[serde(default)]
+    pub is_root: bool,
 }
 
 fn default_true() -> bool {
@@ -83,17 +88,6 @@ pub struct ProductUpdate {
     pub specs: Option<Vec<EmbeddedSpec>>,
 }
 
-/// Product attribute binding with full attribute data
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProductAttributeBinding {
-    /// Relation ID (has_attribute edge)
-    pub id: Option<String>,
-    /// Full attribute object
-    pub attribute: super::attribute::Attribute,
-    pub is_required: bool,
-    pub display_order: i32,
-}
-
 /// Full product with all related data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProductFull {
@@ -113,7 +107,7 @@ pub struct ProductFull {
     /// 嵌入式规格
     pub specs: Vec<EmbeddedSpec>,
     /// Attribute bindings with full attribute data
-    pub attributes: Vec<ProductAttributeBinding>,
+    pub attributes: Vec<super::attribute::AttributeBindingFull>,
     /// Tags attached to this product
     pub tags: Vec<super::tag::Tag>,
 }

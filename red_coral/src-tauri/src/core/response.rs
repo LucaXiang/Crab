@@ -174,7 +174,7 @@ impl DeleteData {
 /// Product Attributes 列表
 #[derive(Debug, Clone, Serialize)]
 pub struct ProductAttributeListData {
-    pub attributes: Vec<shared::models::HasAttribute>,
+    pub attributes: Vec<shared::models::AttributeBinding>,
 }
 
 // ============ Print Destinations ============
@@ -259,7 +259,7 @@ pub struct OrderListData {
 /// Employees 列表
 #[derive(Debug, Clone, Serialize)]
 pub struct EmployeeListData {
-    pub employees: Vec<shared::models::EmployeeResponse>,
+    pub employees: Vec<shared::models::Employee>,
 }
 
 /// Price Rules 列表

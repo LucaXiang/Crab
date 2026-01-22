@@ -6,31 +6,34 @@ use axum::{
 };
 
 use crate::core::ServerState;
-use crate::db::models::{EmployeeCreate, EmployeeResponse, EmployeeUpdate};
+use crate::db::models::{EmployeeCreate, EmployeeUpdate};
 use crate::db::repository::EmployeeRepository;
 use crate::utils::{AppError, AppResult};
+use shared::models::Employee;
 
 const RESOURCE: &str = "employee";
 
 /// List all employees (excluding system users)
-pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<EmployeeResponse>>> {
+pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Employee>>> {
     let repo = EmployeeRepository::new(state.db.clone());
     let employees = repo
         .find_all()
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
+    let employees: Vec<Employee> = employees.into_iter().map(|e| e.into()).collect();
     Ok(Json(employees))
 }
 
 /// List all employees including inactive (excluding system users)
 pub async fn list_with_inactive(
     State(state): State<ServerState>,
-) -> AppResult<Json<Vec<EmployeeResponse>>> {
+) -> AppResult<Json<Vec<Employee>>> {
     let repo = EmployeeRepository::new(state.db.clone());
     let employees = repo
         .find_all_with_inactive()
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
+    let employees: Vec<Employee> = employees.into_iter().map(|e| e.into()).collect();
     Ok(Json(employees))
 }
 
@@ -38,32 +41,33 @@ pub async fn list_with_inactive(
 pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<String>,
-) -> AppResult<Json<EmployeeResponse>> {
+) -> AppResult<Json<Employee>> {
     let repo = EmployeeRepository::new(state.db.clone());
     let employee = repo
         .find_by_id_safe(&id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?
         .ok_or_else(|| AppError::not_found(format!("Employee {} not found", id)))?;
-    Ok(Json(employee))
+    Ok(Json(employee.into()))
 }
 
 /// Create a new employee
 pub async fn create(
     State(state): State<ServerState>,
     Json(payload): Json<EmployeeCreate>,
-) -> AppResult<Json<EmployeeResponse>> {
+) -> AppResult<Json<Employee>> {
     let repo = EmployeeRepository::new(state.db.clone());
     let employee = repo
         .create(payload)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
+    let response: Employee = employee.into();
     state
-        .broadcast_sync(RESOURCE, "created", &employee.id, Some(&employee))
+        .broadcast_sync(RESOURCE, "created", response.id.as_deref().unwrap_or_default(), Some(&response))
         .await;
 
-    Ok(Json(employee))
+    Ok(Json(response))
 }
 
 /// Update an employee
@@ -71,18 +75,19 @@ pub async fn update(
     State(state): State<ServerState>,
     Path(id): Path<String>,
     Json(payload): Json<EmployeeUpdate>,
-) -> AppResult<Json<EmployeeResponse>> {
+) -> AppResult<Json<Employee>> {
     let repo = EmployeeRepository::new(state.db.clone());
     let employee = repo
         .update(&id, payload)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
+    let response: Employee = employee.into();
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&employee))
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&response))
         .await;
 
-    Ok(Json(employee))
+    Ok(Json(response))
 }
 
 /// Soft delete an employee

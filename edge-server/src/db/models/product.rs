@@ -21,6 +21,11 @@ pub struct EmbeddedSpec {
     #[serde(default = "default_true")]
     pub is_active: bool,
     pub external_id: Option<i64>,
+    /// Receipt display name (e.g., "L", "M", "大杯")
+    pub receipt_name: Option<String>,
+    /// Root spec, cannot be deleted (each product must have at least one)
+    #[serde(default)]
+    pub is_root: bool,
 }
 
 /// Product model

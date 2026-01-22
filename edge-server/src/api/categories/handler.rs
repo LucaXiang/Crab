@@ -12,7 +12,7 @@ use crate::db::repository::{AttributeRepository, CategoryRepository};
 use crate::utils::{AppError, AppResult};
 use shared::models::Attribute as SharedAttribute;
 use shared::models::Category as SharedCategory;
-use shared::models::HasAttribute as SharedHasAttribute;
+use shared::models::AttributeBinding as SharedAttributeBinding;
 
 const RESOURCE: &str = "category";
 
@@ -196,6 +196,7 @@ pub async fn batch_update_sort_order(
 pub struct BindAttributePayload {
     pub is_required: Option<bool>,
     pub display_order: Option<i32>,
+    pub default_option_idx: Option<i32>,
 }
 
 /// GET /api/categories/:id/attributes - 获取分类关联的属性
@@ -216,7 +217,7 @@ pub async fn bind_category_attribute(
     State(state): State<ServerState>,
     Path((category_id, attr_id)): Path<(String, String)>,
     Json(payload): Json<BindAttributePayload>,
-) -> AppResult<Json<SharedHasAttribute>> {
+) -> AppResult<Json<SharedAttributeBinding>> {
     let repo = AttributeRepository::new(state.db.clone());
     let binding = repo
         .link_to_category(
@@ -224,6 +225,7 @@ pub async fn bind_category_attribute(
             &attr_id,
             payload.is_required.unwrap_or(false),
             payload.display_order.unwrap_or(0),
+            payload.default_option_idx,
         )
         .await
         .map_err(|e| AppError::database(e.to_string()))?;

@@ -114,6 +114,7 @@ export const LoginScreen: React.FC = () => {
           role_name: roleName,
           avatar: null,
           is_active: true,
+          is_system: response.session.user_info.is_system ?? false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });

@@ -22,6 +22,8 @@ export interface Tag {
   name: string;
   color: string;
   display_order: number;
+  /** 系统标签 */
+  is_system: boolean;
   is_active: boolean;
 }
 
@@ -87,10 +89,14 @@ export interface CategoryUpdate {
 /** 嵌入式规格 (文档数据库风格) */
 export interface EmbeddedSpec {
   name: string;
+  /** 小票显示名称 */
+  receipt_name?: string;
   /** Price in cents */
   price: number;
   display_order: number;
   is_default: boolean;
+  /** 根规格 */
+  is_root: boolean;
   is_active: boolean;
   external_id: number | null;
 }
@@ -144,15 +150,19 @@ export interface ProductUpdate {
   specs?: EmbeddedSpec[];
 }
 
-/** Product attribute binding with full attribute data */
-export interface ProductAttributeBinding {
+/** Attribute binding with full attribute data */
+export interface AttributeBindingFull {
   /** Relation ID (has_attribute edge) */
   id: string | null;
   /** Full attribute object */
   attribute: Attribute;
   is_required: boolean;
   display_order: number;
+  default_option_idx?: number;
 }
+
+/** @deprecated Use AttributeBindingFull instead */
+export type ProductAttributeBinding = AttributeBindingFull;
 
 /** Full product with all related data */
 export interface ProductFull {
@@ -170,7 +180,7 @@ export interface ProductFull {
   /** Embedded specifications */
   specs: EmbeddedSpec[];
   /** Attribute bindings with full attribute data */
-  attributes: ProductAttributeBinding[];
+  attributes: AttributeBindingFull[];
   /** Tags attached to this product */
   tags: Tag[];
 }
@@ -187,13 +197,9 @@ export interface AttributeOption {
   kitchen_print_name: string | null;
 }
 
-export type AttributeScope = 'global' | 'inherited';
-
 export interface Attribute {
   id: string | null;
   name: string;
-  scope: AttributeScope;
-  excluded_categories: string[];
   is_multi_select: boolean;
   max_selections: number | null;
   default_option_idx: number | null;
@@ -208,8 +214,6 @@ export interface Attribute {
 
 export interface AttributeCreate {
   name: string;
-  scope?: AttributeScope;
-  excluded_categories?: string[];
   is_multi_select?: boolean;
   max_selections?: number;
   default_option_idx?: number;
@@ -223,8 +227,6 @@ export interface AttributeCreate {
 
 export interface AttributeUpdate {
   name?: string;
-  scope?: AttributeScope;
-  excluded_categories?: string[];
   is_multi_select?: boolean;
   max_selections?: number;
   default_option_idx?: number;
@@ -237,7 +239,7 @@ export interface AttributeUpdate {
   options?: AttributeOption[];
 }
 
-export interface HasAttribute {
+export interface AttributeBinding {
   id: string | null;
   /** Product or Category ID */
   from: string;
@@ -245,7 +247,11 @@ export interface HasAttribute {
   to: string;
   is_required: boolean;
   display_order: number;
+  default_option_idx?: number;
 }
+
+/** @deprecated Use AttributeBinding instead */
+export type HasAttribute = AttributeBinding;
 
 // ============ Embedded Printer ============
 
@@ -425,12 +431,17 @@ export interface PriceRuleUpdate {
 
 // ============ Employee ============
 
-export interface EmployeeResponse {
-  id: string;
+export interface Employee {
+  id?: string;
   username: string;
+  display_name: string;
   role: string;
+  is_system: boolean;
   is_active: boolean;
 }
+
+/** @deprecated Use Employee instead */
+export type EmployeeResponse = Employee;
 
 export interface EmployeeCreate {
   username: string;
@@ -650,6 +661,7 @@ export interface User {
   role_name?: string;
   avatar: string | null;
   is_active: boolean;
+  is_system: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -657,17 +669,17 @@ export interface User {
 // ============ Product/Category Attribute Bindings ============
 
 /**
- * ProductAttribute represents a HasAttribute relation where 'in' is a Product
+ * ProductAttribute represents a AttributeBinding relation where 'in' is a Product
  */
-export interface ProductAttribute extends HasAttribute {
+export interface ProductAttribute extends AttributeBinding {
   /** The attribute details when fetched with relations */
   attribute?: Attribute;
 }
 
 /**
- * CategoryAttribute represents a HasAttribute relation where 'in' is a Category
+ * CategoryAttribute represents a AttributeBinding relation where 'in' is a Category
  */
-export interface CategoryAttribute extends HasAttribute {
+export interface CategoryAttribute extends AttributeBinding {
   /** The attribute details when fetched with relations */
   attribute?: Attribute;
 }
