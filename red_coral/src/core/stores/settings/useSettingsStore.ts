@@ -112,6 +112,7 @@ interface FormData {
   // === Tag ===
   color?: string;
   display_order?: number;
+  is_active?: boolean;
 
   // === Zone (UI only, no API fields) ===
   description?: string;
@@ -235,6 +236,7 @@ export const useSettingsStore = create<SettingsStore>()(
             name: tableData?.name || '',
             zone: tableData?.zone || tableData?.defaultZoneId || '',
             capacity: tableData?.capacity ?? 4,
+            is_active: tableData?.is_active ?? true,  // Default to active for new tables
           };
         } else if (entity === 'ZONE') {
           const zoneData = data as ZoneEditData | null;
@@ -244,6 +246,7 @@ export const useSettingsStore = create<SettingsStore>()(
             description: zoneData?.description || '',
             surcharge_type: zoneData?.surchargeType || 'none',
             surcharge_amount: zoneData?.surchargeAmount || 0,
+            is_active: zoneData?.is_active ?? true,  // Default to active for new zones
           };
         } else if (entity === 'PRODUCT') {
           const productData = data as ProductEditData | null;
@@ -259,6 +262,7 @@ export const useSettingsStore = create<SettingsStore>()(
             kitchen_print_name: productData?.kitchen_print_name ?? '',
             print_destinations: productData?.print_destinations || [],
             is_label_print_enabled: !!productData?.is_label_print_enabled,
+            is_active: productData?.is_active ?? true,  // Default to active for new products
             tags: productData?.tags || [],
             specs: productData?.specs || [],
             has_multi_spec: (productData?.specs?.length ?? 0) > 1,
@@ -271,6 +275,7 @@ export const useSettingsStore = create<SettingsStore>()(
             sort_order: categoryData?.sort_order,
             print_destinations: categoryData?.print_destinations || [],
             is_label_print_enabled: !!categoryData?.is_label_print_enabled,
+            is_active: categoryData?.is_active ?? true,  // Default to active for new categories
             is_virtual: categoryData?.is_virtual ?? false,
             tag_ids: categoryData?.tag_ids ?? [],
             match_mode: categoryData?.match_mode ?? 'any',
@@ -284,6 +289,7 @@ export const useSettingsStore = create<SettingsStore>()(
             name: tagData?.name || '',
             color: tagData?.color || '#3B82F6',
             display_order: tagData?.display_order ?? 0,
+            is_active: tagData?.is_active ?? true,  // Default to active for new tags
           };
         }
 
@@ -458,27 +464,27 @@ function computeIsDirty(entity: ModalEntity, next: FormData, initial: FormData):
   const pick = (o: FormData, keys: (keyof FormData)[]) => keys.map((k) => o[k]);
 
   if (entity === 'TABLE') {
-    const keys: (keyof FormData)[] = ['name', 'zone', 'capacity'];
+    const keys: (keyof FormData)[] = ['name', 'zone', 'capacity', 'is_active'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'ZONE') {
-    const keys: (keyof FormData)[] = ['name', 'surcharge_type', 'surcharge_amount'];
+    const keys: (keyof FormData)[] = ['name', 'surcharge_type', 'surcharge_amount', 'is_active'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'PRODUCT') {
     const keys: (keyof FormData)[] = [
       'name', 'category', 'image', 'tax_rate', 'receipt_name',
       'sort_order', 'print_destinations', 'kitchen_print_name',
-      'is_label_print_enabled', 'has_multi_spec', 'tags', 'specs',
+      'is_label_print_enabled', 'is_active', 'has_multi_spec', 'tags', 'specs',
     ];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'CATEGORY') {
     const keys: (keyof FormData)[] = [
       'name', 'sort_order', 'print_destinations', 'is_label_print_enabled',
-      'is_virtual', 'tag_ids', 'match_mode',
+      'is_active', 'is_virtual', 'tag_ids', 'match_mode',
       'selected_attribute_ids', 'attribute_default_options',
     ];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'TAG') {
-    const keys: (keyof FormData)[] = ['name', 'color', 'display_order'];
+    const keys: (keyof FormData)[] = ['name', 'color', 'display_order', 'is_active'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   }
   return false;

@@ -1,12 +1,12 @@
 import React from 'react';
-import { FormField, inputClass } from './FormField';
+import { FormField, FormSection, inputClass } from './FormField';
+import { Settings } from 'lucide-react';
 import { SelectField } from '@/presentation/components/form/FormField/SelectField';
 
 interface ZoneFormProps {
   formData: {
     name: string;
-    surcharge_type: 'none' | 'fixed' | 'percentage';
-    surcharge_amount: number;
+    is_active?: boolean;
   };
   onFieldChange: (field: string, value: any) => void;
   t: (key: string) => string;
@@ -14,44 +14,28 @@ interface ZoneFormProps {
 
 export const ZoneForm: React.FC<ZoneFormProps> = ({ formData, onFieldChange, t }) => {
   return (
-    <>
+    <div className="space-y-4">
       <FormField label={t('settings.table.zone.form.name')} required>
         <input
           value={formData.name}
           onChange={(e) => onFieldChange('name', e.target.value)}
-          placeholder={t('settings.table.zone.form.namePlaceholder')}
+          placeholder={t('settings.table.zone.form.name_placeholder')}
           className={inputClass}
         />
       </FormField>
-      <div className="grid grid-cols-2 gap-4">
+
+      {/* Status Settings */}
+      <FormSection title={t('common.label.status')} icon={Settings}>
         <SelectField
-          label={t('settings.table.zone.form.surchargeType')}
-          value={formData.surcharge_type}
-          onChange={(value) => onFieldChange('surcharge_type', value as string)}
+          label={t('common.label.is_active')}
+          value={formData.is_active !== false ? 'true' : 'false'}
+          onChange={(value) => onFieldChange('is_active', value === 'true')}
           options={[
-            { value: 'none', label: t('common.dialog.none') },
-            { value: 'fixed', label: t("settings.table.zone.form.surchargeFixed") },
-            { value: 'percentage', label: t("settings.table.zone.form.surchargePercentage") },
+            { value: 'true', label: t('common.status.enabled') },
+            { value: 'false', label: t('common.status.disabled') },
           ]}
         />
-
-        {formData.surcharge_type !== 'none' && (
-          <FormField label={t('settings.table.zone.form.surchargeAmount')}>
-            <div className="relative">
-              <input
-                type="number"
-                value={formData.surcharge_amount}
-                onChange={(e) => onFieldChange('surcharge_amount', parseFloat(e.target.value))}
-                className={`${inputClass} pl-8`}
-                step={formData.surcharge_type === 'percentage' ? '1' : '0.01'}
-              />
-              <span className="absolute left-3 top-2.5 text-gray-500">
-                {formData.surcharge_type === 'percentage' ? '%' : '€'}
-              </span>
-            </div>
-          </FormField>
-        )}
-      </div>
-    </>
+      </FormSection>
+    </div>
   );
 };

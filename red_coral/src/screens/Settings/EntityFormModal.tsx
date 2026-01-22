@@ -6,7 +6,8 @@ import {
   useSettingsFormMeta,
   useSettingsStore,
 } from '@/core/stores/settings/useSettingsStore';
-import { createTauriClient, invokeApi, ApiError } from '@/infrastructure/api';
+import { createTauriClient, invokeApi } from '@/infrastructure/api';
+import type { Attribute } from '@/core/domain/types/api';
 import { useProductStore, useZones, useCategoryStore } from '@/core/stores/resources';
 import { getErrorMessage } from '@/utils/error';
 
@@ -14,7 +15,7 @@ const api = createTauriClient();
 import { toast } from '@/presentation/components/Toast';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 import { syncAttributeBindings } from './utils';
-import { useZoneTableStore } from '@/hooks/useZonesAndTables';
+import { useZoneStore, useTableStore } from '@/core/stores/resources';
 
 // Form Components
 import {
@@ -40,7 +41,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
   const setLastSelectedCategory = useSettingsStore((s) => s.setLastSelectedCategory);
   const refreshData = useSettingsStore((s) => s.refreshData);
 
-  const clearZoneTableCache = useZoneTableStore((state) => state.clearCache);
+  const refreshZones = () => useZoneStore.getState().fetchAll(true);
+  const refreshTables = () => useTableStore.getState().fetchAll(true);
   const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
   const [inheritedAttributeIds, setInheritedAttributeIds] = useState<string[]>([]);
   const defaultCategorySet = useRef(false);
@@ -130,15 +132,17 @@ export const EntityFormModal: React.FC = React.memo(() => {
     if (modal.open && modal.entity === 'CATEGORY' && modal.action === 'EDIT' && modal.data?.id) {
       const loadCategoryAttributes = async () => {
         try {
-          const catAttrs = await api.listCategoryAttributes(modal.data.id ? String(modal.data.id) : undefined);
-          const attributeIds = catAttrs.map((ca: any) => ca.attribute_id);
+          const catAttrs = await api.listCategoryAttributes(String(modal.data.id));
+          // API returns Attribute[] (with id field), not bindings (with attribute_id)
+          const safeAttrs: Attribute[] = catAttrs ?? [];
+          const attributeIds = safeAttrs.map((ca) => ca.id).filter(Boolean) as string[];
 
           // Load default options from category attributes
           const defaultOptions: Record<string, string[]> = {};
-          catAttrs.forEach((ca: any) => {
-            const defaults = ca.default_option_id ? [String(ca.default_option_id)] : [];
-            if (defaults.length > 0) {
-              defaultOptions[ca.attribute_id] = defaults;
+          safeAttrs.forEach((ca) => {
+            const defaults = ca.default_option_idx != null ? [String(ca.default_option_idx)] : [];
+            if (defaults.length > 0 && ca.id) {
+              defaultOptions[ca.id] = defaults;
             }
           });
 
@@ -161,25 +165,25 @@ export const EntityFormModal: React.FC = React.memo(() => {
   const getTitle = () => {
     const titles: Record<string, Record<string, string>> = {
       CREATE: {
-        TABLE: t('settings.table.addTable'),
-        ZONE: t('settings.zone.addZone'),
-        PRODUCT: t('settings.product.addProduct'),
-        CATEGORY: t('settings.category.addCategory'),
-        TAG: t('settings.tag.addTag')
+        TABLE: t('settings.table.add_table'),
+        ZONE: t('settings.zone.add_zone'),
+        PRODUCT: t('settings.product.add_product'),
+        CATEGORY: t('settings.category.add_category'),
+        TAG: t('settings.tag.add_tag')
       },
       EDIT: {
-        TABLE: t('settings.table.editTable'),
-        ZONE: t('settings.zone.editZone'),
-        PRODUCT: t('settings.product.editProduct'),
-        CATEGORY: t('settings.category.editCategory'),
-        TAG: t('settings.tag.editTag')
+        TABLE: t('settings.table.edit_table'),
+        ZONE: t('settings.zone.edit_zone'),
+        PRODUCT: t('settings.product.edit_product'),
+        CATEGORY: t('settings.category.edit_category'),
+        TAG: t('settings.tag.edit_tag')
       },
       DELETE: {
-        TABLE: t('settings.table.deleteTable'),
-        ZONE: t('settings.zone.deleteZone'),
-        PRODUCT: t('settings.product.deleteProduct'),
-        CATEGORY: t('settings.category.deleteCategory'),
-        TAG: t('settings.tag.deleteTag')
+        TABLE: t('settings.table.delete_table'),
+        ZONE: t('settings.zone.delete_zone'),
+        PRODUCT: t('settings.product.delete_product'),
+        CATEGORY: t('settings.category.delete_category'),
+        TAG: t('settings.tag.delete_tag')
       }
     };
     return titles[action]?.[entity] || '';
@@ -217,13 +221,13 @@ export const EntityFormModal: React.FC = React.memo(() => {
     try {
       if (entity === 'TABLE') {
         await api.deleteTable(String(data.id));
-        clearZoneTableCache(); // Invalidate tables cache
-        toast.success(t('settings.table.tableDeleted'));
+        refreshTables(); // Refresh tables from server
+        toast.success(t('settings.table.table_deleted'));
       } else if (entity === 'ZONE') {
         try {
           await api.deleteZone(String(data.id));
-          clearZoneTableCache(); // Invalidate zones cache
-          toast.success(t('settings.zone.zoneDeleted'));
+          refreshZones(); // Refresh zones from server
+          toast.success(t('settings.zone.zone_deleted'));
         } catch (e: unknown) {
           // Use getErrorMessage to get localized message from numeric error code
           toast.error(getErrorMessage(e));
@@ -234,7 +238,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           await api.deleteProduct(String(data.id));
           // Optimistic update: remove from ProductStore
           useProductStore.getState().optimisticRemove(data.id);
-          toast.success(t('settings.product.productDeleted'));
+          toast.success(t('settings.product.product_deleted'));
         } catch (e: any) {
           toast.error(getErrorMessage(e));
           return;
@@ -245,7 +249,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           // Refresh products and categories from resources stores
           useProductStore.getState().fetchAll();
           useCategoryStore.getState().fetchAll();
-          toast.success(t('settings.category.categoryDeleted'));
+          toast.success(t('settings.category.category_deleted'));
         } catch (e: any) {
           toast.error(getErrorMessage(e));
           return;
@@ -255,7 +259,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           await api.deleteTag(String(data.id));
           // Trigger refresh
           refreshData();
-          toast.success(t('settings.tag.tagDeleted'));
+          toast.success(t('settings.tag.tag_deleted'));
         } catch (e: any) {
           toast.error(getErrorMessage(e));
           return;
@@ -270,7 +274,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
   const handleSave = async () => {
     const hasError = Object.values(formErrors).some(Boolean);
     if (hasError) {
-      toast.error(t('common.message.invalidForm'));
+      toast.error(t('common.message.invalid_form'));
       return;
     }
     try {
@@ -279,34 +283,41 @@ export const EntityFormModal: React.FC = React.memo(() => {
           name: formData.name.trim(),
           zone: formData.zone,
           capacity: Math.max(1, formData.capacity),
+          is_active: formData.is_active ?? true,
         };
         if (action === 'CREATE') {
           await api.createTable({ name: tablePayload.name, zone: String(tablePayload.zone), capacity: Number(tablePayload.capacity) });
-          clearZoneTableCache(); // Invalidate tables cache
+          refreshTables(); // Refresh tables from server
           toast.success(t("settings.table.message.created"));
         } else {
-          await api.updateTable(String(data.id), { name: tablePayload.name, capacity: Number(tablePayload.capacity) });
-          clearZoneTableCache(); // Invalidate tables cache
+          await api.updateTable(String(data.id), {
+            name: tablePayload.name,
+            capacity: Number(tablePayload.capacity),
+            is_active: tablePayload.is_active,
+          });
+          refreshTables(); // Refresh tables from server
           toast.success(t("settings.table.message.updated"));
         }
       } else if (entity === 'ZONE') {
         const zonePayload = {
           name: formData.name.trim(),
-          description: formData.description,
-          // Note: surcharge_type and surcharge_amount are UI-only, may not be sent to API
+          is_active: formData.is_active ?? true,
         };
         if (action === 'CREATE') {
           await api.createZone({ name: zonePayload.name });
-          clearZoneTableCache(); // Invalidate zones cache
+          refreshZones(); // Refresh zones from server
           toast.success(t("settings.zone.message.created"));
         } else {
-          await api.updateZone(String(data.id), { name: zonePayload.name });
-          clearZoneTableCache(); // Invalidate zones cache
+          await api.updateZone(String(data.id), {
+            name: zonePayload.name,
+            is_active: zonePayload.is_active,
+          });
+          refreshZones(); // Refresh zones from server
           toast.success(t("settings.zone.message.updated"));
         }
       } else if (entity === 'PRODUCT') {
         if (!formData.name?.trim()) {
-          toast.error(t('settings.product.form.nameRequired'));
+          toast.error(t('settings.product.form.name_required'));
           return;
         }
         // Get price and externalId from default spec
@@ -315,12 +326,12 @@ export const EntityFormModal: React.FC = React.memo(() => {
         const externalId = defaultSpec?.external_id;
 
         if (externalId === undefined) {
-          toast.error(t('settings.externalIdRequired'));
+          toast.error(t('settings.external_id_required'));
           return;
         }
         if (!formData.category) {
           if (categories.length === 0) {
-            toast.error(t('settings.category.createFirst'));
+            toast.error(t('settings.category.create_first'));
           } else {
             toast.error(t('settings.category.required'));
           }
@@ -337,6 +348,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           kitchen_print_name: formData.kitchen_print_name?.trim() ?? undefined,
           print_destinations: formData.print_destinations ?? [],
           is_label_print_enabled: formData.is_label_print_enabled ? 1 : 0,
+          is_active: formData.is_active ?? true,
           tags: formData.tags ?? [],
           specs: formData.specs ?? [],
           // These are used for the default spec (extracted from formData.specs above)
@@ -392,6 +404,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             kitchen_print_name: productPayload.kitchen_print_name,
             print_destinations: productPayload.print_destinations,
             is_label_print_enabled: productPayload.is_label_print_enabled,
+            is_active: productPayload.is_active,
             // Update specs with price and external_id
             specs: [{
               name: productPayload.name,
@@ -416,6 +429,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             kitchen_print_name: productPayload.kitchen_print_name ?? null,
             print_destinations: productPayload.print_destinations ?? p.print_destinations,
             is_label_print_enabled: productPayload.is_label_print_enabled ?? p.is_label_print_enabled,
+            is_active: productPayload.is_active ?? p.is_active,
             // Update embedded specs
             specs: [{
               name: productPayload.name,
@@ -484,15 +498,20 @@ export const EntityFormModal: React.FC = React.memo(() => {
             });
           } catch (error) {
             console.error('Failed to update specifications:', error);
-            toast.error(t('settings.specification.message.partialCreateFailed'));
+            toast.error(t('settings.specification.message.partial_create_failed'));
           }
         }
       } else if (entity === 'CATEGORY') {
+        // Filter out marker value ['-1'] from print_destinations
+        const rawDestinations = formData.print_destinations ?? [];
+        const validDestinations = rawDestinations.filter((d) => d !== '-1');
+
         const categoryPayload = {
           name: formData.name.trim(),
           sort_order: formData.sort_order ?? 0,
-          print_destinations: formData.print_destinations ?? [],
+          print_destinations: validDestinations,
           is_label_print_enabled: formData.is_label_print_enabled ?? true,
+          is_active: formData.is_active ?? true,
           is_virtual: formData.is_virtual ?? false,
           tag_ids: formData.tag_ids ?? [],
           match_mode: formData.match_mode ?? 'any',
@@ -513,7 +532,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           // Trigger refresh of products store
           useProductStore.getState().fetchAll();
           refreshData(); // Trigger UI refresh
-          toast.success(t('settings.category.createCategorySuccess'));
+          toast.success(t('settings.category.create_category_success'));
         } else {
           categoryId = String(data.id);
           await api.updateCategory(categoryId, {
@@ -521,6 +540,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             sort_order: categoryPayload.sort_order,
             print_destinations: categoryPayload.print_destinations,
             is_label_print_enabled: categoryPayload.is_label_print_enabled,
+            is_active: categoryPayload.is_active,
             is_virtual: categoryPayload.is_virtual,
             tag_ids: categoryPayload.tag_ids,
             match_mode: categoryPayload.match_mode,
@@ -528,7 +548,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           // Trigger refresh of products store
           useProductStore.getState().fetchAll();
           refreshData(); // Trigger UI refresh
-          toast.success(t('settings.category.updateCategorySuccess'));
+          toast.success(t('settings.category.update_category_success'));
         }
 
         // Handle attribute bindings
@@ -570,9 +590,11 @@ export const EntityFormModal: React.FC = React.memo(() => {
           name: formData.name.trim(),
           color: formData.color || '#3B82F6',
           display_order: formData.display_order ?? 0,
+          is_active: formData.is_active ?? true,
         };
 
         if (action === 'CREATE') {
+          // Note: is_active defaults to true on server for new tags
           await api.createTag({
             name: tagPayload.name,
             color: tagPayload.color,
@@ -585,6 +607,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             name: tagPayload.name,
             color: tagPayload.color,
             display_order: tagPayload.display_order,
+            is_active: tagPayload.is_active,
           });
           refreshData();
           toast.success(t('settings.tag.message.updated'));
@@ -636,6 +659,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
               name: formData.name,
               capacity: formData.capacity ?? 1,
               zone: formData.zone ?? '',
+              is_active: formData.is_active ?? true,
             }}
             zones={zones as any}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -648,8 +672,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
           <ZoneForm
             formData={{
               name: formData.name,
-              surcharge_type: formData.surcharge_type ?? 'none',
-              surcharge_amount: formData.surcharge_amount ?? 0,
+              is_active: formData.is_active ?? true,
             }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onFieldChange={setFormField as (field: string, value: any) => void}
@@ -670,13 +693,14 @@ export const EntityFormModal: React.FC = React.memo(() => {
               image: formData.image ?? '',
               externalId: productDefaultSpec?.external_id ?? undefined,
               tax_rate: formData.tax_rate ?? 0,
-              selectedAttributeIds: formData.selected_attribute_ids,
-              attributeDefaultOptions: formData.attribute_default_options,
-              print_destinations: formData.print_destinations?.map(Number),
+              selected_attribute_ids: formData.selected_attribute_ids,
+              attribute_default_options: formData.attribute_default_options,
+              print_destinations: formData.print_destinations,
               kitchen_print_name: formData.kitchen_print_name,
               is_label_print_enabled: formData.is_label_print_enabled ? 1 : 0,
+              is_active: formData.is_active ?? true,
               specs: formData.specs,
-              selectedTagIds: formData.tags,
+              selected_tag_ids: formData.tags,
             }}
             categories={categories}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -692,10 +716,11 @@ export const EntityFormModal: React.FC = React.memo(() => {
           <CategoryForm
             formData={{
               name: formData.name,
-              print_destinations: formData.print_destinations?.map(Number),
+              print_destinations: formData.print_destinations,
               is_label_print_enabled: formData.is_label_print_enabled ?? true,
-              selectedAttributeIds: formData.selected_attribute_ids,
-              attributeDefaultOptions: formData.attribute_default_options,
+              is_active: formData.is_active ?? true,
+              selected_attribute_ids: formData.selected_attribute_ids,
+              attribute_default_options: formData.attribute_default_options,
               is_virtual: formData.is_virtual,
               tag_ids: formData.tag_ids,
               match_mode: formData.match_mode,
@@ -712,6 +737,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
               name: formData.name,
               color: formData.color || '#3B82F6',
               display_order: formData.display_order ?? 0,
+              is_active: formData.is_active ?? true,
             }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onFieldChange={setFormField as (field: string, value: any) => void}
@@ -781,8 +807,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
         <div className="fixed inset-0 z-90 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95">
             <div className="p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">{t('settings.unsavedConfirm')}</h3>
-              <p className="text-sm text-gray-600 mb-6">{t('settings.unsavedConfirmHint')}</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">{t('settings.unsaved_confirm')}</h3>
+              <p className="text-sm text-gray-600 mb-6">{t('settings.unsaved_confirm_hint')}</p>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={handleCancelDiscard}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { FormField, inputClass } from './FormField';
-import { Layers, Filter } from 'lucide-react';
+import { FormField, FormSection, SubField, inputClass } from './FormField';
+import { Printer, Filter, Tags, Settings } from 'lucide-react';
 import { attributeHelpers, useTags } from '@/core/stores/resources';
 import { AttributeSelectionModal } from './AttributeSelectionModal';
 import { SelectField } from '@/presentation/components/form/FormField/SelectField';
@@ -10,10 +10,11 @@ import { AttributeDisplayTag } from '@/presentation/components/form/FormField/At
 interface CategoryFormProps {
   formData: {
     name: string;
-    print_destinations?: number[];
+    print_destinations?: string[];
     is_label_print_enabled?: boolean;
-    selectedAttributeIds?: string[];
-    attributeDefaultOptions?: Record<string, string | string[]>;
+    is_active?: boolean;
+    selected_attribute_ids?: string[];
+    attribute_default_options?: Record<string, string | string[]>;
     is_virtual?: boolean;
     tag_ids?: string[];
     match_mode?: 'any' | 'all';
@@ -25,7 +26,7 @@ interface CategoryFormProps {
 export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldChange, t }) => {
   const [showAttributeModal, setShowAttributeModal] = useState(false);
 
-  const selectedAttributeIds = formData.selectedAttributeIds || [];
+  const selectedAttributeIds = formData.selected_attribute_ids || [];
   const tags = useTags();
 
   // Use stable helper directly (same reference every render)
@@ -36,9 +37,12 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
   const selectedTagIds = formData.tag_ids || [];
   const matchMode = formData.match_mode || 'any';
 
-  // Kitchen print state (derived from print_destinations array)
-  const isKitchenPrintEnabled = (formData.print_destinations?.length ?? 0) > 0;
-  const kitchenPrinterId = formData.print_destinations?.[0];
+  // Kitchen print state
+  // Use a special marker value ['-1'] to indicate "enabled but no printer selected"
+  const printDestinations = formData.print_destinations ?? [];
+  const hasMarkerOrPrinter = printDestinations.length > 0;
+  const kitchenPrinterId = printDestinations[0] !== '-1' ? printDestinations[0] : undefined;
+  const isKitchenPrintEnabled = hasMarkerOrPrinter;
 
   // Toggle tag selection
   const handleTagToggle = (tagId: string) => {
@@ -50,126 +54,107 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
 
   return (
     <div className="space-y-4">
+      {/* 基本信息 - 直接显示，不用 section */}
       <FormField label={t('settings.category.form.name')} required>
         <input
           value={formData.name}
           onChange={(e) => onFieldChange('name', e.target.value)}
-          placeholder={t('settings.category.form.namePlaceholder')}
+          placeholder={t('settings.category.form.name_placeholder')}
           className={inputClass}
         />
       </FormField>
 
-      {/* Virtual Category Settings */}
-      <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-4 shadow-sm">
-        <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 pb-2 border-b border-gray-100">
-          <Filter size={16} className="text-teal-500" />
-          {t('settings.category.form.virtualSettings')}
-        </h3>
+      {/* 虚拟分类设置 */}
+      <FormSection title={t('settings.category.form.virtual_settings')} icon={Filter}>
+        <SelectField
+          label={t('settings.category.form.is_virtual')}
+          value={isVirtual ? 'true' : 'false'}
+          onChange={(value) => onFieldChange('is_virtual', value === 'true')}
+          options={[
+            { value: 'false', label: t('settings.category.form.regular_category') },
+            { value: 'true', label: t('settings.category.form.virtual_category') }
+          ]}
+        />
 
-        <div className="space-y-4">
+        <SubField show={isVirtual}>
           <SelectField
-            label={t('settings.category.form.isVirtual')}
-            value={isVirtual ? 'true' : 'false'}
-            onChange={(value) => onFieldChange('is_virtual', value === 'true')}
+            label={t('settings.category.form.match_mode')}
+            value={matchMode}
+            onChange={(value) => onFieldChange('match_mode', value)}
             options={[
-              { value: 'false', label: t('settings.category.form.regularCategory') },
-              { value: 'true', label: t('settings.category.form.virtualCategory') }
+              { value: 'any', label: t('settings.category.form.match_any') },
+              { value: 'all', label: t('settings.category.form.match_all') }
             ]}
           />
 
-          {isVirtual && (
-            <div className="pl-4 border-l-2 border-teal-100 space-y-4">
-              <SelectField
-                label={t('settings.category.form.matchMode')}
-                value={matchMode}
-                onChange={(value) => onFieldChange('match_mode', value)}
-                options={[
-                  { value: 'any', label: t('settings.category.form.matchAny') },
-                  { value: 'all', label: t('settings.category.form.matchAll') }
-                ]}
-              />
-
-              <FormField label={t('settings.category.form.filterTags')}>
-                <div className="min-h-[60px]">
-                  {tags.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {tags.map((tag) => {
-                        const isSelected = selectedTagIds.includes(tag.id);
-                        return (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            onClick={() => handleTagToggle(tag.id)}
-                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                              isSelected
-                                ? 'bg-teal-500 text-white shadow-sm'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                            style={isSelected ? { backgroundColor: tag.color || undefined } : undefined}
-                          >
-                            {tag.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-4 text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                      <p className="text-sm">{t('settings.category.form.noTagsAvailable')}</p>
-                    </div>
-                  )}
+          <FormField label={t('settings.category.form.filter_tags')}>
+            <div className="min-h-[60px]">
+              {tags.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => {
+                    const isSelected = selectedTagIds.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => handleTagToggle(tag.id)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                          isSelected
+                            ? 'bg-teal-500 text-white shadow-sm'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                        style={isSelected ? { backgroundColor: tag.color || undefined } : undefined}
+                      >
+                        {tag.name}
+                      </button>
+                    );
+                  })}
                 </div>
-              </FormField>
-
-              {selectedTagIds.length === 0 && isVirtual && (
-                <p className="text-xs text-amber-600">
-                  {t('settings.category.form.selectTagsHint')}
-                </p>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-4 text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                  <p className="text-sm">{t('settings.category.form.no_tags_available')}</p>
+                </div>
               )}
             </div>
+          </FormField>
+
+          {selectedTagIds.length === 0 && (
+            <p className="text-xs text-amber-600">
+              {t('settings.category.form.select_tags_hint')}
+            </p>
           )}
-        </div>
-      </section>
+        </SubField>
+      </FormSection>
 
-      {/* Print Settings Section */}
-      <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-4 shadow-sm">
-        <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 pb-2 border-b border-gray-100">
-          <Layers size={16} className="text-teal-500" />
-          {t('settings.product.print.settings')}
-        </h3>
+      {/* 打印设置 */}
+      <FormSection title={t('settings.product.print.settings')} icon={Printer}>
+        <SelectField
+          label={t('settings.product.print.is_kitchen_print_enabled')}
+          value={isKitchenPrintEnabled ? 'true' : 'false'}
+          onChange={(value) => {
+            if (value === 'true') {
+              onFieldChange('print_destinations', kitchenPrinterId ? [kitchenPrinterId] : ['-1']);
+            } else {
+              onFieldChange('print_destinations', []);
+            }
+          }}
+          options={[
+            { value: 'true', label: t('common.status.enabled') },
+            { value: 'false', label: t('common.status.disabled') }
+          ]}
+        />
 
-        <div className="space-y-4">
-          <SelectField
-            label={t('settings.product.print.isKitchenPrintEnabled')}
-            value={isKitchenPrintEnabled ? 'true' : 'false'}
-            onChange={(value) => {
-              if (value === 'true') {
-                // Enable: set print_destinations with current printer or empty (will select later)
-                onFieldChange('print_destinations', kitchenPrinterId ? [kitchenPrinterId] : []);
-              } else {
-                // Disable: clear print_destinations
-                onFieldChange('print_destinations', []);
-              }
-            }}
-            options={[
-              { value: 'true', label: t('common.status.enabled') },
-              { value: 'false', label: t('common.status.disabled') }
-            ]}
+        <SubField show={isKitchenPrintEnabled}>
+          <KitchenPrinterSelector
+            value={kitchenPrinterId}
+            onChange={(value) => onFieldChange('print_destinations', value ? [value] : ['-1'])}
+            t={t}
           />
+        </SubField>
 
-          {isKitchenPrintEnabled && (
-            <div className="pl-4 border-l-2 border-teal-100">
-              <KitchenPrinterSelector
-                value={kitchenPrinterId}
-                onChange={(value) => onFieldChange('print_destinations', value ? [value] : [])}
-                t={t}
-              />
-            </div>
-          )}
-
-          <div className="border-t border-gray-50 my-2"></div>
-
+        <div className="border-t border-gray-100 pt-3">
           <SelectField
-            label={t('settings.product.print.isLabelPrintEnabled')}
+            label={t('settings.product.print.is_label_print_enabled')}
             value={formData.is_label_print_enabled ? 'true' : 'false'}
             onChange={(value) => onFieldChange('is_label_print_enabled', value === 'true')}
             options={[
@@ -178,15 +163,12 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
             ]}
           />
         </div>
-      </section>
+      </FormSection>
 
-      {/* Category Attributes */}
-      <section className="bg-white rounded-xl border border-gray-100 p-4 space-y-4 shadow-sm mt-4">
-        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900">
-            <Layers size={16} className="text-teal-500" />
-            {t('settings.category.form.attributes')}
-          </h3>
+      {/* 分类属性 */}
+      <FormSection title={t('settings.category.form.attributes')} icon={Tags}>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-gray-500">{t('settings.category.form.attributes_hint')}</p>
           <button
             type="button"
             onClick={() => setShowAttributeModal(true)}
@@ -203,7 +185,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
                 const attr = getAttributeById(id);
                 if (!attr) return null;
 
-                const rawDefaults = formData.attributeDefaultOptions?.[id];
+                const rawDefaults = formData.attribute_default_options?.[id];
                 const defaultOptionIds = Array.isArray(rawDefaults)
                     ? rawDefaults
                     : (rawDefaults ? [rawDefaults] : []);
@@ -220,22 +202,35 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-4 text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-              <p className="text-sm">{t('settings.product.attribute.noSelected')}</p>
+              <p className="text-sm">{t('settings.product.attribute.no_selected')}</p>
             </div>
           )}
         </div>
-      </section>
+      </FormSection>
+
+      {/* Status Settings */}
+      <FormSection title={t('common.label.status')} icon={Settings}>
+        <SelectField
+          label={t('common.label.is_active')}
+          value={formData.is_active !== false ? 'true' : 'false'}
+          onChange={(value) => onFieldChange('is_active', value === 'true')}
+          options={[
+            { value: 'true', label: t('common.status.enabled') },
+            { value: 'false', label: t('common.status.disabled') },
+          ]}
+        />
+      </FormSection>
 
       <AttributeSelectionModal
         isOpen={showAttributeModal}
         onClose={() => setShowAttributeModal(false)}
-        selectedAttributeIds={formData.selectedAttributeIds || []}
-        attributeDefaultOptions={formData.attributeDefaultOptions || {}}
-        onChange={(ids) => onFieldChange('selectedAttributeIds', ids)}
+        selectedAttributeIds={formData.selected_attribute_ids || []}
+        attributeDefaultOptions={formData.attribute_default_options || {}}
+        onChange={(ids) => onFieldChange('selected_attribute_ids', ids)}
         onDefaultOptionChange={(attrId, optionIds) => {
-          const newDefaults = { ...formData.attributeDefaultOptions, [attrId]: optionIds };
+          const newDefaults = { ...formData.attribute_default_options, [attrId]: optionIds };
           if (!optionIds || optionIds.length === 0) delete newDefaults[attrId];
-          onFieldChange('attributeDefaultOptions', newDefaults);
+          onFieldChange('attribute_default_options', newDefaults);
         }}
         t={t}
       />
