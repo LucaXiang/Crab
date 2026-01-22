@@ -5,8 +5,10 @@
 
 mod calculator;
 mod engine;
+mod item_calculator;
 mod matcher;
 
 pub use calculator::*;
 pub use engine::PriceRuleEngine;
+pub use item_calculator::*;
 pub use matcher::*;
