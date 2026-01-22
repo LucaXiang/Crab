@@ -2,141 +2,92 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Overview
+## RedCoral POS
 
-RedCoral POS - A full-stack Point of Sale application built with Tauri, React, TypeScript, and Rust. Part of the Crab distributed restaurant management system.
+Tauri 2 + React 19 + TypeScript + Rust 全栈 POS 应用。
 
-## Tech Stack
+## 命令
 
-- **Frontend**: React 19, TypeScript 5.8, Vite 6, Zustand 5, TailwindCSS 4
-- **Desktop Runtime**: Tauri 2.9 (Rust backend)
-- **Database**: SurrealDB (embedded, via edge-server)
-- **Backend Integration**: Uses `edge-server` and `crab-client` workspace crates
+```bash
+npm run tauri:dev      # 开发
+npm run tauri:build    # 构建
+npx tsc --noEmit       # TS 类型检查
+npm run test           # Vitest 测试
+```
 
-## Project Structure
+## 项目结构
 
 ```
 red_coral/
-├── src/                        # React frontend
-│   ├── core/                   # Core domain (types, stores, services)
-│   │   ├── domain/types/       # TypeScript types (must match Rust)
-│   │   └── stores/             # Zustand stores (auth, cart, bridge, etc.)
-│   ├── screens/                # Page components (Login, POS, Setup, etc.)
-│   ├── presentation/           # UI components
-│   ├── utils/currency/         # Money calculations (Decimal.js)
-│   └── App.tsx                 # Routes and app shell
-├── src-tauri/                  # Rust backend
-│   ├── src/
-│   │   ├── commands/           # Tauri commands (auth, mode, tenant, etc.)
-│   │   ├── core/               # ClientBridge, TenantManager, config
-│   │   └── lib.rs              # Command registration
-│   └── Cargo.toml
-└── package.json
+├── src/                          # React 前端
+│   ├── core/
+│   │   ├── stores/               # Zustand 状态管理
+│   │   │   ├── order/            # 订单 (Event Sourcing)
+│   │   │   ├── cart/             # 购物车
+│   │   │   ├── resources/        # 资源 Store (Product, Category, etc.)
+│   │   │   └── auth/             # 认证状态
+│   │   ├── domain/types/         # TypeScript 类型定义
+│   │   └── hooks/                # 核心 Hooks
+│   ├── screens/                  # 页面组件
+│   ├── presentation/components/  # UI 组件
+│   ├── infrastructure/api/       # Tauri API 客户端
+│   └── utils/currency/           # 金额计算 (Decimal.js)
+└── src-tauri/                    # Rust 后端
+    ├── src/
+    │   ├── core/bridge/          # ClientBridge (Server/Client 双模式)
+    │   ├── commands/             # Tauri Commands
+    │   └── utils/                # 打印、收据渲染
+    └── Cargo.toml
 ```
 
-This app uses workspace crates from parent `/Users/xzy/workspace/crab/`:
-- `edge-server` - Embedded server with SurrealDB, JWT auth, message bus
-- `crab-client` - Unified client (Local/Remote) with typestate pattern
-- `shared` - Common types and protocols
+## 核心概念
 
-## Key Concepts
+### ClientBridge 双模式
 
-### ClientBridge Architecture (Server/Client Modes)
+`src-tauri/src/core/bridge/mod.rs`:
+- **Server 模式**: 内嵌 edge-server，In-Process 通信
+- **Client 模式**: mTLS 连接远程 edge-server
 
-The app runs in two modes managed by `ClientBridge` (`src-tauri/src/core/client_bridge.rs`):
-
-- **Server Mode**: Runs embedded `edge-server` with In-Process communication (LocalClient)
-- **Client Mode**: Connects to remote edge-server via mTLS (RemoteClient)
+### 订单系统 (Event Sourcing)
 
 ```
-App Startup → ClientBridge (Disconnected)
-           → TenantManager loads certificates
-           → User selects mode → Server/Client
-           → CrabClient (Local/Remote) → edge-server APIs
+OrderCommand → edge-server → OrderEvent → 广播 → 前端 Store 更新
 ```
 
-Key files:
-- `src-tauri/src/core/client_bridge.rs` - Mode management, CrabClient state transitions
-- `src-tauri/src/core/tenant_manager.rs` - Multi-tenant certificate management
-- `src/core/stores/bridge/useBridgeStore.ts` - Frontend state for mode/auth
+- `useOrderCommands`: 发送命令
+- `useActiveOrdersStore`: 订单快照状态
+- `orderReducer`: Event → Snapshot 转换
 
-### Type Alignment (Frontend ↔ Backend)
+### 类型对齐
 
-**Critical**: TypeScript types must match Rust types exactly.
+TypeScript 类型必须与 Rust 完全匹配：
+- Rust: `edge-server/src/db/models/`, `shared/src/`
+- TypeScript: `src/core/domain/types/api/models.ts`
 
-When modifying types:
-1. Update Rust types first (in `.rs` files)
-2. Update TypeScript types to match
-3. Run `npx tsc --noEmit` to verify
+修改流程: Rust → TypeScript → `npx tsc --noEmit` 验证
 
-Key type locations:
-- Rust: `src-tauri/src/core/`, `edge-server/src/api/`, `shared/src/`
-- TypeScript: `src/core/domain/types/`
+### 金额计算
 
-### Currency Handling
-
-Always use `Currency` utility for financial calculations:
-
+必须使用 `Currency` 工具类：
 ```typescript
 import { Currency } from '@/utils/currency';
-const total = Currency.add(itemPrice, surcharge);
-const final = Currency.floor2(total);
+Currency.add(a, b);
+Currency.floor2(total);
 ```
 
-### State Management
+## 添加 Tauri Command
 
-Two patterns coexist (prefer new architecture):
-- **Legacy**: Direct stores in `src/stores/`
-- **New**: React hooks wrapping stores in `src/core/stores/`
+1. `src-tauri/src/commands/` 添加函数
+2. `src-tauri/src/lib.rs` 注册到 invoke_handler
+3. 前端调用: `invoke<T>('command_name', { args })`
 
-## Common Commands
+## 数据目录
 
-```bash
-# Development
-npm run tauri:dev        # Full app with Tauri (use this)
-npm run dev              # Frontend only (vite dev server)
+`~/Library/Application Support/com.xzy.pos/redcoral/`
+- `config.json` - 模式和租户配置
+- `tenants/` - 租户证书存储
+- `database/` - 本地数据库
 
-# Build
-npm run tauri:build      # Build Tauri app
-npm run build            # Build frontend only
+## 响应语言
 
-# Type checking
-npx tsc --noEmit         # TypeScript check
-
-# Testing
-npm run test             # Run vitest tests
-npm run deadcode         # Find unused exports (ts-prune)
-```
-
-## App Data Location
-
-User data stored at: `~/Library/Application Support/com.xzy.pos/redcoral/`
-- `config.json` - Mode and tenant configuration
-- `tenants/` - Per-tenant certificate storage
-- `database/` - Local database files
-
-## Authentication Flow
-
-1. **Setup** (`/setup`) - First-run tenant activation via Auth Server
-2. **Login** (`/login`) - Employee login (uses CrabClient.login())
-3. **POS** (`/pos`) - Protected route, requires authenticated session
-
-Routes in `App.tsx`:
-- `InitialRoute` - Checks first-run, auto-starts Server mode if tenant exists
-- `ProtectedRoute` - Wraps authenticated routes
-
-## Adding Tauri Commands
-
-1. Add command in `src-tauri/src/commands/`
-2. Register in `src-tauri/src/lib.rs` invoke_handler
-3. Call from frontend: `invoke<ReturnType>('command_name', { args })`
-
-## Important Files
-
-| File | Purpose |
-|------|---------|
-| `src-tauri/src/core/client_bridge.rs` | Server/Client mode management |
-| `src-tauri/src/core/tenant_manager.rs` | Multi-tenant certificates |
-| `src/core/stores/bridge/useBridgeStore.ts` | Frontend bridge state |
-| `src/utils/currency/currency.ts` | Money calculations |
-| `src/App.tsx` | Routes and initial flow |
+使用中文回答。

@@ -1,216 +1,129 @@
-# CLAUDE.md - Crab Project Guide
+# CLAUDE.md
 
-## Project Overview
-Crab is a distributed restaurant management system written in Rust, featuring an Edge Server and Client architecture. It focuses on reliability, offline capabilities, and type-safe communication.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Architecture
-- **Workspace**:
-  - `shared`: Common types, protocols, and message definitions (`Notification`, `ServerCommand`).
-  - `edge-server`: The core edge node. Handles HTTP/TCP requests, database (SurrealDB), and message broadcasting. Supports mTLS.
-  - `crab-client`: Unified client library supporting both Network (HTTP/TCP) and In-Process (Oneshot/Memory) communication.
-  - `crab-cert`: Certificate authority and PKI management library. Handles Root CA, Tenant CA, and entity certificates.
-  - `crab-auth`: Authentication server (Port 3001). Manages centralized identity and CA hierarchy.
+## Crab - 分布式餐饮管理系统
 
-### Edge Server 详细架构
+Rust workspace 架构，专注离线优先、边缘计算、mTLS 安全通信。
 
-```
-┌─────────────────────────────────────────────────┐
-│              HTTP API Layer (Axum)               │
-│   /api/auth, /api/role, /api/upload, /health    │
-└────────────────────┬────────────────────────────┘
-                     │
-    ┌────────────────┼────────────────┐
-    ▼                ▼                ▼
-┌─────────┐   ┌──────────┐   ┌────────────┐
-│ Oneshot │   │   Http   │   │  Message   │
-│ Client  │   │  Client  │   │  Client    │
-│(同进程) │   │ (HTTP)   │   │ (TCP/TLS)  │
-└─────────┘   └──────────┘   └────────────┘
-                     │
-         ┌───────────────────────┐
-         │  ServerState (Arc共享) │
-         └───────────┬───────────┘
-                     │
-    ┌────────────────┼────────────────┐
-    ▼                ▼                ▼
-┌──────────┐  ┌───────────┐  ┌────────────┐
-│ Message  │  │ Embedded  │  │  Services  │
-│   Bus    │  │    DB     │  │(Cert,Auth) │
-│(broadcast)│  │(SurrealDB)│  │            │
-└──────────┘  └───────────┘  └────────────┘
+## Workspace 成员
+
+| Crate | 用途 | 详细文档 |
+|-------|------|----------|
+| `shared` | 共享类型、协议、消息定义 | [`shared/CLAUDE.md`](shared/CLAUDE.md) |
+| `edge-server` | 边缘服务器 (SurrealDB + Axum + MessageBus) | [`edge-server/CLAUDE.md`](edge-server/CLAUDE.md) |
+| `crab-client` | 统一客户端库 (Local/Remote + Typestate) | [`crab-client/CLAUDE.md`](crab-client/CLAUDE.md) |
+| `crab-cert` | PKI/证书管理 (Root CA → Tenant CA → Entity) | [`crab-cert/CLAUDE.md`](crab-cert/CLAUDE.md) |
+| `crab-auth` | 认证服务器 (Port 3001) | [`crab-auth/CLAUDE.md`](crab-auth/CLAUDE.md) |
+| `red_coral` | **Tauri POS 前端** | [`red_coral/CLAUDE.md`](red_coral/CLAUDE.md) |
+
+## 命令
+
+```bash
+# Rust workspace
+cargo check --workspace        # 类型检查
+cargo build --workspace        # 编译
+cargo test --workspace --lib   # 测试
+cargo clippy --workspace       # Lint
+
+# POS 前端 (red_coral/)
+cd red_coral && npm run tauri:dev   # 开发
+cd red_coral && npx tsc --noEmit    # TS 检查
 ```
 
-#### 模块结构 (`edge-server/src/`)
-| 目录 | 职责 |
+## 核心架构
+
+```
+┌─────────────────┐     ┌─────────────────┐
+│   red_coral     │     │   crab-auth     │
+│  (Tauri POS)    │     │ (认证服务器)     │
+└────────┬────────┘     └────────┬────────┘
+         │ In-Process / mTLS     │ 激活/证书
+         ▼                       ▼
+┌─────────────────────────────────────────┐
+│            edge-server                   │
+│  ┌─────────┬──────────┬──────────────┐  │
+│  │ Axum API│ MessageBus│ SurrealDB   │  │
+│  │ (HTTP)  │ (TCP/TLS) │ (Embedded)  │  │
+│  └─────────┴──────────┴──────────────┘  │
+└─────────────────────────────────────────┘
+```
+
+**ClientBridge 双模式**:
+- Server 模式: 内嵌 edge-server，进程内通信 (LocalClient)
+- Client 模式: mTLS 连接远程 edge-server (RemoteClient)
+
+## 数据库规则 (SurrealDB)
+
+**RELATE 边关系**:
+- `attribute_binding`: product/category → attribute
+- `has_event`: order → order_event
+
+**删除规则**:
+- Order/OrderEvent **禁止删除** (使用状态管理)
+- 删除 Product/Category 时**必须清理** `attribute_binding` 边
+- 删除 Attribute 时自动清理关联边
+
+## 安全
+
+- mTLS 双向认证 (TLS 1.3 + aws-lc-rs FIPS)
+- 三层 CA 层级: Root CA → Tenant CA → Entity Cert
+- 硬件绑定: 证书包含 device_id 防克隆
+
+## 类型对齐
+
+TypeScript (前端) ↔ Rust (后端) 类型必须完全匹配：
+1. 先改 Rust 类型 (`shared/`, `edge-server/src/db/models/`)
+2. 再改 TypeScript (`red_coral/src/core/domain/types/`)
+3. 验证: `cargo check && npx tsc --noEmit`
+
+## 约束与准则
+
+### 代码规范
+
+| 规则 | 说明 |
 |------|------|
-| `core/` | 核心状态 (`ServerState`, `Config`, `Server`) |
-| `api/` | HTTP API 路由和处理器 |
-| `auth/` | JWT 认证、权限、中间件 |
-| `message/` | 消息总线、Transport、Handler、Processor |
-| `client/` | 客户端实现 (Http, Oneshot, Message) |
-| `services/` | 业务服务 (Https, MessageBus, Cert, Activation) |
-| `db/` | SurrealDB 数据访问层 |
-| `utils/` | 工具函数 (AppError, Logger 等) |
+| **类型优先** | 修改数据结构时：Rust 先行 → TypeScript 跟进 → 双端验证 |
+| **金额计算** | 前端必须使用 `Currency` 工具类，禁止直接浮点运算 |
+| **错误处理** | 使用 `shared::error::ErrorCode` 统一错误码 |
+| **异步运行时** | 统一使用 `tokio`，trait 直接使用原生 `async fn`（Rust 1.75+） |
+| **共享状态** | 使用 `Arc` 包装，`ServerState` 设计为 clone-cheap |
 
-#### Message 模块结构 (`edge-server/src/message/`)
-```
-message/
-├── mod.rs              # 模块导出 + 测试
-├── bus.rs              # MessageBus 核心逻辑
-├── tcp_server.rs       # TCP 服务器 (连接管理、握手、消息转发)
-├── handler.rs          # 消息处理器 (重试、死信队列)
-├── processor.rs        # 具体处理逻辑 (Notification, ServerCommand, RequestCommand)
-└── transport/
-    ├── mod.rs          # Transport trait + 辅助函数
-    ├── tcp.rs          # TcpTransport
-    ├── tls.rs          # TlsTransport (mTLS)
-    └── memory.rs       # MemoryTransport (同进程)
-```
+### 数据库约束
 
-#### 多客户端连接管理
-- **存储结构**: `Arc<DashMap<String, Arc<dyn Transport>>>` (无锁并发安全)
-- **连接流程**: TCP Connect → TLS Handshake (mTLS) → Handshake Message → Register to DashMap
-- **断线处理**: 自动检测并从 DashMap 移除，资源自动释放
+| 约束 | 说明 |
+|------|------|
+| **Order 不可删除** | 订单使用状态管理（VOID），禁止物理删除 |
+| **OrderEvent 不可删除** | 事件溯源，只追加不删除 |
+| **RELATE 边清理** | 删除实体时必须清理关联的图边 |
+| **ID 格式** | SurrealDB Thing 格式: `"table:id"` |
 
-#### 消息类型
-| 类型 | 方向 | 用途 |
-|------|------|------|
-| `Handshake` | C→S | 握手验证 (Protocol version, 身份) |
-| `RequestCommand` | C→S | 客户端 RPC 请求 (ping, echo, status) |
-| `Response` | S→C | 请求响应 (带 correlation_id) |
-| `Notification` | S→C | 系统通知/日志 |
-| `ServerCommand` | Upstream→S | 上层服务器指令 |
-| `Sync` | S→C | 数据同步信号 |
+### 安全约束
 
-#### ServerState 核心字段
-```rust
-pub struct ServerState {
-    pub config: Config,              // 不可变配置
-    pub db: Surreal<Db>,             // SurrealDB (Arc 包装)
-    pub message_bus: MessageBusService, // 消息总线
-    pub cert_service: CertService,   // 证书管理
-    pub activation: ActivationService, // 激活状态
-    pub jwt_service: Arc<JwtService>, // JWT 认证
-}
-// Clone 成本极低 - 所有字段都是 Arc 包装
-```
+| 约束 | 说明 |
+|------|------|
+| **mTLS 必须** | 生产环境必须启用双向 TLS 认证 |
+| **硬件绑定** | 证书包含 device_id，防止凭据克隆 |
+| **密码存储** | 使用 Argon2 哈希，禁止明文存储 |
+| **JWT 过期** | Access Token 短期，Refresh Token 长期 |
 
-#### 性能特性 (3-4 客户端场景)
-- 每客户端内存: ~400 bytes
-- 消息队列容量: 1024 条 (broadcast channel)
-- 请求延迟: 5-15 ms (简单命令)
-- 支持广播 (1→N) 和单播 (1→1) 两种模式
+### 架构约定
 
-## TLS & Security
+| 约定 | 说明 |
+|------|------|
+| **离线优先** | 边缘节点必须支持完全离线运行 |
+| **事件溯源** | 订单系统使用 Event Sourcing 模式 |
+| **类型状态** | 客户端使用 Typestate 模式确保状态转换安全 |
+| **依赖集中** | 所有依赖在 workspace Cargo.toml 统一管理 |
 
-### TLS 配置
-- **加密后端**: `aws-lc-rs` (FIPS 140-3 合规)
-- **TLS 版本**: 仅 TLS 1.3
-- **协议**: mTLS (双向认证)
+### 禁止事项
 
-```toml
-# Cargo.toml (workspace)
-aws-lc-rs = { version = "1", features = ["fips"] }
-rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "fips"] }
-```
+- ❌ 直接删除 Order/OrderEvent 记录
+- ❌ 前端直接进行金额浮点运算
+- ❌ 跳过类型对齐直接部署
+- ❌ 在非 mTLS 环境传输敏感数据
+- ❌ 子 crate 单独声明依赖版本
 
-### 三层证书验证
-```
-Layer 1: TLS 握手 (WebPkiClientVerifier)
-   → 验证证书链是否由受信 CA 签发
+## 响应语言
 
-Layer 2: 身份验证 (tcp_server.rs)
-   → peer_identity (证书) == client_name (握手消息)
-
-Layer 3: 硬件绑定 (credential.rs)
-   → device_id (证书) == generate_hardware_id() (当前机器)
-```
-
-### 自定义 X.509 扩展
-| OID | 字段 | 用途 |
-|-----|------|------|
-| `1.3.6.1.4.1.99999.1` | `tenant_id` | 租户标识 |
-| `1.3.6.1.4.1.99999.2` | `device_id` | 硬件绑定 |
-| `1.3.6.1.4.1.99999.5` | `client_name` | 客户端名称 |
-
-## Build & Test Commands
-- **Build**: `cargo build --workspace`
-- **Check**: `cargo check --workspace`
-- **Test**: `cargo test --workspace --lib`
-- **Lint**: `cargo clippy --workspace -- -D warnings`
-- **Format**: `cargo fmt`
-- **Release Build**: `cargo build --workspace --release`
-
-### Release 编译优化
-```toml
-[profile.release]
-lto = true           # 链接时优化
-codegen-units = 1    # 单代码生成单元
-opt-level = 3        # 最大优化级别
-strip = true         # 移除符号表
-```
-
-## Run Examples
-- **Interactive Server Demo**:
-  ```bash
-  cargo run -p edge-server --example interactive_demo
-  ```
-- **Message Client Demo**:
-  ```bash
-  cargo run -p crab-client --example message_client
-  ```
-- **mTLS Certificate Demo**:
-  ```bash
-  cargo run -p crab-cert --example mtls_demo
-  ```
-- **Auth Server**:
-  ```bash
-  cargo run -p crab-auth
-  ```
-
-## Key Protocols & Patterns
-- **Message Bus**:
-  - Uses `Notification` (Server -> Client) and `ServerCommand` (Upstream -> Server) for system communication.
-  - Payloads are defined in `shared::message`.
-  - Supports both TCP (network) and Memory (in-process) transports.
-- **Security & Identity**:
-  - **mTLS**: Uses a 3-tier CA hierarchy (Root CA -> Tenant CA -> Entity Certs) for device trust.
-  - **Hardware Binding**: Certificates are bound to hardware IDs to prevent cloning.
-  - **Storage**: Certificates are stored in `auth_storage/` (gitignored).
-- **Server State**:
-  - `ServerState` is initialized via `ServerState::initialize(&config).await`.
-  - Background tasks must be started explicitly via `state.start_background_tasks().await` if not using `Server::run`.
-  - `ServerState` is designed to be clone-cheap (uses `Arc`).
-- **Client**:
-  - `CrabClient` trait unifies `Http` and `Oneshot` backends.
-  - `MessageClient` handles real-time bidirectional communication.
-
-## Dependency Management
-所有依赖统一在 workspace `Cargo.toml` 中管理，子 crate 使用 `xxx.workspace = true` 引用。
-
-主要分类：
-- **TLS**: `aws-lc-rs`, `rustls`, `tokio-rustls`, `rustls-pemfile`
-- **Web**: `axum`, `tower`, `tower-http`, `hyper`
-- **Database**: `surrealdb`, `surrealdb-migrations`
-- **Cryptography**: `sha2`, `ring`, `rsa`, `argon2`
-- **Certificate**: `rcgen`, `x509-parser`, `pem`
-
-## Coding Standards
-- **Error Handling**:
-  - **Current Phase (PoC/Alpha)**: `unwrap()`/`expect()` are permitted for rapid prototyping and asserting invariants in controlled environments.
-  - **Production Goal**: Move towards strict, typed error handling (`AppError`, `Result<T, E>`). Eliminate panics in runtime paths.
-- **Async**: Prefer `tokio`. Use `#[async_trait]` for traits with async methods.
-- **Ownership**: Prefer borrowing over cloning. Use `Arc` for shared state.
-
-## Project Status & Philosophy
-- **Phase**: **Feasibility Testing / Prototype**
-- **Edge Server Focus**:
-  - Designed as an **Edge Node**: Self-contained, offline-capable, and maintenance-free.
-  - **Embedded DB**: Uses embedded SurrealDB to avoid external dependencies.
-  - **Future Roadmap**: Transition to strong typing enforcement and robust error handling as the project matures from prototype to production.
-
-## User Preferences
-- **Language**: Rust Idiomatic.
-- **Concurrency**: Safe patterns (`Arc<Mutex<T>>`, channels).
-- **Type System**: Leverage newtypes and traits to enforce invariants.
-- **Response Language**: Chinese (Answer in Chinese).
+使用中文回答。
