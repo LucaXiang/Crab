@@ -86,7 +86,7 @@ TypeScript (前端) ↔ Rust (后端) 类型必须完全匹配：
 | **类型优先** | 修改数据结构时：Rust 先行 → TypeScript 跟进 → 双端验证 |
 | **金额计算** | 前端必须使用 `Currency` 工具类，禁止直接浮点运算 |
 | **错误处理** | 使用 `shared::error::ErrorCode` 统一错误码 |
-| **异步运行时** | 统一使用 `tokio`，trait 直接使用原生 `async fn`（Rust 1.75+） |
+| **异步运行时** | 统一使用 `tokio`，trait object (`dyn Trait`) 场景使用 `#[async_trait]` |
 | **共享状态** | 使用 `Arc` 包装，`ServerState` 设计为 clone-cheap |
 
 ### 数据库约束
