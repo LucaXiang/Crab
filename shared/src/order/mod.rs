@@ -12,6 +12,6 @@ pub mod types;
 
 // Re-exports
 pub use command::{OrderCommand, OrderCommandPayload};
-pub use event::{OrderEvent, OrderEventType, EventPayload};
+pub use event::{EventPayload, OrderEvent, OrderEventType};
 pub use snapshot::{OrderSnapshot, OrderStatus};
 pub use types::*;

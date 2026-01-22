@@ -110,13 +110,22 @@ mod tests {
     fn test_error_code_category() {
         assert_eq!(ErrorCode::Success.category(), ErrorCategory::General);
         assert_eq!(ErrorCode::NotAuthenticated.category(), ErrorCategory::Auth);
-        assert_eq!(ErrorCode::PermissionDenied.category(), ErrorCategory::Permission);
+        assert_eq!(
+            ErrorCode::PermissionDenied.category(),
+            ErrorCategory::Permission
+        );
         assert_eq!(ErrorCode::TenantNotFound.category(), ErrorCategory::Tenant);
         assert_eq!(ErrorCode::OrderNotFound.category(), ErrorCategory::Order);
         assert_eq!(ErrorCode::PaymentFailed.category(), ErrorCategory::Payment);
-        assert_eq!(ErrorCode::ProductNotFound.category(), ErrorCategory::Product);
+        assert_eq!(
+            ErrorCode::ProductNotFound.category(),
+            ErrorCategory::Product
+        );
         assert_eq!(ErrorCode::TableNotFound.category(), ErrorCategory::Table);
-        assert_eq!(ErrorCode::EmployeeNotFound.category(), ErrorCategory::Employee);
+        assert_eq!(
+            ErrorCode::EmployeeNotFound.category(),
+            ErrorCategory::Employee
+        );
         assert_eq!(ErrorCode::InternalError.category(), ErrorCategory::System);
     }
 

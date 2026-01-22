@@ -20,8 +20,7 @@ use std::fmt;
 ///
 /// All error codes are represented as u16 values for efficient serialization
 /// and cross-language compatibility (Rust, TypeScript, etc.)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(into = "u16", try_from = "u16")]
 #[repr(u16)]
 pub enum ErrorCode {
@@ -600,7 +599,10 @@ mod tests {
 
     #[test]
     fn test_message() {
-        assert_eq!(ErrorCode::Success.message(), "Operation completed successfully");
+        assert_eq!(
+            ErrorCode::Success.message(),
+            "Operation completed successfully"
+        );
         assert_eq!(ErrorCode::NotFound.message(), "Resource not found");
         assert_eq!(ErrorCode::OrderNotFound.message(), "Order not found");
         assert_eq!(ErrorCode::InternalError.message(), "Internal server error");

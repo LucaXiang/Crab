@@ -4,9 +4,9 @@
 //! Clients can compare their locally computed checksum with the server's
 //! to detect if the reducer logic has diverged.
 
+use super::types::{CartItemSnapshot, PaymentRecord};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
-use super::types::{CartItemSnapshot, PaymentRecord};
 
 /// Order status
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]

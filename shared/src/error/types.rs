@@ -66,7 +66,8 @@ impl AppError {
     /// Create a not found error
     pub fn not_found(resource: impl Into<String>) -> Self {
         let r = resource.into();
-        Self::with_message(ErrorCode::NotFound, format!("{} not found", r)).with_detail("resource", r)
+        Self::with_message(ErrorCode::NotFound, format!("{} not found", r))
+            .with_detail("resource", r)
     }
 
     /// Create a not authenticated error
@@ -261,8 +262,8 @@ impl axum::response::IntoResponse for AppError {
 
 impl<T: Serialize> axum::response::IntoResponse for ApiResponse<T> {
     fn into_response(self) -> axum::response::Response {
-        use axum::Json;
         use super::codes::ErrorCode;
+        use axum::Json;
 
         let status = if self.code == Some(0) || self.code.is_none() {
             http::StatusCode::OK
@@ -309,7 +310,10 @@ mod tests {
 
     #[test]
     fn test_app_error_http_status() {
-        assert_eq!(AppError::new(ErrorCode::NotFound).http_status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            AppError::new(ErrorCode::NotFound).http_status(),
+            StatusCode::NOT_FOUND
+        );
         assert_eq!(
             AppError::new(ErrorCode::NotAuthenticated).http_status(),
             StatusCode::UNAUTHORIZED
@@ -370,8 +374,8 @@ mod tests {
 
     #[test]
     fn test_api_response_error() {
-        let err = AppError::with_message(ErrorCode::NotFound, "User not found")
-            .with_detail("id", "123");
+        let err =
+            AppError::with_message(ErrorCode::NotFound, "User not found").with_detail("id", "123");
         let response = ApiResponse::<()>::error(&err);
 
         assert_eq!(response.code, Some(3)); // NotFound = 3

@@ -23,9 +23,7 @@ pub use serde::{Deserialize, Serialize};
 pub use message::{BusMessage, EventType};
 
 // Intent re-exports (for DataIntent dispatch pattern)
-pub use intent::{CrudAction, DataIntent, DataResult, QueryRequest, PaginatedResponse};
+pub use intent::{CrudAction, DataIntent, DataResult, PaginatedResponse, QueryRequest};
 
 // Unified error system re-exports
-pub use error::{
-    ApiResponse as UnifiedApiResponse, AppError, AppResult, ErrorCategory, ErrorCode,
-};
+pub use error::{ApiResponse as UnifiedApiResponse, AppError, AppResult, ErrorCategory, ErrorCode};

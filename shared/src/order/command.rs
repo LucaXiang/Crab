@@ -1,7 +1,7 @@
 //! Order commands - requests from clients to modify orders
 
-use serde::{Deserialize, Serialize};
 use super::types::{CartItemInput, ItemChanges, PaymentInput, SplitItem};
+use serde::{Deserialize, Serialize};
 
 /// Order command wrapper
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,7 +23,6 @@ pub struct OrderCommand {
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OrderCommandPayload {
     // ========== Order Lifecycle ==========
-
     /// Open a new table/order
     OpenTable {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -54,12 +53,9 @@ pub enum OrderCommandPayload {
     },
 
     /// Restore a voided order (reserved, not implemented)
-    RestoreOrder {
-        order_id: String,
-    },
+    RestoreOrder { order_id: String },
 
     // ========== Item Operations ==========
-
     /// Add items to order
     AddItems {
         order_id: String,
@@ -104,7 +100,6 @@ pub enum OrderCommandPayload {
     },
 
     // ========== Payment Operations ==========
-
     /// Add payment to order
     AddPayment {
         order_id: String,
@@ -133,7 +128,6 @@ pub enum OrderCommandPayload {
     },
 
     // ========== Table Operations ==========
-
     /// Move order to another table
     MoveOrder {
         order_id: String,
@@ -150,7 +144,6 @@ pub enum OrderCommandPayload {
     },
 
     // ========== Other Operations ==========
-
     /// Update order info
     UpdateOrderInfo {
         order_id: String,
@@ -196,7 +189,9 @@ impl OrderCommand {
             OrderCommandPayload::CancelPayment { order_id, .. } => Some(order_id),
             OrderCommandPayload::SplitOrder { order_id, .. } => Some(order_id),
             OrderCommandPayload::MoveOrder { order_id, .. } => Some(order_id),
-            OrderCommandPayload::MergeOrders { source_order_id, .. } => Some(source_order_id),
+            OrderCommandPayload::MergeOrders {
+                source_order_id, ..
+            } => Some(source_order_id),
             OrderCommandPayload::UpdateOrderInfo { order_id, .. } => Some(order_id),
         }
     }
