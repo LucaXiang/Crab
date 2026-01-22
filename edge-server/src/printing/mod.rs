@@ -5,7 +5,9 @@
 //! - Label printing: per-item labels (e.g., bubble tea stickers)
 
 pub mod cache;
+pub mod storage;
 pub mod types;
 
 pub use cache::PrintConfigCache;
+pub use storage::{PrintStorage, PrintStorageError, PrintStorageResult, PrintStorageStats};
 pub use types::*;
