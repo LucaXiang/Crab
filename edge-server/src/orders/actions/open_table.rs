@@ -3,10 +3,64 @@
 //! Creates a new order with table information.
 
 use async_trait::async_trait;
+use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 use uuid::Uuid;
 
+use crate::db::models::PriceRule;
+use crate::db::repository::PriceRuleRepository;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
+
+/// 加载匹配的价格规则
+///
+/// 根据订单的 zone 信息加载适用的价格规则：
+/// - zone_scope = -1: 适用于所有区域
+/// - zone_scope = 0: 适用于零售订单 (is_retail = true)
+/// - zone_scope > 0: 适用于特定区域 (zone_id 匹配)
+///
+/// # Arguments
+/// * `db` - SurrealDB 数据库连接
+/// * `zone_id` - 区域 ID (None 表示零售订单)
+/// * `is_retail` - 是否为零售订单
+///
+/// # Returns
+/// 返回匹配的活跃价格规则列表
+pub async fn load_matching_rules(
+    db: &Surreal<Db>,
+    zone_id: Option<&str>,
+    is_retail: bool,
+) -> Vec<PriceRule> {
+    let repo = PriceRuleRepository::new(db.clone());
+    let all_rules = match repo.find_all().await {
+        Ok(rules) => rules,
+        Err(e) => {
+            tracing::error!("加载价格规则失败: {:?}", e);
+            return vec![];
+        }
+    };
+
+    // 根据 zone_scope 过滤规则
+    all_rules
+        .into_iter()
+        .filter(|r| {
+            // zone_scope = -1: 适用于所有区域
+            if r.zone_scope == -1 {
+                return true;
+            }
+            // zone_scope = 0: 仅适用于零售订单
+            if r.zone_scope == 0 && is_retail {
+                return true;
+            }
+            // zone_scope > 0: 匹配特定区域 ID
+            if let Some(zid) = zone_id {
+                // zone_scope 存储的可能是数字形式的 zone ID
+                return r.zone_scope.to_string() == zid;
+            }
+            false
+        })
+        .collect()
+}
 
 /// OpenTable action
 #[derive(Debug, Clone)]

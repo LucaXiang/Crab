@@ -15,7 +15,7 @@ mod complete_order;
 mod merge_orders;
 mod modify_item;
 mod move_order;
-mod open_table;
+pub mod open_table;
 mod remove_item;
 mod restore_item;
 mod restore_order;

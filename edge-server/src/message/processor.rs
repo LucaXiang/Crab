@@ -1,5 +1,6 @@
 use crate::core::ServerState;
 use crate::message::{BusMessage, EventType};
+use crate::orders::actions::open_table::load_matching_rules;
 use crate::utils::AppError;
 use async_trait::async_trait;
 use shared::order::{OrderCommand, OrderCommandPayload};
@@ -200,11 +201,46 @@ impl RequestCommandProcessor {
         let mut command: OrderCommand = serde_json::from_value(params_value.clone())
             .map_err(|e| AppError::invalid(format!("Invalid OrderCommand: {}", e)))?;
 
+        // 保存 OpenTable 的信息用于后续规则加载
+        let open_table_info = if let OrderCommandPayload::OpenTable {
+            zone_id, is_retail, ..
+        } = &command.payload
+        {
+            Some((zone_id.clone(), *is_retail))
+        } else {
+            None
+        };
+
         // Apply price rules for AddItems commands
         command = self.apply_price_rules_if_needed(command).await;
 
         // Execute via OrdersManager
         let response = self.state.orders_manager().execute_command(command);
+
+        // 如果是 OpenTable 且成功执行，加载并缓存价格规则
+        if response.success {
+            if let Some((zone_id, is_retail)) = open_table_info {
+                if let Some(ref order_id) = response.order_id {
+                    // 加载匹配的价格规则
+                    let rules = load_matching_rules(
+                        &self.state.get_db(),
+                        zone_id.as_deref(),
+                        is_retail,
+                    )
+                    .await;
+
+                    // 缓存到 OrdersManager
+                    if !rules.is_empty() {
+                        tracing::debug!(
+                            order_id = %order_id,
+                            rule_count = rules.len(),
+                            "缓存订单价格规则"
+                        );
+                        self.state.orders_manager().cache_rules(order_id, rules);
+                    }
+                }
+            }
+        }
 
         // Return result
         if response.success {
