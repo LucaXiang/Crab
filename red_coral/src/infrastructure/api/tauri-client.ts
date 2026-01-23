@@ -190,7 +190,7 @@ export class TauriApiClient {
   }
 
   async deleteProduct(id: string): Promise<void> {
-    await invokeAndUnwrap<{ deleted: boolean }>('delete_product', { id });
+    await invokeAndUnwrap<void>('delete_product', { id });
   }
 
   async bulkDeleteProducts(ids: (string | number)[]): Promise<void> {

@@ -225,6 +225,7 @@
     },
     "split": {
       "title": "分单",
+      "label": "分单",
       "total": "分单金额",
       "success": "分单成功",
       "failed": "分单失败",
@@ -258,7 +259,13 @@
       "confirm": "确认支付",
       "failed": "支付失败",
       "method": "选择支付方式",
-      "success": "支付成功"
+      "success": "支付成功",
+      "records": "支付记录",
+      "cancel": "取消支付",
+      "confirm_cancel": "确定要取消此支付记录吗？",
+      "confirm_cancel_split": "确定要取消此分账支付吗？取消后相关菜品将恢复到订单中。",
+      "cancel_success": "支付记录已取消",
+      "cancel_failed": "取消支付失败"
     },
     "items": {
       "paid": "已付项目",
@@ -343,7 +350,12 @@
     },
     "payment": {
       "details": "支付详情",
-      "no_payments": "暂无支付记录"
+      "no_payments": "暂无支付记录",
+      "cancel": "取消支付",
+      "confirm_cancel": "确定要取消此支付记录吗？",
+      "confirm_cancel_split": "确定要取消此分账支付吗？取消后相关菜品将恢复到订单中。",
+      "cancel_success": "支付记录已取消",
+      "cancel_failed": "取消支付失败"
     }
   },
   "statistics": {
@@ -543,7 +555,7 @@
         "discount_value": "折扣数值",
         "surcharge_value": "加价数值",
         "percentage_hint": "输入 1-100 之间的整数，例如 10 表示 10%",
-        "fixed_hint": "输入金额（分），例如 500 表示 ¥5.00",
+        "fixed_hint": "输入金额（元），例如 5 表示 ¥5.00",
         "preview": "预览",
         "preview_discount_percent": "商品将享受 {value}% 折扣",
         "preview_discount_fixed": "每件商品减免 ¥{value}",
@@ -753,6 +765,7 @@
         "is_virtual": "分类类型",
         "regular_category": "常规分类",
         "virtual_category": "虚拟分类（按标签筛选）",
+        "type_cannot_change": "分类类型创建后不可更改",
         "match_mode": "匹配模式",
         "match_any": "匹配任一标签",
         "match_all": "匹配全部标签",
@@ -1242,6 +1255,7 @@
     "unsaved_confirm": "有未保存的更改",
     "unsaved_confirm_hint": "确定要离开吗？",
     "kitchen_printer": "厨房打印机",
+    "label_printer": "标签打印机",
     "reset_password": "重置密码",
     "new_password": "新密码",
     "enter_new_password": "输入新密码",
@@ -1304,6 +1318,7 @@
     "6102": "分类下存在商品，无法删除",
     "6103": "分类名称已存在",
     "6201": "规格不存在",
+    "6202": "外部ID已存在",
     "6301": "属性不存在",
     "6302": "绑定属性失败",
     "7001": "桌台不存在",

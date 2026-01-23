@@ -106,7 +106,8 @@ export function calculateItemTotal(item: CartItem): Decimal {
 export function calculateOrderTotal(items: CartItem[]): Decimal {
   return items.reduce((total, item) => {
     if (item._removed) return total;
-    const itemTotal = calculateItemTotal(item);
+    // Use backend-computed line_total for consistency, fall back to local calculation
+    const itemTotal = item.line_total != null ? new Decimal(item.line_total) : calculateItemTotal(item);
     return Currency.add(total, itemTotal);
   }, new Decimal(0));
 }

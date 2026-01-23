@@ -59,6 +59,7 @@ export const ErrorCode = {
   CategoryHasProducts: 6102,
   CategoryNameExists: 6103,
   SpecNotFound: 6201,
+  SpecExternalIdExists: 6202,
   AttributeNotFound: 6301,
   AttributeBindFailed: 6302,
 
