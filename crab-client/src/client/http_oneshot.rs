@@ -18,6 +18,15 @@ struct EdgeResponse<T> {
     pub error: Option<String>,
 }
 
+/// 服务端返回的错误响应格式
+#[derive(serde::Deserialize)]
+struct ApiErrorResponse {
+    pub code: i32,
+    pub message: String,
+    #[serde(default)]
+    pub details: Option<serde_json::Value>,
+}
+
 use tokio::sync::RwLock;
 use tower::ServiceExt;
 
@@ -122,6 +131,15 @@ impl OneshotHttpClient {
 
         if !status.is_success() {
             let text = String::from_utf8_lossy(&body_bytes).to_string();
+            // 尝试解析为 API 错误响应
+            if let Ok(api_err) = serde_json::from_str::<ApiErrorResponse>(&text) {
+                return Err(ClientError::Api {
+                    code: api_err.code,
+                    message: api_err.message,
+                    details: api_err.details,
+                });
+            }
+            // 降级到原来的处理方式
             return match status {
                 StatusCode::UNAUTHORIZED => Err(ClientError::Unauthorized("Unauthorized".into())),
                 StatusCode::FORBIDDEN => Err(ClientError::Forbidden(text)),

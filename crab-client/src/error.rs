@@ -60,6 +60,14 @@ pub enum ClientError {
     #[error("Validation error: {0}")]
     Validation(String),
 
+    /// API error with code (from server).
+    #[error("API error {code}: {message}")]
+    Api {
+        code: i32,
+        message: String,
+        details: Option<serde_json::Value>,
+    },
+
     // ===== Protocol Errors =====
     /// Invalid message format.
     #[error("Invalid message: {0}")]

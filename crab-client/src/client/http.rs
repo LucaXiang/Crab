@@ -14,6 +14,15 @@ struct EdgeResponse<T> {
     pub error: Option<String>,
 }
 
+/// 服务端返回的错误响应格式
+#[derive(serde::Deserialize)]
+struct ApiErrorResponse {
+    pub code: i32,
+    pub message: String,
+    #[serde(default)]
+    pub details: Option<serde_json::Value>,
+}
+
 /// HTTP 客户端 trait
 #[async_trait]
 pub trait HttpClient: Send + Sync {
@@ -77,6 +86,15 @@ impl NetworkHttpClient {
         let status = response.status();
         if !status.is_success() {
             let text = response.text().await?;
+            // 尝试解析为 API 错误响应
+            if let Ok(api_err) = serde_json::from_str::<ApiErrorResponse>(&text) {
+                return Err(ClientError::Api {
+                    code: api_err.code,
+                    message: api_err.message,
+                    details: api_err.details,
+                });
+            }
+            // 降级到原来的处理方式
             return match status {
                 StatusCode::UNAUTHORIZED => Err(ClientError::Unauthorized("Unauthorized".into())),
                 StatusCode::FORBIDDEN => Err(ClientError::Forbidden(text)),
