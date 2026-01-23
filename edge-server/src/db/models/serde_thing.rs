@@ -1,7 +1,6 @@
 //! Serde helpers for SurrealDB Thing type
 //!
-//! 支持从字符串格式 "table:id" 反序列化为 Thing
-//! 同时兼容 SurrealDB 原生格式和 JSON 字符串格式
+//! 序列化/反序列化 Thing 为字符串格式 "table:id"
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::fmt;
@@ -17,14 +16,14 @@ fn parse_thing_from_string(s: &str) -> Thing {
     }
 }
 
-/// 自定义 Visitor，支持 Thing 原生格式和字符串格式
+/// Thing 字符串格式的 Visitor
 struct ThingVisitor;
 
 impl<'de> de::Visitor<'de> for ThingVisitor {
     type Value = Thing;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a Thing or a string like 'table:id'")
+        formatter.write_str("a string like 'table:id'")
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
@@ -40,40 +39,27 @@ impl<'de> de::Visitor<'de> for ThingVisitor {
     {
         Ok(parse_thing_from_string(&v))
     }
-
-    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-    where
-        A: de::MapAccess<'de>,
-    {
-        // 委托给 Thing 的默认反序列化
-        Thing::deserialize(de::value::MapAccessDeserializer::new(map))
-    }
-
-    fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Thing::deserialize(deserializer)
-    }
 }
 
-/// 反序列化 Thing，支持字符串格式 "table:id" 和 SurrealDB 原生格式
+/// 反序列化 Thing，从字符串格式 "table:id"
 pub fn deserialize<'de, D>(deserializer: D) -> Result<Thing, D::Error>
 where
     D: Deserializer<'de>,
 {
-    deserializer.deserialize_any(ThingVisitor)
+    deserializer.deserialize_str(ThingVisitor)
 }
 
-/// 序列化 Thing 为字符串格式
+/// 序列化 Thing 为字符串格式 "table:id"
 pub fn serialize<S>(thing: &Thing, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    serializer.serialize_str(&thing.to_string())
+    // 使用 tb:id.to_raw() 格式避免 SurrealDB 的特殊括号
+    let s = format!("{}:{}", thing.tb, thing.id.to_raw());
+    serializer.serialize_str(&s)
 }
 
-/// Option<Thing> 的反序列化
+/// Option<Thing> 的序列化/反序列化
 pub mod option {
     use super::*;
 
@@ -83,7 +69,7 @@ pub mod option {
         type Value = Option<Thing>;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("null, a Thing, or a string like 'table:id'")
+            formatter.write_str("null or a string like 'table:id'")
         }
 
         fn visit_none<E>(self) -> Result<Self::Value, E>
@@ -104,7 +90,7 @@ pub mod option {
         where
             D: Deserializer<'de>,
         {
-            deserializer.deserialize_any(ThingVisitor).map(Some)
+            deserializer.deserialize_str(ThingVisitor).map(Some)
         }
 
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
@@ -128,13 +114,6 @@ pub mod option {
                 Ok(Some(parse_thing_from_string(&v)))
             }
         }
-
-        fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-        where
-            A: de::MapAccess<'de>,
-        {
-            Thing::deserialize(de::value::MapAccessDeserializer::new(map)).map(Some)
-        }
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Thing>, D::Error>
@@ -149,13 +128,16 @@ pub mod option {
         S: Serializer,
     {
         match thing {
-            Some(t) => serializer.serialize_some(&t.to_string()),
+            Some(t) => {
+                let s = format!("{}:{}", t.tb, t.id.to_raw());
+                serializer.serialize_some(&s)
+            }
             None => serializer.serialize_none(),
         }
     }
 }
 
-/// Vec<Thing> 的反序列化
+/// Vec<Thing> 的序列化/反序列化
 pub mod vec {
     use super::*;
 
@@ -167,7 +149,7 @@ pub mod vec {
         where
             D: Deserializer<'de>,
         {
-            deserializer.deserialize_any(ThingVisitor).map(ThingWrapper)
+            deserializer.deserialize_str(ThingVisitor).map(ThingWrapper)
         }
     }
 
@@ -186,13 +168,14 @@ pub mod vec {
         use serde::ser::SerializeSeq;
         let mut seq = serializer.serialize_seq(Some(things.len()))?;
         for thing in things {
-            seq.serialize_element(&thing.to_string())?;
+            let s = format!("{}:{}", thing.tb, thing.id.to_raw());
+            seq.serialize_element(&s)?;
         }
         seq.end()
     }
 }
 
-/// Option<Vec<Thing>> 的反序列化
+/// Option<Vec<Thing>> 的序列化/反序列化
 pub mod option_vec {
     use super::*;
 
@@ -200,18 +183,12 @@ pub mod option_vec {
     where
         D: Deserializer<'de>,
     {
-        Option::<Vec<serde_json::Value>>::deserialize(deserializer)?
+        Option::<Vec<String>>::deserialize(deserializer)?
             .map(|values| {
-                values
+                Ok(values
                     .into_iter()
-                    .map(|v| {
-                        if let Some(s) = v.as_str() {
-                            Ok(parse_thing_from_string(s))
-                        } else {
-                            serde_json::from_value::<Thing>(v).map_err(de::Error::custom)
-                        }
-                    })
-                    .collect::<Result<Vec<Thing>, _>>()
+                    .map(|s| parse_thing_from_string(&s))
+                    .collect())
             })
             .transpose()
     }
@@ -222,7 +199,10 @@ pub mod option_vec {
     {
         match things {
             Some(vec) => {
-                let strings: Vec<String> = vec.iter().map(|t| t.to_string()).collect();
+                let strings: Vec<String> = vec
+                    .iter()
+                    .map(|t| format!("{}:{}", t.tb, t.id.to_raw()))
+                    .collect();
                 strings.serialize(serializer)
             }
             None => serializer.serialize_none(),
