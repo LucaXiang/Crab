@@ -1,6 +1,6 @@
 //! Price Rule Repository
 
-use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
+use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix, parse_thing};
 use crate::db::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope, TimeMode};
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
@@ -101,6 +101,9 @@ impl PriceRuleRepository {
             )));
         }
 
+        // Convert target string to Thing if provided
+        let target_thing = data.target.as_ref().and_then(|t| parse_thing(t));
+
         let rule = PriceRule {
             id: None,
             name: data.name,
@@ -109,8 +112,8 @@ impl PriceRuleRepository {
             description: data.description,
             rule_type: data.rule_type,
             product_scope: data.product_scope,
-            target: data.target,
-            zone_scope: data.zone_scope.unwrap_or(-1),
+            target: target_thing,
+            zone_scope: data.zone_scope.clone().unwrap_or_else(|| crate::db::models::ZONE_SCOPE_ALL.to_string()),
             adjustment_type: data.adjustment_type,
             adjustment_value: data.adjustment_value,
             priority: data.priority.unwrap_or(0),
@@ -153,12 +156,92 @@ impl PriceRuleRepository {
             )));
         }
 
+        // Convert target string to Thing if provided
+        let target_thing = data.target.as_ref().and_then(|t| parse_thing(t));
+
+        // Create internal update struct with Thing type for target
+        #[derive(serde::Serialize)]
+        struct InternalUpdate {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            name: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            display_name: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            receipt_name: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            description: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            rule_type: Option<crate::db::models::RuleType>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            product_scope: Option<ProductScope>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            target: Option<surrealdb::sql::Thing>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            zone_scope: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            adjustment_type: Option<crate::db::models::AdjustmentType>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            adjustment_value: Option<f64>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            priority: Option<i32>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            is_stackable: Option<bool>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            is_exclusive: Option<bool>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            time_mode: Option<TimeMode>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            start_time: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            end_time: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            schedule_config: Option<crate::db::models::ScheduleConfig>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            valid_from: Option<i64>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            valid_until: Option<i64>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            active_days: Option<Vec<u8>>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            active_start_time: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            active_end_time: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            is_active: Option<bool>,
+        }
+
+        let internal = InternalUpdate {
+            name: data.name,
+            display_name: data.display_name,
+            receipt_name: data.receipt_name,
+            description: data.description,
+            rule_type: data.rule_type,
+            product_scope: data.product_scope,
+            target: target_thing,
+            zone_scope: data.zone_scope,
+            adjustment_type: data.adjustment_type,
+            adjustment_value: data.adjustment_value,
+            priority: data.priority,
+            is_stackable: data.is_stackable,
+            is_exclusive: data.is_exclusive,
+            time_mode: data.time_mode,
+            start_time: data.start_time,
+            end_time: data.end_time,
+            schedule_config: data.schedule_config,
+            valid_from: data.valid_from,
+            valid_until: data.valid_until,
+            active_days: data.active_days,
+            active_start_time: data.active_start_time,
+            active_end_time: data.active_end_time,
+            is_active: data.is_active,
+        };
+
         let thing = make_thing(TABLE, pure_id);
         self.base
             .db()
             .query("UPDATE $thing MERGE $data")
             .bind(("thing", thing))
-            .bind(("data", data))
+            .bind(("data", internal))
             .await?;
 
         self.find_by_id(pure_id)

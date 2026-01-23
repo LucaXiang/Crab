@@ -67,6 +67,36 @@ impl ProductRepository {
         Ok(products.into_iter().next())
     }
 
+    /// Sync product_spec table after create/update (best effort, ignore if table doesn't exist)
+    async fn sync_product_specs(
+        &self,
+        product_id: &surrealdb::sql::Thing,
+        specs: &[crate::db::models::EmbeddedSpec],
+    ) -> RepoResult<()> {
+        // Delete existing product_spec records for this product (ignore errors)
+        let _ = self.base
+            .db()
+            .query("DELETE product_spec WHERE product = $product")
+            .bind(("product", product_id.clone()))
+            .await;
+
+        // Insert new records for specs with external_id (ignore errors if table doesn't exist)
+        for (index, spec) in specs.iter().enumerate() {
+            if let Some(external_id) = spec.external_id {
+                let _ = self.base
+                    .db()
+                    .query(
+                        "CREATE product_spec SET product = $product, spec_index = $index, external_id = $external_id",
+                    )
+                    .bind(("product", product_id.clone()))
+                    .bind(("index", index as i32))
+                    .bind(("external_id", external_id))
+                    .await;
+            }
+        }
+        Ok(())
+    }
+
     /// Create a new product
     pub async fn create(&self, data: ProductCreate) -> RepoResult<Product> {
         // 校验 specs 非空
@@ -81,6 +111,7 @@ impl ProductRepository {
             ));
         }
 
+        let specs_clone = data.specs.clone();
         let product = Product {
             id: None,
             name: data.name,
@@ -105,7 +136,15 @@ impl ProductRepository {
             .create(PRODUCT_TABLE)
             .content(product)
             .await?;
-        created.ok_or_else(|| RepoError::Database("Failed to create product".to_string()))
+
+        let created = created.ok_or_else(|| RepoError::Database("Failed to create product".to_string()))?;
+
+        // Sync product_spec table for external_id uniqueness
+        if let Some(ref id) = created.id {
+            self.sync_product_specs(id, &specs_clone).await?;
+        }
+
+        Ok(created)
     }
 
     /// Update a product
@@ -113,32 +152,110 @@ impl ProductRepository {
         let pure_id = strip_table_prefix(PRODUCT_TABLE, id);
         let thing = make_thing(PRODUCT_TABLE, pure_id);
 
-        self.base
-            .db()
-            .query("UPDATE $thing MERGE $data")
-            .bind(("thing", thing))
-            .bind(("data", data))
-            .await?;
+        // Clone specs before moving data
+        let specs_to_sync = data.specs.clone();
 
-        self.find_by_id(pure_id)
-            .await?
+        // Build dynamic SET clauses with proper type bindings
+        let mut set_parts: Vec<&str> = Vec::new();
+
+        if data.name.is_some() { set_parts.push("name = $name"); }
+        if data.image.is_some() { set_parts.push("image = $image"); }
+        if data.category.is_some() { set_parts.push("category = $category"); }
+        if data.sort_order.is_some() { set_parts.push("sort_order = $sort_order"); }
+        if data.tax_rate.is_some() { set_parts.push("tax_rate = $tax_rate"); }
+        if data.receipt_name.is_some() { set_parts.push("receipt_name = $receipt_name"); }
+        if data.kitchen_print_name.is_some() { set_parts.push("kitchen_print_name = $kitchen_print_name"); }
+        if data.kitchen_print_destinations.is_some() { set_parts.push("kitchen_print_destinations = $kitchen_print_destinations"); }
+        if data.label_print_destinations.is_some() { set_parts.push("label_print_destinations = $label_print_destinations"); }
+        if data.is_kitchen_print_enabled.is_some() { set_parts.push("is_kitchen_print_enabled = $is_kitchen_print_enabled"); }
+        if data.is_label_print_enabled.is_some() { set_parts.push("is_label_print_enabled = $is_label_print_enabled"); }
+        if data.is_active.is_some() { set_parts.push("is_active = $is_active"); }
+        if data.tags.is_some() { set_parts.push("tags = $tags"); }
+        if data.specs.is_some() { set_parts.push("specs = $specs"); }
+
+        if set_parts.is_empty() {
+            // No fields to update
+            return self.find_by_id(pure_id)
+                .await?
+                .ok_or_else(|| RepoError::NotFound(format!("Product {} not found", id)));
+        }
+
+        let query_str = format!("UPDATE $thing SET {} RETURN AFTER", set_parts.join(", "));
+        tracing::info!("ProductRepository::update - query: {}, id: {}", query_str, id);
+
+        // Build query with direct type bindings (Things bound as Things, not strings)
+        let mut query = self.base.db().query(&query_str).bind(("thing", thing.clone()));
+
+        // Bind each field with its native type
+        if let Some(v) = data.name { query = query.bind(("name", v)); }
+        if let Some(v) = data.image { query = query.bind(("image", v)); }
+        if let Some(v) = data.category { query = query.bind(("category", v)); } // Thing type
+        if let Some(v) = data.sort_order { query = query.bind(("sort_order", v)); }
+        if let Some(v) = data.tax_rate {
+            tracing::info!("ProductRepository::update - binding tax_rate: {}", v);
+            query = query.bind(("tax_rate", v));
+        }
+        if let Some(v) = data.receipt_name { query = query.bind(("receipt_name", v)); }
+        if let Some(v) = data.kitchen_print_name { query = query.bind(("kitchen_print_name", v)); }
+        if let Some(v) = data.kitchen_print_destinations { query = query.bind(("kitchen_print_destinations", v)); } // Vec<Thing>
+        if let Some(v) = data.label_print_destinations { query = query.bind(("label_print_destinations", v)); } // Vec<Thing>
+        if let Some(v) = data.is_kitchen_print_enabled { query = query.bind(("is_kitchen_print_enabled", v)); }
+        if let Some(v) = data.is_label_print_enabled { query = query.bind(("is_label_print_enabled", v)); }
+        if let Some(v) = data.is_active { query = query.bind(("is_active", v)); }
+        if let Some(v) = data.tags { query = query.bind(("tags", v)); } // Vec<Thing>
+        if let Some(v) = data.specs {
+            // specs need to be serialized as JSON value for embedded objects
+            query = query.bind(("specs", serde_json::to_value(&v).unwrap_or_default()));
+        }
+
+        let mut result = query.await?;
+        let products: Vec<Product> = result.take(0)?;
+
+        // Sync product_spec table if specs were updated
+        if let Some(specs) = specs_to_sync {
+            self.sync_product_specs(&thing, &specs).await?;
+        }
+
+        products.into_iter().next()
             .ok_or_else(|| RepoError::NotFound(format!("Product {} not found", id)))
     }
 
-    /// Hard delete a product (also cleans up has_attribute edges)
-    pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let thing = make_thing(PRODUCT_TABLE, id);
+    /// Hard delete a product (also cleans up has_attribute edges and product_spec)
+    pub async fn delete(&self, id: &str) -> RepoResult<()> {
+        let pure_id = strip_table_prefix(PRODUCT_TABLE, id);
+        let thing = make_thing(PRODUCT_TABLE, pure_id);
 
-        // Clean up has_attribute edges first
-        self.base
+        // Clean up product_spec records first (ignore error if table doesn't exist)
+        let _ = self.base
+            .db()
+            .query("DELETE product_spec WHERE product = $product")
+            .bind(("product", thing.clone()))
+            .await;
+
+        // Clean up has_attribute edges
+        let _ = self.base
             .db()
             .query("DELETE has_attribute WHERE in = $product")
             .bind(("product", thing.clone()))
-            .await?;
+            .await;
 
         // Then delete the product
-        let result: Option<Product> = self.base.db().delete((PRODUCT_TABLE, id)).await?;
-        Ok(result.is_some())
+        let result: Option<Product> = self.base.db().delete((PRODUCT_TABLE, pure_id)).await?;
+        if result.is_none() {
+            return Err(RepoError::NotFound(format!("Product {} not found", id)));
+        }
+        Ok(())
+    }
+
+    /// Find all active products with print destinations fetched
+    pub async fn find_all_with_destinations(&self) -> RepoResult<Vec<Product>> {
+        let products: Vec<Product> = self
+            .base
+            .db()
+            .query("SELECT * FROM product WHERE is_active = true ORDER BY sort_order FETCH kitchen_print_destinations, label_print_destinations")
+            .await?
+            .take(0)?;
+        Ok(products)
     }
 
     /// Find all active products with tags fetched

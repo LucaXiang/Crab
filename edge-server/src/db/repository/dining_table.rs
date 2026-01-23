@@ -4,6 +4,7 @@ use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefi
 use crate::db::models::{DiningTable, DiningTableCreate, DiningTableUpdate};
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use surrealdb::sql::Thing;
 
 const TABLE: &str = "dining_table";
 
@@ -24,7 +25,7 @@ impl DiningTableRepository {
         let tables: Vec<DiningTable> = self
             .base
             .db()
-            .query("SELECT * FROM dining_table WHERE is_active = true ORDER BY name FETCH zone")
+            .query("SELECT * FROM dining_table WHERE is_active = true ORDER BY name")
             .await?
             .take(0)?;
         Ok(tables)
@@ -58,7 +59,7 @@ impl DiningTableRepository {
         let mut result = self
             .base
             .db()
-            .query("SELECT * FROM dining_table WHERE id = $id FETCH zone")
+            .query("SELECT * FROM dining_table WHERE id = $id")
             .bind(("id", table_thing))
             .await?;
         let tables: Vec<DiningTable> = result.take(0)?;
@@ -68,17 +69,15 @@ impl DiningTableRepository {
     /// Find table by name in zone
     pub async fn find_by_name_in_zone(
         &self,
-        zone_id: &str,
+        zone: &Thing,
         name: &str,
     ) -> RepoResult<Option<DiningTable>> {
-        let zone_thing = make_thing("zone", zone_id);
-        let name_owned = name.to_string();
         let mut result = self
             .base
             .db()
             .query("SELECT * FROM dining_table WHERE zone = $zone AND name = $name LIMIT 1")
-            .bind(("zone", zone_thing))
-            .bind(("name", name_owned))
+            .bind(("zone", zone.clone()))
+            .bind(("name", name.to_string()))
             .await?;
         let tables: Vec<DiningTable> = result.take(0)?;
         Ok(tables.into_iter().next())
@@ -87,9 +86,8 @@ impl DiningTableRepository {
     /// Create a new dining table
     pub async fn create(&self, data: DiningTableCreate) -> RepoResult<DiningTable> {
         // Check duplicate name in same zone
-        let zone_id = data.zone.id.to_string();
         if self
-            .find_by_name_in_zone(&zone_id, &data.name)
+            .find_by_name_in_zone(&data.zone, &data.name)
             .await?
             .is_some()
         {
@@ -124,8 +122,7 @@ impl DiningTableRepository {
         let check_name = data.name.as_ref().unwrap_or(&existing.name);
 
         if data.name.is_some() || data.zone.is_some() {
-            let zone_id = check_zone.id.to_string();
-            if let Some(found) = self.find_by_name_in_zone(&zone_id, check_name).await?
+            if let Some(found) = self.find_by_name_in_zone(check_zone, check_name).await?
                 && found.id != existing.id
             {
                 return Err(RepoError::Duplicate(format!(
@@ -135,12 +132,21 @@ impl DiningTableRepository {
             }
         }
 
+        // 手动构建 UPDATE 语句，避免 zone 被序列化为字符串
         let thing = make_thing(TABLE, pure_id);
+        let name = data.name.unwrap_or(existing.name);
+        let zone = data.zone.unwrap_or(existing.zone);
+        let capacity = data.capacity.unwrap_or(existing.capacity);
+        let is_active = data.is_active.unwrap_or(existing.is_active);
+
         self.base
             .db()
-            .query("UPDATE $thing MERGE $data")
+            .query("UPDATE $thing SET name = $name, zone = $zone, capacity = $capacity, is_active = $is_active")
             .bind(("thing", thing))
-            .bind(("data", data))
+            .bind(("name", name))
+            .bind(("zone", zone))
+            .bind(("capacity", capacity))
+            .bind(("is_active", is_active))
             .await?;
 
         self.find_by_id(pure_id)
