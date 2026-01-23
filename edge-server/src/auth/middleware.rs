@@ -76,14 +76,6 @@ pub async fn require_auth(
     match jwt_service.validate_token(token) {
         Ok(claims) => {
             let user = CurrentUser::from(claims);
-
-            tracing::info!(
-                user_id = %user.id,
-                username = %user.username,
-                role = %user.role,
-                "User authenticated successfully"
-            );
-
             req.extensions_mut().insert(user);
             Ok(next.run(req).await)
         }

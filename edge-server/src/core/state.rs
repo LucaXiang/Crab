@@ -9,13 +9,17 @@ use crate::auth::JwtService;
 use crate::core::Config;
 use crate::core::config::migrate_legacy_structure;
 use crate::db::DbService;
+use crate::db::repository::{CategoryRepository, ProductRepository};
 use crate::orders::OrdersManager;
 use crate::orders::actions::open_table::load_matching_rules;
 use crate::pricing::PriceRuleEngine;
-use crate::printing::{KitchenPrintService, PrintConfigCache, PrintStorage};
+use crate::printing::{
+    CategoryPrintConfig, KitchenPrintService, PrintConfigCache, PrintStorage, ProductPrintConfig,
+};
 use crate::services::{
     ActivationService, CertService, HttpsService, MessageBusService, ProvisioningService,
 };
+use shared::order::OrderEventType;
 
 /// 资源版本管理器
 ///
@@ -248,17 +252,32 @@ impl ServerState {
     ///
     /// 启动的任务：
     /// - 价格规则缓存预热 (为活跃订单加载规则)
+    /// - 打印配置缓存预热 (加载商品/分类打印配置)
     /// - 消息总线处理器 (MessageHandler)
     /// - 订单事件转发器 (Order Event Forwarder)
+    /// - 厨房打印事件监听器 (Kitchen Print Event Listener)
+    /// - 同步事件监听器 (Sync Event -> Cache Update)
     pub async fn start_background_tasks(&self) {
         // Warmup: Load price rules for all active orders
         self.warmup_active_order_rules().await;
+
+        // Warmup: Load print config for all products/categories
+        self.warmup_print_config_cache().await;
 
         // Start MessageBus background tasks
         self.message_bus.start_background_tasks(self.clone());
 
         // Start order event forwarder (OrderEvent -> MessageBus)
         self.start_order_event_forwarder();
+
+        // Start kitchen print event listener (ItemsAdded -> Print)
+        self.start_kitchen_print_event_listener();
+
+        // Start sync event listener (product/category changes -> cache update)
+        self.start_sync_event_listener();
+
+        // Start print record cleanup task (cleanup records older than 3 days)
+        self.start_print_record_cleanup_task();
     }
 
     /// 预热活跃订单的价格规则缓存
@@ -343,6 +362,368 @@ impl ServerState {
             // No rules to cache, but still valid
             true
         }
+    }
+
+    /// 预热打印配置缓存
+    ///
+    /// 服务器启动时调用，加载所有商品和分类的打印配置到内存缓存。
+    pub async fn warmup_print_config_cache(&self) {
+        let product_repo = ProductRepository::new(self.db.clone());
+        let category_repo = CategoryRepository::new(self.db.clone());
+
+        // Load categories first (products reference category_id)
+        match category_repo.find_all_with_destinations().await {
+            Ok(categories) => {
+                for cat in &categories {
+                    let id = cat
+                        .id
+                        .as_ref()
+                        .map(|t| t.to_string())
+                        .unwrap_or_default();
+
+                    // Get destination IDs from the Thing references (full "table:id" format)
+                    let kitchen_destinations: Vec<String> = cat
+                        .kitchen_print_destinations
+                        .iter()
+                        .map(|t| t.to_string())
+                        .collect();
+                    let label_destinations: Vec<String> = cat
+                        .label_print_destinations
+                        .iter()
+                        .map(|t| t.to_string())
+                        .collect();
+
+                    let config = CategoryPrintConfig {
+                        category_id: id,
+                        category_name: cat.name.clone(),
+                        kitchen_print_destinations: kitchen_destinations,
+                        label_print_destinations: label_destinations,
+                        is_kitchen_print_enabled: cat.is_kitchen_print_enabled,
+                        is_label_print_enabled: cat.is_label_print_enabled,
+                    };
+                    self.kitchen_print_service
+                        .config_cache()
+                        .update_category(config)
+                        .await;
+                }
+                tracing::info!(
+                    "🖨️ Loaded {} category print configs",
+                    categories.len()
+                );
+            }
+            Err(e) => {
+                tracing::error!("Failed to load categories for print config: {:?}", e);
+            }
+        }
+
+        // Load products
+        match product_repo.find_all_with_destinations().await {
+            Ok(products) => {
+                for prod in &products {
+                    let id = prod
+                        .id
+                        .as_ref()
+                        .map(|t| t.to_string())
+                        .unwrap_or_default();
+
+                    // Get destination IDs (full "table:id" format)
+                    let kitchen_destinations: Vec<String> = prod
+                        .kitchen_print_destinations
+                        .iter()
+                        .map(|t| t.to_string())
+                        .collect();
+                    let label_destinations: Vec<String> = prod
+                        .label_print_destinations
+                        .iter()
+                        .map(|t| t.to_string())
+                        .collect();
+
+                    // Get category ID from the Thing reference (full "table:id" format)
+                    let category_id = prod.category.to_string();
+
+                    // Get root spec external_id (find spec where is_root == true)
+                    let root_spec_external_id = prod
+                        .specs
+                        .iter()
+                        .find(|s| s.is_root)
+                        .and_then(|s| s.external_id);
+
+                    let config = ProductPrintConfig {
+                        product_id: id,
+                        product_name: prod.name.clone(),
+                        kitchen_name: prod
+                            .kitchen_print_name
+                            .clone()
+                            .unwrap_or_else(|| prod.name.clone()),
+                        kitchen_print_destinations: kitchen_destinations,
+                        label_print_destinations: label_destinations,
+                        is_kitchen_print_enabled: prod.is_kitchen_print_enabled,
+                        is_label_print_enabled: prod.is_label_print_enabled,
+                        root_spec_external_id,
+                        category_id,
+                    };
+                    self.kitchen_print_service
+                        .config_cache()
+                        .update_product(config)
+                        .await;
+                }
+                tracing::info!(
+                    "🖨️ Loaded {} product print configs",
+                    products.len()
+                );
+            }
+            Err(e) => {
+                tracing::error!("Failed to load products for print config: {:?}", e);
+            }
+        }
+    }
+
+    /// 启动厨房打印事件监听器
+    ///
+    /// 订阅 OrdersManager 的事件流，处理 ItemsAdded 事件：
+    /// - 检查打印是否启用
+    /// - 创建 KitchenOrder 和 LabelPrintRecord
+    fn start_kitchen_print_event_listener(&self) {
+        use crate::db::repository::PrintDestinationRepository;
+        use crate::printing::PrintExecutor;
+        use std::collections::HashMap;
+
+        let mut event_rx = self.orders_manager.subscribe();
+        let kitchen_print_service = self.kitchen_print_service.clone();
+        let orders_manager = self.orders_manager.clone();
+        let db = self.db.clone();
+
+        tokio::spawn(async move {
+            tracing::info!("🖨️ Kitchen print event listener started");
+            let executor = PrintExecutor::new();
+
+            loop {
+                match event_rx.recv().await {
+                    Ok(event) => {
+                        // Only process ItemsAdded events
+                        if event.event_type != OrderEventType::ItemsAdded {
+                            continue;
+                        }
+
+                        // Get table name from order snapshot
+                        let table_name = orders_manager
+                            .get_snapshot(&event.order_id)
+                            .ok()
+                            .flatten()
+                            .and_then(|s| s.table_name);
+
+                        // Process the event (create KitchenOrder record)
+                        match kitchen_print_service
+                            .process_items_added(&event, table_name)
+                            .await
+                        {
+                            Ok(Some(kitchen_order_id)) => {
+                                tracing::info!(
+                                    order_id = %event.order_id,
+                                    kitchen_order_id = %kitchen_order_id,
+                                    "🖨️ Created kitchen order"
+                                );
+
+                                // Execute actual printing
+                                if let Ok(Some(order)) = kitchen_print_service.get_kitchen_order(&kitchen_order_id) {
+                                    // Load print destinations
+                                    let repo = PrintDestinationRepository::new(db.clone());
+                                    match repo.find_all().await {
+                                        Ok(destinations) => {
+                                            let dest_map: HashMap<String, _> = destinations
+                                                .into_iter()
+                                                .filter_map(|d| {
+                                                    d.id.as_ref()
+                                                        .map(|id| (id.to_string(), d.clone()))
+                                                })
+                                                .collect();
+
+                                            if let Err(e) = executor.print_kitchen_order(&order, &dest_map).await {
+                                                tracing::error!(
+                                                    kitchen_order_id = %kitchen_order_id,
+                                                    error = %e,
+                                                    "Failed to execute print job"
+                                                );
+                                            }
+                                        }
+                                        Err(e) => {
+                                            tracing::error!(
+                                                error = ?e,
+                                                "Failed to load print destinations"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                // Printing not enabled or no items to print
+                            }
+                            Err(e) => {
+                                tracing::error!(
+                                    order_id = %event.order_id,
+                                    "Failed to process ItemsAdded for printing: {:?}",
+                                    e
+                                );
+                            }
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("Kitchen print listener lagged, skipped {} events", n);
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::info!("Order event channel closed, kitchen print listener stopping");
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    /// 启动同步事件监听器
+    ///
+    /// 订阅 MessageBus 的广播流，处理 product/category 变更：
+    /// - 更新 PrintConfigCache 以保持缓存与数据库同步
+    fn start_sync_event_listener(&self) {
+        use crate::db::models::{Category, Product};
+        use shared::message::EventType;
+
+        let mut sync_rx = self.message_bus.bus().subscribe();
+        let kitchen_print_service = self.kitchen_print_service.clone();
+
+        tokio::spawn(async move {
+            tracing::info!("🔄 Sync event listener started (for print config cache)");
+            loop {
+                match sync_rx.recv().await {
+                    Ok(msg) => {
+                        // Only process Sync events
+                        if msg.event_type != EventType::Sync {
+                            continue;
+                        }
+
+                        // Parse SyncPayload
+                        let payload: SyncPayload = match serde_json::from_slice(&msg.payload) {
+                            Ok(p) => p,
+                            Err(_) => continue,
+                        };
+
+                        // Handle product changes
+                        if payload.resource == "product" {
+                            if let Some(data) = &payload.data {
+                                if let Ok(product) = serde_json::from_value::<Product>(data.clone()) {
+                                    let product_id = product.id.as_ref().map(|t| t.to_string()).unwrap_or_default();
+
+                                    // Find root spec external_id
+                                    let root_spec_external_id = product
+                                        .specs
+                                        .iter()
+                                        .find(|s| s.is_root)
+                                        .and_then(|s| s.external_id);
+
+                                    let config = ProductPrintConfig {
+                                        product_id,
+                                        product_name: product.name.clone(),
+                                        kitchen_name: product
+                                            .kitchen_print_name
+                                            .clone()
+                                            .unwrap_or_else(|| product.name.clone()),
+                                        kitchen_print_destinations: product.kitchen_print_destinations.iter().map(|t| t.to_string()).collect(),
+                                        label_print_destinations: product.label_print_destinations.iter().map(|t| t.to_string()).collect(),
+                                        is_kitchen_print_enabled: product.is_kitchen_print_enabled,
+                                        is_label_print_enabled: product.is_label_print_enabled,
+                                        root_spec_external_id,
+                                        category_id: product.category.to_string(),
+                                    };
+                                    kitchen_print_service.config_cache().update_product(config).await;
+                                    tracing::debug!(
+                                        product_id = %payload.id,
+                                        action = %payload.action,
+                                        "Updated product print config from sync"
+                                    );
+                                }
+                            }
+                        }
+
+                        // Handle category changes
+                        if payload.resource == "category" {
+                            if let Some(data) = &payload.data {
+                                if let Ok(category) = serde_json::from_value::<Category>(data.clone()) {
+                                    let category_id = category.id.as_ref().map(|t| t.to_string()).unwrap_or_default();
+                                    let config = CategoryPrintConfig {
+                                        category_id,
+                                        category_name: category.name.clone(),
+                                        kitchen_print_destinations: category.kitchen_print_destinations.iter().map(|t| t.to_string()).collect(),
+                                        label_print_destinations: category.label_print_destinations.iter().map(|t| t.to_string()).collect(),
+                                        is_kitchen_print_enabled: category.is_kitchen_print_enabled,
+                                        is_label_print_enabled: category.is_label_print_enabled,
+                                    };
+                                    kitchen_print_service.config_cache().update_category(config).await;
+                                    tracing::debug!(
+                                        category_id = %payload.id,
+                                        action = %payload.action,
+                                        "Updated category print config from sync"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("Sync event listener lagged, skipped {} events", n);
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::info!("Server broadcast channel closed, sync listener stopping");
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    /// 启动打印记录清理任务
+    ///
+    /// - 启动时立即执行一次清理
+    /// - 之后每小时执行一次
+    /// - 清理 3 天以前的记录 (kitchen_order, label_record)
+    fn start_print_record_cleanup_task(&self) {
+        const CLEANUP_INTERVAL_SECS: u64 = 3600; // 1 hour
+        const MAX_AGE_SECS: i64 = 3 * 24 * 3600; // 3 days
+
+        let print_service = self.kitchen_print_service.clone();
+
+        tokio::spawn(async move {
+            tracing::info!("🧹 Print record cleanup task started (interval: 1h, max_age: 3d)");
+
+            // Cleanup immediately on startup
+            match print_service.cleanup_old_records(MAX_AGE_SECS) {
+                Ok(count) if count > 0 => {
+                    tracing::info!("🧹 Cleaned up {} old print records on startup", count);
+                }
+                Ok(_) => {
+                    tracing::debug!("No old print records to cleanup on startup");
+                }
+                Err(e) => {
+                    tracing::error!("Failed to cleanup print records on startup: {:?}", e);
+                }
+            }
+
+            // Then cleanup periodically
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(CLEANUP_INTERVAL_SECS));
+            interval.tick().await; // Skip the first immediate tick (already cleaned up above)
+
+            loop {
+                interval.tick().await;
+                match print_service.cleanup_old_records(MAX_AGE_SECS) {
+                    Ok(count) if count > 0 => {
+                        tracing::info!("🧹 Cleaned up {} old print records", count);
+                    }
+                    Ok(_) => {
+                        tracing::debug!("No old print records to cleanup");
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to cleanup print records: {:?}", e);
+                    }
+                }
+            }
+        });
     }
 
     /// 启动订单同步转发器

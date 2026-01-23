@@ -46,13 +46,6 @@ impl FromRequestParts<ServerState> for CurrentUser {
             Ok(claims) => {
                 let user = CurrentUser::from(claims);
 
-                tracing::info!(
-                    user_id = %user.id,
-                    username = %user.username,
-                    role = %user.role,
-                    "User authenticated successfully"
-                );
-
                 // Store in extensions for potential reuse
                 parts.extensions.insert(user.clone());
 
