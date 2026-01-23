@@ -63,6 +63,33 @@ cd red_coral && npx tsc --noEmit    # TS 检查
 
 ## 数据库规则 (SurrealDB)
 
+### ID 格式规范
+
+**核心原则**: 全栈统一使用 `"table:id"` 格式，与 SurrealDB 原生格式一致。
+
+| 层级 | ID 格式 | 示例 |
+|------|---------|------|
+| **前端 (TypeScript)** | `"table:id"` | `"product:hyfz15ouopnehs9wxq2o"` |
+| **API 传输 (JSON)** | `"table:id"` | `"product:hyfz15ouopnehs9wxq2o"` |
+| **后端模型** | `Thing` | `Thing { tb: "product", id: "..." }` |
+| **数据库存储** | SurrealDB Record | `product:hyfz15ouopnehs9wxq2o` |
+
+**Serde 自动转换** (`#[serde(with = "serde_thing")]`):
+- 序列化: `Thing` → `"table:id"`
+- 反序列化: `"table:id"` → `Thing`
+
+**关键实现**:
+```rust
+// edge-server/src/db/models/serde_thing.rs
+pub fn serialize<S>(thing: &Thing, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_str(&thing.to_string())  // "product:xxx"
+}
+
+pub fn deserialize<'de, D>(d: D) -> Result<Thing, D::Error> {
+    // 支持 "table:id" 字符串和 Thing 原生格式
+}
+```
+
 **RELATE 边关系**:
 - `attribute_binding`: product/category → attribute
 - `has_event`: order → order_event
@@ -104,7 +131,7 @@ TypeScript (前端) ↔ Rust (后端) 类型必须完全匹配：
 | **Order 不可删除** | 订单使用状态管理（VOID），禁止物理删除 |
 | **OrderEvent 不可删除** | 事件溯源，只追加不删除 |
 | **RELATE 边清理** | 删除实体时必须清理关联的图边 |
-| **ID 格式** | SurrealDB Thing 格式: `"table:id"` |
+| **ID 格式** | 全栈统一 `"table:id"` 格式，使用 `serde_thing` 自动转换 |
 
 ### 安全约束
 
