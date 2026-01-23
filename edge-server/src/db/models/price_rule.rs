@@ -1,6 +1,7 @@
 //! Price Rule Model
 
 use super::serde_helpers;
+use super::serde_thing;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -40,6 +41,10 @@ pub enum TimeMode {
     Onetime,
 }
 
+/// Zone scope constants
+pub const ZONE_SCOPE_ALL: &str = "zone:all";
+pub const ZONE_SCOPE_RETAIL: &str = "zone:retail";
+
 /// Schedule config for recurring rules
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ScheduleConfig {
@@ -54,6 +59,7 @@ pub struct ScheduleConfig {
 /// Price rule entity (价格调整规则)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriceRule {
+    #[serde(default, with = "serde_thing::option")]
     pub id: Option<Thing>,
     pub name: String,
     pub display_name: String,
@@ -62,9 +68,11 @@ pub struct PriceRule {
     pub rule_type: RuleType,
     pub product_scope: ProductScope,
     /// Target record based on scope (category/tag/product)
+    #[serde(default, with = "serde_thing::option")]
     pub target: Option<Thing>,
-    /// Zone scope: -1=all, 0=retail, >0=specific zone
-    pub zone_scope: i32,
+    /// Zone scope: "zone:all", "zone:retail", or specific zone ID like "zone:xxx"
+    #[serde(default = "default_zone_scope")]
+    pub zone_scope: String,
     pub adjustment_type: AdjustmentType,
     /// Adjustment value (percentage: 30=30%, fixed: amount in currency unit e.g. 5.00)
     pub adjustment_value: f64,
@@ -95,6 +103,7 @@ pub struct PriceRule {
         deserialize_with = "serde_helpers::bool_true"
     )]
     pub is_active: bool,
+    #[serde(default, with = "serde_thing::option")]
     pub created_by: Option<Thing>,
     /// Created timestamp (milliseconds since epoch)
     #[serde(default)]
@@ -103,6 +112,10 @@ pub struct PriceRule {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_zone_scope() -> String {
+    ZONE_SCOPE_ALL.to_string()
 }
 
 /// Create price rule payload
@@ -114,8 +127,10 @@ pub struct PriceRuleCreate {
     pub description: Option<String>,
     pub rule_type: RuleType,
     pub product_scope: ProductScope,
-    pub target: Option<Thing>,
-    pub zone_scope: Option<i32>,
+    /// Target ID as string (e.g., "category:xxx", "tag:xxx", "product:xxx")
+    pub target: Option<String>,
+    /// Zone scope: "zone:all", "zone:retail", or specific zone ID like "zone:xxx"
+    pub zone_scope: Option<String>,
     pub adjustment_type: AdjustmentType,
     pub adjustment_value: f64,
     pub priority: Option<i32>,
@@ -142,33 +157,58 @@ pub struct PriceRuleCreate {
 /// Update price rule payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriceRuleUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub receipt_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rule_type: Option<RuleType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub product_scope: Option<ProductScope>,
-    pub target: Option<Thing>,
-    pub zone_scope: Option<i32>,
+    /// Target ID as string (e.g., "category:xxx", "tag:xxx", "product:xxx")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+    /// Zone scope: "zone:all", "zone:retail", or specific zone ID like "zone:xxx"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zone_scope: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub adjustment_type: Option<AdjustmentType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub adjustment_value: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_exclusive: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub time_mode: Option<TimeMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub start_time: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub end_time: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub schedule_config: Option<ScheduleConfig>,
     /// Valid from timestamp (milliseconds since epoch)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub valid_from: Option<i64>,
     /// Valid until timestamp (milliseconds since epoch)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub valid_until: Option<i64>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub active_days: Option<Vec<u8>>,
     /// Active start time (HH:MM format)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub active_start_time: Option<String>,
     /// Active end time (HH:MM format)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub active_end_time: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_active: Option<bool>,
 }

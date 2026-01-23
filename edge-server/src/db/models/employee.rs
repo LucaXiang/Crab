@@ -2,6 +2,7 @@
 
 use super::RoleId;
 use super::serde_helpers;
+use super::serde_thing;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -11,11 +12,14 @@ pub type EmployeeId = Thing;
 /// Employee model matching SurrealDB schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Employee {
+    #[serde(default, with = "serde_thing::option")]
     pub id: Option<EmployeeId>,
     pub username: String,
     #[serde(rename = "employee_name")]
     pub display_name: String,
+    #[serde(skip_serializing)]
     pub hash_pass: String,
+    #[serde(with = "serde_thing")]
     pub role: RoleId,
     #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_system: bool,
@@ -36,16 +40,22 @@ pub struct EmployeeCreate {
     pub username: String,
     pub password: String,
     pub display_name: Option<String>,
+    #[serde(with = "serde_thing")]
     pub role: RoleId,
 }
 
 /// Update employee payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmployeeUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
+    #[serde(default, with = "serde_thing::option", skip_serializing_if = "Option::is_none")]
     pub role: Option<RoleId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_active: Option<bool>,
 }
 

@@ -1,6 +1,7 @@
 //! Print Destination Model
 
 use super::serde_helpers;
+use super::serde_thing;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -30,6 +31,7 @@ fn default_printer_format() -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrintDestination {
+    #[serde(default, with = "serde_thing::option")]
     pub id: Option<PrintDestinationId>,
     pub name: String,
     pub description: Option<String>,
@@ -70,8 +72,12 @@ pub struct PrintDestinationCreate {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrintDestinationUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub printers: Option<Vec<EmbeddedPrinter>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_active: Option<bool>,
 }

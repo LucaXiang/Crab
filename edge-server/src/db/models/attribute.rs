@@ -4,6 +4,7 @@
 //! Use RELATE to connect products/categories to attributes.
 
 use super::serde_helpers;
+use super::serde_thing;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -47,6 +48,7 @@ impl AttributeOption {
 /// Attribute model (with embedded options)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Attribute {
+    #[serde(default, with = "serde_thing::option")]
     pub id: Option<AttributeId>,
     pub name: String,
 
@@ -118,30 +120,56 @@ pub struct AttributeCreate {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_multi_select: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_selections: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default_option_idx: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub display_order: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_active: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub show_on_receipt: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub receipt_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub show_on_kitchen_print: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub kitchen_print_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub options: Option<Vec<AttributeOption>>,
 }
 
 /// Edge relation: has_attribute (product/category -> attribute)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeBinding {
+    #[serde(default, with = "serde_thing::option")]
     pub id: Option<Thing>,
-    #[serde(rename = "in")]
+    #[serde(rename = "in", with = "serde_thing")]
     pub from: Thing, // product or category
-    #[serde(rename = "out")]
+    #[serde(rename = "out", with = "serde_thing")]
     pub to: Thing, // attribute
     #[serde(default)]
     pub is_required: bool,
     #[serde(default)]
+    pub display_order: i32,
+    /// Override attribute's default option
+    pub default_option_idx: Option<i32>,
+}
+
+/// Attribute binding with full attribute data (for API responses)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttributeBindingFull {
+    /// Relation ID
+    #[serde(default, with = "serde_thing::option")]
+    pub id: Option<Thing>,
+    /// Full attribute object
+    pub attribute: Attribute,
+    pub is_required: bool,
     pub display_order: i32,
     /// Override attribute's default option
     pub default_option_idx: Option<i32>,

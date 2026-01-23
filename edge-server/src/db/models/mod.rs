@@ -29,7 +29,7 @@ pub mod order;
 pub mod system_state;
 
 // Re-exports
-pub use attribute::{Attribute, AttributeBinding, AttributeCreate, AttributeOption, AttributeUpdate};
+pub use attribute::{Attribute, AttributeBinding, AttributeBindingFull, AttributeCreate, AttributeOption, AttributeUpdate};
 pub use category::{Category, CategoryCreate, CategoryUpdate};
 pub use dining_table::{DiningTable, DiningTableCreate, DiningTableUpdate};
 pub use employee::{Employee, EmployeeCreate, EmployeeId, EmployeeUpdate};
@@ -39,12 +39,12 @@ pub use order::{
 };
 pub use price_rule::{
     AdjustmentType, PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope, RuleType,
-    ScheduleConfig, TimeMode,
+    ScheduleConfig, TimeMode, ZONE_SCOPE_ALL, ZONE_SCOPE_RETAIL,
 };
 pub use print_destination::{
     EmbeddedPrinter, PrintDestination, PrintDestinationCreate, PrintDestinationUpdate,
 };
-pub use product::{EmbeddedSpec, Product, ProductCreate, ProductUpdate};
+pub use product::{EmbeddedSpec, Product, ProductCreate, ProductFull, ProductUpdate};
 pub use role::{Role, RoleCreate, RoleId, RoleUpdate};
 pub use system_state::{SystemState, SystemStateUpdate};
 pub use tag::{Tag, TagCreate, TagUpdate};

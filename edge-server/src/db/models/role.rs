@@ -1,6 +1,7 @@
 //! Role Model
 
 use super::serde_helpers;
+use super::serde_thing;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -11,7 +12,7 @@ pub type RoleId = Thing;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Role {
     /// Optional role ID
-    #[serde(skip)]
+    #[serde(default, with = "serde_thing::option")]
     pub id: Option<RoleId>,
     /// Name of the role
     pub role_name: String,
@@ -57,7 +58,10 @@ pub struct RoleCreate {
 /// Update role request
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RoleUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub role_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub permissions: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_active: Option<bool>,
 }

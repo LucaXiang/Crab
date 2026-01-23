@@ -1,6 +1,7 @@
 //! Tag Model
 
 use super::serde_helpers;
+use super::serde_thing;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -9,6 +10,7 @@ pub type TagId = Thing;
 /// Tag model matching SurrealDB schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tag {
+    #[serde(default, with = "serde_thing::option")]
     pub id: Option<TagId>,
     pub name: String,
     #[serde(default = "default_color")]
@@ -57,8 +59,12 @@ pub struct TagCreate {
 /// Tag for update (all optional)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TagUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub display_order: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_active: Option<bool>,
 }
