@@ -48,8 +48,8 @@ export function useOrderEventListener() {
         since_sequence: 0,
       });
 
-      // Full sync with server state
-      store._fullSync(response.active_orders, response.server_sequence);
+      // Full sync with server state (including events for timeline)
+      store._fullSync(response.active_orders, response.server_sequence, undefined, response.events);
       store._setInitialized(true);
       isInitializedRef.current = true;
 
@@ -128,7 +128,7 @@ export function useOrderSyncActions() {
       });
 
       if (response.requires_full_sync || since_sequence === 0) {
-        store._fullSync(response.active_orders, response.server_sequence);
+        store._fullSync(response.active_orders, response.server_sequence, undefined, response.events);
       } else if (response.events.length > 0) {
         store._applyEvents(response.events);
         store._setConnectionState('connected');

@@ -4,6 +4,7 @@ import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { useCartStore } from '@/core/stores/cart/useCartStore';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
+import { toast } from '@/presentation/components/Toast';
 
 interface UseOrderHandlersParams {
   handleTableSelectStore: (
@@ -38,24 +39,35 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
     ) => {
       const { cart, totalAmount } = useCartStore.getState();
 
-      const result = await handleTableSelectStore(
-        table,
-        guestCount,
-        cart,
-        totalAmount,
-        zone
-      );
+      try {
+        const result = await handleTableSelectStore(
+          table,
+          guestCount,
+          cart,
+          totalAmount,
+          zone
+        );
 
-      if (result === 'RETRIEVED') {
-        setViewMode('checkout');
-        setCurrentOrderKey(String(table.id));
-      } else if (result === 'CREATED' || result === 'MERGED') {
-        setCurrentOrderKey(String(table.id));
-      }
+        if (result === 'RETRIEVED') {
+          setViewMode('checkout');
+          setCurrentOrderKey(String(table.id));
+        } else if (result === 'CREATED' || result === 'MERGED') {
+          setCurrentOrderKey(String(table.id));
+        }
 
-      setShowTableScreen(false);
-      if (cart.length > 0 && (result === 'MERGED' || result === 'CREATED')) {
-        useCartStore.getState().clearCart();
+        setShowTableScreen(false);
+        if (cart.length > 0 && (result === 'MERGED' || result === 'CREATED')) {
+          useCartStore.getState().clearCart();
+        }
+      } catch (error) {
+        // Handle TABLE_OCCUPIED and other errors
+        const message = error instanceof Error ? error.message : '操作失败';
+        if (message.includes('已被占用')) {
+          toast.error(`桌台 ${table.name || table.id} 已被占用，请刷新列表`);
+        } else {
+          toast.error(message);
+        }
+        console.error('[handleTableSelect] Error:', error);
       }
     },
     [handleTableSelectStore, setViewMode, setCurrentOrderKey, setShowTableScreen]

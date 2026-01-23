@@ -98,7 +98,7 @@ async function handleGapDetectedSync(): Promise<void> {
     });
 
     if (response) {
-      _fullSync(response.active_orders, response.server_sequence, response.server_epoch);
+      _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
       console.log(
         `[Sync] Gap recovery complete - synced ${response.active_orders.length} orders, epoch=${response.server_epoch}`
       );
@@ -144,7 +144,7 @@ export function useSyncListener() {
           });
 
           if (response) {
-            _fullSync(response.active_orders, response.server_sequence, response.server_epoch);
+            _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
             console.log(
               `[Sync] WiFi lag recovery complete - synced ${response.active_orders.length} orders, epoch=${response.server_epoch}`
             );
