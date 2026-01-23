@@ -6,7 +6,8 @@ import {
   useSettingsFormMeta,
   useSettingsStore,
 } from '@/core/stores/settings/useSettingsStore';
-import { createTauriClient, invokeApi } from '@/infrastructure/api';
+import { createTauriClient } from '@/infrastructure/api';
+import { invoke } from '@tauri-apps/api/core';
 import type { Attribute, Product } from '@/core/domain/types/api';
 import { useProductStore, useZones, useCategoryStore } from '@/core/stores/resources';
 import { getErrorMessage } from '@/utils/error';
@@ -44,6 +45,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
   const refreshZones = () => useZoneStore.getState().fetchAll(true);
   const refreshTables = () => useTableStore.getState().fetchAll(true);
   const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [inheritedAttributeIds, setInheritedAttributeIds] = useState<string[]>([]);
   const defaultCategorySet = useRef(false);
 
@@ -84,6 +86,10 @@ export const EntityFormModal: React.FC = React.memo(() => {
             return;
           }
 
+          // Debug: log print settings from API
+          console.log('[DEBUG] getProductFull - is_kitchen_print_enabled:', productFull.is_kitchen_print_enabled,
+            'is_label_print_enabled:', productFull.is_label_print_enabled);
+
           // Extract attribute bindings
           const attributeIds = productFull.attributes.map((binding) => binding.attribute.id).filter(Boolean) as string[];
 
@@ -118,6 +124,12 @@ export const EntityFormModal: React.FC = React.memo(() => {
             tags: tagIds,
             // Determine has_multi_spec from specs count (specs.length > 1)
             has_multi_spec: productFull.specs.length > 1,
+            // Print settings
+            is_kitchen_print_enabled: productFull.is_kitchen_print_enabled,
+            is_label_print_enabled: productFull.is_label_print_enabled,
+            print_destinations: productFull.kitchen_print_destinations,
+            label_print_destinations: productFull.label_print_destinations,
+            kitchen_print_name: productFull.kitchen_print_name,
           });
         } catch (error) {
           console.error('Failed to load product full data:', error, JSON.stringify(error));
@@ -272,11 +284,16 @@ export const EntityFormModal: React.FC = React.memo(() => {
   };
 
   const handleSave = async () => {
+    // Prevent duplicate submissions
+    if (isSaving) return;
+
     const hasError = Object.values(formErrors).some(Boolean);
     if (hasError) {
       toast.error(t('common.message.invalid_form'));
       return;
     }
+
+    setIsSaving(true);
     try {
       if (entity === 'TABLE') {
         const tablePayload = {
@@ -292,6 +309,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
         } else {
           await api.updateTable(String(data.id), {
             name: tablePayload.name,
+            zone: String(tablePayload.zone),  // 支持修改区域
             capacity: Number(tablePayload.capacity),
             is_active: tablePayload.is_active,
           });
@@ -325,15 +343,18 @@ export const EntityFormModal: React.FC = React.memo(() => {
           toast.error(t('settings.product.form.name_required'));
           return;
         }
-        // Get price and externalId from default spec
-        const defaultSpec = formData.specs?.find(s => s.is_default) ?? formData.specs?.[0];
-        const price = defaultSpec?.price ?? 0;
-        const externalId = defaultSpec?.external_id;
+        // Get price and externalId from root spec
+        const rootSpec = formData.specs?.find(s => s.is_root);
+        const price = rootSpec?.price ?? 0;
+        const externalId = rootSpec?.external_id;
 
-        if (externalId === undefined) {
+        if (externalId === undefined || externalId === null) {
           toast.error(t('settings.external_id_required'));
           return;
         }
+
+        // external_id uniqueness is enforced by backend via product_spec table UNIQUE index
+
         if (!formData.category) {
           if (categories.length === 0) {
             toast.error(t('settings.category.create_first'));
@@ -391,8 +412,9 @@ export const EntityFormModal: React.FC = React.memo(() => {
               display_order: 0,
               is_default: true,
               is_active: true,
-              is_root: false,
+              is_root: true,
               external_id: productPayload.externalId ?? null,
+              receipt_name: null,
             }],
           });
           productId = created?.id || '';
@@ -403,8 +425,27 @@ export const EntityFormModal: React.FC = React.memo(() => {
           }
           toast.success(t("settings.product.message.created"));
         } else {
-          // Update product with embedded specs (price and external_id are in specs now)
-          await api.updateProduct(String(data.id), {
+          // Update product - preserve all specs, only update root spec's price/external_id
+          const existingSpecs = formData.specs ?? [];
+          const updatedSpecs = existingSpecs.length > 0
+            ? existingSpecs.map(spec => spec.is_root ? {
+                ...spec,
+                name: spec.name,  // Keep spec name (may differ from product name for multi-spec)
+                price: spec.price,
+                external_id: spec.external_id,
+              } : spec)
+            : [{
+                name: productPayload.name,
+                price: productPayload.price ?? 0,
+                display_order: 0,
+                is_default: true,
+                is_active: true,
+                is_root: true,
+                external_id: productPayload.externalId ?? null,
+                receipt_name: null,
+              }];
+
+          const updatePayload = {
             name: productPayload.name,
             category: String(productPayload.category),
             image: productPayload.image,
@@ -417,45 +458,20 @@ export const EntityFormModal: React.FC = React.memo(() => {
             is_kitchen_print_enabled: productPayload.is_kitchen_print_enabled,
             is_label_print_enabled: productPayload.is_label_print_enabled,
             is_active: productPayload.is_active,
-            // Update specs with price and external_id
-            specs: [{
-              name: productPayload.name,
-              price: productPayload.price ?? 0,
-              display_order: 0,
-              is_default: true,
-              is_active: true,
-              is_root: false,
-              external_id: productPayload.externalId ?? null,
-            }],
-          });
+            specs: updatedSpecs,
+          };
+          console.log('[DEBUG] Update product payload:', JSON.stringify(updatePayload, null, 2));
+          const updated = await api.updateProduct(String(data.id), updatePayload);
           productId = data.id;
 
-          // Optimistic update: update ProductStore cache with snake_case fields
-          useProductStore.getState().optimisticUpdate(data.id, (p) => ({
-            ...p,
-            name: productPayload.name,
-            image: productPayload.image,
-            category: String(productPayload.category),
-            tax_rate: productPayload.tax_rate ?? p.tax_rate,
-            sort_order: productPayload.sort_order ?? p.sort_order,
-            receipt_name: productPayload.receipt_name ?? null,
-            kitchen_print_name: productPayload.kitchen_print_name ?? null,
-            kitchen_print_destinations: productPayload.kitchen_print_destinations ?? p.kitchen_print_destinations,
-            label_print_destinations: productPayload.label_print_destinations ?? p.label_print_destinations,
-            is_kitchen_print_enabled: productPayload.is_kitchen_print_enabled ?? p.is_kitchen_print_enabled,
-            is_label_print_enabled: productPayload.is_label_print_enabled ?? p.is_label_print_enabled,
-            is_active: productPayload.is_active ?? p.is_active,
-            // Update embedded specs
-            specs: [{
-              name: productPayload.name,
-              price: productPayload.price ?? 0,
-              display_order: 0,
-              is_default: true,
-              is_active: true,
-              is_root: false,
-              external_id: productPayload.externalId ?? null,
-            }],
-          }));
+          // Debug: log the API response
+          console.log('[DEBUG] updateProduct response - is_kitchen_print_enabled:', updated?.is_kitchen_print_enabled,
+            'is_label_print_enabled:', updated?.is_label_print_enabled);
+
+          // Update ProductStore cache with API response data
+          if (updated) {
+            useProductStore.getState().optimisticUpdate(data.id, () => updated as Product);
+          }
           toast.success(t("settings.product.message.updated"));
         }
 
@@ -467,8 +483,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
         if (action === 'EDIT') {
           try {
             const productAttrs = await api.fetchProductAttributes(productId);
-            // Transform to expected format
-            existingBindings = productAttrs.map((pa: any) => ({
+            // Transform to expected format (handle undefined/null)
+            existingBindings = (productAttrs ?? []).map((pa: any) => ({
               attributeId: pa.to,
               id: pa.id
             }));
@@ -507,7 +523,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
               display_order: idx,
               is_default: spec.is_default ?? false,
               is_active: true,
-              is_root: false,
+              is_root: spec.is_root,
               external_id: spec.external_id ?? null,
             }));
 
@@ -646,6 +662,8 @@ export const EntityFormModal: React.FC = React.memo(() => {
     } catch (e: unknown) {
       // Use getErrorMessage for localized error display
       toast.error(getErrorMessage(e));
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -656,7 +674,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
         filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
       });
       if (!file || Array.isArray(file)) return;
-      const hash = await invokeApi<string>('save_image', { source_path: file });
+      const hash = await invoke<string>('save_image', { source_path: file });
       setFormField('image', hash);
     } catch {
       toast.error(t('common.label.none'));
@@ -665,7 +683,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
 
   const accent = getAccentColor();
   const hasError = Object.values(formErrors).some(Boolean);
-  const isSaveDisabled = !isFormDirty || hasError;
+  const isSaveDisabled = !isFormDirty || hasError || isSaving;
   const saveEnabledClass = `px-5 py-2.5 bg-${accent}-600 text-white rounded-xl text-sm font-semibold hover:bg-${accent}-700 transition-colors shadow-lg shadow-${accent}-600/20`;
   const saveDisabledClass = 'px-5 py-2.5 bg-gray-200 text-gray-400 rounded-xl text-sm font-semibold cursor-not-allowed';
 
@@ -705,23 +723,24 @@ export const EntityFormModal: React.FC = React.memo(() => {
           />
         );
       case 'PRODUCT': {
-        // Get price and externalId from default spec for ProductForm
-        const productDefaultSpec = formData.specs?.find(s => s.is_default) ?? formData.specs?.[0];
+        // Get price and externalId from root spec for ProductForm
+        const rootSpec = formData.specs?.find(s => s.is_root);
         return (
           <ProductForm
             formData={{
               id: formData.id,
               name: formData.name,
               receipt_name: formData.receipt_name,
-              price: productDefaultSpec?.price ?? 0,
+              price: rootSpec?.price ?? 0,
               category: formData.category,
               image: formData.image ?? '',
-              externalId: productDefaultSpec?.external_id ?? undefined,
+              externalId: rootSpec?.external_id ?? undefined,
               tax_rate: formData.tax_rate ?? 0,
               selected_attribute_ids: formData.selected_attribute_ids,
               attribute_default_options: formData.attribute_default_options,
               print_destinations: formData.print_destinations,
               kitchen_print_name: formData.kitchen_print_name,
+              is_kitchen_print_enabled: formData.is_kitchen_print_enabled ?? -1,
               is_label_print_enabled: formData.is_label_print_enabled ?? -1,
               is_active: formData.is_active ?? true,
               specs: formData.specs,
