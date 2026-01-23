@@ -106,7 +106,7 @@ export interface EmbeddedSpec {
   name: string;
   /** 小票显示名称 */
   receipt_name?: string;
-  /** Price in cents */
+  /** Price in currency unit (e.g., 10.50 = €10.50) */
   price: number;
   display_order: number;
   is_default: boolean;
@@ -397,7 +397,8 @@ export interface PriceRule {
   rule_type: RuleType;
   product_scope: ProductScope;
   target: string | null;
-  zone_scope: number;
+  /** Zone scope: "zone:all", "zone:retail", or specific zone ID like "zone:xxx" */
+  zone_scope: string;
   adjustment_type: AdjustmentType;
   adjustment_value: number;
   priority: number;
@@ -425,7 +426,8 @@ export interface PriceRuleCreate {
   rule_type: RuleType;
   product_scope: ProductScope;
   target?: string;
-  zone_scope?: number;
+  /** Zone scope: "zone:all", "zone:retail", or specific zone ID */
+  zone_scope?: string;
   adjustment_type: AdjustmentType;
   adjustment_value: number;
   priority?: number;
@@ -452,7 +454,8 @@ export interface PriceRuleUpdate {
   rule_type?: RuleType;
   product_scope?: ProductScope;
   target?: string;
-  zone_scope?: number;
+  /** Zone scope: "zone:all", "zone:retail", or specific zone ID */
+  zone_scope?: string;
   adjustment_type?: AdjustmentType;
   adjustment_value?: number;
   priority?: number;
@@ -695,11 +698,10 @@ export interface RolePermissionListData {
  * Note: password_hash is NOT included - it should never be sent to frontend.
  */
 export interface User {
-  id: number;
-  uuid: string;
+  id: string;
   username: string;
   display_name: string | null;
-  role_id: number;
+  role_id: string;
   role_name?: string;
   avatar: string | null;
   is_active: boolean;
@@ -724,4 +726,90 @@ export interface ProductAttribute extends AttributeBinding {
 export interface CategoryAttribute extends AttributeBinding {
   /** The attribute details when fetched with relations */
   attribute?: Attribute;
+}
+
+// ============ Kitchen Printing ============
+
+/**
+ * 打印上下文 (完整 JSON，模板自取所需字段)
+ * Aligned with edge-server printing types
+ */
+export interface PrintItemContext {
+  // 分类
+  category_id: string;
+  category_name: string;
+
+  // 商品
+  product_id: string;
+  external_id: number | null; // 商品编号 (root spec)
+  kitchen_name: string; // 厨房打印名称
+  product_name: string; // 原始商品名
+
+  // 规格
+  spec_name: string | null;
+
+  // 数量
+  quantity: number;
+  index: string | null; // 标签用："2/5"
+
+  // 属性/做法
+  options: string[];
+
+  // 备注
+  note: string | null;
+
+  // 打印目的地
+  kitchen_destinations: string[];
+  label_destinations: string[];
+}
+
+/** 厨房订单菜品 */
+export interface KitchenOrderItem {
+  context: PrintItemContext;
+}
+
+/**
+ * 一次点单的厨房记录（对应一个 ItemsAdded 事件）
+ * Used for kitchen order display and reprint
+ */
+export interface KitchenOrder {
+  /** Kitchen order ID (= event_id) */
+  id: string;
+  /** Parent order ID */
+  order_id: string;
+  /** Table name (if applicable) */
+  table_name: string | null;
+  /** Unix timestamp (seconds) */
+  created_at: number;
+  /** Items in this kitchen order */
+  items: KitchenOrderItem[];
+  /** Number of times this order has been printed */
+  print_count: number;
+}
+
+/**
+ * 标签打印记录（单品级别）
+ * Each item in an order can have multiple labels (one per quantity unit)
+ */
+export interface LabelPrintRecord {
+  /** Label record ID (UUID) */
+  id: string;
+  /** Parent order ID */
+  order_id: string;
+  /** Related kitchen order ID */
+  kitchen_order_id: string;
+  /** Table name (if applicable) */
+  table_name: string | null;
+  /** Unix timestamp (seconds) */
+  created_at: number;
+  /** Print context for this label */
+  context: PrintItemContext;
+  /** Number of times this label has been printed */
+  print_count: number;
+}
+
+/** Response for kitchen order list */
+export interface KitchenOrderListResponse {
+  items: KitchenOrder[];
+  total: number | null;
 }

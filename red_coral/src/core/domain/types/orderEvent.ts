@@ -346,13 +346,18 @@ export interface RestoreItemCommand {
   instance_id: string;
 }
 
-export interface AddPaymentCommand {
-  type: 'ADD_PAYMENT';
-  order_id: string;
-  method: PaymentMethod;
+/** Payment input for AddPayment command (matches Rust PaymentInput) */
+export interface PaymentInput {
+  method: string;
   amount: number;
   tendered?: number | null;
   note?: string | null;
+}
+
+export interface AddPaymentCommand {
+  type: 'ADD_PAYMENT';
+  order_id: string;
+  payment: PaymentInput;
 }
 
 export interface CancelPaymentCommand {
@@ -360,6 +365,8 @@ export interface CancelPaymentCommand {
   order_id: string;
   payment_id: string;
   reason?: string | null;
+  authorizer_id?: string | null;
+  authorizer_name?: string | null;
 }
 
 export interface SplitOrderCommand {
@@ -429,7 +436,9 @@ export type CommandErrorCode =
   | 'INSUFFICIENT_QUANTITY'
   | 'INVALID_AMOUNT'
   | 'DUPLICATE_COMMAND'
-  | 'INTERNAL_ERROR';
+  | 'INTERNAL_ERROR'
+  | 'INVALID_OPERATION'
+  | 'TABLE_OCCUPIED';
 
 // ============================================================================
 // Sync Types
@@ -552,6 +561,10 @@ export interface CartItemSnapshot {
   /** Applied price rules list */
   applied_rules?: AppliedRule[] | null;
 
+  // === Computed Fields ===
+  /** Line total (computed by backend: price * quantity with adjustments) */
+  line_total?: number | null;
+
   note?: string | null;
   authorizer_id?: string | null;
   authorizer_name?: string | null;
@@ -570,7 +583,8 @@ export interface AppliedRule {
   rule_type: 'discount' | 'surcharge';
   adjustment_type: 'percentage' | 'fixed';
   product_scope: 'global' | 'category' | 'product';
-  zone_scope: number;
+  /** Zone scope: "zone:all", "zone:retail", or specific zone ID */
+  zone_scope: string;
   adjustment_value: number;
   calculated_amount: number;
   priority: number;
@@ -646,6 +660,8 @@ export interface PaymentRecord {
   timestamp: number;
   cancelled?: boolean;
   cancel_reason?: string | null;
+  /** Split payment items snapshot (for restoration on cancel) */
+  split_items?: CartItemSnapshot[] | null;
 }
 
 // ============================================================================

@@ -98,11 +98,10 @@ export interface LoginResponseData {
 }
 
 export interface CurrentUser {
-  id: number;
-  uuid: string;
+  id: string;
   username: string;
   display_name: string | null;
-  role_id: number;
+  role_id: string;
   role_name: string;
   permissions: string[];
   avatar: string | null;
@@ -236,7 +235,7 @@ export interface PriceAdjustmentData {
   rule_type: string;
   product_scope: string;
   target_id?: number;
-  zone_scope: number;
+  zone_scope: string;
   adjustment_type: string;
   adjustment_value: number;
   priority: number;
@@ -263,7 +262,7 @@ export interface CreatePriceAdjustmentRequest {
   rule_type: string;           // "SURCHARGE" | "DISCOUNT"
   product_scope: string;       // "PRODUCT" | "TAG" | "CATEGORY" | "GLOBAL"
   target_id?: number;          // i64
-  zone_scope: number;          // 0=RETAIL, -1=ALL, >0=ZONE_ID
+  zone_scope: string;          // 0=RETAIL, -1=ALL, >0=ZONE_ID
   adjustment_type: string;     // "PERCENTAGE" | "FIXED_AMOUNT"
   adjustment_value: number;    // i64 - 金额(分) 或 百分比值
   priority?: number;           // i64, default 0
@@ -283,7 +282,7 @@ export interface UpdatePriceAdjustmentRequest {
   rule_type?: string;
   product_scope?: string;
   target_id?: number;
-  zone_scope?: number;
+  zone_scope?: string;
   adjustment_type?: string;
   adjustment_value?: number;
   priority?: number;
