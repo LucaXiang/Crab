@@ -33,9 +33,9 @@ DEFINE FIELD OVERWRITE product_scope ON price_rule TYPE string
 DEFINE FIELD OVERWRITE target ON price_rule TYPE option<record>
     PERMISSIONS FULL;
 
--- 区域范围: -1=全部, 0=零售, >0=指定区域
-DEFINE FIELD OVERWRITE zone_scope ON price_rule TYPE int
-    DEFAULT -1
+-- 区域范围: "zone:all"=全部, "zone:retail"=零售, "zone:xxx"=指定区域
+DEFINE FIELD OVERWRITE zone_scope ON price_rule TYPE string
+    DEFAULT "zone:all"
     PERMISSIONS FULL;
 
 -- 调整类型: PERCENTAGE, FIXED_AMOUNT
@@ -43,8 +43,8 @@ DEFINE FIELD OVERWRITE adjustment_type ON price_rule TYPE string
     ASSERT $value IN ["PERCENTAGE", "FIXED_AMOUNT"]
     PERMISSIONS FULL;
 
--- 调整值 (百分比如30=30%, 固定金额单位:分)
-DEFINE FIELD OVERWRITE adjustment_value ON price_rule TYPE int
+-- 调整值 (百分比如30=30%, 固定金额如0.5)
+DEFINE FIELD OVERWRITE adjustment_value ON price_rule TYPE float
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE priority ON price_rule TYPE int

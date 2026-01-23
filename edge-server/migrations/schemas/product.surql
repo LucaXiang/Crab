@@ -35,11 +35,22 @@ DEFINE FIELD OVERWRITE receipt_name ON product TYPE option<string>
 DEFINE FIELD OVERWRITE kitchen_print_name ON product TYPE option<string>
     PERMISSIONS FULL;
 
--- 打印目的地
-DEFINE FIELD OVERWRITE print_destinations ON product TYPE array<record<print_destination>>
+-- 厨房打印目的地
+DEFINE FIELD OVERWRITE kitchen_print_destinations ON product TYPE array<record<print_destination>>
     DEFAULT []
     PERMISSIONS FULL;
 
+-- 标签打印目的地
+DEFINE FIELD OVERWRITE label_print_destinations ON product TYPE array<record<print_destination>>
+    DEFAULT []
+    PERMISSIONS FULL;
+
+-- 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
+DEFINE FIELD OVERWRITE is_kitchen_print_enabled ON product TYPE int
+    DEFAULT -1
+    PERMISSIONS FULL;
+
+-- 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
 DEFINE FIELD OVERWRITE is_label_print_enabled ON product TYPE int
     DEFAULT -1
     PERMISSIONS FULL;
@@ -60,7 +71,7 @@ DEFINE FIELD OVERWRITE specs ON product TYPE array<object>
 
 -- 规格对象字段定义
 DEFINE FIELD OVERWRITE specs.*.name ON product TYPE string PERMISSIONS FULL;
-DEFINE FIELD OVERWRITE specs.*.price ON product TYPE int DEFAULT 0 PERMISSIONS FULL;
+DEFINE FIELD OVERWRITE specs.*.price ON product TYPE float DEFAULT 0 PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE specs.*.display_order ON product TYPE int DEFAULT 0 PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE specs.*.is_default ON product TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE specs.*.is_active ON product TYPE bool DEFAULT true PERMISSIONS FULL;
