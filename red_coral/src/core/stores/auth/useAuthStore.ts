@@ -18,7 +18,7 @@ interface AuthStore {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   setUser: (user: User | null) => void;
-  fetchUserPermissions: (roleId: number) => Promise<void>;
+  fetchUserPermissions: (roleId: string) => Promise<void>;
   refreshToken: () => Promise<void>;
 
   // Permission Checks
@@ -28,9 +28,9 @@ interface AuthStore {
   // User Management Actions (Admin only)
   fetchUsers: () => Promise<User[]>;
   createUser: (data: { username: string; password: string; displayName?: string; role: string }) => Promise<User>;
-  updateUser: (userId: number, data: { displayName?: string; role?: string; isActive?: boolean }) => Promise<User>;
-  resetPassword: (userId: number, newPassword: string) => Promise<void>;
-  deleteUser: (userId: number) => Promise<void>;
+  updateUser: (userId: string, data: { displayName?: string; role?: string; isActive?: boolean }) => Promise<User>;
+  resetPassword: (userId: string, newPassword: string) => Promise<void>;
+  deleteUser: (userId: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -57,7 +57,6 @@ export const useAuthStore = create<AuthStore>()(
           // 将 API 用户数据转换为本地 User 类型
           const user: User = {
             id: userData.id,
-            uuid: userData.uuid,
             username: userData.username,
             display_name: userData.display_name,
             role_id: userData.role_id,
@@ -69,7 +68,7 @@ export const useAuthStore = create<AuthStore>()(
           };
 
           // 获取权限 - API 返回 RolePermission[]，提取 permission 字段
-          const rolePermissions = await api.getRolePermissions(String(userData.role_id));
+          const rolePermissions = await api.getRolePermissions(userData.role_id);
           const permissions = rolePermissions.permissions.map(p => p.permission);
 
           set({
@@ -112,9 +111,9 @@ export const useAuthStore = create<AuthStore>()(
       /**
        * Fetch permissions for a role
        */
-      fetchUserPermissions: async (roleId: number) => {
+      fetchUserPermissions: async (roleId: string) => {
         try {
-          const rolePermissions = await api.getRolePermissions(String(roleId));
+          const rolePermissions = await api.getRolePermissions(roleId);
           const permissions = rolePermissions.permissions.map(p => p.permission);
           set({ permissions });
         } catch (error) {
@@ -142,7 +141,7 @@ export const useAuthStore = create<AuthStore>()(
       hasPermission: (permission: string) => {
         const { permissions, user } = get();
         // Admin always has all permissions
-        if (user?.role_name === 'admin' || user?.role_id === 1 || permissions.includes('*')) return true;
+        if (user?.role_name === 'admin' || user?.role_id === 'role:admin' || permissions.includes('*')) return true;
         return permissions.includes(permission);
       },
 
@@ -165,14 +164,14 @@ export const useAuthStore = create<AuthStore>()(
         const employees = await api.listEmployees();
         // 转换 Employee -> User
         return employees.map((e) => ({
-          id: parseInt(e.id) || 0,
-          uuid: e.id,
+          id: e.id ?? '',
           username: e.username,
-          display_name: e.username,
-          role_id: parseInt(e.role) || 0,
+          display_name: e.display_name,
+          role_id: e.role,
           role_name: undefined,
           avatar: null,
           is_active: e.is_active,
+          is_system: e.is_system,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })) as User[];
@@ -185,42 +184,42 @@ export const useAuthStore = create<AuthStore>()(
           role: data.role,
         });
         return {
-          id: parseInt(result.id) || 0,
-          uuid: result.id,
+          id: result.id ?? '',
           username: result.username,
-          display_name: data.displayName || result.username,
-          role_id: parseInt(result.role) || 0,
+          display_name: data.displayName || result.display_name,
+          role_id: result.role,
           avatar: null,
           is_active: result.is_active,
+          is_system: result.is_system,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         } as User;
       },
 
-      updateUser: async (userId: number, data: { displayName?: string; role?: string; isActive?: boolean }) => {
-        const result = await api.updateEmployee(String(userId), {
+      updateUser: async (userId: string, data: { displayName?: string; role?: string; isActive?: boolean }) => {
+        const result = await api.updateEmployee(userId, {
           role: data.role,
           is_active: data.isActive,
         });
         return {
-          id: parseInt(result.id) || userId,
-          uuid: result.id,
+          id: result.id ?? userId,
           username: result.username,
-          display_name: data.displayName || result.username,
-          role_id: parseInt(result.role) || 0,
+          display_name: data.displayName || result.display_name,
+          role_id: result.role,
           avatar: null,
           is_active: result.is_active,
+          is_system: result.is_system,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         } as User;
       },
 
-      resetPassword: async (userId: number, newPassword: string) => {
-        await api.updateEmployee(String(userId), { password: newPassword });
+      resetPassword: async (userId: string, newPassword: string) => {
+        await api.updateEmployee(userId, { password: newPassword });
       },
 
-      deleteUser: async (userId: number) => {
-        await api.deleteEmployee(String(userId));
+      deleteUser: async (userId: string) => {
+        await api.deleteEmployee(userId);
       },
     }),
     {

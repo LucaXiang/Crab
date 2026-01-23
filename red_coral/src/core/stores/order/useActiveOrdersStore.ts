@@ -33,6 +33,8 @@ import { applyEvent, createEmptySnapshot } from './orderReducer';
 interface ActiveOrdersState {
   /** Map of order_id -> OrderSnapshot */
   orders: Map<string, OrderSnapshot>;
+  /** Map of order_id -> OrderEvent[] (timeline for UI display) */
+  timelines: Map<string, OrderEvent[]>;
   /** Last processed event sequence number */
   lastSequence: number;
   /** Connection state for order sync */
@@ -105,8 +107,9 @@ interface ActiveOrdersActions {
    * @param orders - Active order snapshots from server
    * @param serverSequence - Server's current sequence number
    * @param serverEpoch - Server instance epoch (optional, updates if provided)
+   * @param events - All events to populate timelines (optional)
    */
-  _fullSync: (orders: OrderSnapshot[], serverSequence: number, serverEpoch?: string) => void;
+  _fullSync: (orders: OrderSnapshot[], serverSequence: number, serverEpoch?: string, events?: OrderEvent[]) => void;
 
   /**
    * Update connection state
@@ -133,6 +136,7 @@ type ActiveOrdersStore = ActiveOrdersState & ActiveOrdersActions;
 
 const initialState: ActiveOrdersState = {
   orders: new Map(),
+  timelines: new Map(),
   lastSequence: 0,
   connectionState: 'disconnected',
   isInitialized: false,
@@ -244,9 +248,18 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
       const orders = new Map(state.orders);
       orders.set(snapshot.order_id, snapshot);
 
+      // 追加 event 到 timeline（用于 UI 渲染操作记录）
+      const timelines = new Map(state.timelines);
+      const existingTimeline = timelines.get(snapshot.order_id) || [];
+      // 去重：检查 event_id 是否已存在
+      if (!existingTimeline.some(e => e.event_id === event.event_id)) {
+        timelines.set(snapshot.order_id, [...existingTimeline, event]);
+      }
+
       return {
         ...state,
         orders,
+        timelines,
         lastSequence: Math.max(state.lastSequence, snapshot.last_sequence),
       };
     });
@@ -285,7 +298,7 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
     });
   },
 
-  _fullSync: (orders: OrderSnapshot[], serverSequence: number, serverEpoch?: string) => {
+  _fullSync: (orders: OrderSnapshot[], serverSequence: number, serverEpoch?: string, events?: OrderEvent[]) => {
     set((state) => {
       const newOrders = new Map<string, OrderSnapshot>();
 
@@ -293,9 +306,24 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
         newOrders.set(order.order_id, order);
       }
 
+      // 从 events 构建 timelines
+      const newTimelines = new Map<string, OrderEvent[]>();
+      if (events && events.length > 0) {
+        for (const event of events) {
+          const orderId = event.order_id;
+          // 只为活跃订单构建 timeline
+          if (newOrders.has(orderId)) {
+            const timeline = newTimelines.get(orderId) || [];
+            timeline.push(event);
+            newTimelines.set(orderId, timeline);
+          }
+        }
+      }
+
       return {
         ...state,
         orders: newOrders,
+        timelines: newTimelines,
         lastSequence: serverSequence,
         isInitialized: true,
         connectionState: 'connected',
@@ -352,6 +380,14 @@ export const useOrderByTable = (tableId: string | null | undefined) =>
       (order) => order.table_id === tableId && order.status === 'ACTIVE'
     );
   });
+
+/**
+ * Select timeline for a specific order
+ */
+export const useOrderTimeline = (orderId: string | null | undefined) =>
+  useActiveOrdersStore((state) =>
+    orderId ? state.timelines.get(orderId) || [] : []
+  );
 
 /**
  * Select active order count

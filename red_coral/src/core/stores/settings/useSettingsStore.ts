@@ -452,6 +452,11 @@ function validateSettingsForm(entity: ModalEntity, formData: FormData): Record<s
   } else if (entity === 'PRODUCT') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.product.nameRequired';
     if (!formData.category) errors.category = 'settings.errors.product.categoryRequired';
+    // Check external_id in default spec
+    const defaultSpec = formData.specs?.find(s => s.is_default) ?? formData.specs?.[0];
+    if (defaultSpec?.external_id === undefined || defaultSpec?.external_id === null) {
+      errors.externalId = 'settings.external_id_required';
+    }
   } else if (entity === 'CATEGORY') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.category.nameRequired';
   } else if (entity === 'TAG') {
@@ -472,8 +477,10 @@ function computeIsDirty(entity: ModalEntity, next: FormData, initial: FormData):
   } else if (entity === 'PRODUCT') {
     const keys: (keyof FormData)[] = [
       'name', 'category', 'image', 'tax_rate', 'receipt_name',
-      'sort_order', 'print_destinations', 'kitchen_print_name',
-      'is_label_print_enabled', 'is_active', 'has_multi_spec', 'tags', 'specs',
+      'sort_order', 'print_destinations', 'label_print_destinations',
+      'kitchen_print_name', 'is_kitchen_print_enabled', 'is_label_print_enabled',
+      'is_active', 'has_multi_spec', 'tags', 'specs',
+      'selected_attribute_ids', 'attribute_default_options',
     ];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'CATEGORY') {

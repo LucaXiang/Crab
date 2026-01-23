@@ -298,10 +298,12 @@ export function useOrderCommands() {
       const command = createCommand({
         type: 'ADD_PAYMENT',
         order_id: orderId,
-        method: payment.method,
-        amount: payment.amount,
-        tendered: payment.tendered ?? null,
-        note: payment.note ?? null,
+        payment: {
+          method: payment.method,
+          amount: payment.amount,
+          tendered: payment.tendered ?? null,
+          note: payment.note ?? null,
+        },
       });
 
       return sendCommand(command);

@@ -32,6 +32,7 @@ export {
   useActiveOrders,
   useOrder,
   useOrderByTable,
+  useOrderTimeline,
   useActiveOrderCount,
   useOrderConnectionState,
   useOrdersInitialized,

@@ -101,7 +101,7 @@ export function createResourceStore<T extends { id: string }>(
       const state = get();
       const { id, version, action, data } = payload;
 
-      console.log(`[${resourceName}] applySync called, id=${id}, version=${version}, action=${action}, lastVersion=${state.lastVersion}`);
+      console.log(`[${resourceName}] applySync called, id=${id}, version=${version}, action=${action}, lastVersion=${state.lastVersion}, itemCount=${state.items.length}`);
 
       // Skip if duplicate (version already seen)
       if (version <= state.lastVersion) {
@@ -124,10 +124,20 @@ export function createResourceStore<T extends { id: string }>(
       switch (action) {
         case 'created':
           if (data) {
-            set((s) => ({
-              items: [...s.items, data],
-              lastVersion: version,
-            }));
+            // Check if item already exists (from optimistic add)
+            const exists = state.items.some((item) => item.id === id);
+            if (exists) {
+              // Update existing item instead of adding duplicate
+              set((s) => ({
+                items: s.items.map((item) => (item.id === id ? data : item)),
+                lastVersion: version,
+              }));
+            } else {
+              set((s) => ({
+                items: [...s.items, data],
+                lastVersion: version,
+              }));
+            }
           }
           break;
         case 'updated':
@@ -209,7 +219,7 @@ export function createCrudResourceStore<
       const state = get();
       const { id, version, action, data } = payload;
 
-      console.log(`[${resourceName}] applySync called, id=${id}, version=${version}, action=${action}, lastVersion=${state.lastVersion}`);
+      console.log(`[${resourceName}] applySync called, id=${id}, version=${version}, action=${action}, lastVersion=${state.lastVersion}, itemCount=${state.items.length}`);
 
       // Skip if duplicate (version already seen)
       if (version <= state.lastVersion) {
@@ -232,10 +242,20 @@ export function createCrudResourceStore<
       switch (action) {
         case 'created':
           if (data) {
-            set((s) => ({
-              items: [...s.items, data],
-              lastVersion: version,
-            }));
+            // Check if item already exists (from optimistic add)
+            const exists = state.items.some((item) => item.id === id);
+            if (exists) {
+              // Update existing item instead of adding duplicate
+              set((s) => ({
+                items: s.items.map((item) => (item.id === id ? data : item)),
+                lastVersion: version,
+              }));
+            } else {
+              set((s) => ({
+                items: [...s.items, data],
+                lastVersion: version,
+              }));
+            }
           }
           break;
         case 'updated':
@@ -303,7 +323,15 @@ export function createCrudResourceStore<
     },
 
     optimisticAdd: (item) => {
-      set((state) => ({ items: [...state.items, item] }));
+      set((state) => {
+        // Check if item already exists to prevent duplicates
+        const exists = state.items.some((i) => i.id === item.id);
+        if (exists) {
+          console.log(`[optimisticAdd] Item ${item.id} already exists, skipping`);
+          return state;
+        }
+        return { items: [...state.items, item] };
+      });
     },
   }));
 }

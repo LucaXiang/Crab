@@ -125,7 +125,7 @@ export function useOrderSync() {
         // Full sync: replace all state with server snapshots
         const reason = epochChanged ? 'epoch_change' : eventGap > MAX_EVENT_GAP ? 'large_gap' : 'server_request';
         console.log(`[Sync] Full sync: reason=${reason}, gap=${eventGap}, epoch=${response.server_epoch}`);
-        _fullSync(response.active_orders, response.server_sequence, response.server_epoch);
+        _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
       } else if (response.events.length > 0) {
         // Incremental sync: apply missing events
         console.log(`[Sync] Incremental: ${response.events.length} events`);
@@ -196,7 +196,7 @@ export function useOrderSync() {
 
       // Full sync with all active orders, storing the server epoch
       console.log(`[Sync] Initial sync: ${response.active_orders.length} orders, epoch=${response.server_epoch}`);
-      _fullSync(response.active_orders, response.server_sequence, response.server_epoch);
+      _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
       _setInitialized(true);
 
       return true;
@@ -298,7 +298,7 @@ export async function setupOrderEventListeners(): Promise<() => void> {
         }
 
         if (response.requires_full_sync || epochChanged) {
-          _fullSync(response.active_orders, response.server_sequence, response.server_epoch);
+          _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
         } else if (response.events.length > 0) {
           _applyEvents(response.events);
           _setConnectionState('connected');

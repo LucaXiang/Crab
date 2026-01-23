@@ -16,7 +16,6 @@ import type {
   OrderCommandPayload,
   CommandResponse,
   CartItemInput,
-  PaymentMethod,
 } from '@/core/domain/types/orderEvent';
 
 // ============================================================================
@@ -229,10 +228,12 @@ export const completeOrder = async (
     const paymentCommand = createCommand({
       type: 'ADD_PAYMENT',
       order_id: orderId,
-      method: payment.method as PaymentMethod,
-      amount: payment.amount,
-      tendered: payment.tendered ?? null,
-      note: payment.note ?? null,
+      payment: {
+        method: payment.method,
+        amount: payment.amount,
+        tendered: payment.tendered ?? null,
+        note: payment.note ?? null,
+      },
     });
     const paymentResponse = await sendCommand(paymentCommand);
     ensureSuccess(paymentResponse, 'Add payment');
@@ -291,10 +292,12 @@ export const partialSettle = async (
     const command = createCommand({
       type: 'ADD_PAYMENT',
       order_id: orderId,
-      method: payment.method as PaymentMethod,
-      amount: payment.amount,
-      tendered: payment.tendered ?? null,
-      note: payment.note ?? null,
+      payment: {
+        method: payment.method,
+        amount: payment.amount,
+        tendered: payment.tendered ?? null,
+        note: payment.note ?? null,
+      },
     });
     const response = await sendCommand(command);
     ensureSuccess(response, 'Add payment');

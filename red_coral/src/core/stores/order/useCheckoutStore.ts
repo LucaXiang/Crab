@@ -226,7 +226,30 @@ export const useCheckoutCustomerCount = () => useCheckoutStore((s) => s.customer
 export const useCheckoutNoteInput = () => useCheckoutStore((s) => s.noteInput);
 export const useCheckoutRecentCustomers = () => useCheckoutStore((s) => s.recentCustomers);
 export const useCurrentOrderKey = () => useCheckoutStore((s) => s.currentOrderKey);
-export const useCheckoutOrder = () => useCheckoutStore((s) => s.checkoutOrder);
+
+// 直接从 useActiveOrdersStore 获取订单数据（单一数据源）
+import { useActiveOrdersStore } from './useActiveOrdersStore';
+
+export const useCheckoutOrder = () => {
+  // currentOrderKey 是 table ID，不是 order ID
+  const currentOrderKey = useCheckoutStore((s) => s.currentOrderKey);
+  const fallbackOrder = useCheckoutStore((s) => s.checkoutOrder);
+  
+  // 从 useActiveOrdersStore 按 table_id 查找订单
+  // 当 orders Map 更新时，selector 会重新执行，组件会重新渲染
+  const orderFromStore = useActiveOrdersStore((state) => {
+    if (!currentOrderKey) return null;
+    for (const order of state.orders.values()) {
+      if (order.table_id === currentOrderKey && order.status === 'ACTIVE') {
+        return order;
+      }
+    }
+    return null;
+  });
+  
+  // 优先使用 store 数据（单一数据源），fallback 到 checkoutOrder
+  return (orderFromStore as HeldOrder | null) ?? fallbackOrder;
+};
 
 // Actions export
 export function useCheckoutActions() {
