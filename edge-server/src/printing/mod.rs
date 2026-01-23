@@ -5,11 +5,15 @@
 //! - Label printing: per-item labels (e.g., bubble tea stickers)
 
 pub mod cache;
+pub mod executor;
+pub mod renderer;
 pub mod service;
 pub mod storage;
 pub mod types;
 
 pub use cache::PrintConfigCache;
+pub use executor::{PrintExecutor, PrintExecutorError, PrintExecutorResult};
+pub use renderer::KitchenTicketRenderer;
 pub use service::{KitchenPrintService, PrintServiceError, PrintServiceResult};
 pub use storage::{PrintStorage, PrintStorageError, PrintStorageResult, PrintStorageStats};
 pub use types::*;

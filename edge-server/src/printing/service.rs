@@ -167,8 +167,17 @@ impl KitchenPrintService {
     async fn build_print_context(&self, item: &CartItemSnapshot) -> PrintItemContext {
         // Get product config from cache
         let product_config = self.config_cache.get_product(&item.id).await;
-        // Category config could be loaded here for category_name lookup
-        // For now, we leave it empty as the config cache handles fallback routing
+
+        // Get category info from cache
+        let (category_id, category_name) = if let Some(ref pc) = product_config {
+            let cat_config = self.config_cache.get_category(&pc.category_id).await;
+            (
+                pc.category_id.clone(),
+                cat_config.map(|c| c.category_name).unwrap_or_default(),
+            )
+        } else {
+            (String::new(), String::new())
+        };
 
         // Get destinations using the fallback chain
         let kitchen_destinations = self.config_cache.get_kitchen_destinations(&item.id).await;
@@ -188,11 +197,8 @@ impl KitchenPrintService {
             .map(|s| s.name.clone());
 
         PrintItemContext {
-            category_id: product_config
-                .as_ref()
-                .map(|p| p.category_id.clone())
-                .unwrap_or_default(),
-            category_name: String::new(), // Will be filled from cache
+            category_id,
+            category_name,
             product_id: item.id.clone(),
             external_id: product_config
                 .as_ref()
@@ -341,6 +347,7 @@ mod tests {
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
+            line_total: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,

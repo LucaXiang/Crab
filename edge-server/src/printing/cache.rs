@@ -47,6 +47,17 @@ impl PrintConfigCache {
         inner.default_label_printer = label;
     }
 
+    /// 获取系统默认打印机
+    ///
+    /// Returns (kitchen_printer_id, label_printer_id)
+    pub async fn get_defaults(&self) -> (Option<String>, Option<String>) {
+        let inner = self.inner.read().await;
+        (
+            inner.default_kitchen_printer.clone(),
+            inner.default_label_printer.clone(),
+        )
+    }
+
     /// 更新商品配置
     pub async fn update_product(&self, config: ProductPrintConfig) {
         let mut inner = self.inner.write().await;
@@ -202,5 +213,230 @@ impl PrintConfigCache {
 impl Default for PrintConfigCache {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_product_config(
+        product_id: &str,
+        category_id: &str,
+        kitchen_enabled: i32,
+        label_enabled: i32,
+        kitchen_dests: Vec<&str>,
+        label_dests: Vec<&str>,
+    ) -> ProductPrintConfig {
+        ProductPrintConfig {
+            product_id: product_id.to_string(),
+            product_name: format!("Product {}", product_id),
+            kitchen_name: format!("Kitchen {}", product_id),
+            kitchen_print_destinations: kitchen_dests.into_iter().map(String::from).collect(),
+            label_print_destinations: label_dests.into_iter().map(String::from).collect(),
+            is_kitchen_print_enabled: kitchen_enabled,
+            is_label_print_enabled: label_enabled,
+            root_spec_external_id: None,
+            category_id: category_id.to_string(),
+        }
+    }
+
+    fn create_category_config(
+        category_id: &str,
+        kitchen_enabled: bool,
+        label_enabled: bool,
+        kitchen_dests: Vec<&str>,
+        label_dests: Vec<&str>,
+    ) -> CategoryPrintConfig {
+        CategoryPrintConfig {
+            category_id: category_id.to_string(),
+            category_name: format!("Category {}", category_id),
+            kitchen_print_destinations: kitchen_dests.into_iter().map(String::from).collect(),
+            label_print_destinations: label_dests.into_iter().map(String::from).collect(),
+            is_kitchen_print_enabled: kitchen_enabled,
+            is_label_print_enabled: label_enabled,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_defaults() {
+        let cache = PrintConfigCache::new();
+
+        // Initially no defaults
+        assert!(!cache.is_kitchen_print_enabled().await);
+        assert!(!cache.is_label_print_enabled().await);
+        let (k, l) = cache.get_defaults().await;
+        assert!(k.is_none());
+        assert!(l.is_none());
+
+        // Set defaults
+        cache.set_defaults(Some("printer-k".to_string()), Some("printer-l".to_string())).await;
+
+        assert!(cache.is_kitchen_print_enabled().await);
+        assert!(cache.is_label_print_enabled().await);
+        let (k, l) = cache.get_defaults().await;
+        assert_eq!(k, Some("printer-k".to_string()));
+        assert_eq!(l, Some("printer-l".to_string()));
+
+        // Clear one default
+        cache.set_defaults(None, Some("printer-l".to_string())).await;
+        assert!(!cache.is_kitchen_print_enabled().await);
+        assert!(cache.is_label_print_enabled().await);
+    }
+
+    #[tokio::test]
+    async fn test_product_crud() {
+        let cache = PrintConfigCache::new();
+
+        let config = create_product_config("p1", "c1", 1, 0, vec!["dest1"], vec![]);
+        cache.update_product(config).await;
+
+        let p = cache.get_product("p1").await;
+        assert!(p.is_some());
+        assert_eq!(p.unwrap().product_id, "p1");
+
+        cache.remove_product("p1").await;
+        assert!(cache.get_product("p1").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_category_crud() {
+        let cache = PrintConfigCache::new();
+
+        let config = create_category_config("c1", true, false, vec!["dest1"], vec![]);
+        cache.update_category(config).await;
+
+        let c = cache.get_category("c1").await;
+        assert!(c.is_some());
+        assert_eq!(c.unwrap().category_id, "c1");
+
+        cache.remove_category("c1").await;
+        assert!(cache.get_category("c1").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_tristate_kitchen_enabled() {
+        let cache = PrintConfigCache::new();
+
+        // Setup category with kitchen enabled
+        cache.update_category(create_category_config("c1", true, false, vec![], vec![])).await;
+
+        // Product explicitly enabled
+        cache.update_product(create_product_config("p1", "c1", 1, 0, vec![], vec![])).await;
+        assert!(cache.is_product_kitchen_enabled("p1").await);
+
+        // Product explicitly disabled
+        cache.update_product(create_product_config("p2", "c1", 0, 0, vec![], vec![])).await;
+        assert!(!cache.is_product_kitchen_enabled("p2").await);
+
+        // Product inherits from category (-1)
+        cache.update_product(create_product_config("p3", "c1", -1, 0, vec![], vec![])).await;
+        assert!(cache.is_product_kitchen_enabled("p3").await);
+
+        // Product inherits but category disabled
+        cache.update_category(create_category_config("c2", false, false, vec![], vec![])).await;
+        cache.update_product(create_product_config("p4", "c2", -1, 0, vec![], vec![])).await;
+        assert!(!cache.is_product_kitchen_enabled("p4").await);
+
+        // Unknown product
+        assert!(!cache.is_product_kitchen_enabled("unknown").await);
+    }
+
+    #[tokio::test]
+    async fn test_tristate_label_enabled() {
+        let cache = PrintConfigCache::new();
+
+        // Setup category with label enabled
+        cache.update_category(create_category_config("c1", false, true, vec![], vec![])).await;
+
+        // Product explicitly enabled
+        cache.update_product(create_product_config("p1", "c1", 0, 1, vec![], vec![])).await;
+        assert!(cache.is_product_label_enabled("p1").await);
+
+        // Product explicitly disabled
+        cache.update_product(create_product_config("p2", "c1", 0, 0, vec![], vec![])).await;
+        assert!(!cache.is_product_label_enabled("p2").await);
+
+        // Product inherits from category (-1)
+        cache.update_product(create_product_config("p3", "c1", 0, -1, vec![], vec![])).await;
+        assert!(cache.is_product_label_enabled("p3").await);
+    }
+
+    #[tokio::test]
+    async fn test_kitchen_destinations_fallback() {
+        let cache = PrintConfigCache::new();
+
+        // Setup system default
+        cache.set_defaults(Some("default-k".to_string()), None).await;
+
+        // Setup category with destinations
+        cache.update_category(create_category_config("c1", true, false, vec!["cat-k"], vec![])).await;
+
+        // Product with own destinations - should use product's
+        cache.update_product(create_product_config("p1", "c1", 1, 0, vec!["prod-k"], vec![])).await;
+        let dests = cache.get_kitchen_destinations("p1").await;
+        assert_eq!(dests, vec!["prod-k"]);
+
+        // Product without destinations - should fallback to category
+        cache.update_product(create_product_config("p2", "c1", 1, 0, vec![], vec![])).await;
+        let dests = cache.get_kitchen_destinations("p2").await;
+        assert_eq!(dests, vec!["cat-k"]);
+
+        // Product in category without destinations - should fallback to system default
+        cache.update_category(create_category_config("c2", true, false, vec![], vec![])).await;
+        cache.update_product(create_product_config("p3", "c2", 1, 0, vec![], vec![])).await;
+        let dests = cache.get_kitchen_destinations("p3").await;
+        assert_eq!(dests, vec!["default-k"]);
+
+        // Product with kitchen disabled - should return empty
+        cache.update_product(create_product_config("p4", "c1", 0, 0, vec![], vec![])).await;
+        let dests = cache.get_kitchen_destinations("p4").await;
+        assert!(dests.is_empty());
+
+        // Unknown product - should return system default
+        let dests = cache.get_kitchen_destinations("unknown").await;
+        assert_eq!(dests, vec!["default-k"]);
+    }
+
+    #[tokio::test]
+    async fn test_label_destinations_fallback() {
+        let cache = PrintConfigCache::new();
+
+        // Setup system default
+        cache.set_defaults(None, Some("default-l".to_string())).await;
+
+        // Setup category with destinations
+        cache.update_category(create_category_config("c1", false, true, vec![], vec!["cat-l"])).await;
+
+        // Product with own destinations
+        cache.update_product(create_product_config("p1", "c1", 0, 1, vec![], vec!["prod-l"])).await;
+        let dests = cache.get_label_destinations("p1").await;
+        assert_eq!(dests, vec!["prod-l"]);
+
+        // Product without destinations - fallback to category
+        cache.update_product(create_product_config("p2", "c1", 0, 1, vec![], vec![])).await;
+        let dests = cache.get_label_destinations("p2").await;
+        assert_eq!(dests, vec!["cat-l"]);
+
+        // Product with label disabled
+        cache.update_product(create_product_config("p3", "c1", 0, 0, vec![], vec![])).await;
+        let dests = cache.get_label_destinations("p3").await;
+        assert!(dests.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_clear() {
+        let cache = PrintConfigCache::new();
+
+        cache.update_product(create_product_config("p1", "c1", 1, 1, vec![], vec![])).await;
+        cache.update_category(create_category_config("c1", true, true, vec![], vec![])).await;
+
+        assert!(cache.get_product("p1").await.is_some());
+        assert!(cache.get_category("c1").await.is_some());
+
+        cache.clear().await;
+
+        assert!(cache.get_product("p1").await.is_none());
+        assert!(cache.get_category("c1").await.is_none());
     }
 }
