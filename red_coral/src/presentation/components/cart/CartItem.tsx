@@ -24,7 +24,8 @@ export const CartItem = React.memo<CartItemProps>(({
   const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
   const baseUnitPrice = (item.original_price ?? item.price) + optionsModifier;
   const finalUnitPrice = calculateItemFinalPrice(item).toNumber();
-  const finalLineTotal = calculateItemTotal(item).toNumber();
+  // Use backend-computed line_total for consistency with order total, fall back to local calculation
+  const finalLineTotal = item.line_total ?? calculateItemTotal(item).toNumber();
 
   const handleQuantityChange = (e: React.MouseEvent, delta: number) => {
     e.stopPropagation();

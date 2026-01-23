@@ -176,12 +176,12 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
 
   const handleProtectedDelete = (authorizer?: { id: string; username: string }) => {
      if (onDelete) {
-        onDelete(authorizer || (currentUser ? { id: String(currentUser.id), username: currentUser.username } : undefined));
+        onDelete(authorizer || (currentUser ? { id: currentUser.id, username: currentUser.username } : undefined));
      }
   };
 
   const handleProtectedDiscount = (val: number, authorizer?: { id: string; username: string }) => {
-      onDiscountChange(val, authorizer || (currentUser ? { id: String(currentUser.id), username: currentUser.username } : undefined));
+      onDiscountChange(val, authorizer || (currentUser ? { id: currentUser.id, username: currentUser.username } : undefined));
   };
 
   return (
@@ -274,7 +274,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                                 permission={Permission.APPLY_DISCOUNT}
                                 mode="intercept"
                                 description={t('pos.cart.enter_discount')}
-                                onAuthorized={(user) => openNumpad('DISC', { id: String(user.id), username: user.username })}
+                                onAuthorized={(user) => openNumpad('DISC', { id: user.id, username: user.username })}
                             >
                                 <button
                                     onClick={() => {
@@ -320,7 +320,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                                     permission={Permission.APPLY_DISCOUNT}
                                     mode="intercept"
                                     description={`${t('checkout.cart.discount')} ${d}%`}
-                                    onAuthorized={(user) => handleProtectedDiscount(d === discount ? 0 : d, { id: String(user.id), username: user.username })}
+                                    onAuthorized={(user) => handleProtectedDiscount(d === discount ? 0 : d, { id: user.id, username: user.username })}
                                 >
                                     <button
                                         onClick={() => {
@@ -365,7 +365,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                         permission={Permission.VOID_ORDER}
                         mode="intercept"
                         description={t('common.action.delete')}
-                        onAuthorized={(user) => handleProtectedDelete({ id: String(user.id), username: user.username })}
+                        onAuthorized={(user) => handleProtectedDelete({ id: user.id, username: user.username })}
                     >
                         <button
                             onClick={() => {

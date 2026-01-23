@@ -1,6 +1,5 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { HeldOrder, CartItem } from '@/core/domain/types';
-import type { OrderEvent } from '@/core/domain/types/orderEvent';
 import { Clock, List, Settings, ShoppingBag } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { OrderItemsSummary } from '@/screens/Checkout/OrderItemsSummary';
@@ -8,6 +7,7 @@ import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDe
 import { QuickAddModal } from '@/presentation/components/modals/QuickAddModal';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
+import { useOrderTimeline } from '@/core/stores/order/useActiveOrdersStore';
 import { Currency } from '@/utils/currency';
 import { formatCurrency } from '@/utils/currency';
 import { calculateDiscountAmount, calculateOptionsModifier } from '@/utils/pricing';
@@ -33,7 +33,9 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   const [activeTab, setActiveTab] = useState<Tab>('ITEMS');
   const [editingItem, setEditingItem] = useState<{ item: CartItem; index: number } | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [lazyTimeline, setLazyTimeline] = useState<OrderEvent[] | null>(null);
+  
+  // 直接从 store 获取 timeline（不依赖 order.timeline）
+  const timeline = useOrderTimeline(order.order_id);
 
   const handleEditItem = React.useCallback((item: CartItem) => {
     // Find index of item in order.items
@@ -137,11 +139,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       }));
   }, [order.items]);
 
-  React.useEffect(() => {
-    if (activeTab !== 'TIMELINE') return;
-    // Timeline events come from server via order.timeline
-    setLazyTimeline(order.timeline || []);
-  }, [activeTab, order.timeline]);
+  // Timeline 现在直接从 store 获取，不需要 useEffect
 
   return (
     <div className="w-[400px] bg-white h-full border-r border-gray-200 flex flex-col shadow-xl relative">
@@ -226,7 +224,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
             </div>
           }>
-            <TimelineList events={lazyTimeline || []} />
+            <TimelineList events={timeline} />
           </Suspense>
         )}
       </div>
