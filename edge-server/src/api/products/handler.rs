@@ -4,17 +4,53 @@ use axum::{
     Json,
     extract::{Path, State},
 };
+use surrealdb::Surreal;
+use surrealdb::engine::local::Db;
 
-use crate::api::convert::{option_thing_to_string, thing_to_string, things_to_strings};
+use crate::api::convert::thing_to_string;
 use crate::core::ServerState;
-use crate::db::models::{ProductCreate, ProductUpdate};
+use crate::db::models::{AttributeBindingFull, Product, ProductCreate, ProductFull, ProductUpdate};
 use crate::db::repository::{AttributeRepository, ProductRepository, TagRepository};
-use crate::utils::{AppError, AppResult};
-
-// API 返回类型使用 shared::models (String ID)
-use shared::models::{AttributeBindingFull, EmbeddedSpec, Product, ProductFull};
+use crate::utils::{AppError, AppResult, ErrorCode};
 
 const RESOURCE_PRODUCT: &str = "product";
+
+/// 检查 external_id 是否已存在，返回重复的 ID 列表
+async fn check_duplicate_external_ids(
+    db: &Surreal<Db>,
+    external_ids: &[i64],
+    exclude_product_id: Option<&str>,
+) -> Option<Vec<i64>> {
+    let query_result = if let Some(exclude_id) = exclude_product_id {
+        // Strip "product:" prefix if present, since type::thing() will add it
+        let exclude_id = exclude_id
+            .strip_prefix("product:")
+            .unwrap_or(exclude_id)
+            .to_string();
+        db.query("SELECT external_id FROM product_spec WHERE external_id IN $ids AND product != type::thing('product', $exclude)")
+            .bind(("ids", external_ids.to_vec()))
+            .bind(("exclude", exclude_id))
+            .await
+    } else {
+        db.query("SELECT external_id FROM product_spec WHERE external_id IN $ids")
+            .bind(("ids", external_ids.to_vec()))
+            .await
+    };
+
+    let query = query_result.ok()?;
+
+    #[derive(serde::Deserialize)]
+    struct Found {
+        external_id: i64,
+    }
+
+    let found: Vec<Found> = query.check().ok()?.take(0).unwrap_or_default();
+    if found.is_empty() {
+        None
+    } else {
+        Some(found.into_iter().map(|f| f.external_id).collect())
+    }
+}
 
 // =============================================================================
 // Product Handlers
@@ -27,8 +63,8 @@ pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Produc
         .find_all()
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
-    // 转换为 API 类型 (Thing -> String)
-    Ok(Json(products.into_iter().map(Into::into).collect()))
+
+    Ok(Json(products))
 }
 
 /// GET /api/products/by-category/:category_id - 按分类获取商品
@@ -41,7 +77,7 @@ pub async fn list_by_category(
         .find_by_category(&category_id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(products.into_iter().map(Into::into).collect()))
+    Ok(Json(products))
 }
 
 /// GET /api/products/:id - 获取单个商品
@@ -55,7 +91,7 @@ pub async fn get_by_id(
         .await
         .map_err(|e| AppError::database(e.to_string()))?
         .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
-    Ok(Json(product.into()))
+    Ok(Json(product))
 }
 
 /// GET /api/products/:id/full - 获取商品完整信息 (含规格、属性、标签)
@@ -81,7 +117,7 @@ pub async fn get_full(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // Get full tag objects
-    let tag_ids: Vec<String> = product.tags.iter().map(|t| t.id.to_string()).collect();
+    let tag_ids: Vec<String> = product.tags.iter().map(|t| t.to_string()).collect();
     let mut tags = Vec::new();
     for tag_id in tag_ids {
         if let Some(tag) = tag_repo
@@ -89,19 +125,16 @@ pub async fn get_full(
             .await
             .map_err(|e| AppError::database(e.to_string()))?
         {
-            tags.push(tag.into());
+            tags.push(tag);
         }
     }
-
-    // Convert embedded specs to API type
-    let specs: Vec<EmbeddedSpec> = product.specs.into_iter().map(Into::into).collect();
 
     // Convert attribute bindings
     let attr_bindings: Vec<AttributeBindingFull> = bindings
         .into_iter()
         .map(|(binding, attr)| AttributeBindingFull {
-            id: binding.id.map(|t| t.to_raw()),
-            attribute: attr.into(),
+            id: binding.id,
+            attribute: attr,
             is_required: binding.is_required,
             display_order: binding.display_order,
             default_option_idx: binding.default_option_idx,
@@ -110,20 +143,20 @@ pub async fn get_full(
 
     // Build ProductFull
     let product_full = ProductFull {
-        id: option_thing_to_string(&product.id),
+        id: product.id,
         name: product.name,
         image: product.image,
-        category: thing_to_string(&product.category),
+        category: product.category,
         sort_order: product.sort_order,
         tax_rate: product.tax_rate,
         receipt_name: product.receipt_name,
         kitchen_print_name: product.kitchen_print_name,
-        kitchen_print_destinations: things_to_strings(&product.kitchen_print_destinations),
-        label_print_destinations: things_to_strings(&product.label_print_destinations),
+        kitchen_print_destinations: product.kitchen_print_destinations,
+        label_print_destinations: product.label_print_destinations,
         is_kitchen_print_enabled: product.is_kitchen_print_enabled,
         is_label_print_enabled: product.is_label_print_enabled,
         is_active: product.is_active,
-        specs,
+        specs: product.specs,
         attributes: attr_bindings,
         tags,
     };
@@ -136,26 +169,28 @@ pub async fn create(
     State(state): State<ServerState>,
     Json(payload): Json<ProductCreate>,
 ) -> AppResult<Json<Product>> {
+    // 检查 external_id 是否已存在
+    let external_ids: Vec<i64> = payload.specs.iter().filter_map(|s| s.external_id).collect();
+    if !external_ids.is_empty() {
+        if let Some(duplicates) = check_duplicate_external_ids(&state.db, &external_ids, None).await {
+            return Err(AppError::new(ErrorCode::SpecExternalIdExists)
+                .with_detail("external_ids", duplicates));
+        }
+    }
+
     let repo = ProductRepository::new(state.db.clone());
     let product = repo
         .create(payload)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    // Get product ID for broadcast
-    let product_id = product
-        .id
-        .clone()
-        .ok_or_else(|| AppError::internal("Product created without ID"))?;
-
     // 广播同步通知
-    let id = product_id.id.to_string();
-    let api_product: Product = product.into();
+    let id = product.id.as_ref().map(thing_to_string).unwrap_or_default();
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&api_product))
+        .broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&product))
         .await;
 
-    Ok(Json(api_product))
+    Ok(Json(product))
 }
 
 /// PUT /api/products/:id - 更新商品
@@ -164,40 +199,55 @@ pub async fn update(
     Path(id): Path<String>,
     Json(payload): Json<ProductUpdate>,
 ) -> AppResult<Json<Product>> {
+    // Debug: log the received payload
+    tracing::error!("!!! Product update - id: {}, tax_rate: {:?}, is_kitchen_print_enabled: {:?}, is_label_print_enabled: {:?}",
+        id, payload.tax_rate, payload.is_kitchen_print_enabled, payload.is_label_print_enabled);
+
+    // 检查 external_id 是否已存在 (排除当前产品)
+    if let Some(ref specs) = payload.specs {
+        let external_ids: Vec<i64> = specs.iter().filter_map(|s| s.external_id).collect();
+        if !external_ids.is_empty() {
+            if let Some(duplicates) = check_duplicate_external_ids(&state.db, &external_ids, Some(&id)).await {
+                return Err(AppError::new(ErrorCode::SpecExternalIdExists)
+                    .with_detail("external_ids", duplicates));
+            }
+        }
+    }
+
     let repo = ProductRepository::new(state.db.clone());
     let product = repo
         .update(&id, payload)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
+    // Debug: log the updated product
+    tracing::error!("!!! Product updated - is_kitchen_print_enabled: {}, is_label_print_enabled: {}",
+        product.is_kitchen_print_enabled, product.is_label_print_enabled);
+
     // 广播同步通知
-    let api_product: Product = product.into();
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "updated", &id, Some(&api_product))
+        .broadcast_sync(RESOURCE_PRODUCT, "updated", &id, Some(&product))
         .await;
 
-    Ok(Json(api_product))
+    Ok(Json(product))
 }
 
-/// DELETE /api/products/:id - 删除商品 (软删除)
+/// DELETE /api/products/:id - 删除商品
 pub async fn delete(
     State(state): State<ServerState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let repo = ProductRepository::new(state.db.clone());
-    let result = repo
-        .delete(&id)
+    repo.delete(&id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    if result {
-        state
-            .broadcast_sync::<()>(RESOURCE_PRODUCT, "deleted", &id, None)
-            .await;
-    }
+    state
+        .broadcast_sync::<()>(RESOURCE_PRODUCT, "deleted", &id, None)
+        .await;
 
-    Ok(Json(result))
+    Ok(Json(true))
 }
 
 /// GET /api/products/:id/attributes - 获取商品的属性绑定列表
@@ -217,8 +267,8 @@ pub async fn list_product_attributes(
     let result: Vec<AttributeBindingFull> = bindings
         .into_iter()
         .map(|(binding, attr)| AttributeBindingFull {
-            id: binding.id.map(|t| t.to_raw()),
-            attribute: attr.into(),
+            id: binding.id,
+            attribute: attr,
             is_required: binding.is_required,
             display_order: binding.display_order,
             default_option_idx: binding.default_option_idx,
@@ -244,12 +294,11 @@ pub async fn add_product_tag(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let api_product: Product = product.into();
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&api_product))
+        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&product))
         .await;
 
-    Ok(Json(api_product))
+    Ok(Json(product))
 }
 
 /// DELETE /api/products/:id/tags/:tag_id - 从商品移除标签
@@ -264,12 +313,11 @@ pub async fn remove_product_tag(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let api_product: Product = product.into();
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&api_product))
+        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&product))
         .await;
 
-    Ok(Json(api_product))
+    Ok(Json(product))
 }
 
 // =============================================================================

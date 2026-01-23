@@ -6,45 +6,43 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::api::convert::thing_to_string;
 use crate::core::ServerState;
-use crate::db::models::{CategoryCreate, CategoryUpdate};
+use crate::db::models::{Attribute, AttributeBinding, Category, CategoryCreate, CategoryUpdate};
 use crate::db::repository::{AttributeRepository, CategoryRepository};
 use crate::utils::{AppError, AppResult};
-use shared::models::Attribute as SharedAttribute;
-use shared::models::Category as SharedCategory;
-use shared::models::AttributeBinding as SharedAttributeBinding;
 
 const RESOURCE: &str = "category";
 
 /// GET /api/categories - 获取所有分类
-pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<SharedCategory>>> {
+pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Category>>> {
     let repo = CategoryRepository::new(state.db.clone());
     let categories = repo
         .find_all()
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(categories.into_iter().map(|c| c.into()).collect()))
+    Ok(Json(categories))
 }
 
 /// GET /api/categories/:id - 获取单个分类
 pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<String>,
-) -> AppResult<Json<SharedCategory>> {
+) -> AppResult<Json<Category>> {
     let repo = CategoryRepository::new(state.db.clone());
     let category = repo
         .find_by_id(&id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?
         .ok_or_else(|| AppError::not_found(format!("Category {} not found", id)))?;
-    Ok(Json(category.into()))
+    Ok(Json(category))
 }
 
 /// POST /api/categories - 创建分类
 pub async fn create(
     State(state): State<ServerState>,
     Json(payload): Json<CategoryCreate>,
-) -> AppResult<Json<SharedCategory>> {
+) -> AppResult<Json<Category>> {
     let repo = CategoryRepository::new(state.db.clone());
     let category = repo
         .create(payload)
@@ -52,17 +50,12 @@ pub async fn create(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let id = category
-        .id
-        .as_ref()
-        .map(|t| t.id.to_string())
-        .unwrap_or_default();
-    let api_category: SharedCategory = category.into();
+    let id = category.id.as_ref().map(thing_to_string).unwrap_or_default();
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&api_category))
+        .broadcast_sync(RESOURCE, "created", &id, Some(&category))
         .await;
 
-    Ok(Json(api_category))
+    Ok(Json(category))
 }
 
 /// PUT /api/categories/:id - 更新分类
@@ -70,7 +63,7 @@ pub async fn update(
     State(state): State<ServerState>,
     Path(id): Path<String>,
     Json(payload): Json<CategoryUpdate>,
-) -> AppResult<Json<SharedCategory>> {
+) -> AppResult<Json<Category>> {
     let repo = CategoryRepository::new(state.db.clone());
     let category = repo
         .update(&id, payload)
@@ -78,12 +71,11 @@ pub async fn update(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let api_category: SharedCategory = category.into();
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&api_category))
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&category))
         .await;
 
-    Ok(Json(api_category))
+    Ok(Json(category))
 }
 
 /// DELETE /api/categories/:id - 删除分类 (软删除)
@@ -207,13 +199,13 @@ pub struct BindAttributePayload {
 pub async fn list_category_attributes(
     State(state): State<ServerState>,
     Path(category_id): Path<String>,
-) -> AppResult<Json<Vec<SharedAttribute>>> {
+) -> AppResult<Json<Vec<Attribute>>> {
     let repo = AttributeRepository::new(state.db.clone());
     let attributes = repo
         .find_by_category(&category_id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(attributes.into_iter().map(Into::into).collect()))
+    Ok(Json(attributes))
 }
 
 /// POST /api/categories/:id/attributes/:attr_id - 绑定属性到分类
@@ -221,7 +213,7 @@ pub async fn bind_category_attribute(
     State(state): State<ServerState>,
     Path((category_id, attr_id)): Path<(String, String)>,
     Json(payload): Json<BindAttributePayload>,
-) -> AppResult<Json<SharedAttributeBinding>> {
+) -> AppResult<Json<AttributeBinding>> {
     let repo = AttributeRepository::new(state.db.clone());
     let binding = repo
         .link_to_category(
@@ -244,7 +236,7 @@ pub async fn bind_category_attribute(
         )
         .await;
 
-    Ok(Json(binding.into()))
+    Ok(Json(binding))
 }
 
 /// DELETE /api/categories/:id/attributes/:attr_id - 解绑属性与分类

@@ -101,7 +101,7 @@ pub async fn create(
     let id = order
         .id
         .as_ref()
-        .map(|t| t.id.to_string())
+        .map(|t| t.to_string())
         .unwrap_or_default();
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&order))

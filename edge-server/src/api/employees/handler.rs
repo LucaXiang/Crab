@@ -5,11 +5,11 @@ use axum::{
     extract::{Path, State},
 };
 
+use crate::api::convert::thing_to_string;
 use crate::core::ServerState;
-use crate::db::models::{EmployeeCreate, EmployeeUpdate};
+use crate::db::models::{Employee, EmployeeCreate, EmployeeUpdate};
 use crate::db::repository::EmployeeRepository;
 use crate::utils::{AppError, AppResult};
-use shared::models::Employee;
 
 const RESOURCE: &str = "employee";
 
@@ -20,7 +20,6 @@ pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Employ
         .find_all()
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
-    let employees: Vec<Employee> = employees.into_iter().map(|e| e.into()).collect();
     Ok(Json(employees))
 }
 
@@ -33,7 +32,6 @@ pub async fn list_with_inactive(
         .find_all_with_inactive()
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
-    let employees: Vec<Employee> = employees.into_iter().map(|e| e.into()).collect();
     Ok(Json(employees))
 }
 
@@ -48,7 +46,7 @@ pub async fn get_by_id(
         .await
         .map_err(|e| AppError::database(e.to_string()))?
         .ok_or_else(|| AppError::not_found(format!("Employee {} not found", id)))?;
-    Ok(Json(employee.into()))
+    Ok(Json(employee))
 }
 
 /// Create a new employee
@@ -62,12 +60,12 @@ pub async fn create(
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    let response: Employee = employee.into();
+    let id = employee.id.as_ref().map(thing_to_string).unwrap_or_default();
     state
-        .broadcast_sync(RESOURCE, "created", response.id.as_deref().unwrap_or_default(), Some(&response))
+        .broadcast_sync(RESOURCE, "created", &id, Some(&employee))
         .await;
 
-    Ok(Json(response))
+    Ok(Json(employee))
 }
 
 /// Update an employee
@@ -82,12 +80,11 @@ pub async fn update(
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    let response: Employee = employee.into();
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&response))
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&employee))
         .await;
 
-    Ok(Json(response))
+    Ok(Json(employee))
 }
 
 /// Soft delete an employee

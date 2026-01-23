@@ -32,6 +32,7 @@ pub mod has_attribute;
 pub mod kitchen_orders;
 pub mod orders;
 pub mod price_rules;
+pub mod print_config;
 pub mod print_destinations;
 pub mod products;
 pub mod sync;

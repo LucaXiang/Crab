@@ -81,12 +81,8 @@ pub async fn create(
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    // 广播同步通知
-    let id = rule
-        .id
-        .as_ref()
-        .map(|t| t.id.to_string())
-        .unwrap_or_default();
+    // 广播同步通知 (使用完整 id 格式，与 rule.id 一致)
+    let id = rule.id.as_ref().map(|t| t.to_string()).unwrap_or_default();
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&rule))
         .await;

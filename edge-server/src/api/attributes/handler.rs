@@ -5,11 +5,11 @@ use axum::{
     extract::{Path, State},
 };
 
+use crate::api::convert::thing_to_string;
 use crate::core::ServerState;
-use crate::db::models::{AttributeCreate, AttributeOption, AttributeUpdate};
+use crate::db::models::{Attribute, AttributeCreate, AttributeOption, AttributeUpdate};
 use crate::db::repository::AttributeRepository;
 use crate::utils::{AppError, AppResult};
-use shared::models::Attribute;
 
 const RESOURCE: &str = "attribute";
 
@@ -20,7 +20,7 @@ pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Attrib
         .find_all()
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(attrs.into_iter().map(Into::into).collect()))
+    Ok(Json(attrs))
 }
 
 /// GET /api/attributes/:id - 获取单个属性
@@ -34,7 +34,7 @@ pub async fn get_by_id(
         .await
         .map_err(|e| AppError::database(e.to_string()))?
         .ok_or_else(|| AppError::not_found(format!("Attribute {} not found", id)))?;
-    Ok(Json(attr.into()))
+    Ok(Json(attr))
 }
 
 /// POST /api/attributes - 创建属性
@@ -49,17 +49,12 @@ pub async fn create(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let id = attr
-        .id
-        .as_ref()
-        .map(|t| t.id.to_string())
-        .unwrap_or_default();
-    let api_attr: Attribute = attr.into();
+    let id = attr.id.as_ref().map(thing_to_string).unwrap_or_default();
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&api_attr))
+        .broadcast_sync(RESOURCE, "created", &id, Some(&attr))
         .await;
 
-    Ok(Json(api_attr))
+    Ok(Json(attr))
 }
 
 /// PUT /api/attributes/:id - 更新属性
@@ -75,12 +70,11 @@ pub async fn update(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let api_attr: Attribute = attr.into();
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&api_attr))
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
         .await;
 
-    Ok(Json(api_attr))
+    Ok(Json(attr))
 }
 
 /// DELETE /api/attributes/:id - 删除属性 (软删除)
@@ -117,12 +111,11 @@ pub async fn add_option(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let api_attr: Attribute = attr.into();
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&api_attr))
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
         .await;
 
-    Ok(Json(api_attr))
+    Ok(Json(attr))
 }
 
 /// PUT /api/attributes/:id/options/:idx - 更新选项
@@ -138,12 +131,11 @@ pub async fn update_option(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let api_attr: Attribute = attr.into();
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&api_attr))
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
         .await;
 
-    Ok(Json(api_attr))
+    Ok(Json(attr))
 }
 
 /// DELETE /api/attributes/:id/options/:idx - 删除选项
@@ -158,10 +150,9 @@ pub async fn remove_option(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let api_attr: Attribute = attr.into();
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&api_attr))
+        .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
         .await;
 
-    Ok(Json(api_attr))
+    Ok(Json(attr))
 }
