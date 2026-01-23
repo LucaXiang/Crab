@@ -2,8 +2,9 @@
 //!
 //! Logic for matching rules to products and checking time validity.
 
-use crate::db::models::{PriceRule, ProductScope, TimeMode};
-use chrono::{Datelike, Local, NaiveTime, Timelike, Weekday};
+use crate::db::models::{PriceRule, ProductScope};
+use chrono::{Datelike, Local};
+use tracing::trace;
 
 /// Check if a rule matches a product based on scope
 pub fn matches_product_scope(
@@ -12,35 +13,106 @@ pub fn matches_product_scope(
     category_id: Option<&str>,
     tags: &[String],
 ) -> bool {
-    match rule.product_scope {
-        ProductScope::Global => true,
+    let result = match rule.product_scope {
+        ProductScope::Global => {
+            trace!(
+                rule_name = %rule.name,
+                product_scope = ?rule.product_scope,
+                product_id,
+                "[ProductScope] Global scope - matches all"
+            );
+            true
+        }
         ProductScope::Product => {
             if let Some(target) = &rule.target {
                 // target is Thing like "product:xxx"
                 let target_id = target.id.to_raw();
-                target_id == product_id || format!("product:{}", product_id) == target.to_string()
+                let matches = target_id == product_id || format!("product:{}", product_id) == target.to_string();
+                trace!(
+                    rule_name = %rule.name,
+                    product_scope = ?rule.product_scope,
+                    target = %target.to_string(),
+                    target_id = %target_id,
+                    product_id,
+                    matches,
+                    "[ProductScope] Product scope check"
+                );
+                matches
             } else {
+                trace!(
+                    rule_name = %rule.name,
+                    product_scope = ?rule.product_scope,
+                    product_id,
+                    "[ProductScope] Product scope - no target defined"
+                );
                 false
             }
         }
         ProductScope::Category => {
             if let (Some(target), Some(cat_id)) = (&rule.target, category_id) {
                 let target_id = target.id.to_raw();
-                target_id == cat_id || format!("category:{}", cat_id) == target.to_string()
+                let matches = target_id == cat_id || format!("category:{}", cat_id) == target.to_string();
+                trace!(
+                    rule_name = %rule.name,
+                    product_scope = ?rule.product_scope,
+                    target = %target.to_string(),
+                    target_id = %target_id,
+                    category_id = %cat_id,
+                    product_id,
+                    matches,
+                    "[ProductScope] Category scope check"
+                );
+                matches
             } else {
+                trace!(
+                    rule_name = %rule.name,
+                    product_scope = ?rule.product_scope,
+                    target = ?rule.target.as_ref().map(|t| t.to_string()),
+                    category_id = ?category_id,
+                    product_id,
+                    "[ProductScope] Category scope - missing target or category_id"
+                );
                 false
             }
         }
         ProductScope::Tag => {
             if let Some(target) = &rule.target {
                 let target_id = target.id.to_raw();
-                tags.iter()
-                    .any(|t| t == &target_id || format!("tag:{}", t) == target.to_string())
+                let matches = tags.iter()
+                    .any(|t| t == &target_id || format!("tag:{}", t) == target.to_string());
+                trace!(
+                    rule_name = %rule.name,
+                    product_scope = ?rule.product_scope,
+                    target = %target.to_string(),
+                    target_id = %target_id,
+                    product_id,
+                    tags = ?tags,
+                    matches,
+                    "[ProductScope] Tag scope check"
+                );
+                matches
             } else {
+                trace!(
+                    rule_name = %rule.name,
+                    product_scope = ?rule.product_scope,
+                    product_id,
+                    "[ProductScope] Tag scope - no target defined"
+                );
                 false
             }
         }
-    }
+    };
+
+    trace!(
+        rule_name = %rule.name,
+        product_id,
+        category_id = ?category_id,
+        tags_count = tags.len(),
+        result,
+        "[ProductScope] Final match result"
+    );
+
+    result
 }
 
 /// Check if a rule matches the zone scope
@@ -52,7 +124,9 @@ pub fn matches_zone_scope(rule: &PriceRule, zone_id: Option<&str>, is_retail: bo
         zone_scope => {
             // Specific zone
             if let Some(zid) = zone_id {
-                zid == zone_scope.to_string()
+                // Handle both "zone:1" and "1" formats
+                let zid_num = zid.split(':').last().unwrap_or(zid);
+                zid_num == zone_scope.to_string()
             } else {
                 false
             }
@@ -63,41 +137,46 @@ pub fn matches_zone_scope(rule: &PriceRule, zone_id: Option<&str>, is_retail: bo
 /// Check if rule is valid at the given timestamp
 ///
 /// This function checks the new time control fields:
-/// - valid_from/valid_until: absolute validity period
-/// - active_days: days of week filter (0=Sunday, 1=Monday, ..., 6=Saturday)
-/// - active_start_time/active_end_time: time of day filter (HH:MM format)
+/// - valid_from/valid_until: absolute validity period (milliseconds since epoch)
+/// - active_days: days of week filter (0=Sunday, 1=Monday, ..., 6=Saturday) - local time
+/// - active_start_time/active_end_time: time of day filter (HH:MM format) - local time
+///
+/// Note: active_days and active_time use LOCAL time (with DST handling) since rules
+/// are typically configured in local business hours.
 pub fn is_time_valid(rule: &PriceRule, current_time: i64) -> bool {
-    // Check valid_from
+    // Check valid_from (absolute timestamp comparison)
     if let Some(from) = rule.valid_from
         && current_time < from
     {
         return false;
     }
 
-    // Check valid_until
+    // Check valid_until (absolute timestamp comparison)
     if let Some(until) = rule.valid_until
         && current_time > until
     {
         return false;
     }
 
-    // Check active_days (0=Sunday, 1=Monday, ..., 6=Saturday)
+    // Convert timestamp to local time for day-of-week and time-of-day checks
+    // This handles daylight saving time automatically
+    let utc_datetime =
+        chrono::DateTime::from_timestamp_millis(current_time).unwrap_or_else(chrono::Utc::now);
+    let local_datetime = utc_datetime.with_timezone(&Local);
+
+    // Check active_days (0=Sunday, 1=Monday, ..., 6=Saturday) in LOCAL time
     if let Some(ref days) = rule.active_days {
-        let datetime =
-            chrono::DateTime::from_timestamp_millis(current_time).unwrap_or_else(chrono::Utc::now);
         // chrono's weekday: Mon=0, Tue=1, ..., Sun=6
         // We need: Sun=0, Mon=1, ..., Sat=6
-        let weekday = datetime.weekday().num_days_from_sunday() as u8;
+        let weekday = local_datetime.weekday().num_days_from_sunday() as u8;
         if !days.contains(&weekday) {
             return false;
         }
     }
 
-    // Check active_start_time/active_end_time ("HH:MM" format)
+    // Check active_start_time/active_end_time ("HH:MM" format) in LOCAL time
     if rule.active_start_time.is_some() || rule.active_end_time.is_some() {
-        let datetime =
-            chrono::DateTime::from_timestamp_millis(current_time).unwrap_or_else(chrono::Utc::now);
-        let current_time_str = datetime.format("%H:%M").to_string();
+        let current_time_str = local_datetime.format("%H:%M").to_string();
 
         if let Some(ref start) = rule.active_start_time
             && current_time_str < *start
@@ -115,86 +194,12 @@ pub fn is_time_valid(rule: &PriceRule, current_time: i64) -> bool {
     true
 }
 
-/// Legacy time validation based on time_mode
-/// Kept for backward compatibility
-#[allow(dead_code)]
-pub fn is_time_valid_legacy(rule: &PriceRule, current_time: i64) -> bool {
-    match rule.time_mode {
-        TimeMode::Always => true,
-        TimeMode::Schedule => check_schedule(rule, current_time),
-        TimeMode::Onetime => check_onetime(rule, current_time),
-    }
-}
 
-/// Check schedule-based time constraint
-fn check_schedule(rule: &PriceRule, _current_time: i64) -> bool {
-    let now = Local::now();
-
-    // Check day of week
-    if let Some(ref config) = rule.schedule_config {
-        if let Some(ref days) = config.days_of_week {
-            let current_day = match now.weekday() {
-                Weekday::Sun => 0,
-                Weekday::Mon => 1,
-                Weekday::Tue => 2,
-                Weekday::Wed => 3,
-                Weekday::Thu => 4,
-                Weekday::Fri => 5,
-                Weekday::Sat => 6,
-            };
-            if !days.contains(&current_day) {
-                return false;
-            }
-        }
-
-        // Check time range
-        if let (Some(start), Some(end)) = (&config.start_time, &config.end_time)
-            && let (Ok(start_time), Ok(end_time)) = (
-                NaiveTime::parse_from_str(start, "%H:%M"),
-                NaiveTime::parse_from_str(end, "%H:%M"),
-            )
-        {
-            let current_time = NaiveTime::from_hms_opt(now.hour(), now.minute(), 0)
-                .unwrap_or_else(|| NaiveTime::from_hms_opt(0, 0, 0).unwrap());
-
-            // Handle overnight ranges (e.g., 22:00 - 02:00)
-            if start_time <= end_time {
-                if !(current_time >= start_time && current_time <= end_time) {
-                    return false;
-                }
-            } else {
-                // Overnight
-                if !(current_time >= start_time || current_time <= end_time) {
-                    return false;
-                }
-            }
-        }
-    }
-
-    true
-}
-
-/// Check one-time date range constraint
-fn check_onetime(rule: &PriceRule, current_time: i64) -> bool {
-    // start_time and end_time are ISO8601 date strings
-    if let (Some(start), Some(end)) = (&rule.start_time, &rule.end_time)
-        && let (Ok(start_dt), Ok(end_dt)) = (
-            chrono::DateTime::parse_from_rfc3339(start),
-            chrono::DateTime::parse_from_rfc3339(end),
-        )
-    {
-        let current =
-            chrono::DateTime::from_timestamp_millis(current_time).unwrap_or_else(chrono::Utc::now);
-
-        return current >= start_dt && current <= end_dt;
-    }
-    false
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::models::{AdjustmentType, RuleType};
+    use crate::db::models::{AdjustmentType, RuleType, TimeMode};
     use surrealdb::sql::Thing;
 
     fn make_rule(product_scope: ProductScope, target: Option<&str>) -> PriceRule {

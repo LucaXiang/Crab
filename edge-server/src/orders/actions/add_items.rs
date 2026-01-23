@@ -3,6 +3,7 @@
 //! Adds items to an existing order.
 
 use async_trait::async_trait;
+use tracing::{debug, info};
 
 use crate::db::models::PriceRule;
 use crate::orders::reducer::input_to_snapshot_with_rules;
@@ -44,10 +45,78 @@ impl CommandHandler for AddItemsAction {
 
         // 4. Convert inputs to snapshots with generated instance_ids and price rules applied
         let rules_refs: Vec<&PriceRule> = self.rules.iter().collect();
+
+        info!(
+            order_id = %self.order_id,
+            items_count = self.items.len(),
+            rules_count = rules_refs.len(),
+            "[AddItems] Starting to apply price rules"
+        );
+
+        for (idx, rule) in rules_refs.iter().enumerate() {
+            debug!(
+                rule_idx = idx,
+                rule_name = %rule.name,
+                rule_type = ?rule.rule_type,
+                product_scope = ?rule.product_scope,
+                zone_scope = rule.zone_scope,
+                adjustment_type = ?rule.adjustment_type,
+                adjustment_value = rule.adjustment_value,
+                is_stackable = rule.is_stackable,
+                is_exclusive = rule.is_exclusive,
+                is_active = rule.is_active,
+                target = ?rule.target.as_ref().map(|t| t.to_string()),
+                "[AddItems] Available rule"
+            );
+        }
+
         let item_snapshots: Vec<_> = self
             .items
             .iter()
-            .map(|item| input_to_snapshot_with_rules(item, &rules_refs))
+            .enumerate()
+            .map(|(idx, item)| {
+                debug!(
+                    item_idx = idx,
+                    product_id = %item.product_id,
+                    product_name = %item.name,
+                    input_price = item.price,
+                    original_price = ?item.original_price,
+                    quantity = item.quantity,
+                    manual_discount_percent = ?item.manual_discount_percent,
+                    surcharge = ?item.surcharge,
+                    "[AddItems] Processing item"
+                );
+
+                let snapshot = input_to_snapshot_with_rules(item, &rules_refs);
+
+                info!(
+                    item_idx = idx,
+                    product_id = %item.product_id,
+                    product_name = %item.name,
+                    input_price = item.price,
+                    final_price = snapshot.price,
+                    rule_discount_amount = ?snapshot.rule_discount_amount,
+                    rule_surcharge_amount = ?snapshot.rule_surcharge_amount,
+                    applied_rules_count = snapshot.applied_rules.as_ref().map(|r| r.len()).unwrap_or(0),
+                    "[AddItems] Item processed with price rules"
+                );
+
+                if let Some(applied) = &snapshot.applied_rules {
+                    for rule in applied {
+                        debug!(
+                            product_id = %item.product_id,
+                            rule_name = %rule.name,
+                            rule_type = ?rule.rule_type,
+                            adjustment_type = ?rule.adjustment_type,
+                            adjustment_value = rule.adjustment_value,
+                            calculated_amount = rule.calculated_amount,
+                            "[AddItems] Applied rule detail"
+                        );
+                    }
+                }
+
+                snapshot
+            })
             .collect();
 
         // 5. Create event

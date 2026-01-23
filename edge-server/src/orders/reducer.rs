@@ -11,6 +11,7 @@
 use crate::db::models::PriceRule;
 use crate::pricing::calculate_item_price;
 use shared::order::CartItemSnapshot;
+use tracing::debug;
 
 /// Generate a content-addressed instance_id from CartItemInput
 ///
@@ -96,6 +97,16 @@ pub fn input_to_snapshot_with_rules(
     input: &shared::order::CartItemInput,
     rules: &[&PriceRule],
 ) -> CartItemSnapshot {
+    debug!(
+        product_id = %input.product_id,
+        product_name = %input.name,
+        input_price = input.price,
+        original_price = ?input.original_price,
+        manual_discount_percent = ?input.manual_discount_percent,
+        rules_count = rules.len(),
+        "[Reducer] input_to_snapshot_with_rules called"
+    );
+
     // Calculate options modifier from selected_options
     let options_modifier: f64 = input
         .selected_options
@@ -106,8 +117,29 @@ pub fn input_to_snapshot_with_rules(
     let manual_discount = input.manual_discount_percent.unwrap_or(0.0);
     let base_price = input.original_price.unwrap_or(input.price);
 
+    debug!(
+        product_id = %input.product_id,
+        options_modifier,
+        manual_discount,
+        base_price,
+        "[Reducer] Calculated input values"
+    );
+
     // Calculate item price with rules
     let calc_result = calculate_item_price(base_price, options_modifier, manual_discount, rules);
+
+    debug!(
+        product_id = %input.product_id,
+        calc_base = calc_result.base,
+        calc_manual_discount_amount = calc_result.manual_discount_amount,
+        calc_after_manual = calc_result.after_manual,
+        calc_rule_discount_amount = calc_result.rule_discount_amount,
+        calc_after_discount = calc_result.after_discount,
+        calc_rule_surcharge_amount = calc_result.rule_surcharge_amount,
+        calc_item_final = calc_result.item_final,
+        applied_rules_count = calc_result.applied_rules.len(),
+        "[Reducer] Price calculation result"
+    );
 
     // Generate instance_id directly from CartItemInput
     // instance_id 完全基于 CartItemInput 字段生成，确保一致性
@@ -140,6 +172,7 @@ pub fn input_to_snapshot_with_rules(
             Some(calc_result.applied_rules)
         },
         surcharge: input.surcharge,
+        line_total: None, // Computed by recalculate_totals
         note: input.note.clone(),
         authorizer_id: input.authorizer_id.clone(),
         authorizer_name: input.authorizer_name.clone(),

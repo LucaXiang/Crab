@@ -10,6 +10,7 @@
 use crate::db::models::{AdjustmentType, PriceRule, ProductScope, RuleType};
 use rust_decimal::prelude::*;
 use shared::order::AppliedRule;
+use tracing::{debug, trace};
 
 /// Rounding strategy for monetary values (2 decimal places, half-up)
 const DECIMAL_PLACES: u32 = 2;
@@ -153,7 +154,15 @@ pub fn apply_discount_rules(
         .copied()
         .collect();
 
+    debug!(
+        total_rules = rules.len(),
+        discount_rules_count = discount_rules.len(),
+        price_basis = %price_basis,
+        "[DiscountRules] Starting discount rule application"
+    );
+
     if discount_rules.is_empty() {
+        debug!("[DiscountRules] No discount rules to apply");
         return DiscountResult {
             amount: Decimal::ZERO,
             applied: vec![],
@@ -182,9 +191,23 @@ pub fn apply_discount_rules(
         .copied()
         .collect();
 
+    debug!(
+        exclusive_count = exclusive.len(),
+        non_stackable_count = non_stackable.len(),
+        stackable_count = stackable.len(),
+        "[DiscountRules] Rules categorized"
+    );
+
     // Step 1: Check for exclusive rules
     if let Some(winner) = select_winner(&exclusive) {
         let amount = calculate_single_discount(winner, price_basis);
+        debug!(
+            winner_name = %winner.name,
+            winner_value = winner.adjustment_value,
+            winner_type = ?winner.adjustment_type,
+            discount_amount = %amount,
+            "[DiscountRules] Exclusive winner selected"
+        );
         let applied = AppliedRule::from_rule(
             &to_shared_rule(winner),
             to_f64(amount),
@@ -200,6 +223,13 @@ pub fn apply_discount_rules(
     // Step 2: Apply non-stackable winner (if any)
     if let Some(winner) = select_winner(&non_stackable) {
         let amount = calculate_single_discount(winner, price_basis);
+        debug!(
+            winner_name = %winner.name,
+            winner_value = winner.adjustment_value,
+            winner_type = ?winner.adjustment_type,
+            discount_amount = %amount,
+            "[DiscountRules] Non-stackable winner selected"
+        );
         total_discount += amount;
         applied_rules.push(AppliedRule::from_rule(
             &to_shared_rule(winner),
@@ -222,15 +252,32 @@ pub fn apply_discount_rules(
         .copied()
         .collect();
 
+    debug!(
+        stackable_pct_count = stackable_pct.len(),
+        stackable_fixed_count = stackable_fixed.len(),
+        "[DiscountRules] Stackable rules categorized"
+    );
+
     // Capitalist mode for percentage discounts
     if !stackable_pct.is_empty() {
         let mut remaining_multiplier = Decimal::ONE;
         for rule in &stackable_pct {
             let rate = to_decimal(rule.adjustment_value) / hundred;
             remaining_multiplier *= Decimal::ONE - rate;
+            trace!(
+                rule_name = %rule.name,
+                rate = %rate,
+                remaining_multiplier = %remaining_multiplier,
+                "[DiscountRules] Stackable pct rule applied"
+            );
         }
         // Total percentage discount amount
         let pct_discount = price_basis * (Decimal::ONE - remaining_multiplier);
+        debug!(
+            pct_discount = %pct_discount,
+            final_multiplier = %remaining_multiplier,
+            "[DiscountRules] Capitalist mode pct discount"
+        );
         total_discount += pct_discount;
 
         // Record each rule's individual contribution
@@ -246,12 +293,23 @@ pub fn apply_discount_rules(
     // Simple addition for fixed discounts (value is already in currency units)
     for rule in &stackable_fixed {
         let amount = to_decimal(rule.adjustment_value);
+        debug!(
+            rule_name = %rule.name,
+            fixed_amount = %amount,
+            "[DiscountRules] Stackable fixed rule applied"
+        );
         total_discount += amount;
         applied_rules.push(AppliedRule::from_rule(
             &to_shared_rule(rule),
             to_f64(amount),
         ));
     }
+
+    debug!(
+        total_discount = %total_discount,
+        applied_rules_count = applied_rules.len(),
+        "[DiscountRules] Final discount result"
+    );
 
     DiscountResult {
         amount: total_discount,
@@ -292,7 +350,15 @@ pub fn apply_surcharge_rules(
         .copied()
         .collect();
 
+    debug!(
+        total_rules = rules.len(),
+        surcharge_rules_count = surcharge_rules.len(),
+        price_basis = %price_basis,
+        "[SurchargeRules] Starting surcharge rule application"
+    );
+
     if surcharge_rules.is_empty() {
+        debug!("[SurchargeRules] No surcharge rules to apply");
         return SurchargeResult {
             amount: Decimal::ZERO,
             applied: vec![],
@@ -320,9 +386,23 @@ pub fn apply_surcharge_rules(
         .copied()
         .collect();
 
+    debug!(
+        exclusive_count = exclusive.len(),
+        non_stackable_count = non_stackable.len(),
+        stackable_count = stackable.len(),
+        "[SurchargeRules] Rules categorized"
+    );
+
     // Step 1: Check for exclusive rules
     if let Some(winner) = select_winner(&exclusive) {
         let amount = calculate_single_surcharge(winner, price_basis);
+        debug!(
+            winner_name = %winner.name,
+            winner_value = winner.adjustment_value,
+            winner_type = ?winner.adjustment_type,
+            surcharge_amount = %amount,
+            "[SurchargeRules] Exclusive winner selected"
+        );
         let applied = AppliedRule::from_rule(
             &to_shared_rule(winner),
             to_f64(amount),
@@ -338,6 +418,13 @@ pub fn apply_surcharge_rules(
     // Step 2: Apply non-stackable winner (if any)
     if let Some(winner) = select_winner(&non_stackable) {
         let amount = calculate_single_surcharge(winner, price_basis);
+        debug!(
+            winner_name = %winner.name,
+            winner_value = winner.adjustment_value,
+            winner_type = ?winner.adjustment_type,
+            surcharge_amount = %amount,
+            "[SurchargeRules] Non-stackable winner selected"
+        );
         total_surcharge += amount;
         applied_rules.push(AppliedRule::from_rule(
             &to_shared_rule(winner),
@@ -350,12 +437,25 @@ pub fn apply_surcharge_rules(
     // (unlike discounts, surcharges don't compound in "capitalist mode")
     for rule in &stackable {
         let amount = calculate_single_surcharge(rule, price_basis);
+        debug!(
+            rule_name = %rule.name,
+            rule_value = rule.adjustment_value,
+            rule_type = ?rule.adjustment_type,
+            surcharge_amount = %amount,
+            "[SurchargeRules] Stackable rule applied"
+        );
         total_surcharge += amount;
         applied_rules.push(AppliedRule::from_rule(
             &to_shared_rule(rule),
             to_f64(amount),
         ));
     }
+
+    debug!(
+        total_surcharge = %total_surcharge,
+        applied_rules_count = applied_rules.len(),
+        "[SurchargeRules] Final surcharge result"
+    );
 
     SurchargeResult {
         amount: total_surcharge,
@@ -453,6 +553,30 @@ pub fn calculate_item_price(
     manual_discount_percent: f64,
     matched_rules: &[&PriceRule],
 ) -> ItemCalculationResult {
+    debug!(
+        original_price,
+        options_modifier,
+        manual_discount_percent,
+        matched_rules_count = matched_rules.len(),
+        "[ItemCalc] Starting calculation"
+    );
+
+    // Log each matched rule
+    for (idx, rule) in matched_rules.iter().enumerate() {
+        trace!(
+            rule_idx = idx,
+            rule_name = %rule.name,
+            rule_type = ?rule.rule_type,
+            adjustment_type = ?rule.adjustment_type,
+            adjustment_value = rule.adjustment_value,
+            is_stackable = rule.is_stackable,
+            is_exclusive = rule.is_exclusive,
+            priority = rule.priority,
+            effective_priority = calculate_effective_priority(rule),
+            "[ItemCalc] Matched rule"
+        );
+    }
+
     let original = to_decimal(original_price);
     let modifier = to_decimal(options_modifier);
     let manual_pct = to_decimal(manual_discount_percent);
@@ -460,22 +584,59 @@ pub fn calculate_item_price(
 
     // Step 1: Calculate base price
     let base = original + modifier;
+    debug!(
+        original = %original,
+        modifier = %modifier,
+        base = %base,
+        "[ItemCalc] Step 1: Base price"
+    );
 
     // Step 2: Apply manual discount (percentage of base)
     let manual_discount_amount = base * manual_pct / hundred;
     let after_manual = base - manual_discount_amount;
+    debug!(
+        manual_pct = %manual_pct,
+        manual_discount_amount = %manual_discount_amount,
+        after_manual = %after_manual,
+        "[ItemCalc] Step 2: Manual discount"
+    );
 
     // Step 3: Apply rule discounts (based on after_manual price)
     let discount_result = apply_discount_rules(matched_rules, after_manual);
     let after_discount = (after_manual - discount_result.amount).max(Decimal::ZERO);
+    debug!(
+        discount_amount = %discount_result.amount,
+        after_discount = %after_discount,
+        discount_rules_applied = discount_result.applied.len(),
+        "[ItemCalc] Step 3: Rule discounts"
+    );
 
     // Step 4: Apply rule surcharges (based on base price)
     let surcharge_result = apply_surcharge_rules(matched_rules, base);
     let item_final = (after_discount + surcharge_result.amount).max(Decimal::ZERO);
+    debug!(
+        surcharge_amount = %surcharge_result.amount,
+        surcharge_rules_applied = surcharge_result.applied.len(),
+        item_final = %item_final,
+        "[ItemCalc] Step 4: Rule surcharges & final"
+    );
 
     // Combine applied rules
     let mut applied_rules = discount_result.applied;
     applied_rules.extend(surcharge_result.applied);
+
+    // Log final result
+    debug!(
+        base = to_f64(base),
+        manual_discount_amount = to_f64(manual_discount_amount),
+        after_manual = to_f64(after_manual),
+        rule_discount_amount = to_f64(discount_result.amount),
+        after_discount = to_f64(after_discount),
+        rule_surcharge_amount = to_f64(surcharge_result.amount),
+        item_final = to_f64(item_final),
+        applied_rules_count = applied_rules.len(),
+        "[ItemCalc] Final result"
+    );
 
     ItemCalculationResult {
         base: to_f64(base),
