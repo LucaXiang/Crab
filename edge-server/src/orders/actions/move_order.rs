@@ -42,14 +42,25 @@ impl CommandHandler for MoveOrderAction {
             }
         }
 
-        // 3. Get source table info from snapshot
+        // 3. Validate target table is not occupied by another order
+        if let Some(existing_order_id) = ctx.find_active_order_for_table(&self.target_table_id)? {
+            // Allow moving to the same table (no-op case)
+            if existing_order_id != self.order_id {
+                return Err(OrderError::TableOccupied(format!(
+                    "目标桌台 {} 已被占用 (订单: {})",
+                    self.target_table_name, existing_order_id
+                )));
+            }
+        }
+
+        // 4. Get source table info from snapshot
         let source_table_id = snapshot.table_id.clone().unwrap_or_default();
         let source_table_name = snapshot.table_name.clone().unwrap_or_default();
 
-        // 4. Allocate sequence number
+        // 5. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 5. Create event
+        // 6. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -163,6 +174,7 @@ mod tests {
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
+            line_total: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -361,5 +373,75 @@ mod tests {
         } else {
             panic!("Expected OrderMoved payload");
         }
+    }
+
+    #[tokio::test]
+    async fn test_move_order_target_table_occupied_fails() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        // Create order-1 at table-1
+        let mut snapshot1 = OrderSnapshot::new("order-1".to_string());
+        snapshot1.status = OrderStatus::Active;
+        snapshot1.table_id = Some("table-1".to_string());
+        snapshot1.table_name = Some("Table 1".to_string());
+        storage.store_snapshot(&txn, &snapshot1).unwrap();
+        storage.mark_order_active(&txn, "order-1").unwrap();
+
+        // Create order-2 at table-2
+        let mut snapshot2 = OrderSnapshot::new("order-2".to_string());
+        snapshot2.status = OrderStatus::Active;
+        snapshot2.table_id = Some("table-2".to_string());
+        snapshot2.table_name = Some("Table 2".to_string());
+        storage.store_snapshot(&txn, &snapshot2).unwrap();
+        storage.mark_order_active(&txn, "order-2").unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        // Try to move order-1 to table-2 (which is occupied by order-2)
+        let action = MoveOrderAction {
+            order_id: "order-1".to_string(),
+            target_table_id: "table-2".to_string(),
+            target_table_name: "Table 2".to_string(),
+            target_zone_id: None,
+            target_zone_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+
+        assert!(matches!(result, Err(OrderError::TableOccupied(_))));
+    }
+
+    #[tokio::test]
+    async fn test_move_order_to_same_table_succeeds() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        // Create order-1 at table-1
+        let mut snapshot1 = OrderSnapshot::new("order-1".to_string());
+        snapshot1.status = OrderStatus::Active;
+        snapshot1.table_id = Some("table-1".to_string());
+        snapshot1.table_name = Some("Table 1".to_string());
+        storage.store_snapshot(&txn, &snapshot1).unwrap();
+        storage.mark_order_active(&txn, "order-1").unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        // Move order-1 to table-1 (same table - should succeed as a no-op)
+        let action = MoveOrderAction {
+            order_id: "order-1".to_string(),
+            target_table_id: "table-1".to_string(),
+            target_table_name: "Table 1".to_string(),
+            target_zone_id: None,
+            target_zone_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+
+        assert!(result.is_ok());
     }
 }

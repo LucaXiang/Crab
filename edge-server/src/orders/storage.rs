@@ -412,6 +412,34 @@ impl OrderStorage {
         Ok(snapshots)
     }
 
+    /// Find active order for a specific table (within transaction)
+    ///
+    /// Returns the order_id if the table is occupied by an active order.
+    pub fn find_active_order_for_table_txn(
+        &self,
+        txn: &WriteTransaction,
+        table_id: &str,
+    ) -> StorageResult<Option<String>> {
+        let active_table = txn.open_table(ACTIVE_ORDERS_TABLE)?;
+        let snapshots_table = txn.open_table(SNAPSHOTS_TABLE)?;
+
+        for result in active_table.iter()? {
+            let (key, _) = result?;
+            let order_id = key.value();
+
+            if let Some(value) = snapshots_table.get(order_id)? {
+                let snapshot: OrderSnapshot = serde_json::from_slice(value.value())?;
+                if let Some(ref tid) = snapshot.table_id {
+                    if tid == table_id {
+                        return Ok(Some(order_id.to_string()));
+                    }
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
     // ========== Cleanup Operations ==========
 
     /// Remove events for an order (for archival)

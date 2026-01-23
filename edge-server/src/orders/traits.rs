@@ -38,6 +38,9 @@ pub enum OrderError {
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
 
+    #[error("Table is already occupied: {0}")]
+    TableOccupied(String),
+
     #[error("Storage error: {0}")]
     Storage(String),
 }
@@ -121,6 +124,15 @@ impl<'a> CommandContext<'a> {
     /// Get the storage
     pub fn storage(&self) -> &OrderStorage {
         self.storage
+    }
+
+    /// Check if a table is occupied by an active order
+    ///
+    /// Returns the order_id if the table is occupied.
+    pub fn find_active_order_for_table(&self, table_id: &str) -> Result<Option<String>, OrderError> {
+        self.storage
+            .find_active_order_for_table_txn(self.txn, table_id)
+            .map_err(|e| OrderError::Storage(e.to_string()))
     }
 
     /// Allocate a new sequence number

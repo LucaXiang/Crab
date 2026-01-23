@@ -60,8 +60,12 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
             .unwrap_or(0);
         item.unpaid_quantity = (item.quantity - paid_qty).max(0);
 
+        // Calculate and set line_total
+        let item_total = calculate_item_total(item);
+        item.line_total = Some(to_f64(item_total));
+
         // Accumulate subtotal
-        subtotal += calculate_item_total(item);
+        subtotal += item_total;
     }
 
     let tax = to_decimal(snapshot.tax);
@@ -149,6 +153,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            line_total: None,
         };
 
         let total = calculate_item_total(&item);
@@ -175,6 +180,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            line_total: None,
         };
 
         let total = calculate_item_total(&item);
@@ -202,6 +208,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            line_total: None,
         };
 
         let total = calculate_item_total(&item);
@@ -258,6 +265,7 @@ mod tests {
                 note: None,
                 authorizer_id: None,
                 authorizer_name: None,
+                line_total: None,
             })
             .collect();
 

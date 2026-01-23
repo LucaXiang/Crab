@@ -2,9 +2,12 @@
 //!
 //! Applies the PaymentCancelled event to mark a payment as cancelled
 //! and update the paid_amount.
+//!
+//! For split payments with `split_items`, this applier also restores items
+//! using "add items" logic - merging with existing items or creating new ones.
 
 use crate::orders::traits::EventApplier;
-use shared::order::{EventPayload, OrderEvent, OrderSnapshot};
+use shared::order::{CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot};
 
 /// PaymentCancelled applier
 pub struct PaymentCancelledApplier;
@@ -16,6 +19,20 @@ impl EventApplier for PaymentCancelledApplier {
         } = &event.payload
         {
             // Find the payment and mark it as cancelled
+            // We need to find and clone split_items before mutating payment
+            let (amount, split_items) = {
+                if let Some(payment) = snapshot
+                    .payments
+                    .iter()
+                    .find(|p| p.payment_id == *payment_id && !p.cancelled)
+                {
+                    (payment.amount, payment.split_items.clone())
+                } else {
+                    return; // Payment not found or already cancelled
+                }
+            };
+
+            // Now mutate the payment
             if let Some(payment) = snapshot
                 .payments
                 .iter_mut()
@@ -24,16 +41,63 @@ impl EventApplier for PaymentCancelledApplier {
                 // Set cancelled flag
                 payment.cancelled = true;
                 payment.cancel_reason = reason.clone();
+            }
 
-                // Subtract from paid_amount
-                snapshot.paid_amount -= payment.amount;
+            // Subtract from paid_amount
+            snapshot.paid_amount -= amount;
 
-                // Update sequence and timestamp
-                snapshot.last_sequence = event.sequence;
-                snapshot.updated_at = event.timestamp;
+            // If this was a split payment, restore items using "add items" logic
+            if let Some(items_to_restore) = split_items {
+                restore_split_items(snapshot, &items_to_restore);
+            }
 
-                // Update checksum
-                snapshot.update_checksum();
+            // Update sequence and timestamp
+            snapshot.last_sequence = event.sequence;
+            snapshot.updated_at = event.timestamp;
+
+            // Update checksum
+            snapshot.update_checksum();
+        }
+    }
+}
+
+/// Restore split payment items using "add items" logic
+///
+/// For each item in split_items:
+/// - If an item with the same instance_id exists in the order, merge quantities
+/// - Otherwise, create a new item entry
+///
+/// This handles the case where the original items may have been modified
+/// (e.g., discounts added to remaining quantity, causing instance_id change)
+fn restore_split_items(snapshot: &mut OrderSnapshot, items_to_restore: &[CartItemSnapshot]) {
+    for restore_item in items_to_restore {
+        // Try to find an existing item with the same instance_id
+        if let Some(existing) = snapshot
+            .items
+            .iter_mut()
+            .find(|i| i.instance_id == restore_item.instance_id)
+        {
+            // Merge: add quantity back
+            existing.quantity += restore_item.quantity;
+            existing.unpaid_quantity += restore_item.quantity;
+        } else {
+            // No matching item found - add as new item
+            let mut new_item = restore_item.clone();
+            // Set unpaid_quantity to quantity (all restored items are unpaid)
+            new_item.unpaid_quantity = new_item.quantity;
+            snapshot.items.push(new_item);
+        }
+
+        // Restore paid_item_quantities
+        if let Some(paid_qty) = snapshot
+            .paid_item_quantities
+            .get_mut(&restore_item.instance_id)
+        {
+            *paid_qty = (*paid_qty - restore_item.quantity).max(0);
+            if *paid_qty == 0 {
+                snapshot
+                    .paid_item_quantities
+                    .remove(&restore_item.instance_id);
             }
         }
     }
@@ -84,6 +148,7 @@ mod tests {
             timestamp: 1234567800,
             cancelled: false,
             cancel_reason: None,
+            split_items: None,
         }
     }
 
@@ -374,5 +439,232 @@ mod tests {
         assert!(!snapshot.is_fully_paid());
         assert_eq!(snapshot.remaining_amount(), 60.0);
         assert_eq!(snapshot.paid_amount, 40.0);
+    }
+
+    // ==================== Split Payment Cancellation Tests ====================
+
+    #[test]
+    fn test_cancel_split_payment_restores_items_to_existing() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.total = 100.0;
+        snapshot.paid_amount = 50.0;
+
+        // Add an item with 5 quantity (3 remain unpaid)
+        let item = CartItemSnapshot {
+            id: "product-1".to_string(),
+            instance_id: "inst-1".to_string(),
+            name: "Coffee".to_string(),
+            price: 10.0,
+            original_price: None,
+            quantity: 3,
+            unpaid_quantity: 3,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            line_total: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+        snapshot.items.push(item.clone());
+
+        // Create split payment with items
+        let mut split_item = item.clone();
+        split_item.quantity = 2;
+        split_item.unpaid_quantity = 0;
+
+        let mut payment = create_payment_record("split-pay-1", "cash", 20.0);
+        payment.split_items = Some(vec![split_item]);
+        snapshot.payments.push(payment);
+        snapshot
+            .paid_item_quantities
+            .insert("inst-1".to_string(), 2);
+
+        // Cancel the split payment
+        let event = create_payment_cancelled_event(
+            "order-1",
+            1,
+            "split-pay-1",
+            "cash",
+            20.0,
+            None,
+            None,
+            None,
+        );
+
+        let applier = PaymentCancelledApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Check: paid_amount reduced
+        assert_eq!(snapshot.paid_amount, 30.0); // 50 - 20 = 30
+
+        // Check: item quantity restored (merged with existing)
+        assert_eq!(snapshot.items.len(), 1);
+        assert_eq!(snapshot.items[0].quantity, 5); // 3 + 2 = 5
+        assert_eq!(snapshot.items[0].unpaid_quantity, 5); // 3 + 2 = 5
+
+        // Check: paid_item_quantities updated
+        assert!(snapshot.paid_item_quantities.get("inst-1").is_none() 
+                || *snapshot.paid_item_quantities.get("inst-1").unwrap() == 0);
+    }
+
+    #[test]
+    fn test_cancel_split_payment_creates_new_item_when_not_found() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.total = 100.0;
+        snapshot.paid_amount = 30.0;
+
+        // Order has a different item (different instance_id due to discount)
+        let modified_item = CartItemSnapshot {
+            id: "product-1".to_string(),
+            instance_id: "inst-2".to_string(), // Different instance_id after modification
+            name: "Coffee (10% off)".to_string(),
+            price: 9.0,
+            original_price: Some(10.0),
+            quantity: 3,
+            unpaid_quantity: 3,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: Some(10.0),
+            surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            line_total: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+        snapshot.items.push(modified_item);
+
+        // Split payment was for original items (inst-1) before modification
+        let original_item = CartItemSnapshot {
+            id: "product-1".to_string(),
+            instance_id: "inst-1".to_string(), // Original instance_id
+            name: "Coffee".to_string(),
+            price: 10.0,
+            original_price: None,
+            quantity: 2,
+            unpaid_quantity: 0,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            line_total: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let mut payment = create_payment_record("split-pay-1", "cash", 20.0);
+        payment.split_items = Some(vec![original_item]);
+        snapshot.payments.push(payment);
+        snapshot
+            .paid_item_quantities
+            .insert("inst-1".to_string(), 2);
+
+        // Cancel the split payment
+        let event = create_payment_cancelled_event(
+            "order-1",
+            1,
+            "split-pay-1",
+            "cash",
+            20.0,
+            None,
+            None,
+            None,
+        );
+
+        let applier = PaymentCancelledApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Check: paid_amount reduced
+        assert_eq!(snapshot.paid_amount, 10.0); // 30 - 20 = 10
+
+        // Check: new item created (original item added back)
+        assert_eq!(snapshot.items.len(), 2);
+
+        // Find the restored item
+        let restored = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "inst-1")
+            .expect("Restored item not found");
+        assert_eq!(restored.quantity, 2);
+        assert_eq!(restored.unpaid_quantity, 2);
+        assert_eq!(restored.price, 10.0);
+        assert!(restored.manual_discount_percent.is_none());
+
+        // Modified item unchanged
+        let modified = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "inst-2")
+            .expect("Modified item should remain");
+        assert_eq!(modified.quantity, 3);
+    }
+
+    #[test]
+    fn test_cancel_normal_payment_no_item_restoration() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.total = 100.0;
+        snapshot.paid_amount = 50.0;
+
+        let item = CartItemSnapshot {
+            id: "product-1".to_string(),
+            instance_id: "inst-1".to_string(),
+            name: "Coffee".to_string(),
+            price: 10.0,
+            original_price: None,
+            quantity: 5,
+            unpaid_quantity: 5,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            line_total: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+        snapshot.items.push(item);
+
+        // Normal payment (no split_items)
+        snapshot
+            .payments
+            .push(create_payment_record("pay-1", "cash", 50.0));
+
+        // Cancel normal payment
+        let event = create_payment_cancelled_event(
+            "order-1",
+            1,
+            "pay-1",
+            "cash",
+            50.0,
+            None,
+            None,
+            None,
+        );
+
+        let applier = PaymentCancelledApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Check: paid_amount reduced
+        assert_eq!(snapshot.paid_amount, 0.0);
+
+        // Check: items unchanged (no split_items to restore)
+        assert_eq!(snapshot.items.len(), 1);
+        assert_eq!(snapshot.items[0].quantity, 5);
+        assert_eq!(snapshot.items[0].unpaid_quantity, 5);
     }
 }

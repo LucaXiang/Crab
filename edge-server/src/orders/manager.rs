@@ -25,6 +25,7 @@
 
 use super::actions::CommandAction;
 use super::appliers::EventAction;
+use super::money;
 use super::storage::{OrderStorage, StorageError};
 use super::traits::{CommandContext, CommandHandler, CommandMetadata, EventApplier, OrderError};
 use crate::db::models::PriceRule;
@@ -68,6 +69,9 @@ pub enum ManagerError {
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
 
+    #[error("Table is already occupied: {0}")]
+    TableOccupied(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -105,6 +109,7 @@ impl From<ManagerError> for CommandError {
                 "Invalid amount".to_string(),
             ),
             ManagerError::InvalidOperation(msg) => (CommandErrorCode::InvalidOperation, msg),
+            ManagerError::TableOccupied(msg) => (CommandErrorCode::TableOccupied, msg),
             ManagerError::Internal(msg) => (CommandErrorCode::InternalError, msg),
         };
         CommandError::new(code, message)
@@ -122,6 +127,7 @@ impl From<OrderError> for ManagerError {
             OrderError::InsufficientQuantity => ManagerError::InsufficientQuantity,
             OrderError::InvalidAmount => ManagerError::InvalidAmount,
             OrderError::InvalidOperation(msg) => ManagerError::InvalidOperation(msg),
+            OrderError::TableOccupied(msg) => ManagerError::TableOccupied(msg),
             OrderError::Storage(msg) => ManagerError::Internal(msg),
         }
     }
@@ -379,12 +385,30 @@ impl OrdersManager {
 
     /// Get a snapshot by order ID
     pub fn get_snapshot(&self, order_id: &str) -> ManagerResult<Option<OrderSnapshot>> {
-        Ok(self.storage.get_snapshot(order_id)?)
+        let mut snapshot = self.storage.get_snapshot(order_id)?;
+        // Ensure line_total is populated for backward compatibility with old data
+        if let Some(ref mut order) = snapshot {
+            let needs_recalc = order.items.iter().any(|item| item.line_total.is_none());
+            if needs_recalc {
+                money::recalculate_totals(order);
+            }
+        }
+        Ok(snapshot)
     }
 
     /// Get all active order snapshots
+    ///
+    /// Ensures all items have `line_total` computed for consistency with order totals.
     pub fn get_active_orders(&self) -> ManagerResult<Vec<OrderSnapshot>> {
-        Ok(self.storage.get_active_orders()?)
+        let mut orders = self.storage.get_active_orders()?;
+        // Ensure line_total is populated for backward compatibility with old data
+        for order in &mut orders {
+            let needs_recalc = order.items.iter().any(|item| item.line_total.is_none());
+            if needs_recalc {
+                money::recalculate_totals(order);
+            }
+        }
+        Ok(orders)
     }
 
     /// Get current sequence number

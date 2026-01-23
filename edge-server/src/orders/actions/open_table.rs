@@ -17,9 +17,9 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// 加载匹配的价格规则
 ///
 /// 根据订单的 zone 信息加载适用的价格规则：
-/// - zone_scope = -1: 适用于所有区域
-/// - zone_scope = 0: 适用于零售订单 (is_retail = true)
-/// - zone_scope > 0: 适用于特定区域 (zone_id 匹配)
+/// - zone_scope = "zone:all": 适用于所有区域
+/// - zone_scope = "zone:retail": 适用于零售订单 (is_retail = true)
+/// - zone_scope = "zone:xxx": 适用于特定区域 (zone_id 匹配)
 ///
 /// 同时过滤：
 /// - is_active = true: 规则必须是激活状态
@@ -89,29 +89,27 @@ pub async fn load_matching_rules(
                 return false;
             }
 
-            // zone_scope = -1: 适用于所有区域
-            if r.zone_scope == -1 {
+            // zone_scope = "zone:all": 适用于所有区域
+            if r.zone_scope == crate::db::models::ZONE_SCOPE_ALL {
                 debug!(
                     rule_name = %rule_name,
-                    zone_scope = r.zone_scope,
-                    "[LoadRules] Rule matched: zone_scope=-1 (all zones)"
+                    zone_scope = %r.zone_scope,
+                    "[LoadRules] Rule matched: zone_scope=all"
                 );
                 return true;
             }
-            // zone_scope = 0: 仅适用于零售订单
-            if r.zone_scope == 0 && is_retail {
+            // zone_scope = "zone:retail": 仅适用于零售订单
+            if r.zone_scope == crate::db::models::ZONE_SCOPE_RETAIL && is_retail {
                 debug!(
                     rule_name = %rule_name,
-                    zone_scope = r.zone_scope,
-                    "[LoadRules] Rule matched: zone_scope=0 (retail only)"
+                    zone_scope = %r.zone_scope,
+                    "[LoadRules] Rule matched: zone_scope=retail"
                 );
                 return true;
             }
-            // zone_scope > 0: 匹配特定区域 ID
+            // zone_scope = "zone:xxx": 匹配特定区域 ID
             if let Some(zid) = zone_id {
-                // Handle both "zone:1" and "1" formats
-                let zid_num = zid.split(':').last().unwrap_or(zid);
-                let matches = r.zone_scope.to_string() == zid_num;
+                let matches = r.zone_scope == zid;
                 if matches {
                     debug!(
                         rule_name = %rule_name,

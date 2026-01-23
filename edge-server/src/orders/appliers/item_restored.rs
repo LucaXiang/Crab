@@ -88,6 +88,7 @@ mod tests {
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
+            line_total: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -203,6 +204,7 @@ mod tests {
             timestamp: 1234567800,
             cancelled: false,
             cancel_reason: None,
+            split_items: None,
         });
 
         let event = create_item_restored_event("order-1", 2, "item-1", "Test Product");

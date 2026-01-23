@@ -125,6 +125,7 @@ mod tests {
             timestamp: 1234567890,
             cancelled: false,
             cancel_reason: None,
+            split_items: None,
         }
     }
 

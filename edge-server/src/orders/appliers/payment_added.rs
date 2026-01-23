@@ -30,6 +30,7 @@ impl EventApplier for PaymentAddedApplier {
                 timestamp: event.timestamp,
                 cancelled: false,
                 cancel_reason: None,
+                split_items: None, // Normal payments don't have split items
             };
 
             // Add payment to snapshot

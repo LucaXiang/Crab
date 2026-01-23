@@ -4,7 +4,7 @@
 //! This is used for split bill payments where specific items are paid for.
 
 use crate::orders::traits::EventApplier;
-use shared::order::{EventPayload, OrderEvent, OrderSnapshot};
+use shared::order::{CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot, PaymentRecord};
 
 /// OrderSplit applier
 pub struct OrderSplitApplier;
@@ -13,8 +13,8 @@ impl EventApplier for OrderSplitApplier {
     fn apply(&self, snapshot: &mut OrderSnapshot, event: &OrderEvent) {
         if let EventPayload::OrderSplit {
             split_amount,
+            payment_method,
             items,
-            ..
         } = &event.payload
         {
             // Track paid quantities for each item
@@ -27,6 +27,51 @@ impl EventApplier for OrderSplitApplier {
 
             // Update paid amount
             snapshot.paid_amount += split_amount;
+
+            // Create PaymentRecord for audit trail
+            let item_names: Vec<&str> = items.iter().map(|i| i.name.as_str()).collect();
+            let note = if items.is_empty() {
+                None
+            } else {
+                Some(format!("Split: {}", item_names.join(", ")))
+            };
+
+            // Build split_items snapshot for restoration on cancel
+            // Find each item in snapshot and create a snapshot with the split quantity
+            let split_items: Vec<CartItemSnapshot> = items
+                .iter()
+                .filter_map(|split_item| {
+                    snapshot
+                        .items
+                        .iter()
+                        .find(|item| item.instance_id == split_item.instance_id)
+                        .map(|item| {
+                            let mut item_snapshot = item.clone();
+                            // Set quantity to the split quantity (not the full item quantity)
+                            item_snapshot.quantity = split_item.quantity;
+                            item_snapshot.unpaid_quantity = 0; // These items are paid
+                            item_snapshot
+                        })
+                })
+                .collect();
+
+            let payment = PaymentRecord {
+                payment_id: format!("split-{}", event.event_id),
+                method: payment_method.clone(),
+                amount: *split_amount,
+                tendered: None,
+                change: None,
+                note,
+                timestamp: event.timestamp,
+                cancelled: false,
+                cancel_reason: None,
+                split_items: if split_items.is_empty() {
+                    None
+                } else {
+                    Some(split_items)
+                },
+            };
+            snapshot.payments.push(payment);
 
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
@@ -65,6 +110,7 @@ mod tests {
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
+            line_total: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -84,6 +130,7 @@ mod tests {
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
+            line_total: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -140,6 +187,69 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         assert_eq!(snapshot.paid_item_quantities.get("item-1"), Some(&2));
+    }
+
+    #[test]
+    fn test_order_split_creates_payment_record() {
+        let mut snapshot = create_test_snapshot("order-1");
+        assert!(snapshot.payments.is_empty());
+
+        let event = create_order_split_event(
+            "order-1",
+            2,
+            20.0,
+            "cash",
+            vec![SplitItem {
+                instance_id: "item-1".to_string(),
+                name: "Coffee".to_string(),
+                quantity: 2,
+            }],
+        );
+
+        let applier = OrderSplitApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // PaymentRecord should be created
+        assert_eq!(snapshot.payments.len(), 1);
+        let payment = &snapshot.payments[0];
+        assert!(payment.payment_id.starts_with("split-"));
+        assert_eq!(payment.method, "cash");
+        assert_eq!(payment.amount, 20.0);
+        assert_eq!(payment.note, Some("Split: Coffee".to_string()));
+        assert!(!payment.cancelled);
+    }
+
+    #[test]
+    fn test_order_split_payment_record_multiple_items() {
+        let mut snapshot = create_test_snapshot("order-1");
+
+        let event = create_order_split_event(
+            "order-1",
+            2,
+            28.0,
+            "card",
+            vec![
+                SplitItem {
+                    instance_id: "item-1".to_string(),
+                    name: "Coffee".to_string(),
+                    quantity: 2,
+                },
+                SplitItem {
+                    instance_id: "item-2".to_string(),
+                    name: "Tea".to_string(),
+                    quantity: 1,
+                },
+            ],
+        );
+
+        let applier = OrderSplitApplier;
+        applier.apply(&mut snapshot, &event);
+
+        assert_eq!(snapshot.payments.len(), 1);
+        let payment = &snapshot.payments[0];
+        assert_eq!(payment.method, "card");
+        assert_eq!(payment.amount, 28.0);
+        assert_eq!(payment.note, Some("Split: Coffee, Tea".to_string()));
     }
 
     #[test]

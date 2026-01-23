@@ -294,6 +294,7 @@ mod tests {
             timestamp: 1234567800,
             cancelled: false,
             cancel_reason: None,
+            split_items: None,
         });
 
         let event = create_order_voided_event(

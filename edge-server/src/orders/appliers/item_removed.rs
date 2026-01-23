@@ -93,6 +93,7 @@ mod tests {
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
+            line_total: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,

@@ -248,13 +248,13 @@ mod tests {
         OrdersManager::with_storage(storage)
     }
 
-    fn create_open_table_cmd(operator_id: &str) -> shared::order::OrderCommand {
+    fn create_open_table_cmd(operator_id: &str, table_id: &str) -> shared::order::OrderCommand {
         shared::order::OrderCommand::new(
             operator_id.to_string(),
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T1".to_string()),
-                table_name: Some("Table 1".to_string()),
+                table_id: Some(table_id.to_string()),
+                table_name: Some(format!("Table {}", table_id)),
                 zone_id: None,
                 zone_name: None,
                 guest_count: 2,
@@ -282,10 +282,10 @@ mod tests {
         let sync_service = SyncService::new(manager.clone());
 
         // Create some orders
-        let cmd1 = create_open_table_cmd("op-1");
+        let cmd1 = create_open_table_cmd("op-1", "T1");
         manager.execute_command(cmd1);
 
-        let cmd2 = create_open_table_cmd("op-1");
+        let cmd2 = create_open_table_cmd("op-1", "T2");
         manager.execute_command(cmd2);
 
         // Sync from beginning
@@ -310,7 +310,7 @@ mod tests {
         let sync_service = SyncService::new(manager.clone());
 
         // Create an order
-        let cmd = create_open_table_cmd("op-1");
+        let cmd = create_open_table_cmd("op-1", "T1");
         manager.execute_command(cmd);
 
         // Sync with current sequence
@@ -328,7 +328,7 @@ mod tests {
         let sync_service = SyncService::new(manager.clone());
 
         // Create an order
-        let cmd = create_open_table_cmd("op-1");
+        let cmd = create_open_table_cmd("op-1", "T1");
         let response = manager.execute_command(cmd);
         let order_id = response.order_id.unwrap();
 
