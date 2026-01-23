@@ -1,0 +1,38 @@
+[package]
+name = "crab-printer"
+version = "0.1.0"
+edition = "2021"
+description = "ESC/POS thermal printer library for restaurant POS systems"
+license = "MIT"
+
+[dependencies]
+# Encoding
+encoding_rs = { workspace = true }
+
+# Image processing (optional, for logo printing)
+image = { workspace = true, optional = true }
+
+# Async runtime
+tokio = { workspace = true, features = ["net", "io-util", "time"] }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Serialization (for renderer configs)
+serde = { workspace = true, features = ["derive"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Graphics_Printing",
+    "Win32_Foundation",
+] }
+
+[features]
+default = ["image"]
+image = ["dep:image"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
