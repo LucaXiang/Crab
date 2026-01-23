@@ -9,7 +9,7 @@
 //! Use `EventAction` from `super::appliers` to apply events to snapshots.
 
 use crate::db::models::PriceRule;
-use crate::pricing::calculate_item_price;
+use crate::pricing::{calculate_item_price, matches_product_scope};
 use shared::order::CartItemSnapshot;
 use tracing::debug;
 
@@ -107,6 +107,23 @@ pub fn input_to_snapshot_with_rules(
         "[Reducer] input_to_snapshot_with_rules called"
     );
 
+    // Filter rules by product scope matching
+    // Note: category_id and tags are not available in CartItemInput,
+    // so Category and Tag scope rules won't match (safe fallback).
+    // Only Global and Product scope rules will be applied.
+    let matched_rules: Vec<&PriceRule> = rules
+        .iter()
+        .filter(|rule| matches_product_scope(rule, &input.product_id, None, &[]))
+        .copied()
+        .collect();
+
+    debug!(
+        product_id = %input.product_id,
+        total_rules = rules.len(),
+        matched_rules_count = matched_rules.len(),
+        "[Reducer] Filtered rules by product scope"
+    );
+
     // Calculate options modifier from selected_options
     let options_modifier: f64 = input
         .selected_options
@@ -125,8 +142,8 @@ pub fn input_to_snapshot_with_rules(
         "[Reducer] Calculated input values"
     );
 
-    // Calculate item price with rules
-    let calc_result = calculate_item_price(base_price, options_modifier, manual_discount, rules);
+    // Calculate item price with matched rules
+    let calc_result = calculate_item_price(base_price, options_modifier, manual_discount, &matched_rules);
 
     debug!(
         product_id = %input.product_id,
@@ -571,5 +588,134 @@ mod tests {
             snapshot_no_rules.instance_id, snapshot_with_rules.instance_id,
             "instance_id should be the same regardless of rules applied"
         );
+    }
+
+    #[test]
+    fn test_product_scope_filtering() {
+        use crate::db::models::{AdjustmentType, ProductScope, RuleType, TimeMode};
+        use surrealdb::sql::Thing;
+
+        // Item for product:p1
+        let input = shared::order::CartItemInput {
+            product_id: "product:p1".to_string(),
+            name: "Product 1".to_string(),
+            price: 100.0,
+            original_price: None,
+            quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            surcharge: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        // Global scope rule - should apply to all products
+        let global_rule = PriceRule {
+            id: None,
+            name: "global_discount".to_string(),
+            display_name: "Global Discount".to_string(),
+            receipt_name: "GD".to_string(),
+            description: None,
+            rule_type: RuleType::Discount,
+            product_scope: ProductScope::Global,
+            target: None,
+            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            adjustment_type: AdjustmentType::Percentage,
+            adjustment_value: 10.0,
+            priority: 0,
+            is_stackable: true,
+            is_exclusive: false,
+            time_mode: TimeMode::Always,
+            start_time: None,
+            end_time: None,
+            schedule_config: None,
+            valid_from: None,
+            valid_until: None,
+            active_days: None,
+            active_start_time: None,
+            active_end_time: None,
+            is_active: true,
+            created_by: None,
+            created_at: 0,
+        };
+
+        // Product-specific rule for product:p1 - should apply
+        let product_p1_rule = PriceRule {
+            id: None,
+            name: "product_p1_discount".to_string(),
+            display_name: "P1 Discount".to_string(),
+            receipt_name: "P1D".to_string(),
+            description: None,
+            rule_type: RuleType::Discount,
+            product_scope: ProductScope::Product,
+            target: Some(Thing::from(("product", "p1"))),
+            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            adjustment_type: AdjustmentType::FixedAmount,
+            adjustment_value: 5.0,
+            priority: 0,
+            is_stackable: true,
+            is_exclusive: false,
+            time_mode: TimeMode::Always,
+            start_time: None,
+            end_time: None,
+            schedule_config: None,
+            valid_from: None,
+            valid_until: None,
+            active_days: None,
+            active_start_time: None,
+            active_end_time: None,
+            is_active: true,
+            created_by: None,
+            created_at: 0,
+        };
+
+        // Product-specific rule for product:p2 - should NOT apply to p1
+        let product_p2_rule = PriceRule {
+            id: None,
+            name: "product_p2_discount".to_string(),
+            display_name: "P2 Discount".to_string(),
+            receipt_name: "P2D".to_string(),
+            description: None,
+            rule_type: RuleType::Discount,
+            product_scope: ProductScope::Product,
+            target: Some(Thing::from(("product", "p2"))),
+            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            adjustment_type: AdjustmentType::FixedAmount,
+            adjustment_value: 50.0, // Large discount that should NOT apply
+            priority: 0,
+            is_stackable: true,
+            is_exclusive: false,
+            time_mode: TimeMode::Always,
+            start_time: None,
+            end_time: None,
+            schedule_config: None,
+            valid_from: None,
+            valid_until: None,
+            active_days: None,
+            active_start_time: None,
+            active_end_time: None,
+            is_active: true,
+            created_by: None,
+            created_at: 0,
+        };
+
+        // Pass ALL rules - filtering should happen inside input_to_snapshot_with_rules
+        let rules: Vec<&PriceRule> = vec![&global_rule, &product_p1_rule, &product_p2_rule];
+        let snapshot = input_to_snapshot_with_rules(&input, &rules);
+
+        // Expected calculation:
+        // - Global 10%: $100 * 10% = $10 discount
+        // - Product P1 $5 fixed: $5 discount
+        // - Product P2 $50: should NOT apply (filtered out)
+        // Total discount: $15
+        // Final: $100 - $10 - $5 = $85
+        assert_eq!(snapshot.price, 85.0);
+        assert_eq!(snapshot.rule_discount_amount, Some(15.0));
+
+        // Should have 2 applied rules (global + p1), not 3
+        let applied_rules = snapshot.applied_rules.as_ref().unwrap();
+        assert_eq!(applied_rules.len(), 2);
     }
 }
