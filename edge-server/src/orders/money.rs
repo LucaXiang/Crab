@@ -25,33 +25,57 @@ pub fn to_f64(value: Decimal) -> f64 {
         .unwrap_or_default()
 }
 
-/// Calculate item line total with precise decimal arithmetic
+/// Calculate item unit price with precise decimal arithmetic
 ///
-/// Formula: (price * quantity) * (1 - manual_discount_percent/100)
-pub fn calculate_item_total(item: &CartItemSnapshot) -> Decimal {
+/// Formula: (price * (1 - manual_discount_percent/100)) + surcharge
+/// This is the final per-unit price shown to customers
+pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
     let price = to_decimal(item.price);
-    let quantity = Decimal::from(item.quantity);
     let discount_rate = item
         .manual_discount_percent
         .map(|d| to_decimal(d) / Decimal::ONE_HUNDRED)
         .unwrap_or(Decimal::ZERO);
+    let surcharge = item.surcharge.map(to_decimal).unwrap_or(Decimal::ZERO);
 
-    let base_total = price * quantity;
-    let discounted = base_total * (Decimal::ONE - discount_rate);
+    let discounted_price = price * (Decimal::ONE - discount_rate);
+    let unit_price = discounted_price + surcharge;
 
-    discounted.round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
+    unit_price.round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
+}
+
+/// Calculate item line total with precise decimal arithmetic
+///
+/// Formula: unit_price * quantity
+pub fn calculate_item_total(item: &CartItemSnapshot) -> Decimal {
+    let unit_price = calculate_unit_price(item);
+    let quantity = Decimal::from(item.quantity);
+
+    (unit_price * quantity).round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
 }
 
 /// Recalculate order totals from items using precise decimal arithmetic
 ///
-/// This function:
-/// 1. Calculates subtotal from all items
-/// 2. Updates unpaid_quantity for each item based on paid_item_quantities
-/// 3. Calculates total = subtotal + tax - discount
+/// This function calculates all financial totals:
+/// - original_total: sum of base prices before any adjustments
+/// - subtotal: sum of line totals (after item-level adjustments)
+/// - total_discount: item-level + order-level discounts
+/// - total_surcharge: item-level + order-level surcharges
+/// - total: final amount to pay
+/// - remaining_amount: total - paid_amount
+///
+/// Also resets `is_pre_payment` to false if total changes (prepaid receipt invalidated)
 pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
+    // Save old total for pre-payment check
+    let old_total = to_decimal(snapshot.total);
+
+    let mut original_total = Decimal::ZERO;
     let mut subtotal = Decimal::ZERO;
+    let mut item_discount_total = Decimal::ZERO;
+    let mut item_surcharge_total = Decimal::ZERO;
 
     for item in &mut snapshot.items {
+        let quantity = Decimal::from(item.quantity);
+
         // Update unpaid_quantity
         let paid_qty = snapshot
             .paid_item_quantities
@@ -60,20 +84,66 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
             .unwrap_or(0);
         item.unpaid_quantity = (item.quantity - paid_qty).max(0);
 
-        // Calculate and set line_total
-        let item_total = calculate_item_total(item);
+        // Calculate original price (base price before any adjustments)
+        let base_price = item.original_price.unwrap_or(item.price);
+        original_total += to_decimal(base_price) * quantity;
+
+        // Calculate item-level discount
+        let manual_discount = item
+            .manual_discount_percent
+            .map(|d| to_decimal(base_price) * to_decimal(d) / Decimal::ONE_HUNDRED)
+            .unwrap_or(Decimal::ZERO);
+        let rule_discount = item.rule_discount_amount.map(to_decimal).unwrap_or(Decimal::ZERO);
+        item_discount_total += (manual_discount + rule_discount) * quantity;
+
+        // Calculate item-level surcharge
+        let surcharge = item.surcharge.map(to_decimal).unwrap_or(Decimal::ZERO);
+        let rule_surcharge = item.rule_surcharge_amount.map(to_decimal).unwrap_or(Decimal::ZERO);
+        item_surcharge_total += (surcharge + rule_surcharge) * quantity;
+
+        // Calculate and set unit_price (final per-unit price for display)
+        let unit_price = calculate_unit_price(item);
+        item.unit_price = Some(to_f64(unit_price));
+
+        // Calculate and set line_total (unit_price * quantity)
+        let item_total = unit_price * quantity;
         item.line_total = Some(to_f64(item_total));
 
         // Accumulate subtotal
         subtotal += item_total;
     }
 
-    let tax = to_decimal(snapshot.tax);
-    let discount = to_decimal(snapshot.discount);
-    let total = subtotal + tax - discount;
+    // Order-level adjustments
+    let order_discount = snapshot.order_rule_discount_amount.map(to_decimal).unwrap_or(Decimal::ZERO)
+        + snapshot.order_manual_discount_fixed.map(to_decimal).unwrap_or(Decimal::ZERO)
+        + snapshot.order_manual_discount_percent
+            .map(|p| subtotal * to_decimal(p) / Decimal::ONE_HUNDRED)
+            .unwrap_or(Decimal::ZERO);
+    let order_surcharge = snapshot.order_rule_surcharge_amount.map(to_decimal).unwrap_or(Decimal::ZERO);
 
+    // Total discount and surcharge (item-level + order-level)
+    let total_discount = item_discount_total + order_discount;
+    let total_surcharge = item_surcharge_total + order_surcharge;
+
+    // Final total
+    let tax = to_decimal(snapshot.tax);
+    let total = subtotal + tax - order_discount + order_surcharge;
+    let paid = to_decimal(snapshot.paid_amount);
+    let remaining = (total - paid).max(Decimal::ZERO);
+
+    // Update snapshot
+    snapshot.original_total = to_f64(original_total);
     snapshot.subtotal = to_f64(subtotal);
+    snapshot.total_discount = to_f64(total_discount);
+    snapshot.total_surcharge = to_f64(total_surcharge);
+    snapshot.discount = to_f64(order_discount); // Legacy field
     snapshot.total = to_f64(total);
+    snapshot.remaining_amount = to_f64(remaining);
+
+    // Reset pre-payment status if total changed (prepaid receipt invalidated)
+    if snapshot.is_pre_payment && total != old_total {
+        snapshot.is_pre_payment = false;
+    }
 }
 
 /// Sum payment amounts with precise arithmetic
@@ -153,6 +223,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            unit_price: None,
             line_total: None,
         };
 
@@ -180,6 +251,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            unit_price: None,
             line_total: None,
         };
 
@@ -208,6 +280,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            unit_price: None,
             line_total: None,
         };
 
@@ -265,11 +338,117 @@ mod tests {
                 note: None,
                 authorizer_id: None,
                 authorizer_name: None,
+                unit_price: None,
                 line_total: None,
             })
             .collect();
 
         let total: Decimal = items.iter().map(|i| calculate_item_total(i)).sum();
         assert_eq!(to_f64(total), 1.0);
+    }
+
+    #[test]
+    fn test_is_pre_payment_reset_when_total_changes() {
+        use shared::order::OrderSnapshot;
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.items.push(CartItemSnapshot {
+            id: "p1".to_string(),
+            instance_id: "i1".to_string(),
+            name: "Item".to_string(),
+            price: 100.0,
+            original_price: None,
+            quantity: 1,
+            unpaid_quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            surcharge: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            unit_price: None,
+            line_total: None,
+        });
+
+        // Initial calculation
+        recalculate_totals(&mut snapshot);
+        assert_eq!(snapshot.total, 100.0);
+
+        // Set pre-payment flag (simulating prepaid receipt printed)
+        snapshot.is_pre_payment = true;
+
+        // Recalculate without changing items - total unchanged, is_pre_payment stays true
+        recalculate_totals(&mut snapshot);
+        assert!(snapshot.is_pre_payment, "is_pre_payment should stay true when total unchanged");
+
+        // Add another item - total changes, is_pre_payment should reset
+        snapshot.items.push(CartItemSnapshot {
+            id: "p2".to_string(),
+            instance_id: "i2".to_string(),
+            name: "Item 2".to_string(),
+            price: 50.0,
+            original_price: None,
+            quantity: 1,
+            unpaid_quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            surcharge: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            unit_price: None,
+            line_total: None,
+        });
+
+        recalculate_totals(&mut snapshot);
+        assert_eq!(snapshot.total, 150.0);
+        assert!(!snapshot.is_pre_payment, "is_pre_payment should reset when total changes");
+    }
+
+    #[test]
+    fn test_is_pre_payment_not_affected_when_false() {
+        use shared::order::OrderSnapshot;
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.items.push(CartItemSnapshot {
+            id: "p1".to_string(),
+            instance_id: "i1".to_string(),
+            name: "Item".to_string(),
+            price: 100.0,
+            original_price: None,
+            quantity: 1,
+            unpaid_quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            surcharge: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            unit_price: None,
+            line_total: None,
+        });
+
+        // is_pre_payment is false by default
+        assert!(!snapshot.is_pre_payment);
+
+        recalculate_totals(&mut snapshot);
+
+        // Add item and recalculate - is_pre_payment should stay false
+        snapshot.items[0].price = 200.0;
+        recalculate_totals(&mut snapshot);
+
+        assert!(!snapshot.is_pre_payment, "is_pre_payment should stay false");
     }
 }

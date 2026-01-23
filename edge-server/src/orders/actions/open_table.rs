@@ -108,6 +108,7 @@ pub async fn load_matching_rules(
                 return true;
             }
             // zone_scope = "zone:xxx": 匹配特定区域 ID
+            // zone_id 格式规范: "zone:xxx" (与 zone_scope 格式一致)
             if let Some(zid) = zone_id {
                 let matches = r.zone_scope == zid;
                 if matches {

@@ -122,7 +122,8 @@ pub enum OrderCommandPayload {
     /// Split bill payment
     SplitOrder {
         order_id: String,
-        split_amount: f64,
+        /// Split amount (optional for item-based split, backend calculates from items)
+        split_amount: Option<f64>,
         payment_method: String,
         items: Vec<SplitItem>,
     },

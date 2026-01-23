@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calculator, Percent, DollarSign } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import type { WizardState } from './index';
@@ -12,8 +12,45 @@ interface Step2AdjustmentProps {
 export const Step2Adjustment: React.FC<Step2AdjustmentProps> = ({ state, updateState }) => {
   const { t } = useI18n();
 
+  // Local string state for free text input
+  const [inputValue, setInputValue] = useState(() =>
+    state.adjustment_value > 0 ? String(state.adjustment_value) : ''
+  );
+
   const isDiscount = state.rule_type === 'DISCOUNT';
   const isPercentage = state.adjustment_type === 'PERCENTAGE';
+
+  // Sync from parent state when adjustment_type changes
+  useEffect(() => {
+    setInputValue(state.adjustment_value > 0 ? String(state.adjustment_value) : '');
+  }, [state.adjustment_type]);
+
+  // Handle input change - allow free typing
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Allow empty, digits, and one decimal point
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setInputValue(value);
+    }
+  };
+
+  // Handle blur - validate and update parent state
+  const handleBlur = () => {
+    const parsed = parseFloat(inputValue);
+    if (!isNaN(parsed) && parsed > 0) {
+      // Format: percentage as integer, fixed as 2 decimal places
+      const formatted = isPercentage
+        ? Math.round(parsed)
+        : Math.round(parsed * 100) / 100;
+      updateState({ adjustment_value: formatted });
+      setInputValue(String(formatted));
+    } else {
+      // Reset to previous valid value or default
+      const fallback = state.adjustment_value > 0 ? state.adjustment_value : (isPercentage ? 10 : 1);
+      updateState({ adjustment_value: fallback });
+      setInputValue(String(fallback));
+    }
+  };
 
   return (
     <FormSection title={t('settings.price_rule.wizard.step2_section')} icon={Calculator}>
@@ -63,14 +100,13 @@ export const Step2Adjustment: React.FC<Step2AdjustmentProps> = ({ state, updateS
       >
         <div className="relative">
           <input
-            type="number"
-            min={isPercentage ? 1 : 0.01}
-            max={isPercentage ? 100 : undefined}
-            step={isPercentage ? 1 : 0.01}
-            value={state.adjustment_value}
-            onChange={(e) => updateState({ adjustment_value: parseFloat(e.target.value) || 0 })}
+            type="text"
+            inputMode="decimal"
+            value={inputValue}
+            onChange={handleInputChange}
+            onBlur={handleBlur}
             className={`${inputClass} pr-12`}
-            placeholder={isPercentage ? '10' : '5'}
+            placeholder={isPercentage ? '10' : '5.00'}
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">
             {isPercentage ? '%' : '¥'}

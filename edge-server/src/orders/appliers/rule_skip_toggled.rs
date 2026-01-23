@@ -92,6 +92,7 @@ mod tests {
                 skipped: false,
             }]),
             surcharge: None,
+            unit_price: None,
             line_total: None,
             note: None,
             authorizer_id: None,

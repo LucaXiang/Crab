@@ -504,28 +504,14 @@ fn to_shared_rule(rule: &PriceRule) -> shared::models::price_rule::PriceRule {
         priority: rule.priority,
         is_stackable: rule.is_stackable,
         is_exclusive: rule.is_exclusive,
-        time_mode: match rule.time_mode {
-            crate::db::models::TimeMode::Always => shared::models::price_rule::TimeMode::Always,
-            crate::db::models::TimeMode::Schedule => shared::models::price_rule::TimeMode::Schedule,
-            crate::db::models::TimeMode::Onetime => shared::models::price_rule::TimeMode::Onetime,
-        },
-        start_time: rule.start_time.clone(),
-        end_time: rule.end_time.clone(),
-        schedule_config: rule.schedule_config.as_ref().map(|sc| {
-            shared::models::price_rule::ScheduleConfig {
-                days_of_week: sc.days_of_week.clone(),
-                start_time: sc.start_time.clone(),
-                end_time: sc.end_time.clone(),
-            }
-        }),
-        valid_from: rule.valid_from,
-        valid_until: rule.valid_until,
+        valid_from: rule.valid_from.map(|dt| dt.to_rfc3339()),
+        valid_until: rule.valid_until.map(|dt| dt.to_rfc3339()),
         active_days: rule.active_days.clone(),
         active_start_time: rule.active_start_time.clone(),
         active_end_time: rule.active_end_time.clone(),
         is_active: rule.is_active,
         created_by: rule.created_by.as_ref().map(|t| t.to_string()),
-        created_at: rule.created_at,
+        created_at: rule.created_at.to_rfc3339(),
     }
 }
 
@@ -655,7 +641,7 @@ pub fn calculate_item_price(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::models::TimeMode;
+    use chrono::Utc;
 
     /// Helper to create a test rule
     fn make_rule(
@@ -681,10 +667,6 @@ mod tests {
             priority,
             is_stackable: stackable,
             is_exclusive: exclusive,
-            time_mode: TimeMode::Always,
-            start_time: None,
-            end_time: None,
-            schedule_config: None,
             valid_from: None,
             valid_until: None,
             active_days: None,
@@ -692,7 +674,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: 0,
+            created_at: Utc::now(),
         }
     }
 

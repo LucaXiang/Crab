@@ -1,7 +1,8 @@
 //! Price Rule Repository
 
 use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix, parse_thing};
-use crate::db::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope, TimeMode};
+use crate::db::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
+use chrono::Utc;
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
 
@@ -104,8 +105,40 @@ impl PriceRuleRepository {
         // Convert target string to Thing if provided
         let target_thing = data.target.as_ref().and_then(|t| parse_thing(t));
 
-        let rule = PriceRule {
-            id: None,
+        // Internal struct with native Thing type (not serde_thing which serializes as string)
+        #[derive(serde::Serialize)]
+        struct InternalCreate {
+            name: String,
+            display_name: String,
+            receipt_name: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            description: Option<String>,
+            rule_type: crate::db::models::RuleType,
+            product_scope: ProductScope,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            target: Option<surrealdb::sql::Thing>,
+            zone_scope: String,
+            adjustment_type: crate::db::models::AdjustmentType,
+            adjustment_value: f64,
+            priority: i32,
+            is_stackable: bool,
+            is_exclusive: bool,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            valid_from: Option<chrono::DateTime<Utc>>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            valid_until: Option<chrono::DateTime<Utc>>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            active_days: Option<Vec<u8>>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            active_start_time: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            active_end_time: Option<String>,
+            is_active: bool,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            created_by: Option<surrealdb::sql::Thing>,
+        }
+
+        let internal = InternalCreate {
             name: data.name,
             display_name: data.display_name,
             receipt_name: data.receipt_name,
@@ -113,16 +146,12 @@ impl PriceRuleRepository {
             rule_type: data.rule_type,
             product_scope: data.product_scope,
             target: target_thing,
-            zone_scope: data.zone_scope.clone().unwrap_or_else(|| crate::db::models::ZONE_SCOPE_ALL.to_string()),
+            zone_scope: data.zone_scope.unwrap_or_else(|| crate::db::models::ZONE_SCOPE_ALL.to_string()),
             adjustment_type: data.adjustment_type,
             adjustment_value: data.adjustment_value,
             priority: data.priority.unwrap_or(0),
             is_stackable: data.is_stackable.unwrap_or(true),
             is_exclusive: data.is_exclusive.unwrap_or(false),
-            time_mode: data.time_mode.unwrap_or(TimeMode::Always),
-            start_time: data.start_time,
-            end_time: data.end_time,
-            schedule_config: data.schedule_config,
             valid_from: data.valid_from,
             valid_until: data.valid_until,
             active_days: data.active_days,
@@ -130,10 +159,9 @@ impl PriceRuleRepository {
             active_end_time: data.active_end_time,
             is_active: true,
             created_by: data.created_by,
-            created_at: chrono::Utc::now().timestamp_millis(),
         };
 
-        let created: Option<PriceRule> = self.base.db().create(TABLE).content(rule).await?;
+        let created: Option<PriceRule> = self.base.db().create(TABLE).content(internal).await?;
         created.ok_or_else(|| RepoError::Database("Failed to create price rule".to_string()))
     }
 
@@ -189,17 +217,9 @@ impl PriceRuleRepository {
             #[serde(skip_serializing_if = "Option::is_none")]
             is_exclusive: Option<bool>,
             #[serde(skip_serializing_if = "Option::is_none")]
-            time_mode: Option<TimeMode>,
+            valid_from: Option<chrono::DateTime<Utc>>,
             #[serde(skip_serializing_if = "Option::is_none")]
-            start_time: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            end_time: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            schedule_config: Option<crate::db::models::ScheduleConfig>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            valid_from: Option<i64>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            valid_until: Option<i64>,
+            valid_until: Option<chrono::DateTime<Utc>>,
             #[serde(skip_serializing_if = "Option::is_none")]
             active_days: Option<Vec<u8>>,
             #[serde(skip_serializing_if = "Option::is_none")]
@@ -224,10 +244,6 @@ impl PriceRuleRepository {
             priority: data.priority,
             is_stackable: data.is_stackable,
             is_exclusive: data.is_exclusive,
-            time_mode: data.time_mode,
-            start_time: data.start_time,
-            end_time: data.end_time,
-            schedule_config: data.schedule_config,
             valid_from: data.valid_from,
             valid_until: data.valid_until,
             active_days: data.active_days,

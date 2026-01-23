@@ -49,19 +49,33 @@ pub struct OrderSnapshot {
     pub items: Vec<CartItemSnapshot>,
     /// Payment records
     pub payments: Vec<PaymentRecord>,
-    /// Subtotal before surcharge
+    // === Financial Totals (all computed by server) ===
+    /// Original total before any discounts/surcharges
+    /// = Σ((original_price ?? price) * quantity)
+    #[serde(default)]
+    pub original_total: f64,
+    /// Subtotal after item-level adjustments (before order-level adjustments)
     pub subtotal: f64,
+    /// Total discount amount (item-level + order-level)
+    #[serde(default)]
+    pub total_discount: f64,
+    /// Total surcharge amount (item-level + order-level)
+    #[serde(default)]
+    pub total_surcharge: f64,
     /// Tax amount
     #[serde(default)]
     pub tax: f64,
-    /// Discount amount
+    /// Discount amount (legacy, use total_discount instead)
     #[serde(default)]
     pub discount: f64,
-    /// Total amount
+    /// Total amount to pay
     pub total: f64,
-    /// Amount paid
+    /// Amount already paid
     #[serde(default)]
     pub paid_amount: f64,
+    /// Remaining amount to pay (total - paid_amount)
+    #[serde(default)]
+    pub remaining_amount: f64,
     /// Quantities paid per item (for split bill)
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
     pub paid_item_quantities: std::collections::HashMap<String, i32>,
@@ -125,11 +139,15 @@ impl OrderSnapshot {
             status: OrderStatus::Active,
             items: Vec::new(),
             payments: Vec::new(),
+            original_total: 0.0,
             subtotal: 0.0,
+            total_discount: 0.0,
+            total_surcharge: 0.0,
             tax: 0.0,
             discount: 0.0,
             total: 0.0,
             paid_amount: 0.0,
+            remaining_amount: 0.0,
             paid_item_quantities: std::collections::HashMap::new(),
             receipt_number: None,
             is_pre_payment: false,

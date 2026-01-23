@@ -8,8 +8,8 @@
 //! - PriceRuleEngine DB queries
 
 use crate::db::models::{
-    Attribute, AttributeBindingFull, Category, CategoryCreate, CategoryUpdate, Product,
-    ProductCreate, ProductFull, ProductUpdate, Tag,
+    serde_thing, Attribute, AttributeBindingFull, Category, CategoryCreate, CategoryUpdate,
+    Product, ProductCreate, ProductFull, ProductUpdate, Tag,
 };
 use crate::db::repository::{make_thing, strip_table_prefix, RepoError, RepoResult};
 use serde::{Deserialize, Serialize};
@@ -22,6 +22,44 @@ use surrealdb::Surreal;
 // =============================================================================
 // Types
 // =============================================================================
+
+/// Product with tags fetched (for FETCH queries)
+/// Note: When using FETCH tags, SurrealDB returns full Tag objects instead of Thing references
+#[derive(Debug, Clone, Deserialize)]
+struct ProductWithTags {
+    #[serde(default, with = "serde_thing::option")]
+    pub id: Option<Thing>,
+    pub name: String,
+    #[serde(default)]
+    pub image: String,
+    #[serde(with = "serde_thing")]
+    pub category: Thing,
+    #[serde(default)]
+    pub sort_order: i32,
+    #[serde(default)]
+    pub tax_rate: i32,
+    pub receipt_name: Option<String>,
+    pub kitchen_print_name: Option<String>,
+    #[serde(default, with = "serde_thing::vec")]
+    pub kitchen_print_destinations: Vec<Thing>,
+    #[serde(default, with = "serde_thing::vec")]
+    pub label_print_destinations: Vec<Thing>,
+    #[serde(default)]
+    pub is_kitchen_print_enabled: i32,
+    #[serde(default)]
+    pub is_label_print_enabled: i32,
+    #[serde(default = "default_true")]
+    pub is_active: bool,
+    /// Tags are fetched as full Tag objects
+    #[serde(default)]
+    pub tags: Vec<Tag>,
+    #[serde(default)]
+    pub specs: Vec<crate::db::models::EmbeddedSpec>,
+}
+
+fn default_true() -> bool {
+    true
+}
 
 /// Product metadata for price rule matching
 #[derive(Debug, Clone, Default)]
@@ -114,8 +152,8 @@ impl CatalogService {
         }
         tracing::info!("📦 CatalogService: Loaded {} categories", categories.len());
 
-        // 2. Load all products with tags fetched
-        let products: Vec<Product> = self
+        // 2. Load all products with tags fetched (using ProductWithTags to deserialize full Tag objects)
+        let products: Vec<ProductWithTags> = self
             .db
             .query("SELECT * FROM product WHERE is_active = true ORDER BY sort_order FETCH tags")
             .await?
@@ -173,20 +211,8 @@ impl CatalogService {
                     None => continue,
                 };
 
-                // Convert Vec<Thing> tags to Vec<Tag>
-                // Note: tags are already fetched as full Tag objects due to FETCH
-                let tags: Vec<Tag> = product
-                    .tags
-                    .iter()
-                    .map(|t| Tag {
-                        id: Some(t.clone()),
-                        name: t.id.to_string(), // Fallback, actual name from FETCH
-                        color: "#3B82F6".to_string(),
-                        display_order: 0,
-                        is_active: true,
-                        is_system: false,
-                    })
-                    .collect();
+                // Tags are already fetched as full Tag objects (name, color, etc.)
+                let tags = product.tags;
 
                 // Get attribute bindings for this product
                 let attributes = product_bindings
@@ -496,13 +522,13 @@ impl CatalogService {
     async fn fetch_product_full(&self, product_id: &str) -> RepoResult<ProductFull> {
         let thing = make_thing("product", strip_table_prefix("product", product_id));
 
-        // Fetch product with tags
+        // Fetch product with tags (using ProductWithTags to get full Tag objects)
         let mut result = self
             .db
             .query("SELECT * FROM product WHERE id = $id FETCH tags")
             .bind(("id", thing.clone()))
             .await?;
-        let products: Vec<Product> = result.take(0)?;
+        let products: Vec<ProductWithTags> = result.take(0)?;
         let product = products
             .into_iter()
             .next()
@@ -539,19 +565,8 @@ impl CatalogService {
             })
             .collect();
 
-        // Convert tags
-        let tags: Vec<Tag> = product
-            .tags
-            .iter()
-            .map(|t| Tag {
-                id: Some(t.clone()),
-                name: t.id.to_string(),
-                color: "#3B82F6".to_string(),
-                display_order: 0,
-                is_active: true,
-                is_system: false,
-            })
-            .collect();
+        // Tags are already fetched as full Tag objects
+        let tags = product.tags;
 
         Ok(ProductFull {
             id: product.id,

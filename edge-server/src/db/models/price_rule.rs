@@ -2,6 +2,7 @@
 
 use super::serde_helpers;
 use super::serde_thing;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Thing;
 
@@ -31,30 +32,9 @@ pub enum AdjustmentType {
     FixedAmount,
 }
 
-/// Time mode enum
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum TimeMode {
-    #[default]
-    Always,
-    Schedule,
-    Onetime,
-}
-
 /// Zone scope constants
 pub const ZONE_SCOPE_ALL: &str = "zone:all";
 pub const ZONE_SCOPE_RETAIL: &str = "zone:retail";
-
-/// Schedule config for recurring rules
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ScheduleConfig {
-    /// Days of week (0=Sunday, 1=Monday, ...)
-    pub days_of_week: Option<Vec<i32>>,
-    /// Start time (HH:MM)
-    pub start_time: Option<String>,
-    /// End time (HH:MM)
-    pub end_time: Option<String>,
-}
 
 /// Price rule entity (价格调整规则)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,15 +63,10 @@ pub struct PriceRule {
     /// Whether this rule is exclusive (cannot be combined with other rules)
     #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_exclusive: bool,
-    #[serde(default)]
-    pub time_mode: TimeMode,
-    pub start_time: Option<String>,
-    pub end_time: Option<String>,
-    pub schedule_config: Option<ScheduleConfig>,
-    /// Valid from timestamp (milliseconds since epoch)
-    pub valid_from: Option<i64>,
-    /// Valid until timestamp (milliseconds since epoch)
-    pub valid_until: Option<i64>,
+    /// Valid from datetime
+    pub valid_from: Option<DateTime<Utc>>,
+    /// Valid until datetime
+    pub valid_until: Option<DateTime<Utc>>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
     pub active_days: Option<Vec<u8>>,
     /// Active start time (HH:MM format)
@@ -105,9 +80,9 @@ pub struct PriceRule {
     pub is_active: bool,
     #[serde(default, with = "serde_thing::option")]
     pub created_by: Option<Thing>,
-    /// Created timestamp (milliseconds since epoch)
-    #[serde(default)]
-    pub created_at: i64,
+    /// Created datetime (set by database DEFAULT)
+    #[serde(default = "Utc::now")]
+    pub created_at: DateTime<Utc>,
 }
 
 fn default_true() -> bool {
@@ -137,14 +112,10 @@ pub struct PriceRuleCreate {
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
     pub is_exclusive: Option<bool>,
-    pub time_mode: Option<TimeMode>,
-    pub start_time: Option<String>,
-    pub end_time: Option<String>,
-    pub schedule_config: Option<ScheduleConfig>,
-    /// Valid from timestamp (milliseconds since epoch)
-    pub valid_from: Option<i64>,
-    /// Valid until timestamp (milliseconds since epoch)
-    pub valid_until: Option<i64>,
+    /// Valid from datetime
+    pub valid_from: Option<DateTime<Utc>>,
+    /// Valid until datetime
+    pub valid_until: Option<DateTime<Utc>>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
     pub active_days: Option<Vec<u8>>,
     /// Active start time (HH:MM format)
@@ -186,20 +157,12 @@ pub struct PriceRuleUpdate {
     /// Whether this rule is exclusive (cannot be combined with other rules)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_exclusive: Option<bool>,
+    /// Valid from datetime
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub time_mode: Option<TimeMode>,
+    pub valid_from: Option<DateTime<Utc>>,
+    /// Valid until datetime
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub start_time: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub end_time: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub schedule_config: Option<ScheduleConfig>,
-    /// Valid from timestamp (milliseconds since epoch)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub valid_from: Option<i64>,
-    /// Valid until timestamp (milliseconds since epoch)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub valid_until: Option<i64>,
+    pub valid_until: Option<DateTime<Utc>>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_days: Option<Vec<u8>>,

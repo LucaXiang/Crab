@@ -100,7 +100,14 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
       SCHEDULE: { color: 'bg-amber-100 text-amber-700', label: t('settings.price_rule.time.schedule') },
       ONETIME: { color: 'bg-rose-100 text-rose-700', label: t('settings.price_rule.time.onetime') },
     };
-    const config = timeConfig[rule.time_mode] || timeConfig.ALWAYS;
+    // Determine time mode from fields
+    let mode = 'ALWAYS';
+    if (rule.valid_from || rule.valid_until) {
+      mode = 'ONETIME';
+    } else if (rule.active_days?.length || rule.active_start_time || rule.active_end_time) {
+      mode = 'SCHEDULE';
+    }
+    const config = timeConfig[mode];
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
         <Clock size={12} />

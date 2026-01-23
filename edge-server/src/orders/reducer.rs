@@ -196,7 +196,8 @@ pub fn input_to_snapshot_with_rules(
             Some(calc_result.applied_rules)
         },
         surcharge: input.surcharge,
-        line_total: None, // Computed by recalculate_totals
+        unit_price: None,  // Computed by recalculate_totals
+        line_total: None,  // Computed by recalculate_totals
         note: input.note.clone(),
         authorizer_id: input.authorizer_id.clone(),
         authorizer_name: input.authorizer_name.clone(),
@@ -336,7 +337,8 @@ mod tests {
 
     #[test]
     fn test_input_to_snapshot_with_rules_discount() {
-        use crate::db::models::{AdjustmentType, ProductScope, RuleType, TimeMode};
+        use crate::db::models::{AdjustmentType, ProductScope, RuleType};
+        use chrono::Utc;
 
         let input = shared::order::CartItemInput {
             product_id: "product:1".to_string(),
@@ -369,10 +371,6 @@ mod tests {
             priority: 0,
             is_stackable: true,
             is_exclusive: false,
-            time_mode: TimeMode::Always,
-            start_time: None,
-            end_time: None,
-            schedule_config: None,
             valid_from: None,
             valid_until: None,
             active_days: None,
@@ -380,7 +378,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: 0,
+            created_at: Utc::now(),
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
@@ -396,7 +394,8 @@ mod tests {
 
     #[test]
     fn test_input_to_snapshot_with_rules_and_options() {
-        use crate::db::models::{AdjustmentType, ProductScope, RuleType, TimeMode};
+        use crate::db::models::{AdjustmentType, ProductScope, RuleType};
+        use chrono::Utc;
         use shared::order::ItemOption;
 
         let input = shared::order::CartItemInput {
@@ -445,10 +444,6 @@ mod tests {
             priority: 0,
             is_stackable: true,
             is_exclusive: false,
-            time_mode: TimeMode::Always,
-            start_time: None,
-            end_time: None,
-            schedule_config: None,
             valid_from: None,
             valid_until: None,
             active_days: None,
@@ -456,7 +451,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: 0,
+            created_at: Utc::now(),
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
@@ -471,7 +466,8 @@ mod tests {
 
     #[test]
     fn test_input_to_snapshot_with_manual_and_rule_discount() {
-        use crate::db::models::{AdjustmentType, ProductScope, RuleType, TimeMode};
+        use crate::db::models::{AdjustmentType, ProductScope, RuleType};
+        use chrono::Utc;
 
         let input = shared::order::CartItemInput {
             product_id: "product:1".to_string(),
@@ -504,10 +500,6 @@ mod tests {
             priority: 0,
             is_stackable: true,
             is_exclusive: false,
-            time_mode: TimeMode::Always,
-            start_time: None,
-            end_time: None,
-            schedule_config: None,
             valid_from: None,
             valid_until: None,
             active_days: None,
@@ -515,7 +507,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: 0,
+            created_at: Utc::now(),
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
@@ -531,7 +523,8 @@ mod tests {
 
     #[test]
     fn test_instance_id_consistent_with_or_without_rules() {
-        use crate::db::models::{AdjustmentType, ProductScope, RuleType, TimeMode};
+        use crate::db::models::{AdjustmentType, ProductScope, RuleType};
+        use chrono::Utc;
 
         // Same input for both cases
         let input = shared::order::CartItemInput {
@@ -568,10 +561,6 @@ mod tests {
             priority: 0,
             is_stackable: true,
             is_exclusive: false,
-            time_mode: TimeMode::Always,
-            start_time: None,
-            end_time: None,
-            schedule_config: None,
             valid_from: None,
             valid_until: None,
             active_days: None,
@@ -579,7 +568,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: 0,
+            created_at: Utc::now(),
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
@@ -599,7 +588,8 @@ mod tests {
 
     #[test]
     fn test_product_scope_filtering() {
-        use crate::db::models::{AdjustmentType, ProductScope, RuleType, TimeMode};
+        use crate::db::models::{AdjustmentType, ProductScope, RuleType};
+        use chrono::Utc;
         use surrealdb::sql::Thing;
 
         // Item for product:p1
@@ -634,10 +624,6 @@ mod tests {
             priority: 0,
             is_stackable: true,
             is_exclusive: false,
-            time_mode: TimeMode::Always,
-            start_time: None,
-            end_time: None,
-            schedule_config: None,
             valid_from: None,
             valid_until: None,
             active_days: None,
@@ -645,7 +631,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: 0,
+            created_at: Utc::now(),
         };
 
         // Product-specific rule for product:p1 - should apply
@@ -664,10 +650,6 @@ mod tests {
             priority: 0,
             is_stackable: true,
             is_exclusive: false,
-            time_mode: TimeMode::Always,
-            start_time: None,
-            end_time: None,
-            schedule_config: None,
             valid_from: None,
             valid_until: None,
             active_days: None,
@@ -675,7 +657,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: 0,
+            created_at: Utc::now(),
         };
 
         // Product-specific rule for product:p2 - should NOT apply to p1
@@ -694,10 +676,6 @@ mod tests {
             priority: 0,
             is_stackable: true,
             is_exclusive: false,
-            time_mode: TimeMode::Always,
-            start_time: None,
-            end_time: None,
-            schedule_config: None,
             valid_from: None,
             valid_until: None,
             active_days: None,
@@ -705,7 +683,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: 0,
+            created_at: Utc::now(),
         };
 
         // Pass ALL rules - filtering should happen inside input_to_snapshot_with_rules

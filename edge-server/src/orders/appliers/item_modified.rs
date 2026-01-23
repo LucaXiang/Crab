@@ -56,6 +56,11 @@ fn apply_item_modified(
         if affected_quantity >= original_qty {
             // Full modification: update entire item in place
             apply_changes_to_item(&mut snapshot.items[idx], changes);
+
+            // Update instance_id from results (it may have changed due to modifications)
+            if let Some(result) = results.iter().find(|r| r.action == "UPDATED") {
+                snapshot.items[idx].instance_id = result.instance_id.clone();
+            }
         } else {
             // Partial modification (split scenario):
             // 1. Reduce original item quantity
@@ -148,6 +153,7 @@ mod tests {
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
+            unit_price: None,
             line_total: None,
             note: None,
             authorizer_id: None,
@@ -516,8 +522,9 @@ mod tests {
         assert_eq!(snapshot.items[0].manual_discount_percent, Some(10.0));
         assert_eq!(snapshot.items[0].surcharge, Some(2.0));
         assert_eq!(snapshot.items[0].note, Some("Special order".to_string()));
-        // 15.0 * 2 * 0.9 = 27.0
-        assert!((snapshot.subtotal - 27.0).abs() < 0.001);
+        // unit_price = (15.0 * 0.9) + 2.0 surcharge = 15.5
+        // subtotal = 15.5 * 2 = 31.0
+        assert!((snapshot.subtotal - 31.0).abs() < 0.001);
     }
 
     #[test]
@@ -753,5 +760,115 @@ mod tests {
         assert!(snapshot.items[1].selected_options.is_some());
         let options = snapshot.items[1].selected_options.as_ref().unwrap();
         assert_eq!(options[0].option_name, "Mild");
+    }
+
+    /// Test that full modification updates instance_id
+    ///
+    /// Scenario:
+    /// 1. Add item with instance_id "item-1"
+    /// 2. Apply discount → instance_id should change to "item-1-new"
+    /// 3. Verify the item's instance_id is updated
+    #[test]
+    fn test_item_modified_full_updates_instance_id() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot
+            .items
+            .push(create_test_item("item-1", "product:p1", "Product A", 100.0, 2));
+
+        let source = create_test_item("item-1", "product:p1", "Product A", 100.0, 2);
+        let changes = ItemChanges {
+            manual_discount_percent: Some(10.0),
+            ..Default::default()
+        };
+        // The result now contains a NEW instance_id (simulating what modify_item.rs generates)
+        let results = vec![ItemModificationResult {
+            instance_id: "item-1-discounted".to_string(), // New instance_id
+            quantity: 2,
+            price: 100.0,
+            manual_discount_percent: Some(10.0),
+            action: "UPDATED".to_string(),
+        }];
+
+        let event = create_item_modified_event("order-1", 2, source, 2, changes, results);
+
+        let applier = ItemModifiedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // instance_id should be updated
+        assert_eq!(snapshot.items.len(), 1);
+        assert_eq!(snapshot.items[0].instance_id, "item-1-discounted");
+        assert_eq!(snapshot.items[0].manual_discount_percent, Some(10.0));
+    }
+
+    /// Test that after full modification, adding the same product creates a separate item
+    ///
+    /// This is an integration-style test demonstrating the fix for the merge bug:
+    /// 1. Add item A (instance_id based on product + price)
+    /// 2. Modify item A with discount (instance_id changes)
+    /// 3. Add item A again (instance_id = original, different from modified)
+    /// 4. Should have 2 separate items (not merged)
+    #[test]
+    fn test_modified_item_does_not_merge_with_new_item() {
+        use crate::orders::appliers::items_added::ItemsAddedApplier;
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+
+        // Step 1: Add initial item
+        let initial_item = create_test_item("original-id", "product:p1", "Product A", 100.0, 1);
+        snapshot.items.push(initial_item.clone());
+
+        // Step 2: Modify item with discount (instance_id changes)
+        let changes = ItemChanges {
+            manual_discount_percent: Some(20.0),
+            ..Default::default()
+        };
+        let results = vec![ItemModificationResult {
+            instance_id: "discounted-id".to_string(), // NEW instance_id
+            quantity: 1,
+            price: 100.0,
+            manual_discount_percent: Some(20.0),
+            action: "UPDATED".to_string(),
+        }];
+
+        let modify_event = create_item_modified_event("order-1", 2, initial_item, 1, changes, results);
+
+        let modify_applier = ItemModifiedApplier;
+        modify_applier.apply(&mut snapshot, &modify_event);
+
+        // Verify instance_id changed
+        assert_eq!(snapshot.items.len(), 1);
+        assert_eq!(snapshot.items[0].instance_id, "discounted-id");
+        assert_eq!(snapshot.items[0].manual_discount_percent, Some(20.0));
+
+        // Step 3: Add same product again (with original instance_id, no discount)
+        let new_item = create_test_item("original-id", "product:p1", "Product A", 100.0, 1);
+        let items_added_event = OrderEvent::new(
+            3,
+            "order-1".to_string(),
+            "user-1".to_string(),
+            "Test User".to_string(),
+            "cmd-3".to_string(),
+            Some(1234567890),
+            OrderEventType::ItemsAdded,
+            EventPayload::ItemsAdded {
+                items: vec![new_item],
+            },
+        );
+
+        let add_applier = ItemsAddedApplier;
+        add_applier.apply(&mut snapshot, &items_added_event);
+
+        // Step 4: Should have 2 separate items
+        assert_eq!(snapshot.items.len(), 2);
+
+        // Item 1: discounted (instance_id = "discounted-id")
+        assert_eq!(snapshot.items[0].instance_id, "discounted-id");
+        assert_eq!(snapshot.items[0].manual_discount_percent, Some(20.0));
+        assert_eq!(snapshot.items[0].quantity, 1);
+
+        // Item 2: new item without discount (instance_id = "original-id")
+        assert_eq!(snapshot.items[1].instance_id, "original-id");
+        assert_eq!(snapshot.items[1].manual_discount_percent, None);
+        assert_eq!(snapshot.items[1].quantity, 1);
     }
 }

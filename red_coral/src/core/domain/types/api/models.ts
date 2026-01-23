@@ -380,13 +380,6 @@ export interface DiningTableUpdate {
 export type RuleType = 'DISCOUNT' | 'SURCHARGE';
 export type ProductScope = 'GLOBAL' | 'CATEGORY' | 'TAG' | 'PRODUCT';
 export type AdjustmentType = 'PERCENTAGE' | 'FIXED_AMOUNT';
-export type TimeMode = 'ALWAYS' | 'SCHEDULE' | 'ONETIME';
-
-export interface ScheduleConfig {
-  days_of_week: number[] | null;
-  start_time: string | null;
-  end_time: string | null;
-}
 
 export interface PriceRule {
   id: string | null;
@@ -404,18 +397,15 @@ export interface PriceRule {
   priority: number;
   is_stackable: boolean;
   is_exclusive: boolean;
-  time_mode: TimeMode;
-  start_time: string | null;
-  end_time: string | null;
-  schedule_config: ScheduleConfig | null;
-  // Time fields (snake_case to match Rust)
-  valid_from: number | null;        // milliseconds since epoch
-  valid_until: number | null;       // milliseconds since epoch
+  // Time fields
+  valid_from: string | null;        // ISO 8601 datetime string
+  valid_until: string | null;       // ISO 8601 datetime string
   active_days: number[] | null;     // [0=Sunday, 1=Monday, ...]
   active_start_time: string | null; // HH:MM format
   active_end_time: string | null;   // HH:MM format
   is_active: boolean;
   created_by: string | null;
+  created_at: string;               // ISO 8601 datetime string
 }
 
 export interface PriceRuleCreate {
@@ -433,13 +423,9 @@ export interface PriceRuleCreate {
   priority?: number;
   is_stackable?: boolean;
   is_exclusive?: boolean;
-  time_mode?: TimeMode;
-  start_time?: string;
-  end_time?: string;
-  schedule_config?: ScheduleConfig;
-  // Time fields (snake_case to match Rust)
-  valid_from?: number;        // milliseconds since epoch
-  valid_until?: number;       // milliseconds since epoch
+  // Time fields
+  valid_from?: string;        // ISO 8601 datetime string
+  valid_until?: string;       // ISO 8601 datetime string
   active_days?: number[];     // [0=Sunday, 1=Monday, ...]
   active_start_time?: string; // HH:MM format
   active_end_time?: string;   // HH:MM format
@@ -461,13 +447,9 @@ export interface PriceRuleUpdate {
   priority?: number;
   is_stackable?: boolean;
   is_exclusive?: boolean;
-  time_mode?: TimeMode;
-  start_time?: string;
-  end_time?: string;
-  schedule_config?: ScheduleConfig;
-  // Time fields (snake_case to match Rust)
-  valid_from?: number;        // milliseconds since epoch
-  valid_until?: number;       // milliseconds since epoch
+  // Time fields
+  valid_from?: string;        // ISO 8601 datetime string
+  valid_until?: string;       // ISO 8601 datetime string
   active_days?: number[];     // [0=Sunday, 1=Monday, ...]
   active_start_time?: string; // HH:MM format
   active_end_time?: string;   // HH:MM format

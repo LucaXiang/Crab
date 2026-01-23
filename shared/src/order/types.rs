@@ -48,7 +48,11 @@ pub struct CartItemSnapshot {
     pub applied_rules: Option<Vec<AppliedRule>>,
 
     // === Computed Fields ===
-    /// Line total (computed by backend: price * quantity with adjustments)
+    /// Unit price for display (computed by backend: price with manual discount and surcharge)
+    /// This is the final per-unit price shown to customers
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit_price: Option<f64>,
+    /// Line total (computed by backend: unit_price * quantity)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub line_total: Option<f64>,
 
@@ -322,6 +326,7 @@ mod tests {
             rule_discount_amount: Some(5.0),
             rule_surcharge_amount: Some(3.0),
             applied_rules: Some(vec![]),
+            unit_price: None,
             line_total: None,
             note: None,
             authorizer_id: None,

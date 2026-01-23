@@ -3,7 +3,7 @@ import { X, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
-import type { PriceRule, PriceRuleCreate, ScheduleConfig } from '@/core/domain/types';
+import type { PriceRule, PriceRuleCreate } from '@/core/domain/types';
 
 // Step components
 import { Step1RuleType } from './Step1RuleType';
@@ -27,16 +27,13 @@ export interface WizardState {
   target: string | null;
   /** Zone scope: "zone:all", "zone:retail", or specific zone ID */
   zone_scope: string;
-  // Step 4
+  // Step 4 - UI-only mode for form control
   time_mode: 'ALWAYS' | 'SCHEDULE' | 'ONETIME';
-  schedule_config: ScheduleConfig;
-  start_time: string;
-  end_time: string;
-  // Step 4 - SCHEDULE mode fields (snake_case to match Rust)
+  // Step 4 - SCHEDULE mode fields
   active_days: number[];
   active_start_time: string;
   active_end_time: string;
-  // Step 4 - ONETIME mode fields (ISO datetime string)
+  // Step 4 - ONETIME mode fields (ISO datetime string for input)
   valid_from: string;
   valid_until: string;
   // Step 5
@@ -52,6 +49,14 @@ export interface WizardState {
 
 const getInitialState = (rule?: PriceRule | null): WizardState => {
   if (rule) {
+    // Determine time_mode based on which fields are set
+    let time_mode: WizardState['time_mode'] = 'ALWAYS';
+    if (rule.valid_from || rule.valid_until) {
+      time_mode = 'ONETIME';
+    } else if (rule.active_days?.length || rule.active_start_time || rule.active_end_time) {
+      time_mode = 'SCHEDULE';
+    }
+
     return {
       rule_type: rule.rule_type as 'DISCOUNT' | 'SURCHARGE',
       adjustment_type: rule.adjustment_type as 'PERCENTAGE' | 'FIXED_AMOUNT',
@@ -59,10 +64,7 @@ const getInitialState = (rule?: PriceRule | null): WizardState => {
       product_scope: rule.product_scope as WizardState['product_scope'],
       target: rule.target,
       zone_scope: rule.zone_scope,
-      time_mode: rule.time_mode as 'ALWAYS' | 'SCHEDULE' | 'ONETIME',
-      schedule_config: rule.schedule_config || { days_of_week: [1, 2, 3, 4, 5], start_time: '09:00', end_time: '18:00' },
-      start_time: rule.start_time || '',
-      end_time: rule.end_time || '',
+      time_mode,
       active_days: rule.active_days || [1, 2, 3, 4, 5],
       active_start_time: rule.active_start_time || '09:00',
       active_end_time: rule.active_end_time || '18:00',
@@ -85,9 +87,6 @@ const getInitialState = (rule?: PriceRule | null): WizardState => {
     target: null,
     zone_scope: 'zone:all',
     time_mode: 'ALWAYS',
-    schedule_config: { days_of_week: [1, 2, 3, 4, 5], start_time: '09:00', end_time: '18:00' },
-    start_time: '',
-    end_time: '',
     active_days: [1, 2, 3, 4, 5],
     active_start_time: '09:00',
     active_end_time: '18:00',
@@ -180,7 +179,6 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({
       priority: state.priority,
       is_stackable: state.is_stackable,
       is_exclusive: state.is_exclusive,
-      time_mode: state.time_mode,
     };
 
     if (state.time_mode === 'SCHEDULE') {
@@ -188,9 +186,9 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({
       payload.active_start_time = state.active_start_time;
       payload.active_end_time = state.active_end_time;
     } else if (state.time_mode === 'ONETIME') {
-      // Convert ISO datetime string to milliseconds since epoch
-      payload.valid_from = state.valid_from ? new Date(state.valid_from).getTime() : undefined;
-      payload.valid_until = state.valid_until ? new Date(state.valid_until).getTime() : undefined;
+      // Convert local datetime to ISO string for backend
+      payload.valid_from = state.valid_from ? new Date(state.valid_from).toISOString() : undefined;
+      payload.valid_until = state.valid_until ? new Date(state.valid_until).toISOString() : undefined;
     }
 
     return payload;
@@ -233,11 +231,9 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({
   return (
     <div
       className="fixed inset-0 z-80 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
     >
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="shrink-0 px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-teal-50 to-white">

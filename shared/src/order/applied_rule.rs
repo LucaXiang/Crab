@@ -64,7 +64,7 @@ impl AppliedRule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::price_rule::{PriceRule, TimeMode};
+    use crate::models::price_rule::PriceRule;
 
     #[test]
     fn test_applied_rule_from_rule() {
@@ -90,11 +90,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: 0,
-            time_mode: TimeMode::Always,
-            start_time: None,
-            end_time: None,
-            schedule_config: None,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
         };
 
         let applied = AppliedRule::from_rule(&rule, 5.0);

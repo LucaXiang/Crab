@@ -52,22 +52,32 @@ DEFINE FIELD OVERWRITE priority ON price_rule TYPE int
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE is_stackable ON price_rule TYPE bool
-    DEFAULT true
+    DEFAULT false
     PERMISSIONS FULL;
 
--- 时间模式: ALWAYS, SCHEDULE, ONETIME
-DEFINE FIELD OVERWRITE time_mode ON price_rule TYPE string
-    DEFAULT "ALWAYS"
+-- 独占规则 (不能与其他规则叠加)
+DEFINE FIELD OVERWRITE is_exclusive ON price_rule TYPE bool
+    DEFAULT false
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE start_time ON price_rule TYPE option<datetime>
+-- 有效期开始时间
+DEFINE FIELD OVERWRITE valid_from ON price_rule TYPE option<datetime>
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE end_time ON price_rule TYPE option<datetime>
+-- 有效期结束时间
+DEFINE FIELD OVERWRITE valid_until ON price_rule TYPE option<datetime>
     PERMISSIONS FULL;
 
--- 周期配置 (JSON)
-DEFINE FIELD OVERWRITE schedule_config ON price_rule TYPE option<object>
+-- 活动日 (0=周日, 1=周一, ..., 6=周六)
+DEFINE FIELD OVERWRITE active_days ON price_rule TYPE option<array<int>>
+    PERMISSIONS FULL;
+
+-- 每日开始时间 (HH:MM 格式)
+DEFINE FIELD OVERWRITE active_start_time ON price_rule TYPE option<string>
+    PERMISSIONS FULL;
+
+-- 每日结束时间 (HH:MM 格式)
+DEFINE FIELD OVERWRITE active_end_time ON price_rule TYPE option<string>
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE is_active ON price_rule TYPE bool
@@ -77,4 +87,8 @@ DEFINE FIELD OVERWRITE is_active ON price_rule TYPE bool
 DEFINE FIELD OVERWRITE created_by ON price_rule TYPE option<record<employee>>
     PERMISSIONS FULL;
 
-DEFINE INDEX OVERWRITE rule_active ON price_rule FIELDS is_active, product_scope, time_mode;
+DEFINE FIELD OVERWRITE created_at ON price_rule TYPE datetime
+    DEFAULT time::now()
+    PERMISSIONS FULL;
+
+DEFINE INDEX OVERWRITE rule_active ON price_rule FIELDS is_active, product_scope;

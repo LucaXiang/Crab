@@ -169,7 +169,8 @@ pub fn calculate_adjustments(rules: &[&PriceRule], base_price: f64) -> PriceAdju
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::models::{ProductScope, TimeMode};
+    use crate::db::models::ProductScope;
+    use chrono::Utc;
 
     fn make_rule(
         rule_type: RuleType,
@@ -193,10 +194,6 @@ mod tests {
             priority,
             is_stackable: stackable,
             is_exclusive: false,
-            time_mode: TimeMode::Always,
-            start_time: None,
-            end_time: None,
-            schedule_config: None,
             valid_from: None,
             valid_until: None,
             active_days: None,
@@ -204,7 +201,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: 0,
+            created_at: Utc::now(),
         }
     }
 

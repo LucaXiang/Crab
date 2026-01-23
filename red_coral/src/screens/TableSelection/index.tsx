@@ -98,26 +98,36 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
       loadTables();
     }, [activeZoneId, dataVersion]);
 
-    // Calculate stats
+    // Calculate stats based on zone-filtered tables
     const stats = useMemo(() => {
+      // First filter by zone
+      const zoneFiltered = activeZoneId && activeZoneId !== 'ALL'
+        ? zoneTables.filter((t) => t.zone === activeZoneId)
+        : zoneTables;
+
       return {
-        ALL: zoneTables.length,
-        EMPTY: zoneTables.filter((t) => !getOrderByTable(t.id)).length,
-        OCCUPIED: zoneTables.filter((t) => {
+        ALL: zoneFiltered.length,
+        EMPTY: zoneFiltered.filter((t) => !getOrderByTable(t.id)).length,
+        OCCUPIED: zoneFiltered.filter((t) => {
           const order = getOrderByTable(t.id);
           return !!order && !order.is_pre_payment;
         }).length,
-        OVERTIME: zoneTables.filter((t) => isOvertime(getOrderByTable(t.id))).length,
-        PRE_PAYMENT: zoneTables.filter((t) => {
+        OVERTIME: zoneFiltered.filter((t) => isOvertime(getOrderByTable(t.id))).length,
+        PRE_PAYMENT: zoneFiltered.filter((t) => {
           const order = getOrderByTable(t.id);
           return order && order.is_pre_payment;
         }).length,
       };
-    }, [zoneTables, heldOrders]);
+    }, [zoneTables, activeZoneId, heldOrders]);
 
-    // Filter tables
+    // Filter tables by zone first, then by status
     const filteredTables = useMemo(() => {
       const filtered = zoneTables.filter((table) => {
+        // Zone filter: if not "ALL", must match selected zone
+        if (activeZoneId && activeZoneId !== 'ALL' && table.zone !== activeZoneId) {
+          return false;
+        }
+
         const order = getOrderByTable(table.id);
         const isOccupied = !!order;
 
@@ -142,7 +152,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
         seen.add(t.id);
         return true;
       });
-    }, [zoneTables, activeFilter, heldOrders]);
+    }, [zoneTables, activeZoneId, activeFilter, heldOrders]);
 
     // Handle table click
     const handleTableClick = (table: Table, isOccupied: boolean, order?: HeldOrder) => {

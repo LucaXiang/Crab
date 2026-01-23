@@ -93,6 +93,7 @@ mod tests {
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
+            unit_price: None,
             line_total: None,
             note: None,
             authorizer_id: None,
@@ -431,12 +432,13 @@ mod tests {
             .items
             .push(create_test_item("item-1", "product:p1", "Product A", 100.0, 1));
         snapshot.tax = 10.0;
-        snapshot.discount = 5.0;
+        snapshot.order_manual_discount_fixed = Some(5.0); // Use structured field
 
         recalculate_totals(&mut snapshot);
 
         assert_eq!(snapshot.subtotal, 100.0);
         // total = subtotal + tax - discount = 100 + 10 - 5 = 105
         assert_eq!(snapshot.total, 105.0);
+        assert_eq!(snapshot.discount, 5.0); // Legacy field should be updated
     }
 }

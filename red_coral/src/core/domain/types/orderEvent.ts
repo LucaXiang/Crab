@@ -500,11 +500,25 @@ export interface OrderSnapshot {
   status: OrderStatus;
   items: CartItemSnapshot[];
   payments: PaymentRecord[];
+
+  // === Financial Totals (all computed by server) ===
+  /** Original total before any discounts/surcharges */
+  original_total: number;
+  /** Subtotal after item-level adjustments (before order-level adjustments) */
   subtotal: number;
+  /** Total discount amount (item-level + order-level) */
+  total_discount: number;
+  /** Total surcharge amount (item-level + order-level) */
+  total_surcharge: number;
   tax: number;
+  /** Legacy discount field (use total_discount instead) */
   discount: number;
+  /** Total amount to pay */
   total: number;
+  /** Amount already paid */
   paid_amount: number;
+  /** Remaining amount to pay (total - paid_amount) */
+  remaining_amount: number;
   /** Quantities paid per item (for split bill) */
   paid_item_quantities?: Record<string, number>;
   receipt_number: string | null;
@@ -562,7 +576,9 @@ export interface CartItemSnapshot {
   applied_rules?: AppliedRule[] | null;
 
   // === Computed Fields ===
-  /** Line total (computed by backend: price * quantity with adjustments) */
+  /** Unit price for display (computed by backend: price with manual discount and surcharge) */
+  unit_price?: number | null;
+  /** Line total (computed by backend: unit_price * quantity) */
   line_total?: number | null;
 
   note?: string | null;

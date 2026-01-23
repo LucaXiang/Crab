@@ -2,17 +2,25 @@
 //!
 //! Splits an order by creating a partial payment for selected items.
 //! Tracks which items have been paid and updates the paid amount.
+//!
+//! Two modes:
+//! - **Item-based split (菜品分单)**: `split_amount` is None, backend calculates from items
+//! - **Amount-based split (金额分单)**: `split_amount` is provided by frontend
 
 use async_trait::async_trait;
 
+use crate::orders::money::{calculate_unit_price, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use rust_decimal::Decimal;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, SplitItem};
 
 /// SplitOrder action
 #[derive(Debug, Clone)]
 pub struct SplitOrderAction {
     pub order_id: String,
-    pub split_amount: f64,
+    /// Split amount (optional for item-based split, required for amount-based split)
+    /// If None and items are provided, backend calculates from items
+    pub split_amount: Option<f64>,
     pub payment_method: String,
     pub items: Vec<SplitItem>,
 }
@@ -41,12 +49,9 @@ impl CommandHandler for SplitOrderAction {
             }
         }
 
-        // 3. Validate split amount
-        if self.split_amount <= 0.0 {
-            return Err(OrderError::InvalidAmount);
-        }
-
-        // 4. Validate items exist in order and have sufficient quantity
+        // 3. Validate items exist in order and have sufficient quantity
+        // Also calculate split amount from items if not provided
+        let mut calculated_amount = Decimal::ZERO;
         for split_item in &self.items {
             let order_item = snapshot
                 .items
@@ -65,12 +70,45 @@ impl CommandHandler for SplitOrderAction {
             if split_item.quantity > available_qty {
                 return Err(OrderError::InsufficientQuantity);
             }
+
+            // Calculate amount for this item: unit_price * split_quantity
+            let unit_price = calculate_unit_price(order_item);
+            calculated_amount += unit_price * Decimal::from(split_item.quantity);
         }
 
-        // 5. Allocate sequence number
+        // 4. Determine final split amount
+        let final_split_amount = if let Some(amount) = self.split_amount {
+            // Amount-based split: use provided amount
+            if amount <= 0.0 {
+                return Err(OrderError::InvalidAmount);
+            }
+            amount
+        } else if !self.items.is_empty() {
+            // Item-based split: use calculated amount
+            let amount = to_f64(calculated_amount);
+            if amount <= 0.0 {
+                return Err(OrderError::InvalidAmount);
+            }
+            amount
+        } else {
+            // No amount and no items
+            return Err(OrderError::InvalidAmount);
+        };
+
+        // 5. Validate: cannot overpay (split_amount <= remaining unpaid)
+        let remaining_unpaid = snapshot.total - snapshot.paid_amount;
+        if final_split_amount > remaining_unpaid + 0.01 {
+            // Allow small tolerance for rounding
+            return Err(OrderError::InvalidOperation(format!(
+                "Split amount ({:.2}) exceeds remaining unpaid ({:.2})",
+                final_split_amount, remaining_unpaid
+            )));
+        }
+
+        // 6. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 6. Create event
+        // 7. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -80,7 +118,7 @@ impl CommandHandler for SplitOrderAction {
             Some(metadata.timestamp),
             OrderEventType::OrderSplit,
             EventPayload::OrderSplit {
-                split_amount: self.split_amount,
+                split_amount: final_split_amount,
                 payment_method: self.payment_method.clone(),
                 items: self.items.clone(),
             },
@@ -128,6 +166,7 @@ mod tests {
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
+            unit_price: None,
             line_total: None,
             note: None,
             authorizer_id: None,
@@ -148,6 +187,7 @@ mod tests {
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
+            unit_price: None,
             line_total: None,
             note: None,
             authorizer_id: None,
@@ -174,7 +214,7 @@ mod tests {
 
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: 20.0,
+            split_amount: Some(20.0),
             payment_method: "cash".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
@@ -220,7 +260,7 @@ mod tests {
 
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: 28.0,
+            split_amount: Some(28.0),
             payment_method: "card".to_string(),
             items: vec![
                 SplitItem {
@@ -260,7 +300,7 @@ mod tests {
 
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: 0.0, // Invalid
+            split_amount: Some(0.0), // Invalid
             payment_method: "cash".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
@@ -288,7 +328,7 @@ mod tests {
 
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: -10.0, // Negative
+            split_amount: Some(-10.0), // Negative
             payment_method: "cash".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
@@ -316,7 +356,7 @@ mod tests {
 
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: 10.0,
+            split_amount: Some(10.0),
             payment_method: "cash".to_string(),
             items: vec![SplitItem {
                 instance_id: "nonexistent".to_string(),
@@ -344,7 +384,7 @@ mod tests {
 
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: 50.0,
+            split_amount: Some(50.0),
             payment_method: "cash".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
@@ -377,7 +417,7 @@ mod tests {
         // Try to split 2 more of item-1, but only 1 is unpaid
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: 20.0,
+            split_amount: Some(20.0),
             payment_method: "cash".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
@@ -394,7 +434,7 @@ mod tests {
         // But splitting 1 should work
         let action_valid = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: 10.0,
+            split_amount: Some(10.0),
             payment_method: "cash".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
@@ -422,7 +462,7 @@ mod tests {
 
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: 10.0,
+            split_amount: Some(10.0),
             payment_method: "cash".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
@@ -451,7 +491,7 @@ mod tests {
 
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: 10.0,
+            split_amount: Some(10.0),
             payment_method: "cash".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
@@ -476,7 +516,7 @@ mod tests {
 
         let action = SplitOrderAction {
             order_id: "nonexistent".to_string(),
-            split_amount: 10.0,
+            split_amount: Some(10.0),
             payment_method: "cash".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
@@ -504,7 +544,7 @@ mod tests {
 
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: 10.0,
+            split_amount: Some(10.0),
             payment_method: "cash".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
@@ -532,7 +572,7 @@ mod tests {
 
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: 10.0,
+            split_amount: Some(10.0),
             payment_method: "cash".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
@@ -569,7 +609,7 @@ mod tests {
         // Split with empty items is valid (payment without item tracking)
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
-            split_amount: 10.0,
+            split_amount: Some(10.0),
             payment_method: "cash".to_string(),
             items: vec![],
         };

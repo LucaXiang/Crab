@@ -28,26 +28,9 @@ pub enum AdjustmentType {
     FixedAmount,
 }
 
-/// Time mode enum
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum TimeMode {
-    #[default]
-    Always,
-    Schedule,
-    Onetime,
-}
-
-/// Schedule config for recurring rules
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ScheduleConfig {
-    /// Days of week (0=Sunday, 1=Monday, ...)
-    pub days_of_week: Option<Vec<i32>>,
-    /// Start time (HH:MM)
-    pub start_time: Option<String>,
-    /// End time (HH:MM)
-    pub end_time: Option<String>,
-}
+/// Zone scope constants
+pub const ZONE_SCOPE_ALL: &str = "zone:all";
+pub const ZONE_SCOPE_RETAIL: &str = "zone:retail";
 
 /// Price rule entity (价格调整规则)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,35 +49,37 @@ pub struct PriceRule {
     pub adjustment_type: AdjustmentType,
     /// Adjustment value (percentage: 30=30%, fixed: currency unit e.g. 5.00 = ¥5.00)
     pub adjustment_value: f64,
+    #[serde(default)]
     pub priority: i32,
+    #[serde(default)]
     pub is_stackable: bool,
     /// Whether this rule is exclusive (cannot be combined with other rules)
     #[serde(default)]
     pub is_exclusive: bool,
-    pub time_mode: TimeMode,
-    pub start_time: Option<String>,
-    pub end_time: Option<String>,
-    pub schedule_config: Option<ScheduleConfig>,
-    /// Valid from timestamp (milliseconds since epoch)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub valid_from: Option<i64>,
-    /// Valid until timestamp (milliseconds since epoch)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub valid_until: Option<i64>,
+    /// Valid from datetime (ISO 8601 string)
+    pub valid_from: Option<String>,
+    /// Valid until datetime (ISO 8601 string)
+    pub valid_until: Option<String>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub active_days: Option<Vec<u8>>,
     /// Active start time (HH:MM format)
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub active_start_time: Option<String>,
     /// Active end time (HH:MM format)
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub active_end_time: Option<String>,
+    #[serde(default = "default_true")]
     pub is_active: bool,
     pub created_by: Option<String>,
-    /// Created timestamp (milliseconds since epoch)
-    #[serde(default)]
-    pub created_at: i64,
+    /// Created datetime (ISO 8601 string)
+    #[serde(default = "default_created_at")]
+    pub created_at: String,
+}
+
+fn default_created_at() -> String {
+    "1970-01-01T00:00:00Z".to_string()
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Create price rule payload
@@ -116,14 +101,10 @@ pub struct PriceRuleCreate {
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
     pub is_exclusive: Option<bool>,
-    pub time_mode: Option<TimeMode>,
-    pub start_time: Option<String>,
-    pub end_time: Option<String>,
-    pub schedule_config: Option<ScheduleConfig>,
-    /// Valid from timestamp (milliseconds since epoch)
-    pub valid_from: Option<i64>,
-    /// Valid until timestamp (milliseconds since epoch)
-    pub valid_until: Option<i64>,
+    /// Valid from datetime (ISO 8601 string)
+    pub valid_from: Option<String>,
+    /// Valid until datetime (ISO 8601 string)
+    pub valid_until: Option<String>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
     pub active_days: Option<Vec<u8>>,
     /// Active start time (HH:MM format)
@@ -152,14 +133,10 @@ pub struct PriceRuleUpdate {
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
     pub is_exclusive: Option<bool>,
-    pub time_mode: Option<TimeMode>,
-    pub start_time: Option<String>,
-    pub end_time: Option<String>,
-    pub schedule_config: Option<ScheduleConfig>,
-    /// Valid from timestamp (milliseconds since epoch)
-    pub valid_from: Option<i64>,
-    /// Valid until timestamp (milliseconds since epoch)
-    pub valid_until: Option<i64>,
+    /// Valid from datetime (ISO 8601 string)
+    pub valid_from: Option<String>,
+    /// Valid until datetime (ISO 8601 string)
+    pub valid_until: Option<String>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
     pub active_days: Option<Vec<u8>>,
     /// Active start time (HH:MM format)
@@ -167,45 +144,4 @@ pub struct PriceRuleUpdate {
     /// Active end time (HH:MM format)
     pub active_end_time: Option<String>,
     pub is_active: Option<bool>,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_price_rule_time_fields() {
-        let rule = PriceRule {
-            id: Some("rule-1".to_string()),
-            name: "test".to_string(),
-            display_name: "Test Rule".to_string(),
-            receipt_name: "TEST".to_string(),
-            description: None,
-            rule_type: RuleType::Discount,
-            product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: "zone:all".to_string(),
-            adjustment_type: AdjustmentType::Percentage,
-            adjustment_value: 10.0,
-            priority: 0,
-            is_stackable: true,
-            is_exclusive: false,
-            valid_from: Some(1704067200000),  // 2024-01-01
-            valid_until: Some(1735689600000), // 2025-01-01
-            active_days: Some(vec![1, 2, 3, 4, 5]), // Mon-Fri
-            active_start_time: Some("11:00".to_string()),
-            active_end_time: Some("14:00".to_string()),
-            is_active: true,
-            created_by: None,
-            created_at: 1704067200000,
-            time_mode: TimeMode::Schedule,
-            start_time: None,
-            end_time: None,
-            schedule_config: None,
-        };
-
-        assert!(!rule.is_exclusive);
-        assert!(rule.valid_from.is_some());
-        assert_eq!(rule.active_days.as_ref().unwrap().len(), 5);
-    }
 }

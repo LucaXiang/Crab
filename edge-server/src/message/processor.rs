@@ -133,28 +133,6 @@ impl RequestCommandProcessor {
         Self { state }
     }
 
-    /// Apply price rules to items if the command is AddItems
-    ///
-    /// NOTE: This is now a no-op. Price rules are applied in OrdersManager.process_command
-    /// which uses the cached rules loaded during OpenTable and applies them via
-    /// input_to_snapshot_with_rules for proper tracking of applied rules.
-    ///
-    /// The old approach modified CartItemInput directly, which lost information about
-    /// which rules were applied. The new approach properly tracks rule_discount_amount,
-    /// rule_surcharge_amount, and applied_rules in CartItemSnapshot.
-    async fn apply_price_rules_if_needed(&self, command: OrderCommand) -> OrderCommand {
-        // For AddItems commands, pre-fill product metadata cache from CatalogService
-        // so that price rules can be properly matched by category/tags
-        if let OrderCommandPayload::AddItems { items, .. } = &command.payload {
-            let product_ids: Vec<String> = items.iter().map(|i| i.product_id.clone()).collect();
-            let metadata = self.state.catalog_service.get_product_meta_batch(&product_ids);
-            self.state
-                .orders_manager()
-                .cache_product_metadata_batch(metadata);
-        }
-        command
-    }
-
     /// Handle order commands (order.open_table, order.add_items, etc.)
     async fn handle_order_command(
         &self,
@@ -169,7 +147,7 @@ impl RequestCommandProcessor {
         };
 
         // Parse full command (sent by client with command_id, operator_id, etc.)
-        let mut command: OrderCommand = serde_json::from_value(params_value.clone())
+        let command: OrderCommand = serde_json::from_value(params_value.clone())
             .map_err(|e| AppError::invalid(format!("Invalid OrderCommand: {}", e)))?;
 
         // 保存 OpenTable 的信息用于后续规则加载
@@ -183,18 +161,14 @@ impl RequestCommandProcessor {
         };
 
         // 检查是否是 RestoreOrder 命令
-        let restore_order_id = if let OrderCommandPayload::RestoreOrder { order_id } =
-            &command.payload
-        {
-            Some(order_id.clone())
-        } else {
-            None
-        };
+        let restore_order_id =
+            if let OrderCommandPayload::RestoreOrder { order_id } = &command.payload {
+                Some(order_id.clone())
+            } else {
+                None
+            };
 
-        // Apply price rules for AddItems commands
-        command = self.apply_price_rules_if_needed(command).await;
-
-        // Execute via OrdersManager
+        // Execute via OrdersManager (CatalogService is injected, metadata lookup is automatic)
         let response = self.state.orders_manager().execute_command(command);
 
         // 如果是 OpenTable 且成功执行，加载并缓存价格规则
@@ -203,12 +177,8 @@ impl RequestCommandProcessor {
                 && let Some(ref order_id) = response.order_id
             {
                 // 加载匹配的价格规则
-                let rules = load_matching_rules(
-                    &self.state.get_db(),
-                    zone_id.as_deref(),
-                    is_retail,
-                )
-                .await;
+                let rules =
+                    load_matching_rules(&self.state.get_db(), zone_id.as_deref(), is_retail).await;
 
                 // 缓存到 OrdersManager
                 if !rules.is_empty() {

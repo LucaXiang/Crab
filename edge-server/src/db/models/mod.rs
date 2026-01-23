@@ -39,7 +39,7 @@ pub use order::{
 };
 pub use price_rule::{
     AdjustmentType, PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope, RuleType,
-    ScheduleConfig, TimeMode, ZONE_SCOPE_ALL, ZONE_SCOPE_RETAIL,
+    ZONE_SCOPE_ALL, ZONE_SCOPE_RETAIL,
 };
 pub use print_destination::{
     EmbeddedPrinter, PrintDestination, PrintDestinationCreate, PrintDestinationUpdate,

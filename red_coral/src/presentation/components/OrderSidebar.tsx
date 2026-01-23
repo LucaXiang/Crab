@@ -8,9 +8,7 @@ import { QuickAddModal } from '@/presentation/components/modals/QuickAddModal';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useOrderTimeline } from '@/core/stores/order/useActiveOrdersStore';
-import { Currency } from '@/utils/currency';
 import { formatCurrency } from '@/utils/currency';
-import { calculateDiscountAmount, calculateOptionsModifier } from '@/utils/pricing';
 
 // Lazy load TimelineList - only loads when user clicks Timeline tab
 const TimelineList = lazy(() =>
@@ -84,50 +82,12 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     setEditingItem(null);
   }, [order]);
 
-  const {
-    displayOriginalPrice,
-    displayTotalDiscount,
-    displayTotalSurcharge,
-    displayFinalTotal
-  } = React.useMemo(() => {
-    const { totalOriginalPrice, totalItemDiscount, totalItemSurcharge } = order.items
-      .filter(item => !item._removed)
-      .reduce(
-        (acc, item) => {
-          const quantity = item.quantity;
-          const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
-          const basePrice = (item.original_price ?? item.price) + optionsModifier;
-
-          // 手动折扣
-          const manualDiscount = calculateDiscountAmount(basePrice, item.manual_discount_percent || 0).toNumber();
-          // 规则折扣
-          const ruleDiscount = item.rule_discount_amount || 0;
-          const unitDiscount = manualDiscount + ruleDiscount;
-
-          // 手动附加费 + 规则附加费
-          const unitSurcharge = (item.surcharge || 0) + (item.rule_surcharge_amount || 0);
-
-          return {
-            totalOriginalPrice: Currency.add(acc.totalOriginalPrice, Currency.mul(basePrice, quantity)).toNumber(),
-            totalItemDiscount: Currency.add(acc.totalItemDiscount, Currency.mul(unitDiscount, quantity)).toNumber(),
-            totalItemSurcharge: Currency.add(acc.totalItemSurcharge, Currency.mul(unitSurcharge, quantity)).toNumber(),
-          };
-        },
-        { totalOriginalPrice: 0, totalItemDiscount: 0, totalItemSurcharge: 0 }
-      );
-
-    const displayOriginalPrice = totalOriginalPrice;
-    const displayTotalDiscount = totalItemDiscount;
-    const displayTotalSurcharge = totalItemSurcharge;
-    const displayFinalTotal = order.total;
-
-    return {
-      displayOriginalPrice,
-      displayTotalDiscount,
-      displayTotalSurcharge,
-      displayFinalTotal,
-    };
-  }, [order.items, order.total]);
+  // Use server-provided financial totals (authoritative)
+  const displayOriginalPrice = order.original_total;
+  const displayTotalDiscount = order.total_discount;
+  const displayTotalSurcharge = order.total_surcharge;
+  const displayFinalTotal = order.total;
+  const displayRemainingAmount = order.remaining_amount;
 
   // Use backend-provided unpaidQuantity for each item
   const unpaidItems = React.useMemo(() => {
@@ -268,15 +228,15 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         </div>
 
         {/* Paid & Remaining (If partial payment exists) */}
-        {totalPaid > 0 && (
+        {order.paid_amount > 0 && (
           <div className="pt-2 border-t border-gray-200 space-y-1">
 	            <div className="flex justify-between items-end">
 	              <span className="text-blue-600 font-medium text-xs">{t('checkout.amount.paid')}</span>
-	              <span className="text-sm text-blue-600 font-semibold">{formatCurrency(totalPaid)}</span>
+	              <span className="text-sm text-blue-600 font-semibold">{formatCurrency(order.paid_amount)}</span>
 	            </div>
 	            <div className="flex justify-between items-end">
 	              <span className="text-red-600 font-medium text-xs">{t('checkout.amount.remaining')}</span>
-	              <span className="text-xl font-bold text-red-600">{formatCurrency(remaining)}</span>
+	              <span className="text-xl font-bold text-red-600">{formatCurrency(displayRemainingAmount)}</span>
 	            </div>
           </div>
         )}

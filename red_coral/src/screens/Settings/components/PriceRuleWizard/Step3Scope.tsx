@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Target, LayoutGrid, Tag, Package, MapPin } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import type { WizardState } from './index';
 import { FormSection, FormField, selectClass } from '../../forms/FormField';
-import { useCategoryStore, useTagStore, useProductStore, useZones } from '@/core/stores/resources';
+import { useCategoryStore, useTagStore, useProductStore, useZoneStore } from '@/core/stores/resources';
 
 interface Step3ScopeProps {
   state: WizardState;
@@ -16,7 +16,13 @@ export const Step3Scope: React.FC<Step3ScopeProps> = ({ state, updateState }) =>
   const categories = useCategoryStore((s) => s.items);
   const tags = useTagStore((s) => s.items);
   const products = useProductStore((s) => s.items);
-  const zones = useZones();
+  const zones = useZoneStore((s) => s.items);
+  const fetchZones = useZoneStore((s) => s.fetchAll);
+
+  // Load zones on mount
+  useEffect(() => {
+    fetchZones();
+  }, [fetchZones]);
 
   const scopeOptions = [
     { value: 'GLOBAL', label: t('settings.price_rule.scope.global'), icon: LayoutGrid, desc: t('settings.price_rule.wizard.scope_global_desc') },

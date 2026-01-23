@@ -205,16 +205,17 @@ impl ServerState {
         let jwt_service = Arc::new(JwtService::default());
         let resource_versions = Arc::new(ResourceVersions::new());
 
-        // 3. Initialize OrdersManager (event sourcing)
-        let orders_db_path = db_dir.join("orders.redb");
-        let orders_manager = Arc::new(
-            OrdersManager::new(&orders_db_path).expect("Failed to initialize orders manager"),
-        );
-
-        // 4. Initialize CatalogService (before PriceRuleEngine which depends on it)
+        // 3. Initialize CatalogService first (OrdersManager and PriceRuleEngine depend on it)
         let catalog_service = Arc::new(CatalogService::new(db.clone()));
 
-        // 5. Initialize PriceRuleEngine (depends on CatalogService)
+        // 4. Initialize OrdersManager (event sourcing) with CatalogService
+        let orders_db_path = db_dir.join("orders.redb");
+        let mut orders_manager =
+            OrdersManager::new(&orders_db_path).expect("Failed to initialize orders manager");
+        orders_manager.set_catalog_service(catalog_service.clone());
+        let orders_manager = Arc::new(orders_manager);
+
+        // 5. Initialize PriceRuleEngine
         let price_rule_engine = PriceRuleEngine::new(db.clone(), catalog_service.clone());
 
         // 6. Initialize KitchenPrintService

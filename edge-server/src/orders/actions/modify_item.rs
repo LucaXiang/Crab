@@ -164,12 +164,33 @@ fn calculate_modification_results(
     changes: &ItemChanges,
 ) -> Vec<ItemModificationResult> {
     if affected_qty >= item.quantity {
-        // Full modification: update entire item in place
+        // Full modification: regenerate instance_id to reflect new state
+        // This ensures that adding the same product later creates a separate item
+        let new_price = changes.price.unwrap_or(item.price);
+        let new_discount = changes.manual_discount_percent.or(item.manual_discount_percent);
+        let new_options = changes
+            .selected_options
+            .as_ref()
+            .or(item.selected_options.as_ref());
+        let new_specification = changes
+            .selected_specification
+            .as_ref()
+            .or(item.selected_specification.as_ref());
+
+        // Generate new instance_id based on the modified state
+        let new_instance_id = generate_instance_id_from_parts(
+            &item.id,
+            new_price,
+            new_discount,
+            &new_options.cloned(),
+            &new_specification.cloned(),
+        );
+
         vec![ItemModificationResult {
-            instance_id: item.instance_id.clone(),
+            instance_id: new_instance_id,
             quantity: item.quantity,
-            price: changes.price.unwrap_or(item.price),
-            manual_discount_percent: changes.manual_discount_percent.or(item.manual_discount_percent),
+            price: new_price,
+            manual_discount_percent: new_discount,
             action: "UPDATED".to_string(),
         }]
     } else {
@@ -253,6 +274,7 @@ mod tests {
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
+            unit_price: None,
             line_total: None,
             note: None,
             authorizer_id: None,
