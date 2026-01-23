@@ -6,7 +6,7 @@
 mod calculator;
 mod engine;
 mod item_calculator;
-mod matcher;
+pub mod matcher;
 mod order_calculator;
 
 pub use calculator::*;

@@ -88,10 +88,10 @@ pub fn to_f64(value: Decimal) -> f64 {
 /// - Tag: 2
 /// - Product: 3
 pub fn calculate_effective_priority(rule: &PriceRule) -> i32 {
-    let zone_weight = match rule.zone_scope {
-        -1 => 0, // Global
-        0 => 1,  // Retail
-        _ => 2,  // Specific zone
+    let zone_weight = match rule.zone_scope.as_str() {
+        crate::db::models::ZONE_SCOPE_ALL => 0,     // Global
+        crate::db::models::ZONE_SCOPE_RETAIL => 1,  // Retail
+        _ => 2,                                      // Specific zone
     };
 
     let product_weight = match rule.product_scope {
@@ -495,7 +495,7 @@ fn to_shared_rule(rule: &PriceRule) -> shared::models::price_rule::PriceRule {
             ProductScope::Product => shared::models::price_rule::ProductScope::Product,
         },
         target: rule.target.as_ref().map(|t| t.to_string()),
-        zone_scope: rule.zone_scope,
+        zone_scope: rule.zone_scope.clone(),
         adjustment_type: match rule.adjustment_type {
             AdjustmentType::Percentage => shared::models::price_rule::AdjustmentType::Percentage,
             AdjustmentType::FixedAmount => shared::models::price_rule::AdjustmentType::FixedAmount,
@@ -675,7 +675,7 @@ mod tests {
             rule_type,
             product_scope: ProductScope::Global,
             target: None,
-            zone_scope: -1,
+            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type,
             adjustment_value: value,
             priority,
@@ -703,11 +703,11 @@ mod tests {
         priority: i32,
         stackable: bool,
         exclusive: bool,
-        zone_scope: i32,
+        zone_scope: &str,
         product_scope: ProductScope,
     ) -> PriceRule {
         let mut rule = make_rule(rule_type, adjustment_type, value, priority, stackable, exclusive);
-        rule.zone_scope = zone_scope;
+        rule.zone_scope = zone_scope.to_string();
         rule.product_scope = product_scope;
         rule
     }
@@ -973,7 +973,7 @@ mod tests {
             5,
             true,
             false,
-            -1,
+            crate::db::models::ZONE_SCOPE_ALL,
             ProductScope::Global,
         );
         assert_eq!(calculate_effective_priority(&global_rule), 5);
@@ -986,7 +986,7 @@ mod tests {
             5,
             true,
             false,
-            1,
+            "zone:1", // Specific zone
             ProductScope::Product,
         );
         assert_eq!(calculate_effective_priority(&specific_rule), 23005);
@@ -999,7 +999,7 @@ mod tests {
             5,
             true,
             false,
-            0,
+            crate::db::models::ZONE_SCOPE_RETAIL,
             ProductScope::Category,
         );
         assert_eq!(calculate_effective_priority(&retail_rule), 11005);
@@ -1015,7 +1015,7 @@ mod tests {
             100, // Higher user priority
             false,
             false,
-            -1,
+            crate::db::models::ZONE_SCOPE_ALL,
             ProductScope::Global,
         );
         let specific = make_rule_with_scope(
@@ -1025,7 +1025,7 @@ mod tests {
             0,  // Lower user priority
             false,
             false,
-            1,
+            "zone:1", // Specific zone
             ProductScope::Product,
         );
         let rules: Vec<&PriceRule> = vec![&global, &specific];

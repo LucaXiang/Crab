@@ -115,8 +115,8 @@ impl PriceRuleEngine {
         // Get product tags
         let tags = self.get_product_tags(&item.product_id).await;
 
-        // Get category ID
-        let category_id = product.category.id.to_string();
+        // Get category ID (full "table:id" format)
+        let category_id = product.category.to_string();
 
         // Match rules to this product
         let matched_rules = self.match_rules_for_item(

@@ -187,7 +187,7 @@ mod tests {
             rule_type,
             product_scope: ProductScope::Global,
             target: None,
-            zone_scope: -1,
+            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type,
             adjustment_value: value,
             priority,

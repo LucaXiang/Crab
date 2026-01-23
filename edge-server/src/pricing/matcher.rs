@@ -25,14 +25,14 @@ pub fn matches_product_scope(
         }
         ProductScope::Product => {
             if let Some(target) = &rule.target {
-                // target is Thing like "product:xxx"
-                let target_id = target.id.to_raw();
-                let matches = target_id == product_id || format!("product:{}", product_id) == target.to_string();
+                // target is Thing like "product:xxx", product_id should also be in full format
+                // Use tb and id.to_raw() for consistent format (avoids SurrealDB's ⟨⟩ brackets)
+                let target_str = format!("{}:{}", target.tb, target.id.to_raw());
+                let matches = target_str == product_id;
                 trace!(
                     rule_name = %rule.name,
                     product_scope = ?rule.product_scope,
-                    target = %target.to_string(),
-                    target_id = %target_id,
+                    target = %target_str,
                     product_id,
                     matches,
                     "[ProductScope] Product scope check"
@@ -50,13 +50,14 @@ pub fn matches_product_scope(
         }
         ProductScope::Category => {
             if let (Some(target), Some(cat_id)) = (&rule.target, category_id) {
-                let target_id = target.id.to_raw();
-                let matches = target_id == cat_id || format!("category:{}", cat_id) == target.to_string();
+                // target is Thing like "category:xxx", cat_id should also be in full format
+                // Use tb and id.to_raw() for consistent format (avoids SurrealDB's ⟨⟩ brackets)
+                let target_str = format!("{}:{}", target.tb, target.id.to_raw());
+                let matches = target_str == cat_id;
                 trace!(
                     rule_name = %rule.name,
                     product_scope = ?rule.product_scope,
-                    target = %target.to_string(),
-                    target_id = %target_id,
+                    target = %target_str,
                     category_id = %cat_id,
                     product_id,
                     matches,
@@ -67,7 +68,7 @@ pub fn matches_product_scope(
                 trace!(
                     rule_name = %rule.name,
                     product_scope = ?rule.product_scope,
-                    target = ?rule.target.as_ref().map(|t| t.to_string()),
+                    target = ?rule.target.as_ref().map(|t| format!("{}:{}", t.tb, t.id.to_raw())),
                     category_id = ?category_id,
                     product_id,
                     "[ProductScope] Category scope - missing target or category_id"
@@ -77,14 +78,14 @@ pub fn matches_product_scope(
         }
         ProductScope::Tag => {
             if let Some(target) = &rule.target {
-                let target_id = target.id.to_raw();
-                let matches = tags.iter()
-                    .any(|t| t == &target_id || format!("tag:{}", t) == target.to_string());
+                // target is Thing like "tag:xxx", tags should also be in full format
+                // Use tb and id.to_raw() for consistent format (avoids SurrealDB's ⟨⟩ brackets)
+                let target_str = format!("{}:{}", target.tb, target.id.to_raw());
+                let matches = tags.iter().any(|t| t == &target_str);
                 trace!(
                     rule_name = %rule.name,
                     product_scope = ?rule.product_scope,
-                    target = %target.to_string(),
-                    target_id = %target_id,
+                    target = %target_str,
                     product_id,
                     tags = ?tags,
                     matches,
@@ -115,18 +116,20 @@ pub fn matches_product_scope(
     result
 }
 
+/// Zone scope constants
+pub const ZONE_SCOPE_ALL: &str = "zone:all";
+pub const ZONE_SCOPE_RETAIL: &str = "zone:retail";
+
 /// Check if a rule matches the zone scope
-/// zone_scope: -1=all zones, 0=retail only, >0=specific zone
+/// zone_scope: "zone:all" = all zones, "zone:retail" = retail only, "zone:xxx" = specific zone
 pub fn matches_zone_scope(rule: &PriceRule, zone_id: Option<&str>, is_retail: bool) -> bool {
-    match rule.zone_scope {
-        -1 => true,     // All zones
-        0 => is_retail, // Retail only
+    match rule.zone_scope.as_str() {
+        ZONE_SCOPE_ALL => true,      // All zones
+        ZONE_SCOPE_RETAIL => is_retail, // Retail only
         zone_scope => {
-            // Specific zone
+            // Specific zone - direct string comparison
             if let Some(zid) = zone_id {
-                // Handle both "zone:1" and "1" formats
-                let zid_num = zid.split(':').last().unwrap_or(zid);
-                zid_num == zone_scope.to_string()
+                zid == zone_scope
             } else {
                 false
             }
@@ -217,7 +220,7 @@ mod tests {
                     t.split(':').last().unwrap_or(t),
                 ))
             }),
-            zone_scope: -1,
+            zone_scope: ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
             priority: 0,
@@ -241,41 +244,48 @@ mod tests {
     #[test]
     fn test_global_scope_matches_all() {
         let rule = make_rule(ProductScope::Global, None);
-        assert!(matches_product_scope(&rule, "123", Some("cat1"), &[]));
+        // All IDs should be in full format "table:id"
+        assert!(matches_product_scope(
+            &rule,
+            "product:123",
+            Some("category:cat1"),
+            &[]
+        ));
     }
 
     #[test]
     fn test_product_scope_matches_specific() {
         let rule = make_rule(ProductScope::Product, Some("product:123"));
 
-        // Debug: print what we're comparing
-        if let Some(target) = &rule.target {
-            eprintln!("target: {:?}", target);
-            eprintln!("target.to_string(): {}", target.to_string());
-            eprintln!("target.id: {:?}", target.id);
-            eprintln!("target.id.to_string(): {}", target.id.to_string());
-            eprintln!("target.id.to_raw(): {}", target.id.to_raw());
-            eprintln!("target.tb: {}", target.tb);
-        }
-
-        assert!(matches_product_scope(&rule, "123", Some("cat1"), &[]));
-        assert!(!matches_product_scope(&rule, "456", Some("cat1"), &[]));
+        // All IDs should be in full format "table:id"
+        assert!(matches_product_scope(
+            &rule,
+            "product:123",
+            Some("category:cat1"),
+            &[]
+        ));
+        assert!(!matches_product_scope(
+            &rule,
+            "product:456",
+            Some("category:cat1"),
+            &[]
+        ));
     }
 
     #[test]
     fn test_zone_scope_all() {
         let mut rule = make_rule(ProductScope::Global, None);
-        rule.zone_scope = -1;
-        assert!(matches_zone_scope(&rule, Some("1"), false));
+        rule.zone_scope = ZONE_SCOPE_ALL.to_string();
+        assert!(matches_zone_scope(&rule, Some("zone:1"), false));
         assert!(matches_zone_scope(&rule, None, true));
     }
 
     #[test]
     fn test_zone_scope_retail_only() {
         let mut rule = make_rule(ProductScope::Global, None);
-        rule.zone_scope = 0;
+        rule.zone_scope = ZONE_SCOPE_RETAIL.to_string();
         assert!(matches_zone_scope(&rule, None, true));
-        assert!(!matches_zone_scope(&rule, Some("1"), false));
+        assert!(!matches_zone_scope(&rule, Some("zone:1"), false));
     }
 
     // ===========================================
