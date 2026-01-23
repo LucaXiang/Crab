@@ -39,9 +39,9 @@ mod tests {
     fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
         let mut snapshot = OrderSnapshot::new(order_id.to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot.table_id = Some("table-1".to_string());
+        snapshot.table_id = Some("dining_table:t1".to_string());
         snapshot.table_name = Some("Table 1".to_string());
-        snapshot.zone_id = Some("zone-1".to_string());
+        snapshot.zone_id = Some("zone:z1".to_string());
         snapshot.zone_name = Some("Zone A".to_string());
         snapshot
     }
@@ -76,15 +76,15 @@ mod tests {
     #[test]
     fn test_order_moved_updates_table_info() {
         let mut snapshot = create_test_snapshot("order-1");
-        assert_eq!(snapshot.table_id, Some("table-1".to_string()));
+        assert_eq!(snapshot.table_id, Some("dining_table:t1".to_string()));
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
 
         let event = create_order_moved_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             vec![],
         );
@@ -92,7 +92,7 @@ mod tests {
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(snapshot.table_id, Some("table-2".to_string()));
+        assert_eq!(snapshot.table_id, Some("dining_table:t2".to_string()));
         assert_eq!(snapshot.table_name, Some("Table 2".to_string()));
     }
 
@@ -105,9 +105,9 @@ mod tests {
         let event = create_order_moved_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-3",
+            "dining_table:t3",
             "Table 3",
             vec![],
         );
@@ -128,9 +128,9 @@ mod tests {
         let event = create_order_moved_event(
             "order-1",
             10,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             vec![],
         );
@@ -149,9 +149,9 @@ mod tests {
         let event = create_order_moved_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             vec![],
         );
@@ -172,9 +172,9 @@ mod tests {
         let event = create_order_moved_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             vec![],
         );
@@ -192,12 +192,12 @@ mod tests {
         snapshot.table_id = None;
         snapshot.table_name = None;
 
-        let event = create_order_moved_event("order-1", 2, "", "", "table-2", "Table 2", vec![]);
+        let event = create_order_moved_event("order-1", 2, "", "", "dining_table:t2", "Table 2", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(snapshot.table_id, Some("table-2".to_string()));
+        assert_eq!(snapshot.table_id, Some("dining_table:t2".to_string()));
         assert_eq!(snapshot.table_name, Some("Table 2".to_string()));
     }
 
@@ -205,7 +205,7 @@ mod tests {
     fn test_order_moved_preserves_items() {
         let mut snapshot = create_test_snapshot("order-1");
         let item = CartItemSnapshot {
-            id: "product-1".to_string(),
+            id: "product:1".to_string(),
             instance_id: "item-1".to_string(),
             name: "Coffee".to_string(),
             price: 10.0,
@@ -229,9 +229,9 @@ mod tests {
         let event = create_order_moved_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             vec![item],
         );
@@ -252,9 +252,9 @@ mod tests {
         let event = create_order_moved_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             vec![],
         );
@@ -302,9 +302,9 @@ mod tests {
         let event = create_order_moved_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             vec![],
         );
@@ -326,9 +326,9 @@ mod tests {
         let event = create_order_moved_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-1", // Same table
+            "dining_table:t1", // Same table
             "Table 1",
             vec![],
         );
@@ -336,7 +336,7 @@ mod tests {
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(snapshot.table_id, Some("table-1".to_string()));
+        assert_eq!(snapshot.table_id, Some("dining_table:t1".to_string()));
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
         assert_eq!(snapshot.last_sequence, 2);
     }
@@ -346,12 +346,12 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
 
         let event =
-            create_order_moved_event("order-1", 2, "table-1", "Table 1", "table-2", "", vec![]);
+            create_order_moved_event("order-1", 2, "dining_table:t1", "Table 1", "dining_table:t2", "", vec![]);
 
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(snapshot.table_id, Some("table-2".to_string()));
+        assert_eq!(snapshot.table_id, Some("dining_table:t2".to_string()));
         assert_eq!(snapshot.table_name, Some("".to_string()));
     }
 }

@@ -146,7 +146,7 @@ mod tests {
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(create_test_item(
             "item-2",
-            "prod-2",
+            "product:p2",
             "Existing Product",
             20.0,
             1,
@@ -271,7 +271,7 @@ mod tests {
     fn test_item_restored_preserves_order_data() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot.table_id = Some("table-1".to_string());
+        snapshot.table_id = Some("dining_table:t1".to_string());
         snapshot.table_name = Some("Table 1".to_string());
         snapshot.guest_count = 4;
         snapshot.is_retail = false;
@@ -282,7 +282,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Order data should be preserved
-        assert_eq!(snapshot.table_id, Some("table-1".to_string()));
+        assert_eq!(snapshot.table_id, Some("dining_table:t1".to_string()));
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
         assert_eq!(snapshot.guest_count, 4);
         assert!(!snapshot.is_retail);

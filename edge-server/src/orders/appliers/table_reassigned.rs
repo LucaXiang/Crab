@@ -47,9 +47,9 @@ mod tests {
     fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
         let mut snapshot = OrderSnapshot::new(order_id.to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot.table_id = Some("table-1".to_string());
+        snapshot.table_id = Some("dining_table:t1".to_string());
         snapshot.table_name = Some("Table 1".to_string());
-        snapshot.zone_id = Some("zone-1".to_string());
+        snapshot.zone_id = Some("zone:z1".to_string());
         snapshot.zone_name = Some("Zone A".to_string());
         snapshot
     }
@@ -86,15 +86,15 @@ mod tests {
     #[test]
     fn test_table_reassigned_updates_table_info() {
         let mut snapshot = create_test_snapshot("order-1");
-        assert_eq!(snapshot.table_id, Some("table-1".to_string()));
+        assert_eq!(snapshot.table_id, Some("dining_table:t1".to_string()));
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
 
         let event = create_table_reassigned_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             None,
         );
@@ -102,7 +102,7 @@ mod tests {
         let applier = TableReassignedApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(snapshot.table_id, Some("table-2".to_string()));
+        assert_eq!(snapshot.table_id, Some("dining_table:t2".to_string()));
         assert_eq!(snapshot.table_name, Some("Table 2".to_string()));
     }
 
@@ -114,9 +114,9 @@ mod tests {
         let event = create_table_reassigned_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             Some("Zone B"),
         );
@@ -135,9 +135,9 @@ mod tests {
         let event = create_table_reassigned_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             None, // No zone change
         );
@@ -157,9 +157,9 @@ mod tests {
         let event = create_table_reassigned_event(
             "order-1",
             10,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             None,
         );
@@ -178,9 +178,9 @@ mod tests {
         let event = create_table_reassigned_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             None,
         );
@@ -200,9 +200,9 @@ mod tests {
         let event = create_table_reassigned_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             None,
         );
@@ -222,9 +222,9 @@ mod tests {
         let event = create_table_reassigned_event(
             "order-1",
             2,
-            "table-1",
+            "dining_table:t1",
             "Table 1",
-            "table-2",
+            "dining_table:t2",
             "Table 2",
             None,
         );

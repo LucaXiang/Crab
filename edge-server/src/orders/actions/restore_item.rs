@@ -180,7 +180,7 @@ mod tests {
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(create_test_item(
             "item-1",
-            "prod-1",
+            "product:p1",
             "Test Product",
             10.0,
             1,
@@ -359,14 +359,14 @@ mod tests {
         snapshot.status = OrderStatus::Active;
         snapshot.items.push(create_test_item(
             "item-2",
-            "prod-2",
+            "product:p2",
             "Another Product",
             15.0,
             1,
         ));
         snapshot.items.push(create_test_item(
             "item-3",
-            "prod-3",
+            "product:p3",
             "Third Product",
             25.0,
             2,

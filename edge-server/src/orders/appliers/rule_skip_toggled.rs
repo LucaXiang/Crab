@@ -63,7 +63,7 @@ mod tests {
 
         // Add an item with applied rules
         let item = CartItemSnapshot {
-            id: "product-1".to_string(),
+            id: "product:1".to_string(),
             instance_id: "inst-1".to_string(),
             name: "Test Product".to_string(),
             price: 90.0, // After 10% discount

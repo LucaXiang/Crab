@@ -152,7 +152,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create order with item
-        let item = create_test_item("item-1", "prod-1", "Test Product", 10.0, 2);
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 2);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -199,7 +199,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create order with item quantity=5
-        let item = create_test_item("item-1", "prod-1", "Test Product", 10.0, 5);
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 5);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -241,7 +241,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "prod-1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -268,7 +268,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "prod-1", "Test Product", 10.0, 3);
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -295,7 +295,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "prod-1", "Test Product", 10.0, 3);
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -322,7 +322,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "prod-1", "Test Product", 10.0, 3);
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -349,7 +349,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "prod-1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Completed;
         snapshot.items.push(item);
@@ -378,7 +378,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "prod-1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Void;
         snapshot.items.push(item);
@@ -430,7 +430,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "prod-1", "Expensive Wine", 150.0, 1);
+        let item = create_test_item("item-1", "product:p1", "Expensive Wine", 150.0, 1);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 

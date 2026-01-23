@@ -59,14 +59,14 @@ mod tests {
     fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
         let mut snapshot = OrderSnapshot::new(order_id.to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot.table_id = Some("table-1".to_string());
+        snapshot.table_id = Some("dining_table:t1".to_string());
         snapshot.table_name = Some("Table 1".to_string());
         snapshot
     }
 
     fn create_test_item(instance_id: &str, name: &str) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: "product-1".to_string(),
+            id: "product:1".to_string(),
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price: 10.0,
@@ -144,7 +144,7 @@ mod tests {
             create_test_item("item-2", "Tea"),
         ];
 
-        let event = create_order_merged_event("target-1", 2, "table-2", "Table 2", items);
+        let event = create_order_merged_event("target-1", 2, "dining_table:t2", "Table 2", items);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -165,7 +165,7 @@ mod tests {
 
         let items = vec![create_test_item("merged-1", "Merged Item")];
 
-        let event = create_order_merged_event("target-1", 2, "table-2", "Table 2", items);
+        let event = create_order_merged_event("target-1", 2, "dining_table:t2", "Table 2", items);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -179,7 +179,7 @@ mod tests {
     fn test_order_merged_empty_items() {
         let mut snapshot = create_test_snapshot("target-1");
 
-        let event = create_order_merged_event("target-1", 2, "table-2", "Table 2", vec![]);
+        let event = create_order_merged_event("target-1", 2, "dining_table:t2", "Table 2", vec![]);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -192,7 +192,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("target-1");
         snapshot.last_sequence = 5;
 
-        let event = create_order_merged_event("target-1", 10, "table-2", "Table 2", vec![]);
+        let event = create_order_merged_event("target-1", 10, "dining_table:t2", "Table 2", vec![]);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -205,7 +205,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("target-1");
         snapshot.updated_at = 1000000000;
 
-        let event = create_order_merged_event("target-1", 2, "table-2", "Table 2", vec![]);
+        let event = create_order_merged_event("target-1", 2, "dining_table:t2", "Table 2", vec![]);
         let expected_timestamp = event.timestamp;
 
         let applier = OrderMergedApplier;
@@ -220,7 +220,7 @@ mod tests {
         let initial_checksum = snapshot.state_checksum.clone();
 
         let items = vec![create_test_item("item-1", "Coffee")];
-        let event = create_order_merged_event("target-1", 2, "table-2", "Table 2", items);
+        let event = create_order_merged_event("target-1", 2, "dining_table:t2", "Table 2", items);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -234,7 +234,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("target-1");
         assert_eq!(snapshot.status, OrderStatus::Active);
 
-        let event = create_order_merged_event("target-1", 2, "table-2", "Table 2", vec![]);
+        let event = create_order_merged_event("target-1", 2, "dining_table:t2", "Table 2", vec![]);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
@@ -297,7 +297,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("source-1");
         assert_eq!(snapshot.status, OrderStatus::Active);
 
-        let event = create_order_merged_out_event("source-1", 2, "table-2", "Table 2");
+        let event = create_order_merged_out_event("source-1", 2, "dining_table:t2", "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -310,7 +310,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("source-1");
         snapshot.last_sequence = 5;
 
-        let event = create_order_merged_out_event("source-1", 10, "table-2", "Table 2");
+        let event = create_order_merged_out_event("source-1", 10, "dining_table:t2", "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -323,7 +323,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("source-1");
         snapshot.updated_at = 1000000000;
 
-        let event = create_order_merged_out_event("source-1", 2, "table-2", "Table 2");
+        let event = create_order_merged_out_event("source-1", 2, "dining_table:t2", "Table 2");
         let expected_timestamp = event.timestamp;
 
         let applier = OrderMergedOutApplier;
@@ -337,7 +337,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("source-1");
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_order_merged_out_event("source-1", 2, "table-2", "Table 2");
+        let event = create_order_merged_out_event("source-1", 2, "dining_table:t2", "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -351,7 +351,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("source-1");
         snapshot.items.push(create_test_item("item-1", "Coffee"));
 
-        let event = create_order_merged_out_event("source-1", 2, "table-2", "Table 2");
+        let event = create_order_merged_out_event("source-1", 2, "dining_table:t2", "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -365,13 +365,13 @@ mod tests {
     fn test_order_merged_out_preserves_table_info() {
         let mut snapshot = create_test_snapshot("source-1");
 
-        let event = create_order_merged_out_event("source-1", 2, "table-2", "Table 2");
+        let event = create_order_merged_out_event("source-1", 2, "dining_table:t2", "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
 
         // Source table info should be preserved
-        assert_eq!(snapshot.table_id, Some("table-1".to_string()));
+        assert_eq!(snapshot.table_id, Some("dining_table:t1".to_string()));
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
     }
 
@@ -409,7 +409,7 @@ mod tests {
     fn test_order_merged_out_checksum_verifiable() {
         let mut snapshot = create_test_snapshot("source-1");
 
-        let event = create_order_merged_out_event("source-1", 2, "table-2", "Table 2");
+        let event = create_order_merged_out_event("source-1", 2, "dining_table:t2", "Table 2");
 
         let applier = OrderMergedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -426,7 +426,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("target-1");
 
         let items = vec![create_test_item("item-1", "Coffee")];
-        let event = create_order_merged_event("target-1", 2, "table-2", "Table 2", items);
+        let event = create_order_merged_event("target-1", 2, "dining_table:t2", "Table 2", items);
 
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);

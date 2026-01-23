@@ -135,7 +135,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 2));
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 2));
         snapshot.subtotal = 20.0;
         snapshot.total = 20.0;
 
@@ -156,7 +156,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 5));
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 5));
         snapshot.subtotal = 50.0;
         snapshot.total = 50.0;
 
@@ -180,7 +180,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 3));
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 3));
         snapshot.subtotal = 30.0;
         snapshot.total = 30.0;
 
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn test_item_removed_with_discount() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        let mut item = create_test_item("item-1", "prod-1", "Product A", 100.0, 2);
+        let mut item = create_test_item("item-1", "product:p1", "Product A", 100.0, 2);
         item.manual_discount_percent = Some(10.0);
         snapshot.items.push(item);
         // 100 * 2 * 0.9 = 180
@@ -223,7 +223,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 1));
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
         snapshot.last_sequence = 5;
 
         let event = create_item_removed_event("order-1", 6, "item-1", "Product A", None, None);
@@ -239,7 +239,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 1));
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
         let initial_checksum = snapshot.state_checksum.clone();
 
         let event = create_item_removed_event("order-1", 1, "item-1", "Product A", None, None);
@@ -256,7 +256,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 1));
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
         snapshot.subtotal = 10.0;
         snapshot.total = 10.0;
 
@@ -278,10 +278,10 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 2));
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 2));
         snapshot
             .items
-            .push(create_test_item("item-2", "prod-2", "Product B", 20.0, 1));
+            .push(create_test_item("item-2", "product:p2", "Product B", 20.0, 1));
         snapshot.subtotal = 40.0; // 10*2 + 20*1
         snapshot.total = 40.0;
 
@@ -303,7 +303,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 3));
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 3));
         // 1 of 3 already paid
         snapshot
             .paid_item_quantities
@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn test_item_removed_partial_with_paid_quantities() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        let mut item = create_test_item("item-1", "prod-1", "Product A", 10.0, 5);
+        let mut item = create_test_item("item-1", "product:p1", "Product A", 10.0, 5);
         item.unpaid_quantity = 4; // 1 already paid
         snapshot.items.push(item);
         snapshot
@@ -351,7 +351,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 1));
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
 
         let event = create_item_removed_event(
             "order-1",
@@ -374,7 +374,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 1));
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
         snapshot.updated_at = 1000;
 
         // Event has a different timestamp
@@ -392,7 +392,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 2));
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 2));
 
         apply_item_removed(&mut snapshot, "item-1", None);
 
@@ -404,7 +404,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 10.0, 5));
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 5));
 
         apply_item_removed(&mut snapshot, "item-1", Some(2));
 
@@ -429,7 +429,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
             .items
-            .push(create_test_item("item-1", "prod-1", "Product A", 100.0, 1));
+            .push(create_test_item("item-1", "product:p1", "Product A", 100.0, 1));
         snapshot.tax = 10.0;
         snapshot.discount = 5.0;
 

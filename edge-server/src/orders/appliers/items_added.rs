@@ -58,7 +58,7 @@ mod tests {
         quantity: i32,
     ) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: "product-1".to_string(),
+            id: "product:1".to_string(),
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price,

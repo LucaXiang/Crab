@@ -215,7 +215,7 @@ mod tests {
         // Create a voided order with data
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Void;
-        snapshot.table_id = Some("table-1".to_string());
+        snapshot.table_id = Some("dining_table:t1".to_string());
         snapshot.table_name = Some("Table 1".to_string());
         snapshot.total = 150.0;
         snapshot.paid_amount = 50.0;

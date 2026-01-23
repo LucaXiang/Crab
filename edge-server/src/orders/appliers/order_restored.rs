@@ -123,7 +123,7 @@ mod tests {
     fn test_order_restored_preserves_existing_data() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Void;
-        snapshot.table_id = Some("table-1".to_string());
+        snapshot.table_id = Some("dining_table:t1".to_string());
         snapshot.table_name = Some("Table 1".to_string());
         snapshot.total = 150.0;
         snapshot.subtotal = 150.0;
@@ -136,7 +136,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Existing data should be preserved
-        assert_eq!(snapshot.table_id, Some("table-1".to_string()));
+        assert_eq!(snapshot.table_id, Some("dining_table:t1".to_string()));
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
         assert_eq!(snapshot.total, 150.0);
         assert_eq!(snapshot.subtotal, 150.0);
@@ -210,7 +210,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Void;
         snapshot.items.push(CartItemSnapshot {
-            id: "prod-1".to_string(),
+            id: "product:p1".to_string(),
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,

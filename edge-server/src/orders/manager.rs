@@ -536,7 +536,7 @@ mod tests {
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![CartItemInput {
-                    product_id: "prod-1".to_string(),
+                    product_id: "product:p1".to_string(),
                     name: "Test Product".to_string(),
                     price: 10.0,
                     original_price: None,
@@ -577,7 +577,7 @@ mod tests {
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![CartItemInput {
-                    product_id: "prod-1".to_string(),
+                    product_id: "product:p1".to_string(),
                     name: "Test Product".to_string(),
                     price: 10.0,
                     original_price: None,

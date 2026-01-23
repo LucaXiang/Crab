@@ -451,7 +451,7 @@ mod tests {
 
         // Add an item with 5 quantity (3 remain unpaid)
         let item = CartItemSnapshot {
-            id: "product-1".to_string(),
+            id: "product:1".to_string(),
             instance_id: "inst-1".to_string(),
             name: "Coffee".to_string(),
             price: 10.0,
@@ -520,7 +520,7 @@ mod tests {
 
         // Order has a different item (different instance_id due to discount)
         let modified_item = CartItemSnapshot {
-            id: "product-1".to_string(),
+            id: "product:1".to_string(),
             instance_id: "inst-2".to_string(), // Different instance_id after modification
             name: "Coffee (10% off)".to_string(),
             price: 9.0,
@@ -543,7 +543,7 @@ mod tests {
 
         // Split payment was for original items (inst-1) before modification
         let original_item = CartItemSnapshot {
-            id: "product-1".to_string(),
+            id: "product:1".to_string(),
             instance_id: "inst-1".to_string(), // Original instance_id
             name: "Coffee".to_string(),
             price: 10.0,
@@ -618,7 +618,7 @@ mod tests {
         snapshot.paid_amount = 50.0;
 
         let item = CartItemSnapshot {
-            id: "product-1".to_string(),
+            id: "product:1".to_string(),
             instance_id: "inst-1".to_string(),
             name: "Coffee".to_string(),
             price: 10.0,

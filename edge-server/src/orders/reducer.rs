@@ -185,9 +185,9 @@ mod tests {
 
     #[test]
     fn test_generate_instance_id_from_parts() {
-        let id1 = generate_instance_id_from_parts("product-1", 10.0, None, &None, &None);
-        let id2 = generate_instance_id_from_parts("product-1", 10.0, None, &None, &None);
-        let id3 = generate_instance_id_from_parts("product-1", 10.0, Some(50.0), &None, &None);
+        let id1 = generate_instance_id_from_parts("product:1", 10.0, None, &None, &None);
+        let id2 = generate_instance_id_from_parts("product:1", 10.0, None, &None, &None);
+        let id3 = generate_instance_id_from_parts("product:1", 10.0, Some(50.0), &None, &None);
 
         // Same inputs should produce same ID
         assert_eq!(id1, id2);
@@ -198,8 +198,8 @@ mod tests {
 
     #[test]
     fn test_generate_instance_id_with_price_difference() {
-        let id1 = generate_instance_id_from_parts("product-1", 10.0, None, &None, &None);
-        let id2 = generate_instance_id_from_parts("product-1", 15.0, None, &None, &None);
+        let id1 = generate_instance_id_from_parts("product:1", 10.0, None, &None, &None);
+        let id2 = generate_instance_id_from_parts("product:1", 15.0, None, &None, &None);
 
         assert_ne!(id1, id2);
     }
@@ -214,8 +214,8 @@ mod tests {
             price_modifier: Some(2.0),
         }]);
 
-        let id1 = generate_instance_id_from_parts("product-1", 10.0, None, &None, &None);
-        let id2 = generate_instance_id_from_parts("product-1", 10.0, None, &opts, &None);
+        let id1 = generate_instance_id_from_parts("product:1", 10.0, None, &None, &None);
+        let id2 = generate_instance_id_from_parts("product:1", 10.0, None, &opts, &None);
 
         assert_ne!(id1, id2);
     }
@@ -224,7 +224,7 @@ mod tests {
     fn test_generate_instance_id_from_input() {
         // Test the public API that takes CartItemInput
         let input = shared::order::CartItemInput {
-            product_id: "product-1".to_string(),
+            product_id: "product:1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,
             original_price: None,
@@ -258,7 +258,7 @@ mod tests {
     #[test]
     fn test_input_to_snapshot() {
         let input = shared::order::CartItemInput {
-            product_id: "product-1".to_string(),
+            product_id: "product:1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,
             original_price: None,
@@ -274,7 +274,7 @@ mod tests {
 
         let snapshot = input_to_snapshot(&input);
 
-        assert_eq!(snapshot.id, "product-1");
+        assert_eq!(snapshot.id, "product:1");
         assert_eq!(snapshot.name, "Test Product");
         // Price is now calculated: base $10, 10% manual discount = $9
         assert_eq!(snapshot.price, 9.0);
@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn test_input_to_snapshot_with_rules_no_rules() {
         let input = shared::order::CartItemInput {
-            product_id: "product-1".to_string(),
+            product_id: "product:1".to_string(),
             name: "Test Product".to_string(),
             price: 100.0,
             original_price: None,
@@ -315,7 +315,7 @@ mod tests {
         use crate::db::models::{AdjustmentType, ProductScope, RuleType, TimeMode};
 
         let input = shared::order::CartItemInput {
-            product_id: "product-1".to_string(),
+            product_id: "product:1".to_string(),
             name: "Test Product".to_string(),
             price: 100.0,
             original_price: None,
@@ -376,21 +376,21 @@ mod tests {
         use shared::order::ItemOption;
 
         let input = shared::order::CartItemInput {
-            product_id: "product-1".to_string(),
+            product_id: "product:1".to_string(),
             name: "Test Product".to_string(),
             price: 100.0,
             original_price: None,
             quantity: 1,
             selected_options: Some(vec![
                 ItemOption {
-                    attribute_id: "attr-1".to_string(),
+                    attribute_id: "attribute:a1".to_string(),
                     attribute_name: "Size".to_string(),
                     option_idx: 1,
                     option_name: "Large".to_string(),
                     price_modifier: Some(5.0),
                 },
                 ItemOption {
-                    attribute_id: "attr-2".to_string(),
+                    attribute_id: "attribute:a2".to_string(),
                     attribute_name: "Extra".to_string(),
                     option_idx: 0,
                     option_name: "Cheese".to_string(),
@@ -450,7 +450,7 @@ mod tests {
         use crate::db::models::{AdjustmentType, ProductScope, RuleType, TimeMode};
 
         let input = shared::order::CartItemInput {
-            product_id: "product-1".to_string(),
+            product_id: "product:1".to_string(),
             name: "Test Product".to_string(),
             price: 100.0,
             original_price: None,
@@ -511,7 +511,7 @@ mod tests {
 
         // Same input for both cases
         let input = shared::order::CartItemInput {
-            product_id: "product-1".to_string(),
+            product_id: "product:1".to_string(),
             name: "Test Product".to_string(),
             price: 100.0,
             original_price: None,

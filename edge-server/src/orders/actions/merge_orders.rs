@@ -153,7 +153,7 @@ mod tests {
 
     fn create_test_item(instance_id: &str, name: &str) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: "product-1".to_string(),
+            id: "product:1".to_string(),
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price: 10.0,
@@ -180,8 +180,8 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create source and target orders
-        let source = create_active_order("source-1", "table-1", "Table 1");
-        let target = create_active_order("target-1", "table-2", "Table 2");
+        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -207,7 +207,7 @@ mod tests {
             ..
         } = &events[0].payload
         {
-            assert_eq!(target_table_id, "table-2");
+            assert_eq!(target_table_id, "dining_table:t2");
             assert_eq!(target_table_name, "Table 2");
         } else {
             panic!("Expected OrderMergedOut payload");
@@ -222,7 +222,7 @@ mod tests {
             items,
         } = &events[1].payload
         {
-            assert_eq!(source_table_id, "table-1");
+            assert_eq!(source_table_id, "dining_table:t1");
             assert_eq!(source_table_name, "Table 1");
             assert!(items.is_empty());
         } else {
@@ -235,11 +235,11 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut source = create_active_order("source-1", "table-1", "Table 1");
+        let mut source = create_active_order("source-1", "dining_table:t1", "Table 1");
         source.items.push(create_test_item("item-1", "Coffee"));
         source.items.push(create_test_item("item-2", "Tea"));
 
-        let target = create_active_order("target-1", "table-2", "Table 2");
+        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -271,7 +271,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let target = create_active_order("target-1", "table-2", "Table 2");
+        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
         storage.store_snapshot(&txn, &target).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -293,7 +293,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", "table-1", "Table 1");
+        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
         storage.store_snapshot(&txn, &source).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -317,7 +317,7 @@ mod tests {
 
         let mut source = OrderSnapshot::new("source-1".to_string());
         source.status = OrderStatus::Completed;
-        let target = create_active_order("target-1", "table-2", "Table 2");
+        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -342,7 +342,7 @@ mod tests {
 
         let mut source = OrderSnapshot::new("source-1".to_string());
         source.status = OrderStatus::Void;
-        let target = create_active_order("target-1", "table-2", "Table 2");
+        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -367,7 +367,7 @@ mod tests {
 
         let mut source = OrderSnapshot::new("source-1".to_string());
         source.status = OrderStatus::Merged;
-        let target = create_active_order("target-1", "table-2", "Table 2");
+        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -390,7 +390,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", "table-1", "Table 1");
+        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
         let mut target = OrderSnapshot::new("target-1".to_string());
         target.status = OrderStatus::Completed;
         storage.store_snapshot(&txn, &source).unwrap();
@@ -415,7 +415,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", "table-1", "Table 1");
+        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
         let mut target = OrderSnapshot::new("target-1".to_string());
         target.status = OrderStatus::Void;
         storage.store_snapshot(&txn, &source).unwrap();
@@ -440,7 +440,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let order = create_active_order("order-1", "table-1", "Table 1");
+        let order = create_active_order("order-1", "dining_table:t1", "Table 1");
         storage.store_snapshot(&txn, &order).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -462,8 +462,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", "table-1", "Table 1");
-        let target = create_active_order("target-1", "table-2", "Table 2");
+        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -488,8 +488,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", "table-1", "Table 1");
-        let target = create_active_order("target-1", "table-2", "Table 2");
+        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 

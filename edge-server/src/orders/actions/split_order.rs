@@ -109,12 +109,12 @@ mod tests {
     fn create_active_order_with_items(order_id: &str) -> OrderSnapshot {
         let mut snapshot = OrderSnapshot::new(order_id.to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot.table_id = Some("table-1".to_string());
+        snapshot.table_id = Some("dining_table:t1".to_string());
         snapshot.table_name = Some("Table 1".to_string());
 
         // Add items
         let item1 = CartItemSnapshot {
-            id: "product-1".to_string(),
+            id: "product:1".to_string(),
             instance_id: "item-1".to_string(),
             name: "Coffee".to_string(),
             price: 10.0,
@@ -134,7 +134,7 @@ mod tests {
             authorizer_name: None,
         };
         let item2 = CartItemSnapshot {
-            id: "product-2".to_string(),
+            id: "product:2".to_string(),
             instance_id: "item-2".to_string(),
             name: "Tea".to_string(),
             price: 8.0,

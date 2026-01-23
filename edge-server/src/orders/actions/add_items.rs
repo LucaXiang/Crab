@@ -191,7 +191,7 @@ mod tests {
 
         let action = AddItemsAction {
             order_id: "order-1".to_string(),
-            items: vec![create_cart_item_input("prod-1", "Test Product", 10.0, 2)],
+            items: vec![create_cart_item_input("product:p1", "Test Product", 10.0, 2)],
             rules: vec![],
         };
 
@@ -205,7 +205,7 @@ mod tests {
 
         if let EventPayload::ItemsAdded { items } = &event.payload {
             assert_eq!(items.len(), 1);
-            assert_eq!(items[0].id, "prod-1");
+            assert_eq!(items[0].id, "product:p1");
             assert_eq!(items[0].name, "Test Product");
             assert_eq!(items[0].price, 10.0);
             assert_eq!(items[0].quantity, 2);
@@ -231,7 +231,7 @@ mod tests {
 
         let action = AddItemsAction {
             order_id: "order-1".to_string(),
-            items: vec![create_cart_item_input("prod-1", "Test", 10.0, 1)],
+            items: vec![create_cart_item_input("product:p1", "Test", 10.0, 1)],
             rules: vec![],
         };
 
@@ -257,7 +257,7 @@ mod tests {
 
         let action = AddItemsAction {
             order_id: "order-1".to_string(),
-            items: vec![create_cart_item_input("prod-1", "Test", 10.0, 1)],
+            items: vec![create_cart_item_input("product:p1", "Test", 10.0, 1)],
             rules: vec![],
         };
 
@@ -277,7 +277,7 @@ mod tests {
 
         let action = AddItemsAction {
             order_id: "nonexistent".to_string(),
-            items: vec![create_cart_item_input("prod-1", "Test", 10.0, 1)],
+            items: vec![create_cart_item_input("product:p1", "Test", 10.0, 1)],
             rules: vec![],
         };
 
@@ -303,9 +303,9 @@ mod tests {
         let action = AddItemsAction {
             order_id: "order-1".to_string(),
             items: vec![
-                create_cart_item_input("prod-1", "Product A", 10.0, 2),
-                create_cart_item_input("prod-2", "Product B", 15.0, 1),
-                create_cart_item_input("prod-3", "Product C", 5.0, 3),
+                create_cart_item_input("product:p1", "Product A", 10.0, 2),
+                create_cart_item_input("product:p2", "Product B", 15.0, 1),
+                create_cart_item_input("product:p3", "Product C", 5.0, 3),
             ],
             rules: vec![],
         };
@@ -316,9 +316,9 @@ mod tests {
         assert_eq!(events.len(), 1);
         if let EventPayload::ItemsAdded { items } = &events[0].payload {
             assert_eq!(items.len(), 3);
-            assert_eq!(items[0].id, "prod-1");
-            assert_eq!(items[1].id, "prod-2");
-            assert_eq!(items[2].id, "prod-3");
+            assert_eq!(items[0].id, "product:p1");
+            assert_eq!(items[1].id, "product:p2");
+            assert_eq!(items[2].id, "product:p3");
         } else {
             panic!("Expected ItemsAdded payload");
         }

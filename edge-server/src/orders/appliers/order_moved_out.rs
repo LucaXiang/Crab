@@ -34,7 +34,7 @@ mod tests {
     fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
         let mut snapshot = OrderSnapshot::new(order_id.to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot.table_id = Some("table-1".to_string());
+        snapshot.table_id = Some("dining_table:t1".to_string());
         snapshot.table_name = Some("Table 1".to_string());
         snapshot
     }
@@ -66,7 +66,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("source-1");
         assert_eq!(snapshot.status, OrderStatus::Active);
 
-        let event = create_order_moved_out_event("source-1", 2, "table-2", "Table 2");
+        let event = create_order_moved_out_event("source-1", 2, "dining_table:t2", "Table 2");
 
         let applier = OrderMovedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -79,7 +79,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("source-1");
         snapshot.last_sequence = 5;
 
-        let event = create_order_moved_out_event("source-1", 10, "table-2", "Table 2");
+        let event = create_order_moved_out_event("source-1", 10, "dining_table:t2", "Table 2");
 
         let applier = OrderMovedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -92,7 +92,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("source-1");
         snapshot.updated_at = 1000000000;
 
-        let event = create_order_moved_out_event("source-1", 2, "table-2", "Table 2");
+        let event = create_order_moved_out_event("source-1", 2, "dining_table:t2", "Table 2");
         let expected_timestamp = event.timestamp;
 
         let applier = OrderMovedOutApplier;
@@ -106,7 +106,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("source-1");
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_order_moved_out_event("source-1", 2, "table-2", "Table 2");
+        let event = create_order_moved_out_event("source-1", 2, "dining_table:t2", "Table 2");
 
         let applier = OrderMovedOutApplier;
         applier.apply(&mut snapshot, &event);
@@ -119,13 +119,13 @@ mod tests {
     fn test_order_moved_out_preserves_table_info() {
         let mut snapshot = create_test_snapshot("source-1");
 
-        let event = create_order_moved_out_event("source-1", 2, "table-2", "Table 2");
+        let event = create_order_moved_out_event("source-1", 2, "dining_table:t2", "Table 2");
 
         let applier = OrderMovedOutApplier;
         applier.apply(&mut snapshot, &event);
 
         // Source table info should be preserved
-        assert_eq!(snapshot.table_id, Some("table-1".to_string()));
+        assert_eq!(snapshot.table_id, Some("dining_table:t1".to_string()));
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
     }
 

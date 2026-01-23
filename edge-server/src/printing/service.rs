@@ -333,7 +333,7 @@ mod tests {
 
     fn create_test_item() -> CartItemSnapshot {
         CartItemSnapshot {
-            id: "prod-1".to_string(),
+            id: "product:p1".to_string(),
             instance_id: "inst-1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,

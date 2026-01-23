@@ -110,7 +110,7 @@ mod tests {
 
     fn create_test_item_with_rule(rule_id: &str) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: "prod-1".to_string(),
+            id: "product:p1".to_string(),
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,
@@ -305,7 +305,7 @@ mod tests {
         let mut rule = create_test_applied_rule("rule-1");
         rule.skipped = true;
         snapshot.items = vec![CartItemSnapshot {
-            id: "prod-1".to_string(),
+            id: "product:p1".to_string(),
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,
