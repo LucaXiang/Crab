@@ -264,6 +264,9 @@ impl ServerState {
         // Warmup: Load print config for all products/categories
         self.warmup_print_config_cache().await;
 
+        // Warmup: Load product metadata (category_id, tags) for rule matching
+        self.warmup_product_metadata_cache().await;
+
         // Start MessageBus background tasks
         self.message_bus.start_background_tasks(self.clone());
 
@@ -478,6 +481,59 @@ impl ServerState {
         }
     }
 
+    /// 预热产品元数据缓存
+    ///
+    /// 服务器启动时调用，加载所有产品的 category_id 和 tags 到 OrdersManager 的缓存。
+    /// 这样价格规则匹配时可以使用 Category 和 Tag 作用域。
+    pub async fn warmup_product_metadata_cache(&self) {
+        use crate::orders::manager::ProductMeta;
+        use std::collections::HashMap;
+
+        let product_repo = ProductRepository::new(self.db.clone());
+
+        match product_repo.find_all().await {
+            Ok(products) => {
+                let mut metadata: HashMap<String, ProductMeta> = HashMap::new();
+
+                for prod in &products {
+                    let product_id = prod
+                        .id
+                        .as_ref()
+                        .map(|t| t.to_string())
+                        .unwrap_or_default();
+
+                    if product_id.is_empty() {
+                        continue;
+                    }
+
+                    // Extract category_id as String (Thing format: "category:xxx")
+                    let category_id = prod.category.to_string();
+
+                    // Extract tags as Vec<String> (Thing format: "tag:xxx")
+                    let tags: Vec<String> = prod.tags.iter().map(|t| t.to_string()).collect();
+
+                    metadata.insert(
+                        product_id.clone(),
+                        ProductMeta { category_id, tags },
+                    );
+                }
+
+                if !metadata.is_empty() {
+                    self.orders_manager.cache_product_metadata_batch(metadata.clone());
+                    tracing::info!(
+                        "📦 Loaded {} product metadata entries for rule matching",
+                        metadata.len()
+                    );
+                } else {
+                    tracing::debug!("No products found for metadata warmup");
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to load products for metadata cache: {:?}", e);
+            }
+        }
+    }
+
     /// 启动厨房打印事件监听器
     ///
     /// 订阅 OrdersManager 的事件流，处理 ItemsAdded 事件：
@@ -585,13 +641,15 @@ impl ServerState {
     /// - 更新 PrintConfigCache 以保持缓存与数据库同步
     fn start_sync_event_listener(&self) {
         use crate::db::models::{Category, Product};
+        use crate::orders::manager::ProductMeta;
         use shared::message::EventType;
 
         let mut sync_rx = self.message_bus.bus().subscribe();
         let kitchen_print_service = self.kitchen_print_service.clone();
+        let orders_manager = self.orders_manager.clone();
 
         tokio::spawn(async move {
-            tracing::info!("🔄 Sync event listener started (for print config cache)");
+            tracing::info!("🔄 Sync event listener started (for print config & product metadata cache)");
             loop {
                 match sync_rx.recv().await {
                     Ok(msg) => {
@@ -634,10 +692,21 @@ impl ServerState {
                                         category_id: product.category.to_string(),
                                     };
                                     kitchen_print_service.config_cache().update_product(config).await;
+
+                                    // Also update product metadata cache for rule matching
+                                    let product_id = product.id.as_ref().map(|t| t.to_string()).unwrap_or_default();
+                                    if !product_id.is_empty() {
+                                        let meta = ProductMeta {
+                                            category_id: product.category.to_string(),
+                                            tags: product.tags.iter().map(|t| t.to_string()).collect(),
+                                        };
+                                        orders_manager.cache_product_meta(&product_id, meta);
+                                    }
+
                                     tracing::debug!(
                                         product_id = %payload.id,
                                         action = %payload.action,
-                                        "Updated product print config from sync"
+                                        "Updated product print config and metadata from sync"
                                     );
                                 }
                             }

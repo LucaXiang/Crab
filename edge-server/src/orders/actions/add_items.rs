@@ -3,9 +3,11 @@
 //! Adds items to an existing order.
 
 use async_trait::async_trait;
+use std::collections::HashMap;
 use tracing::{debug, info};
 
 use crate::db::models::PriceRule;
+use crate::orders::manager::ProductMeta;
 use crate::orders::reducer::input_to_snapshot_with_rules;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{CartItemInput, EventPayload, OrderEvent, OrderEventType, OrderStatus};
@@ -17,6 +19,8 @@ pub struct AddItemsAction {
     pub items: Vec<CartItemInput>,
     /// Matched price rules for this order (from cache)
     pub rules: Vec<PriceRule>,
+    /// Product metadata for rule matching (category_id, tags) from backend cache
+    pub product_metadata: HashMap<String, ProductMeta>,
 }
 
 #[async_trait]
@@ -75,6 +79,12 @@ impl CommandHandler for AddItemsAction {
             .iter()
             .enumerate()
             .map(|(idx, item)| {
+                // Get product metadata from cache for rule matching
+                let meta = self.product_metadata.get(&item.product_id);
+                let category_id = meta.map(|m| m.category_id.as_str());
+                let empty_tags: Vec<String> = Vec::new();
+                let tags = meta.map(|m| m.tags.as_slice()).unwrap_or(&empty_tags);
+
                 debug!(
                     item_idx = idx,
                     product_id = %item.product_id,
@@ -84,10 +94,12 @@ impl CommandHandler for AddItemsAction {
                     quantity = item.quantity,
                     manual_discount_percent = ?item.manual_discount_percent,
                     surcharge = ?item.surcharge,
+                    category_id = ?category_id,
+                    tags_count = tags.len(),
                     "[AddItems] Processing item"
                 );
 
-                let snapshot = input_to_snapshot_with_rules(item, &rules_refs);
+                let snapshot = input_to_snapshot_with_rules(item, &rules_refs, category_id, tags);
 
                 info!(
                     item_idx = idx,
@@ -193,6 +205,7 @@ mod tests {
             order_id: "order-1".to_string(),
             items: vec![create_cart_item_input("product:p1", "Test Product", 10.0, 2)],
             rules: vec![],
+            product_metadata: HashMap::new(),
         };
 
         let metadata = create_test_metadata();
@@ -233,6 +246,7 @@ mod tests {
             order_id: "order-1".to_string(),
             items: vec![create_cart_item_input("product:p1", "Test", 10.0, 1)],
             rules: vec![],
+            product_metadata: HashMap::new(),
         };
 
         let metadata = create_test_metadata();
@@ -259,6 +273,7 @@ mod tests {
             order_id: "order-1".to_string(),
             items: vec![create_cart_item_input("product:p1", "Test", 10.0, 1)],
             rules: vec![],
+            product_metadata: HashMap::new(),
         };
 
         let metadata = create_test_metadata();
@@ -279,6 +294,7 @@ mod tests {
             order_id: "nonexistent".to_string(),
             items: vec![create_cart_item_input("product:p1", "Test", 10.0, 1)],
             rules: vec![],
+            product_metadata: HashMap::new(),
         };
 
         let metadata = create_test_metadata();
@@ -308,6 +324,7 @@ mod tests {
                 create_cart_item_input("product:p3", "Product C", 5.0, 3),
             ],
             rules: vec![],
+            product_metadata: HashMap::new(),
         };
 
         let metadata = create_test_metadata();

@@ -142,6 +142,13 @@ const EVENT_CHANNEL_CAPACITY: usize = 1024;
 ///
 /// The `epoch` field is a unique identifier generated on each startup.
 /// Clients use it to detect server restarts and trigger full resync.
+/// Product metadata for price rule matching
+#[derive(Debug, Clone, Default)]
+pub struct ProductMeta {
+    pub category_id: String,
+    pub tags: Vec<String>,
+}
+
 pub struct OrdersManager {
     storage: OrderStorage,
     event_tx: broadcast::Sender<OrderEvent>,
@@ -150,6 +157,8 @@ pub struct OrdersManager {
     epoch: String,
     /// Cached rules per order
     rule_cache: Arc<RwLock<HashMap<String, Vec<PriceRule>>>>,
+    /// Cached product metadata (category_id, tags) for rule matching
+    product_meta_cache: Arc<RwLock<HashMap<String, ProductMeta>>>,
 }
 
 impl std::fmt::Debug for OrdersManager {
@@ -174,6 +183,7 @@ impl OrdersManager {
             event_tx,
             epoch,
             rule_cache: Arc::new(RwLock::new(HashMap::new())),
+            product_meta_cache: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -187,6 +197,7 @@ impl OrdersManager {
             event_tx,
             epoch,
             rule_cache: Arc::new(RwLock::new(HashMap::new())),
+            product_meta_cache: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -211,6 +222,46 @@ impl OrdersManager {
     pub fn remove_cached_rules(&self, order_id: &str) {
         let mut cache = self.rule_cache.write().unwrap();
         cache.remove(order_id);
+    }
+
+    /// Cache product metadata for a product
+    pub fn cache_product_meta(&self, product_id: &str, meta: ProductMeta) {
+        let mut cache = self.product_meta_cache.write().unwrap();
+        cache.insert(product_id.to_string(), meta);
+    }
+
+    /// Batch cache product metadata
+    pub fn cache_product_metadata_batch(&self, metadata: HashMap<String, ProductMeta>) {
+        let mut cache = self.product_meta_cache.write().unwrap();
+        cache.extend(metadata);
+    }
+
+    /// Get cached product metadata for a product
+    pub fn get_product_meta(&self, product_id: &str) -> Option<ProductMeta> {
+        let cache = self.product_meta_cache.read().unwrap();
+        cache.get(product_id).cloned()
+    }
+
+    /// Get product metadata for a list of items
+    fn get_product_metadata_for_items(
+        &self,
+        items: &[shared::order::CartItemInput],
+    ) -> HashMap<String, ProductMeta> {
+        let cache = self.product_meta_cache.read().unwrap();
+        items
+            .iter()
+            .filter_map(|item| {
+                cache
+                    .get(&item.product_id)
+                    .map(|meta| (item.product_id.clone(), meta.clone()))
+            })
+            .collect()
+    }
+
+    /// Clear product metadata cache
+    pub fn clear_product_meta_cache(&self) {
+        let mut cache = self.product_meta_cache.write().unwrap();
+        cache.clear();
     }
 
     /// Subscribe to event broadcasts
@@ -298,14 +349,17 @@ impl OrdersManager {
         };
 
         // 5. Convert to action and execute (blocking async)
-        // For AddItems commands, inject cached price rules
+        // For AddItems commands, inject cached price rules and product metadata
         let action: CommandAction = match &cmd.payload {
             shared::order::OrderCommandPayload::AddItems { order_id, items } => {
                 let rules = self.get_cached_rules(order_id).unwrap_or_default();
+                // Look up product metadata for each item from cache
+                let product_metadata = self.get_product_metadata_for_items(items);
                 CommandAction::AddItems(super::actions::AddItemsAction {
                     order_id: order_id.clone(),
                     items: items.clone(),
                     rules,
+                    product_metadata,
                 })
             }
             _ => (&cmd).into(),
@@ -453,6 +507,7 @@ impl Clone for OrdersManager {
             event_tx: self.event_tx.clone(),
             epoch: self.epoch.clone(),
             rule_cache: self.rule_cache.clone(),
+            product_meta_cache: self.product_meta_cache.clone(),
         }
     }
 }

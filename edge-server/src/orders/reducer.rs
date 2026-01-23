@@ -75,9 +75,10 @@ pub(crate) fn generate_instance_id_from_parts(
 
 /// Convert CartItemInput to CartItemSnapshot with generated instance_id
 ///
-/// This is a convenience function that calls `input_to_snapshot_with_rules` with empty rules.
+/// This is a convenience function that calls `input_to_snapshot_with_rules` with empty rules
+/// and no product metadata (for cases where rule matching is not needed).
 pub fn input_to_snapshot(input: &shared::order::CartItemInput) -> CartItemSnapshot {
-    input_to_snapshot_with_rules(input, &[])
+    input_to_snapshot_with_rules(input, &[], None, &[])
 }
 
 /// Convert CartItemInput to CartItemSnapshot with price rules applied
@@ -89,13 +90,17 @@ pub fn input_to_snapshot(input: &shared::order::CartItemInput) -> CartItemSnapsh
 ///
 /// # Arguments
 /// * `input` - The cart item input to convert
-/// * `rules` - Matched price rules to apply
+/// * `rules` - Cached price rules (will be filtered by product scope)
+/// * `category_id` - Product's category ID for scope matching (from backend cache)
+/// * `tags` - Product's tags for scope matching (from backend cache)
 ///
 /// # Returns
 /// A CartItemSnapshot with calculated prices and applied rules
 pub fn input_to_snapshot_with_rules(
     input: &shared::order::CartItemInput,
     rules: &[&PriceRule],
+    category_id: Option<&str>,
+    tags: &[String],
 ) -> CartItemSnapshot {
     debug!(
         product_id = %input.product_id,
@@ -104,16 +109,18 @@ pub fn input_to_snapshot_with_rules(
         original_price = ?input.original_price,
         manual_discount_percent = ?input.manual_discount_percent,
         rules_count = rules.len(),
+        category_id = ?category_id,
+        tags_count = tags.len(),
         "[Reducer] input_to_snapshot_with_rules called"
     );
 
     // Filter rules by product scope matching
-    // Note: category_id and tags are not available in CartItemInput,
-    // so Category and Tag scope rules won't match (safe fallback).
-    // Only Global and Product scope rules will be applied.
+    // Uses category_id and tags from backend product metadata cache
     let matched_rules: Vec<&PriceRule> = rules
         .iter()
-        .filter(|rule| matches_product_scope(rule, &input.product_id, None, &[]))
+        .filter(|rule| {
+            matches_product_scope(rule, &input.product_id, category_id, tags)
+        })
         .copied()
         .collect();
 
@@ -319,7 +326,7 @@ mod tests {
             authorizer_name: None,
         };
 
-        let snapshot = input_to_snapshot_with_rules(&input, &[]);
+        let snapshot = input_to_snapshot_with_rules(&input, &[], None, &[]);
 
         assert_eq!(snapshot.price, 100.0);
         assert!(snapshot.rule_discount_amount.is_none());
@@ -377,7 +384,7 @@ mod tests {
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
-        let snapshot = input_to_snapshot_with_rules(&input, &rules);
+        let snapshot = input_to_snapshot_with_rules(&input, &rules, None, &[]);
 
         // $100 - 10% = $90
         assert_eq!(snapshot.price, 90.0);
@@ -453,7 +460,7 @@ mod tests {
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
-        let snapshot = input_to_snapshot_with_rules(&input, &rules);
+        let snapshot = input_to_snapshot_with_rules(&input, &rules, None, &[]);
 
         // Base: $100 + $5 + $2 = $107
         // 10% discount on $107 = $10.70
@@ -512,7 +519,7 @@ mod tests {
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
-        let snapshot = input_to_snapshot_with_rules(&input, &rules);
+        let snapshot = input_to_snapshot_with_rules(&input, &rules, None, &[]);
 
         // $100 base
         // 10% manual discount -> $90
@@ -543,7 +550,7 @@ mod tests {
         };
 
         // Case 1: Without rules (e.g., cache miss)
-        let snapshot_no_rules = input_to_snapshot_with_rules(&input, &[]);
+        let snapshot_no_rules = input_to_snapshot_with_rules(&input, &[], None, &[]);
 
         // Case 2: With a 10% discount rule
         let discount_rule = PriceRule {
@@ -576,7 +583,7 @@ mod tests {
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
-        let snapshot_with_rules = input_to_snapshot_with_rules(&input, &rules);
+        let snapshot_with_rules = input_to_snapshot_with_rules(&input, &rules, None, &[]);
 
         // Prices are different (as expected)
         assert_eq!(snapshot_no_rules.price, 100.0);
@@ -702,8 +709,9 @@ mod tests {
         };
 
         // Pass ALL rules - filtering should happen inside input_to_snapshot_with_rules
+        // category_id and tags come from backend product metadata cache (None for this test)
         let rules: Vec<&PriceRule> = vec![&global_rule, &product_p1_rule, &product_p2_rule];
-        let snapshot = input_to_snapshot_with_rules(&input, &rules);
+        let snapshot = input_to_snapshot_with_rules(&input, &rules, None, &[]);
 
         // Expected calculation:
         // - Global 10%: $100 * 10% = $10 discount

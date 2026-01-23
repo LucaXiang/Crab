@@ -113,6 +113,7 @@ impl From<&OrderCommand> for CommandAction {
                     order_id: order_id.clone(),
                     items: items.clone(),
                     rules: vec![], // Rules will be injected by OrdersManager
+                    product_metadata: std::collections::HashMap::new(), // Metadata will be injected by OrdersManager
                 })
             }
             OrderCommandPayload::ModifyItem {
