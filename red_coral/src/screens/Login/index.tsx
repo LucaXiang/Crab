@@ -91,30 +91,18 @@ export const LoginScreen: React.FC = () => {
       if (response.success && response.session) {
         setLoginMode(response.mode);
 
-        // Helper to map role name to ID (legacy support)
-        const getRoleId = (roleName: string) => {
-           switch(roleName) {
-               case 'admin': return 1;
-               case 'manager': return 2;
-               case 'user': return 3;
-               default: return 0;
-           }
-        };
-        
-        const roleName = response.session.user_info.role;
+        const userInfo = response.session.user_info;
 
         // Update auth store for ProtectedRoute compatibility
-        // Adapt from shared::client::UserInfo to legacy User format
         setAuthUser({
-          id: parseInt(response.session.user_info.id) || 0,
-          uuid: response.session.user_info.id,
-          username: response.session.user_info.username,
-          display_name: response.session.user_info.username, // Fallback to username
-          role_id: getRoleId(roleName), // Map role string to ID
-          role_name: roleName,
+          id: userInfo.id,
+          username: userInfo.username,
+          display_name: userInfo.username, // Fallback to username
+          role_id: userInfo.role,
+          role_name: userInfo.role.replace(/^role:/, ''), // Extract role name from "role:admin" format
           avatar: null,
           is_active: true,
-          is_system: response.session.user_info.is_system ?? false,
+          is_system: userInfo.is_system ?? false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });

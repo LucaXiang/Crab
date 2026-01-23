@@ -96,6 +96,19 @@ export const POSScreen: React.FC = () => {
   const selectedCategory = useSelectedCategory();
   const { setSelectedCategory } = usePOSUIActions();
 
+  // Helper to get default spec from product
+  const getDefaultSpec = (p: Product) => p.specs?.find(s => s.is_default) ?? p.specs?.[0];
+
+  // Helper to map product with price and external_id from default spec
+  const mapProductWithSpec = (p: Product) => {
+    const defaultSpec = getDefaultSpec(p);
+    return {
+      ...p,
+      price: defaultSpec?.price ?? 0,
+      external_id: defaultSpec?.external_id,
+    };
+  };
+
   // Filter products based on selected category
   const filteredProducts = useMemo(() => {
     // "all" category: show all active products sorted by external_id
@@ -103,10 +116,11 @@ export const POSScreen: React.FC = () => {
       return [...products]
         .filter((p) => p.is_active)
         .sort((a, b) => {
-          const aId = a.specs[0]?.external_id ?? Number.MAX_SAFE_INTEGER;
-          const bId = b.specs[0]?.external_id ?? Number.MAX_SAFE_INTEGER;
+          const aId = getDefaultSpec(a)?.external_id ?? Number.MAX_SAFE_INTEGER;
+          const bId = getDefaultSpec(b)?.external_id ?? Number.MAX_SAFE_INTEGER;
           return aId - bId;
-        });
+        })
+        .map(mapProductWithSpec);
     }
 
     // Find the selected category
@@ -122,24 +136,26 @@ export const POSScreen: React.FC = () => {
         return [];
       }
 
-      return products.filter((p) => {
-        if (!p.is_active) return false;
-        const productTags = p.tags || [];
+      return products
+        .filter((p) => {
+          if (!p.is_active) return false;
+          const productTags = p.tags || [];
 
-        if (category.match_mode === 'all') {
-          // Product must have ALL tags
-          return tagIds.every((tagId) => productTags.includes(tagId));
-        } else {
-          // Product must have ANY tag (default: 'any')
-          return tagIds.some((tagId) => productTags.includes(tagId));
-        }
-      });
+          if (category.match_mode === 'all') {
+            // Product must have ALL tags
+            return tagIds.every((tagId) => productTags.includes(tagId));
+          } else {
+            // Product must have ANY tag (default: 'any')
+            return tagIds.some((tagId) => productTags.includes(tagId));
+          }
+        })
+        .map(mapProductWithSpec);
     }
 
     // Regular category: filter by category id
-    return products.filter(
-      (p) => p.is_active && p.category === category.id
-    );
+    return products
+      .filter((p) => p.is_active && p.category === category.id)
+      .map(mapProductWithSpec);
   }, [products, categories, selectedCategory]);
 
   // Only load data on first mount (new architecture auto-handles sync)

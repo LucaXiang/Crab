@@ -104,7 +104,7 @@ export const TagForm: React.FC<TagFormProps> = ({ formData, onFieldChange, t }) 
         <SelectField
           label={t('common.label.is_active')}
           value={formData.is_active !== false ? 'true' : 'false'}
-          onChange={(value) => onFieldChange('is_active', value === 'true')}
+          onChange={(value) => onFieldChange('is_active', String(value) === 'true')}
           options={[
             { value: 'true', label: t('common.status.enabled') },
             { value: 'false', label: t('common.status.disabled') },

@@ -141,7 +141,7 @@ export const ProductManagement: React.FC = React.memo(() => {
                   </div>
                 )}
                 <div className="text-xs text-gray-400 mt-0.5">
-                  ID: {item.id.slice(0, 8)}
+                  id: {item.id.split(':')[1]?.slice(0, 8) || item.id.slice(0, 8)}
                 </div>
               </div>
             </div>
@@ -218,14 +218,17 @@ export const ProductManagement: React.FC = React.memo(() => {
         key: 'category',
         header: t('settings.product.header.category'),
         width: '140px',
-        render: (item) => (
-          <span className="inline-flex items-center px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-            {item.category}
-          </span>
-        ),
+        render: (item) => {
+          const categoryName = categories.find(c => String(c.id) === String(item.category))?.name || item.category;
+          return (
+            <span className="inline-flex items-center px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+              {categoryName}
+            </span>
+          );
+        },
       },
     ],
-    [t]
+    [t, categories]
   );
 
   return (

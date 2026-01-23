@@ -6,6 +6,8 @@ import { calculateItemFinalPrice, calculateItemTotal, calculateOptionsModifier }
 import { formatCurrency } from '@/utils/currency';
 import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Trash2 } from 'lucide-react';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
+import { useOrderCommands } from '@/core/stores/order/useOrderCommands';
+import { toast } from '@/presentation/components/Toast';
 
 import { groupOptionsByAttribute } from '@/utils/formatting';
 
@@ -17,6 +19,7 @@ interface HistoryDetailProps {
 export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }) => {
   const { t } = useI18n();
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const { cancelPayment } = useOrderCommands();
 
   useEffect(() => {
     setExpandedItems(new Set());
@@ -42,6 +45,30 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
       setExpandedItems(new Set(order.items.map((_, i) => i)));
     }
   };
+
+  const handleCancelPayment = useCallback(async (paymentId: string, eventType: string) => {
+    if (!order) return;
+
+    const confirmMessage = eventType === 'ORDER_SPLIT'
+      ? t('history.payment.confirm_cancel_split')
+      : t('history.payment.confirm_cancel');
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      const response = await cancelPayment(order.order_id, paymentId);
+      if (response.success) {
+        toast.success(t('history.payment.cancel_success'));
+      } else {
+        toast.error(response.error?.message || t('history.payment.cancel_failed'));
+      }
+    } catch (error) {
+      console.error('Failed to cancel payment:', error);
+      toast.error(t('history.payment.cancel_failed'));
+    }
+  }, [order, cancelPayment, t]);
 
   if (!order) {
     return (
@@ -244,7 +271,14 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                 <div className="p-4 text-center text-gray-400 text-sm">{t('history.payment.no_payments')}</div>
               ) : (
                 paymentEvents.map((event, idx) => (
-                  <PaymentEventRow key={event.event_id || `${event.event_type}-${event.timestamp}-${idx}`} event={event} t={t} />
+                  <PaymentEventRow
+                    key={event.event_id || `${event.event_type}-${event.timestamp}-${idx}`}
+                    event={event}
+                    t={t}
+                    orderId={order.order_id}
+                    orderStatus={order.status}
+                    onCancelPayment={handleCancelPayment}
+                  />
                 ))
               )}
             </div>
@@ -281,7 +315,8 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
     const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
     const baseUnitPrice = (item.original_price ?? item.price) + optionsModifier;
     const finalUnitPrice = calculateItemFinalPrice(item).toNumber();
-    const lineTotal = calculateItemTotal(item).toNumber();
+    // Use backend-computed line_total for consistency with order total, fall back to local calculation
+    const lineTotal = item.line_total ?? calculateItemTotal(item).toNumber();
     const hasDiscount = discountPercent > 0 || baseUnitPrice !== finalUnitPrice;
     const itemSurcharge = item.surcharge || 0;
     const hasAttributes = item.selected_options && item.selected_options.length > 0;
@@ -376,9 +411,18 @@ OrderItemRow.displayName = 'OrderItemRow';
 export interface PaymentEventRowProps {
   event: HeldOrder['timeline'][number];
   t: (key: string, params?: Record<string, string | number>) => string;
+  orderId?: string;
+  orderStatus?: string;
+  onCancelPayment?: (paymentId: string, eventType: string) => void;
 }
 
-export const PaymentEventRow: React.FC<PaymentEventRowProps> = React.memo(({ event, t }) => {
+export const PaymentEventRow: React.FC<PaymentEventRowProps> = React.memo(({
+  event,
+  t,
+  orderId,
+  orderStatus,
+  onCancelPayment
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const payload = event.payload;
 
@@ -400,9 +444,28 @@ export const PaymentEventRow: React.FC<PaymentEventRowProps> = React.memo(({ eve
   const isCard = /card|visa|master/i.test(methodRaw);
   const hasItems = event.event_type === 'ORDER_SPLIT' && payload.type === 'ORDER_SPLIT' && Array.isArray(payload.items) && payload.items.length > 0;
 
+  // Get payment_id for cancellation
+  let paymentId: string | undefined;
+  if (event.event_type === 'PAYMENT_ADDED' && payload.type === 'PAYMENT_ADDED') {
+    paymentId = payload.payment_id;
+  } else if (event.event_type === 'ORDER_SPLIT' && payload.type === 'ORDER_SPLIT') {
+    // For split payments, payment_id is "split-{event_id}"
+    paymentId = event.event_id ? `split-${event.event_id}` : undefined;
+  }
+
+  // Can cancel if: order is ACTIVE, callback provided, and we have a payment_id
+  const canCancel = orderStatus === 'ACTIVE' && onCancelPayment && paymentId;
+
+  const handleCancelClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (paymentId && onCancelPayment) {
+      onCancelPayment(paymentId, event.event_type);
+    }
+  };
+
   return (
     <div className={`transition-colors ${isExpanded ? 'bg-gray-50/50' : ''}`}>
-      <div 
+      <div
         className={`p-4 flex justify-between items-center ${hasItems ? 'cursor-pointer hover:bg-gray-50' : ''}`}
         onClick={() => hasItems && setIsExpanded(!isExpanded)}
       >
@@ -424,12 +487,23 @@ export const PaymentEventRow: React.FC<PaymentEventRowProps> = React.memo(({ eve
             </div>
           </div>
         </div>
-        <div className="flex flex-col items-end">
-          <div className="font-bold text-gray-800">{formatCurrency(amountNum)}</div>
-          {note && (
-            <div className="mt-1">
-              <NoteTag text={note} />
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col items-end">
+            <div className="font-bold text-gray-800">{formatCurrency(amountNum)}</div>
+            {note && (
+              <div className="mt-1">
+                <NoteTag text={note} />
+              </div>
+            )}
+          </div>
+          {canCancel && (
+            <button
+              onClick={handleCancelClick}
+              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              title={t('history.payment.cancel')}
+            >
+              <Trash2 size={16} />
+            </button>
           )}
         </div>
       </div>

@@ -773,6 +773,7 @@ export const EntityFormModal: React.FC = React.memo(() => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onFieldChange={setFormField as (field: string, value: any) => void}
             t={t}
+            isEditMode={action === 'EDIT'}
           />
         );
       case 'TAG':

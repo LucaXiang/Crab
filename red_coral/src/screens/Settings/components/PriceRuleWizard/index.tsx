@@ -25,7 +25,8 @@ export interface WizardState {
   // Step 3
   product_scope: 'GLOBAL' | 'CATEGORY' | 'TAG' | 'PRODUCT';
   target: string | null;
-  zone_scope: number;
+  /** Zone scope: "zone:all", "zone:retail", or specific zone ID */
+  zone_scope: string;
   // Step 4
   time_mode: 'ALWAYS' | 'SCHEDULE' | 'ONETIME';
   schedule_config: ScheduleConfig;
@@ -82,7 +83,7 @@ const getInitialState = (rule?: PriceRule | null): WizardState => {
     adjustment_value: 10,
     product_scope: 'GLOBAL',
     target: null,
-    zone_scope: -1,
+    zone_scope: 'zone:all',
     time_mode: 'ALWAYS',
     schedule_config: { days_of_week: [1, 2, 3, 4, 5], start_time: '09:00', end_time: '18:00' },
     start_time: '',

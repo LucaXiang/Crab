@@ -14,6 +14,7 @@ import { openCashDrawer, printOrderReceipt } from '@/core/services/order/payment
 import { completeOrder, splitOrder, updateOrderInfo } from '@/core/stores/order/useOrderOperations';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useReceiptStore } from '@/core/stores/order/useReceiptStore';
+import { useOrderCommands } from '@/core/stores/order/useOrderCommands';
 
 // Components
 import { CashPaymentModal } from './CashPaymentModal';
@@ -34,14 +35,21 @@ type PaymentMode = 'SELECT' | 'ITEM_SPLIT';
 export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onCancel, onUpdateOrder, onVoid, onManageTable }) => {
   const { t } = useI18n();
   const serviceType = useRetailServiceType();
+  const { cancelPayment } = useOrderCommands();
 
   // Calculate payment state from order (server state)
   const totalPaid = order.paid_amount;
   const remaining = Math.max(0, order.total - totalPaid);
   const isPaidInFull = remaining <= 0.01;
 
+  // Get active (non-cancelled) payments
+  const activePayments = useMemo(() => {
+    return (order.payments || []).filter(p => !p.cancelled);
+  }, [order.payments]);
+
   // Local State
   const [mode, setMode] = useState<PaymentMode>('SELECT');
+  const [cancellingPaymentId, setCancellingPaymentId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [paymentContext, setPaymentContext] = useState<'FULL' | 'SPLIT'>('FULL');
@@ -64,6 +72,34 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
       onComplete();
     });
   }, [onComplete]);
+
+  /**
+   * 取消支付记录
+   */
+  const handleCancelPayment = useCallback(async (paymentId: string, isSplit: boolean) => {
+    const confirmMessage = isSplit
+      ? t('checkout.payment.confirm_cancel_split')
+      : t('checkout.payment.confirm_cancel');
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setCancellingPaymentId(paymentId);
+    try {
+      const response = await cancelPayment(order.order_id, paymentId);
+      if (response.success) {
+        toast.success(t('checkout.payment.cancel_success'));
+      } else {
+        toast.error(response.error?.message || t('checkout.payment.cancel_failed'));
+      }
+    } catch (error) {
+      console.error('Failed to cancel payment:', error);
+      toast.error(t('checkout.payment.cancel_failed'));
+    } finally {
+      setCancellingPaymentId(null);
+    }
+  }, [order.order_id, cancelPayment, t]);
 
   /**
    * 处理现金全额支付
@@ -548,6 +584,57 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                 <div className={`text-2xl font-bold mt-1 ${isPaidInFull ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(remaining)}</div>
               </div>
             </div>
+
+            {/* Payment Records */}
+            {activePayments.length > 0 && (
+              <div className="mt-4 border-t border-gray-100 pt-4">
+                <div className="text-xs text-gray-500 uppercase font-bold mb-2">{t('checkout.payment.records')}</div>
+                <div className="space-y-2">
+                  {activePayments.map((payment) => {
+                    const isSplit = payment.payment_id.startsWith('split-');
+                    const isCash = /cash/i.test(payment.method);
+                    const isCancelling = cancellingPaymentId === payment.payment_id;
+                    return (
+                      <div key={payment.payment_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-1.5 rounded-full ${isCash ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+                            {isCash ? <Coins size={14} /> : <CreditCard size={14} />}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-800 text-sm flex items-center gap-2">
+                              {isCash ? t('checkout.method.cash') : payment.method}
+                              {isSplit && (
+                                <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium">
+                                  {t('checkout.split.label')}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {new Date(payment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="font-bold text-gray-800">{formatCurrency(payment.amount)}</div>
+                          <button
+                            onClick={() => handleCancelPayment(payment.payment_id, isSplit)}
+                            disabled={isCancelling}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                            title={t('checkout.payment.cancel')}
+                          >
+                            {isCancelling ? (
+                              <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex-1 p-8 grid grid-cols-3 gap-6 overflow-y-auto">

@@ -42,7 +42,7 @@ export const FormSection: React.FC<FormSectionProps> = ({
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between pb-2 border-b border-gray-100 mb-4"
+        className="w-full flex items-center justify-between pb-2 border-b border-gray-100 mb-4 cursor-pointer hover:bg-gray-50 -mx-4 px-4 rounded-t-xl transition-colors"
       >
         <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900">
           <Icon size={16} className="text-teal-500" />

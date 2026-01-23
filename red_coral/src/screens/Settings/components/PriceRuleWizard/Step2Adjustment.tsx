@@ -64,12 +64,13 @@ export const Step2Adjustment: React.FC<Step2AdjustmentProps> = ({ state, updateS
         <div className="relative">
           <input
             type="number"
-            min={1}
+            min={isPercentage ? 1 : 0.01}
             max={isPercentage ? 100 : undefined}
+            step={isPercentage ? 1 : 0.01}
             value={state.adjustment_value}
             onChange={(e) => updateState({ adjustment_value: parseFloat(e.target.value) || 0 })}
             className={`${inputClass} pr-12`}
-            placeholder={isPercentage ? '10' : '500'}
+            placeholder={isPercentage ? '10' : '5'}
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">
             {isPercentage ? '%' : '¥'}

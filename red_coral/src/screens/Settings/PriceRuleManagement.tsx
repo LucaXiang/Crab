@@ -115,9 +115,9 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
         key: 'name',
         header: t('settings.price_rule.column.name'),
         render: (item) => (
-          <div className="flex flex-col gap-0.5">
-            <span className="font-medium text-gray-900">{item.display_name}</span>
-            <span className="text-xs text-gray-400">{item.name}</span>
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="font-medium text-gray-900 truncate">{item.display_name}</span>
+            <span className="text-xs text-gray-400 truncate">{item.name}</span>
           </div>
         ),
       },
@@ -143,32 +143,32 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
       {
         key: 'value',
         header: t('settings.price_rule.column.value'),
-        width: '100px',
+        width: '120px',
         align: 'right',
         render: (item) => (
           <span className="font-mono text-sm">
             {item.adjustment_type === 'PERCENTAGE'
               ? `${item.adjustment_value}%`
-              : `¥${(item.adjustment_value / 100).toFixed(2)}`}
+              : `¥${item.adjustment_value.toFixed(2)}`}
           </span>
         ),
       },
       {
         key: 'scope',
         header: t('settings.price_rule.column.scope'),
-        width: '120px',
+        width: '130px',
         render: renderScopeBadge,
       },
       {
         key: 'time',
         header: t('settings.price_rule.column.time'),
-        width: '100px',
+        width: '120px',
         render: renderTimeBadge,
       },
       {
         key: 'status',
         header: t('settings.price_rule.column.status'),
-        width: '80px',
+        width: '100px',
         align: 'center',
         render: (item) =>
           item.is_active ? (

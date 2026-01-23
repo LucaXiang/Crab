@@ -145,13 +145,13 @@ export const Step3Scope: React.FC<Step3ScopeProps> = ({ state, updateState }) =>
         </div>
         <select
           value={state.zone_scope}
-          onChange={(e) => updateState({ zone_scope: parseInt(e.target.value) })}
+          onChange={(e) => updateState({ zone_scope: e.target.value })}
           className={selectClass}
         >
-          <option value={-1}>{t('settings.price_rule.zone.all')}</option>
-          <option value={0}>{t('settings.price_rule.zone.retail')}</option>
+          <option value="zone:all">{t('settings.price_rule.zone.all')}</option>
+          <option value="zone:retail">{t('settings.price_rule.zone.retail')}</option>
           {zones.map((zone) => (
-            <option key={zone.id} value={zone.id}>
+            <option key={zone.id} value={zone.id ?? ''}>
               {zone.name}
             </option>
           ))}

@@ -24,9 +24,11 @@ interface CategoryFormProps {
   };
   onFieldChange: (field: string, value: any) => void;
   t: (key: string) => string;
+  /** 编辑模式下禁止切换分类类型 */
+  isEditMode?: boolean;
 }
 
-export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldChange, t }) => {
+export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldChange, t, isEditMode = false }) => {
   const [showAttributeModal, setShowAttributeModal] = useState(false);
 
   const selectedAttributeIds = formData.selected_attribute_ids || [];
@@ -67,17 +69,21 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
         />
       </FormField>
 
-      {/* 虚拟分类设置 */}
+      {/* 虚拟分类设置 - 新建时显示类型选择，编辑时只有虚拟分类才显示 */}
+      {(!isEditMode || isVirtual) && (
       <FormSection title={t('settings.category.form.virtual_settings')} icon={Filter}>
-        <SelectField
-          label={t('settings.category.form.is_virtual')}
-          value={isVirtual ? 'true' : 'false'}
-          onChange={(value) => onFieldChange('is_virtual', value === 'true')}
-          options={[
-            { value: 'false', label: t('settings.category.form.regular_category') },
-            { value: 'true', label: t('settings.category.form.virtual_category') }
-          ]}
-        />
+        {/* 新建时显示类型选择器 */}
+        {!isEditMode && (
+          <SelectField
+            label={t('settings.category.form.is_virtual')}
+            value={isVirtual ? 'true' : 'false'}
+            onChange={(value) => onFieldChange('is_virtual', String(value) === 'true')}
+            options={[
+              { value: 'false', label: t('settings.category.form.regular_category') },
+              { value: 'true', label: t('settings.category.form.virtual_category') }
+            ]}
+          />
+        )}
 
         <SubField show={isVirtual}>
           <SelectField
@@ -128,6 +134,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
           )}
         </SubField>
       </FormSection>
+      )}
 
       {/* 打印设置 */}
       <FormSection title={t('settings.product.print.settings')} icon={Printer}>
@@ -210,7 +217,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
         <SelectField
           label={t('common.label.is_active')}
           value={formData.is_active !== false ? 'true' : 'false'}
-          onChange={(value) => onFieldChange('is_active', value === 'true')}
+          onChange={(value) => onFieldChange('is_active', String(value) === 'true')}
           options={[
             { value: 'true', label: t('common.status.enabled') },
             { value: 'false', label: t('common.status.disabled') },

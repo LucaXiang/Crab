@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Image as ImageIcon, Tag, Hash, FileText, Layers, ImagePlus, Printer, Settings, List, Star, Check } from 'lucide-react';
+import { Image as ImageIcon, Tag, Hash, FileText, Layers, ImagePlus, Printer, List, Star, Check } from 'lucide-react';
 import { FormField, FormSection, inputClass, selectClass } from './FormField';
 import { AttributeSelectionModal } from './AttributeSelectionModal';
 import { ProductImage } from '@/presentation/components/ProductImage';
-import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions } from '@/core/stores/resources';
+import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions, usePrintDestinationStore } from '@/core/stores/resources';
 import { useIsKitchenPrintEnabled, useIsLabelPrintEnabled } from '@/core/stores/ui';
 import { usePriceInput } from '@/hooks/usePriceInput';
 import { SelectField } from '@/presentation/components/form/FormField/SelectField';
@@ -25,7 +25,9 @@ interface ProductFormProps {
     attribute_default_options?: Record<string, string[]>; // Product-level default options (array for multi-select)
     print_destinations?: string[];
     kitchen_print_name?: string;
+    is_kitchen_print_enabled?: PrintState; // Kitchen print state: -1=inherit, 0=disabled, 1=enabled
     is_label_print_enabled?: PrintState;
+    label_print_destinations?: string[]; // Label printer destinations
     is_active?: boolean;
     specs?: EmbeddedSpec[]; // Embedded specifications
     selected_tag_ids?: string[]; // Tag IDs loaded from getProductFull API
@@ -36,6 +38,39 @@ interface ProductFormProps {
   t: (key: string) => string;
   inheritedAttributeIds?: string[];
 }
+
+// Label Printer Selector component (similar to KitchenPrinterSelector but for label printers)
+const LabelPrinterSelector: React.FC<{
+  value: string | null;
+  onChange: (value: string | null) => void;
+  t: (key: string) => string;
+}> = ({ value, onChange, t }) => {
+  const items = usePrintDestinationStore((state) => state.items);
+
+  return (
+    <FormField label={t('settings.label_printer')}>
+      <div className="relative">
+        <select
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value || null)}
+          className={selectClass}
+        >
+          <option value="">{t('common.label.default')}</option>
+          {items.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3">
+          <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+    </FormField>
+  );
+};
 
 export const ProductForm: React.FC<ProductFormProps> = ({
   formData,
@@ -58,7 +93,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     {
       minValue: 0,
       onCommit: (value) => {
-        // Update price in default spec (specs is the source of truth)
+        // Update price in root spec (specs is the source of truth)
         const currentSpecs = formData.specs || [];
         if (currentSpecs.length === 0) {
           onFieldChange('specs', [{
@@ -69,16 +104,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             is_active: true,
             external_id: formData.externalId ?? null,
             receipt_name: null,
-            is_root: false,
+            is_root: true,
           }]);
         } else {
           const newSpecs = currentSpecs.map(s =>
-            s.is_default ? { ...s, price: value } : s
+            s.is_root ? { ...s, price: value } : s
           );
-          // If no spec is marked as default, update the first one
-          if (!newSpecs.some(s => s.is_default)) {
-            newSpecs[0] = { ...newSpecs[0], price: value };
-          }
           onFieldChange('specs', newSpecs);
         }
       }
@@ -159,12 +190,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
           <SelectField
             label={t('settings.product.form.tax_rate')}
-            value={formData.tax_rate?.toString() || '10'}
+            value={formData.tax_rate ?? 10}
             onChange={(value) => {
-              const val = parseInt(value as string, 10);
+              const val = typeof value === 'number' ? value : parseInt(value as string, 10);
               onFieldChange('tax_rate', isNaN(val) ? 10 : val);
             }}
-            options={TAX_RATES.map(rate => ({ value: rate.value.toString(), label: rate.label }))}
+            options={TAX_RATES.map(rate => ({ value: rate.value, label: rate.label }))}
             required
           />
 
@@ -179,7 +210,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 onChange={(e) => {
                   const val = e.target.value;
                   const newExternalId = val ? parseInt(val, 10) : null;
-                  // Update external_id in default spec (specs is the source of truth)
+                  // Update external_id in root spec (specs is the source of truth)
                   const currentSpecs = formData.specs || [];
                   if (currentSpecs.length === 0) {
                     onFieldChange('specs', [{
@@ -190,15 +221,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       is_active: true,
                       external_id: newExternalId,
                       receipt_name: null,
-                      is_root: false,
+                      is_root: true,
                     }]);
                   } else {
                     const newSpecs = currentSpecs.map(s =>
-                      s.is_default ? { ...s, external_id: newExternalId } : s
+                      s.is_root ? { ...s, external_id: newExternalId } : s
                     );
-                    if (!newSpecs.some(s => s.is_default)) {
-                      newSpecs[0] = { ...newSpecs[0], external_id: newExternalId };
-                    }
                     onFieldChange('specs', newSpecs);
                   }
                 }}
@@ -222,19 +250,15 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               <div className="relative">
                 <select
                   value={
-                    formData.print_destinations === undefined
+                    formData.is_kitchen_print_enabled === undefined || formData.is_kitchen_print_enabled === null || formData.is_kitchen_print_enabled === -1
                       ? '-1'
-                      : (formData.print_destinations.length > 0 ? '1' : '0')
+                      : String(formData.is_kitchen_print_enabled)
                   }
                   onChange={(e) => {
                     const raw = e.target.value;
-                    if (raw === '-1') {
-                      onFieldChange('print_destinations', undefined);
-                    } else if (raw === '1') {
-                      onFieldChange('print_destinations', formData.print_destinations?.length ? formData.print_destinations : []);
-                    } else {
-                      onFieldChange('print_destinations', []);
-                    }
+                    const num = parseInt(raw, 10);
+                    const next: PrintState = isNaN(num) ? -1 : (num === 1 ? 1 : num === 0 ? 0 : -1);
+                    onFieldChange('is_kitchen_print_enabled', next);
                   }}
                   className={selectClass}
                 >
@@ -242,7 +266,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   <option value="1">{t('common.status.enabled')}</option>
                   <option value="0">{t('common.status.disabled')}</option>
                 </select>
-                {formData.print_destinations === undefined && (
+                {(formData.is_kitchen_print_enabled === undefined || formData.is_kitchen_print_enabled === null || formData.is_kitchen_print_enabled === -1) && (
                   <div className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
                     <span>
@@ -288,43 +312,53 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
             {t('settings.product.print.label_printing')}
           </h4>
-          <FormField label={t('settings.product.print.is_label_print_enabled')}>
-            <div className="relative">
-              <select
-                value={
-                  formData.is_label_print_enabled === undefined || formData.is_label_print_enabled === null || formData.is_label_print_enabled === -1
-                    ? '-1'
-                    : String(formData.is_label_print_enabled)
-                }
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  const num = parseInt(raw, 10);
-                  const next: PrintState = isNaN(num) ? -1 : (num === 1 ? 1 : num === 0 ? 0 : -1);
-                  onFieldChange('is_label_print_enabled', next);
-                }}
-                className={selectClass}
-              >
-                <option value="-1">{t('common.label.default')}</option>
-                <option value="1">{t('common.status.enabled')}</option>
-                <option value="0">{t('common.status.disabled')}</option>
-              </select>
-              {(formData.is_label_print_enabled === undefined || formData.is_label_print_enabled === null || formData.is_label_print_enabled === -1) && (
-                <div className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-                  <span>
-                    {t('settings.product.print.effective_state')}: {
-                      (() => {
-                        if (!isGlobalLabelEnabled) return t('common.status.disabled_global');
-                        const cat = categories.find(c => String(c.id) === String(formData.category));
-                        const isEnabled = cat ? (cat.is_label_print_enabled !== false) : true;
-                        return isEnabled ? t('common.status.enabled') : t('common.status.disabled');
-                      })()
-                    }
-                  </span>
-                </div>
-              )}
-            </div>
-          </FormField>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label={t('settings.product.print.is_label_print_enabled')}>
+              <div className="relative">
+                <select
+                  value={
+                    formData.is_label_print_enabled === undefined || formData.is_label_print_enabled === null || formData.is_label_print_enabled === -1
+                      ? '-1'
+                      : String(formData.is_label_print_enabled)
+                  }
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const num = parseInt(raw, 10);
+                    const next: PrintState = isNaN(num) ? -1 : (num === 1 ? 1 : num === 0 ? 0 : -1);
+                    onFieldChange('is_label_print_enabled', next);
+                  }}
+                  className={selectClass}
+                >
+                  <option value="-1">{t('common.label.default')}</option>
+                  <option value="1">{t('common.status.enabled')}</option>
+                  <option value="0">{t('common.status.disabled')}</option>
+                </select>
+                {(formData.is_label_print_enabled === undefined || formData.is_label_print_enabled === null || formData.is_label_print_enabled === -1) && (
+                  <div className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                    <span>
+                      {t('settings.product.print.effective_state')}: {
+                        (() => {
+                          if (!isGlobalLabelEnabled) return t('common.status.disabled_global');
+                          const cat = categories.find(c => String(c.id) === String(formData.category));
+                          const isEnabled = cat ? (cat.is_label_print_enabled !== false) : true;
+                          return isEnabled ? t('common.status.enabled') : t('common.status.disabled');
+                        })()
+                      }
+                    </span>
+                  </div>
+                )}
+              </div>
+            </FormField>
+
+            <LabelPrinterSelector
+              value={formData.label_print_destinations?.[0] ?? null}
+              onChange={(value) => {
+                onFieldChange('label_print_destinations', value === null ? [] : [value]);
+              }}
+              t={t}
+            />
+          </div>
         </div>
 
         <div className="border-t border-gray-100 pt-3 mt-3" />
@@ -522,18 +556,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         </FormSection>
       )}
 
-      {/* Status Settings */}
-      <FormSection title={t('common.label.status')} icon={Settings}>
-        <SelectField
-          label={t('common.label.is_active')}
-          value={formData.is_active !== false ? 'true' : 'false'}
-          onChange={(value) => onFieldChange('is_active', value === 'true')}
-          options={[
-            { value: 'true', label: t('common.status.enabled') },
-            { value: 'false', label: t('common.status.disabled') },
-          ]}
-        />
-      </FormSection>
     </div>
   );
 };
