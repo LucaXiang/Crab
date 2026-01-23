@@ -7,7 +7,6 @@ use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock;
 
-use crate::core::response::ErrorCode;
 use crate::core::{
     ApiResponse, AttributeData, AttributeListData, CategoryData, CategoryListData, ClientBridge,
     DeleteData, PrintDestinationData, PrintDestinationListData, ProductData, ProductFullData,
@@ -49,10 +48,7 @@ pub async fn list_tags(
     let bridge = bridge.read().await;
     match bridge.get::<Vec<Tag>>("/api/tags").await {
         Ok(tags) => Ok(ApiResponse::success(TagListData { tags })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -67,10 +63,7 @@ pub async fn get_tag(
         .await
     {
         Ok(tag) => Ok(ApiResponse::success(tag)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::NotFound,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -82,10 +75,7 @@ pub async fn create_tag(
     let bridge = bridge.read().await;
     match bridge.post::<Tag, _>("/api/tags", &data).await {
         Ok(tag) => Ok(ApiResponse::success(tag)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -101,10 +91,7 @@ pub async fn update_tag(
         .await
     {
         Ok(tag) => Ok(ApiResponse::success(tag)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -119,10 +106,7 @@ pub async fn delete_tag(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -135,10 +119,7 @@ pub async fn list_categories(
     let bridge = bridge.read().await;
     match bridge.get::<Vec<Category>>("/api/categories").await {
         Ok(categories) => Ok(ApiResponse::success(CategoryListData { categories })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -153,10 +134,7 @@ pub async fn get_category(
         .await
     {
         Ok(cat) => Ok(ApiResponse::success(CategoryData { category: cat })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::CategoryNotFound,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -168,10 +146,7 @@ pub async fn create_category(
     let bridge = bridge.read().await;
     match bridge.post::<Category, _>("/api/categories", &data).await {
         Ok(cat) => Ok(ApiResponse::success(CategoryData { category: cat })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -187,10 +162,7 @@ pub async fn update_category(
         .await
     {
         Ok(cat) => Ok(ApiResponse::success(CategoryData { category: cat })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -205,10 +177,7 @@ pub async fn delete_category(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -221,10 +190,7 @@ pub async fn list_products(
     let bridge = bridge.read().await;
     match bridge.get::<Vec<Product>>("/api/products").await {
         Ok(products) => Ok(ApiResponse::success(ProductListData { products })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -239,10 +205,7 @@ pub async fn get_product(
         .await
     {
         Ok(prod) => Ok(ApiResponse::success(ProductData { product: prod })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::ProductNotFound,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -258,10 +221,7 @@ pub async fn get_product_full(
         .await
     {
         Ok(product) => Ok(ApiResponse::success(ProductFullData { product })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::ProductNotFound,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -273,10 +233,7 @@ pub async fn create_product(
     let bridge = bridge.read().await;
     match bridge.post::<Product, _>("/api/products", &data).await {
         Ok(prod) => Ok(ApiResponse::success(ProductData { product: prod })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -292,10 +249,7 @@ pub async fn update_product(
         .await
     {
         Ok(prod) => Ok(ApiResponse::success(ProductData { product: prod })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -310,10 +264,7 @@ pub async fn delete_product(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -326,10 +277,7 @@ pub async fn list_attributes(
     let bridge = bridge.read().await;
     match bridge.get::<Vec<Attribute>>("/api/attributes").await {
         Ok(templates) => Ok(ApiResponse::success(AttributeListData { templates })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -344,10 +292,7 @@ pub async fn get_attribute(
         .await
     {
         Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::AttributeNotFound,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -359,10 +304,7 @@ pub async fn create_attribute(
     let bridge = bridge.read().await;
     match bridge.post::<Attribute, _>("/api/attributes", &data).await {
         Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -378,10 +320,7 @@ pub async fn update_attribute(
         .await
     {
         Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -396,10 +335,7 @@ pub async fn delete_attribute(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -420,10 +356,7 @@ pub async fn add_attribute_option(
         .await
     {
         Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -447,10 +380,7 @@ pub async fn update_attribute_option(
         .await
     {
         Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -470,10 +400,7 @@ pub async fn delete_attribute_option(
         .await
     {
         Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -490,10 +417,7 @@ pub async fn list_product_attributes(
         .await
     {
         Ok(attrs) => Ok(ApiResponse::success(attrs)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -508,10 +432,7 @@ pub async fn bind_product_attribute(
         .await
     {
         Ok(result) => Ok(ApiResponse::success(result)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::AttributeBindFailed,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -526,10 +447,7 @@ pub async fn unbind_product_attribute(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -545,10 +463,7 @@ pub async fn update_product_attribute_binding(
         .await
     {
         Ok(result) => Ok(ApiResponse::success(result)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -566,10 +481,7 @@ pub async fn list_category_attributes(
         .await
     {
         Ok(templates) => Ok(ApiResponse::success(AttributeListData { templates })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -607,10 +519,7 @@ pub async fn bind_category_attribute(
         .await
     {
         Ok(binding) => Ok(ApiResponse::success(binding)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::AttributeBindFailed,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -630,10 +539,7 @@ pub async fn unbind_category_attribute(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -662,10 +568,7 @@ pub async fn batch_update_category_sort_order(
         .await
     {
         Ok(result) => Ok(ApiResponse::success(result)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -688,10 +591,7 @@ pub async fn batch_update_product_sort_order(
         .await
     {
         Ok(result) => Ok(ApiResponse::success(result)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -709,10 +609,7 @@ pub async fn list_print_destinations(
         Ok(print_destinations) => Ok(ApiResponse::success(PrintDestinationListData {
             print_destinations,
         })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -729,10 +626,7 @@ pub async fn get_print_destination(
         Ok(print_destination) => Ok(ApiResponse::success(PrintDestinationData {
             print_destination,
         })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::NotFound,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -749,10 +643,7 @@ pub async fn create_print_destination(
         Ok(print_destination) => Ok(ApiResponse::success(PrintDestinationData {
             print_destination,
         })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -770,10 +661,7 @@ pub async fn update_print_destination(
         Ok(print_destination) => Ok(ApiResponse::success(PrintDestinationData {
             print_destination,
         })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -788,9 +676,6 @@ pub async fn delete_print_destination(
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }

@@ -28,6 +28,7 @@ tauri-build = { version = "2.5.3", features = [] }
 shared.workspace = true
 crab-client = { workspace = true, features = ["in-process"] }
 crab-cert.workspace = true
+crab-printer.workspace = true
 edge-server.workspace = true
 
 # ========== Tauri ==========

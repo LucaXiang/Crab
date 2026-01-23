@@ -7,6 +7,8 @@ use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 
+use super::bridge::BridgeError;
+
 // Re-export for convenience
 pub use shared::error::ErrorCode;
 
@@ -102,6 +104,47 @@ impl<T: Serialize> From<Result<T, String>> for ApiResponse<T> {
             Err(e) => Self {
                 code: Some(ErrorCode::Unknown.code()),
                 message: e,
+                data: None,
+                details: None,
+            },
+        }
+    }
+}
+
+/// 从 BridgeError 创建错误响应
+/// 会自动提取服务端返回的 error code
+impl<T: Serialize> ApiResponse<T> {
+    pub fn from_bridge_error(err: BridgeError) -> Self {
+        match &err {
+            BridgeError::Client(client_err) => {
+                // 检查是否是 API 错误（包含服务端的 error code）
+                if let crab_client::ClientError::Api { code, message, details } = client_err {
+                    return Self {
+                        code: Some(*code as u16),
+                        message: message.clone(),
+                        data: None,
+                        details: details.as_ref().map(|d| {
+                            let mut map = HashMap::new();
+                            if let Some(obj) = d.as_object() {
+                                for (k, v) in obj {
+                                    map.insert(k.clone(), v.clone());
+                                }
+                            }
+                            map
+                        }),
+                    };
+                }
+                // 其他 client 错误
+                Self {
+                    code: Some(ErrorCode::DatabaseError.code()),
+                    message: format!("Client error: {}", client_err),
+                    data: None,
+                    details: None,
+                }
+            }
+            _ => Self {
+                code: Some(ErrorCode::DatabaseError.code()),
+                message: err.to_string(),
                 data: None,
                 details: None,
             },
