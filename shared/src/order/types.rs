@@ -47,6 +47,11 @@ pub struct CartItemSnapshot {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub applied_rules: Option<Vec<AppliedRule>>,
 
+    // === Computed Fields ===
+    /// Line total (computed by backend: price * quantity with adjustments)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line_total: Option<f64>,
+
     /// Item note
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
@@ -175,6 +180,9 @@ pub struct PaymentRecord {
     pub cancelled: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cancel_reason: Option<String>,
+    /// Split payment items snapshot (for restoration on cancel)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub split_items: Option<Vec<CartItemSnapshot>>,
 }
 
 /// Payment summary for completed order
@@ -258,6 +266,7 @@ pub enum CommandErrorCode {
     InvalidOperation,
     DuplicateCommand,
     InternalError,
+    TableOccupied,
 }
 
 /// Sync request for reconnection
@@ -313,6 +322,7 @@ mod tests {
             rule_discount_amount: Some(5.0),
             rule_surcharge_amount: Some(3.0),
             applied_rules: Some(vec![]),
+            line_total: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,

@@ -18,7 +18,8 @@ pub struct AppliedRule {
 
     // === Scope Info ===
     pub product_scope: ProductScope,
-    pub zone_scope: i32,
+    /// Zone scope: "zone:all", "zone:retail", or specific zone ID
+    pub zone_scope: String,
 
     // === Calculation Info ===
     /// Original value (10 = 10% or ¥10)
@@ -49,7 +50,7 @@ impl AppliedRule {
             rule_type: rule.rule_type.clone(),
             adjustment_type: rule.adjustment_type.clone(),
             product_scope: rule.product_scope.clone(),
-            zone_scope: rule.zone_scope,
+            zone_scope: rule.zone_scope.clone(),
             adjustment_value: rule.adjustment_value,
             calculated_amount,
             priority: rule.priority,
@@ -76,7 +77,7 @@ mod tests {
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
             target: None,
-            zone_scope: -1,
+            zone_scope: "zone:all".to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
             priority: 0,
@@ -105,7 +106,7 @@ mod tests {
         assert_eq!(applied.rule_type, RuleType::Discount);
         assert_eq!(applied.adjustment_type, AdjustmentType::Percentage);
         assert_eq!(applied.product_scope, ProductScope::Global);
-        assert_eq!(applied.zone_scope, -1);
+        assert_eq!(applied.zone_scope, "zone:all");
         assert_eq!(applied.adjustment_value, 10.0);
         assert_eq!(applied.calculated_amount, 5.0);
         assert_eq!(applied.priority, 0);
@@ -124,7 +125,7 @@ mod tests {
             rule_type: RuleType::Discount,
             adjustment_type: AdjustmentType::Percentage,
             product_scope: ProductScope::Global,
-            zone_scope: -1,
+            zone_scope: "zone:all".to_string(),
             adjustment_value: 10.0,
             calculated_amount: 5.0,
             priority: 0,
@@ -150,7 +151,7 @@ mod tests {
             "rule_type": "DISCOUNT",
             "adjustment_type": "PERCENTAGE",
             "product_scope": "GLOBAL",
-            "zone_scope": -1,
+            "zone_scope": "zone:all",
             "adjustment_value": 10.0,
             "calculated_amount": 5.0,
             "priority": 0,

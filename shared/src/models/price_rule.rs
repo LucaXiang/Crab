@@ -61,8 +61,8 @@ pub struct PriceRule {
     pub product_scope: ProductScope,
     /// Target record based on scope (category/tag/product ID)
     pub target: Option<String>,
-    /// Zone scope: -1=all, 0=retail, >0=specific zone
-    pub zone_scope: i32,
+    /// Zone scope: "zone:all", "zone:retail", or specific zone ID like "zone:xxx"
+    pub zone_scope: String,
     pub adjustment_type: AdjustmentType,
     /// Adjustment value (percentage: 30=30%, fixed: currency unit e.g. 5.00 = ¥5.00)
     pub adjustment_value: f64,
@@ -107,7 +107,8 @@ pub struct PriceRuleCreate {
     pub rule_type: RuleType,
     pub product_scope: ProductScope,
     pub target: Option<String>,
-    pub zone_scope: Option<i32>,
+    /// Zone scope: "zone:all", "zone:retail", or specific zone ID
+    pub zone_scope: Option<String>,
     pub adjustment_type: AdjustmentType,
     /// Adjustment value (percentage: 30=30%, fixed: currency unit e.g. 5.00 = ¥5.00)
     pub adjustment_value: f64,
@@ -142,7 +143,8 @@ pub struct PriceRuleUpdate {
     pub rule_type: Option<RuleType>,
     pub product_scope: Option<ProductScope>,
     pub target: Option<String>,
-    pub zone_scope: Option<i32>,
+    /// Zone scope: "zone:all", "zone:retail", or specific zone ID
+    pub zone_scope: Option<String>,
     pub adjustment_type: Option<AdjustmentType>,
     /// Adjustment value (percentage: 30=30%, fixed: currency unit e.g. 5.00 = ¥5.00)
     pub adjustment_value: Option<f64>,
@@ -182,7 +184,7 @@ mod tests {
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
             target: None,
-            zone_scope: -1,
+            zone_scope: "zone:all".to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
             priority: 0,

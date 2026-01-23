@@ -303,9 +303,9 @@ pub struct PriceRuleDto {
     /// 目标 ID (根据 scope)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
-    /// 区域范围: -1=全部, 0=零售, >0=指定区域
+    /// 区域范围: "zone:all", "zone:retail", 或 "zone:xxx"
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub zone_scope: Option<i32>,
+    pub zone_scope: Option<String>,
     /// "PERCENTAGE" | "FIXED_AMOUNT"
     pub adjustment_type: String,
     /// 调整值 (百分比如30=30%, 固定金额单位:分)
@@ -356,8 +356,9 @@ pub struct PriceRuleUpdateDto {
     pub product_scope: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
+    /// 区域范围: "zone:all", "zone:retail", 或 "zone:xxx"
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub zone_scope: Option<i32>,
+    pub zone_scope: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub adjustment_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
