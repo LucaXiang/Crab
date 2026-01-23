@@ -18,6 +18,7 @@ import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { ProductImage } from '@/presentation/components/ProductImage';
 import { formatCurrency } from '@/utils/currency';
+import { displayThingId } from '@/utils/formatting';
 
 // ProductItem matches Product type from models.ts (snake_case naming)
 interface ProductItem {
@@ -141,7 +142,7 @@ export const ProductManagement: React.FC = React.memo(() => {
                   </div>
                 )}
                 <div className="text-xs text-gray-400 mt-0.5">
-                  id: {item.id.split(':')[1]?.slice(0, 8) || item.id.slice(0, 8)}
+                  id: {displayThingId(item.id)}
                 </div>
               </div>
             </div>

@@ -5,6 +5,7 @@ import { useSettingsModal, useDataVersion, useSettingsFilters } from '@/core/sto
 import { useZoneStore, useTableStore } from '@/core/stores/resources';
 import { createTauriClient } from '@/infrastructure/api';
 import { getErrorMessage } from '@/utils/error';
+import { displayThingId } from '@/utils/formatting';
 
 const api = createTauriClient();
 import { DataTable, Column } from '@/presentation/components/ui/DataTable';
@@ -99,7 +100,7 @@ const ZoneList: React.FC = React.memo(() => {
             </div>
             <div>
               <span className="font-medium text-gray-900">{item.name}</span>
-              <div className="text-xs text-gray-400 mt-0.5">ID: {item.id.slice(0, 8)}</div>
+              <div className="text-xs text-gray-400 mt-0.5">ID: {displayThingId(item.id)}</div>
             </div>
           </div>
         ),
