@@ -13,6 +13,7 @@ mod items_added;
 mod order_completed;
 mod order_info_updated;
 mod order_moved;
+mod order_moved_out;
 mod order_restored;
 mod order_split;
 mod order_voided;
@@ -21,6 +22,7 @@ mod payment_added;
 mod payment_cancelled;
 mod rule_skip_toggled;
 mod table_opened;
+mod table_reassigned;
 
 pub use item_modified::ItemModifiedApplier;
 pub use item_removed::ItemRemovedApplier;
@@ -29,6 +31,7 @@ pub use items_added::ItemsAddedApplier;
 pub use order_completed::OrderCompletedApplier;
 pub use order_info_updated::OrderInfoUpdatedApplier;
 pub use order_moved::OrderMovedApplier;
+pub use order_moved_out::OrderMovedOutApplier;
 pub use order_restored::OrderRestoredApplier;
 pub use order_split::OrderSplitApplier;
 pub use order_voided::OrderVoidedApplier;
@@ -37,6 +40,7 @@ pub use payment_added::PaymentAddedApplier;
 pub use payment_cancelled::PaymentCancelledApplier;
 pub use rule_skip_toggled::RuleSkipToggledApplier;
 pub use table_opened::TableOpenedApplier;
+pub use table_reassigned::TableReassignedApplier;
 
 /// EventAction enum - dispatches to concrete applier implementations
 pub enum EventAction {
@@ -50,12 +54,14 @@ pub enum EventAction {
     OrderCompleted(OrderCompletedApplier),
     OrderInfoUpdated(OrderInfoUpdatedApplier),
     OrderMoved(OrderMovedApplier),
+    OrderMovedOut(OrderMovedOutApplier),
     OrderRestored(OrderRestoredApplier),
     OrderVoided(OrderVoidedApplier),
     OrderMerged(OrderMergedApplier),
     OrderMergedOut(OrderMergedOutApplier),
     OrderSplit(OrderSplitApplier),
     RuleSkipToggled(RuleSkipToggledApplier),
+    TableReassigned(TableReassignedApplier),
 }
 
 /// Manual implementation of EventApplier for EventAction
@@ -72,12 +78,14 @@ impl EventApplier for EventAction {
             EventAction::OrderCompleted(applier) => applier.apply(snapshot, event),
             EventAction::OrderInfoUpdated(applier) => applier.apply(snapshot, event),
             EventAction::OrderMoved(applier) => applier.apply(snapshot, event),
+            EventAction::OrderMovedOut(applier) => applier.apply(snapshot, event),
             EventAction::OrderRestored(applier) => applier.apply(snapshot, event),
             EventAction::OrderVoided(applier) => applier.apply(snapshot, event),
             EventAction::OrderMerged(applier) => applier.apply(snapshot, event),
             EventAction::OrderMergedOut(applier) => applier.apply(snapshot, event),
             EventAction::OrderSplit(applier) => applier.apply(snapshot, event),
             EventAction::RuleSkipToggled(applier) => applier.apply(snapshot, event),
+            EventAction::TableReassigned(applier) => applier.apply(snapshot, event),
         }
     }
 }
@@ -110,12 +118,16 @@ impl From<&OrderEvent> for EventAction {
             EventPayload::OrderMergedOut { .. } => {
                 EventAction::OrderMergedOut(OrderMergedOutApplier)
             }
+            EventPayload::OrderMovedOut { .. } => {
+                EventAction::OrderMovedOut(OrderMovedOutApplier)
+            }
             EventPayload::OrderSplit { .. } => EventAction::OrderSplit(OrderSplitApplier),
             EventPayload::RuleSkipToggled { .. } => {
                 EventAction::RuleSkipToggled(RuleSkipToggledApplier)
             }
-            // Other events will be added here
-            _ => todo!("Event applier not yet implemented"),
+            EventPayload::TableReassigned { .. } => {
+                EventAction::TableReassigned(TableReassignedApplier)
+            }
         }
     }
 }
