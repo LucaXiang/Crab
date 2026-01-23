@@ -22,11 +22,10 @@ pub struct PrintConfig {
 ///
 /// Returns the current system default printer configuration.
 pub async fn get(State(state): State<ServerState>) -> AppResult<Json<PrintConfig>> {
-    let cache = state.kitchen_print_service.config_cache();
-    let defaults = cache.get_defaults().await;
+    let defaults = state.catalog_service.get_print_defaults();
     Ok(Json(PrintConfig {
-        default_kitchen_printer: defaults.0,
-        default_label_printer: defaults.1,
+        default_kitchen_printer: defaults.kitchen_destination,
+        default_label_printer: defaults.label_destination,
     }))
 }
 
@@ -38,13 +37,10 @@ pub async fn update(
     State(state): State<ServerState>,
     Json(config): Json<PrintConfig>,
 ) -> AppResult<Json<PrintConfig>> {
-    let cache = state.kitchen_print_service.config_cache();
-    cache
-        .set_defaults(
-            config.default_kitchen_printer.clone(),
-            config.default_label_printer.clone(),
-        )
-        .await;
+    state.catalog_service.set_print_defaults(
+        config.default_kitchen_printer.clone(),
+        config.default_label_printer.clone(),
+    );
 
     tracing::info!(
         default_kitchen = ?config.default_kitchen_printer,

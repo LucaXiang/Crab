@@ -8,9 +8,7 @@ pub mod role;
 
 // Product Domain
 pub mod attribute;
-pub mod category;
 pub mod print_destination;
-pub mod product;
 pub mod tag;
 
 // Location
@@ -28,13 +26,11 @@ pub mod system_state;
 
 // Re-exports
 pub use attribute::AttributeRepository;
-pub use category::CategoryRepository;
 pub use dining_table::DiningTableRepository;
 pub use employee::EmployeeRepository;
 pub use order::OrderRepository;
 pub use price_rule::PriceRuleRepository;
 pub use print_destination::PrintDestinationRepository;
-pub use product::ProductRepository;
 pub use role::RoleRepository;
 pub use system_state::SystemStateRepository;
 pub use tag::TagRepository;

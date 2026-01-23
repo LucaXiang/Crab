@@ -29,6 +29,7 @@ use super::money;
 use super::storage::{OrderStorage, StorageError};
 use super::traits::{CommandContext, CommandHandler, CommandMetadata, EventApplier, OrderError};
 use crate::db::models::PriceRule;
+use crate::services::catalog_service::ProductMeta;
 use shared::order::{
     CommandError, CommandErrorCode, CommandResponse, OrderCommand, OrderEvent, OrderSnapshot,
     OrderStatus,
@@ -142,13 +143,6 @@ const EVENT_CHANNEL_CAPACITY: usize = 1024;
 ///
 /// The `epoch` field is a unique identifier generated on each startup.
 /// Clients use it to detect server restarts and trigger full resync.
-/// Product metadata for price rule matching
-#[derive(Debug, Clone, Default)]
-pub struct ProductMeta {
-    pub category_id: String,
-    pub tags: Vec<String>,
-}
-
 pub struct OrdersManager {
     storage: OrderStorage,
     event_tx: broadcast::Sender<OrderEvent>,

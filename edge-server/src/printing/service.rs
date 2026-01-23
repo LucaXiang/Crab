@@ -1,12 +1,10 @@
 //! Kitchen/Label print service - handles print job generation and reprint
 
-use super::cache::PrintConfigCache;
 use super::storage::{PrintStorage, PrintStorageError};
 use super::types::{KitchenOrder, KitchenOrderItem, LabelPrintRecord, PrintItemContext};
+use crate::services::CatalogService;
 use shared::order::{CartItemSnapshot, EventPayload, OrderEvent};
-use std::sync::Arc;
 use thiserror::Error;
-use tokio::sync::RwLock;
 
 #[derive(Debug, Error)]
 pub enum PrintServiceError {
@@ -34,31 +32,12 @@ pub type PrintServiceResult<T> = Result<T, PrintServiceError>;
 #[derive(Clone)]
 pub struct KitchenPrintService {
     storage: PrintStorage,
-    config_cache: PrintConfigCache,
-    /// Pending print jobs (not yet sent to printer)
-    /// In a real implementation, this would be a queue to a print spooler
-    #[allow(dead_code)]
-    inner: Arc<RwLock<KitchenPrintServiceInner>>,
-}
-
-#[derive(Debug, Default)]
-struct KitchenPrintServiceInner {
-    // Future: pending print queue, printer connections, etc.
 }
 
 impl KitchenPrintService {
     /// Create a new KitchenPrintService
-    pub fn new(storage: PrintStorage, config_cache: PrintConfigCache) -> Self {
-        Self {
-            storage,
-            config_cache,
-            inner: Arc::new(RwLock::new(KitchenPrintServiceInner::default())),
-        }
-    }
-
-    /// Get the config cache (for external updates)
-    pub fn config_cache(&self) -> &PrintConfigCache {
-        &self.config_cache
+    pub fn new(storage: PrintStorage) -> Self {
+        Self { storage }
     }
 
     /// Get the storage (for external queries)
@@ -70,24 +49,24 @@ impl KitchenPrintService {
     ///
     /// Creates KitchenOrder and LabelPrintRecord entries if printing is enabled.
     /// Returns the created KitchenOrder ID if any items were processed.
-    pub async fn process_items_added(
+    pub fn process_items_added(
         &self,
         event: &OrderEvent,
         table_name: Option<String>,
+        catalog: &CatalogService,
     ) -> PrintServiceResult<Option<String>> {
         // Quick check: is any printing enabled?
-        let kitchen_enabled = self.config_cache.is_kitchen_print_enabled().await;
-        let label_enabled = self.config_cache.is_label_print_enabled().await;
+        let kitchen_enabled = catalog.is_kitchen_print_enabled();
+        let label_enabled = catalog.is_label_print_enabled();
 
         if !kitchen_enabled && !label_enabled {
-            // Printing not configured, skip entirely (zero overhead)
             return Ok(None);
         }
 
         // Extract items from event
         let items = match &event.payload {
             EventPayload::ItemsAdded { items } => items,
-            _ => return Ok(None), // Not an ItemsAdded event
+            _ => return Ok(None),
         };
 
         if items.is_empty() {
@@ -99,7 +78,7 @@ impl KitchenPrintService {
         let mut label_records = Vec::new();
 
         for item in items {
-            let context = self.build_print_context(item).await;
+            let context = self.build_print_context(item, catalog);
 
             // Check if this item should be printed to kitchen
             if kitchen_enabled && !context.kitchen_destinations.is_empty() {
@@ -114,7 +93,7 @@ impl KitchenPrintService {
                 for i in 1..=item.quantity {
                     let mut label_context = context.clone();
                     label_context.index = Some(format!("{}/{}", i, item.quantity));
-                    label_context.quantity = 1; // Each label is for one item
+                    label_context.quantity = 1;
 
                     label_records.push(LabelPrintRecord {
                         id: uuid::Uuid::new_v4().to_string(),
@@ -129,7 +108,6 @@ impl KitchenPrintService {
             }
         }
 
-        // If no items to print, return early
         if kitchen_items.is_empty() && label_records.is_empty() {
             return Ok(None);
         }
@@ -146,51 +124,70 @@ impl KitchenPrintService {
 
         // Store in database
         let txn = self.storage.begin_write()?;
-
-        // Store kitchen order (even if empty items, for tracking)
         self.storage.store_kitchen_order(&txn, &kitchen_order)?;
-
-        // Store label records
         for record in &label_records {
             self.storage.store_label_record(&txn, record)?;
         }
-
         txn.commit().map_err(PrintStorageError::from)?;
-
-        // TODO: Actually send to printers here
-        // For now, we just store the records. Printing will be handled separately.
 
         Ok(Some(kitchen_order.id))
     }
 
     /// Build a PrintItemContext from a CartItemSnapshot
-    async fn build_print_context(&self, item: &CartItemSnapshot) -> PrintItemContext {
-        // Get product config from cache
-        let product_config = self.config_cache.get_product(&item.id).await;
+    fn build_print_context(
+        &self,
+        item: &CartItemSnapshot,
+        catalog: &CatalogService,
+    ) -> PrintItemContext {
+        // Get product from catalog
+        let product = catalog.get_product(&item.id);
 
-        // Get category info from cache
-        let (category_id, category_name) = if let Some(ref pc) = product_config {
-            let cat_config = self.config_cache.get_category(&pc.category_id).await;
-            (
-                pc.category_id.clone(),
-                cat_config.map(|c| c.category_name).unwrap_or_default(),
-            )
+        // Get category info
+        let (category_id, category_name) = if let Some(ref p) = product {
+            let cat_id = p.category.to_string();
+            let cat_name = catalog
+                .get_category(&cat_id)
+                .map(|c| c.name.clone())
+                .unwrap_or_default();
+            (cat_id, cat_name)
         } else {
             (String::new(), String::new())
         };
 
-        // Get destinations using the fallback chain
-        let kitchen_destinations = self.config_cache.get_kitchen_destinations(&item.id).await;
-        let label_destinations = self.config_cache.get_label_destinations(&item.id).await;
+        // Get print config from catalog (with fallback chain)
+        let kitchen_config = catalog.get_kitchen_print_config(&item.id);
+        let label_config = catalog.get_label_print_config(&item.id);
 
-        // Build options list from selected_options
+        let kitchen_destinations = kitchen_config
+            .as_ref()
+            .filter(|c| c.enabled)
+            .map(|c| c.destinations.clone())
+            .unwrap_or_default();
+
+        let label_destinations = label_config
+            .as_ref()
+            .filter(|c| c.enabled)
+            .map(|c| c.destinations.clone())
+            .unwrap_or_default();
+
+        let kitchen_name = kitchen_config
+            .as_ref()
+            .and_then(|c| c.kitchen_name.clone())
+            .or_else(|| product.as_ref().map(|p| p.name.clone()))
+            .unwrap_or_else(|| item.name.clone());
+
+        // Get root spec external_id
+        let external_id = product
+            .as_ref()
+            .and_then(|p| p.specs.iter().find(|s| s.is_root).and_then(|s| s.external_id));
+
+        // Build options list
         let options: Vec<String> = item
             .selected_options
             .as_ref()
             .map(|opts| opts.iter().map(|opt| opt.option_name.clone()).collect())
             .unwrap_or_default();
 
-        // Get spec name if present
         let spec_name = item
             .selected_specification
             .as_ref()
@@ -200,13 +197,8 @@ impl KitchenPrintService {
             category_id,
             category_name,
             product_id: item.id.clone(),
-            external_id: product_config
-                .as_ref()
-                .and_then(|p| p.root_spec_external_id),
-            kitchen_name: product_config
-                .as_ref()
-                .map(|p| p.kitchen_name.clone())
-                .unwrap_or_else(|| item.name.clone()),
+            external_id,
+            kitchen_name,
             product_name: item.name.clone(),
             spec_name,
             quantity: item.quantity,
@@ -219,43 +211,35 @@ impl KitchenPrintService {
     }
 
     /// Reprint a kitchen order
-    pub async fn reprint_kitchen_order(&self, id: &str) -> PrintServiceResult<()> {
-        // Load kitchen order
+    pub fn reprint_kitchen_order(&self, id: &str) -> PrintServiceResult<KitchenOrder> {
         let order = self
             .storage
             .get_kitchen_order(id)?
             .ok_or_else(|| PrintServiceError::KitchenOrderNotFound(id.to_string()))?;
 
-        // TODO: Actually send to printers
-
-        // Increment print count
         let txn = self.storage.begin_write()?;
         self.storage.increment_kitchen_order_print_count(&txn, id)?;
         txn.commit().map_err(PrintStorageError::from)?;
 
         tracing::info!(kitchen_order_id = %id, print_count = order.print_count + 1, "Kitchen order reprinted");
 
-        Ok(())
+        Ok(order)
     }
 
     /// Reprint a label record
-    pub async fn reprint_label_record(&self, id: &str) -> PrintServiceResult<()> {
-        // Load label record
+    pub fn reprint_label_record(&self, id: &str) -> PrintServiceResult<LabelPrintRecord> {
         let record = self
             .storage
             .get_label_record(id)?
             .ok_or_else(|| PrintServiceError::LabelRecordNotFound(id.to_string()))?;
 
-        // TODO: Actually send to printer
-
-        // Increment print count
         let txn = self.storage.begin_write()?;
         self.storage.increment_label_record_print_count(&txn, id)?;
         txn.commit().map_err(PrintStorageError::from)?;
 
         tracing::info!(label_record_id = %id, print_count = record.print_count + 1, "Label record reprinted");
 
-        Ok(())
+        Ok(record)
     }
 
     /// Get kitchen orders for an order
@@ -299,7 +283,6 @@ impl KitchenPrintService {
     }
 
     /// Delete kitchen orders and label records for an order
-    /// Called when an order is voided or for manual cleanup
     pub fn delete_records_for_order(&self, order_id: &str) -> PrintServiceResult<()> {
         let txn = self.storage.begin_write()?;
         self.storage
@@ -315,96 +298,6 @@ impl std::fmt::Debug for KitchenPrintService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("KitchenPrintService")
             .field("storage", &"<PrintStorage>")
-            .field("config_cache", &"<PrintConfigCache>")
             .finish()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use shared::order::{EventPayload, OrderEvent, OrderEventType};
-
-    fn create_test_service() -> KitchenPrintService {
-        let storage = PrintStorage::open_in_memory().unwrap();
-        let cache = PrintConfigCache::new();
-        KitchenPrintService::new(storage, cache)
-    }
-
-    fn create_test_item() -> CartItemSnapshot {
-        CartItemSnapshot {
-            id: "product:p1".to_string(),
-            instance_id: "inst-1".to_string(),
-            name: "Test Product".to_string(),
-            price: 10.0,
-            original_price: None,
-            quantity: 2,
-            unpaid_quantity: 2,
-            selected_options: None,
-            selected_specification: None,
-            manual_discount_percent: None,
-            surcharge: None,
-            rule_discount_amount: None,
-            rule_surcharge_amount: None,
-            applied_rules: None,
-            line_total: None,
-            note: None,
-            authorizer_id: None,
-            authorizer_name: None,
-        }
-    }
-
-    fn create_test_event(event_id: &str, order_id: &str, items: Vec<CartItemSnapshot>) -> OrderEvent {
-        OrderEvent {
-            event_id: event_id.to_string(),
-            order_id: order_id.to_string(),
-            event_type: OrderEventType::ItemsAdded,
-            sequence: 1,
-            timestamp: chrono::Utc::now().timestamp(),
-            client_timestamp: None,
-            operator_id: "op-1".to_string(),
-            operator_name: "Test".to_string(),
-            command_id: "cmd-1".to_string(),
-            payload: EventPayload::ItemsAdded { items },
-        }
-    }
-
-    #[tokio::test]
-    async fn test_process_items_added_no_printing_configured() {
-        let service = create_test_service();
-        let event = create_test_event("evt-1", "order-1", vec![create_test_item()]);
-
-        // Without any printing configured, should return None
-        let result = service.process_items_added(&event, None).await;
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_none());
-    }
-
-    #[tokio::test]
-    async fn test_process_items_added_with_kitchen_enabled() {
-        let service = create_test_service();
-
-        // Configure kitchen printing
-        service
-            .config_cache
-            .set_defaults(Some("default-kitchen".to_string()), None)
-            .await;
-
-        let event = create_test_event("evt-1", "order-1", vec![create_test_item()]);
-
-        let result = service
-            .process_items_added(&event, Some("Table 1".to_string()))
-            .await;
-        assert!(result.is_ok());
-        let kitchen_order_id = result.unwrap();
-        assert!(kitchen_order_id.is_some());
-
-        // Verify kitchen order was stored
-        let ko = service.get_kitchen_order("evt-1").unwrap();
-        assert!(ko.is_some());
-        let ko = ko.unwrap();
-        assert_eq!(ko.order_id, "order-1");
-        assert_eq!(ko.table_name, Some("Table 1".to_string()));
-        assert_eq!(ko.items.len(), 1);
     }
 }

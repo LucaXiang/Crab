@@ -1357,8 +1357,7 @@ impl ClientBridge {
             // Apply price rules to items
             let processed_items = server_state
                 .price_rule_engine
-                .apply_rules(items.clone(), &rules, current_time)
-                .await;
+                .apply_rules(items.clone(), &rules, current_time);
 
             // Update command with processed items
             command.payload = shared::order::OrderCommandPayload::AddItems {

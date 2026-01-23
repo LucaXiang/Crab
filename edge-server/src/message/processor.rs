@@ -143,8 +143,15 @@ impl RequestCommandProcessor {
     /// which rules were applied. The new approach properly tracks rule_discount_amount,
     /// rule_surcharge_amount, and applied_rules in CartItemSnapshot.
     async fn apply_price_rules_if_needed(&self, command: OrderCommand) -> OrderCommand {
-        // Rules are now applied in OrdersManager via input_to_snapshot_with_rules
-        // This ensures proper tracking of applied rules and their effects
+        // For AddItems commands, pre-fill product metadata cache from CatalogService
+        // so that price rules can be properly matched by category/tags
+        if let OrderCommandPayload::AddItems { items, .. } = &command.payload {
+            let product_ids: Vec<String> = items.iter().map(|i| i.product_id.clone()).collect();
+            let metadata = self.state.catalog_service.get_product_meta_batch(&product_ids);
+            self.state
+                .orders_manager()
+                .cache_product_metadata_batch(metadata);
+        }
         command
     }
 

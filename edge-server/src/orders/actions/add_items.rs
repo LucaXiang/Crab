@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use tracing::{debug, info};
 
 use crate::db::models::PriceRule;
-use crate::orders::manager::ProductMeta;
+use crate::services::catalog_service::ProductMeta;
 use crate::orders::reducer::input_to_snapshot_with_rules;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{CartItemInput, EventPayload, OrderEvent, OrderEventType, OrderStatus};

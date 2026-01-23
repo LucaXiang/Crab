@@ -1,26 +1,22 @@
 //! Category API Handlers
 
 use axum::{
-    Json,
     extract::{Path, State},
+    Json,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::api::convert::thing_to_string;
 use crate::core::ServerState;
 use crate::db::models::{Attribute, AttributeBinding, Category, CategoryCreate, CategoryUpdate};
-use crate::db::repository::{AttributeRepository, CategoryRepository};
+use crate::db::repository::AttributeRepository;
 use crate::utils::{AppError, AppResult};
 
 const RESOURCE: &str = "category";
 
 /// GET /api/categories - 获取所有分类
 pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Category>>> {
-    let repo = CategoryRepository::new(state.db.clone());
-    let categories = repo
-        .find_all()
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+    let categories = state.catalog_service.list_categories();
     Ok(Json(categories))
 }
 
@@ -29,11 +25,9 @@ pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<Category>> {
-    let repo = CategoryRepository::new(state.db.clone());
-    let category = repo
-        .find_by_id(&id)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?
+    let category = state
+        .catalog_service
+        .get_category(&id)
         .ok_or_else(|| AppError::not_found(format!("Category {} not found", id)))?;
     Ok(Json(category))
 }
@@ -43,9 +37,9 @@ pub async fn create(
     State(state): State<ServerState>,
     Json(payload): Json<CategoryCreate>,
 ) -> AppResult<Json<Category>> {
-    let repo = CategoryRepository::new(state.db.clone());
-    let category = repo
-        .create(payload)
+    let category = state
+        .catalog_service
+        .create_category(payload)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
@@ -64,9 +58,9 @@ pub async fn update(
     Path(id): Path<String>,
     Json(payload): Json<CategoryUpdate>,
 ) -> AppResult<Json<Category>> {
-    let repo = CategoryRepository::new(state.db.clone());
-    let category = repo
-        .update(&id, payload)
+    let category = state
+        .catalog_service
+        .update_category(&id, payload)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
@@ -78,30 +72,27 @@ pub async fn update(
     Ok(Json(category))
 }
 
-/// DELETE /api/categories/:id - 删除分类 (软删除)
+/// DELETE /api/categories/:id - 删除分类
 pub async fn delete(
     State(state): State<ServerState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     tracing::info!(id = %id, "Deleting category");
-    let repo = CategoryRepository::new(state.db.clone());
-    let result = repo
-        .delete(&id)
+
+    state
+        .catalog_service
+        .delete_category(&id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    tracing::info!(id = %id, result = %result, "Category delete result");
+    tracing::info!(id = %id, "Category deleted successfully");
 
     // 广播同步通知
-    if result {
-        state
-            .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
-            .await;
-    } else {
-        tracing::warn!(id = %id, "Category delete returned false, not broadcasting");
-    }
+    state
+        .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
+        .await;
 
-    Ok(Json(result))
+    Ok(Json(true))
 }
 
 // =========================================================================
@@ -131,15 +122,18 @@ pub async fn batch_update_sort_order(
         "Batch update sort order request received"
     );
 
-    let repo = CategoryRepository::new(state.db.clone());
     let mut updated_count = 0;
 
     for update in &updates {
-        tracing::debug!(id = %update.id, sort_order = update.sort_order, "Updating category sort order");
+        tracing::debug!(
+            id = %update.id,
+            sort_order = update.sort_order,
+            "Updating category sort order"
+        );
 
-        // Use existing update method with just sort_order
-        let result = repo
-            .update(
+        let result = state
+            .catalog_service
+            .update_category(
                 &update.id,
                 CategoryUpdate {
                     name: None,

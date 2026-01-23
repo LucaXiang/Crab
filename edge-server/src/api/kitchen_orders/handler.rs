@@ -91,7 +91,6 @@ pub async fn reprint(
 
     service
         .reprint_kitchen_order(&id)
-        .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
     tracing::info!(kitchen_order_id = %id, "Kitchen order reprinted via API");
@@ -144,7 +143,6 @@ pub async fn reprint_label(
 
     service
         .reprint_label_record(&id)
-        .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
     tracing::info!(label_record_id = %id, "Label record reprinted via API");
