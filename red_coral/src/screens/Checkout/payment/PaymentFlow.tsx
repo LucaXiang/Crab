@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { HeldOrder, PaymentRecord } from '@/core/domain/types';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag } from 'lucide-react';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag, Receipt, ImageOff } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
@@ -20,6 +20,12 @@ import { useOrderCommands } from '@/core/stores/order/useOrderCommands';
 import { CashPaymentModal } from './CashPaymentModal';
 import { PaymentSuccessModal } from './PaymentSuccessModal';
 import { OrderSidebar } from '@/presentation/components/OrderSidebar';
+import { ConfirmDialog } from '@/shared/components';
+import { SplitItemRow } from '../components';
+import { useProductStore } from '@/features/product';
+import { useCategoryStore } from '@/features/category';
+import { useImageUrls } from '@/core/hooks';
+import DefaultImage from '@/assets/reshot.svg';
 
 interface PaymentFlowProps {
   order: HeldOrder;
@@ -30,7 +36,7 @@ interface PaymentFlowProps {
   onManageTable?: () => void;
 }
 
-type PaymentMode = 'SELECT' | 'ITEM_SPLIT';
+type PaymentMode = 'SELECT' | 'ITEM_SPLIT' | 'PAYMENT_RECORDS';
 
 export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onCancel, onUpdateOrder, onVoid, onManageTable }) => {
   const { t } = useI18n();
@@ -50,6 +56,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   // Local State
   const [mode, setMode] = useState<PaymentMode>('SELECT');
   const [cancellingPaymentId, setCancellingPaymentId] = useState<string | null>(null);
+  const [cancelConfirm, setCancelConfirm] = useState<{ paymentId: string; isSplit: boolean } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [paymentContext, setPaymentContext] = useState<'FULL' | 'SPLIT'>('FULL');
@@ -74,18 +81,22 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   }, [onComplete]);
 
   /**
-   * 取消支付记录
+   * 打开取消支付确认对话框
    */
-  const handleCancelPayment = useCallback(async (paymentId: string, isSplit: boolean) => {
-    const confirmMessage = isSplit
-      ? t('checkout.payment.confirm_cancel_split')
-      : t('checkout.payment.confirm_cancel');
+  const handleCancelPayment = useCallback((paymentId: string, isSplit: boolean) => {
+    setCancelConfirm({ paymentId, isSplit });
+  }, []);
 
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
+  /**
+   * 确认取消支付记录
+   */
+  const handleConfirmCancelPayment = useCallback(async () => {
+    if (!cancelConfirm) return;
 
+    const { paymentId, isSplit } = cancelConfirm;
+    setCancelConfirm(null);
     setCancellingPaymentId(paymentId);
+
     try {
       const response = await cancelPayment(order.order_id, paymentId);
       if (response.success) {
@@ -99,7 +110,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     } finally {
       setCancellingPaymentId(null);
     }
-  }, [order.order_id, cancelPayment, t]);
+  }, [cancelConfirm, order.order_id, cancelPayment, t]);
 
   /**
    * 处理现金全额支付
@@ -267,8 +278,8 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           await openCashDrawer();
         }
 
+        // Server calculates amount from items (server-authoritative)
         const updatedOrder = await splitOrder(order, {
-          splitAmount: total,
           items: itemsToSplit.map((i) => ({
             instance_id: i.instance_id,
             name: i.name,
@@ -370,11 +381,86 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     (Object.entries(splitItems) as [string, number][]).forEach(([instanceId, qty]) => {
       const item = order.items.find(i => i.instance_id === instanceId);
       if (item) {
-        total += item.price * qty;
+        // Use server-authoritative unit_price
+        const unitPrice = item.unit_price ?? item.price;
+        total += unitPrice * qty;
       }
     });
     return total;
   }, [splitItems, order]);
+
+  // Get product and category info for split mode
+  const products = useProductStore((state) => state.items);
+  const categories = useCategoryStore((state) => state.items);
+
+  // Build product info map (image + category)
+  const productInfoMap = useMemo(() => {
+    const map = new Map<string, { image?: string; category?: string }>();
+    order.items.forEach(item => {
+      const product = products.find(p => p.id === item.id);
+      map.set(item.instance_id, {
+        image: product?.image,
+        category: product?.category,
+      });
+    });
+    return map;
+  }, [order.items, products]);
+
+  // Get all image refs for batch loading
+  const productImageRefs = useMemo(() => {
+    return order.items.map(item => productInfoMap.get(item.instance_id)?.image);
+  }, [order.items, productInfoMap]);
+  const imageUrls = useImageUrls(productImageRefs);
+
+  // Group items by category for split mode (only unpaid items)
+  const itemsByCategory = useMemo(() => {
+    const groups = new Map<string, typeof order.items>();
+    const uncategorized: typeof order.items = [];
+
+    order.items.forEach(item => {
+      // Skip fully paid items
+      const paidQty = (order.paid_item_quantities && order.paid_item_quantities[item.instance_id]) || 0;
+      if (item.quantity - paidQty <= 0) return;
+
+      const info = productInfoMap.get(item.instance_id);
+      const categoryRef = info?.category;
+
+      if (categoryRef) {
+        if (!groups.has(categoryRef)) {
+          groups.set(categoryRef, []);
+        }
+        groups.get(categoryRef)!.push(item);
+      } else {
+        uncategorized.push(item);
+      }
+    });
+
+    // Convert to array with category info
+    const result: Array<{ categoryId: string | null; categoryName: string; items: typeof order.items }> = [];
+
+    groups.forEach((items, categoryRef) => {
+      const category = categories.find(c => c.id === categoryRef);
+      result.push({
+        categoryId: categoryRef,
+        categoryName: category?.name || t('common.label.unknown_item'),
+        items,
+      });
+    });
+
+    // Sort by category name
+    result.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+
+    // Add uncategorized at the end
+    if (uncategorized.length > 0) {
+      result.push({
+        categoryId: null,
+        categoryName: t('common.label.unknown_item'),
+        items: uncategorized,
+      });
+    }
+
+    return result;
+  }, [order.items, productInfoMap, categories, t]);
 
   const renderSplitMode = () => {
     return (
@@ -408,47 +494,85 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-            <div className="space-y-3 max-w-3xl mx-auto">
-              {order.items.map(item => {
-                const currentSplitQty = splitItems[item.instance_id] || 0;
-                const paidQty = (order.paid_item_quantities && order.paid_item_quantities[item.instance_id]) || 0;
-                const maxQty = Math.max(0, item.quantity - paidQty);
-
-                return (
-                  <div key={item.instance_id} className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between ${maxQty === 0 ? 'opacity-60 bg-gray-50' : ''}`}>
-                    <div className="flex-1">
-                      <div className="font-bold text-gray-800 text-lg">
-                        {item.name}
-                        {paidQty > 0 && <span className="text-xs text-green-600 ml-2 font-medium">({t('common.paidQuantity', { qty: paidQty.toString() })})</span>}
-                      </div>
-                      {item.selected_options && item.selected_options.length > 0 && (
-                        <div className="text-sm text-gray-500">
-                          {item.selected_options.map(opt => opt.option_name).join(', ')}
-                        </div>
-                      )}
-                      <div className="text-gray-500">{formatCurrency(item.price)}</div>
-                    </div>
-
-                    <div className="flex items-center gap-4 bg-gray-50 rounded-lg p-1.5 border border-gray-100">
-                      <button
-                        onClick={() => setSplitItems(prev => ({ ...prev, [item.instance_id]: Math.max(0, (prev[item.instance_id] || 0) - 1) }))}
-                        disabled={currentSplitQty <= 0}
-                        className="w-10 h-10 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors shadow-sm"
-                      >
-                        <Minus size={18} />
-                      </button>
-                      <span className="w-10 text-center font-bold text-gray-800 text-lg">{currentSplitQty}</span>
-                      <button
-                        onClick={() => setSplitItems(prev => ({ ...prev, [item.instance_id]: Math.min(maxQty, (prev[item.instance_id] || 0) + 1) }))}
-                        disabled={currentSplitQty >= maxQty || maxQty === 0}
-                        className="w-10 h-10 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors shadow-sm"
-                      >
-                        <Plus size={18} />
-                      </button>
-                    </div>
+            <div className="space-y-6">
+              {itemsByCategory.map(({ categoryId, categoryName, items }) => (
+                <div key={categoryId || 'uncategorized'}>
+                  {/* Category Header */}
+                  <div className="sticky top-0 bg-gray-50 py-2 z-10">
+                    <h4 className="text-lg font-bold text-gray-700 border-b-2 border-purple-200 pb-2">
+                      {categoryName}
+                      <span className="ml-2 text-sm font-normal text-gray-400">({items.length})</span>
+                    </h4>
                   </div>
-                );
-              })}
+
+                  {/* Items Grid */}
+                  <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mt-3">
+                    {items.map((item) => {
+                      const currentSplitQty = splitItems[item.instance_id] || 0;
+                      const paidQty = (order.paid_item_quantities && order.paid_item_quantities[item.instance_id]) || 0;
+                      const maxQty = item.quantity - paidQty;
+                      const unitPrice = item.unit_price ?? item.price;
+                      const imageRef = productInfoMap.get(item.instance_id)?.image;
+                      const imageSrc = imageRef ? (imageUrls.get(imageRef) || DefaultImage) : DefaultImage;
+
+                      return (
+                        <div
+                          key={item.instance_id}
+                          className="bg-white rounded-lg border border-gray-200 overflow-hidden"
+                        >
+                          {/* Image */}
+                          <div className="aspect-[4/3] bg-gray-100">
+                            {imageRef ? (
+                              <img
+                                src={imageSrc}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                <ImageOff size={32} />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Info */}
+                          <div className="p-2">
+                            <div className="text-sm font-medium text-gray-800 truncate" title={item.name}>
+                              {item.name}
+                            </div>
+                            <div className="flex items-center justify-between text-xs mt-0.5">
+                              <span className="text-gray-600">{formatCurrency(unitPrice)}</span>
+                              <span className="text-gray-400">剩{maxQty}</span>
+                            </div>
+                          </div>
+
+                          {/* Quantity Controls */}
+                          <div className="flex items-center justify-between px-2 pb-2">
+                            <button
+                              onClick={() => setSplitItems(prev => ({ ...prev, [item.instance_id]: Math.max(0, (prev[item.instance_id] || 0) - 1) }))}
+                              disabled={currentSplitQty <= 0}
+                              className="w-7 h-7 flex items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <span className={`text-sm font-bold ${currentSplitQty > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+                              {currentSplitQty}
+                            </span>
+                            <button
+                              onClick={() => setSplitItems(prev => ({ ...prev, [item.instance_id]: Math.min(maxQty, (prev[item.instance_id] || 0) + 1) }))}
+                              disabled={currentSplitQty >= maxQty || maxQty === 0}
+                              className="w-7 h-7 flex items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -585,74 +709,161 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
               </div>
             </div>
 
-            {/* Payment Records */}
+          </div>
+
+          <div className="flex-1 p-8 overflow-y-auto space-y-6">
+            {/* Payment Method Buttons */}
+            <div className="grid grid-cols-3 gap-6">
+              <button onClick={handleFullCashPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+                <Coins size={48} />
+                <div className="text-2xl font-bold">{t('checkout.method.cash')}</div>
+                <div className="text-sm opacity-90">{t('checkout.method.cash_desc')}</div>
+              </button>
+              <button onClick={handleFullCardPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+                <CreditCard size={48} />
+                <div className="text-2xl font-bold">{t('checkout.method.card')}</div>
+                <div className="text-sm opacity-90">{t('checkout.method.card_desc')}</div>
+              </button>
+              <button onClick={() => setMode('ITEM_SPLIT')} disabled={isPaidInFull || isProcessing} className="h-40 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+                <Split size={48} />
+                <div className="text-2xl font-bold">{t('checkout.split.title')}</div>
+                <div className="text-sm opacity-90">{t('checkout.split.desc')}</div>
+              </button>
+            </div>
+
+            {/* Payment Records Entry Card */}
             {activePayments.length > 0 && (
-              <div className="mt-4 border-t border-gray-100 pt-4">
-                <div className="text-xs text-gray-500 uppercase font-bold mb-2">{t('checkout.payment.records')}</div>
-                <div className="space-y-2">
-                  {activePayments.map((payment) => {
-                    const isSplit = payment.payment_id.startsWith('split-');
-                    const isCash = /cash/i.test(payment.method);
-                    const isCancelling = cancellingPaymentId === payment.payment_id;
-                    return (
-                      <div key={payment.payment_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-1.5 rounded-full ${isCash ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
-                            {isCash ? <Coins size={14} /> : <CreditCard size={14} />}
-                          </div>
-                          <div>
-                            <div className="font-medium text-gray-800 text-sm flex items-center gap-2">
-                              {isCash ? t('checkout.method.cash') : payment.method}
-                              {isSplit && (
-                                <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium">
-                                  {t('checkout.split.label')}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-400">
-                              {new Date(payment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="font-bold text-gray-800">{formatCurrency(payment.amount)}</div>
-                          <button
-                            onClick={() => handleCancelPayment(payment.payment_id, isSplit)}
-                            disabled={isCancelling}
-                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                            title={t('checkout.payment.cancel')}
-                          >
-                            {isCancelling ? (
-                              <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-                            ) : (
-                              <Trash2 size={16} />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+              <div className="grid grid-cols-3 gap-6">
+                <button
+                  onClick={() => setMode('PAYMENT_RECORDS')}
+                  className="h-40 bg-gradient-to-br from-amber-500 to-orange-500 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-4"
+                >
+                  <Receipt size={48} />
+                  <div className="text-2xl font-bold">{t('checkout.payment.records')}</div>
+                  <div className="text-sm opacity-90">{activePayments.length} {t('checkout.payment.record_count')} · {formatCurrency(totalPaid)}</div>
+                </button>
               </div>
             )}
           </div>
+        </div>
+      </div>
+    );
+  };
 
-          <div className="flex-1 p-8 grid grid-cols-3 gap-6 overflow-y-auto">
-            <button onClick={handleFullCashPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
-              <Coins size={48} />
-              <div className="text-2xl font-bold">{t('checkout.method.cash')}</div>
-              <div className="text-sm opacity-90">{t('checkout.method.cash_desc')}</div>
+  const renderPaymentRecordsMode = () => {
+    return (
+      <div className="h-full flex">
+        <OrderSidebar
+          order={order}
+          totalPaid={totalPaid}
+          remaining={remaining}
+          onUpdateOrder={onUpdateOrder}
+          onManage={onManageTable}
+        />
+        <div className="flex-1 flex flex-col bg-gray-50">
+          {/* Header */}
+          <div className="p-6 bg-white border-b border-gray-200 shadow-sm flex justify-between items-center">
+            <h3 className="font-bold text-gray-800 text-xl flex items-center gap-2">
+              <Receipt size={24} className="text-amber-600" />
+              {t('checkout.payment.records')}
+            </h3>
+            <button
+              onClick={() => setMode('SELECT')}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium flex items-center gap-2 transition-all"
+            >
+              <ArrowLeft size={20} /> {t('common.action.back')}
             </button>
-            <button onClick={handleFullCardPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
-              <CreditCard size={48} />
-              <div className="text-2xl font-bold">{t('checkout.method.card')}</div>
-              <div className="text-sm opacity-90">{t('checkout.method.card_desc')}</div>
-            </button>
-            <button onClick={() => setMode('ITEM_SPLIT')} disabled={isPaidInFull || isProcessing} className="h-40 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
-              <Split size={48} />
-              <div className="text-2xl font-bold">{t('checkout.split.title')}</div>
-              <div className="text-sm opacity-90">{t('checkout.split.desc')}</div>
-            </button>
+          </div>
+
+          {/* Payment Records List */}
+          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            <div className="space-y-4 max-w-3xl mx-auto">
+              {activePayments.map((payment) => {
+                const isSplit = payment.payment_id.startsWith('split-');
+                const isCash = /cash/i.test(payment.method);
+                const isCancelling = cancellingPaymentId === payment.payment_id;
+
+                return (
+                  <div
+                    key={payment.payment_id}
+                    className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm"
+                  >
+                    {/* Header Row */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`p-3 rounded-xl ${isCash ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+                          {isCash ? <Coins size={24} /> : <CreditCard size={24} />}
+                        </div>
+                        <div>
+                          <div className="font-bold text-gray-800 text-lg flex items-center gap-2">
+                            {isCash ? t('checkout.method.cash') : payment.method}
+                            {isSplit && (
+                              <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-medium">
+                                {t('checkout.split.label')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-400 mt-0.5">
+                            {new Date(payment.timestamp).toLocaleString([], {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false,
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <div className="font-bold text-gray-800 text-2xl">
+                            {formatCurrency(payment.amount)}
+                          </div>
+                          {isCash && payment.tendered != null && payment.tendered > payment.amount && (
+                            <div className="text-sm text-gray-400 mt-0.5">
+                              {t('checkout.payment.tendered')}: {formatCurrency(payment.tendered)} → {t('checkout.payment.change')}: {formatCurrency(payment.change ?? 0)}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleCancelPayment(payment.payment_id, isSplit)}
+                          disabled={isCancelling}
+                          className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50"
+                          title={t('checkout.payment.cancel')}
+                        >
+                          {isCancelling ? (
+                            <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                          ) : (
+                            <Trash2 size={20} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Split Items Detail */}
+                    {payment.split_items && payment.split_items.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        <div className="text-xs text-gray-400 uppercase font-bold mb-2">{t('checkout.payment.split_items')}</div>
+                        <div className="divide-y divide-gray-50">
+                          {payment.split_items.map((item, idx) => (
+                            <SplitItemRow key={idx} item={item} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Footer Summary */}
+          <div className="p-6 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <div className="max-w-3xl mx-auto flex justify-between items-center">
+              <span className="text-gray-500 font-medium text-lg">{t('checkout.payment.total_paid')}</span>
+              <span className="text-3xl font-bold text-blue-600">{formatCurrency(totalPaid)}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -665,6 +876,8 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         return renderSelectMode();
       case 'ITEM_SPLIT':
         return renderSplitMode();
+      case 'PAYMENT_RECORDS':
+        return renderPaymentRecordsMode();
       default:
         return renderSelectMode();
     }
@@ -673,6 +886,18 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   return (
     <>
       <div className="h-full">{renderContent()}</div>
+
+      {/* Cancel Payment Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={cancelConfirm !== null}
+        title={t('checkout.payment.cancel')}
+        description={cancelConfirm?.isSplit ? t('checkout.payment.confirm_cancel_split') : t('checkout.payment.confirm_cancel')}
+        confirmText={t('checkout.payment.cancel')}
+        onConfirm={handleConfirmCancelPayment}
+        onCancel={() => setCancelConfirm(null)}
+        variant="danger"
+      />
+
       <CashPaymentModal
         isOpen={showCashModal}
         amountDue={paymentContext === 'SPLIT' ? splitTotal : remaining}

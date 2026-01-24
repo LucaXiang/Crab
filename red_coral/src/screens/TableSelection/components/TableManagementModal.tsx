@@ -133,14 +133,8 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         setIsProcessingSplit(true);
 
         try {
-            // Calculate total for split items
-            let total = 0;
-            itemsToSplit.forEach(splitItem => {
-                total += splitItem.price * splitItem.quantity;
-            });
-
+            // Server calculates amount from items (server-authoritative)
             await orderOps.splitOrder(sourceOrder, {
-                splitAmount: total,
                 items: itemsToSplit,
                 paymentMethod: method
             });

@@ -1,2 +1,2 @@
 export { UnpaidItemRow } from './UnpaidItemRow';
-export { PaidItemRow } from './PaidItemRow';
+export { SplitItemRow } from './SplitItemRow';

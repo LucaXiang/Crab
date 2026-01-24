@@ -369,11 +369,11 @@ export const ensureActiveOrder = (_order: HeldOrder): void => {
 
 /**
  * Split order - process a split payment for specific items
+ * Amount is calculated by server from items (server-authoritative)
  */
 export const splitOrder = async (
   order: HeldOrder,
   splitData: {
-    splitAmount: number;
     items: { instance_id: string; name: string; quantity: number }[];
     paymentMethod: string;
     tendered?: number;
@@ -386,7 +386,7 @@ export const splitOrder = async (
   const command = createCommand({
     type: 'SPLIT_ORDER',
     order_id: orderId,
-    split_amount: splitData.splitAmount,
+    // split_amount omitted - server calculates from items (server-authoritative)
     payment_method: splitData.paymentMethod,
     items: splitData.items.map(item => ({
       instance_id: item.instance_id,

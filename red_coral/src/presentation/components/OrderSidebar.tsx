@@ -181,8 +181,6 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
             selectedQuantities={{}}
             onUpdateSelectedQty={() => {}}
             onEditItem={handleEditItem}
-            t={t}
-            paid_item_quantities={order.paid_item_quantities}
           />
         ) : (
           <Suspense fallback={

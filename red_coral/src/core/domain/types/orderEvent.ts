@@ -372,7 +372,8 @@ export interface CancelPaymentCommand {
 export interface SplitOrderCommand {
   type: 'SPLIT_ORDER';
   order_id: string;
-  split_amount: number;
+  /** Optional - if omitted, server calculates from items (server-authoritative) */
+  split_amount?: number | null;
   payment_method: string;
   items: SplitItem[];
 }

@@ -23,6 +23,8 @@
       "hide": "隐藏",
       "expand_all": "全部展开",
       "collapse_all": "全部收起",
+      "expand": "展开",
+      "collapse": "收起",
       "batch_delete": "批量删除",
       "upload_image": "上传图片"
     },
@@ -54,7 +56,8 @@
       "items": "项",
       "unknown_item": "未知项目",
       "none": "N/A",
-      "system": "系统"
+      "system": "系统",
+      "paidQuantity": "已付 {{qty}} 份"
     },
     "message": {
       "loading": "加载中...",
@@ -264,6 +267,13 @@
       "method": "选择支付方式",
       "success": "支付成功",
       "records": "支付记录",
+      "record_singular": "笔",
+      "record_plural": "笔",
+      "record_count": "笔记录",
+      "change": "找零",
+      "tendered": "收款",
+      "total_paid": "已付总额",
+      "split_items": "分单商品",
       "cancel": "取消支付",
       "confirm_cancel": "确定要取消此支付记录吗？",
       "confirm_cancel_split": "确定要取消此分账支付吗？取消后相关菜品将恢复到订单中。",
