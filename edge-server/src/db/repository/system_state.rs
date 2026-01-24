@@ -89,7 +89,7 @@ impl SystemStateRepository {
         .await
     }
 
-    /// Update last order info
+    /// Update last order info with atomic order_count increment
     /// order_id should be in "order:xxx" format
     pub async fn update_last_order(
         &self,
@@ -100,13 +100,29 @@ impl SystemStateRepository {
             .parse::<RecordId>()
             .map_err(|_| RepoError::Validation(format!("Invalid order ID: {}", order_id)))?;
 
-        self.update(SystemStateUpdate {
-            last_order: Some(order_thing),
-            last_order_hash: Some(order_hash),
-            order_count: Some(self.get().await?.map(|s| s.order_count + 1).unwrap_or(1)),
-            ..Default::default()
-        })
-        .await
+        // Ensure singleton exists
+        self.get_or_create().await?;
+
+        // Use atomic increment for order_count to avoid race conditions
+        let singleton_id = RecordId::from_table_key(TABLE, SINGLETON_ID);
+        let mut result = self
+            .base
+            .db()
+            .query(
+                "UPDATE system_state SET \
+                    last_order = $order_id, \
+                    last_order_hash = $hash, \
+                    order_count = order_count + 1, \
+                    updated_at = time::now() \
+                WHERE id = $id RETURN AFTER",
+            )
+            .bind(("order_id", order_thing))
+            .bind(("hash", order_hash))
+            .bind(("id", singleton_id))
+            .await?;
+
+        let updated: Option<SystemState> = result.take(0)?;
+        updated.ok_or_else(|| RepoError::Database("Failed to update system state".to_string()))
     }
 
     /// Update sync state
