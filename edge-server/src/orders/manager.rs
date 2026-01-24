@@ -40,6 +40,14 @@ use std::sync::{Arc, RwLock};
 use thiserror::Error;
 use tokio::sync::broadcast;
 
+/// Terminal event types that trigger archiving
+const TERMINAL_EVENT_TYPES: &[shared::order::OrderEventType] = &[
+    shared::order::OrderEventType::OrderCompleted,
+    shared::order::OrderEventType::OrderVoided,
+    shared::order::OrderEventType::OrderMoved,
+    shared::order::OrderEventType::OrderMerged,
+];
+
 /// Manager errors
 #[derive(Debug, Error)]
 pub enum ManagerError {
@@ -153,6 +161,8 @@ pub struct OrdersManager {
     rule_cache: Arc<RwLock<HashMap<String, Vec<PriceRule>>>>,
     /// Catalog service for product metadata lookup
     catalog_service: Option<Arc<crate::services::CatalogService>>,
+    /// Archive service for completed orders (optional, only set when SurrealDB is available)
+    archive_service: Option<super::OrderArchiveService>,
 }
 
 impl std::fmt::Debug for OrdersManager {
@@ -178,12 +188,18 @@ impl OrdersManager {
             epoch,
             rule_cache: Arc::new(RwLock::new(HashMap::new())),
             catalog_service: None,
+            archive_service: None,
         })
     }
 
     /// Set the catalog service for product metadata lookup
     pub fn set_catalog_service(&mut self, catalog_service: Arc<crate::services::CatalogService>) {
         self.catalog_service = Some(catalog_service);
+    }
+
+    /// Set the archive service for SurrealDB integration
+    pub fn set_archive_service(&mut self, db: surrealdb::Surreal<surrealdb::engine::local::Db>) {
+        self.archive_service = Some(super::OrderArchiveService::new(db));
     }
 
     /// Create an OrdersManager with existing storage (for testing)
@@ -197,6 +213,7 @@ impl OrdersManager {
             epoch,
             rule_cache: Arc::new(RwLock::new(HashMap::new())),
             catalog_service: None,
+            archive_service: None,
         }
     }
 
@@ -358,6 +375,8 @@ impl OrdersManager {
         }
 
         // 8. Persist snapshots and update active order tracking
+        // Also collect snapshots for terminal events (for archiving after commit)
+        let mut archive_snapshot: Option<OrderSnapshot> = None;
         for snapshot in ctx.modified_snapshots() {
             self.storage.store_snapshot(&txn, snapshot)?;
 
@@ -371,6 +390,13 @@ impl OrdersManager {
                 | OrderStatus::Merged
                 | OrderStatus::Moved => {
                     self.storage.mark_order_inactive(&txn, &snapshot.order_id)?;
+                    // Check if this order has a terminal event
+                    if events
+                        .iter()
+                        .any(|e| e.order_id == snapshot.order_id && TERMINAL_EVENT_TYPES.contains(&e.event_type))
+                    {
+                        archive_snapshot = Some(snapshot.clone());
+                    }
                 }
             }
         }
@@ -400,7 +426,27 @@ impl OrdersManager {
             _ => {}
         }
 
-        // 13. Return response
+        // 13. Archive to SurrealDB if terminal event
+        if let (Some(archive_service), Some(snapshot)) =
+            (&self.archive_service, archive_snapshot)
+        {
+            // Get all events for this order
+            if let Ok(order_events) = self.storage.get_events_for_order(&snapshot.order_id) {
+                let archive_svc = archive_service.clone();
+                let order_id = snapshot.order_id.clone();
+
+                // Spawn async archive task
+                tokio::spawn(async move {
+                    if let Err(e) = archive_svc.archive_order(&snapshot, order_events).await {
+                        tracing::error!(order_id = %order_id, error = %e, "Failed to archive order");
+                    } else {
+                        tracing::info!(order_id = %order_id, "Order archived successfully");
+                    }
+                });
+            }
+        }
+
+        // 14. Return response
         let order_id = events.first().map(|e| e.order_id.clone());
         Ok((CommandResponse::success(cmd.command_id, order_id), events))
     }
@@ -478,6 +524,7 @@ impl Clone for OrdersManager {
             epoch: self.epoch.clone(),
             rule_cache: self.rule_cache.clone(),
             catalog_service: self.catalog_service.clone(),
+            archive_service: self.archive_service.clone(),
         }
     }
 }
