@@ -513,7 +513,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
               <h2 className="text-2xl font-bold text-gray-800">{t('checkout.payment.method')}</h2>
               <div className="flex gap-2 items-center">
                 {order.is_retail && (
-                  <div className="flex bg-gray-100 p-1 rounded-lg h-[40px] items-center mr-2">
+                  <div className="flex bg-gray-100 p-1 rounded-lg h-[2.5rem] items-center mr-2">
                     <button
                       onClick={() => setRetailServiceType('dineIn')}
                       className={`

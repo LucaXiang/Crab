@@ -27,27 +27,28 @@ export const TimelinePreview: React.FC<TimelinePreviewProps> = ({
   });
 
   const groupedItems = React.useMemo(() => {
-    const map = new Map<string, { name: string; external_id?: number | string; quantity: number }>();
-    
+    const map = new Map<string, { name: string; external_id?: number | null; quantity: number }>();
+
     cart.forEach((item) => {
-        const key = item.external_id ? `${item.external_id}-${item.name}` : item.name;
+        const extId = item.selected_specification?.external_id;
+        const key = extId ? `${extId}-${item.name}` : item.name;
         if (!map.has(key)) {
-            map.set(key, { 
-                name: item.name, 
-                external_id: item.external_id, 
-                quantity: 0 
+            map.set(key, {
+                name: item.name,
+                external_id: extId,
+                quantity: 0
             });
         }
         map.get(key)!.quantity += item.quantity;
     });
-    
+
     return Array.from(map.values());
   }, [cart]);
 
   return (
     <div className="flex flex-col h-full bg-gray-50/50 rounded-xl p-6 relative overflow-hidden items-center justify-center">
       <div className="flex flex-col justify-center items-center w-full">
-        <div className="relative border-l-2 border-gray-200 pl-6 pb-2 w-full max-w-[280px]">
+        <div className="relative border-l-2 border-gray-200 pl-6 pb-2 w-full max-w-[17.5rem]">
           {isOccupied && (
             <div className="absolute -left-[5px] -top-8 opacity-40">
               <div className="w-2.5 h-2.5 rounded-full bg-gray-400 mb-2"></div>
@@ -84,7 +85,7 @@ export const TimelinePreview: React.FC<TimelinePreviewProps> = ({
                         )} */}
                         <span className="font-medium text-gray-700 truncate">{item.name}</span>
                     </div>
-                    <span className="font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded text-[10px] shrink-0">x{item.quantity}</span>
+                    <span className="font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded text-[0.625rem] shrink-0">x{item.quantity}</span>
                   </div>
                 ))
               ) : (

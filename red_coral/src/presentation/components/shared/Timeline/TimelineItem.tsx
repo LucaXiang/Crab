@@ -9,7 +9,7 @@ const renderDetailText = (text: string) => {
             {parts.map((part, i) => {
                 if (/^#\d{5}$/.test(part)) {
                     return (
-                        <span key={i} className="mx-1 px-1 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                        <span key={i} className="mx-1 px-1 py-0.5 rounded text-[0.625rem] font-bold bg-blue-100 text-blue-800 border border-blue-200">
                             {part}
                         </span>
                     );
@@ -57,7 +57,7 @@ export const TimelineItem: React.FC<TimelineItemProps> = ({ data, showNoteTags =
     return (
         <div className="relative pl-6">
             <div 
-                className={`absolute -left-[9px] top-0 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-white ${finalColorClass}`}
+                className={`absolute -left-[0.5625rem] top-0 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-white ${finalColorClass}`}
                 style={bgStyle}
             >
                 {Icon && <Icon size={12} strokeWidth={2.5} />}

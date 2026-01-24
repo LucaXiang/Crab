@@ -6,11 +6,15 @@ import { attachConsole } from '@tauri-apps/plugin-log';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import GlobalErrorBoundary from './presentation/components/GlobalErrorBoundary';
 import { reportError } from '@/utils/reportError';
+import { initUIScale } from '@/core/stores/ui';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
+
+// 初始化 UI 缩放 (从 localStorage 读取并应用到 CSS 变量)
+initUIScale();
 
 const root = ReactDOM.createRoot(rootElement);
 void attachConsole();

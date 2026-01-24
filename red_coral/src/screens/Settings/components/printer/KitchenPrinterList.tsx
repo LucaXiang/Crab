@@ -123,7 +123,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
                   </div>
                   <div>
                     <div className="font-bold text-sm text-gray-900">{dest.name}</div>
-                    <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">
+                    <div className="text-[0.625rem] text-gray-400 font-medium uppercase tracking-wide">
                        {dest.description || (t('settings.printer.kitchen_station.default_name'))}
                     </div>
                   </div>

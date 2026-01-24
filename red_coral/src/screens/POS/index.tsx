@@ -4,7 +4,7 @@ import { getImageUrl } from '@/core/services/imageCache';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { voidOrder } from '@/core/stores/order/useOrderOperations';
 import { useCanManageProducts } from '@/hooks/usePermission';
-import { EntityFormModal } from '../Settings/EntityFormModal';
+import { ProductModal } from '@/features/product/ProductModal';
 
 // Components
 import { Sidebar } from '@/presentation/components/Sidebar';
@@ -65,7 +65,7 @@ import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { createTauriClient } from '@/infrastructure/api';
 
 const api = createTauriClient();
-import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 
 // Hooks
 import { useOrderHandlers } from '@/hooks/useOrderHandlers';
@@ -92,7 +92,9 @@ export const POSScreen: React.FC = () => {
   // Product Store (New Architecture)
   const products = useProducts();
   const isProductLoading = useProductsLoading();
-  const categories = useCategories();
+  const allCategories = useCategories();
+  // Filter out categories with is_display: false
+  const categories = allCategories.filter(c => c.is_display !== false);
   const selectedCategory = useSelectedCategory();
   const { setSelectedCategory } = usePOSUIActions();
 
@@ -445,7 +447,7 @@ export const POSScreen: React.FC = () => {
       quantity: number,
       discount: number,
       authorizer?: { id: string; username: string },
-      selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number }
+      selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number }
     ) => {
       if (!selectedProductForOptions) return;
 
@@ -594,7 +596,7 @@ export const POSScreen: React.FC = () => {
 						}`}
 				>
 				{/* Left Column */}
-				<div className="flex flex-col relative z-30 w-[380px] shrink-0">
+				<div className="flex flex-col relative z-30 w-[25rem] shrink-0">
           <ActionBar
             screen={screen}
             isDbOnline={isDbOnline}
@@ -643,7 +645,7 @@ export const POSScreen: React.FC = () => {
         onManageTable={handleManageTableWithId}
       />
         
-      <EntityFormModal />
+      <ProductModal />
 
       <ConfirmDialog
         isOpen={exitDialog.open}

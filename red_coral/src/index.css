@@ -12,7 +12,12 @@
 }
 
 :root {
+  --ui-scale: 1;
   font-family: 'LXGW WenKai GB', "Consolas", ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  font-size: calc(16px * var(--ui-scale));
 }
 
 body {

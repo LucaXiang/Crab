@@ -10,7 +10,7 @@ const api = createTauriClient();
 import { toast } from '@/presentation/components/Toast';
 import { Product } from '@/core/domain/types';
 import DefaultImage from '@/assets/reshot.svg';
-import { useImageUrl } from '@/core/hooks/useImageUrl';
+import { useImageUrl } from '@/core/hooks';
 import { useSettingsStore } from '@/core/stores/settings';
 
 interface SortableProductItemProps {
@@ -62,8 +62,8 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ id, product }
         />
         {/* Sort Order Tag - Bottom Left Black/White */}
         <div className="absolute bottom-1 left-1 z-10">
-           <div className="bg-black/80 backdrop-blur-[1px] px-1.5 py-0.5 rounded shadow-sm min-w-[20px] flex items-center justify-center">
-             <span className="text-[10px] text-white font-medium font-mono leading-none">
+           <div className="bg-black/80 backdrop-blur-[1px] px-1.5 py-0.5 rounded shadow-sm min-w-[1.25rem] flex items-center justify-center">
+             <span className="text-[0.625rem] text-white font-medium font-mono leading-none">
                {product.sort_order}
              </span>
            </div>
@@ -94,8 +94,8 @@ const DragOverlayProductItem: React.FC<{ product: Product }> = ({ product }) => 
           onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
         />
         <div className="absolute bottom-1 left-1 z-10">
-          <div className="bg-black/80 backdrop-blur-[1px] px-1.5 py-0.5 rounded shadow-sm min-w-[20px] flex items-center justify-center">
-            <span className="text-[10px] text-white font-medium font-mono leading-none">
+          <div className="bg-black/80 backdrop-blur-[1px] px-1.5 py-0.5 rounded shadow-sm min-w-[1.25rem] flex items-center justify-center">
+            <span className="text-[0.625rem] text-white font-medium font-mono leading-none">
               {product.sort_order}
             </span>
           </div>

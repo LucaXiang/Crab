@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { CartItem, ItemOption } from '@/core/domain/types';
-import { ProductWithPrice } from '@/presentation/components/ProductCard';
+import { ProductWithPrice } from '@/features/product';
 import { calculateOrderTotal } from '@/utils/pricing';
 
 /**
@@ -41,8 +41,8 @@ function areOptionsEqual(
  * Compare two specifications for equality
  */
 function areSpecificationsEqual(
-  spec1: { id: string; name: string; receiptName?: string; price?: number } | undefined,
-  spec2: { id: string; name: string; receiptName?: string; price?: number } | undefined
+  spec1: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number } | undefined,
+  spec2: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number } | undefined
 ): boolean {
   if (!spec1 && !spec2) return true;
   if (!spec1 || !spec2) return false;
@@ -64,7 +64,7 @@ interface CartStore {
   itemCount: number;
 
   // Actions
-  addToCart: (product: ProductWithPrice, selectedOptions?: ItemOption[], quantity?: number, discount?: number, authorizer?: { id: string; username: string }, selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number }) => void;
+  addToCart: (product: ProductWithPrice, selectedOptions?: ItemOption[], quantity?: number, discount?: number, authorizer?: { id: string; username: string }, selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number }) => void;
   removeFromCart: (instanceId: string) => void;
   updateCartItem: (instanceId: string, updates: Partial<CartItem>) => void;
   incrementItemQuantity: (instanceId: string, delta: number) => void;
@@ -83,8 +83,22 @@ export const useCartStore = create<CartStore>((set, get) => ({
   itemCount: 0,
 
   // Actions
-  addToCart: (product: ProductWithPrice, selectedOptions?: ItemOption[], quantity: number = 1, discount: number = 0, authorizer?: { id: string; username: string }, selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number }) => {
+  addToCart: (product: ProductWithPrice, selectedOptions?: ItemOption[], quantity: number = 1, discount: number = 0, authorizer?: { id: string; username: string }, selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number; is_multi_spec?: boolean }) => {
     set((state) => {
+      // Get default spec from product if no selectedSpecification provided
+      let effectiveSpec = selectedSpecification;
+      if (!effectiveSpec && product.specs && product.specs.length > 0) {
+        const defaultSpec = product.specs.find(s => s.is_default) ?? product.specs[0];
+        const specIdx = product.specs.indexOf(defaultSpec);
+        effectiveSpec = {
+          id: String(specIdx),
+          name: defaultSpec.name,
+          external_id: defaultSpec.external_id,
+          price: defaultSpec.price,
+          is_multi_spec: (product.specs?.length ?? 0) > 1,
+        };
+      }
+
       // Only merge if:
       // 1. Same product ID
       // 2. Same discount (or both zero)
@@ -95,7 +109,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
         item.id === String(product.id) &&
         (item.manual_discount_percent || 0) === discount &&
         areOptionsEqual(item.selected_options, selectedOptions) &&
-        areSpecificationsEqual(item.selected_specification, selectedSpecification) &&
+        areSpecificationsEqual(item.selected_specification, effectiveSpec) &&
         item.authorizer_id === authorizer?.id
       );
 
@@ -108,12 +122,11 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
       // Use specification price if available, otherwise use product price (from root spec or passed in)
       const productPrice = product.price ?? 0;
-      const effectivePrice = selectedSpecification?.price !== undefined ? selectedSpecification.price : productPrice;
+      const effectivePrice = effectiveSpec?.price !== undefined ? effectiveSpec.price : productPrice;
 
       return {
         cart: [...state.cart, {
           id: String(product.id),
-          product_id: String(product.id),  // SurrealDB string ID
           name: product.name,
           quantity: quantity,
           unpaid_quantity: quantity,  // All items are unpaid when first added to cart
@@ -121,7 +134,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
           original_price: effectivePrice,
           manual_discount_percent: discount,
           selected_options: selectedOptions && selectedOptions.length > 0 ? selectedOptions : undefined,
-          selected_specification: selectedSpecification,
+          selected_specification: effectiveSpec,
           instance_id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
           authorizer_id: authorizer?.id,
           authorizer_name: authorizer?.username,

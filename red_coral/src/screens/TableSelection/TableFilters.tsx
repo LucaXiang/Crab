@@ -30,7 +30,7 @@ const FilterButton: React.FC<FilterButtonProps> = React.memo(
         <Icon size={14} />
         <span>{label}</span>
         <span
-          className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${
+          className={`ml-1 px-1.5 py-0.5 rounded-full text-[0.625rem] ${
             isActive ? 'bg-white/20' : 'bg-gray-100 text-gray-600'
           }`}
         >

@@ -24,49 +24,45 @@ export const ActionBar: React.FC<ActionBarProps> = ({
   const { t } = useI18n();
 
   return (
-    <div className="h-14 bg-[#FF5E5E] flex items-center justify-between shrink-0 px-2 text-white shadow-md z-20">
-      <div className="flex items-center space-x-1">
+    <div className="h-16 bg-[#FF5E5E] flex items-center justify-between shrink-0 px-3 text-white shadow-md z-20">
+      <div className="flex items-center gap-2">
         <button
           onClick={() => onSetScreen('POS')}
           onMouseDown={(e) => e.preventDefault()}
-          className={`p-2 rounded-lg transition-all flex items-center gap-2 ${
+          className={`p-3 rounded-xl transition-all flex items-center gap-3 ${
             screen === 'POS'
               ? 'bg-white text-[#FF5E5E] font-bold shadow-sm'
               : 'text-white/80 hover:bg-white/10'
           }`}
         >
-          <Utensils size={20} />
-          <span className="text-sm flex items-center gap-2">
-            {t('app.nav.pos')}
-            <span
-              className={`inline-block w-2 h-2 rounded-full ${
-                isDbOnline === null
-                  ? 'bg-white/50'
-                  : isDbOnline
-                  ? 'bg-green-500'
-                  : 'bg-red-500'
-              }`}
-            />
-          </span>
+          <Utensils size={24} />
+          <span
+            className={`inline-block w-2.5 h-2.5 rounded-full ${
+              isDbOnline === null
+                ? 'bg-white/50'
+                : isDbOnline
+                ? 'bg-green-500'
+                : 'bg-red-500'
+            }`}
+          />
         </button>
         <button
           onClick={() => onSetScreen('HISTORY')}
           onMouseDown={(e) => e.preventDefault()}
-          className={`p-2 rounded-lg transition-all flex items-center gap-2 ${
+          className={`p-3 rounded-xl transition-all flex items-center gap-3 ${
             screen === 'HISTORY'
               ? 'bg-white text-[#FF5E5E] font-bold shadow-sm'
               : 'text-white/80 hover:bg-white/10'
           }`}
         >
-          <ClipboardList size={20} />
-          <span className="text-sm">{t('app.nav.history')}</span>
+          <ClipboardList size={24} />
         </button>
       </div>
 
-      <div className="flex items-center space-x-1">
-        <IconBtn icon={SettingsIcon} onClick={() => onSetScreen('SETTINGS')} onMouseDown={(e) => e.preventDefault()} />
+      <div className="flex items-center gap-2">
+        <IconBtn icon={SettingsIcon} size={24} className="p-3 hover:bg-white/10 rounded-xl" onClick={() => onSetScreen('SETTINGS')} onMouseDown={(e) => e.preventDefault()} />
         <ProtectedGate permission={Permission.VIEW_STATISTICS}>
-          <IconBtn icon={ChartArea} onClick={() => onSetScreen('STATISTICS')} onMouseDown={(e) => e.preventDefault()} />
+          <IconBtn icon={ChartArea} size={24} className="p-3 hover:bg-white/10 rounded-xl" onClick={() => onSetScreen('STATISTICS')} onMouseDown={(e) => e.preventDefault()} />
         </ProtectedGate>
         <EscalatableGate 
           permission={Permission.OPEN_CASH_DRAWER}
@@ -74,9 +70,9 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           description={t('app.action.open_cash_drawer')}
           onAuthorized={onOpenCashDrawer}
         >
-          <IconBtn icon={Archive} onClick={onOpenCashDrawer} onMouseDown={(e) => e.preventDefault()} />
+          <IconBtn icon={Archive} size={24} className="p-3 hover:bg-white/10 rounded-xl" onClick={onOpenCashDrawer} onMouseDown={(e) => e.preventDefault()} />
         </EscalatableGate>
-        <IconBtn icon={LogOut} onClick={onRequestExit} onMouseDown={(e) => e.preventDefault()} />
+        <IconBtn icon={LogOut} size={24} className="p-3 hover:bg-white/10 rounded-xl" onClick={onRequestExit} onMouseDown={(e) => e.preventDefault()} />
       </div>
     </div>
   );

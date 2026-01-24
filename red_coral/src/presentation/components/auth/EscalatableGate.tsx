@@ -71,7 +71,7 @@ export const EscalatableGate: React.FC<EscalatableGateProps> = ({
 
   // 默认 block 模式：显示锁屏界面
   return (
-    <div className="flex flex-col items-center justify-center h-full min-h-[400px] p-8 text-center bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-200">
+    <div className="flex flex-col items-center justify-center h-full min-h-[25rem] p-8 text-center bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-200">
       <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
         <Lock className="w-8 h-8 text-gray-400" />
       </div>

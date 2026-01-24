@@ -60,6 +60,8 @@ export interface Category {
   tag_ids: string[];
   /** Match mode for virtual category: "any" or "all" */
   match_mode: 'any' | 'all';
+  /** Whether to display this category in POS */
+  is_display: boolean;
 }
 
 export interface CategoryCreate {
@@ -78,6 +80,8 @@ export interface CategoryCreate {
   tag_ids?: string[];
   /** Match mode: "any" or "all" */
   match_mode?: 'any' | 'all';
+  /** Whether to display this category in POS */
+  is_display?: boolean;
 }
 
 export interface CategoryUpdate {
@@ -97,6 +101,8 @@ export interface CategoryUpdate {
   tag_ids?: string[];
   /** Match mode: "any" or "all" */
   match_mode?: 'any' | 'all';
+  /** Whether to display this category in POS */
+  is_display?: boolean;
 }
 
 // ============ Product ============
@@ -194,8 +200,6 @@ export interface AttributeBindingFull {
   default_option_idx?: number;
 }
 
-/** @deprecated Use AttributeBindingFull instead */
-export type ProductAttributeBinding = AttributeBindingFull;
 
 /** Full product with all related data */
 export interface ProductFull {
@@ -289,8 +293,6 @@ export interface AttributeBinding {
   default_option_idx?: number;
 }
 
-/** @deprecated Use AttributeBinding instead */
-export type HasAttribute = AttributeBinding;
 
 // ============ Embedded Printer ============
 
@@ -467,8 +469,6 @@ export interface Employee {
   is_active: boolean;
 }
 
-/** @deprecated Use Employee instead */
-export type EmployeeResponse = Employee;
 
 export interface EmployeeCreate {
   username: string;

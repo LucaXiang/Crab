@@ -292,7 +292,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                                     {discount > 0 ? (
                                         <>
                                             <span className="text-lg">{discount}%</span>
-                                            <span className="text-[10px] uppercase opacity-75">{t('common.discount.off')}</span>
+                                            <span className="text-[0.625rem] uppercase opacity-75">{t('common.discount.off')}</span>
                                         </>
                                     ) : (
                                         <>
@@ -386,7 +386,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                     className="flex-1 h-full bg-gray-900 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-black active:scale-[0.98] transition-all flex items-center justify-between px-4"
                 >
                     <div className="flex flex-col items-start leading-none">
-                        <span className="text-[10px] opacity-60 font-medium uppercase tracking-wider">{t('checkout.amount.total')}</span>
+                        <span className="text-[0.625rem] opacity-60 font-medium uppercase tracking-wider">{t('checkout.amount.total')}</span>
                         <span>{formatCurrency(finalTotal.toNumber())}</span>
                     </div>
                     <div className="flex items-center gap-2">

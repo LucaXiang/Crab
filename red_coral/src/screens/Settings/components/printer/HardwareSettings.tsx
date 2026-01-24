@@ -7,8 +7,8 @@ import {
   useIsLabelPrintEnabled,
   useKitchenPrinter,
   useIsKitchenPrintEnabled,
-  useUIActions,
-} from '@/core/stores/ui/useUIStore';
+  usePrinterActions,
+} from '@/core/stores/ui';
 import { PrinterSelect } from './PrinterSelect';
 import { KitchenPrinterList } from './KitchenPrinterList';
 
@@ -19,7 +19,7 @@ interface HardwareSettingsProps {
 
 export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, loading }) => {
   const { t } = useI18n();
-  const { setReceiptPrinter, setLabelPrinter, setKitchenPrinter, setIsKitchenPrintEnabled, setIsLabelPrintEnabled } = useUIActions();
+  const { setReceiptPrinter, setLabelPrinter, setKitchenPrinter, setIsKitchenPrintEnabled, setIsLabelPrintEnabled } = usePrinterActions();
 
   const receiptPrinter = useReceiptPrinter();
   const labelPrinter = useLabelPrinter();
@@ -46,7 +46,7 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
             onChange={setReceiptPrinter}
             printers={printers}
             loading={loading}
-            badge={<span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 rounded uppercase font-bold tracking-wider">{t('settings.printer.badge.pos')}</span>}
+            badge={<span className="text-[0.625rem] bg-gray-100 text-gray-600 px-1.5 rounded uppercase font-bold tracking-wider">{t('settings.printer.badge.pos')}</span>}
           />
 
           {/* Label Printer Section with Toggle */}
@@ -89,7 +89,7 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
                       <>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
                           {t('settings.printer.form.target_printer')}
-                          <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 rounded uppercase font-bold tracking-wider">{t('settings.printer.badge.label')}</span>
+                          <span className="text-[0.625rem] bg-amber-100 text-amber-700 px-1.5 rounded uppercase font-bold tracking-wider">{t('settings.printer.badge.label')}</span>
                         </label>
                         <select
                           value={labelPrinter || ''}
@@ -159,7 +159,7 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                         <h4 className="text-sm font-bold text-blue-900">{t('settings.printer.routing_system.title')}</h4>
-                        <span className="text-[10px] text-blue-500 uppercase font-bold tracking-wider border border-blue-200 px-1.5 rounded bg-white">
+                        <span className="text-[0.625rem] text-blue-500 uppercase font-bold tracking-wider border border-blue-200 px-1.5 rounded bg-white">
                           {showHierarchyInfo ? (t('common.action.hide')) : (t('common.label.details'))}
                         </span>
                     </div>
@@ -201,7 +201,7 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
                   onChange={setKitchenPrinter}
                   printers={printers}
                   loading={loading}
-                  badge={<span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 rounded uppercase font-bold tracking-wider">{t('settings.printer.badge.fallback')}</span>}
+                  badge={<span className="text-[0.625rem] bg-indigo-100 text-indigo-700 px-1.5 rounded uppercase font-bold tracking-wider">{t('settings.printer.badge.fallback')}</span>}
                 />
 
                 <div className="relative">

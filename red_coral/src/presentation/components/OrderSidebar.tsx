@@ -102,15 +102,21 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   // Timeline 现在直接从 store 获取，不需要 useEffect
 
   return (
-    <div className="w-[400px] bg-white h-full border-r border-gray-200 flex flex-col shadow-xl relative">
+    <div className="w-[27.5rem] bg-white h-full border-r border-gray-200 flex flex-col shadow-xl relative">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-5 border-b border-gray-200">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-lg font-bold text-gray-800 leading-tight">
-              {t('checkout.table_order')} {order.zone_name }-{order.table_name}
+            <h1 className="text-xl font-bold text-gray-800 leading-tight">
+              {order.is_retail ? (
+                t('checkout.retail_order')
+              ) : (
+                <>
+                  {t('checkout.table_order')} {order.zone_name}-{order.table_name}
+                </>
+              )}
             </h1>
-            <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
+            <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
               <span>
                 {order.guest_count} {t('table.guests')}
               </span>
@@ -122,19 +128,19 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowQuickAdd(true)}
-              className="px-3 py-2 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 transition-colors flex items-center gap-1.5"
+              className="px-4 py-2.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 transition-colors flex items-center gap-1.5"
               title={t('pos.quick_add.title')}
             >
-              <ShoppingBag size={18} />
-              <span className="text-sm font-bold">{t('pos.quick_add.title')}</span>
+              <ShoppingBag size={20} />
+              <span className="text-base font-bold">{t('pos.quick_add.title')}</span>
             </button>
 
             {onManage && !order.is_retail && (
             <button
               onClick={onManage}
-              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors"
+              className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors"
             >
-              <Settings size={20} />
+              <Settings size={24} />
             </button>
           )}
           </div>
@@ -145,23 +151,23 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       <div className="flex border-b border-gray-200">
         <button
           onClick={() => setActiveTab('ITEMS')}
-          className={`flex-1 py-3 text-sm font-bold flex justify-center items-center gap-2 transition-colors border-b-2 ${
+          className={`flex-1 py-4 text-base font-bold flex justify-center items-center gap-2 transition-colors border-b-2 ${
             activeTab === 'ITEMS'
               ? 'text-[#FF5E5E] border-[#FF5E5E] bg-red-50'
               : 'text-gray-500 border-transparent hover:bg-gray-50'
           }`}
         >
-          <List size={16} /> {t('checkout.items.unpaid')}
+          <List size={20} /> {t('checkout.items.unpaid')}
         </button>
         <button
           onClick={() => setActiveTab('TIMELINE')}
-          className={`flex-1 py-3 text-sm font-bold flex justify-center items-center gap-2 transition-colors border-b-2 ${
+          className={`flex-1 py-4 text-base font-bold flex justify-center items-center gap-2 transition-colors border-b-2 ${
             activeTab === 'TIMELINE'
               ? 'text-blue-600 border-blue-600 bg-blue-50'
               : 'text-gray-500 border-transparent hover:bg-gray-50'
           }`}
         >
-          <Clock size={16} /> {t('checkout.timeline.title')}
+          <Clock size={20} /> {t('checkout.timeline.title')}
         </button>
       </div>
 

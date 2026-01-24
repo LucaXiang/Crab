@@ -56,7 +56,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                  }
             }
 
-            // Extract attributes from ProductFull.attributes (ProductAttributeBinding[])
+            // Extract attributes from ProductFull.attributes (AttributeBindingFull[])
             const attrBindings = productFull?.attributes || [];
 
             // Build set of product attribute IDs for deduplication
@@ -82,7 +82,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
             const attributeList: AttributeTemplate[] = [...productAttributeList, ...categoryAttributes];
             setAttributes(attributeList);
 
-            // Convert ProductAttributeBinding[] to ProductAttribute[] (HasAttribute relation)
+            // Convert AttributeBindingFull[] to ProductAttribute[] (AttributeBinding relation)
             const productBindings: ProductAttribute[] = attrBindings.map(binding => ({
               id: binding.id,
               from: String(item.id),
@@ -201,14 +201,17 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     const finalDisc = Math.min(100, Math.max(0, discount));
 
     // Resolve specification object (using index since EmbeddedSpec doesn't have ID)
-    let selectedSpecification: { id: string; name: string; } | undefined;
-    if (selectedSpecId !== undefined) {
+    // If spec was changed, use new one; otherwise keep original
+    let selectedSpecification = item.selected_specification;
+    if (selectedSpecId !== undefined && specifications.length > 0) {
         const specIdx = parseInt(selectedSpecId, 10);
         const spec = specifications[specIdx];
         if (spec) {
             selectedSpecification = {
                 id: String(specIdx),
                 name: spec.is_default && !spec.name ? t('settings.product.specification.label.default') : spec.name,
+                external_id: spec.external_id,
+                price: spec.price,
             };
         }
     }
@@ -236,7 +239,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
       isOpen={true} 
       onClose={onClose}
       title={t('pos.cart.edit_item')}
-      productName={item.external_id ? `${item.external_id} ${item.name}` : item.name}
+      productName={item.selected_specification?.external_id ? `${item.selected_specification.external_id} ${item.name}` : item.name}
       isLoading={isLoadingAttributes}
       attributes={attributes}
       allOptions={allOptions}

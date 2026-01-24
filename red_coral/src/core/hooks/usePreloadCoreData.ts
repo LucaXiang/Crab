@@ -11,10 +11,10 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useZoneStore } from '@/core/stores/resources/useZoneStore';
-import { useTableStore } from '@/core/stores/resources/useTableStore';
-import { useCategoryStore } from '@/core/stores/resources/useCategoryStore';
-import { useProductStore } from '@/core/stores/resources/useProductStore';
+import { useZoneStore } from '@/features/zone';
+import { useTableStore } from '@/features/table';
+import { useCategoryStore } from '@/features/category';
+import { useProductStore } from '@/features/product';
 
 // 核心资源：启动时预加载
 const CORE_STORES = [

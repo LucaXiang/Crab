@@ -89,7 +89,7 @@ export const CategoryNav = React.memo<CategoryNavProps>(
           key={catName}
           onClick={() => onSelect(catName)}
           className={`
-            px-6 py-2.5 text-lg transition-all duration-200 cursor-pointer rounded-md whitespace-nowrap border h-[46px] flex items-center gap-1.5
+            px-6 py-2.5 text-lg transition-all duration-200 cursor-pointer rounded-md whitespace-nowrap border h-[2.875rem] flex items-center gap-1.5
             ${isActive
               ? 'bg-white text-[#FF5E5E] border-white font-bold shadow-sm'
               : isVirtual
@@ -108,11 +108,11 @@ export const CategoryNav = React.memo<CategoryNavProps>(
     const hasVirtualCats = virtualCats.length > 0;
 
     return (
-      <div className="w-full bg-[#FF5E5E] shadow-md relative z-20 h-[134px] flex border-t border-white/10">
+      <div className="w-full bg-[#FF5E5E] shadow-md relative z-20 h-[8.375rem] flex border-t border-white/10">
         <div
           ref={scrollRef}
           onScroll={checkScroll}
-          className="flex-1 px-3 py-[14px] overflow-hidden relative"
+          className="flex-1 px-3 py-3.5 overflow-hidden relative"
         >
           <div className="flex flex-wrap gap-3">
             {/* 1. "All" button - always first */}
@@ -121,11 +121,11 @@ export const CategoryNav = React.memo<CategoryNavProps>(
             {/* 2. Virtual categories with visual separator */}
             {hasVirtualCats && (
               <>
-                <div className="w-px h-[46px] bg-white/20 mx-1" />
+                <div className="w-px h-[2.875rem] bg-white/20 mx-1" />
                 {virtualCats.map((cat) =>
                   renderCategoryButton(cat.name, cat.name, true)
                 )}
-                <div className="w-px h-[46px] bg-white/20 mx-1" />
+                <div className="w-px h-[2.875rem] bg-white/20 mx-1" />
               </>
             )}
 

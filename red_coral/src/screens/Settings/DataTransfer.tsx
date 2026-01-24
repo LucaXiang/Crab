@@ -94,7 +94,7 @@ export const DataTransfer: React.FC = () => {
               {t('settings.data_transfer.export.title')}
             </h3>
           </div>
-          <p className="text-gray-600 mb-6 min-h-[48px]">
+          <p className="text-gray-600 mb-6 min-h-[3rem]">
             {t('settings.data_transfer.export.description')}
           </p>
           <button
@@ -121,7 +121,7 @@ export const DataTransfer: React.FC = () => {
               {t('settings.data_transfer.import.title')}
             </h3>
           </div>
-          <p className="text-gray-600 mb-6 min-h-[48px]">
+          <p className="text-gray-600 mb-6 min-h-[3rem]">
             {t('settings.data_transfer.import.description')}
           </p>
           <button

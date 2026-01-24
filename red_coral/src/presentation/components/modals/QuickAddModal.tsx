@@ -1,18 +1,61 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
-import { X, ShoppingBag, Plus, Trash2, Minus, Search } from 'lucide-react';
+import { X, ShoppingBag } from 'lucide-react';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
-import { CartItem } from '@/core/domain/types';
+import { CartItem as CartItemType, Product, ItemOption, AttributeTemplate, AttributeOption, EmbeddedSpec, ProductAttribute } from '@/core/domain/types';
 import { v4 as uuidv4 } from 'uuid';
-import { useCategories, useCategoryStore } from '@/core/stores/resources/useCategoryStore';
-import { useProducts, useProductStore } from '@/core/stores/resources/useProductStore';
-import { ProductCard, ProductWithPrice } from '@/presentation/components/ProductCard';
-import clsx from 'clsx';
+import { useCategories, useCategoryStore } from '@/features/category';
+import { useProducts, useProductStore, useProductsLoading, ProductWithPrice } from '@/features/product';
+import { ProductGrid } from '@/screens/POS/components/ProductGrid';
+import { CategoryNav } from '@/presentation/components/CategoryNav';
+import { CartItem } from '@/presentation/components/cart/CartItem';
+import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDetailModal';
+import { ProductOptionsModal } from '@/presentation/components/modals/ProductOptionsModal';
+import { createTauriClient } from '@/infrastructure/api';
+
+const api = createTauriClient();
 
 interface QuickAddModalProps {
   onClose: () => void;
-  onConfirm: (items: CartItem[]) => void;
+  onConfirm: (items: CartItemType[]) => void;
 }
+
+// Helper to check if two items are identical for merging
+const areItemsEqual = (item1: CartItemType, item2: Partial<CartItemType> & { id: string }) => {
+  if (item1.id !== item2.id) return false;
+  
+  // Check price (safeguard for open price or other variations)
+  if (item1.price !== item2.price) return false;
+
+  // Check specs
+  const spec1 = item1.selected_specification?.id;
+  const spec2 = item2.selected_specification?.id;
+  if (spec1 !== spec2) return false;
+  
+  // Check manual discount (normalize null/undefined)
+  const discount1 = item1.manual_discount_percent ?? 0;
+  const discount2 = item2.manual_discount_percent ?? 0;
+  if (discount1 !== discount2) return false;
+
+  // Check manual surcharge (normalize null/undefined)
+  const surcharge1 = item1.surcharge ?? 0;
+  const surcharge2 = item2.surcharge ?? 0;
+  if (surcharge1 !== surcharge2) return false;
+  
+  // Check options
+  const opts1 = item1.selected_options || [];
+  const opts2 = item2.selected_options || [];
+  
+  if (opts1.length !== opts2.length) return false;
+  
+  const sorted1 = [...opts1].sort((a, b) => a.attribute_id.localeCompare(b.attribute_id));
+  const sorted2 = [...opts2].sort((a, b) => a.attribute_id.localeCompare(b.attribute_id));
+  
+  return sorted1.every((opt1, idx) => {
+    const opt2 = sorted2[idx];
+    return opt1.attribute_id === opt2.attribute_id && opt1.option_idx === opt2.option_idx;
+  });
+};
 
 export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm }) => {
   const { t } = useI18n();
@@ -20,10 +63,23 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
   // Use new resources stores
   const categories = useCategories();
   const products = useProducts();
+  const isLoading = useProductsLoading();
 
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [tempItems, setTempItems] = useState<CartItem[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [tempItems, setTempItems] = useState<CartItemType[]>([]);
+  const [editingItem, setEditingItem] = useState<CartItemType | null>(null);
+
+  // Product Options Modal State
+  const [optionsModalOpen, setOptionsModalOpen] = useState(false);
+  const [selectedProductForOptions, setSelectedProductForOptions] = useState<{
+    product: Product;
+    basePrice: number;
+    attributes: AttributeTemplate[];
+    options: Map<string, AttributeOption[]>;
+    bindings: ProductAttribute[];
+    specifications?: EmbeddedSpec[];
+    hasMultiSpec?: boolean;
+  } | null>(null);
 
   // Ensure data is loaded
   useEffect(() => {
@@ -31,61 +87,281 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     useProductStore.getState().fetchAll();
   }, []);
 
-  // Convert store Product to ProductWithPrice (compute price from default spec)
-  const domainProducts: ProductWithPrice[] = useMemo(() => {
-    return products.map((p): ProductWithPrice => {
-      // Get price from default spec or first spec
-      const defaultSpec = p.specs?.find(s => s.is_default) ?? p.specs?.[0];
-      const price = defaultSpec?.price ?? 0;
-      const external_id = defaultSpec?.external_id ?? undefined;
-      return {
-        ...p,
-        price,
-        external_id,
-      };
-    });
-  }, [products]);
+  // Helper to get default spec from product
+  const getDefaultSpec = (p: Product) => p.specs?.find(s => s.is_default) ?? p.specs?.[0];
 
-  // Filter products
+  // Helper to map product with price and external_id from default spec
+  const mapProductWithSpec = (p: Product): ProductWithPrice => {
+    const defaultSpec = getDefaultSpec(p);
+    return {
+      ...p,
+      price: defaultSpec?.price ?? 0,
+      external_id: defaultSpec?.external_id,
+    };
+  };
+
+  // Filter products (same logic as POSScreen)
   const filteredProducts = useMemo(() => {
-    let result = domainProducts;
+    // Category filter (same logic as POSScreen)
+    if (selectedCategory === 'all') {
+      return [...products]
+        .filter((p) => p.is_active)
+        .sort((a, b) => {
+          const aId = getDefaultSpec(a)?.external_id ?? Number.MAX_SAFE_INTEGER;
+          const bId = getDefaultSpec(b)?.external_id ?? Number.MAX_SAFE_INTEGER;
+          return aId - bId;
+        })
+        .map(mapProductWithSpec);
+    }
 
-    // Category filter
-    if (selectedCategoryId !== 'all') {
-      const category = categories.find(c => c.id === selectedCategoryId);
-      if (category) {
-        result = result.filter(p => p.category === category.name);
+    const category = categories.find((c) => c.name === selectedCategory);
+    if (!category) {
+      return [];
+    }
+
+    if (category.is_virtual) {
+      // Virtual category: filter by tags
+      const tagIds = category.tag_ids || [];
+      if (tagIds.length === 0) {
+        return [];
       }
+      return products
+        .filter((p) => {
+          if (!p.is_active) return false;
+          const productTags = p.tags || [];
+          if (category.match_mode === 'all') {
+            return tagIds.every((tagId) => productTags.includes(tagId));
+          } else {
+            return tagIds.some((tagId) => productTags.includes(tagId));
+          }
+        })
+        .map(mapProductWithSpec);
     }
 
-    // Search filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(p =>
-        p.name.toLowerCase().includes(q)
-      );
+    // Regular category
+    return products
+      .filter((p) => p.is_active && p.category === category.id)
+      .map(mapProductWithSpec);
+  }, [products, categories, selectedCategory]);
+
+  // Handle product add from ProductGrid (same logic as POSScreen)
+  const handleAddProduct = useCallback(async (product: Product, _startRect?: DOMRect, skipQuickAdd: boolean = false) => {
+    try {
+      // Fetch full product data with attributes
+      const productFull = await api.getProductFull(String(product.id));
+      const attrBindings = productFull?.attributes || [];
+
+      // Build set of product attribute IDs for deduplication
+      const productAttrIds = new Set(attrBindings.map(b => String(b.attribute.id)));
+
+      // Fetch category attributes (inherited)
+      let categoryAttributes: AttributeTemplate[] = [];
+      if (productFull.category) {
+        try {
+          categoryAttributes = await api.listCategoryAttributes(productFull.category);
+          categoryAttributes = categoryAttributes.filter(
+            attr => !productAttrIds.has(String(attr.id))
+          );
+        } catch (err) {
+          console.warn('Failed to load category attributes:', err);
+        }
+      }
+
+      // Extract attributes from product bindings
+      const productAttributeList: AttributeTemplate[] = attrBindings.map(binding => binding.attribute);
+      const attributeList: AttributeTemplate[] = [...productAttributeList, ...categoryAttributes];
+
+      // Build options map
+      const optionsMap = new Map<string, AttributeOption[]>();
+      attributeList.forEach(attr => {
+        if (attr.options && attr.options.length > 0) {
+          optionsMap.set(String(attr.id), attr.options);
+        }
+      });
+
+      // Build bindings
+      const productBindings: ProductAttribute[] = attrBindings.map(binding => ({
+        id: binding.id,
+        from: String(product.id),
+        to: String(binding.attribute.id),
+        is_required: binding.is_required,
+        display_order: binding.display_order,
+        attribute: binding.attribute,
+      }));
+      const categoryBindings: ProductAttribute[] = categoryAttributes.map((attr, idx) => ({
+        id: null,
+        from: productFull.category,
+        to: String(attr.id),
+        is_required: false,
+        display_order: 1000 + idx,
+        attribute: attr,
+      }));
+      const allBindings = [...productBindings, ...categoryBindings];
+
+      // Specs
+      const hasMultiSpec = product.specs.length > 1;
+      const specifications: EmbeddedSpec[] = product.specs || [];
+      const defaultSpec = specifications.find((s) => s.is_default) || specifications[0];
+      const basePrice = defaultSpec?.price ?? 0;
+
+      // CASE 1: Force Detail View (Image Click)
+      if (skipQuickAdd) {
+        setSelectedProductForOptions({
+          product,
+          basePrice,
+          attributes: attributeList,
+          options: optionsMap,
+          bindings: allBindings,
+          specifications,
+          hasMultiSpec,
+        });
+        setOptionsModalOpen(true);
+        return;
+      }
+
+      // CASE 2: Has Multi-Spec or Attributes -> Open Modal
+      if (hasMultiSpec) {
+        const selectedDefaultSpec = specifications.find((s) => s.is_default === true);
+        if (!selectedDefaultSpec) {
+          setSelectedProductForOptions({
+            product,
+            basePrice,
+            attributes: attributeList,
+            options: optionsMap,
+            bindings: allBindings,
+            specifications,
+            hasMultiSpec,
+          });
+          setOptionsModalOpen(true);
+          return;
+        }
+      }
+
+      if (hasMultiSpec || allBindings.length > 0) {
+        setSelectedProductForOptions({
+          product,
+          basePrice,
+          attributes: attributeList,
+          options: optionsMap,
+          bindings: allBindings,
+          specifications,
+          hasMultiSpec,
+        });
+        setOptionsModalOpen(true);
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to fetch product data:', error);
     }
 
-    return result;
-  }, [domainProducts, selectedCategoryId, searchQuery, categories]);
+    // CASE 3: No attributes - add directly
+    const defaultSpec = getDefaultSpec(product);
+    const defaultSpecIdx = product.specs?.findIndex(s => s === defaultSpec) ?? 0;
+    const price = defaultSpec?.price ?? 0;
 
-  const handleAddProduct = (product: ProductWithPrice) => {
-    // Convert domain Product to CartItem
-    const newItem: CartItem = {
+    const newItem: CartItemType = {
       id: String(product.id),
       name: product.name,
-      price: product.price ?? 0,
+      price,
       quantity: 1,
       unpaid_quantity: 1,
       instance_id: uuidv4(),
       selected_options: [],
+      selected_specification: defaultSpec ? {
+        id: String(defaultSpecIdx),
+        name: defaultSpec.name,
+        external_id: defaultSpec.external_id,
+        price: defaultSpec.price,
+        is_multi_spec: (product.specs?.length ?? 0) > 1,
+      } : undefined,
     };
 
-    // Each item gets a unique instance_id, so no need to merge - just append
-    setTempItems(prev => [...prev, newItem]);
-  };
+    setTempItems(prev => {
+      const existingIdx = prev.findIndex(item => areItemsEqual(item, newItem));
+      if (existingIdx !== -1) {
+        const newItems = [...prev];
+        const existing = newItems[existingIdx];
+        newItems[existingIdx] = {
+          ...existing,
+          quantity: existing.quantity + 1,
+          unpaid_quantity: existing.unpaid_quantity + 1,
+        };
+        return newItems;
+      }
+      return [...prev, newItem];
+    });
+  }, []);
 
-  const updateQuantity = (instanceId: string, delta: number) => {
+  // Handle options confirmed from ProductOptionsModal
+  const handleOptionsConfirmed = useCallback(
+    (
+      selectedOptions: ItemOption[],
+      quantity: number,
+      discount: number,
+      authorizer?: { id: string; username: string },
+      selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number }
+    ) => {
+      if (!selectedProductForOptions) return;
+
+      const { product } = selectedProductForOptions;
+      const defaultSpec = getDefaultSpec(product);
+      const defaultSpecIdx = product.specs?.findIndex(s => s === defaultSpec) ?? 0;
+
+      // Calculate price from spec or base
+      const specPrice = selectedSpecification?.price ?? defaultSpec?.price ?? 0;
+      const optionsModifier = selectedOptions.reduce((sum, opt) => sum + (opt.price_modifier ?? 0), 0);
+      const finalPrice = specPrice + optionsModifier;
+
+      const newItem: CartItemType = {
+        id: String(product.id),
+        name: product.name,
+        price: finalPrice,
+        original_price: specPrice,
+        quantity,
+        unpaid_quantity: quantity,
+        instance_id: uuidv4(),
+        selected_options: selectedOptions,
+        selected_specification: selectedSpecification ? {
+          id: selectedSpecification.id,
+          name: selectedSpecification.name,
+          external_id: selectedSpecification.external_id,
+          receipt_name: selectedSpecification.receiptName,
+          price: selectedSpecification.price,
+          is_multi_spec: (product.specs?.length ?? 0) > 1,
+        } : defaultSpec ? {
+          id: String(defaultSpecIdx),
+          name: defaultSpec.name,
+          external_id: defaultSpec.external_id,
+          price: defaultSpec.price,
+          is_multi_spec: (product.specs?.length ?? 0) > 1,
+        } : undefined,
+        manual_discount_percent: discount > 0 ? discount : undefined,
+        authorizer_id: authorizer?.id,
+        authorizer_name: authorizer?.username,
+      };
+
+      setTempItems(prev => {
+        const existingIdx = prev.findIndex(item => areItemsEqual(item, newItem));
+        if (existingIdx !== -1) {
+          const newItems = [...prev];
+          const existing = newItems[existingIdx];
+          newItems[existingIdx] = {
+            ...existing,
+            quantity: existing.quantity + quantity,
+            unpaid_quantity: existing.unpaid_quantity + quantity,
+          };
+          return newItems;
+        }
+        return [...prev, newItem];
+      });
+      setOptionsModalOpen(false);
+      setSelectedProductForOptions(null);
+    },
+    [selectedProductForOptions]
+  );
+
+  // Handle quantity change (used by CartItem)
+  const handleQuantityChange = useCallback((instanceId: string, delta: number) => {
     setTempItems(prev => {
       const idx = prev.findIndex(item => item.instance_id === instanceId);
       if (idx === -1) return prev;
@@ -101,7 +377,24 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       newItems[idx] = { ...item, quantity: newQty };
       return newItems;
     });
-  };
+  }, []);
+
+  // Handle item click - open edit modal
+  const handleItemClick = useCallback((item: CartItemType) => {
+    setEditingItem(item);
+  }, []);
+
+  // Handle item update from edit modal
+  const handleUpdateItem = useCallback((instanceId: string, updates: Partial<CartItemType>) => {
+    setTempItems(prev => prev.map(item =>
+      item.instance_id === instanceId ? { ...item, ...updates } : item
+    ));
+  }, []);
+
+  // Handle item remove from edit modal
+  const handleRemoveItem = useCallback((instanceId: string) => {
+    setTempItems(prev => prev.filter(item => item.instance_id !== instanceId));
+  }, []);
 
   const totalAmount = tempItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
@@ -113,150 +406,122 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
   };
 
   return (
-    <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div 
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+    <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+      {/* Cart Item Edit Modal */}
+      {editingItem && (
+        <CartItemDetailModal
+          item={editingItem}
+          onClose={() => setEditingItem(null)}
+          onUpdate={handleUpdateItem}
+          onRemove={handleRemoveItem}
+        />
+      )}
+
+      {/* Product Options Modal */}
+      {selectedProductForOptions && (
+        <ProductOptionsModal
+          isOpen={optionsModalOpen}
+          onClose={() => {
+            setOptionsModalOpen(false);
+            setSelectedProductForOptions(null);
+          }}
+          productName={selectedProductForOptions.product.name}
+          basePrice={selectedProductForOptions.basePrice}
+          attributes={selectedProductForOptions.attributes}
+          allOptions={selectedProductForOptions.options}
+          bindings={selectedProductForOptions.bindings}
+          specifications={selectedProductForOptions.specifications}
+          hasMultiSpec={selectedProductForOptions.hasMultiSpec}
+          onConfirm={handleOptionsConfirmed}
+        />
+      )}
+
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] overflow-hidden flex relative animate-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <ShoppingBag className="text-red-500" />
-            {t('pos.quick_add.title')}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-            <X size={24} className="text-gray-500" />
-          </button>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left Side: Product Selection (70%) */}
-          <div className="w-[70%] flex flex-col border-r border-gray-100 bg-gray-50/50">
-            {/* Filter Bar */}
-            <div className="p-4 bg-white border-b border-gray-100 space-y-4">
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  placeholder={t('pos.search_product')}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-100 border-none rounded-lg focus:ring-2 focus:ring-red-500/20 text-gray-800 placeholder:text-gray-400"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                />
-              </div>
-
-              {/* Categories */}
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                <button
-                  onClick={() => setSelectedCategoryId('all')}
-                  className={clsx(
-                    "px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all",
-                    selectedCategoryId === 'all'
-                      ? "bg-gray-900 text-white shadow-md"
-                      : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-                  )}
-                >
-                  {t('pos.all_categories')}
-                </button>
-                {categories.map(cat => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategoryId(cat.id)}
-                    className={clsx(
-                      "px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all",
-                      selectedCategoryId === cat.id
-                        ? "bg-red-500 text-white shadow-md shadow-red-500/20"
-                        : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-                    )}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
-              </div>
+        {/* Left Side: Cart Sidebar (Matches POS Sidebar style) */}
+        <div className="w-[27.5rem] shrink-0 flex flex-col bg-white z-30">
+          {/* Header */}
+          <div className="h-16 flex items-center justify-between px-6 bg-[#FF5E5E] text-white shrink-0 relative z-20">
+            <div className="flex items-center gap-3">
+              <h3 className="font-bold text-xl">{t('pos.quick_add.title')}</h3>
+              <span className="bg-white text-[#FF5E5E] px-2.5 py-0.5 rounded-full text-sm font-bold">
+                {tempItems.reduce((acc, item) => acc + item.quantity, 0)}
+              </span>
             </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-white/80 hover:bg-white/10 hover:text-white rounded-xl transition-all"
+            >
+              <X size={24} />
+            </button>
+          </div>
 
-            {/* Product Grid */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {filteredProducts.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                  <p className="text-lg">{t('pos.quick_add.no_products')}</p>
+          {/* Cart List & Footer Container */}
+          <div className="flex-1 flex flex-col min-h-0 border-r border-gray-200 shadow-xl relative z-10">
+            {/* Cart List */}
+            <div className="flex-1 overflow-y-auto bg-white relative custom-scrollbar">
+              {tempItems.length === 0 ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-300 select-none">
+                  <div className="w-24 h-24 rounded-full bg-gray-50 mb-4 flex items-center justify-center">
+                    <ShoppingBag size={36} className="opacity-20" />
+                  </div>
+                  <p className="text-gray-400 text-sm">{t('pos.quick_add.select_prompt')}</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 lg:grid-cols-4 gap-3">
-                  {filteredProducts.map(product => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      onAdd={() => handleAddProduct(product)}
+                <div className="divide-y divide-gray-100">
+                  {tempItems.map((item) => (
+                    <CartItem
+                      key={item.instance_id}
+                      item={item}
+                      onQuantityChange={handleQuantityChange}
+                      onClick={handleItemClick}
                     />
                   ))}
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Right Side: Cart (30%) */}
-          <div className="w-[30%] flex flex-col bg-white">
-            <div className="p-4 border-b border-gray-100 bg-gray-50">
-              <h3 className="font-bold text-gray-700">{t('pos.quick_add.selected_items')} ({tempItems.length})</h3>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {tempItems.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                  <ShoppingBag size={48} className="mb-2 opacity-20" />
-                  <p>{t('pos.quick_add.select_prompt')}</p>
-                </div>
-              ) : (
-                tempItems.map((item) => (
-                  <div key={item.instance_id} className="flex flex-col p-3 bg-white border border-gray-100 rounded-xl shadow-sm gap-2">
-                    <div className="flex justify-between items-start">
-                      <span className="font-bold text-gray-800 line-clamp-2">{item.name}</span>
-                      <span className="font-bold text-gray-900">{formatCurrency(item.price * item.quantity)}</span>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-500">{formatCurrency(item.price)} {t('pos.quick_add.per_unit')}</span>
-                      <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-1">
-                        <button
-                          onClick={() => updateQuantity(item.instance_id, -1)}
-                          className="p-1 hover:bg-white rounded-md shadow-sm text-gray-600 transition-all"
-                        >
-                          {item.quantity === 1 ? <Trash2 size={14} className="text-red-500" /> : <Minus size={14} />}
-                        </button>
-                        <span className="font-bold w-6 text-center text-sm">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.instance_id, 1)}
-                          className="p-1 hover:bg-white rounded-md shadow-sm text-gray-600 transition-all"
-                        >
-                          <Plus size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-gray-100 bg-white shrink-0">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-gray-500">{t('checkout.amount.total')}</span>
-                <span className="text-2xl font-bold text-gray-900">{formatCurrency(totalAmount)}</span>
-              </div>
-              <button
-                onClick={handleConfirm}
-                disabled={tempItems.length === 0}
-                className="w-full py-3 bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-lg shadow-red-500/30 transition-all active:scale-[0.98]"
+  
+            {/* Footer (Matches CartCheckoutBar style) */}
+            <div className="bg-[#FF5E5E] text-white flex h-16 relative z-30 shadow-inner shrink-0">
+              <div 
+                className="w-28 flex items-center justify-center text-lg font-medium border-r border-white/20 bg-black/5 cursor-pointer hover:bg-black/10 transition-colors"
+                onClick={onClose}
               >
-                {t('pos.quick_add.confirm')}
-              </button>
+                {t('common.action.cancel')} 
+              </div>
+              <div
+                className={`flex-1 flex items-center justify-between px-8 text-2xl font-light transition-colors ${
+                  tempItems.length === 0 ? 'cursor-default opacity-50' : 'cursor-pointer hover:bg-white/10'
+                }`}
+                onClick={tempItems.length > 0 ? handleConfirm : undefined}
+              >
+                <span className="text-lg font-medium opacity-90">{t('pos.quick_add.confirm')}</span>
+                <span className="text-3xl font-semibold">{formatCurrency(totalAmount)}</span>
+              </div>
             </div>
           </div>
+        </div>
+
+        {/* Right Side: Category Nav + Products */}
+        <div className="flex-1 flex flex-col min-w-0 bg-gray-100">
+          {/* Category Nav */}
+          <div className="shrink-0 bg-[#FF5E5E] shadow-sm z-20">
+            <CategoryNav
+              selected={selectedCategory}
+              onSelect={setSelectedCategory}
+              categories={categories}
+            />
+          </div>
+
+          {/* Product Grid */}
+          <ProductGrid
+            products={filteredProducts}
+            isLoading={isLoading}
+            onAdd={handleAddProduct}
+            className="grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3"
+          />
         </div>
       </div>
     </div>

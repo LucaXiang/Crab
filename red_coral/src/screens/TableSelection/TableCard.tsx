@@ -53,7 +53,7 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
         disabled={isDisabled}
         className={`
           relative p-4 rounded-2xl shadow-sm border-2 transition-all duration-200 flex flex-col items-center justify-between overflow-hidden
-          ${className || 'h-[120px]'}
+          ${className || 'h-[7.5rem]'}
           ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md'}
           ${
             is_pre_payment
@@ -116,7 +116,7 @@ export const TableCard: React.FC<TableCardProps> = React.memo(
         ) : (
           <div className="flex flex-col items-center gap-0.5 opacity-30 mt-auto">
             <Users size={18} />
-            <span className="text-[10px]">{table.capacity}</span>
+            <span className="text-[0.625rem]">{table.capacity}</span>
           </div>
         )}
       </button>

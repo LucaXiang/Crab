@@ -146,7 +146,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                                 type="button"
                                 onClick={() => onSpecificationSelect?.(String(specIdx))}
                                 className={`
-                                  relative p-3 rounded-xl border-2 transition-all text-left flex flex-col items-start min-h-[70px] justify-center
+                                  relative p-3 rounded-xl border-2 transition-all text-left flex flex-col items-start min-h-[4.375rem] justify-center
                                   ${isSelected
                                     ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200'
                                     : 'border-gray-200 hover:border-orange-300 bg-white hover:bg-orange-50/30'
@@ -181,7 +181,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                     const attrId = String(attr.id);
                     const options = allOptions.get(attrId) || [];
                     const selectedOptionIds = selections.get(attrId) || [];
-                    // binding.to is the attribute ID in HasAttribute relation
+                    // binding.to is the attribute ID in AttributeBinding relation
                     const binding = bindings?.find(b => b.to === attr.id);
 
                     // Logic to find defaults for display (visual cues in AttributeSelector)
@@ -217,7 +217,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
           )}
 
           {/* Right: Action Panel */}
-          <div className={`${showAttributesColumn ? 'w-[440px] border-l border-gray-100' : 'w-full'} bg-white shadow-xl z-20 flex flex-col h-full transition-all duration-300`}>
+          <div className={`${showAttributesColumn ? 'w-[27.5rem] border-l border-gray-100' : 'w-full'} bg-white shadow-xl z-20 flex flex-col h-full transition-all duration-300`}>
             <ItemActionPanel
               t={t}
               quantity={quantity}

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { LayoutTemplate, Plus, Copy, Trash2, Edit2, Check } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { useActiveLabelTemplateId, useUIActions } from '@/core/stores/ui/useUIStore';
+import { useActiveLabelTemplateId, usePrinterActions } from '@/core/stores/ui';
 import { LabelTemplate, DEFAULT_LABEL_TEMPLATES } from '@/core/domain/types/print';
 import { LabelEditorScreen } from '../LabelEditorScreen';
-import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { toast } from '@/presentation/components/Toast';
 
 const STORAGE_KEY = 'label_templates';
@@ -18,7 +18,7 @@ export const LabelTemplateManager: React.FC = () => {
   const [templateHeight, setTemplateHeight] = useState(30);
 
   const activeTemplateId = useActiveLabelTemplateId();
-  const { setActiveLabelTemplateId } = useUIActions();
+  const { setActiveLabelTemplateId } = usePrinterActions();
 
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
@@ -241,7 +241,7 @@ export const LabelTemplateManager: React.FC = () => {
         {/* New Template Card */}
         <button
           onClick={() => setShowNewTemplateDialog(true)}
-          className="bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 p-5 hover:bg-gray-100 hover:border-gray-300 transition-all flex flex-col items-center justify-center text-gray-400 gap-3 min-h-[200px]"
+          className="bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 p-5 hover:bg-gray-100 hover:border-gray-300 transition-all flex flex-col items-center justify-center text-gray-400 gap-3 min-h-[12.5rem]"
         >
           <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm">
             <Plus size={24} />

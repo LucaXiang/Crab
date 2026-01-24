@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Lock, X } from 'lucide-react';
 import { AttributeTemplate } from '@/core/domain/types';
-import { useAttributeStore } from '@/core/stores/resources';
+import { useAttributeStore } from '@/features/attribute';
 
 export interface AttributeDisplayTagProps {
   attribute: AttributeTemplate;
@@ -48,7 +48,7 @@ export const AttributeDisplayTag: React.FC<AttributeDisplayTagProps> = ({
 
       {defaultOptions.length > 0 && (
         <span className="flex items-center gap-1 text-xs bg-teal-100 px-1.5 py-0.5 rounded text-teal-800 border border-teal-200">
-          <span className="opacity-60 text-[10px] uppercase tracking-wider">
+          <span className="opacity-60 text-[0.625rem] uppercase tracking-wider">
             {t('common.label.default')}:
           </span>
           <span className="font-semibold">

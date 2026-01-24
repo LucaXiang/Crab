@@ -400,7 +400,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
 
     return (
 	    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-60 flex items-center justify-center p-6 font-sans">
-            <div className="bg-white w-full max-w-3xl h-[520px] rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-gray-100">
+            <div className="bg-white w-full max-w-3xl h-[32.5rem] rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-gray-100">
                 <div className="h-14 border-b border-gray-100 flex items-center justify-between px-6 bg-white shadow-sm z-20">
                     <div className="font-bold text-lg text-gray-800 flex items-center gap-3">
                         <span>{t('table.action.manage')}</span>

@@ -5,15 +5,15 @@
  * key 必须与后端 broadcast_sync 的 resource 参数一致。
  */
 import type { SyncPayload } from '../factory/createResourceStore';
-import { useProductStore } from './useProductStore';
-import { useCategoryStore } from './useCategoryStore';
-import { useTagStore } from './useTagStore';
-import { useAttributeStore } from './useAttributeStore';
-import { useZoneStore } from './useZoneStore';
-import { useTableStore } from './useTableStore';
-import { useEmployeeStore } from './useEmployeeStore';
-import { useRoleStore } from './useRoleStore';
-import { usePriceRuleStore } from './usePriceRuleStore';
+import { useProductStore } from '@/features/product';
+import { useCategoryStore } from '@/features/category/store';
+import { useTagStore } from '@/features/tag';
+import { useAttributeStore } from '@/features/attribute';
+import { useZoneStore } from '@/features/zone';
+import { useTableStore } from '@/features/table';
+import { useEmployeeStore } from '@/features/user';
+import { useRoleStore } from '@/features/role';
+import { usePriceRuleStore } from '@/features/price-rule';
 import { usePrintDestinationStore } from './usePrintDestinationStore';
 
 // Store interface for registry

@@ -33,7 +33,9 @@
       "void": "作废",
       "enabled": "已启用",
       "disabled": "已禁用",
-      "disabled_global": "禁用 (全局关闭)"
+      "disabled_global": "禁用 (全局关闭)",
+      "show": "显示",
+      "hide": "隐藏"
     },
     "label": {
       "name": "名称",
@@ -201,7 +203,7 @@
       "title": "快速添加",
       "no_products": "暂无可用商品",
       "selected_items": "已选项目",
-      "select_prompt": "请从左侧选择商品",
+      "select_prompt": "请从右侧选择物品",
       "per_unit": "/份",
       "confirm": "确认添加"
     }
@@ -254,6 +256,7 @@
       "move_failed": "转台失败"
     },
     "table_order": "桌台订单",
+    "retail_order": "零售订单",
     "order_completed": "订单完成",
     "payment": {
       "confirm": "确认支付",
@@ -771,7 +774,8 @@
         "match_all": "匹配全部标签",
         "filter_tags": "筛选标签",
         "no_tags_available": "暂无可用标签",
-        "select_tags_hint": "请至少选择一个标签用于筛选产品"
+        "select_tags_hint": "请至少选择一个标签用于筛选产品",
+        "is_display": "在主页显示"
       },
       "message": {
         "exists": "分类已存在"
@@ -1045,6 +1049,11 @@
     },
     "system": {
       "title": "系统设置",
+      "ui_scale": {
+        "title": "界面缩放",
+        "description": "调整界面元素大小，适配不同显示设备",
+        "reset": "恢复默认"
+      },
       "font_optimization": {
         "title": "字体优化",
         "description": "优化字体渲染，提升显示效果"
@@ -1056,7 +1065,7 @@
         "confirm_description": "清除后应用将重新加载，可能需要一些时间恢复数据"
       },
       "performance_mode": "性能模式",
-      "performance_mode_desc": "优化系统性能"
+      "performance_mode_desc": "禁用动画效果，使用系统字体，降低视觉复杂度以提升响应速度"
     },
     "permissions": {
       "manage_users": "管理用户",

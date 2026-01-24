@@ -68,7 +68,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
 
       attributes.forEach((attr) => {
         const options = allOptions.get(String(attr.id)) || [];
-        // binding.to is the attribute ID in HasAttribute relation
+        // binding.to is the attribute ID in AttributeBinding relation
         const binding = bindings?.find(b => b.to === attr.id);
 
         let initialIds: string[] = [];
@@ -148,7 +148,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
     });
 
     // Get selected specification details (use index as ID)
-    let selectedSpec: { id: string; name: string; receipt_name?: string | null; price?: number } | undefined;
+    let selectedSpec: { id: string; name: string; external_id?: number | null; receipt_name?: string | null; price?: number; is_multi_spec?: boolean } | undefined;
     if (hasMultiSpec && selectedSpecId !== null && specifications) {
       const specIdx = parseInt(selectedSpecId, 10);
       const spec = specifications[specIdx];
@@ -156,9 +156,22 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
         selectedSpec = {
           id: String(specIdx),
           name: spec.is_default && !spec.name ? t('settings.product.specification.label.default') : spec.name,
+          external_id: spec.external_id,
           price: spec.price,
+          is_multi_spec: hasMultiSpec,
         };
       }
+    } else if (specifications && specifications.length > 0) {
+      // For non-multi-spec products, use default spec
+      const defaultSpec = specifications.find(s => s.is_default) ?? specifications[0];
+      const specIdx = specifications.indexOf(defaultSpec);
+      selectedSpec = {
+        id: String(specIdx),
+        name: defaultSpec.name,
+        external_id: defaultSpec.external_id,
+        price: defaultSpec.price,
+        is_multi_spec: hasMultiSpec,
+      };
     }
 
     onConfirm(result, quantity, discount, discountAuthorizer, selectedSpec);

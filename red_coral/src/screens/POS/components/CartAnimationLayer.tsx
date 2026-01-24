@@ -1,14 +1,15 @@
 import React from 'react';
 import { CartAnimationOverlay } from '@/presentation/components/CartAnimationOverlay';
-import { useAnimations } from '@/core/stores/ui/useAnimations';
+import { useAnimations, useUIActions } from '@/core/stores/ui';
 
 export const CartAnimationLayer: React.FC = React.memo(() => {
-	  const { animationQueue, removeAnimation } = useAnimations();
+	  const animations = useAnimations();
+	  const { removeAnimation } = useUIActions();
 
-	  if (!animationQueue.length) return null;
+	  if (!animations.length) return null;
 
 	  return (
-	    <CartAnimationOverlay items={animationQueue} onComplete={removeAnimation} />
+	    <CartAnimationOverlay items={animations} onComplete={removeAnimation} />
 	  );
 });
 

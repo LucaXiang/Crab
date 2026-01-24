@@ -104,7 +104,7 @@ const ErrorBoundaryUI = ({
             <span>{t('error.action.view_details')}</span>
           </button>
 
-          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showDetails ? 'max-h-[500px] opacity-100 mt-4' : 'max-h-0 opacity-0'}`}>
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showDetails ? 'max-h-[31.25rem] opacity-100 mt-4' : 'max-h-0 opacity-0'}`}>
             <div className="bg-gray-50 rounded-lg border border-gray-200 text-left overflow-hidden relative group">
               <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button 
@@ -120,7 +120,7 @@ const ErrorBoundaryUI = ({
                   {error?.toString()}
                 </p>
                 {errorInfo && (
-                  <pre className="text-gray-500 font-mono text-[10px] leading-relaxed whitespace-pre-wrap">
+                  <pre className="text-gray-500 font-mono text-[0.625rem] leading-relaxed whitespace-pre-wrap">
                     {errorInfo.componentStack}
                   </pre>
                 )}

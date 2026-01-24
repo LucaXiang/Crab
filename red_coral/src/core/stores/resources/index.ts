@@ -22,16 +22,16 @@ export {
   clearAllStores,
 } from './registry';
 
-// Product
+// Product - re-exported from feature module
 export {
   useProductStore,
   useProducts,
   useProductsLoading,
   useProductById,
   useProductActions,
-} from './useProductStore';
+} from '@/features/product';
 
-// Category
+// Category - re-exported from feature module
 export {
   useCategoryStore,
   useCategories,
@@ -45,17 +45,17 @@ export {
   getVirtualCategories,
   getRegularCategories,
   getCategoryByName,
-} from './useCategoryStore';
+} from '@/features/category';
 
-// Tag
+// Tag - re-exported from feature module
 export {
   useTagStore,
   useTags,
   useTagsLoading,
   useTagById,
-} from './useTagStore';
+} from '@/features/tag';
 
-// Attribute
+// Attribute - re-exported from feature module
 export {
   useAttributeStore,
   useAttributes,
@@ -65,49 +65,49 @@ export {
   useOptionActions,
   attributeHelpers,
   useAttributeHelpers,
-} from './useAttributeStore';
+} from '@/features/attribute';
 
-// Zone
+// Zone - re-exported from feature module
 export {
   useZoneStore,
   useZones,
   useZonesLoading,
   useZoneById,
-} from './useZoneStore';
+} from '@/features/zone';
 
-// Table
+// Table - re-exported from feature module
 export {
   useTableStore,
   useTables,
   useTablesLoading,
   useTableById,
   useTablesByZone,
-} from './useTableStore';
+} from '@/features/table';
 
-// Employee
+// Employee - re-exported from feature module
 export {
   useEmployeeStore,
   useEmployees,
   useEmployeesLoading,
   useEmployeeById,
-} from './useEmployeeStore';
+} from '@/features/user';
 
-// Role
+// Role - re-exported from feature module
 export {
   useRoleStore,
   useRoles,
   useRolesLoading,
   useRoleById,
-} from './useRoleStore';
+} from '@/features/role';
 
-// PriceRule
+// PriceRule - re-exported from feature module
 export {
   usePriceRuleStore,
   usePriceRules,
   usePriceRulesLoading,
   usePriceRuleById,
   useActivePriceRules,
-} from './usePriceRuleStore';
+} from '@/features/price-rule';
 
 // PrintDestination
 export {

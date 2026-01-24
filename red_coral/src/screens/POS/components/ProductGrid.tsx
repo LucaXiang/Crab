@@ -1,28 +1,30 @@
 import React from 'react';
 import { PlusSquare } from 'lucide-react';
-import { ProductCard } from '@/presentation/components/ProductCard';
+import { ProductCard } from '@/features/product';
 import { useI18n } from '@/hooks/useI18n';
 import { Product } from '@/core/domain/types';
 
 interface ProductGridProps {
-	  products: Product[];
-	  isLoading: boolean;
-	  onAdd: (product: Product, startRect?: DOMRect, skipQuickAdd?: boolean) => void;
-	  onLongPress?: (product: Product) => void;
-	}
+  products: Product[];
+  isLoading: boolean;
+  onAdd: (product: Product, startRect?: DOMRect, skipQuickAdd?: boolean) => void;
+  onLongPress?: (product: Product) => void;
+  className?: string;
+}
 
 const ProductGridInner: React.FC<ProductGridProps> = ({
-	  products,
-	  isLoading,
-	  onAdd,
-	  onLongPress,
-	}) => {
-	  const { t } = useI18n();
+  products,
+  isLoading,
+  onAdd,
+  onLongPress,
+  className,
+}) => {
+  const { t } = useI18n();
 
-	  return (
-	    <div className="relative flex-1 overflow-y-auto p-4">
-	      <div className="grid grid-cols-4 gap-3">
-	        {isLoading ? (
+  return (
+    <div className="relative flex-1 overflow-y-auto p-4 custom-scrollbar">
+      <div className={`grid gap-3 ${className || 'grid-cols-4'}`}>
+        {isLoading ? (
 	          <div className="col-span-full flex flex-col items-center justify-center h-64 text-gray-400">
 	            <div className="animate-spin w-8 h-8 border-2 border-coral-500 border-t-transparent rounded-full mb-2" />
 	            <p>{t('app.status.loading')}</p>
@@ -59,7 +61,8 @@ export const ProductGrid: React.FC<ProductGridProps> = React.memo(
 			prevProps.products === nextProps.products &&
 			prevProps.isLoading === nextProps.isLoading &&
 			prevProps.onAdd === nextProps.onAdd &&
-			prevProps.onLongPress === nextProps.onLongPress
-		);
-	}
+      prevProps.onLongPress === nextProps.onLongPress &&
+      prevProps.className === nextProps.className
+    );
+  }
 );

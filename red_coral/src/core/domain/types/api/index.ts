@@ -1,8 +1,5 @@
 export * from './models';
 
-// Re-export with renamed types for API consistency
-export type { HasAttribute as AttributeBinding } from './models';
-export type { ProductAttributeBinding as AttributeBindingFull } from './models';
 
 // Import types used in this file
 import type {

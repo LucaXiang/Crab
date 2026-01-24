@@ -99,7 +99,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                         </span>
                       )}
                     </div>
-                    <div className="flex gap-2 text-[10px] items-center mb-1">
+                    <div className="flex gap-2 text-[0.625rem] items-center mb-1">
                       {order.receipt_number && order.table_name !== 'RETAIL' && (
                         <span className="text-gray-500 bg-gray-100 px-1 rounded">{order.table_name}</span>
                       )}

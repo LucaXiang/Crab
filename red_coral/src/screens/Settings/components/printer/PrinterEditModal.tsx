@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Printer, X } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { FormField, FormSection, inputClass, selectClass } from '../../forms/FormField';
+import { FormField, FormSection, inputClass, selectClass } from '@/shared/components/FormField';
 
 interface PrinterFormData {
   name: string;

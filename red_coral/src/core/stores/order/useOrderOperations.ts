@@ -88,7 +88,7 @@ function toCartItemInput(item: CartItem): CartItemInput {
   })) ?? null;
 
   return {
-    product_id: item.product_id ?? item.id,
+    product_id: item.id,
     name: item.name,
     price: item.price,
     original_price: item.original_price ?? item.price,
@@ -100,6 +100,7 @@ function toCartItemInput(item: CartItem): CartItemInput {
     selected_specification: item.selected_specification ? {
       id: item.selected_specification.id,
       name: item.selected_specification.name,
+      external_id: item.selected_specification.external_id ?? null,
       receipt_name: item.selected_specification.receipt_name ?? null,
       price: item.selected_specification.price ?? null,
     } : null,
@@ -169,6 +170,49 @@ const handleCreateNewOrder = async (
 // ============================================================================
 // Exported Operations (Async)
 // ============================================================================
+
+/**
+ * Create a retail order with cart items
+ * Returns the new order_id directly (no waiting for WebSocket events)
+ */
+export const createRetailOrder = async (
+  cart: CartItem[]
+): Promise<string> => {
+  if (cart.length === 0) {
+    throw new Error('Cannot create retail order with empty cart');
+  }
+
+  // 1. Create retail order (no table_id, is_retail = true)
+  const openCommand = createCommand({
+    type: 'OPEN_TABLE',
+    table_id: null,
+    table_name: null,
+    zone_id: null,
+    zone_name: null,
+    guest_count: 1,
+    is_retail: true,
+  });
+
+  const openResponse = await sendCommand(openCommand);
+  ensureSuccess(openResponse, 'Create retail order');
+
+  const orderId = openResponse.order_id;
+  if (!orderId) {
+    throw new Error('Create retail order succeeded but no order_id returned');
+  }
+
+  // 2. Add items to the order
+  const addCommand = createCommand({
+    type: 'ADD_ITEMS',
+    order_id: orderId,
+    items: cart.map(toCartItemInput),
+  });
+
+  const addResponse = await sendCommand(addCommand);
+  ensureSuccess(addResponse, 'Add items to retail order');
+
+  return orderId;
+};
 
 /**
  * Handle table selection - creates new order or merges to existing

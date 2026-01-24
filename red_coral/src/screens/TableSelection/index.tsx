@@ -230,7 +230,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
 
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 font-sans animate-in fade-in duration-200">
-        <div className="bg-gray-100 w-full max-w-2xl h-[550px] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-200">
+        <div className="bg-gray-100 w-full max-w-2xl h-[34.375rem] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-200">
           <div className="bg-white h-12 border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-10 gap-4">
             <h1 className="text-base font-bold text-gray-800 flex items-center gap-2 shrink-0">
               <LayoutGrid className="text-[#FF5E5E]" size={18} />

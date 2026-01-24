@@ -1,21 +1,30 @@
 /**
- * UI Stores - Re-export for backward compatibility
+ * UI Stores
  */
+
+// UI Store (路由、模态框、动画、POS 过滤)
 export { useUIStore } from './useUIStore';
-export { useIsKitchenPrintEnabled } from './useUIStore';
-export { useIsLabelPrintEnabled } from './useUIStore';
-export { useAnimations } from './useUIStore';
-export { useActiveLabelTemplateId } from './useUIStore';
 export { useScreen } from './useUIStore';
 export { useViewMode } from './useUIStore';
-export { useSelectedPrinter } from './useUIStore';
-export { useReceiptPrinter } from './useUIStore';
-export { useKitchenPrinter } from './useUIStore';
-export { useLabelPrinter } from './useUIStore';
+export { useAnimations } from './useUIStore';
 export { useModalStates } from './useUIStore';
 export { useUIActions } from './useUIStore';
-
-// POS UI
 export { useSelectedCategory } from './useUIStore';
 export { useSearchQuery } from './useUIStore';
 export { usePOSUIActions } from './useUIStore';
+
+// Printer Store (打印机配置)
+export {
+  usePrinterStore,
+  useReceiptPrinter,
+  useKitchenPrinter,
+  useIsKitchenPrintEnabled,
+  useLabelPrinter,
+  useIsLabelPrintEnabled,
+  useActiveLabelTemplateId,
+  useSelectedPrinter,
+  usePrinterActions,
+} from '../printer';
+
+// UI Scale Store
+export { useUIScaleStore, useUIScale, useSetUIScale, initUIScale } from './useUIScaleStore';

@@ -63,7 +63,7 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
         <h3 className="font-semibold text-gray-800 flex items-center gap-2">
           {attribute.name}
           {isRequired && (
-            <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium">
+            <span className="text-[0.625rem] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium">
               {t('common.label.required')}
             </span>
           )}
@@ -88,7 +88,7 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
                 isSingleChoice ? handleSingleSelect(optionIdStr) : handleMultiSelect(optionIdStr);
               }}
               className={`
-                relative p-2 rounded-xl border-2 transition-all text-left flex flex-col items-start min-h-[60px] justify-center
+                relative p-2 rounded-xl border-2 transition-all text-left flex flex-col items-start min-h-[3.75rem] justify-center
                 ${isSelected 
                   ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200' 
                   : 'bg-white text-gray-700 border-gray-200 hover:border-orange-300 hover:bg-orange-50/30'
@@ -100,12 +100,12 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
               </span>
               
               {option.price_modifier !== 0 ? (
-                <span className={`text-[10px] font-medium ${option.price_modifier > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                <span className={`text-[0.625rem] font-medium ${option.price_modifier > 0 ? 'text-orange-600' : 'text-green-600'}`}>
                   {option.price_modifier > 0 ? '+' : ''}{formatCurrency(option.price_modifier)}
                 </span>
               ) : (
                 // Placeholder to keep height consistent if needed, or just let it collapse
-                <span className="text-[10px] text-gray-400 opacity-50">
+                <span className="text-[0.625rem] text-gray-400 opacity-50">
                    {formatCurrency(0)}
                 </span>
               )}

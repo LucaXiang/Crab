@@ -86,10 +86,10 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
     const map = new Map<string, number>();
     if (!order.paid_item_quantities) return map;
 
-    // Group items by original_instance_id (or instanceId if no original)
+    // Group items by instance_id
     const groups = new Map<string, typeof order.items>();
     order.items.forEach(item => {
-        const key = item.original_instance_id || item.instance_id;
+        const key = item.instance_id;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(item);
     });
@@ -336,7 +336,7 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
             `}>
               {isRemoved ? <span className="line-through">x{item.quantity}</span> : `x${item.quantity}`}
               {paidQty > 0 && !isFullyPaid && (
-                <div className="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] px-1 rounded-full shadow-sm">
+                <div className="absolute -top-2 -right-2 bg-green-500 text-white text-[0.625rem] px-1 rounded-full shadow-sm">
                   {paidQty}
                 </div>
               )}
@@ -345,19 +345,19 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
               <div className="font-medium text-gray-800 flex items-center gap-2 flex-wrap">
                 {/* User requested to use InstanceID instead of ExternalID
                 {item.external_id && (
-                  <span className="text-[10px] text-white bg-gray-900/85 font-bold font-mono px-1.5 py-0.5 rounded backdrop-blur-[1px]">
+                  <span className="text-[0.625rem] text-white bg-gray-900/85 font-bold font-mono px-1.5 py-0.5 rounded backdrop-blur-[1px]">
                     {item.external_id}
                   </span>
                 )} */}
                 <span>{item.name}</span>
-                <span className="text-[10px] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded">
-                  #{(item.original_instance_id || item.instance_id).slice(-5)}
+                <span className="text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded">
+                  #{item.instance_id.slice(-5)}
                 </span>
                 {item.manual_discount_percent ? (
-                  <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">-{item.manual_discount_percent}%</span>
+                  <span className="text-[0.625rem] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">-{item.manual_discount_percent}%</span>
                 ) : null}
                 {itemSurcharge > 0 ? (
-                  <span className="text-[10px] font-bold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">+{formatCurrency(itemSurcharge)}</span>
+                  <span className="text-[0.625rem] font-bold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">+{formatCurrency(itemSurcharge)}</span>
                 ) : null}
               </div>
               <div className="text-xs text-gray-400 flex items-center gap-2">
@@ -517,7 +517,7 @@ export const PaymentEventRow: React.FC<PaymentEventRowProps> = React.memo(({
                   <span className="text-gray-800 font-medium">
                     {item.name} <span className="text-gray-500">x{item.quantity}</span>
                     {item.instance_id && (
-                      <span className="ml-1.5 text-[10px] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded">
+                      <span className="ml-1.5 text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded">
                         #{item.instance_id.slice(-5)}
                       </span>
                     )}

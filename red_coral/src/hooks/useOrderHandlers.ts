@@ -83,7 +83,7 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
       const checkout = useCheckoutStore.getState();
       const { cart } = useCartStore.getState();
 
-      // Try to retrieve existing non-retail order
+      // Try to retrieve existing non-retail order (dine-in checkout)
       if (key) {
         const existingSnapshot = store.getOrder(key);
         if (existingSnapshot && !existingSnapshot.is_retail) {
@@ -94,46 +94,36 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
         }
       }
 
+      // Retail checkout: create new order with cart items
       if (cart.length === 0) return;
 
-      // Clear key for retail orders (new order will be created)
-      checkout.setCurrentOrderKey(null);
-
-      // Create retail order via command
-      const retailTable: Table = {
-        id: null, // Will be assigned by backend for retail
-        name: 'Inmediata',
-        capacity: 1,
-        zone: '',
-        is_active: true,
-      };
-
       try {
-        const result = await orderOps.handleTableSelect(
-          retailTable,
-          1,
-          cart,
-          0,
-          undefined
-        );
+        // Create retail order and get order_id directly (no waiting for WebSocket)
+        const orderId = await orderOps.createRetailOrder(cart);
 
-        if (result === 'CREATED' || result === 'MERGED') {
-          // Wait a bit for event to arrive and update store
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // Clear cart immediately after successful creation
+        useCartStore.getState().clearCart();
 
-          // Find the created retail order
-          const activeOrders = store.getActiveOrders();
-          const retailOrder = activeOrders.find(o => o.is_retail === true);
+        // Poll for the order in store (WebSocket event should arrive quickly)
+        let retailOrder = store.getOrder(orderId);
+        let attempts = 0;
+        while (!retailOrder && attempts < 10) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+          retailOrder = store.getOrder(orderId);
+          attempts++;
+        }
 
-          if (retailOrder) {
-            const heldOrder = retailOrder;
-            checkout.setCheckoutOrder(heldOrder);
-            setCurrentOrderKey(heldOrder.order_id);
-            setViewMode('checkout');
-          }
+        if (retailOrder) {
+          checkout.setCheckoutOrder(retailOrder);
+          setCurrentOrderKey(orderId);
+          setViewMode('checkout');
+        } else {
+          console.error('Retail order created but not found in store after polling');
+          toast.error('订单创建成功但加载失败，请重试');
         }
       } catch (error) {
         console.error('Failed to create retail order:', error);
+        toast.error('创建零售订单失败');
       }
     },
     [setCurrentOrderKey, setViewMode]

@@ -30,7 +30,7 @@ export const PrinterSettings: React.FC = React.memo(() => {
   }, []);
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-6 pb-10">
+    <div className="max-w-[100rem] mx-auto space-y-6 pb-10">
 
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 pb-6">
@@ -57,7 +57,7 @@ export const PrinterSettings: React.FC = React.memo(() => {
       </div>
 
       {/* Content Area */}
-      <div className="min-h-[500px]">
+      <div className="min-h-[31.25rem]">
         {activeTab === 'hardware' ? (
           <HardwareSettings printers={printers} loading={loading} />
         ) : (

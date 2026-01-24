@@ -87,7 +87,7 @@ const CollapsibleGroup: React.FC<CollapsibleGroupProps> = ({ title, icon: Icon, 
       
       <div 
         className={`overflow-hidden transition-all duration-300 ease-in-out ${
-          isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+          isOpen ? 'max-h-[31.25rem] opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
         <div className="pl-4 mt-1 border-l-2 border-gray-100 ml-4 space-y-1">

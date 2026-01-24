@@ -67,7 +67,7 @@ export const FieldHelperDialog: React.FC<FieldHelperDialogProps> = ({
                     {`{${field.key}}`}
                   </td>
                   <td className="p-4 py-3 text-gray-700">
-                    <span className="inline-block px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500 font-medium mr-2 uppercase tracking-wide">
+                    <span className="inline-block px-2 py-0.5 rounded text-[0.625rem] bg-gray-100 text-gray-500 font-medium mr-2 uppercase tracking-wide">
                       {field.category}
                     </span>
                     {field.description}

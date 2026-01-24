@@ -2,7 +2,7 @@ import React from 'react';
 import { useStoreInfo } from '@/core/stores/settings';
 import { useI18n } from '@/hooks/useI18n';
 import { Save, Store, Building2, MapPin, Phone, Mail, Globe, CreditCard, ImageIcon } from 'lucide-react';
-import { useDirtyForm } from '@/hooks/useDirtyForm';
+import { useDirtyForm } from '@/shared/hooks/useDirtyForm';
 
 export const StoreSettings: React.FC = () => {
   const { info, setInfo } = useStoreInfo();

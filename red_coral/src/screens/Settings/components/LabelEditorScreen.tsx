@@ -5,10 +5,10 @@ import { LabelTemplate, LabelField, SUPPORTED_LABEL_FIELDS } from '@/core/domain
 import { convertTemplateToRust } from '@/infrastructure/print';
 import { LabelTemplateEditor } from './LabelTemplateEditor';
 import { FieldPropertiesPanel } from './FieldPropertiesPanel';
-import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { FieldHelperDialog } from './FieldHelperDialog';
 import { useI18n } from '../../../hooks/useI18n';
-import { useLabelPrinter } from '@/core/stores/ui/useLabelPrinter';
+import { useLabelPrinter } from '@/core/stores/ui';
 import { NumberInput } from '@/presentation/components/ui/NumberInput';
 import { JsonEditor } from '@/presentation/components/ui/JsonEditor';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -71,7 +71,7 @@ const SortableLayerItem = ({
         <div className={`text-sm font-medium truncate ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>
           {field.name || t('settings.common.untitled')}
         </div>
-        <div className="text-[10px] text-gray-400 font-mono truncate">
+        <div className="text-[0.625rem] text-gray-400 font-mono truncate">
           {renderInfo(field)}
         </div>
       </div>
@@ -341,7 +341,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         setDialogConfig({
           isOpen: true,
           title: t('common.message.success'),
-          description: (t("settings.label.test_sent")).replace('{printer}', String(labelPrinter.selectedPrinterId ?? '')),
+          description: (t("settings.label.test_sent")).replace('{printer}', String(labelPrinter ?? '')),
           variant: 'info'
         });
       } catch (e) {
@@ -486,21 +486,21 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           <div className="p-3 grid grid-cols-3 gap-2 border-b border-gray-100">
             <button
               onClick={() => handleAddField('text')}
-              className="flex flex-col items-center justify-center gap-1 p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 text-[10px] font-medium transition-all"
+              className="flex flex-col items-center justify-center gap-1 p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 text-[0.625rem] font-medium transition-all"
             >
               <Type size={16} />
               {t("settings.label.field.text")}
             </button>
             <button
               onClick={() => handleAddField('image')}
-              className="flex flex-col items-center justify-center gap-1 p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 text-[10px] font-medium transition-all"
+              className="flex flex-col items-center justify-center gap-1 p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 text-[0.625rem] font-medium transition-all"
             >
               <ImageIcon size={16} />
               {t("settings.label.field.image")}
             </button>
             <button
               onClick={() => handleAddField('separator')}
-              className="flex flex-col items-center justify-center gap-1 p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 text-[10px] font-medium transition-all"
+              className="flex flex-col items-center justify-center gap-1 p-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 text-[0.625rem] font-medium transition-all"
             >
               <Minus size={16} />
               {t("settings.label.field.line")}

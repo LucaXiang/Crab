@@ -15,7 +15,7 @@ export const ZoneSidebar: React.FC<ZoneSidebarProps> = React.memo(
     return (
       <div className="w-40 bg-white border-r border-gray-200 flex flex-col overflow-y-auto shrink-0">
         <div className="p-2">
-          <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">
+          <h2 className="text-[0.625rem] font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">
             {t('table.zones')}
           </h2>
           <div className="space-y-1">
