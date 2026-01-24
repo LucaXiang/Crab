@@ -70,6 +70,7 @@ import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 // Hooks
 import { useOrderHandlers } from '@/hooks/useOrderHandlers';
 import { useDraftHandlers } from '@/hooks/useDraftHandlers';
+import { useRetailOrderRecovery } from '@/hooks/useRetailOrderRecovery';
 
 export const POSScreen: React.FC = () => {
   const { t } = useI18n();
@@ -263,6 +264,12 @@ export const POSScreen: React.FC = () => {
     clearCart,
     setCart,
     setShowDraftModal,
+    setCurrentOrderKey,
+  });
+
+  // 检查并恢复未完成的零售订单（断电/崩溃后恢复）
+  useRetailOrderRecovery({
+    setViewMode,
     setCurrentOrderKey,
   });
 

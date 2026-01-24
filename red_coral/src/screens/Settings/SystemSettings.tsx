@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useUIScale, useSetUIScale } from '@/core/stores/ui';
 import { useI18n } from '@/hooks/useI18n';
-import { Monitor, Zap, Trash2, ZoomIn, Plus, Minus } from 'lucide-react';
+import { Monitor, Zap, Trash2, ZoomIn, Plus, Minus, Bug } from 'lucide-react';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 
 
 export const SystemSettings: React.FC = () => {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const performanceMode = useSettingsStore((state) => state.performanceMode);
   const setPerformanceMode = useSettingsStore((state) => state.setPerformanceMode);
 
@@ -15,6 +17,8 @@ export const SystemSettings: React.FC = () => {
   const setUIScale = useSetUIScale();
 
   const [showClearCacheDialog, setShowClearCacheDialog] = useState(false);
+
+  const isDev = import.meta.env.DEV;
 
   const scalePercent = Math.round(uiScale * 100);
 
@@ -163,6 +167,33 @@ export const SystemSettings: React.FC = () => {
               {t('common.action.clear')}
             </button>
           </div>
+
+          {/* Debug Section - Dev Only */}
+          {isDev && (
+            <div className="flex items-center justify-between p-6 bg-orange-50 rounded-xl border border-orange-100 transition-all hover:border-orange-200 hover:shadow-sm">
+              <div className="flex gap-5">
+                <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-orange-100 text-orange-600 shrink-0">
+                  <Bug size={24} />
+                </div>
+                <div>
+                  <div className="font-bold text-gray-900 text-lg mb-1">
+                    订单调试
+                    <span className="ml-2 px-2 py-0.5 text-xs bg-orange-200 text-orange-700 rounded">DEV</span>
+                  </div>
+                  <div className="text-sm text-gray-500 max-w-lg leading-relaxed">
+                    查看所有订单状态，排查幽灵订单问题
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate('/debug/orders')}
+                className="px-4 py-2 bg-white border border-orange-200 text-orange-600 rounded-lg font-medium hover:bg-orange-50 transition-colors shadow-sm"
+              >
+                打开调试
+              </button>
+            </div>
+          )}
 
         </div>
       </div>

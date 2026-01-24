@@ -8,7 +8,7 @@ import { useCategories, useCategoryStore } from '@/features/category';
 import { useProducts, useProductStore, useProductsLoading, ProductWithPrice } from '@/features/product';
 import { ProductGrid } from '@/screens/POS/components/ProductGrid';
 import { CategoryNav } from '@/presentation/components/CategoryNav';
-import { CartItem } from '@/presentation/components/cart/CartItem';
+import { CartList } from '@/presentation/components/cart/CartList';
 import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDetailModal';
 import { ProductOptionsModal } from '@/presentation/components/modals/ProductOptionsModal';
 import { createTauriClient } from '@/infrastructure/api';
@@ -437,7 +437,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       )}
 
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] overflow-hidden flex relative animate-in zoom-in-95 duration-200"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-[95vw] h-[92vh] overflow-hidden flex relative animate-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         {/* Left Side: Cart Sidebar (Matches POS Sidebar style) */}
@@ -470,16 +470,11 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
                   <p className="text-gray-400 text-sm">{t('pos.quick_add.select_prompt')}</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
-                  {tempItems.map((item) => (
-                    <CartItem
-                      key={item.instance_id}
-                      item={item}
-                      onQuantityChange={handleQuantityChange}
-                      onClick={handleItemClick}
-                    />
-                  ))}
-                </div>
+                <CartList
+                  cart={tempItems}
+                  onQuantityChange={handleQuantityChange}
+                  onItemClick={handleItemClick}
+                />
               )}
             </div>
   
@@ -520,7 +515,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
             products={filteredProducts}
             isLoading={isLoading}
             onAdd={handleAddProduct}
-            className="grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3"
+            className="grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 p-4"
           />
         </div>
       </div>

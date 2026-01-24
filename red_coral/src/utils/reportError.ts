@@ -1,5 +1,3 @@
-import { invokeApi } from '@/infrastructure/api/tauri-client';
-
 interface ReportErrorOptions {
   source?: string;
   userActionOverride?: string | null;
@@ -55,9 +53,6 @@ export async function reportError(
     Object.assign(payload, options.extras);
   }
 
-  try {
-    await invokeApi('record_error_cmd', { payload });
-  } catch {
-    // Silently fail - error reporting should not cause errors
-  }
+  // TODO: 错误上报功能待实现后端支持
+  console.error('[reportError]', payload);
 }

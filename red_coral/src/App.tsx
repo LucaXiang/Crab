@@ -17,6 +17,7 @@ import { LoginScreen } from '@/screens/Login';
 import { POSScreen } from '@/screens/POS';
 import { SetupScreen } from '@/screens/Setup';
 import { TenantSelectScreen } from '@/screens/TenantSelect';
+import { OrderDebug } from '@/screens/Debug';
 
 // Initial route component that handles first-run detection and mode auto-start
 // 使用新的 AppState 状态机进行路由决策
@@ -268,6 +269,9 @@ const App: React.FC = () => {
             </ProtectedRoute>
           }
         />
+
+        {/* Debug Route */}
+        <Route path="/debug/orders" element={<OrderDebug />} />
 
         {/* Default Route - handles first-run detection */}
         <Route path="/" element={<InitialRoute />} />

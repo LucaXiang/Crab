@@ -41,7 +41,7 @@ function createCommand(payload: OrderCommandPayload): OrderCommand {
   return {
     command_id: generateCommandId(),
     timestamp: Date.now(),
-    operator_id: operatorId,
+    operator_id: String(operatorId),
     operator_name: operatorName,
     payload,
   };

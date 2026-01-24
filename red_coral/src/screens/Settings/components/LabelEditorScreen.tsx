@@ -336,8 +336,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           override_dpi: template.renderDpi
         };
 
-        // Backend command print_label_cmd(ticket: LabelTicketData) expects 'ticket' argument
-        await invokeApi('print_label_cmd', { ticket: ticketData });
+        // TODO: 标签打印功能已移至服务端，前端测试打印暂不可用
+        console.warn('[LabelEditor] 标签打印功能已由服务端处理，测试打印暂不可用', ticketData);
         setDialogConfig({
           isOpen: true,
           title: t('common.message.success'),

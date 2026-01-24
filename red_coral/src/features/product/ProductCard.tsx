@@ -90,7 +90,7 @@ export const ProductCard = React.memo<ProductCardProps>(
              </div>
           )}
           {product.external_id !== undefined && (
-            <div className="absolute bottom-0 left-0 bg-gray-900/85 text-white text-[0.625rem] font-bold font-mono px-1.5 py-0.5 rounded-tr-md backdrop-blur-[1px] shadow-sm z-10 leading-none">
+            <div className="absolute bottom-0 left-0 bg-gray-900/85 text-white text-sm font-bold font-mono px-2 py-1 rounded-tr-lg backdrop-blur-[1px] shadow-sm z-10 leading-none">
               {product.external_id}
             </div>
           )}
@@ -100,7 +100,7 @@ export const ProductCard = React.memo<ProductCardProps>(
         <div className="flex-1 flex flex-col justify-between p-2 min-w-0 bg-white">
           {/* Header: Name */}
           <div className="w-full">
-            <h3 className="font-bold text-gray-800 text-xs leading-tight line-clamp-5 transition-colors wrap-break-word group-active:text-blue-600" title={product.name}>
+            <h3 className="font-bold text-gray-800 text-base leading-tight line-clamp-4 transition-colors wrap-break-word group-active:text-blue-600" title={product.name}>
               {product.name}
             </h3>
           </div>
