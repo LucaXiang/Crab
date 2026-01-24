@@ -3,13 +3,14 @@
 //! Archives completed orders from redb to SurrealDB with hash chain integrity.
 
 use crate::db::models::{
-    Order as SurrealOrder, OrderEventType as SurrealEventType, OrderStatus as SurrealOrderStatus,
+    Order as SurrealOrder, OrderEventType as SurrealEventType, OrderItem, OrderItemAttribute,
+    OrderPayment, OrderStatus as SurrealOrderStatus,
 };
 use crate::db::repository::{OrderRepository, SystemStateRepository};
 use sha2::{Digest, Sha256};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
 use surrealdb::engine::local::Db;
-use surrealdb::Surreal;
+use surrealdb::{RecordId, Surreal};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -23,6 +24,11 @@ pub enum ArchiveError {
 }
 
 pub type ArchiveResult<T> = Result<T, ArchiveError>;
+
+/// Maximum retry attempts for archiving
+const MAX_RETRY_ATTEMPTS: u32 = 3;
+/// Base delay between retries (exponential backoff)
+const RETRY_BASE_DELAY_MS: u64 = 1000;
 
 /// Service for archiving orders to SurrealDB
 #[derive(Clone)]
@@ -39,12 +45,53 @@ impl OrderArchiveService {
         }
     }
 
-    /// Archive a completed order with its events
+    /// Archive a completed order with its events (with retry logic)
     pub async fn archive_order(
         &self,
         snapshot: &OrderSnapshot,
         events: Vec<OrderEvent>,
     ) -> ArchiveResult<()> {
+        let mut last_error = None;
+
+        for attempt in 0..MAX_RETRY_ATTEMPTS {
+            match self.archive_order_internal(snapshot, &events).await {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    last_error = Some(e);
+                    if attempt + 1 < MAX_RETRY_ATTEMPTS {
+                        let delay_ms = RETRY_BASE_DELAY_MS * 2u64.pow(attempt);
+                        tracing::warn!(
+                            order_id = %snapshot.order_id,
+                            attempt = attempt + 1,
+                            max_attempts = MAX_RETRY_ATTEMPTS,
+                            delay_ms = delay_ms,
+                            "Archive failed, retrying..."
+                        );
+                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+                    }
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| ArchiveError::Database("Unknown error".to_string())))
+    }
+
+    /// Internal archive implementation (single attempt)
+    async fn archive_order_internal(
+        &self,
+        snapshot: &OrderSnapshot,
+        events: &[OrderEvent],
+    ) -> ArchiveResult<()> {
+        // 0. Check idempotency - skip if already archived
+        if let Ok(Some(_)) = self
+            .order_repo
+            .find_by_receipt(snapshot.receipt_number.as_deref().unwrap_or(""))
+            .await
+        {
+            tracing::info!(order_id = %snapshot.order_id, "Order already archived, skipping");
+            return Ok(());
+        }
+
         // 1. Get last order hash from system_state
         let system_state = self
             .system_state_repo
@@ -157,6 +204,69 @@ impl OrderArchiveService {
             }
         };
 
+        // Convert items from CartItemSnapshot to OrderItem
+        // Note: snapshot.items only contains active items (removed items are excluded by reducer)
+        let items: Vec<OrderItem> = snapshot
+            .items
+            .iter()
+            .map(|item| {
+                // Calculate discount amount from manual_discount_percent
+                let manual_discount_amount = item
+                    .manual_discount_percent
+                    .map(|p| item.price * item.quantity as f64 * p / 100.0)
+                    .unwrap_or(0.0);
+                let rule_discount = item.rule_discount_amount.unwrap_or(0.0);
+                let total_discount = manual_discount_amount + rule_discount;
+
+                let surcharge = item.surcharge.unwrap_or(0.0)
+                    + item.rule_surcharge_amount.unwrap_or(0.0);
+
+                // Convert selected_options to OrderItemAttribute
+                let attributes: Vec<OrderItemAttribute> = item
+                    .selected_options
+                    .as_ref()
+                    .map(|opts| {
+                        opts.iter()
+                            .map(|opt| OrderItemAttribute {
+                                attr_id: RecordId::from_table_key("attribute", &opt.attribute_id),
+                                option_idx: opt.option_idx,
+                                name: opt.option_name.clone(),
+                                price: opt.price_modifier.unwrap_or(0.0),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                OrderItem {
+                    spec: RecordId::from_table_key("product_spec", &item.id),
+                    name: item.name.clone(),
+                    spec_name: item.selected_specification.as_ref().map(|s| s.name.clone()),
+                    price: item.price,
+                    quantity: item.quantity,
+                    attributes,
+                    discount_amount: total_discount,
+                    surcharge_amount: surcharge,
+                    note: item.note.clone(),
+                    is_sent: true, // Archived orders have been processed
+                }
+            })
+            .collect();
+
+        // Convert payments from PaymentRecord to OrderPayment
+        let payments: Vec<OrderPayment> = snapshot
+            .payments
+            .iter()
+            .filter(|p| !p.cancelled) // Only include non-cancelled payments
+            .map(|payment| OrderPayment {
+                method: payment.method.clone(),
+                amount: payment.amount,
+                time: chrono::DateTime::from_timestamp_millis(payment.timestamp)
+                    .map(|dt| dt.to_rfc3339())
+                    .unwrap_or_default(),
+                reference: payment.note.clone(),
+            })
+            .collect();
+
         Ok(SurrealOrder {
             id: None,
             receipt_number: snapshot.receipt_number.clone().unwrap_or_default(),
@@ -176,8 +286,8 @@ impl OrderArchiveService {
             paid_amount: snapshot.paid_amount,
             discount_amount: snapshot.total_discount,
             surcharge_amount: snapshot.total_surcharge,
-            items: vec![], // Items embedded in events
-            payments: vec![], // Payments embedded in events
+            items,
+            payments,
             prev_hash,
             curr_hash,
             related_order_id: None,
@@ -188,15 +298,31 @@ impl OrderArchiveService {
 
     fn convert_event_type(&self, event_type: &OrderEventType) -> SurrealEventType {
         match event_type {
-            OrderEventType::TableOpened => SurrealEventType::Created,
-            OrderEventType::ItemsAdded => SurrealEventType::ItemAdded,
+            // Lifecycle
+            OrderEventType::TableOpened => SurrealEventType::TableOpened,
+            OrderEventType::OrderCompleted => SurrealEventType::OrderCompleted,
+            OrderEventType::OrderVoided => SurrealEventType::OrderVoided,
+            OrderEventType::OrderRestored => SurrealEventType::OrderRestored,
+            // Items
+            OrderEventType::ItemsAdded => SurrealEventType::ItemsAdded,
+            OrderEventType::ItemModified => SurrealEventType::ItemModified,
             OrderEventType::ItemRemoved => SurrealEventType::ItemRemoved,
-            OrderEventType::ItemModified => SurrealEventType::ItemUpdated,
-            OrderEventType::PaymentAdded => SurrealEventType::PartialPaid,
-            OrderEventType::OrderCompleted => SurrealEventType::Paid,
-            OrderEventType::OrderVoided => SurrealEventType::Void,
-            // Fallback for other event types
-            _ => SurrealEventType::ItemUpdated,
+            OrderEventType::ItemRestored => SurrealEventType::ItemRestored,
+            // Payments
+            OrderEventType::PaymentAdded => SurrealEventType::PaymentAdded,
+            OrderEventType::PaymentCancelled => SurrealEventType::PaymentCancelled,
+            // Split
+            OrderEventType::OrderSplit => SurrealEventType::OrderSplit,
+            // Table operations
+            OrderEventType::OrderMoved => SurrealEventType::OrderMoved,
+            OrderEventType::OrderMovedOut => SurrealEventType::OrderMovedOut,
+            OrderEventType::OrderMerged => SurrealEventType::OrderMerged,
+            OrderEventType::OrderMergedOut => SurrealEventType::OrderMergedOut,
+            OrderEventType::TableReassigned => SurrealEventType::TableReassigned,
+            // Other
+            OrderEventType::OrderInfoUpdated => SurrealEventType::OrderInfoUpdated,
+            // Price Rules
+            OrderEventType::RuleSkipToggled => SurrealEventType::RuleSkipToggled,
         }
     }
 }

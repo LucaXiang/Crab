@@ -98,20 +98,35 @@ pub struct Order {
     pub created_at: Option<String>,
 }
 
-/// Order event types
+/// Order event types (matches shared::order::OrderEventType)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OrderEventType {
-    Created,
-    ItemAdded,
+    // Lifecycle
+    TableOpened,
+    OrderCompleted,
+    OrderVoided,
+    OrderRestored,
+    // Items
+    ItemsAdded,
+    ItemModified,
     ItemRemoved,
-    ItemUpdated,
-    Paid,
-    PartialPaid,
-    Void,
-    Refund,
-    TableChanged,
-    GuestCountChanged,
+    ItemRestored,
+    // Payments
+    PaymentAdded,
+    PaymentCancelled,
+    // Split
+    OrderSplit,
+    // Table operations
+    OrderMoved,
+    OrderMovedOut,
+    OrderMerged,
+    OrderMergedOut,
+    TableReassigned,
+    // Other
+    OrderInfoUpdated,
+    // Price Rules
+    RuleSkipToggled,
 }
 
 /// Order event entity (connected via has_event edge)

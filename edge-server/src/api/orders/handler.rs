@@ -274,6 +274,7 @@ pub struct OrderHistoryQuery {
     pub start_date: String,
     pub end_date: String,
     pub limit: Option<i32>,
+    pub offset: Option<i32>,
 }
 
 /// Order summary for history list
@@ -299,7 +300,12 @@ pub async fn fetch_order_list(
     let repo = OrderRepository::new(state.db.clone());
 
     let orders = repo
-        .find_by_date_range(&params.start_date, &params.end_date, params.limit.unwrap_or(100))
+        .find_by_date_range(
+            &params.start_date,
+            &params.end_date,
+            params.limit.unwrap_or(100),
+            params.offset.unwrap_or(0),
+        )
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 

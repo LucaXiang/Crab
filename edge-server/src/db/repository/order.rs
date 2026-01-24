@@ -285,16 +285,18 @@ impl OrderRepository {
         start_date: &str,
         end_date: &str,
         limit: i32,
+        offset: i32,
     ) -> RepoResult<Vec<Order>> {
         let start_owned = start_date.to_string();
         let end_owned = end_date.to_string();
         let mut result = self
             .base
             .db()
-            .query("SELECT * FROM order WHERE end_time >= $start AND end_time <= $end ORDER BY end_time DESC LIMIT $limit")
+            .query("SELECT * FROM order WHERE end_time >= $start AND end_time <= $end ORDER BY end_time DESC LIMIT $limit START $offset")
             .bind(("start", start_owned))
             .bind(("end", end_owned))
             .bind(("limit", limit))
+            .bind(("offset", offset))
             .await?;
         let orders: Vec<Order> = result.take(0)?;
         Ok(orders)
