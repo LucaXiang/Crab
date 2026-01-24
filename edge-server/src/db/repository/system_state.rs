@@ -1,9 +1,9 @@
 //! System State Repository (Singleton)
 
-use super::{BaseRepository, RepoError, RepoResult, make_thing};
+use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{SystemState, SystemStateUpdate};
-use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use surrealdb::{RecordId, Surreal};
 
 const TABLE: &str = "system_state";
 const SINGLETON_ID: &str = "main";
@@ -29,7 +29,7 @@ impl SystemStateRepository {
 
         // Create new singleton
         let state = SystemState {
-            id: Some(make_thing(TABLE, SINGLETON_ID)),
+            id: Some(RecordId::from_table_key(TABLE, SINGLETON_ID)),
             genesis_hash: None,
             last_order: None,
             last_order_hash: None,
@@ -62,11 +62,12 @@ impl SystemStateRepository {
         self.get_or_create().await?;
 
         // Update timestamp first
+        let singleton_id = RecordId::from_table_key(TABLE, SINGLETON_ID);
         let _ = self
             .base
             .db()
             .query("UPDATE system_state SET updated_at = time::now() WHERE id = $id RETURN AFTER")
-            .bind(("id", make_thing(TABLE, SINGLETON_ID)))
+            .bind(("id", singleton_id))
             .await?;
 
         // Merge the actual data
@@ -89,12 +90,16 @@ impl SystemStateRepository {
     }
 
     /// Update last order info
+    /// order_id should be in "order:xxx" format
     pub async fn update_last_order(
         &self,
         order_id: &str,
         order_hash: String,
     ) -> RepoResult<SystemState> {
-        let order_thing = make_thing("order", order_id);
+        let order_thing = order_id
+            .parse::<RecordId>()
+            .map_err(|_| RepoError::Validation(format!("Invalid order ID: {}", order_id)))?;
+
         self.update(SystemStateUpdate {
             last_order: Some(order_thing),
             last_order_hash: Some(order_hash),
@@ -105,14 +110,18 @@ impl SystemStateRepository {
     }
 
     /// Update sync state
+    /// synced_up_to_id should be in "order:xxx" format
     pub async fn update_sync_state(
         &self,
         synced_up_to_id: &str,
         synced_up_to_hash: String,
     ) -> RepoResult<SystemState> {
-        let order_thing = make_thing("order", synced_up_to_id);
+        let synced_thing = synced_up_to_id
+            .parse::<RecordId>()
+            .map_err(|_| RepoError::Validation(format!("Invalid order ID: {}", synced_up_to_id)))?;
+
         self.update(SystemStateUpdate {
-            synced_up_to: Some(order_thing),
+            synced_up_to: Some(synced_thing),
             synced_up_to_hash: Some(synced_up_to_hash),
             last_sync_time: Some(chrono::Utc::now().to_rfc3339()),
             ..Default::default()

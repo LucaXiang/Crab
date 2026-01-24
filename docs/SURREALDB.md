@@ -129,20 +129,24 @@ type::thing("table", $id)    -- 构造 Thing ID
 
 ### ID 格式
 
-SurrealDB 使用 `Thing` 类型: `"table:id"`
+全栈统一使用 `"table:id"` 格式，与 SurrealDB 原生格式一致。
 
 ```rust
-// Rust 中构造 Thing
-use surrealdb::sql::Thing;
+use surrealdb::RecordId;
 
-fn make_thing(table: &str, id: &str) -> Thing {
-    Thing::from((table, id))
-}
+// 解析字符串 ID
+let id: RecordId = "product:abc".parse()?;
 
-// 从完整 ID 提取纯 ID
-fn strip_table_prefix(table: &str, id: &str) -> &str {
-    id.strip_prefix(&format!("{}:", table)).unwrap_or(id)
-}
+// 从 table + key 创建
+let id = RecordId::from_table_key("product", "abc");
+
+// 获取组件
+let table: &str = id.table();           // "product"
+let key: String = id.key().to_string(); // "abc"
+
+// 直接用于 SDK 操作
+db.select(id.clone()).await?;
+db.delete(id).await?;
 ```
 
 ### 关系表定义
@@ -205,8 +209,9 @@ db.query("DELETE $thing").bind(("thing", thing)).await?;
 **图遍历**:
 ```rust
 // 获取产品的所有属性
+let prod_id = RecordId::from_table_key("product", id);
 db.query("SELECT ->has_attribute->attribute.* FROM $prod")
-    .bind(("prod", make_thing("product", id)))
+    .bind(("prod", prod_id.clone()))
     .await?;
 
 // 带条件的图查询
@@ -216,7 +221,7 @@ db.query(r#"
     WHERE in = $prod AND out.is_active = true
     ORDER BY display_order
 "#)
-.bind(("prod", make_thing("product", id)))
+.bind(("prod", prod_id))
 .await?;
 ```
 

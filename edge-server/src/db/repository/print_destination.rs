@@ -1,9 +1,9 @@
 //! Print Destination Repository
 
-use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
+use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{PrintDestination, PrintDestinationCreate, PrintDestinationUpdate};
-use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use surrealdb::{RecordId, Surreal};
 
 const TABLE: &str = "print_destination";
 
@@ -43,8 +43,10 @@ impl PrintDestinationRepository {
 
     /// Find print destination by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<PrintDestination>> {
-        let pure_id = strip_table_prefix(TABLE, id);
-        let item: Option<PrintDestination> = self.base.db().select((TABLE, pure_id)).await?;
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+        let item: Option<PrintDestination> = self.base.db().select(thing).await?;
         Ok(item)
     }
 
@@ -89,9 +91,11 @@ impl PrintDestinationRepository {
         id: &str,
         data: PrintDestinationUpdate,
     ) -> RepoResult<PrintDestination> {
-        let pure_id = strip_table_prefix(TABLE, id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
         let existing = self
-            .find_by_id(pure_id)
+            .find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Print destination {} not found", id)))?;
 
@@ -106,23 +110,23 @@ impl PrintDestinationRepository {
             )));
         }
 
-        let thing = make_thing(TABLE, pure_id);
         self.base
             .db()
             .query("UPDATE $thing MERGE $data")
-            .bind(("thing", thing))
+            .bind(("thing", thing.clone()))
             .bind(("data", data))
             .await?;
 
-        self.find_by_id(pure_id)
+        self.find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Print destination {} not found", id)))
     }
 
     /// Hard delete a print destination
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let pure_id = strip_table_prefix(TABLE, id);
-        let thing = make_thing(TABLE, pure_id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
         self.base
             .db()
             .query("DELETE $thing")

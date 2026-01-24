@@ -1,10 +1,10 @@
 //! Price Rule Repository
 
-use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix, parse_thing};
-use crate::db::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
+use super::{BaseRepository, RepoError, RepoResult};
+use crate::db::models::{serde_helpers, PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
 use chrono::Utc;
-use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use surrealdb::{RecordId, Surreal};
 
 const TABLE: &str = "price_rule";
 
@@ -74,8 +74,10 @@ impl PriceRuleRepository {
 
     /// Find rule by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<PriceRule>> {
-        let pure_id = strip_table_prefix(TABLE, id);
-        let rule: Option<PriceRule> = self.base.db().select((TABLE, pure_id)).await?;
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+        let rule: Option<PriceRule> = self.base.db().select(thing).await?;
         Ok(rule)
     }
 
@@ -102,10 +104,10 @@ impl PriceRuleRepository {
             )));
         }
 
-        // Convert target string to Thing if provided
-        let target_thing = data.target.as_ref().and_then(|t| parse_thing(t));
+        // Convert target string to RecordId if provided
+        let target_thing: Option<RecordId> = data.target.as_ref().and_then(|t| t.parse().ok());
 
-        // Internal struct with native Thing type (not serde_thing which serializes as string)
+        // Internal struct with native RecordId type
         #[derive(serde::Serialize)]
         struct InternalCreate {
             name: String,
@@ -115,8 +117,11 @@ impl PriceRuleRepository {
             description: Option<String>,
             rule_type: crate::db::models::RuleType,
             product_scope: ProductScope,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            target: Option<surrealdb::sql::Thing>,
+            #[serde(
+                skip_serializing_if = "Option::is_none",
+                with = "serde_helpers::option_record_id"
+            )]
+            target: Option<RecordId>,
             zone_scope: String,
             adjustment_type: crate::db::models::AdjustmentType,
             adjustment_value: f64,
@@ -134,8 +139,11 @@ impl PriceRuleRepository {
             #[serde(skip_serializing_if = "Option::is_none")]
             active_end_time: Option<String>,
             is_active: bool,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            created_by: Option<surrealdb::sql::Thing>,
+            #[serde(
+                skip_serializing_if = "Option::is_none",
+                with = "serde_helpers::option_record_id"
+            )]
+            created_by: Option<RecordId>,
         }
 
         let internal = InternalCreate {
@@ -167,9 +175,11 @@ impl PriceRuleRepository {
 
     /// Update a price rule
     pub async fn update(&self, id: &str, data: PriceRuleUpdate) -> RepoResult<PriceRule> {
-        let pure_id = strip_table_prefix(TABLE, id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
         let existing = self
-            .find_by_id(pure_id)
+            .find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Price rule {} not found", id)))?;
 
@@ -184,10 +194,10 @@ impl PriceRuleRepository {
             )));
         }
 
-        // Convert target string to Thing if provided
-        let target_thing = data.target.as_ref().and_then(|t| parse_thing(t));
+        // Convert target string to RecordId if provided
+        let target_thing: Option<RecordId> = data.target.as_ref().and_then(|t| t.parse().ok());
 
-        // Create internal update struct with Thing type for target
+        // Create internal update struct with RecordId type for target
         #[derive(serde::Serialize)]
         struct InternalUpdate {
             #[serde(skip_serializing_if = "Option::is_none")]
@@ -202,8 +212,11 @@ impl PriceRuleRepository {
             rule_type: Option<crate::db::models::RuleType>,
             #[serde(skip_serializing_if = "Option::is_none")]
             product_scope: Option<ProductScope>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            target: Option<surrealdb::sql::Thing>,
+            #[serde(
+                skip_serializing_if = "Option::is_none",
+                with = "serde_helpers::option_record_id"
+            )]
+            target: Option<RecordId>,
             #[serde(skip_serializing_if = "Option::is_none")]
             zone_scope: Option<String>,
             #[serde(skip_serializing_if = "Option::is_none")]
@@ -252,23 +265,23 @@ impl PriceRuleRepository {
             is_active: data.is_active,
         };
 
-        let thing = make_thing(TABLE, pure_id);
         self.base
             .db()
             .query("UPDATE $thing MERGE $data")
-            .bind(("thing", thing))
+            .bind(("thing", thing.clone()))
             .bind(("data", internal))
             .await?;
 
-        self.find_by_id(pure_id)
+        self.find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Price rule {} not found", id)))
     }
 
     /// Hard delete a price rule
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let pure_id = strip_table_prefix(TABLE, id);
-        let thing = make_thing(TABLE, pure_id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
         self.base
             .db()
             .query("DELETE $thing")

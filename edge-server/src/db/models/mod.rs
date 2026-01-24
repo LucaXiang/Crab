@@ -2,7 +2,6 @@
 
 // Serde helpers
 pub mod serde_helpers;
-pub mod serde_thing;
 
 // Auth
 pub mod employee;

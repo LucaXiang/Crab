@@ -65,30 +65,39 @@ cd red_coral && npx tsc --noEmit    # TS 检查
 
 ### ID 格式规范
 
-**核心原则**: 全栈统一使用 `"table:id"` 格式，与 SurrealDB 原生格式一致。
+**核心原则**: 全栈统一使用 `surrealdb::RecordId`，格式 `"table:id"`。
 
-| 层级 | ID 格式 | 示例 |
-|------|---------|------|
-| **前端 (TypeScript)** | `"table:id"` | `"product:hyfz15ouopnehs9wxq2o"` |
-| **API 传输 (JSON)** | `"table:id"` | `"product:hyfz15ouopnehs9wxq2o"` |
-| **后端模型** | `Thing` | `Thing { tb: "product", id: "..." }` |
-| **数据库存储** | SurrealDB Record | `product:hyfz15ouopnehs9wxq2o` |
+| 层级 | 类型 | 示例 |
+|------|------|------|
+| **前端 (TypeScript)** | `string` | `"product:abc123"` |
+| **API 传输 (JSON)** | `string` | `"product:abc123"` |
+| **后端 (Rust)** | `RecordId` | `surrealdb::RecordId` |
+| **数据库** | `record` | SurrealDB 原生 record |
 
-**Serde 自动转换** (`#[serde(with = "serde_thing")]`):
-- 序列化: `Thing` → `"table:id"`
-- 反序列化: `"table:id"` → `Thing`
-
-**关键实现**:
+**RecordId 使用**:
 ```rust
-// edge-server/src/db/models/serde_thing.rs
-pub fn serialize<S>(thing: &Thing, s: S) -> Result<S::Ok, S::Error> {
-    s.serialize_str(&thing.to_string())  // "product:xxx"
-}
+use surrealdb::RecordId;
 
-pub fn deserialize<'de, D>(d: D) -> Result<Thing, D::Error> {
-    // 支持 "table:id" 字符串和 Thing 原生格式
-}
+// 解析
+let id: RecordId = "product:abc".parse()?;
+
+// 创建
+let id = RecordId::from_table_key("product", "abc");
+
+// 获取组件
+id.table()        // "product"
+id.key()          // Key 类型
+id.to_string()    // "product:abc"
+
+// SDK 操作
+db.select(id.clone()).await?;
+db.delete(id).await?;
 ```
+
+**禁止**:
+- ❌ `surrealdb::sql::Thing` - 不要用
+- ❌ `serde_thing` 模块 - 已删除
+- ❌ 任何 ID 适配层/转换层
 
 **RELATE 边关系**:
 - `attribute_binding`: product/category → attribute

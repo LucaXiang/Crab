@@ -8,15 +8,15 @@
 //! - PriceRuleEngine DB queries
 
 use crate::db::models::{
-    serde_thing, Attribute, AttributeBindingFull, Category, CategoryCreate, CategoryUpdate,
+    serde_helpers, Attribute, AttributeBindingFull, Category, CategoryCreate, CategoryUpdate,
     Product, ProductCreate, ProductFull, ProductUpdate, Tag,
 };
-use crate::db::repository::{make_thing, strip_table_prefix, RepoError, RepoResult};
+use crate::db::repository::{RepoError, RepoResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use surrealdb::engine::local::Db;
-use surrealdb::sql::Thing;
+use surrealdb::RecordId;
 use surrealdb::Surreal;
 
 // =============================================================================
@@ -24,26 +24,25 @@ use surrealdb::Surreal;
 // =============================================================================
 
 /// Product with tags fetched (for FETCH queries)
-/// Note: When using FETCH tags, SurrealDB returns full Tag objects instead of Thing references
 #[derive(Debug, Clone, Deserialize)]
 struct ProductWithTags {
-    #[serde(default, with = "serde_thing::option")]
-    pub id: Option<Thing>,
+    #[serde(default, with = "serde_helpers::option_record_id")]
+    pub id: Option<RecordId>,
     pub name: String,
     #[serde(default)]
     pub image: String,
-    #[serde(with = "serde_thing")]
-    pub category: Thing,
+    #[serde(with = "serde_helpers::record_id")]
+    pub category: RecordId,
     #[serde(default)]
     pub sort_order: i32,
     #[serde(default)]
     pub tax_rate: i32,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    #[serde(default, with = "serde_thing::vec")]
-    pub kitchen_print_destinations: Vec<Thing>,
-    #[serde(default, with = "serde_thing::vec")]
-    pub label_print_destinations: Vec<Thing>,
+    #[serde(default, with = "serde_helpers::vec_record_id")]
+    pub kitchen_print_destinations: Vec<RecordId>,
+    #[serde(default, with = "serde_helpers::vec_record_id")]
+    pub label_print_destinations: Vec<RecordId>,
     #[serde(default)]
     pub is_kitchen_print_enabled: i32,
     #[serde(default)]
@@ -162,9 +161,10 @@ impl CatalogService {
         // 3. Load all attribute bindings with full attribute data
         #[derive(Debug, Deserialize)]
         struct BindingRow {
-            id: Option<Thing>,
-            #[serde(rename = "in")]
-            from: Thing,
+            #[serde(default, with = "serde_helpers::option_record_id")]
+            id: Option<RecordId>,
+            #[serde(rename = "in", with = "serde_helpers::record_id")]
+            from: RecordId,
             #[serde(rename = "out")]
             to: Attribute,
             #[serde(default)]
@@ -357,8 +357,8 @@ impl CatalogService {
 
     /// Update a product
     pub async fn update_product(&self, id: &str, data: ProductUpdate) -> RepoResult<ProductFull> {
-        let pure_id = strip_table_prefix("product", id);
-        let thing = make_thing("product", pure_id);
+        let thing = id.parse::<RecordId>()
+            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", id)))?;
 
         // Build dynamic SET clauses
         let mut set_parts: Vec<&str> = Vec::new();
@@ -420,16 +420,15 @@ impl CatalogService {
         let _updated: Vec<Product> = result.take(0)?;
 
         // Fetch full product data
-        let product_id = format!("product:{}", pure_id);
-        let full = self.fetch_product_full(&product_id).await?;
+        let full = self.fetch_product_full(id).await?;
 
         // Update cache
         {
             let mut cache = self.products.write().unwrap();
             if full.is_active {
-                cache.insert(product_id, full.clone());
+                cache.insert(id.to_string(), full.clone());
             } else {
-                cache.remove(&format!("product:{}", pure_id));
+                cache.remove(id);
             }
         }
 
@@ -438,8 +437,8 @@ impl CatalogService {
 
     /// Delete a product
     pub async fn delete_product(&self, id: &str) -> RepoResult<()> {
-        let pure_id = strip_table_prefix("product", id);
-        let thing = make_thing("product", pure_id);
+        let thing = id.parse::<RecordId>()
+            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", id)))?;
 
         // Clean up attribute_binding edges
         self.db
@@ -448,7 +447,7 @@ impl CatalogService {
             .await?;
 
         // Delete product
-        let result: Option<Product> = self.db.delete(("product", pure_id)).await?;
+        let result: Option<Product> = self.db.delete(("product", thing.key().to_string())).await?;
         if result.is_none() {
             return Err(RepoError::NotFound(format!("Product {} not found", id)));
         }
@@ -456,7 +455,7 @@ impl CatalogService {
         // Update cache
         {
             let mut cache = self.products.write().unwrap();
-            cache.remove(&format!("product:{}", pure_id));
+            cache.remove(id);
         }
 
         Ok(())
@@ -464,9 +463,10 @@ impl CatalogService {
 
     /// Add tag to product
     pub async fn add_product_tag(&self, product_id: &str, tag_id: &str) -> RepoResult<ProductFull> {
-        let pure_product_id = strip_table_prefix("product", product_id);
-        let prod_thing = make_thing("product", pure_product_id);
-        let tag_thing = make_thing("tag", strip_table_prefix("tag", tag_id));
+        let prod_thing = product_id.parse::<RecordId>()
+            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
+        let tag_thing = tag_id.parse::<RecordId>()
+            .map_err(|_| RepoError::Validation(format!("Invalid tag ID: {}", tag_id)))?;
 
         // Update in DB
         let mut result = self
@@ -481,8 +481,7 @@ impl CatalogService {
         let full = self.fetch_product_full(product_id).await?;
         {
             let mut cache = self.products.write().unwrap();
-            let key = format!("product:{}", pure_product_id);
-            cache.insert(key, full.clone());
+            cache.insert(product_id.to_string(), full.clone());
         }
 
         Ok(full)
@@ -494,9 +493,10 @@ impl CatalogService {
         product_id: &str,
         tag_id: &str,
     ) -> RepoResult<ProductFull> {
-        let pure_product_id = strip_table_prefix("product", product_id);
-        let prod_thing = make_thing("product", pure_product_id);
-        let tag_thing = make_thing("tag", strip_table_prefix("tag", tag_id));
+        let prod_thing = product_id.parse::<RecordId>()
+            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
+        let tag_thing = tag_id.parse::<RecordId>()
+            .map_err(|_| RepoError::Validation(format!("Invalid tag ID: {}", tag_id)))?;
 
         // Update in DB
         let mut result = self
@@ -511,8 +511,7 @@ impl CatalogService {
         let full = self.fetch_product_full(product_id).await?;
         {
             let mut cache = self.products.write().unwrap();
-            let key = format!("product:{}", pure_product_id);
-            cache.insert(key, full.clone());
+            cache.insert(product_id.to_string(), full.clone());
         }
 
         Ok(full)
@@ -520,7 +519,8 @@ impl CatalogService {
 
     /// Fetch full product data from DB (helper)
     async fn fetch_product_full(&self, product_id: &str) -> RepoResult<ProductFull> {
-        let thing = make_thing("product", strip_table_prefix("product", product_id));
+        let thing = product_id.parse::<RecordId>()
+            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
 
         // Fetch product with tags (using ProductWithTags to get full Tag objects)
         let mut result = self
@@ -537,7 +537,8 @@ impl CatalogService {
         // Fetch attribute bindings
         #[derive(Debug, Deserialize)]
         struct BindingRow {
-            id: Option<Thing>,
+            #[serde(default, with = "serde_helpers::option_record_id")]
+            id: Option<RecordId>,
             #[serde(rename = "out")]
             to: Attribute,
             #[serde(default)]
@@ -623,22 +624,22 @@ impl CatalogService {
             }
         }
 
-        let kitchen_print_destinations: Vec<Thing> = data
+        let kitchen_print_destinations: Vec<RecordId> = data
             .kitchen_print_destinations
             .iter()
-            .map(|id| make_thing("print_destination", id))
+            .filter_map(|id| id.parse().ok())
             .collect();
 
-        let label_print_destinations: Vec<Thing> = data
+        let label_print_destinations: Vec<RecordId> = data
             .label_print_destinations
             .iter()
-            .map(|id| make_thing("print_destination", id))
+            .filter_map(|id| id.parse().ok())
             .collect();
 
-        let tag_ids: Vec<Thing> = data
+        let tag_ids: Vec<RecordId> = data
             .tag_ids
             .iter()
-            .map(|id| make_thing("tag", id))
+            .filter_map(|id| id.parse().ok())
             .collect();
 
         let category = Category {
@@ -653,6 +654,7 @@ impl CatalogService {
             is_virtual: data.is_virtual.unwrap_or(false),
             tag_ids,
             match_mode: data.match_mode.unwrap_or_else(|| "any".to_string()),
+            is_display: data.is_display.unwrap_or(true),
         };
 
         let created: Option<Category> = self.db.create("category").content(category).await?;
@@ -671,11 +673,12 @@ impl CatalogService {
 
     /// Update a category
     pub async fn update_category(&self, id: &str, data: CategoryUpdate) -> RepoResult<Category> {
-        let pure_id = strip_table_prefix("category", id);
+        let thing = id.parse::<RecordId>()
+            .map_err(|_| RepoError::Validation(format!("Invalid category ID: {}", id)))?;
 
         // Check existing
         let existing = self
-            .get_category(&format!("category:{}", pure_id))
+            .get_category(id)
             .ok_or_else(|| RepoError::NotFound(format!("Category {} not found", id)))?;
 
         // Check duplicate name if changing
@@ -697,10 +700,16 @@ impl CatalogService {
             name: Option<String>,
             #[serde(skip_serializing_if = "Option::is_none")]
             sort_order: Option<i32>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            kitchen_print_destinations: Option<Vec<Thing>>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            label_print_destinations: Option<Vec<Thing>>,
+            #[serde(
+                skip_serializing_if = "Option::is_none",
+                with = "serde_helpers::option_vec_record_id"
+            )]
+            kitchen_print_destinations: Option<Vec<RecordId>>,
+            #[serde(
+                skip_serializing_if = "Option::is_none",
+                with = "serde_helpers::option_vec_record_id"
+            )]
+            label_print_destinations: Option<Vec<RecordId>>,
             #[serde(skip_serializing_if = "Option::is_none")]
             is_kitchen_print_enabled: Option<bool>,
             #[serde(skip_serializing_if = "Option::is_none")]
@@ -709,55 +718,55 @@ impl CatalogService {
             is_active: Option<bool>,
             #[serde(skip_serializing_if = "Option::is_none")]
             is_virtual: Option<bool>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            tag_ids: Option<Vec<Thing>>,
+            #[serde(
+                skip_serializing_if = "Option::is_none",
+                with = "serde_helpers::option_vec_record_id"
+            )]
+            tag_ids: Option<Vec<RecordId>>,
             #[serde(skip_serializing_if = "Option::is_none")]
             match_mode: Option<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            is_display: Option<bool>,
         }
 
         let update_data = CategoryUpdateDb {
             name: data.name,
             sort_order: data.sort_order,
-            kitchen_print_destinations: data.kitchen_print_destinations.map(|ids| {
-                ids.iter()
-                    .map(|id| make_thing("print_destination", id))
-                    .collect()
-            }),
-            label_print_destinations: data.label_print_destinations.map(|ids| {
-                ids.iter()
-                    .map(|id| make_thing("print_destination", id))
-                    .collect()
-            }),
+            kitchen_print_destinations: data
+                .kitchen_print_destinations
+                .map(|ids| ids.iter().filter_map(|id| id.parse().ok()).collect()),
+            label_print_destinations: data
+                .label_print_destinations
+                .map(|ids| ids.iter().filter_map(|id| id.parse().ok()).collect()),
             is_kitchen_print_enabled: data.is_kitchen_print_enabled,
             is_label_print_enabled: data.is_label_print_enabled,
             is_active: data.is_active,
             is_virtual: data.is_virtual,
             tag_ids: data
                 .tag_ids
-                .map(|ids| ids.iter().map(|id| make_thing("tag", id)).collect()),
+                .map(|ids| ids.iter().filter_map(|id| id.parse().ok()).collect()),
             match_mode: data.match_mode,
+            is_display: data.is_display,
         };
 
-        let thing = make_thing("category", pure_id);
         self.db
             .query("UPDATE $thing MERGE $data")
-            .bind(("thing", thing))
+            .bind(("thing", thing.clone()))
             .bind(("data", update_data))
             .await?;
 
         // Fetch updated category
-        let updated: Option<Category> = self.db.select(("category", pure_id)).await?;
+        let updated: Option<Category> = self.db.select(("category", thing.key().to_string())).await?;
         let updated =
             updated.ok_or_else(|| RepoError::NotFound(format!("Category {} not found", id)))?;
 
         // Update cache
-        let category_id = format!("category:{}", pure_id);
         {
             let mut cache = self.categories.write().unwrap();
             if updated.is_active {
-                cache.insert(category_id, updated.clone());
+                cache.insert(id.to_string(), updated.clone());
             } else {
-                cache.remove(&category_id);
+                cache.remove(id);
             }
         }
 
@@ -766,8 +775,8 @@ impl CatalogService {
 
     /// Delete a category
     pub async fn delete_category(&self, id: &str) -> RepoResult<()> {
-        let pure_id = strip_table_prefix("category", id);
-        let cat_thing = make_thing("category", pure_id);
+        let cat_thing = id.parse::<RecordId>()
+            .map_err(|_| RepoError::Validation(format!("Invalid category ID: {}", id)))?;
 
         // Check if category has products
         let mut result = self
@@ -798,7 +807,7 @@ impl CatalogService {
         // Update cache
         {
             let mut cache = self.categories.write().unwrap();
-            cache.remove(&format!("category:{}", pure_id));
+            cache.remove(id);
         }
 
         Ok(())

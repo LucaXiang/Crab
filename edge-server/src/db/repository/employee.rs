@@ -1,9 +1,9 @@
 //! Employee Repository
 
-use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
+use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{Employee, EmployeeCreate, EmployeeUpdate};
-use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use surrealdb::{RecordId, Surreal};
 
 const TABLE: &str = "employee";
 
@@ -43,15 +43,19 @@ impl EmployeeRepository {
 
     /// Find employee by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Employee>> {
-        let pure_id = strip_table_prefix(TABLE, id);
-        let emp: Option<Employee> = self.base.db().select((TABLE, pure_id)).await?;
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+        let emp: Option<Employee> = self.base.db().select(thing).await?;
         Ok(emp)
     }
 
     /// Find employee by id (returns Employee without password)
     pub async fn find_by_id_safe(&self, id: &str) -> RepoResult<Option<Employee>> {
-        let pure_id = strip_table_prefix(TABLE, id);
-        let emp: Option<Employee> = self.base.db().select((TABLE, pure_id)).await?;
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+        let emp: Option<Employee> = self.base.db().select(thing).await?;
         Ok(emp)
     }
 
@@ -99,9 +103,11 @@ impl EmployeeRepository {
 
     /// Update an employee
     pub async fn update(&self, id: &str, data: EmployeeUpdate) -> RepoResult<Employee> {
-        let pure_id = strip_table_prefix(TABLE, id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
         let existing = self
-            .find_by_id(pure_id)
+            .find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Employee {} not found", id)))?;
 
@@ -133,7 +139,7 @@ impl EmployeeRepository {
             #[serde(skip_serializing_if = "Option::is_none")]
             hash_pass: Option<String>,
             #[serde(skip_serializing_if = "Option::is_none")]
-            role: Option<surrealdb::sql::Thing>,
+            role: Option<RecordId>,
             #[serde(skip_serializing_if = "Option::is_none")]
             is_active: Option<bool>,
         }
@@ -155,24 +161,25 @@ impl EmployeeRepository {
             is_active: data.is_active,
         };
 
-        let thing = make_thing(TABLE, pure_id);
         self.base
             .db()
             .query("UPDATE $thing MERGE $data")
-            .bind(("thing", thing))
+            .bind(("thing", thing.clone()))
             .bind(("data", update_doc))
             .await?;
 
-        self.find_by_id(pure_id)
+        self.find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Employee {} not found", id)))
     }
 
     /// Hard delete an employee
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let pure_id = strip_table_prefix(TABLE, id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
         let existing = self
-            .find_by_id(pure_id)
+            .find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Employee {} not found", id)))?;
 
@@ -183,7 +190,6 @@ impl EmployeeRepository {
             ));
         }
 
-        let thing = make_thing(TABLE, pure_id);
         self.base
             .db()
             .query("DELETE $thing")

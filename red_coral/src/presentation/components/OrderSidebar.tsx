@@ -102,7 +102,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   // Timeline 现在直接从 store 获取，不需要 useEffect
 
   return (
-    <div className="w-[27.5rem] bg-white h-full border-r border-gray-200 flex flex-col shadow-xl relative">
+    <div className="w-[calc(380px+3.5rem)] bg-white h-full border-r border-gray-200 flex flex-col shadow-xl relative">
       {/* Header */}
       <div className="p-5 border-b border-gray-200">
         <div className="flex justify-between items-start">

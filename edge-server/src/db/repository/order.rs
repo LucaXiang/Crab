@@ -1,12 +1,12 @@
 //! Order Repository (Graph/Document hybrid)
 
-use super::{BaseRepository, RepoError, RepoResult, make_thing};
+use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{
     Order, OrderAddItem, OrderAddPayment, OrderCreate, OrderEvent, OrderEventType, OrderItem,
     OrderPayment, OrderStatus,
 };
-use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use surrealdb::{RecordId, Surreal};
 
 const TABLE: &str = "order";
 const EVENT_TABLE: &str = "order_event";
@@ -125,7 +125,7 @@ impl OrderRepository {
 
     /// Add item to order
     pub async fn add_item(&self, order_id: &str, item: OrderAddItem) -> RepoResult<Order> {
-        let order_thing = make_thing(TABLE, order_id);
+        let order_thing = RecordId::from_table_key(TABLE, order_id);
         let new_item = OrderItem {
             spec: item.spec,
             name: item.name,
@@ -155,7 +155,7 @@ impl OrderRepository {
 
     /// Remove item from order by index
     pub async fn remove_item(&self, order_id: &str, item_idx: usize) -> RepoResult<Order> {
-        let order_thing = make_thing(TABLE, order_id);
+        let order_thing = RecordId::from_table_key(TABLE, order_id);
         let mut result = self
             .base
             .db()
@@ -174,7 +174,7 @@ impl OrderRepository {
 
     /// Add payment to order
     pub async fn add_payment(&self, order_id: &str, payment: OrderAddPayment) -> RepoResult<Order> {
-        let order_thing = make_thing(TABLE, order_id);
+        let order_thing = RecordId::from_table_key(TABLE, order_id);
         let new_payment = OrderPayment {
             method: payment.method,
             amount: payment.amount,
@@ -207,7 +207,7 @@ impl OrderRepository {
         discount_amount: i32,
         surcharge_amount: i32,
     ) -> RepoResult<Order> {
-        let order_thing = make_thing(TABLE, order_id);
+        let order_thing = RecordId::from_table_key(TABLE, order_id);
         let mut result = self
             .base
             .db()
@@ -228,7 +228,7 @@ impl OrderRepository {
 
     /// Update order status
     pub async fn update_status(&self, order_id: &str, status: OrderStatus) -> RepoResult<Order> {
-        let order_thing = make_thing(TABLE, order_id);
+        let order_thing = RecordId::from_table_key(TABLE, order_id);
         let end_time = if status != OrderStatus::Open {
             Some(chrono::Utc::now().to_rfc3339())
         } else {
@@ -257,7 +257,7 @@ impl OrderRepository {
         prev_hash: String,
         curr_hash: String,
     ) -> RepoResult<Order> {
-        let order_thing = make_thing(TABLE, order_id);
+        let order_thing = RecordId::from_table_key(TABLE, order_id);
         let mut result = self
             .base
             .db()
@@ -288,7 +288,7 @@ impl OrderRepository {
         prev_hash: String,
         curr_hash: String,
     ) -> RepoResult<OrderEvent> {
-        let order_thing = make_thing(TABLE, order_id);
+        let order_thing = RecordId::from_table_key(TABLE, order_id);
 
         // Create event
         let event = OrderEvent {
@@ -321,7 +321,7 @@ impl OrderRepository {
 
     /// Get all events for an order (graph traversal)
     pub async fn get_events(&self, order_id: &str) -> RepoResult<Vec<OrderEvent>> {
-        let order_thing = make_thing(TABLE, order_id);
+        let order_thing = RecordId::from_table_key(TABLE, order_id);
         let mut result = self
             .base
             .db()

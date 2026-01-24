@@ -596,7 +596,7 @@ export const POSScreen: React.FC = () => {
 						}`}
 				>
 				{/* Left Column */}
-				<div className="flex flex-col relative z-30 w-[25rem] shrink-0">
+				<div className="flex flex-col relative z-30 w-[calc(350px+3rem)] shrink-0">
           <ActionBar
             screen={screen}
             isDbOnline={isDbOnline}

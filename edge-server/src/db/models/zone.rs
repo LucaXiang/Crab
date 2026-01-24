@@ -1,15 +1,14 @@
 //! Zone Model
 
 use super::serde_helpers;
-use super::serde_thing;
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::Thing;
+use surrealdb::RecordId;
 
 /// Zone entity (区域：大厅、露台、包厢等)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Zone {
-    #[serde(default, with = "serde_thing::option")]
-    pub id: Option<Thing>,
+    #[serde(default, with = "serde_helpers::option_record_id")]
+    pub id: Option<RecordId>,
     pub name: String,
     pub description: Option<String>,
     #[serde(

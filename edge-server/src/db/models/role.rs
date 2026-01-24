@@ -1,18 +1,17 @@
 //! Role Model
 
 use super::serde_helpers;
-use super::serde_thing;
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::Thing;
+use surrealdb::RecordId;
 
 /// Role ID type
-pub type RoleId = Thing;
+pub type RoleId = RecordId;
 
 /// Role model matching SurrealDB schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Role {
     /// Optional role ID
-    #[serde(default, with = "serde_thing::option")]
+    #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<RoleId>,
     /// Name of the role
     pub role_name: String,

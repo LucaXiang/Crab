@@ -2,12 +2,11 @@
 
 use super::attribute::AttributeBindingFull;
 use super::serde_helpers;
-use super::serde_thing;
 use super::tag::Tag;
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::Thing;
+use surrealdb::RecordId;
 
-pub type ProductId = Thing;
+pub type ProductId = RecordId;
 
 /// 嵌入式规格 (文档数据库风格)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,14 +32,14 @@ pub struct EmbeddedSpec {
 /// Product model
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Product {
-    #[serde(default, with = "serde_thing::option")]
+    #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<ProductId>,
     pub name: String,
     #[serde(default)]
     pub image: String,
     /// Record link to category
-    #[serde(with = "serde_thing")]
-    pub category: Thing,
+    #[serde(with = "serde_helpers::record_id")]
+    pub category: RecordId,
     #[serde(default)]
     pub sort_order: i32,
     /// Tax rate in percentage (e.g., 10 = 10%)
@@ -49,11 +48,11 @@ pub struct Product {
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
     /// 厨房打印目的地
-    #[serde(default, with = "serde_thing::vec")]
-    pub kitchen_print_destinations: Vec<Thing>,
+    #[serde(default, with = "serde_helpers::vec_record_id")]
+    pub kitchen_print_destinations: Vec<RecordId>,
     /// 标签打印目的地
-    #[serde(default, with = "serde_thing::vec")]
-    pub label_print_destinations: Vec<Thing>,
+    #[serde(default, with = "serde_helpers::vec_record_id")]
+    pub label_print_destinations: Vec<RecordId>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
     #[serde(default = "default_inherit")]
     pub is_kitchen_print_enabled: i32,
@@ -66,8 +65,8 @@ pub struct Product {
     )]
     pub is_active: bool,
     /// Array of record links to tags
-    #[serde(default, with = "serde_thing::vec")]
-    pub tags: Vec<Thing>,
+    #[serde(default, with = "serde_helpers::vec_record_id")]
+    pub tags: Vec<RecordId>,
     /// 嵌入式规格数组
     #[serde(default)]
     pub specs: Vec<EmbeddedSpec>,
@@ -82,7 +81,7 @@ fn default_true() -> bool {
 }
 
 impl Product {
-    pub fn new(name: String, category: Thing) -> Self {
+    pub fn new(name: String, category: RecordId) -> Self {
         Self {
             id: None,
             name,
@@ -107,8 +106,8 @@ impl Product {
 pub struct ProductCreate {
     pub name: String,
     pub image: Option<String>,
-    #[serde(with = "serde_thing")]
-    pub category: Thing,
+    #[serde(with = "serde_helpers::record_id")]
+    pub category: RecordId,
     /// Price in currency unit (e.g., 10.50 = ¥10.50)
     pub price: Option<f64>,
     pub sort_order: Option<i32>,
@@ -116,17 +115,17 @@ pub struct ProductCreate {
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
     /// 厨房打印目的地
-    #[serde(default, with = "serde_thing::option_vec")]
-    pub kitchen_print_destinations: Option<Vec<Thing>>,
+    #[serde(default, with = "serde_helpers::option_vec_record_id")]
+    pub kitchen_print_destinations: Option<Vec<RecordId>>,
     /// 标签打印目的地
-    #[serde(default, with = "serde_thing::option_vec")]
-    pub label_print_destinations: Option<Vec<Thing>>,
+    #[serde(default, with = "serde_helpers::option_vec_record_id")]
+    pub label_print_destinations: Option<Vec<RecordId>>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_kitchen_print_enabled: Option<i32>,
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_label_print_enabled: Option<i32>,
-    #[serde(default, with = "serde_thing::option_vec")]
-    pub tags: Option<Vec<Thing>>,
+    #[serde(default, with = "serde_helpers::option_vec_record_id")]
+    pub tags: Option<Vec<RecordId>>,
     /// 嵌入式规格 (必需，至少一个规格)
     pub specs: Vec<EmbeddedSpec>,
 }
@@ -139,10 +138,10 @@ pub struct ProductUpdate {
     pub image: Option<String>,
     #[serde(
         default,
-        with = "serde_thing::option",
-        skip_serializing_if = "Option::is_none"
+        skip_serializing_if = "Option::is_none",
+        with = "serde_helpers::option_record_id"
     )]
-    pub category: Option<Thing>,
+    pub category: Option<RecordId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sort_order: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -154,17 +153,17 @@ pub struct ProductUpdate {
     /// 厨房打印目的地
     #[serde(
         default,
-        with = "serde_thing::option_vec",
-        skip_serializing_if = "Option::is_none"
+        skip_serializing_if = "Option::is_none",
+        with = "serde_helpers::option_vec_record_id"
     )]
-    pub kitchen_print_destinations: Option<Vec<Thing>>,
+    pub kitchen_print_destinations: Option<Vec<RecordId>>,
     /// 标签打印目的地
     #[serde(
         default,
-        with = "serde_thing::option_vec",
-        skip_serializing_if = "Option::is_none"
+        skip_serializing_if = "Option::is_none",
+        with = "serde_helpers::option_vec_record_id"
     )]
-    pub label_print_destinations: Option<Vec<Thing>>,
+    pub label_print_destinations: Option<Vec<RecordId>>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_kitchen_print_enabled: Option<i32>,
@@ -175,10 +174,10 @@ pub struct ProductUpdate {
     pub is_active: Option<bool>,
     #[serde(
         default,
-        with = "serde_thing::option_vec",
-        skip_serializing_if = "Option::is_none"
+        skip_serializing_if = "Option::is_none",
+        with = "serde_helpers::option_vec_record_id"
     )]
-    pub tags: Option<Vec<Thing>>,
+    pub tags: Option<Vec<RecordId>>,
     /// 嵌入式规格
     #[serde(skip_serializing_if = "Option::is_none")]
     pub specs: Option<Vec<EmbeddedSpec>>,
@@ -187,13 +186,13 @@ pub struct ProductUpdate {
 /// Full product with all related data (for API responses)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProductFull {
-    #[serde(default, with = "serde_thing::option")]
+    #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<ProductId>,
     pub name: String,
     #[serde(default)]
     pub image: String,
-    #[serde(with = "serde_thing")]
-    pub category: Thing,
+    #[serde(with = "serde_helpers::record_id")]
+    pub category: RecordId,
     #[serde(default)]
     pub sort_order: i32,
     /// Tax rate in percentage (e.g., 10 = 10%)
@@ -202,11 +201,11 @@ pub struct ProductFull {
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
     /// 厨房打印目的地
-    #[serde(default, with = "serde_thing::vec")]
-    pub kitchen_print_destinations: Vec<Thing>,
+    #[serde(default, with = "serde_helpers::vec_record_id")]
+    pub kitchen_print_destinations: Vec<RecordId>,
     /// 标签打印目的地
-    #[serde(default, with = "serde_thing::vec")]
-    pub label_print_destinations: Vec<Thing>,
+    #[serde(default, with = "serde_helpers::vec_record_id")]
+    pub label_print_destinations: Vec<RecordId>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
     #[serde(default = "default_inherit")]
     pub is_kitchen_print_enabled: i32,

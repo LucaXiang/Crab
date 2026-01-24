@@ -1,16 +1,15 @@
 //! Tag Model
 
 use super::serde_helpers;
-use super::serde_thing;
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::Thing;
+use surrealdb::RecordId;
 
-pub type TagId = Thing;
+pub type TagId = RecordId;
 
 /// Tag model matching SurrealDB schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tag {
-    #[serde(default, with = "serde_thing::option")]
+    #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<TagId>,
     pub name: String,
     #[serde(default = "default_color")]

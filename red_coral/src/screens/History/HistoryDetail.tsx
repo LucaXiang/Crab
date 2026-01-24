@@ -2,13 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { HeldOrder, Permission } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { TimelineList, NoteTag } from '@/presentation/components/shared/TimelineList';
-import { calculateItemFinalPrice, calculateItemTotal, calculateOptionsModifier } from '@/utils/pricing';
 import { formatCurrency } from '@/utils/currency';
 import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Trash2 } from 'lucide-react';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { useOrderCommands } from '@/core/stores/order/useOrderCommands';
 import { toast } from '@/presentation/components/Toast';
-
 import { groupOptionsByAttribute } from '@/utils/formatting';
 
 interface HistoryDetailProps {
@@ -312,11 +310,12 @@ interface OrderItemRowProps {
 const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(
   ({ item, index, isExpanded, onToggle, order, t, allocatedPaidQty }) => {
     const discountPercent = item.manual_discount_percent || 0;
-    const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
+    // Use server-computed values
+    const finalUnitPrice = item.unit_price ?? item.price;
+    const lineTotal = item.line_total ?? item.price * item.quantity;
+    // Calculate base price for display (original + options)
+    const optionsModifier = (item.selected_options ?? []).reduce((sum, opt) => sum + (opt.price_modifier ?? 0), 0);
     const baseUnitPrice = (item.original_price ?? item.price) + optionsModifier;
-    const finalUnitPrice = calculateItemFinalPrice(item).toNumber();
-    // Use backend-computed line_total for consistency with order total, fall back to local calculation
-    const lineTotal = item.line_total ?? calculateItemTotal(item).toNumber();
     const hasDiscount = discountPercent > 0 || baseUnitPrice !== finalUnitPrice;
     const itemSurcharge = item.surcharge || 0;
     const hasAttributes = item.selected_options && item.selected_options.length > 0;

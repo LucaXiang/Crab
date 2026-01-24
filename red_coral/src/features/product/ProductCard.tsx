@@ -60,7 +60,7 @@ export const ProductCard = React.memo<ProductCardProps>(
     return (
       <div
         {...longPressHandlers}
-        className="group relative min-h-24 max-h-32 bg-white rounded-xl shadow-sm border border-gray-200
+        className="group relative min-h-[calc(80px+1rem)] max-h-[calc(100px+1.5rem)] bg-white rounded-xl shadow-sm border border-gray-200
         cursor-pointer overflow-hidden select-none flex touch-manipulation
         hover:shadow-md hover:border-blue-300
         active:scale-[0.96] active:shadow-inner active:border-blue-500 active:ring-4 active:ring-blue-500/10"

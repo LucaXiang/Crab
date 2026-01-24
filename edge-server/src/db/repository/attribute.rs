@@ -2,12 +2,12 @@
 //!
 //! Uses RELATE to connect products/categories to attributes.
 
-use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
+use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{
-    Attribute, AttributeBinding, AttributeCreate, AttributeOption, AttributeUpdate,
+    serde_helpers, Attribute, AttributeBinding, AttributeCreate, AttributeOption, AttributeUpdate,
 };
-use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use surrealdb::{RecordId, Surreal};
 
 const TABLE: &str = "attribute";
 
@@ -40,9 +40,10 @@ impl AttributeRepository {
 
     /// Find attribute by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Attribute>> {
-        // Extract pure id if it contains table prefix (e.g., "attribute:xxx" -> "xxx")
-        let pure_id = strip_table_prefix(TABLE, id);
-        let attr: Option<Attribute> = self.base.db().select((TABLE, pure_id)).await?;
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+        let attr: Option<Attribute> = self.base.db().select(thing).await?;
         Ok(attr)
     }
 
@@ -69,11 +70,11 @@ impl AttributeRepository {
 
     /// Update an attribute
     pub async fn update(&self, id: &str, data: AttributeUpdate) -> RepoResult<Attribute> {
-        // Extract pure id if it contains table prefix
-        let pure_id = strip_table_prefix(TABLE, id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
 
         // Update using raw query to avoid deserialization issues with null fields
-        let thing = make_thing(TABLE, pure_id);
         self.base
             .db()
             .query("UPDATE $thing MERGE $data")
@@ -82,7 +83,7 @@ impl AttributeRepository {
             .await?;
 
         // Fetch the updated record
-        self.find_by_id(pure_id)
+        self.find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Attribute {} not found", id)))
     }
@@ -93,11 +94,14 @@ impl AttributeRepository {
         attr_id: &str,
         option: AttributeOption,
     ) -> RepoResult<Attribute> {
+        let thing: RecordId = attr_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", attr_id)))?;
         let mut result = self
             .base
             .db()
             .query("UPDATE attribute SET options += $opt WHERE id = $id RETURN AFTER")
-            .bind(("id", make_thing(TABLE, attr_id)))
+            .bind(("id", thing))
             .bind(("opt", option))
             .await?;
         let attrs: Vec<Attribute> = result.take(0)?;
@@ -114,11 +118,14 @@ impl AttributeRepository {
         idx: usize,
         option: AttributeOption,
     ) -> RepoResult<Attribute> {
+        let thing: RecordId = attr_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", attr_id)))?;
         let mut result = self
             .base
             .db()
             .query("UPDATE attribute SET options[$idx] = $opt WHERE id = $id RETURN AFTER")
-            .bind(("id", make_thing(TABLE, attr_id)))
+            .bind(("id", thing))
             .bind(("idx", idx))
             .bind(("opt", option))
             .await?;
@@ -131,11 +138,14 @@ impl AttributeRepository {
 
     /// Remove option by index
     pub async fn remove_option(&self, attr_id: &str, idx: usize) -> RepoResult<Attribute> {
+        let thing: RecordId = attr_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", attr_id)))?;
         let mut result = self
             .base
             .db()
             .query("UPDATE attribute SET options = array::remove(options, $idx) WHERE id = $id RETURN AFTER")
-            .bind(("id", make_thing(TABLE, attr_id)))
+            .bind(("id", thing))
             .bind(("idx", idx))
             .await?;
         let attrs: Vec<Attribute> = result.take(0)?;
@@ -147,11 +157,11 @@ impl AttributeRepository {
 
     /// Hard delete attribute
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        // Extract pure id if it contains table prefix
-        let pure_id = strip_table_prefix(TABLE, id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
 
         // Delete all relations first
-        let thing = make_thing(TABLE, pure_id);
         self.base
             .db()
             .query("DELETE has_attribute WHERE out = $attr")
@@ -181,14 +191,16 @@ impl AttributeRepository {
         display_order: i32,
         default_option_idx: Option<i32>,
     ) -> RepoResult<AttributeBinding> {
+        let product_thing = RecordId::from_table_key("product", product_id);
+        let attr_thing = RecordId::from_table_key(TABLE, attr_id);
         let mut result = self
             .base
             .db()
             .query(
                 "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order, default_option_idx = $default_idx",
             )
-            .bind(("from", make_thing("product", product_id)))
-            .bind(("to", make_thing(TABLE, attr_id)))
+            .bind(("from", product_thing))
+            .bind(("to", attr_thing))
             .bind(("req", is_required))
             .bind(("order", display_order))
             .bind(("default_idx", default_option_idx))
@@ -209,14 +221,16 @@ impl AttributeRepository {
         display_order: i32,
         default_option_idx: Option<i32>,
     ) -> RepoResult<AttributeBinding> {
+        let category_thing = RecordId::from_table_key("category", category_id);
+        let attr_thing = RecordId::from_table_key(TABLE, attr_id);
         let mut result = self
             .base
             .db()
             .query(
                 "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order, default_option_idx = $default_idx",
             )
-            .bind(("from", make_thing("category", category_id)))
-            .bind(("to", make_thing(TABLE, attr_id)))
+            .bind(("from", category_thing))
+            .bind(("to", attr_thing))
             .bind(("req", is_required))
             .bind(("order", display_order))
             .bind(("default_idx", default_option_idx))
@@ -230,33 +244,38 @@ impl AttributeRepository {
 
     /// Unlink attribute from product
     pub async fn unlink_from_product(&self, product_id: &str, attr_id: &str) -> RepoResult<bool> {
+        let product_thing = RecordId::from_table_key("product", product_id);
+        let attr_thing = RecordId::from_table_key(TABLE, attr_id);
         self.base
             .db()
             .query("DELETE has_attribute WHERE in = $from AND out = $to")
-            .bind(("from", make_thing("product", product_id)))
-            .bind(("to", make_thing(TABLE, attr_id)))
+            .bind(("from", product_thing))
+            .bind(("to", attr_thing))
             .await?;
         Ok(true)
     }
 
     /// Unlink attribute from category
     pub async fn unlink_from_category(&self, category_id: &str, attr_id: &str) -> RepoResult<bool> {
+        let category_thing = RecordId::from_table_key("category", category_id);
+        let attr_thing = RecordId::from_table_key(TABLE, attr_id);
         self.base
             .db()
             .query("DELETE has_attribute WHERE in = $from AND out = $to")
-            .bind(("from", make_thing("category", category_id)))
-            .bind(("to", make_thing(TABLE, attr_id)))
+            .bind(("from", category_thing))
+            .bind(("to", attr_thing))
             .await?;
         Ok(true)
     }
 
     /// Get attributes for a product (Graph traversal)
     pub async fn find_by_product(&self, product_id: &str) -> RepoResult<Vec<Attribute>> {
+        let product_thing = RecordId::from_table_key("product", product_id);
         let attrs: Vec<Attribute> = self
             .base
             .db()
             .query("SELECT ->has_attribute->attribute.* FROM $prod")
-            .bind(("prod", make_thing("product", product_id)))
+            .bind(("prod", product_thing))
             .await?
             .take(0)?;
         Ok(attrs)
@@ -264,11 +283,12 @@ impl AttributeRepository {
 
     /// Get attributes for a category (Graph traversal)
     pub async fn find_by_category(&self, category_id: &str) -> RepoResult<Vec<Attribute>> {
+        let category_thing = RecordId::from_table_key("category", category_id);
         let attrs: Vec<Attribute> = self
             .base
             .db()
             .query("SELECT ->has_attribute->attribute.* FROM $cat")
-            .bind(("cat", make_thing("category", category_id)))
+            .bind(("cat", category_thing))
             .await?
             .take(0)?;
         Ok(attrs)
@@ -280,6 +300,7 @@ impl AttributeRepository {
         &self,
         product_id: &str,
     ) -> RepoResult<Vec<(AttributeBinding, Attribute)>> {
+        let product_thing = RecordId::from_table_key("product", product_id);
         // Query the has_attribute edge table and fetch the attribute
         let mut result = self
             .base
@@ -292,15 +313,17 @@ impl AttributeRepository {
                 ORDER BY display_order
                 "#,
             )
-            .bind(("prod", make_thing("product", product_id)))
+            .bind(("prod", product_thing))
             .await?;
 
         #[derive(Debug, serde::Deserialize)]
         struct BindingRow {
-            id: Option<surrealdb::sql::Thing>,
-            #[serde(rename = "in")]
-            from: surrealdb::sql::Thing,
-            out: surrealdb::sql::Thing,
+            #[serde(default, with = "serde_helpers::option_record_id")]
+            id: Option<RecordId>,
+            #[serde(rename = "in", with = "serde_helpers::record_id")]
+            from: RecordId,
+            #[serde(with = "serde_helpers::record_id")]
+            out: RecordId,
             is_required: bool,
             display_order: i32,
             default_option_idx: Option<i32>,

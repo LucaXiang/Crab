@@ -5,6 +5,7 @@ use axum::{
     extract::{Path, State},
 };
 use serde::{Deserialize, Serialize};
+use surrealdb::RecordId;
 
 use crate::core::ServerState;
 use crate::db::models::{Attribute, AttributeBinding};
@@ -65,13 +66,13 @@ pub async fn get_by_id(
     Path(id): Path<String>,
 ) -> AppResult<Json<AttributeBinding>> {
     // 通过 ID 查询 has_attribute 边
+    let thing: RecordId = id
+        .parse()
+        .map_err(|_| AppError::validation(format!("Invalid ID: {}", id)))?;
     let mut result = state
         .db
         .query("SELECT * FROM has_attribute WHERE id = $id")
-        .bind((
-            "id",
-            crate::db::repository::make_thing("has_attribute", &id),
-        ))
+        .bind(("id", thing))
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
@@ -92,7 +93,9 @@ pub async fn update(
     Path(id): Path<String>,
     Json(payload): Json<UpdateBindingRequest>,
 ) -> AppResult<Json<AttributeBinding>> {
-    let thing = crate::db::repository::make_thing("has_attribute", &id);
+    let thing: RecordId = id
+        .parse()
+        .map_err(|_| AppError::validation(format!("Invalid ID: {}", id)))?;
 
     let mut result = state
         .db
@@ -118,7 +121,9 @@ pub async fn delete(
     State(state): State<ServerState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
-    let thing = crate::db::repository::make_thing("has_attribute", &id);
+    let thing: RecordId = id
+        .parse()
+        .map_err(|_| AppError::validation(format!("Invalid ID: {}", id)))?;
 
     state
         .db

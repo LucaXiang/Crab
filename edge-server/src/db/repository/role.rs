@@ -1,9 +1,9 @@
 //! Role Repository
 
-use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
+use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{Role, RoleCreate, RoleUpdate};
-use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use surrealdb::{RecordId, Surreal};
 
 const TABLE: &str = "role";
 
@@ -43,8 +43,10 @@ impl RoleRepository {
 
     /// Find role by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Role>> {
-        let pure_id = strip_table_prefix(TABLE, id);
-        let role: Option<Role> = self.base.db().select((TABLE, pure_id)).await?;
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+        let role: Option<Role> = self.base.db().select(thing).await?;
         Ok(role)
     }
 
@@ -78,9 +80,11 @@ impl RoleRepository {
 
     /// Update a role
     pub async fn update(&self, id: &str, data: RoleUpdate) -> RepoResult<Role> {
-        let pure_id = strip_table_prefix(TABLE, id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
         let existing = self
-            .find_by_id(pure_id)
+            .find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Role {} not found", id)))?;
 
@@ -102,24 +106,25 @@ impl RoleRepository {
             )));
         }
 
-        let thing = make_thing(TABLE, pure_id);
         self.base
             .db()
             .query("UPDATE $thing MERGE $data")
-            .bind(("thing", thing))
+            .bind(("thing", thing.clone()))
             .bind(("data", data))
             .await?;
 
-        self.find_by_id(pure_id)
+        self.find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Role {} not found", id)))
     }
 
     /// Hard delete a role
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let pure_id = strip_table_prefix(TABLE, id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
         let existing = self
-            .find_by_id(pure_id)
+            .find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Role {} not found", id)))?;
 
@@ -130,7 +135,6 @@ impl RoleRepository {
             ));
         }
 
-        let thing = make_thing(TABLE, pure_id);
         self.base
             .db()
             .query("DELETE $thing")

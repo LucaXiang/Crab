@@ -3,11 +3,7 @@ import { CartItem, CheckoutMode } from '@/core/domain/types';
 import { useCategories } from '@/core/stores/resources';
 import { useLongPress } from '@/hooks/useLongPress';
 import { CheckCircle } from 'lucide-react';
-import { calculateItemFinalPrice, calculateOptionsModifier } from '@/utils/pricing';
-import { Currency } from '@/utils/currency';
 import { formatCurrency } from '@/utils/currency';
-
-
 import { groupOptionsByAttribute } from '@/utils/formatting';
 
 interface OrderItemsSummaryProps {
@@ -47,12 +43,12 @@ const ActiveItemRow: React.FC<ActiveItemRowProps> = ({
 }) => {
   const isSelected = selectedQuantities[originalIndex] > 0;
   const currentQty = selectedQuantities[originalIndex] || 0;
-  const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
+  // Use server-computed unit_price, adjust for surcharge exempt if needed
+  const optionsModifier = (item.selected_options ?? []).reduce((sum, opt) => sum + (opt.price_modifier ?? 0), 0);
   const basePrice = (item.original_price ?? item.price) + optionsModifier;
-  const unitPrice = calculateItemFinalPrice({
-    ...item,
-    surcharge: surchargeExempt ? 0 : item.surcharge,
-  }).toNumber();
+  const unitPrice = surchargeExempt
+    ? (item.unit_price ?? item.price) - (item.surcharge ?? 0)
+    : (item.unit_price ?? item.price);
   const hasDiscount = (item.manual_discount_percent || 0) > 0 || basePrice !== unitPrice;
   const isSelectMode = mode === 'SELECT';
 
@@ -120,7 +116,7 @@ const ActiveItemRow: React.FC<ActiveItemRowProps> = ({
         <div className="flex flex-col items-end gap-2">
           <div className="text-right min-w-[6.25rem]">
             <div className={`font-bold text-xl ${isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
-              {formatCurrency(Currency.mul(unitPrice, remainingQty).toNumber())}
+              {formatCurrency(unitPrice * remainingQty)}
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -231,19 +227,19 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
 
     // Add to Paid Map if there's paid quantity
     if (paidQty > 0) {
-      const effectiveUnitPrice = calculateItemFinalPrice({
-            ...item,
-            surcharge: surchargeExempt ? 0 : item.surcharge,
-          });
+      // Use server-computed unit_price, adjust for surcharge exempt
+      const effectiveUnitPrice = surchargeExempt
+        ? (item.unit_price ?? item.price) - (item.surcharge ?? 0)
+        : (item.unit_price ?? item.price);
 
-          // Group Key
-          const key = `${item.id}-${effectiveUnitPrice.toFixed(2)}`;
+      // Group Key
+      const key = `${item.id}-${effectiveUnitPrice.toFixed(2)}`;
 
-          if (!paidItemsMap[key]) {
-            paidItemsMap[key] = { item, paidQty: 0 };
-          }
-          paidItemsMap[key].paidQty += paidQty;
-        }
+      if (!paidItemsMap[key]) {
+        paidItemsMap[key] = { item, paidQty: 0 };
+      }
+      paidItemsMap[key].paidQty += paidQty;
+    }
   });
 
   const completedItems = Object.values(paidItemsMap);
@@ -301,12 +297,12 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
           </div>
           <div className="space-y-3">
             {completedItems.map(({ item, paidQty }, idx) => {
-              const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
+              // Use server-computed values
+              const optionsModifier = (item.selected_options ?? []).reduce((sum, opt) => sum + (opt.price_modifier ?? 0), 0);
               const basePrice = (item.original_price ?? item.price) + optionsModifier;
-              const unitPricePaid = calculateItemFinalPrice({
-                ...item,
-                surcharge: surchargeExempt ? 0 : item.surcharge,
-              }).toNumber();
+              const unitPricePaid = surchargeExempt
+                ? (item.unit_price ?? item.price) - (item.surcharge ?? 0)
+                : (item.unit_price ?? item.price);
               const hasDiscount = (item.manual_discount_percent || 0) > 0 || basePrice !== unitPricePaid;
 
               return (
@@ -368,7 +364,7 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
                     <div className="text-right min-w-[6.25rem]">
                       <div className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-0.5">{t('pos.cart.subtotal')}</div>
                       <div className="font-bold text-xl text-gray-700">
-                        {formatCurrency(Currency.mul(unitPricePaid, paidQty).toNumber())}
+                        {formatCurrency(unitPricePaid * paidQty)}
                       </div>
                     </div>
                   </div>

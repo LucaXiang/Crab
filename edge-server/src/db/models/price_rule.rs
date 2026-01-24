@@ -1,10 +1,9 @@
 //! Price Rule Model
 
 use super::serde_helpers;
-use super::serde_thing;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::Thing;
+use surrealdb::RecordId;
 
 /// Rule type enum
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -39,8 +38,8 @@ pub const ZONE_SCOPE_RETAIL: &str = "zone:retail";
 /// Price rule entity (价格调整规则)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriceRule {
-    #[serde(default, with = "serde_thing::option")]
-    pub id: Option<Thing>,
+    #[serde(default, with = "serde_helpers::option_record_id")]
+    pub id: Option<RecordId>,
     pub name: String,
     pub display_name: String,
     pub receipt_name: String,
@@ -48,8 +47,8 @@ pub struct PriceRule {
     pub rule_type: RuleType,
     pub product_scope: ProductScope,
     /// Target record based on scope (category/tag/product)
-    #[serde(default, with = "serde_thing::option")]
-    pub target: Option<Thing>,
+    #[serde(default, with = "serde_helpers::option_record_id")]
+    pub target: Option<RecordId>,
     /// Zone scope: "zone:all", "zone:retail", or specific zone ID like "zone:xxx"
     #[serde(default = "default_zone_scope")]
     pub zone_scope: String,
@@ -78,8 +77,8 @@ pub struct PriceRule {
         deserialize_with = "serde_helpers::bool_true"
     )]
     pub is_active: bool,
-    #[serde(default, with = "serde_thing::option")]
-    pub created_by: Option<Thing>,
+    #[serde(default, with = "serde_helpers::option_record_id")]
+    pub created_by: Option<RecordId>,
     /// Created datetime (set by database DEFAULT)
     #[serde(default = "Utc::now")]
     pub created_at: DateTime<Utc>,
@@ -122,7 +121,8 @@ pub struct PriceRuleCreate {
     pub active_start_time: Option<String>,
     /// Active end time (HH:MM format)
     pub active_end_time: Option<String>,
-    pub created_by: Option<Thing>,
+    #[serde(default, with = "serde_helpers::option_record_id")]
+    pub created_by: Option<RecordId>,
 }
 
 /// Update price rule payload

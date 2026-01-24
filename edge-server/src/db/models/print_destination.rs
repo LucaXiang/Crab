@@ -1,11 +1,10 @@
 //! Print Destination Model
 
 use super::serde_helpers;
-use super::serde_thing;
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::Thing;
+use surrealdb::RecordId;
 
-pub type PrintDestinationId = Thing;
+pub type PrintDestinationId = RecordId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbeddedPrinter {
@@ -31,7 +30,7 @@ fn default_printer_format() -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrintDestination {
-    #[serde(default, with = "serde_thing::option")]
+    #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<PrintDestinationId>,
     pub name: String,
     pub description: Option<String>,

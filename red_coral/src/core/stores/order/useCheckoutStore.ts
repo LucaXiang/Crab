@@ -1,10 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { HeldOrder, CartItem, PaymentRecord, CheckoutMode, DetailTab, PendingCashTx } from '@/core/domain/types';
-import {
-  calculateRemaining,
-  isPaidInFull as checkIsPaidInFull
-} from '@/utils/formatting/checkoutCalculations';
 
 function calculateUnpaidItems(items: CartItem[], paidQuantities?: Record<string, number>): CartItem[] {
   if (!paidQuantities) return items;
@@ -189,8 +185,9 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
     const previousPaid = order.paid_amount; // From previous split payments
     const currentSessionPaid = state.paymentRecords.reduce((sum, p) => sum + p.amount, 0);
     const totalPaid = previousPaid + currentSessionPaid;
-    const remaining = calculateRemaining(order.total, totalPaid);
-    const isPaidInFull = checkIsPaidInFull(order.total, totalPaid);
+    // Use server-computed remaining_amount, adjusted for current session payments
+    const remaining = Math.max(0, order.remaining_amount - currentSessionPaid);
+    const isPaidInFull = remaining <= 0.01;
     const isPartialPaymentMade = totalPaid > 0 && remaining > 0.005;
 
     return {

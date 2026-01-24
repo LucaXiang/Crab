@@ -1,8 +1,8 @@
 //! Order Model (Graph/Document hybrid)
 
-use super::serde_thing;
+use super::serde_helpers;
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::Thing;
+use surrealdb::RecordId;
 
 /// Order status enum
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -18,8 +18,8 @@ pub enum OrderStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderItem {
     /// Product specification reference
-    #[serde(with = "serde_thing")]
-    pub spec: Thing,
+    #[serde(with = "serde_helpers::record_id")]
+    pub spec: RecordId,
     /// Snapshot: product name
     pub name: String,
     /// Snapshot: specification name
@@ -42,8 +42,8 @@ pub struct OrderItem {
 /// Embedded attribute selection
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderItemAttribute {
-    #[serde(with = "serde_thing")]
-    pub attr_id: Thing,
+    #[serde(with = "serde_helpers::record_id")]
+    pub attr_id: RecordId,
     pub option_idx: i32,
     pub name: String,
     /// Price in currency unit (e.g., 2.50 = ¥2.50)
@@ -63,8 +63,8 @@ pub struct OrderPayment {
 /// Order entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Order {
-    #[serde(default, with = "serde_thing::option")]
-    pub id: Option<Thing>,
+    #[serde(default, with = "serde_helpers::option_record_id")]
+    pub id: Option<RecordId>,
     pub receipt_number: String,
     /// Zone name snapshot
     pub zone_name: Option<String>,
@@ -112,8 +112,8 @@ pub enum OrderEventType {
 /// Order event entity (connected via has_event edge)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderEvent {
-    #[serde(default, with = "serde_thing::option")]
-    pub id: Option<Thing>,
+    #[serde(default, with = "serde_helpers::option_record_id")]
+    pub id: Option<RecordId>,
     pub event_type: OrderEventType,
     pub timestamp: String,
     pub data: Option<serde_json::Value>,
@@ -124,12 +124,12 @@ pub struct OrderEvent {
 /// Has event edge relation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HasEvent {
-    #[serde(default, with = "serde_thing::option")]
-    pub id: Option<Thing>,
-    #[serde(rename = "in", with = "serde_thing")]
-    pub from: Thing,
-    #[serde(with = "serde_thing")]
-    pub out: Thing,
+    #[serde(default, with = "serde_helpers::option_record_id")]
+    pub id: Option<RecordId>,
+    #[serde(rename = "in", with = "serde_helpers::record_id")]
+    pub from: RecordId,
+    #[serde(with = "serde_helpers::record_id")]
+    pub out: RecordId,
 }
 
 /// Create order payload
@@ -145,8 +145,8 @@ pub struct OrderCreate {
 /// Add item to order payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderAddItem {
-    #[serde(with = "serde_thing")]
-    pub spec: Thing,
+    #[serde(with = "serde_helpers::record_id")]
+    pub spec: RecordId,
     pub name: String,
     pub spec_name: Option<String>,
     /// Price in currency unit (e.g., 10.50 = ¥10.50)

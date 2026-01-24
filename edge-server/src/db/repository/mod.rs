@@ -75,29 +75,18 @@ pub trait Repository<T, CreateDto, UpdateDto> {
     async fn delete(&self, id: &str) -> RepoResult<bool>;
 }
 
-/// Helper to create Thing from table:id string
-pub fn parse_thing(id: &str) -> Option<surrealdb::sql::Thing> {
-    let parts: Vec<&str> = id.split(':').collect();
-    if parts.len() == 2 {
-        Some(surrealdb::sql::Thing::from((
-            parts[0].to_string(),
-            parts[1].to_string(),
-        )))
-    } else {
-        None
-    }
-}
-
-/// Helper to create Thing from table name and id
-pub fn make_thing(table: &str, id: &str) -> surrealdb::sql::Thing {
-    surrealdb::sql::Thing::from((table.to_string(), id.to_string()))
-}
-
-/// Strip table prefix from id (e.g., "product:xxx" -> "xxx")
-pub fn strip_table_prefix<'a>(table: &str, id: &'a str) -> &'a str {
-    let prefix = format!("{}:", table);
-    id.strip_prefix(&prefix).unwrap_or(id)
-}
+// =============================================================================
+// ID Convention: 全栈统一使用 "table:id" 格式
+// =============================================================================
+//
+// 使用 surrealdb::RecordId 处理所有 ID：
+//   - 解析: let id: RecordId = "product:abc".parse()?;
+//   - 创建: let id = RecordId::from_table_key("product", "abc");
+//   - 获取表名: id.table()
+//   - 获取纯ID: id.key().to_string()
+//   - CRUD: db.select(id) / db.delete(id) 直接使用 RecordId
+//
+// 禁止使用旧的 Thing 类型和 make_thing/strip_table_prefix 辅助函数
 
 /// Base repository with database reference
 #[derive(Clone)]

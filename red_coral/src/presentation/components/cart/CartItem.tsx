@@ -2,10 +2,8 @@ import React from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { CartItem as CartItemType } from '@/core/domain/types';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
-import { calculateItemFinalPrice, calculateItemTotal, calculateOptionsModifier } from '@/utils/pricing';
 import { formatCurrency } from '@/utils/currency';
 import { groupOptionsByAttribute } from '@/utils/formatting';
-
 import { useLongPress } from '@/hooks/useLongPress';
 
 interface CartItemProps {
@@ -21,11 +19,13 @@ export const CartItem = React.memo<CartItemProps>(({
 }) => {
   const performanceMode = useSettingsStore(state => state.performanceMode);
   const discountPercent = item.manual_discount_percent || 0;
-  const optionsModifier = calculateOptionsModifier(item.selected_options).toNumber();
+  // Calculate options modifier for display
+  const optionsModifier = (item.selected_options ?? []).reduce((sum, opt) => sum + (opt.price_modifier ?? 0), 0);
   const baseUnitPrice = (item.original_price ?? item.price) + optionsModifier;
-  const finalUnitPrice = calculateItemFinalPrice(item).toNumber();
-  // Use backend-computed line_total for consistency with order total, fall back to local calculation
-  const finalLineTotal = item.line_total ?? calculateItemTotal(item).toNumber();
+  // Use server-computed unit_price, fallback to item.price
+  const finalUnitPrice = item.unit_price ?? item.price;
+  // Use server-computed line_total, fallback to price * quantity
+  const finalLineTotal = item.line_total ?? item.price * item.quantity;
 
   const handleQuantityChange = (e: React.MouseEvent, delta: number) => {
     e.stopPropagation();

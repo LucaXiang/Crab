@@ -1,26 +1,25 @@
 //! Category Model
 
 use super::serde_helpers;
-use super::serde_thing;
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::Thing;
+use surrealdb::RecordId;
 
-pub type CategoryId = Thing;
+pub type CategoryId = RecordId;
 
 /// Category model
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Category {
-    #[serde(default, with = "serde_thing::option")]
+    #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<CategoryId>,
     pub name: String,
     #[serde(default)]
     pub sort_order: i32,
     /// Kitchen print destination references
-    #[serde(default, with = "serde_thing::vec")]
-    pub kitchen_print_destinations: Vec<Thing>,
+    #[serde(default, with = "serde_helpers::vec_record_id")]
+    pub kitchen_print_destinations: Vec<RecordId>,
     /// Label print destination references
-    #[serde(default, with = "serde_thing::vec")]
-    pub label_print_destinations: Vec<Thing>,
+    #[serde(default, with = "serde_helpers::vec_record_id")]
+    pub label_print_destinations: Vec<RecordId>,
     /// Whether kitchen printing is enabled for this category
     #[serde(
         default = "default_true",
@@ -41,11 +40,17 @@ pub struct Category {
     #[serde(default)]
     pub is_virtual: bool,
     /// Tag IDs for virtual category filtering
-    #[serde(default, with = "serde_thing::vec")]
-    pub tag_ids: Vec<Thing>,
+    #[serde(default, with = "serde_helpers::vec_record_id")]
+    pub tag_ids: Vec<RecordId>,
     /// Match mode for virtual category: "any" or "all"
     #[serde(default = "default_match_mode")]
     pub match_mode: String,
+    /// Whether to display this category in POS (for virtual categories)
+    #[serde(
+        default = "default_true",
+        deserialize_with = "serde_helpers::bool_true"
+    )]
+    pub is_display: bool,
 }
 
 fn default_true() -> bool {
@@ -70,6 +75,7 @@ impl Category {
             is_virtual: false,
             tag_ids: Vec::new(),
             match_mode: "any".to_string(),
+            is_display: true,
         }
     }
 }
@@ -94,6 +100,8 @@ pub struct CategoryCreate {
     pub tag_ids: Vec<String>,
     /// Match mode: "any" or "all"
     pub match_mode: Option<String>,
+    /// Whether to display this category in POS
+    pub is_display: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,4 +132,7 @@ pub struct CategoryUpdate {
     /// Match mode: "any" or "all"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub match_mode: Option<String>,
+    /// Whether to display this category in POS
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_display: Option<bool>,
 }

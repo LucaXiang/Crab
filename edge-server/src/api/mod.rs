@@ -17,8 +17,6 @@
 //! - [`orders`] - 订单管理接口
 //! - [`system_state`] - 系统状态接口
 
-pub mod convert;
-
 pub mod auth;
 pub mod health;
 pub mod role;

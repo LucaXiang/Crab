@@ -4,11 +4,10 @@
 //! Use RELATE to connect products/categories to attributes.
 
 use super::serde_helpers;
-use super::serde_thing;
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::Thing;
+use surrealdb::RecordId;
 
-pub type AttributeId = Thing;
+pub type AttributeId = RecordId;
 
 /// Attribute Option (embedded in Attribute)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,7 +47,7 @@ impl AttributeOption {
 /// Attribute model (with embedded options)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Attribute {
-    #[serde(default, with = "serde_thing::option")]
+    #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<AttributeId>,
     pub name: String,
 
@@ -147,12 +146,12 @@ pub struct AttributeUpdate {
 /// Edge relation: has_attribute (product/category -> attribute)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeBinding {
-    #[serde(default, with = "serde_thing::option")]
-    pub id: Option<Thing>,
-    #[serde(rename = "in", with = "serde_thing")]
-    pub from: Thing, // product or category
-    #[serde(rename = "out", with = "serde_thing")]
-    pub to: Thing, // attribute
+    #[serde(default, with = "serde_helpers::option_record_id")]
+    pub id: Option<RecordId>,
+    #[serde(rename = "in", with = "serde_helpers::record_id")]
+    pub from: RecordId, // product or category
+    #[serde(rename = "out", with = "serde_helpers::record_id")]
+    pub to: RecordId, // attribute
     #[serde(default)]
     pub is_required: bool,
     #[serde(default)]
@@ -165,8 +164,8 @@ pub struct AttributeBinding {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeBindingFull {
     /// Relation ID
-    #[serde(default, with = "serde_thing::option")]
-    pub id: Option<Thing>,
+    #[serde(default, with = "serde_helpers::option_record_id")]
+    pub id: Option<RecordId>,
     /// Full attribute object
     pub attribute: Attribute,
     pub is_required: bool,

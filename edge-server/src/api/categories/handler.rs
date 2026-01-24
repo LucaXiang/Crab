@@ -6,7 +6,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::api::convert::thing_to_string;
 use crate::core::ServerState;
 use crate::db::models::{Attribute, AttributeBinding, Category, CategoryCreate, CategoryUpdate};
 use crate::db::repository::AttributeRepository;
@@ -44,7 +43,7 @@ pub async fn create(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let id = category.id.as_ref().map(thing_to_string).unwrap_or_default();
+    let id = category.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&category))
         .await;
@@ -146,6 +145,7 @@ pub async fn batch_update_sort_order(
                     is_virtual: None,
                     tag_ids: None,
                     match_mode: None,
+                    is_display: None,
                 },
             )
             .await;

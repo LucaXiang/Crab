@@ -590,7 +590,7 @@ mod tests {
     fn test_product_scope_filtering() {
         use crate::db::models::{AdjustmentType, ProductScope, RuleType};
         use chrono::Utc;
-        use surrealdb::sql::Thing;
+        use surrealdb::RecordId;
 
         // Item for product:p1
         let input = shared::order::CartItemInput {
@@ -643,7 +643,7 @@ mod tests {
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Product,
-            target: Some(Thing::from(("product", "p1"))),
+            target: Some(RecordId::from_table_key("product", "p1")),
             zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::FixedAmount,
             adjustment_value: 5.0,
@@ -669,7 +669,7 @@ mod tests {
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Product,
-            target: Some(Thing::from(("product", "p2"))),
+            target: Some(RecordId::from_table_key("product", "p2")),
             zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::FixedAmount,
             adjustment_value: 50.0, // Large discount that should NOT apply

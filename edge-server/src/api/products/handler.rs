@@ -8,7 +8,6 @@ use serde::Deserialize;
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
 
-use crate::api::convert::thing_to_string;
 use crate::core::ServerState;
 use crate::db::models::{AttributeBindingFull, ProductCreate, ProductFull, ProductUpdate};
 use crate::db::repository::AttributeRepository;
@@ -119,7 +118,7 @@ pub async fn create(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let id = product.id.as_ref().map(thing_to_string).unwrap_or_default();
+    let id = product.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
     state
         .broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&product))
         .await;

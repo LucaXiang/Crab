@@ -25,9 +25,9 @@ pub fn matches_product_scope(
         }
         ProductScope::Product => {
             if let Some(target) = &rule.target {
-                // target is Thing like "product:xxx", product_id should also be in full format
+                // target is RecordId like "product:xxx", product_id should also be in full format
                 // Use tb and id.to_raw() for consistent format (avoids SurrealDB's ⟨⟩ brackets)
-                let target_str = format!("{}:{}", target.tb, target.id.to_raw());
+                let target_str = format!("{}:{}", target.table(), target.key());
                 let matches = target_str == product_id;
                 trace!(
                     rule_name = %rule.name,
@@ -50,9 +50,9 @@ pub fn matches_product_scope(
         }
         ProductScope::Category => {
             if let (Some(target), Some(cat_id)) = (&rule.target, category_id) {
-                // target is Thing like "category:xxx", cat_id should also be in full format
+                // target is RecordId like "category:xxx", cat_id should also be in full format
                 // Use tb and id.to_raw() for consistent format (avoids SurrealDB's ⟨⟩ brackets)
-                let target_str = format!("{}:{}", target.tb, target.id.to_raw());
+                let target_str = format!("{}:{}", target.table(), target.key());
                 let matches = target_str == cat_id;
                 trace!(
                     rule_name = %rule.name,
@@ -68,7 +68,7 @@ pub fn matches_product_scope(
                 trace!(
                     rule_name = %rule.name,
                     product_scope = ?rule.product_scope,
-                    target = ?rule.target.as_ref().map(|t| format!("{}:{}", t.tb, t.id.to_raw())),
+                    target = ?rule.target.as_ref().map(|t| t.to_string()),
                     category_id = ?category_id,
                     product_id,
                     "[ProductScope] Category scope - missing target or category_id"
@@ -78,9 +78,9 @@ pub fn matches_product_scope(
         }
         ProductScope::Tag => {
             if let Some(target) = &rule.target {
-                // target is Thing like "tag:xxx", tags should also be in full format
+                // target is RecordId like "tag:xxx", tags should also be in full format
                 // Use tb and id.to_raw() for consistent format (avoids SurrealDB's ⟨⟩ brackets)
-                let target_str = format!("{}:{}", target.tb, target.id.to_raw());
+                let target_str = format!("{}:{}", target.table(), target.key());
                 let matches = tags.iter().any(|t| t == &target_str);
                 trace!(
                     rule_name = %rule.name,
@@ -206,7 +206,7 @@ mod tests {
     use super::*;
     use crate::db::models::{AdjustmentType, RuleType};
     use chrono::Utc;
-    use surrealdb::sql::Thing;
+    use surrealdb::RecordId;
 
     fn make_rule(product_scope: ProductScope, target: Option<&str>) -> PriceRule {
         PriceRule {
@@ -217,12 +217,7 @@ mod tests {
             description: None,
             rule_type: RuleType::Discount,
             product_scope,
-            target: target.map(|t| {
-                Thing::from((
-                    t.split(':').next().unwrap_or("product"),
-                    t.split(':').last().unwrap_or(t),
-                ))
-            }),
+            target: target.map(|t| t.parse::<RecordId>().unwrap()),
             zone_scope: ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,

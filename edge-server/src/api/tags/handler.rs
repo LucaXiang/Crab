@@ -5,7 +5,6 @@ use axum::{
     extract::{Path, State},
 };
 
-use crate::api::convert::thing_to_string;
 use crate::core::ServerState;
 use crate::db::models::{Tag, TagCreate, TagUpdate};
 use crate::db::repository::TagRepository;
@@ -49,7 +48,7 @@ pub async fn create(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     // 广播同步通知
-    let id = tag.id.as_ref().map(thing_to_string).unwrap_or_default();
+    let id = tag.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&tag))
         .await;

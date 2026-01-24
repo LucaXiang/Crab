@@ -46,5 +46,10 @@ DEFINE FIELD OVERWRITE match_mode ON category TYPE string
     DEFAULT 'any'
     PERMISSIONS FULL;
 
+-- 是否在 POS 主页显示此分类
+DEFINE FIELD OVERWRITE is_display ON category TYPE bool
+    DEFAULT true
+    PERMISSIONS FULL;
+
 DEFINE INDEX OVERWRITE category_name_unique ON category FIELDS name UNIQUE;
 DEFINE INDEX OVERWRITE category_sort_order ON category FIELDS sort_order;

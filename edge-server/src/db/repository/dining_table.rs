@@ -1,10 +1,9 @@
 //! Dining Table Repository
 
-use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
+use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{DiningTable, DiningTableCreate, DiningTableUpdate};
-use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
-use surrealdb::sql::Thing;
+use surrealdb::{RecordId, Surreal};
 
 const TABLE: &str = "dining_table";
 
@@ -33,7 +32,9 @@ impl DiningTableRepository {
 
     /// Find all tables in a zone
     pub async fn find_by_zone(&self, zone_id: &str) -> RepoResult<Vec<DiningTable>> {
-        let zone_thing = make_thing("zone", zone_id);
+        let zone_thing: RecordId = zone_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid zone ID: {}", zone_id)))?;
         let tables: Vec<DiningTable> = self
             .base
             .db()
@@ -48,14 +49,18 @@ impl DiningTableRepository {
 
     /// Find table by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<DiningTable>> {
-        let pure_id = strip_table_prefix(TABLE, id);
-        let table: Option<DiningTable> = self.base.db().select((TABLE, pure_id)).await?;
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+        let table: Option<DiningTable> = self.base.db().select(thing).await?;
         Ok(table)
     }
 
     /// Find table by id with zone fetched
     pub async fn find_by_id_with_zone(&self, id: &str) -> RepoResult<Option<DiningTable>> {
-        let table_thing = make_thing(TABLE, id);
+        let table_thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
         let mut result = self
             .base
             .db()
@@ -69,7 +74,7 @@ impl DiningTableRepository {
     /// Find table by name in zone
     pub async fn find_by_name_in_zone(
         &self,
-        zone: &Thing,
+        zone: &RecordId,
         name: &str,
     ) -> RepoResult<Option<DiningTable>> {
         let mut result = self
@@ -111,9 +116,11 @@ impl DiningTableRepository {
 
     /// Update a dining table
     pub async fn update(&self, id: &str, data: DiningTableUpdate) -> RepoResult<DiningTable> {
-        let pure_id = strip_table_prefix(TABLE, id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
         let existing = self
-            .find_by_id(pure_id)
+            .find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Dining table {} not found", id)))?;
 
@@ -133,7 +140,6 @@ impl DiningTableRepository {
         }
 
         // 手动构建 UPDATE 语句，避免 zone 被序列化为字符串
-        let thing = make_thing(TABLE, pure_id);
         let name = data.name.unwrap_or(existing.name);
         let zone = data.zone.unwrap_or(existing.zone);
         let capacity = data.capacity.unwrap_or(existing.capacity);
@@ -142,22 +148,23 @@ impl DiningTableRepository {
         self.base
             .db()
             .query("UPDATE $thing SET name = $name, zone = $zone, capacity = $capacity, is_active = $is_active")
-            .bind(("thing", thing))
+            .bind(("thing", thing.clone()))
             .bind(("name", name))
             .bind(("zone", zone))
             .bind(("capacity", capacity))
             .bind(("is_active", is_active))
             .await?;
 
-        self.find_by_id(pure_id)
+        self.find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Dining table {} not found", id)))
     }
 
     /// Hard delete a dining table
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let pure_id = strip_table_prefix(TABLE, id);
-        let thing = make_thing(TABLE, pure_id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
         self.base
             .db()
             .query("DELETE $thing")

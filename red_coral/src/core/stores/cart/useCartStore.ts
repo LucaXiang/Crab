@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { CartItem, ItemOption } from '@/core/domain/types';
 import { ProductWithPrice } from '@/features/product';
-import { calculateOrderTotal } from '@/utils/pricing';
 
 /**
  * Compare two selectedOptions arrays for equality
@@ -202,7 +201,12 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
   calculateTotal: () => {
     const { cart } = get();
-    const total = calculateOrderTotal(cart).toNumber();
+    // Simple sum for draft cart - use line_total if available (server data), otherwise price * quantity
+    const total = cart.reduce((sum, item) => {
+      if (item._removed) return sum;
+      const lineTotal = item.line_total ?? item.price * item.quantity;
+      return sum + lineTotal;
+    }, 0);
     const count = cart.reduce((sum, item) => sum + item.quantity, 0);
     set({ totalAmount: total, itemCount: count });
   }

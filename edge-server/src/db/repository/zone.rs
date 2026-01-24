@@ -1,9 +1,9 @@
 //! Zone Repository
 
-use super::{BaseRepository, RepoError, RepoResult, make_thing, strip_table_prefix};
+use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{Zone, ZoneCreate, ZoneUpdate};
-use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use surrealdb::{RecordId, Surreal};
 
 const TABLE: &str = "zone";
 
@@ -32,8 +32,10 @@ impl ZoneRepository {
 
     /// Find zone by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Zone>> {
-        let pure_id = strip_table_prefix(TABLE, id);
-        let zone: Option<Zone> = self.base.db().select((TABLE, pure_id)).await?;
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+        let zone: Option<Zone> = self.base.db().select(thing).await?;
         Ok(zone)
     }
 
@@ -73,9 +75,11 @@ impl ZoneRepository {
 
     /// Update a zone
     pub async fn update(&self, id: &str, data: ZoneUpdate) -> RepoResult<Zone> {
-        let pure_id = strip_table_prefix(TABLE, id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
         let existing = self
-            .find_by_id(pure_id)
+            .find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Zone {} not found", id)))?;
 
@@ -90,30 +94,30 @@ impl ZoneRepository {
             )));
         }
 
-        let thing = make_thing(TABLE, pure_id);
         self.base
             .db()
             .query("UPDATE $thing MERGE $data")
-            .bind(("thing", thing))
+            .bind(("thing", thing.clone()))
             .bind(("data", data))
             .await?;
 
-        self.find_by_id(pure_id)
+        self.find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Zone {} not found", id)))
     }
 
     /// Hard delete a zone (check for tables first)
     pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let pure_id = strip_table_prefix(TABLE, id);
+        let thing: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
 
         // Check if zone has dining tables
-        let zone_thing = make_thing(TABLE, pure_id);
         let mut result = self
             .base
             .db()
             .query("SELECT count() FROM dining_table WHERE zone = $zone AND is_active = true GROUP ALL")
-            .bind(("zone", zone_thing.clone()))
+            .bind(("zone", thing.clone()))
             .await?;
         let count: Option<i64> = result.take((0, "count"))?;
 
@@ -126,7 +130,7 @@ impl ZoneRepository {
         self.base
             .db()
             .query("DELETE $thing")
-            .bind(("thing", zone_thing))
+            .bind(("thing", thing))
             .await?;
         Ok(true)
     }

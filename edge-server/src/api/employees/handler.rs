@@ -5,7 +5,6 @@ use axum::{
     extract::{Path, State},
 };
 
-use crate::api::convert::thing_to_string;
 use crate::core::ServerState;
 use crate::db::models::{Employee, EmployeeCreate, EmployeeUpdate};
 use crate::db::repository::EmployeeRepository;
@@ -60,7 +59,7 @@ pub async fn create(
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    let id = employee.id.as_ref().map(thing_to_string).unwrap_or_default();
+    let id = employee.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&employee))
         .await;

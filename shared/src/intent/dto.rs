@@ -1,7 +1,6 @@
 //! Data Transfer Objects (DTOs)
 //!
-//! 这些类型用于前后端通信，不包含数据库特定类型 (如 SurrealDB 的 Thing)。
-//! 使用 String 表示 ID 和关联引用。
+//! 这些类型用于前后端通信，使用 String 表示 ID (格式: "table:id")。
 
 use serde::{Deserialize, Serialize};
 
