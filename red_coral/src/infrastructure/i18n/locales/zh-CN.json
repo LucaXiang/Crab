@@ -251,6 +251,11 @@
       "confirm": "确定要作废此订单吗？",
       "reason": "选择作废原因"
     },
+    "retail": {
+      "cancel_title": "确认返回",
+      "cancel_description": "返回将作废当前零售订单，所有商品将被清空。确定要返回吗？",
+      "cancel_confirm": "确认作废"
+    },
     "error": {
       "title": "结账错误",
       "hint": "结账区域加载失败，请重试",

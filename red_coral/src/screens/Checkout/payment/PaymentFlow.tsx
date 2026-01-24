@@ -73,12 +73,27 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   const [splitItems, setSplitItems] = useState<Record<string, number>>({});
   const [isProcessingSplit, setIsProcessingSplit] = useState(false);
 
+  // Retail order cancel confirmation
+  const [showRetailCancelConfirm, setShowRetailCancelConfirm] = useState(false);
+
   // Defer completion to avoid "update during render" errors
   const handleComplete = useCallback(() => {
     requestAnimationFrame(() => {
       onComplete();
     });
   }, [onComplete]);
+
+  /**
+   * 处理返回按钮点击
+   * 零售订单需要确认作废
+   */
+  const handleBackClick = useCallback(() => {
+    if (order.is_retail) {
+      setShowRetailCancelConfirm(true);
+    } else {
+      onCancel?.();
+    }
+  }, [order.is_retail, onCancel]);
 
   /**
    * 打开取消支付确认对话框
@@ -686,7 +701,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                   </EscalatableGate>
                 )}
                 {onCancel && (
-                  <button onClick={onCancel} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors flex items-center gap-2">
+                  <button onClick={handleBackClick} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors flex items-center gap-2">
                     <ArrowLeft size={20} />
                     {t('common.action.back')}
                   </button>
@@ -895,6 +910,20 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         confirmText={t('checkout.payment.cancel')}
         onConfirm={handleConfirmCancelPayment}
         onCancel={() => setCancelConfirm(null)}
+        variant="danger"
+      />
+
+      {/* Retail Order Cancel Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showRetailCancelConfirm}
+        title={t('checkout.retail.cancel_title')}
+        description={t('checkout.retail.cancel_description')}
+        confirmText={t('checkout.retail.cancel_confirm')}
+        onConfirm={() => {
+          setShowRetailCancelConfirm(false);
+          onCancel?.();
+        }}
+        onCancel={() => setShowRetailCancelConfirm(false)}
         variant="danger"
       />
 

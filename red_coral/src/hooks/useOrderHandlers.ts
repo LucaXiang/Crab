@@ -5,6 +5,10 @@ import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { useCartStore } from '@/core/stores/cart/useCartStore';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
 import { toast } from '@/presentation/components/Toast';
+import {
+  savePendingRetailOrder,
+  clearPendingRetailOrder,
+} from '@/core/stores/order/retailOrderTracker';
 
 interface UseOrderHandlersParams {
   handleTableSelectStore: (
@@ -101,6 +105,9 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
         // Create retail order and get order_id directly (no waiting for WebSocket)
         const orderId = await orderOps.createRetailOrder(cart);
 
+        // Save to local storage for recovery after crash/power outage
+        savePendingRetailOrder(orderId);
+
         // Clear cart immediately after successful creation
         useCartStore.getState().clearCart();
 
@@ -130,6 +137,9 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
   );
 
   const handleCheckoutComplete = useCallback(() => {
+    // Clear pending retail order tracker (order completed successfully)
+    clearPendingRetailOrder();
+
     useCartStore.getState().clearCart();
 
     setViewMode('pos');
@@ -145,6 +155,8 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
     if (checkoutOrder?.is_retail) {
       try {
         await voidOrder(checkoutOrder, 'Retail checkout cancelled');
+        // Clear pending retail order tracker after successful void
+        clearPendingRetailOrder();
       } catch (error) {
         console.error('Failed to void retail order on cancel:', error);
         // Continue with UI cleanup even if void fails
