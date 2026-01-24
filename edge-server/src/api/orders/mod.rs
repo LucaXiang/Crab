@@ -18,6 +18,7 @@ fn routes() -> Router<ServerState> {
     Router::new()
         // List & query
         .route("/", get(handler::list))
+        .route("/history", get(handler::fetch_order_list))
         .route("/last", get(handler::get_last))
         .route("/verify", get(handler::verify_chain))
         .route("/receipt/{receipt}", get(handler::get_by_receipt))

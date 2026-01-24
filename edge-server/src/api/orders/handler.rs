@@ -4,7 +4,7 @@ use axum::{
     Json,
     extract::{Path, Query, State},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
 use crate::db::models::{Order, OrderAddItem, OrderAddPayment, OrderEvent, OrderEventType};
@@ -262,4 +262,62 @@ pub async fn verify_chain(
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
     Ok(Json(valid))
+}
+
+// =========================================================================
+// Order History
+// =========================================================================
+
+/// Query params for order history
+#[derive(Debug, Deserialize)]
+pub struct OrderHistoryQuery {
+    pub start_date: String,
+    pub end_date: String,
+    pub limit: Option<i32>,
+}
+
+/// Order summary for history list
+#[derive(Debug, Serialize)]
+pub struct OrderSummary {
+    pub id: Option<String>,
+    pub receipt_number: String,
+    pub status: String,
+    pub zone_name: Option<String>,
+    pub table_name: Option<String>,
+    pub total_amount: f64,
+    pub paid_amount: f64,
+    pub start_time: String,
+    pub end_time: Option<String>,
+    pub guest_count: Option<i32>,
+}
+
+/// Fetch archived order list from SurrealDB
+pub async fn fetch_order_list(
+    State(state): State<ServerState>,
+    Query(params): Query<OrderHistoryQuery>,
+) -> AppResult<Json<Vec<OrderSummary>>> {
+    let repo = OrderRepository::new(state.db.clone());
+
+    let orders = repo
+        .find_by_date_range(&params.start_date, &params.end_date, params.limit.unwrap_or(100))
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+
+    let summaries: Vec<OrderSummary> = orders
+        .into_iter()
+        .map(|o| OrderSummary {
+            id: o.id.map(|id| id.to_string()),
+            receipt_number: o.receipt_number,
+            status: format!("{:?}", o.status),
+            zone_name: o.zone_name,
+            table_name: o.table_name,
+            total_amount: o.total_amount,
+            paid_amount: o.paid_amount,
+            start_time: o.start_time,
+            end_time: o.end_time,
+            guest_count: o.guest_count,
+        })
+        .collect();
+
+    Ok(Json(summaries))
 }
