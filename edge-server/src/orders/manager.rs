@@ -434,6 +434,7 @@ impl OrdersManager {
             if let Ok(order_events) = self.storage.get_events_for_order(&snapshot.order_id) {
                 let archive_svc = archive_service.clone();
                 let order_id = snapshot.order_id.clone();
+                let storage = self.storage.clone();
 
                 // Spawn async archive task
                 tokio::spawn(async move {
@@ -441,6 +442,13 @@ impl OrdersManager {
                         tracing::error!(order_id = %order_id, error = %e, "Failed to archive order");
                     } else {
                         tracing::info!(order_id = %order_id, "Order archived successfully");
+                        // Clean up redb after successful archive
+                        let order_id_cleanup = order_id.clone();
+                        if let Err(e) = tokio::task::spawn_blocking(move || {
+                            storage.cleanup_archived_order(&order_id_cleanup)
+                        }).await {
+                            tracing::error!(order_id = %order_id, error = ?e, "Failed to cleanup archived order from redb");
+                        }
                     }
                 });
             }

@@ -9,9 +9,11 @@ use crate::db::models::{
 use crate::db::repository::{OrderRepository, SystemStateRepository};
 use sha2::{Digest, Sha256};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
+use std::sync::Arc;
 use surrealdb::engine::local::Db;
 use surrealdb::{RecordId, Surreal};
 use thiserror::Error;
+use tokio::sync::Semaphore;
 
 #[derive(Debug, Error)]
 pub enum ArchiveError {
@@ -29,12 +31,16 @@ pub type ArchiveResult<T> = Result<T, ArchiveError>;
 const MAX_RETRY_ATTEMPTS: u32 = 3;
 /// Base delay between retries (exponential backoff)
 const RETRY_BASE_DELAY_MS: u64 = 1000;
+/// Maximum concurrent archive tasks
+const MAX_CONCURRENT_ARCHIVES: usize = 5;
 
 /// Service for archiving orders to SurrealDB
 #[derive(Clone)]
 pub struct OrderArchiveService {
     order_repo: OrderRepository,
     system_state_repo: SystemStateRepository,
+    /// Semaphore to limit concurrent archive tasks
+    archive_semaphore: Arc<Semaphore>,
 }
 
 impl OrderArchiveService {
@@ -42,15 +48,21 @@ impl OrderArchiveService {
         Self {
             order_repo: OrderRepository::new(db.clone()),
             system_state_repo: SystemStateRepository::new(db),
+            archive_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_ARCHIVES)),
         }
     }
 
-    /// Archive a completed order with its events (with retry logic)
+    /// Archive a completed order with its events (with retry logic and concurrency limit)
     pub async fn archive_order(
         &self,
         snapshot: &OrderSnapshot,
         events: Vec<OrderEvent>,
     ) -> ArchiveResult<()> {
+        // Acquire semaphore permit to limit concurrent archives
+        let _permit = self.archive_semaphore.acquire().await.map_err(|_| {
+            ArchiveError::Database("Archive semaphore closed".to_string())
+        })?;
+
         let mut last_error = None;
 
         for attempt in 0..MAX_RETRY_ATTEMPTS {

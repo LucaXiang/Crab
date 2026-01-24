@@ -535,17 +535,33 @@ export interface Order {
   created_at: string | null;
 }
 
+/// Order event types for archived orders (matches db::models::order::OrderEventType)
 export type OrderEventType =
-  | 'CREATED'
-  | 'ITEM_ADDED'
+  // Lifecycle
+  | 'TABLE_OPENED'
+  | 'ORDER_COMPLETED'
+  | 'ORDER_VOIDED'
+  | 'ORDER_RESTORED'
+  // Items
+  | 'ITEMS_ADDED'
+  | 'ITEM_MODIFIED'
   | 'ITEM_REMOVED'
-  | 'ITEM_UPDATED'
-  | 'PAID'
-  | 'PARTIAL_PAID'
-  | 'VOID'
-  | 'REFUND'
-  | 'TABLE_CHANGED'
-  | 'GUEST_COUNT_CHANGED';
+  | 'ITEM_RESTORED'
+  // Payments
+  | 'PAYMENT_ADDED'
+  | 'PAYMENT_CANCELLED'
+  // Split
+  | 'ORDER_SPLIT'
+  // Table operations
+  | 'ORDER_MOVED'
+  | 'ORDER_MOVED_OUT'
+  | 'ORDER_MERGED'
+  | 'ORDER_MERGED_OUT'
+  | 'TABLE_REASSIGNED'
+  // Other
+  | 'ORDER_INFO_UPDATED'
+  // Price Rules
+  | 'RULE_SKIP_TOGGLED';
 
 export interface OrderEvent {
   id: string | null;
