@@ -13,7 +13,7 @@ use std::sync::Arc;
 use surrealdb::engine::local::Db;
 use surrealdb::{RecordId, Surreal};
 use thiserror::Error;
-use tokio::sync::Semaphore;
+use tokio::sync::{Mutex, Semaphore};
 
 #[derive(Debug, Error)]
 pub enum ArchiveError {
@@ -41,6 +41,8 @@ pub struct OrderArchiveService {
     system_state_repo: SystemStateRepository,
     /// Semaphore to limit concurrent archive tasks
     archive_semaphore: Arc<Semaphore>,
+    /// Mutex to ensure hash chain updates are serialized (prevents race conditions)
+    hash_chain_lock: Arc<Mutex<()>>,
 }
 
 impl OrderArchiveService {
@@ -49,6 +51,7 @@ impl OrderArchiveService {
             order_repo: OrderRepository::new(db.clone()),
             system_state_repo: SystemStateRepository::new(db),
             archive_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_ARCHIVES)),
+            hash_chain_lock: Arc::new(Mutex::new(())),
         }
     }
 
@@ -103,6 +106,10 @@ impl OrderArchiveService {
             tracing::info!(order_id = %snapshot.order_id, "Order already archived, skipping");
             return Ok(());
         }
+
+        // Acquire hash chain lock to prevent concurrent hash chain corruption
+        // This ensures only one archive operation can read-modify-write the hash chain at a time
+        let _hash_lock = self.hash_chain_lock.lock().await;
 
         // 1. Get last order hash from system_state
         let system_state = self

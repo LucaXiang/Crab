@@ -68,11 +68,15 @@ pub async fn fetch_order_list(
             .to_string()
     };
 
+    // Calculate offset from page number (1-indexed)
+    let offset = (params.page.max(1) - 1) * params.limit;
+
     let query = format!(
-        "/api/orders/history?start_date={}&end_date={}&limit={}",
+        "/api/orders/history?start_date={}&end_date={}&limit={}&offset={}",
         encode(&start_date),
         encode(&end_date),
-        params.limit
+        params.limit,
+        offset
     );
 
     match bridge.get::<Vec<OrderSummary>>(&query).await {

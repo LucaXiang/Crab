@@ -3,6 +3,7 @@ import { invokeApi } from '@/infrastructure/api';
 import { HeldOrder, CartItem } from '@/core/domain/types';
 import type { OrderEvent, OrderSnapshot, OrderStatus } from '@/core/domain/types/orderEvent';
 import { logger } from '@/utils/logger';
+import { Currency } from '@/utils/currency';
 
 interface UseHistoryOrderDetailResult {
   order: HeldOrder | null;
@@ -82,30 +83,41 @@ function convertArchivedToHeldOrder(archived: ArchivedOrder): HeldOrder {
     return isNaN(ts) ? 0 : ts;
   };
 
-  // Map items
-  const items: CartItem[] = archived.items.map((item, idx) => ({
-    id: item.spec,
-    product_id: item.spec,
-    instance_id: `archived-${idx}`,
-    name: item.name,
-    price: item.price,
-    quantity: item.quantity,
-    unpaid_quantity: 0, // Archived orders are fully paid
-    original_price: item.price,
-    unit_price: item.price - item.discount_amount / item.quantity + item.surcharge_amount / item.quantity,
-    line_total: (item.price * item.quantity) - item.discount_amount + item.surcharge_amount,
-    manual_discount_percent: 0,
-    surcharge: item.surcharge_amount,
-    note: item.note || null,
-    selected_options: item.attributes.map(attr => ({
-      attribute_id: attr.attr_id,
-      attribute_name: attr.name,
-      option_idx: attr.option_idx,
-      option_name: attr.name,
-      price_modifier: attr.price,
-    })),
-    _removed: false,
-  }));
+  // Map items - use Currency for precise calculations
+  const items: CartItem[] = archived.items.map((item, idx) => {
+    // Calculate line total: (price * quantity) - discount + surcharge
+    const subtotal = Currency.mul(item.price, item.quantity);
+    const afterDiscount = Currency.sub(subtotal, item.discount_amount);
+    const lineTotal = Currency.add(afterDiscount, item.surcharge_amount);
+    // Calculate effective unit price
+    const unitPrice = item.quantity > 0
+      ? Currency.div(lineTotal, item.quantity).toNumber()
+      : item.price;
+
+    return {
+      id: item.spec,
+      product_id: item.spec,
+      instance_id: `archived-${idx}`,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      unpaid_quantity: 0, // Archived orders are fully paid
+      original_price: item.price,
+      unit_price: unitPrice,
+      line_total: lineTotal.toNumber(),
+      manual_discount_percent: 0,
+      surcharge: item.surcharge_amount,
+      note: item.note || null,
+      selected_options: item.attributes.map(attr => ({
+        attribute_id: attr.attr_id,
+        attribute_name: attr.name,
+        option_idx: attr.option_idx,
+        option_name: attr.name,
+        price_modifier: attr.price,
+      })),
+      _removed: false,
+    };
+  });
 
   // Map payments
   const payments = archived.payments.map((p, idx) => ({
@@ -116,9 +128,16 @@ function convertArchivedToHeldOrder(archived: ArchivedOrder): HeldOrder {
     note: p.reference || null,
   }));
 
-  // Calculate totals
+  // Calculate totals using Currency for precision
   const total = archived.total_amount;
   const paidAmount = archived.paid_amount;
+  // original_total = total + discount - surcharge (reverse the adjustments)
+  const originalTotal = Currency.sub(
+    Currency.add(total, archived.discount_amount),
+    archived.surcharge_amount
+  ).toNumber();
+  // remaining = max(0, total - paid)
+  const remaining = Currency.max(0, Currency.sub(total, paidAmount)).toNumber();
 
   return {
     order_id: archived.id || archived.receipt_number,
@@ -131,7 +150,7 @@ function convertArchivedToHeldOrder(archived: ArchivedOrder): HeldOrder {
     status: archived.status as OrderStatus,
     items,
     payments,
-    original_total: total + archived.discount_amount - archived.surcharge_amount,
+    original_total: originalTotal,
     subtotal: total,
     total_discount: archived.discount_amount,
     total_surcharge: archived.surcharge_amount,
@@ -139,7 +158,7 @@ function convertArchivedToHeldOrder(archived: ArchivedOrder): HeldOrder {
     discount: archived.discount_amount,
     total,
     paid_amount: paidAmount,
-    remaining_amount: Math.max(0, total - paidAmount),
+    remaining_amount: remaining,
     receipt_number: archived.receipt_number,
     start_time: parseTime(archived.start_time),
     end_time: parseTime(archived.end_time),
