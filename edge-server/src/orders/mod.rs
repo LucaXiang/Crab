@@ -29,6 +29,7 @@
 
 pub mod actions;
 pub mod appliers;
+pub mod archive;
 pub mod manager;
 pub mod money;
 pub mod reducer;
@@ -37,6 +38,7 @@ pub mod sync;
 pub mod traits;
 
 // Re-exports
+pub use archive::{ArchiveError, ArchiveResult, OrderArchiveService};
 pub use manager::OrdersManager;
 pub use reducer::{generate_instance_id, input_to_snapshot};
 pub use storage::OrderStorage;

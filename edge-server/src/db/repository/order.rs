@@ -270,6 +270,16 @@ impl OrderRepository {
     }
 
     // =========================================================================
+    // Archiving
+    // =========================================================================
+
+    /// Create an archived order (from OrderSnapshot)
+    pub async fn create_archived(&self, order: Order) -> RepoResult<Order> {
+        let created: Option<Order> = self.base.db().create(TABLE).content(order).await?;
+        created.ok_or_else(|| RepoError::Database("Failed to create archived order".to_string()))
+    }
+
+    // =========================================================================
     // Hash Chain
     // =========================================================================
 
