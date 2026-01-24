@@ -3,7 +3,6 @@ import { Minus, Plus } from 'lucide-react';
 import { CartItem as CartItemType } from '@/core/domain/types';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { formatCurrency } from '@/utils/currency';
-import { groupOptionsByAttribute } from '@/utils/formatting';
 import { useLongPress } from '@/hooks/useLongPress';
 
 interface CartItemProps {
@@ -42,43 +41,62 @@ export const CartItem = React.memo<CartItemProps>(({
     { delay: 500, isPreventDefault: false }
   );
 
+  const hasMultiSpec = item.selected_specification?.is_multi_spec;
+  const hasOptions = item.selected_options && item.selected_options.length > 0;
+  const hasNote = item.note && item.note.trim().length > 0;
+
   return (
     <div
-      className={`flex justify-between items-center py-2 px-3 relative group cursor-pointer ${
+      className={`flex justify-between items-start py-2 px-3 relative group cursor-pointer ${
         performanceMode ? 'hover:bg-gray-100' : 'hover:bg-gray-50'
       }`}
     >
-
-
       <div className="flex-1 min-w-0 pr-4" {...clickHandlers}>
+        {/* Line 1: Product Name */}
         <div className="font-medium text-gray-800 text-lg truncate">
-          {item.name}{item.selected_specification?.is_multi_spec ? ` (${item.selected_specification.name})` : ''}
+          {item.name}
         </div>
 
-        {/* Selected Options */}
-        {item.selected_options && item.selected_options.length > 0 && (
-          <div className="text-xs text-gray-500 mt-1 space-y-1">
-            {groupOptionsByAttribute(item.selected_options).map((group, idx) => (
-              <div key={idx} className="flex items-center gap-1">
-                <span>{group.attributeName}: {group.optionNames.join(', ')}</span>
-                {group.totalPrice !== 0 && (
-                  <span className={group.totalPrice > 0 ? 'text-orange-600' : 'text-green-600'}>
-                    ({group.totalPrice > 0 ? '+' : ''}{formatCurrency(group.totalPrice)})
+        {/* Line 2: Specification (if multi-spec) */}
+        {hasMultiSpec && (
+          <div className="text-sm text-gray-600 mt-0.5">
+            {item.selected_specification!.name}
+          </div>
+        )}
+
+        {/* Line 3: Attribute Tags */}
+        {hasOptions && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {item.selected_options!.map((opt, idx) => (
+              <span
+                key={idx}
+                className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded"
+              >
+                {opt.attribute_name}:{opt.option_name}
+                {opt.price_modifier != null && opt.price_modifier !== 0 && (
+                  <span className={opt.price_modifier > 0 ? 'text-orange-600 ml-0.5' : 'text-green-600 ml-0.5'}>
+                    {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
                   </span>
                 )}
-              </div>
+              </span>
             ))}
           </div>
         )}
 
+        {/* Line 4: Note */}
+        {hasNote && (
+          <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+            <span>📝</span>
+            <span className="truncate">{item.note}</span>
+          </div>
+        )}
+
+        {/* Line 5: Unit Price */}
         <div className="flex items-center gap-2 mt-1">
           {discountPercent > 0 ? (
             <>
               <span className="text-sm text-gray-400 line-through">{formatCurrency(baseUnitPrice)}</span>
               <span className="text-base text-[#FF5E5E] font-bold">{formatCurrency(finalUnitPrice)}</span>
-              <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded flex items-center">
-                -{discountPercent}%
-              </span>
             </>
           ) : (
             <div className="text-sm text-[#FF5E5E]">{formatCurrency(finalUnitPrice)}</div>
@@ -86,11 +104,22 @@ export const CartItem = React.memo<CartItemProps>(({
         </div>
       </div>
 
-      <div className="flex flex-col items-end gap-2">
-        <div className="font-bold text-gray-700 text-lg">
-          {formatCurrency(finalLineTotal)}
+      {/* Right Column */}
+      <div className="flex flex-col items-end gap-2 shrink-0">
+        {/* Line Total + Discount Badge */}
+        <div className="flex items-center gap-2">
+          {discountPercent > 0 && (
+            <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
+              -{discountPercent}%
+            </span>
+          )}
+          <div className="font-bold text-gray-700 text-lg">
+            {formatCurrency(finalLineTotal)}
+          </div>
         </div>
-        <div className="flex items-center gap-4">
+
+        {/* External ID + Quantity Control */}
+        <div className="flex items-center gap-2">
           {item.selected_specification?.external_id && (
             <div className="text-xs text-white bg-gray-900/85 font-bold font-mono px-2 py-0.5 rounded">
               {item.selected_specification.external_id}
