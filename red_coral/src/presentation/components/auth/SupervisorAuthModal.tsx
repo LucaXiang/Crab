@@ -4,6 +4,20 @@ import { X, Shield, Lock, User as UserIcon, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { User } from '@/core/domain/types';
 
+interface AuthData {
+  mode: string;
+  session: {
+    username: string;
+    user_info: {
+      id: string;
+      username: string;
+      role: string;
+      permissions: string[];
+      is_system?: boolean;
+    };
+  } | null;
+}
+
 interface SupervisorAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -35,19 +49,48 @@ export const SupervisorAuthModal: React.FC<SupervisorAuthModalProps> = ({
     setError(null);
 
     try {
-      const supervisor = await invokeApi<User>('verify_supervisor_auth', {
+      // 直接调用 login_employee 验证凭据（不会影响当前 session，因为这是一次性验证）
+      const authData = await invokeApi<AuthData>('login_employee', {
         username,
         password,
-        required_permission: requiredPermission,
       });
-      
+
+      if (!authData.session) {
+        throw new Error(t('auth.login.invalid_credentials'));
+      }
+
+      const userInfo = authData.session.user_info;
+
+      // 检查权限: admin 有所有权限，或者检查特定权限
+      const hasPermission =
+        userInfo.role === 'admin' ||
+        userInfo.permissions.includes('*') ||
+        userInfo.permissions.includes(requiredPermission);
+
+      if (!hasPermission) {
+        throw new Error(t('auth.unauthorized.permission'));
+      }
+
+      // 构造 User 对象返回
+      const supervisor: User = {
+        id: userInfo.id,
+        username: userInfo.username,
+        display_name: null,
+        role_id: `role:${userInfo.role}`,
+        role_name: userInfo.role,
+        avatar: null,
+        is_active: true,
+        is_system: userInfo.is_system ?? false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
       onSuccess(supervisor);
-      // Clear sensitive data
       setPassword('');
       onClose();
     } catch (err) {
       console.error('Supervisor auth failed:', err);
-      setError(typeof err === 'string' ? err : 'Authentication failed');
+      setError(typeof err === 'string' ? err : (err as Error).message || t('auth.login.failed'));
     } finally {
       setIsLoading(false);
     }
@@ -71,8 +114,8 @@ export const SupervisorAuthModal: React.FC<SupervisorAuthModalProps> = ({
               )}
             </div>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="p-2 hover:bg-teal-100/50 rounded-full transition-colors text-gray-500"
           >
             <X size={20} />
