@@ -128,15 +128,14 @@ impl DiningTableRepository {
         let check_zone = data.zone.as_ref().unwrap_or(&existing.zone);
         let check_name = data.name.as_ref().unwrap_or(&existing.name);
 
-        if data.name.is_some() || data.zone.is_some() {
-            if let Some(found) = self.find_by_name_in_zone(check_zone, check_name).await?
-                && found.id != existing.id
-            {
-                return Err(RepoError::Duplicate(format!(
-                    "Table '{}' already exists in this zone",
-                    check_name
-                )));
-            }
+        if (data.name.is_some() || data.zone.is_some())
+            && let Some(found) = self.find_by_name_in_zone(check_zone, check_name).await?
+            && found.id != existing.id
+        {
+            return Err(RepoError::Duplicate(format!(
+                "Table '{}' already exists in this zone",
+                check_name
+            )));
         }
 
         // 手动构建 UPDATE 语句，避免 zone 被序列化为字符串

@@ -184,14 +184,14 @@ impl CommandHandler for OpenTableAction {
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
         // 0. Validate table is not occupied (only for non-retail orders with table_id)
-        if let Some(ref table_id) = self.table_id {
-            if let Some(existing_order_id) = ctx.find_active_order_for_table(table_id)? {
-                let table_name = self.table_name.as_deref().unwrap_or(table_id);
-                return Err(OrderError::TableOccupied(format!(
-                    "桌台 {} 已被占用 (订单: {})",
-                    table_name, existing_order_id
-                )));
-            }
+        if let Some(ref table_id) = self.table_id
+            && let Some(existing_order_id) = ctx.find_active_order_for_table(table_id)?
+        {
+            let table_name = self.table_name.as_deref().unwrap_or(table_id);
+            return Err(OrderError::TableOccupied(format!(
+                "桌台 {} 已被占用 (订单: {})",
+                table_name, existing_order_id
+            )));
         }
 
         // 1. Generate new order ID

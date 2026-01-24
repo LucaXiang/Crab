@@ -309,12 +309,12 @@ impl CatalogService {
         {
             let categories = self.categories.read().unwrap();
             let cat_id = data.category.to_string();
-            if let Some(cat) = categories.get(&cat_id) {
-                if cat.is_virtual {
-                    return Err(RepoError::Validation(
-                        "Product cannot belong to a virtual category".into(),
-                    ));
-                }
+            if let Some(cat) = categories.get(&cat_id)
+                && cat.is_virtual
+            {
+                return Err(RepoError::Validation(
+                    "Product cannot belong to a virtual category".into(),
+                ));
             }
         }
 
@@ -386,12 +386,12 @@ impl CatalogService {
         if let Some(ref new_cat) = data.category {
             let categories = self.categories.read().unwrap();
             let cat_id = new_cat.to_string();
-            if let Some(cat) = categories.get(&cat_id) {
-                if cat.is_virtual {
-                    return Err(RepoError::Validation(
-                        "Product cannot belong to a virtual category".into(),
-                    ));
-                }
+            if let Some(cat) = categories.get(&cat_id)
+                && cat.is_virtual
+            {
+                return Err(RepoError::Validation(
+                    "Product cannot belong to a virtual category".into(),
+                ));
             }
         }
 
@@ -682,15 +682,15 @@ impl CatalogService {
             .ok_or_else(|| RepoError::NotFound(format!("Category {} not found", id)))?;
 
         // Check duplicate name if changing
-        if let Some(ref new_name) = data.name {
-            if new_name != &existing.name {
-                let categories = self.categories.read().unwrap();
-                if categories.values().any(|c| &c.name == new_name) {
-                    return Err(RepoError::Duplicate(format!(
-                        "Category '{}' already exists",
-                        new_name
-                    )));
-                }
+        if let Some(ref new_name) = data.name
+            && new_name != &existing.name
+        {
+            let categories = self.categories.read().unwrap();
+            if categories.values().any(|c| &c.name == new_name) {
+                return Err(RepoError::Duplicate(format!(
+                    "Category '{}' already exists",
+                    new_name
+                )));
             }
         }
 

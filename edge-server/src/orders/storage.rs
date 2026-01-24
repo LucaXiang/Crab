@@ -429,10 +429,10 @@ impl OrderStorage {
 
             if let Some(value) = snapshots_table.get(order_id)? {
                 let snapshot: OrderSnapshot = serde_json::from_slice(value.value())?;
-                if let Some(ref tid) = snapshot.table_id {
-                    if tid == table_id {
-                        return Ok(Some(order_id.to_string()));
-                    }
+                if let Some(ref tid) = snapshot.table_id
+                    && tid == table_id
+                {
+                    return Ok(Some(order_id.to_string()));
                 }
             }
         }

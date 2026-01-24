@@ -82,8 +82,8 @@ impl KitchenTicketRenderer {
 
         // Convert to vec with category names, sort items by external_id
         groups
-            .into_iter()
-            .map(|(_, mut items)| {
+            .into_values()
+            .map(|mut items| {
                 // Sort by external_id (nulls last)
                 items.sort_by(|a, b| {
                     match (a.external_id, b.external_id) {
@@ -160,12 +160,12 @@ impl KitchenTicketRenderer {
         }
 
         // Note (备注)
-        if let Some(ref note) = item.note {
-            if !note.is_empty() {
-                b.bold();
-                b.line(&format!("     * {}", note));
-                b.bold_off();
-            }
+        if let Some(ref note) = item.note
+            && !note.is_empty()
+        {
+            b.bold();
+            b.line(&format!("     * {}", note));
+            b.bold_off();
         }
     }
 
