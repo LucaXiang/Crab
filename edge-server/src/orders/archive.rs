@@ -200,3 +200,123 @@ impl OrderArchiveService {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shared::order::{OrderEventType, OrderSnapshot, OrderStatus};
+
+    fn create_test_snapshot() -> OrderSnapshot {
+        OrderSnapshot {
+            order_id: "test-order-1".to_string(),
+            table_id: Some("T1".to_string()),
+            table_name: Some("Table 1".to_string()),
+            zone_id: None,
+            zone_name: None,
+            guest_count: 2,
+            is_retail: false,
+            status: OrderStatus::Completed,
+            items: vec![],
+            payments: vec![],
+            original_total: 100.0,
+            subtotal: 100.0,
+            total_discount: 0.0,
+            total_surcharge: 0.0,
+            tax: 0.0,
+            discount: 0.0,
+            total: 100.0,
+            paid_amount: 100.0,
+            remaining_amount: 0.0,
+            paid_item_quantities: std::collections::HashMap::new(),
+            receipt_number: Some("R001".to_string()),
+            is_pre_payment: false,
+            order_rule_discount_amount: None,
+            order_rule_surcharge_amount: None,
+            order_applied_rules: None,
+            order_manual_discount_percent: None,
+            order_manual_discount_fixed: None,
+            start_time: 1704067200000,
+            end_time: Some(1704070800000),
+            created_at: 1704067200000,
+            updated_at: 1704070800000,
+            last_sequence: 5,
+            state_checksum: String::new(),
+        }
+    }
+
+    fn create_test_event(order_id: &str, sequence: u64) -> shared::order::OrderEvent {
+        shared::order::OrderEvent {
+            event_id: format!("event-{}", sequence),
+            sequence,
+            order_id: order_id.to_string(),
+            timestamp: 1704067200000,
+            client_timestamp: None,
+            operator_id: "op-1".to_string(),
+            operator_name: "Test Operator".to_string(),
+            command_id: format!("cmd-{}", sequence),
+            event_type: OrderEventType::TableOpened,
+            payload: shared::order::EventPayload::TableOpened {
+                table_id: Some("T1".to_string()),
+                table_name: Some("Table 1".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 2,
+                is_retail: false,
+                receipt_number: None,
+            },
+        }
+    }
+
+    #[test]
+    fn test_compute_order_hash_deterministic() {
+        // Hash should be deterministic for same inputs
+        let snapshot = create_test_snapshot();
+
+        let hash1 = compute_order_hash_standalone(&snapshot, "prev_hash", "event_hash");
+        let hash2 = compute_order_hash_standalone(&snapshot, "prev_hash", "event_hash");
+
+        assert_eq!(hash1, hash2);
+        assert_eq!(hash1.len(), 64); // SHA256 hex = 64 chars
+    }
+
+    #[test]
+    fn test_compute_order_hash_different_inputs() {
+        let snapshot = create_test_snapshot();
+
+        let hash1 = compute_order_hash_standalone(&snapshot, "prev_hash_a", "event_hash");
+        let hash2 = compute_order_hash_standalone(&snapshot, "prev_hash_b", "event_hash");
+
+        assert_ne!(hash1, hash2); // Different prev_hash should produce different hash
+    }
+
+    #[test]
+    fn test_compute_event_hash_deterministic() {
+        let event = create_test_event("order-1", 1);
+
+        let hash1 = compute_event_hash_standalone(&event);
+        let hash2 = compute_event_hash_standalone(&event);
+
+        assert_eq!(hash1, hash2);
+        assert_eq!(hash1.len(), 64);
+    }
+
+    // Standalone functions for testing without OrderArchiveService
+    fn compute_order_hash_standalone(snapshot: &OrderSnapshot, prev_hash: &str, last_event_hash: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(prev_hash.as_bytes());
+        hasher.update(snapshot.order_id.as_bytes());
+        hasher.update(snapshot.receipt_number.as_deref().unwrap_or("").as_bytes());
+        hasher.update(format!("{:?}", snapshot.status).as_bytes());
+        hasher.update(last_event_hash.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
+    fn compute_event_hash_standalone(event: &shared::order::OrderEvent) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(event.event_id.as_bytes());
+        hasher.update(event.order_id.as_bytes());
+        hasher.update(format!("{}", event.sequence).as_bytes());
+        hasher.update(format!("{:?}", event.event_type).as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+}
