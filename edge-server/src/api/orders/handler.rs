@@ -7,9 +7,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::core::ServerState;
-use crate::db::models::{
-    Order, OrderAddItem, OrderAddPayment, OrderCreate, OrderEvent, OrderEventType, OrderStatus,
-};
+use crate::db::models::{Order, OrderAddItem, OrderAddPayment, OrderEvent, OrderEventType};
 use crate::db::repository::OrderRepository;
 use crate::utils::{AppError, AppResult};
 
@@ -41,16 +39,6 @@ pub async fn list(
     Ok(Json(orders))
 }
 
-/// List open orders
-pub async fn list_open(State(state): State<ServerState>) -> AppResult<Json<Vec<Order>>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let orders = repo
-        .find_open()
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(orders))
-}
-
 /// Get order by id
 pub async fn get_by_id(
     State(state): State<ServerState>,
@@ -76,37 +64,6 @@ pub async fn get_by_receipt(
         .await
         .map_err(|e| AppError::database(e.to_string()))?
         .ok_or_else(|| AppError::not_found(format!("Order with receipt {} not found", receipt)))?;
-    Ok(Json(order))
-}
-
-/// Create order payload with hash
-#[derive(Debug, Deserialize)]
-pub struct CreateOrderRequest {
-    #[serde(flatten)]
-    pub data: OrderCreate,
-    pub curr_hash: String,
-}
-
-/// Create a new order
-pub async fn create(
-    State(state): State<ServerState>,
-    Json(payload): Json<CreateOrderRequest>,
-) -> AppResult<Json<Order>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let order = repo
-        .create(payload.data, payload.curr_hash)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-
-    let id = order
-        .id
-        .as_ref()
-        .map(|t| t.to_string())
-        .unwrap_or_default();
-    state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&order))
-        .await;
-
     Ok(Json(order))
 }
 
@@ -200,31 +157,6 @@ pub async fn update_totals(
 
     state
         .broadcast_sync(RESOURCE, "totals_updated", &id, Some(&order))
-        .await;
-
-    Ok(Json(order))
-}
-
-/// Update status request
-#[derive(Debug, Deserialize)]
-pub struct UpdateStatusRequest {
-    pub status: OrderStatus,
-}
-
-/// Update order status
-pub async fn update_status(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-    Json(payload): Json<UpdateStatusRequest>,
-) -> AppResult<Json<Order>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let order = repo
-        .update_status(&id, payload.status)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-
-    state
-        .broadcast_sync(RESOURCE, "status_updated", &id, Some(&order))
         .await;
 
     Ok(Json(order))

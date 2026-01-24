@@ -17,8 +17,7 @@ pub fn router() -> Router<ServerState> {
 fn routes() -> Router<ServerState> {
     Router::new()
         // List & query
-        .route("/", get(handler::list).post(handler::create))
-        .route("/open", get(handler::list_open))
+        .route("/", get(handler::list))
         .route("/last", get(handler::get_last))
         .route("/verify", get(handler::verify_chain))
         .route("/receipt/{receipt}", get(handler::get_by_receipt))
@@ -30,7 +29,6 @@ fn routes() -> Router<ServerState> {
         )
         .route("/{id}/payments", post(handler::add_payment))
         .route("/{id}/totals", put(handler::update_totals))
-        .route("/{id}/status", put(handler::update_status))
         .route("/{id}/hash", put(handler::update_hash))
         .route(
             "/{id}/events",

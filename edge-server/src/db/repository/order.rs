@@ -2,8 +2,8 @@
 
 use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{
-    Order, OrderAddItem, OrderAddPayment, OrderCreate, OrderEvent, OrderEventType, OrderItem,
-    OrderPayment, OrderStatus,
+    Order, OrderAddItem, OrderAddPayment, OrderEvent, OrderEventType, OrderItem, OrderPayment,
+    OrderStatus,
 };
 use surrealdb::engine::local::Db;
 use surrealdb::{RecordId, Surreal};
@@ -52,11 +52,6 @@ impl OrderRepository {
         Ok(orders)
     }
 
-    /// Find open orders
-    pub async fn find_open(&self) -> RepoResult<Vec<Order>> {
-        self.find_by_status(OrderStatus::Open).await
-    }
-
     /// Find order by id
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Order>> {
         let order: Option<Order> = self.base.db().select((TABLE, id)).await?;
@@ -87,40 +82,6 @@ impl OrderRepository {
             .await?;
         let orders: Vec<Order> = result.take(0)?;
         Ok(orders.into_iter().next())
-    }
-
-    /// Create a new order
-    pub async fn create(&self, data: OrderCreate, curr_hash: String) -> RepoResult<Order> {
-        // Check duplicate receipt number
-        if self.find_by_receipt(&data.receipt_number).await?.is_some() {
-            return Err(RepoError::Duplicate(format!(
-                "Order with receipt '{}' already exists",
-                data.receipt_number
-            )));
-        }
-
-        let order = Order {
-            id: None,
-            receipt_number: data.receipt_number,
-            zone_name: data.zone_name,
-            table_name: data.table_name,
-            status: OrderStatus::Open,
-            start_time: chrono::Utc::now().to_rfc3339(),
-            end_time: None,
-            guest_count: data.guest_count,
-            total_amount: 0.0,
-            paid_amount: 0.0,
-            discount_amount: 0.0,
-            surcharge_amount: 0.0,
-            items: vec![],
-            payments: vec![],
-            prev_hash: data.prev_hash,
-            curr_hash,
-            created_at: None,
-        };
-
-        let created: Option<Order> = self.base.db().create(TABLE).content(order).await?;
-        created.ok_or_else(|| RepoError::Database("Failed to create order".to_string()))
     }
 
     /// Add item to order
@@ -218,30 +179,6 @@ impl OrderRepository {
             .bind(("total", total_amount))
             .bind(("disc", discount_amount))
             .bind(("sur", surcharge_amount))
-            .await?;
-        let orders: Vec<Order> = result.take(0)?;
-        orders
-            .into_iter()
-            .next()
-            .ok_or_else(|| RepoError::NotFound(format!("Order {} not found", order_id)))
-    }
-
-    /// Update order status
-    pub async fn update_status(&self, order_id: &str, status: OrderStatus) -> RepoResult<Order> {
-        let order_thing = RecordId::from_table_key(TABLE, order_id);
-        let end_time = if status != OrderStatus::Open {
-            Some(chrono::Utc::now().to_rfc3339())
-        } else {
-            None
-        };
-
-        let mut result = self
-            .base
-            .db()
-            .query("UPDATE order SET status = $status, end_time = $end WHERE id = $id RETURN AFTER")
-            .bind(("id", order_thing))
-            .bind(("status", status))
-            .bind(("end", end_time))
             .await?;
         let orders: Vec<Order> = result.take(0)?;
         orders

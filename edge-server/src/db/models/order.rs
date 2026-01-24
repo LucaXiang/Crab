@@ -4,14 +4,14 @@ use super::serde_helpers;
 use serde::{Deserialize, Serialize};
 use surrealdb::RecordId;
 
-/// Order status enum
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+/// Order status enum (archived orders only)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OrderStatus {
-    #[default]
-    Open,
-    Paid,
+    Completed,
     Void,
+    Moved,
+    Merged,
 }
 
 /// Embedded order item
@@ -90,6 +90,11 @@ pub struct Order {
     pub prev_hash: String,
     /// Hash chain: current hash
     pub curr_hash: String,
+    /// Related order (for MOVED/MERGED)
+    #[serde(default, with = "serde_helpers::option_record_id")]
+    pub related_order_id: Option<RecordId>,
+    /// Operator ID who completed/voided the order
+    pub operator_id: Option<String>,
     pub created_at: Option<String>,
 }
 
