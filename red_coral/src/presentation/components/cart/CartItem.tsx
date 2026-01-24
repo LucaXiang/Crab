@@ -2,7 +2,7 @@ import React from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { CartItem as CartItemType } from '@/core/domain/types';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
-import { formatCurrency } from '@/utils/currency';
+import { formatCurrency, Currency } from '@/utils/currency';
 import { useLongPress } from '@/hooks/useLongPress';
 
 interface CartItemProps {
@@ -18,13 +18,29 @@ export const CartItem = React.memo<CartItemProps>(({
 }) => {
   const performanceMode = useSettingsStore(state => state.performanceMode);
   const discountPercent = item.manual_discount_percent || 0;
+  
   // Calculate options modifier for display
   const optionsModifier = (item.selected_options ?? []).reduce((sum, opt) => sum + (opt.price_modifier ?? 0), 0);
-  const baseUnitPrice = (item.original_price ?? item.price) + optionsModifier;
-  // Use server-computed unit_price, fallback to item.price
-  const finalUnitPrice = item.unit_price ?? item.price;
-  // Use server-computed line_total, fallback to price * quantity
-  const finalLineTotal = item.line_total ?? item.price * item.quantity;
+  const basePrice = item.original_price ?? item.price;
+  const baseUnitPrice = basePrice + optionsModifier;
+
+  // Use server-computed unit_price, fallback to local calculation
+  let finalUnitPrice = item.unit_price;
+  
+  if (finalUnitPrice === undefined || finalUnitPrice === null) {
+    if (discountPercent > 0) {
+      // Calculate discounted price: (base + options) * (1 - discount%)
+      const discountFactor = Currency.sub(1, Currency.div(discountPercent, 100));
+      finalUnitPrice = Currency.floor2(
+        Currency.mul(baseUnitPrice, discountFactor)
+      ).toNumber();
+    } else {
+      finalUnitPrice = baseUnitPrice;
+    }
+  }
+
+  // Use server-computed line_total, fallback to local calculation
+  const finalLineTotal = item.line_total ?? Currency.floor2(Currency.mul(finalUnitPrice, item.quantity)).toNumber();
 
   const handleQuantityChange = (e: React.MouseEvent, delta: number) => {
     e.stopPropagation();
