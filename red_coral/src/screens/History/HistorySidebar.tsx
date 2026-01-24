@@ -6,8 +6,8 @@ import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface HistorySidebarProps {
   orders: OrderSummary[];
-  selectedKey: number | null;
-  onSelect: (id: number) => void;
+  selectedKey: string | null;
+  onSelect: (id: string) => void;
   search: string;
   setSearch: (term: string) => void;
   page: number;

@@ -16,7 +16,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({ isVisible, onBack,
   const { orders, total, page, pageSize, setPage, search, setSearch, loading: listLoading } = useHistoryOrderList(6, isVisible);
 
   // Step 2: Track selected order key
-  const [selectedID, setSelectedID] = useState<number | null>(null);
+  const [selectedID, setSelectedID] = useState<string | null>(null);
 
   // Auto-select first order when list loads
   useEffect(() => {

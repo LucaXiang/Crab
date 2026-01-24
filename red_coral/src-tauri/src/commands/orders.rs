@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 use urlencoding::encode;
 
 use crate::core::response::ErrorCode;
-use crate::core::{ApiResponse, ClientBridge, FetchOrderListResponse, OrderListData};
+use crate::core::{ApiResponse, ClientBridge, OrderListData};
 use shared::models::Order;
 
 #[derive(Debug, serde::Deserialize)]
@@ -21,33 +21,64 @@ pub struct FetchOrderListParams {
 
 // ============ Order Queries ============
 
+/// Order summary from history API
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct OrderSummary {
+    pub id: Option<String>,
+    pub receipt_number: String,
+    pub status: String,
+    pub zone_name: Option<String>,
+    pub table_name: Option<String>,
+    pub total_amount: f64,
+    pub paid_amount: f64,
+    pub start_time: String,
+    pub end_time: Option<String>,
+    pub guest_count: Option<i32>,
+}
+
+/// Fetch order list response with summaries
+#[derive(Debug, serde::Serialize)]
+pub struct FetchOrderListSummaryResponse {
+    pub orders: Vec<OrderSummary>,
+    pub total: i64,
+    pub page: i32,
+}
+
 #[tauri::command(rename_all = "snake_case")]
 pub async fn fetch_order_list(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     params: FetchOrderListParams,
-) -> Result<ApiResponse<FetchOrderListResponse>, String> {
+) -> Result<ApiResponse<FetchOrderListSummaryResponse>, String> {
     let bridge = bridge.read().await;
-    let offset = (params.page - 1) * params.limit;
 
-    let mut query = format!("/api/orders?limit={}&offset={}", params.limit, offset);
-    if let Some(search) = params.search {
-        if !search.is_empty() {
-            query.push_str(&format!("&search={}", encode(&search)));
-        }
-    }
-    if let Some(start_time) = params.start_time {
-        query.push_str(&format!("&start_time={}", start_time));
-    }
+    // Calculate date range (default: last 7 days)
+    let end_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let start_date = if let Some(start_time) = params.start_time {
+        // Convert timestamp to date string
+        chrono::DateTime::from_timestamp_millis(start_time as i64)
+            .map(|dt| dt.format("%Y-%m-%d").to_string())
+            .unwrap_or_else(|| {
+                (chrono::Utc::now() - chrono::Duration::days(7))
+                    .format("%Y-%m-%d")
+                    .to_string()
+            })
+    } else {
+        (chrono::Utc::now() - chrono::Duration::days(7))
+            .format("%Y-%m-%d")
+            .to_string()
+    };
 
-    match bridge.get::<Vec<Order>>(&query).await {
+    let query = format!(
+        "/api/orders/history?start_date={}&end_date={}&limit={}",
+        encode(&start_date),
+        encode(&end_date),
+        params.limit
+    );
+
+    match bridge.get::<Vec<OrderSummary>>(&query).await {
         Ok(orders) => {
-            // Mock total since API returns simple list
-            let total = if orders.len() < params.limit as usize {
-                offset as i64 + orders.len() as i64
-            } else {
-                offset as i64 + orders.len() as i64 + 1 // Assume more
-            };
-            Ok(ApiResponse::success(FetchOrderListResponse {
+            let total = orders.len() as i64;
+            Ok(ApiResponse::success(FetchOrderListSummaryResponse {
                 orders,
                 total,
                 page: params.page,

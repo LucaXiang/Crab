@@ -2,14 +2,15 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Order status
+/// Order status (archived orders only - no ACTIVE status in SurrealDB)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OrderStatus {
     #[default]
-    Open,
-    Paid,
+    Completed,
     Void,
+    Moved,
+    Merged,
 }
 
 /// Order item attribute selection
@@ -52,7 +53,7 @@ pub struct OrderPayment {
     pub reference: Option<String>,
 }
 
-/// Order entity
+/// Order entity (archived order in SurrealDB)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Order {
     pub id: Option<String>,
@@ -75,6 +76,10 @@ pub struct Order {
     pub payments: Vec<OrderPayment>,
     pub prev_hash: String,
     pub curr_hash: String,
+    /// Related order ID (for MOVED/MERGED orders)
+    pub related_order_id: Option<String>,
+    /// Operator ID who completed/voided the order
+    pub operator_id: Option<String>,
     pub created_at: Option<String>,
 }
 
