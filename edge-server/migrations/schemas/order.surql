@@ -18,9 +18,17 @@ DEFINE FIELD OVERWRITE zone_name ON order TYPE option<string>
 DEFINE FIELD OVERWRITE table_name ON order TYPE option<string>
     PERMISSIONS FULL;
 
--- 状态: OPEN, PAID, VOID
+-- 状态: COMPLETED, VOID, MOVED, MERGED (归档订单，无 OPEN/ACTIVE)
 DEFINE FIELD OVERWRITE status ON order TYPE string
-    DEFAULT "OPEN"
+    ASSERT $value IN ["COMPLETED", "VOID", "MOVED", "MERGED"]
+    PERMISSIONS FULL;
+
+-- 新增：关联订单（用于 MOVED/MERGED 场景）
+DEFINE FIELD OVERWRITE related_order_id ON order TYPE option<record<order>>
+    PERMISSIONS FULL;
+
+-- 新增：操作员 ID
+DEFINE FIELD OVERWRITE operator_id ON order TYPE option<string>
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE start_time ON order TYPE datetime
