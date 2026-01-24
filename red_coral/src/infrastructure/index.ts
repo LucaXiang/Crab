@@ -14,6 +14,3 @@ export * from './print';
 
 // Label
 export * from './label';
-
-// Persistence
-export * from './persistence';

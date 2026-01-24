@@ -186,11 +186,6 @@ interface BridgeStore {
   removeTenant: (tenantId: string) => Promise<void>;
   getCurrentTenant: () => Promise<string | null>;
 
-  // Auth Actions
-  logout: () => Promise<void>;
-  fetchCurrentSession: () => Promise<void>;
-  hasOfflineCache: (username: string) => Promise<boolean>;
-
   // Auth Actions (unified - ClientBridge based)
   loginEmployee: (username: string, password: string) => Promise<LoginResponse>;
   logoutEmployee: () => Promise<void>;
@@ -347,37 +342,7 @@ export const useBridgeStore = create<BridgeStore>()(
         }
       },
 
-      // ==================== Auth Actions ====================
-
-      logout: async () => {
-        try {
-          await invokeApi('logout');
-          set({ currentSession: null });
-        } catch (error: any) {
-          console.error('Logout failed:', error);
-          // Force local logout anyway
-          set({ currentSession: null });
-        }
-      },
-
-      fetchCurrentSession: async () => {
-        try {
-          const session = await invokeApi<EmployeeSession | null>('get_current_session');
-          set({ currentSession: session });
-        } catch (error: any) {
-          console.error('Failed to fetch session:', error);
-        }
-      },
-
-      hasOfflineCache: async (username: string) => {
-        try {
-          return await invokeApi<boolean>('has_offline_cache', { username });
-        } catch (error: any) {
-          return false;
-        }
-      },
-
-      // ==================== Unified Auth (ClientBridge) ====================
+      // ==================== Auth (ClientBridge) ====================
 
       loginEmployee: async (username: string, password: string) => {
         set({ isLoading: true, error: null });

@@ -1,5 +1,4 @@
 /**
- * Order Services - Re-export for backward compatibility
+ * Order Services
  */
-export { saveCompletedOrder } from './eventPersistence';
 export { openCashDrawer, printOrderReceipt } from './paymentService';
