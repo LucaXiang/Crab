@@ -1,9 +1,11 @@
 /**
  * Print Service
- * Handles all printing operations (receipts, kitchen tickets, labels)
+ *
+ * NOTE: 打印功能现在由服务端 (edge-server) 处理。
+ * 前端不再需要直接调用打印命令。
+ * 保留此文件仅用于类型导出和向后兼容。
  */
 
-import { invokeApi } from '@/infrastructure/api/tauri-client';
 import type { ReceiptPrintConfig, KitchenTicketPrintConfig, LabelPrintConfig } from '@/core/domain/types/print';
 
 export interface PrintService {
@@ -17,15 +19,20 @@ export interface PrintService {
   listPrinters(): Promise<string[]>;
 }
 
+// 打印功能已移至服务端，这些函数现在是空操作
+const notImplemented = async () => {
+  console.warn('[PrintService] 打印功能已由服务端处理，前端调用无效');
+};
+
 export const printService: PrintService = {
-  printReceipt: (config) => invokeApi('print_receipt', { config }),
-  reprintReceipt: (orderId) => invokeApi('reprint_receipt', { order_id: orderId }),
-  printKitchenTicket: (config) => invokeApi('print_kitchen_ticket', { config }),
-  printMultipleKitchenTickets: (configs) => invokeApi('print_multiple_kitchen_tickets', { configs }),
-  printLabel: (config) => invokeApi('print_label', { config }),
-  printMultipleLabels: (configs) => invokeApi('print_multiple_labels', { configs }),
-  openCashDrawer: (printerName) => invokeApi('open_cash_drawer_cmd', { printer_name: printerName }),
-  listPrinters: () => invokeApi('list_printers'),
+  printReceipt: notImplemented,
+  reprintReceipt: notImplemented,
+  printKitchenTicket: notImplemented,
+  printMultipleKitchenTickets: notImplemented,
+  printLabel: notImplemented,
+  printMultipleLabels: notImplemented,
+  openCashDrawer: notImplemented,
+  listPrinters: async () => [],
 };
 
 // Export individual functions

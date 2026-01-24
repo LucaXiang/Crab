@@ -1,9 +1,11 @@
 /**
  * Label Print Service
- * Handles label printing functionality
+ *
+ * NOTE: 标签打印功能现在由服务端 (edge-server) 处理。
+ * 前端不再需要直接调用打印命令。
+ * 保留此文件仅用于类型导出和向后兼容。
  */
 
-import { invokeApi } from '@/infrastructure/api/tauri-client';
 import type { LabelPrintConfig, LabelPrintJob } from '@/core/domain/types/print';
 import type { HeldOrder, CartItem } from '@/core/domain/types';
 
@@ -16,13 +18,18 @@ export interface LabelPrintService {
   cancelPrintJob(jobId: string): Promise<void>;
 }
 
+// 标签打印功能已移至服务端，这些函数现在是空操作
+const notImplemented = async () => {
+  console.warn('[LabelPrintService] 标签打印功能已由服务端处理，前端调用无效');
+};
+
 export const labelPrintService: LabelPrintService = {
-  printLabel: (config) => invokeApi('print_label', { config }),
-  printMultipleLabels: (configs) => invokeApi('print_multiple_labels', { configs }),
-  printOrderLabels: (order) => invokeApi('print_order_labels', { order }),
-  printItemsLabels: (order, items) => invokeApi('print_items_labels', { order, items }),
-  getPrintJobs: () => invokeApi('get_print_jobs'),
-  cancelPrintJob: (jobId) => invokeApi('cancel_print_job', { job_id: jobId }),
+  printLabel: notImplemented,
+  printMultipleLabels: notImplemented,
+  printOrderLabels: notImplemented,
+  printItemsLabels: notImplemented,
+  getPrintJobs: async () => [],
+  cancelPrintJob: notImplemented,
 };
 
 export default labelPrintService;
