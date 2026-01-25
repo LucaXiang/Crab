@@ -250,6 +250,11 @@ impl OrdersManager {
         &self.storage
     }
 
+    /// Get the archive service if configured
+    pub fn archive_service(&self) -> Option<&super::OrderArchiveService> {
+        self.archive_service.as_ref()
+    }
+
     /// Execute a command and return the response
     pub fn execute_command(&self, cmd: OrderCommand) -> CommandResponse {
         match self.process_command(cmd.clone()) {

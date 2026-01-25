@@ -9,7 +9,7 @@ use crate::auth::JwtService;
 use crate::core::Config;
 use crate::core::config::migrate_legacy_structure;
 use crate::db::DbService;
-use crate::orders::OrdersManager;
+use crate::orders::{ArchiveWorker, OrdersManager};
 use crate::orders::actions::open_table::load_matching_rules;
 use crate::pricing::PriceRuleEngine;
 use crate::printing::{KitchenPrintService, PrintStorage};
@@ -214,6 +214,19 @@ impl ServerState {
             OrdersManager::new(&orders_db_path).expect("Failed to initialize orders manager");
         orders_manager.set_catalog_service(catalog_service.clone());
         orders_manager.set_archive_service(db.clone());
+
+        // Start ArchiveWorker if archive service is configured
+        if let Some(archive_service) = orders_manager.archive_service() {
+            let worker = ArchiveWorker::new(
+                orders_manager.storage().clone(),
+                archive_service.clone(),
+            );
+            let event_rx = orders_manager.subscribe();
+            tokio::spawn(async move {
+                worker.run(event_rx).await;
+            });
+        }
+
         let orders_manager = Arc::new(orders_manager);
 
         // 5. Initialize PriceRuleEngine
