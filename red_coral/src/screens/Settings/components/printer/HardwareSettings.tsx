@@ -4,9 +4,7 @@ import { useI18n } from '@/hooks/useI18n';
 import {
   useReceiptPrinter,
   useLabelPrinter,
-  useIsLabelPrintEnabled,
   useKitchenPrinter,
-  useIsKitchenPrintEnabled,
   usePrinterActions,
 } from '@/core/stores/ui';
 import { PrinterSelect } from './PrinterSelect';
@@ -19,14 +17,19 @@ interface HardwareSettingsProps {
 
 export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, loading }) => {
   const { t } = useI18n();
-  const { setReceiptPrinter, setLabelPrinter, setKitchenPrinter, setIsKitchenPrintEnabled, setIsLabelPrintEnabled } = usePrinterActions();
+  const { setReceiptPrinter, setLabelPrinter, setKitchenPrinter } = usePrinterActions();
 
   const receiptPrinter = useReceiptPrinter();
   const labelPrinter = useLabelPrinter();
-  const isLabelPrintEnabled = useIsLabelPrintEnabled();
   const kitchenPrinter = useKitchenPrinter();
-  const isKitchenPrintEnabled = useIsKitchenPrintEnabled();
   const [showHierarchyInfo, setShowHierarchyInfo] = useState(false);
+
+  // TODO: 当前全局默认都是启用的，需要讨论是否应该：
+  // 1. 从服务端获取全局配置状态
+  // 2. 或者改为"是否配置了打印机"来决定启用状态（当前实现）
+  // 当前实现：启用状态由"是否配置了打印机"决定（与服务端逻辑一致）
+  const isLabelPrintEnabled = !!labelPrinter;
+  const isKitchenPrintEnabled = !!kitchenPrinter;
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start animate-in fade-in duration-300">
@@ -67,7 +70,9 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
                   type="checkbox"
                   className="sr-only peer"
                   checked={isLabelPrintEnabled}
-                  onChange={(e) => setIsLabelPrintEnabled(e.target.checked)}
+                  onChange={(e) => {
+                    if (!e.target.checked) setLabelPrinter(null);
+                  }}
                 />
                 <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 shadow-sm transition-colors"></div>
               </label>
@@ -136,7 +141,9 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
               type="checkbox"
               className="sr-only peer"
               checked={isKitchenPrintEnabled}
-              onChange={(e) => setIsKitchenPrintEnabled(e.target.checked)}
+              onChange={(e) => {
+                if (!e.target.checked) setKitchenPrinter(null);
+              }}
             />
             <span className="mr-3 text-sm font-medium text-gray-600 group-hover:text-gray-900 transition-colors">
               {isKitchenPrintEnabled ? (t('common.status.enabled')) : (t('common.status.disabled'))}
@@ -225,12 +232,9 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
               <p className="text-gray-500 max-w-md mx-auto mb-6">
                 {t('settings.printer.kitchen_printing.enable_to_configure')}
               </p>
-              <button
-                onClick={() => setIsKitchenPrintEnabled(true)}
-                className="px-5 py-2.5 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-lg shadow-gray-200 active:scale-95"
-              >
-                {t('common.action.enable')}
-              </button>
+              <p className="text-sm text-gray-400">
+                {t('settings.printer.kitchen_printing.select_printer_to_enable')}
+              </p>
             </div>
         )}
       </div>

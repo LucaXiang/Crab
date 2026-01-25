@@ -369,8 +369,8 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: 'settings-storage',
+      // TODO: storeInfo 应该从服务端获取，已从持久化中移除
       partialize: (state) => ({
-        storeInfo: state.storeInfo,
         performanceMode: state.performanceMode,
         lastSelectedCategory: state.lastSelectedCategory,
       }),

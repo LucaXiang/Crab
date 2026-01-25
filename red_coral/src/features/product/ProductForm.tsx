@@ -5,7 +5,6 @@ import { AttributeSelectionModal } from '@/features/attribute';
 import { TagSelectionModal, useTags } from '@/features/tag';
 import { ProductImage } from './ProductImage';
 import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions, usePrintDestinationStore } from '@/core/stores/resources';
-import { useIsKitchenPrintEnabled, useIsLabelPrintEnabled } from '@/core/stores/ui';
 import { usePriceInput } from '@/hooks/usePriceInput';
 import { Category, EmbeddedSpec, PrintState } from '@/core/domain/types';
 
@@ -80,8 +79,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   t,
   inheritedAttributeIds = [],
 }) => {
-  const isGlobalKitchenEnabled = useIsKitchenPrintEnabled();
-  const isGlobalLabelEnabled = useIsLabelPrintEnabled();
   const [showAttributeModal, setShowAttributeModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
   const allTags = useTags();
@@ -292,7 +289,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <span>
                       {t('settings.product.print.effective_state')}: {
                         (() => {
-                          if (!isGlobalKitchenEnabled) return t('common.status.disabled_global');
                           const cat = categories.find(c => String(c.id) === String(formData.category));
                           const isEnabled = cat ? (cat.kitchen_print_destinations && cat.kitchen_print_destinations.length > 0) : false;
                           return isEnabled ? t('common.status.enabled') : t('common.status.disabled');
@@ -359,7 +355,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <span>
                       {t('settings.product.print.effective_state')}: {
                         (() => {
-                          if (!isGlobalLabelEnabled) return t('common.status.disabled_global');
                           const cat = categories.find(c => String(c.id) === String(formData.category));
                           const isEnabled = cat ? (cat.is_label_print_enabled !== false) : true;
                           return isEnabled ? t('common.status.enabled') : t('common.status.disabled');

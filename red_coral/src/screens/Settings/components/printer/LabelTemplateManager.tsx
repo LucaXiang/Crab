@@ -7,6 +7,7 @@ import { LabelEditorScreen } from '../LabelEditorScreen';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { toast } from '@/presentation/components/Toast';
 
+// TODO: label_templates 应该迁移到服务端存储，实现多设备共享模板
 const STORAGE_KEY = 'label_templates';
 
 export const LabelTemplateManager: React.FC = () => {

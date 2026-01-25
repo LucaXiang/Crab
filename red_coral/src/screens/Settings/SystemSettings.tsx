@@ -23,13 +23,8 @@ export const SystemSettings: React.FC = () => {
   const scalePercent = Math.round(uiScale * 100);
 
   const handleClearCache = () => {
-    localStorage.removeItem('pos-active-orders');
-    // We iterate to remove individual order keys
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith('pos-active-order:') || key.startsWith('pos-active-events:')) {
-        localStorage.removeItem(key);
-      }
-    });
+    // 服务端权威模式下，订单数据不缓存在 localStorage
+    // 清理缓存只需要刷新页面重新从服务端同步
     window.location.reload();
   };
 
