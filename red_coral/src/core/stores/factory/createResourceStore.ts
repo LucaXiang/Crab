@@ -89,8 +89,8 @@ export function createResourceStore<T extends { id: string }>(
         const items = await fetchFn();
         console.log(`[${resourceName}] fetchAll success, got ${items.length} items`);
         set({ items, isLoading: false, isLoaded: true });
-      } catch (e: any) {
-        const errorMsg = e.message || 'Failed to fetch';
+      } catch (e: unknown) {
+        const errorMsg = e instanceof Error ? e.message : 'Failed to fetch';
         set({ error: errorMsg, isLoading: false });
         console.error(`[${resourceName}] fetch failed:`, errorMsg);
       }
@@ -207,8 +207,8 @@ export function createCrudResourceStore<
         const items = await fetchFn();
         console.log(`[${resourceName}] fetchAll success, got ${items.length} items`);
         set({ items, isLoading: false, isLoaded: true });
-      } catch (e: any) {
-        const errorMsg = e.message || 'Failed to fetch';
+      } catch (e: unknown) {
+        const errorMsg = e instanceof Error ? e.message : 'Failed to fetch';
         set({ error: errorMsg, isLoading: false });
         console.error(`[${resourceName}] fetch failed:`, errorMsg);
       }
