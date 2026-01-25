@@ -257,14 +257,6 @@ pub struct AuthData {
     pub mode: super::LoginMode,
 }
 
-// ============ Orders ============
-
-/// Orders 列表
-#[derive(Debug, Clone, Serialize)]
-pub struct OrderListData {
-    pub orders: Vec<shared::models::Order>,
-}
-
 // ============ System ============
 
 /// Employees 列表
@@ -289,14 +281,6 @@ pub struct OrderSnapshotListData {
 #[derive(Debug, Clone, Serialize)]
 pub struct OrderEventListData {
     pub events: Vec<shared::order::OrderEvent>,
-}
-
-/// Order List Response with pagination
-#[derive(Debug, Clone, Serialize)]
-pub struct FetchOrderListResponse {
-    pub orders: Vec<shared::models::Order>,
-    pub total: i64,
-    pub page: i32,
 }
 
 // ============ Tenants ============

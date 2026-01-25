@@ -8,27 +8,13 @@ use tokio::sync::RwLock;
 use urlencoding::encode;
 
 use crate::core::response::{
-    ApiResponse, DeleteData, EmployeeListData, ErrorCode, OrderListData, PriceRuleListData, Role,
-    RoleListData, RolePermissionListData,
+    ApiResponse, DeleteData, EmployeeListData, ErrorCode, PriceRuleListData, Role, RoleListData,
+    RolePermissionListData,
 };
 use crate::core::ClientBridge;
 use shared::models::{
-    // Employees
-    Employee,
-    EmployeeCreate,
-    EmployeeUpdate,
-    InitGenesisRequest,
-    // Order for pending sync
-    Order,
-    // Price Rules
-    PriceRule,
-    PriceRuleCreate,
-    PriceRuleUpdate,
-    // System State
-    SystemState,
-    SystemStateUpdate,
-    UpdateLastOrderRequest,
-    UpdateSyncStateRequest,
+    Employee, EmployeeCreate, EmployeeUpdate, InitGenesisRequest, PriceRule, PriceRuleCreate,
+    PriceRuleUpdate, SystemState, SystemStateUpdate, UpdateLastOrderRequest, UpdateSyncStateRequest,
 };
 
 // ============ System State ============
@@ -100,23 +86,6 @@ pub async fn update_sync_state(
     let bridge = bridge.read().await;
     match bridge.put("/api/system-state/sync-state", &data).await {
         Ok(state) => Ok(ApiResponse::success(state)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
-    }
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn get_pending_sync_orders(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-) -> Result<ApiResponse<OrderListData>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .get::<Vec<Order>>("/api/system-state/pending-sync")
-        .await
-    {
-        Ok(orders) => Ok(ApiResponse::success(OrderListData { orders })),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),

@@ -7,8 +7,7 @@ use tauri::State;
 use tokio::sync::RwLock;
 use urlencoding::encode;
 
-use crate::core::{ApiResponse, ClientBridge, OrderListData};
-use shared::models::Order;
+use crate::core::{ApiResponse, ClientBridge};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct FetchOrderListParams {
@@ -194,92 +193,6 @@ pub async fn fetch_order_detail(
         .await
     {
         Ok(detail) => Ok(ApiResponse::success(detail)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
-    }
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn list_orders(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    limit: Option<i32>,
-    offset: Option<i32>,
-) -> Result<ApiResponse<OrderListData>, String> {
-    let bridge = bridge.read().await;
-    let limit = limit.unwrap_or(50);
-    let offset = offset.unwrap_or(0);
-    match bridge
-        .get::<Vec<Order>>(&format!("/api/orders?limit={}&offset={}", limit, offset))
-        .await
-    {
-        Ok(orders) => Ok(ApiResponse::success(OrderListData { orders })),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
-    }
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn list_open_orders(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-) -> Result<ApiResponse<OrderListData>, String> {
-    let bridge = bridge.read().await;
-    match bridge.get::<Vec<Order>>("/api/orders/open").await {
-        Ok(orders) => Ok(ApiResponse::success(OrderListData { orders })),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
-    }
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn get_order(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    id: String,
-) -> Result<ApiResponse<Order>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .get::<Order>(&format!("/api/orders/{}", encode(&id)))
-        .await
-    {
-        Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
-    }
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn get_order_by_receipt(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    receipt: String,
-) -> Result<ApiResponse<Order>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .get::<Order>(&format!("/api/orders/receipt/{}", encode(&receipt)))
-        .await
-    {
-        Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
-    }
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn get_last_order(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-) -> Result<ApiResponse<Option<Order>>, String> {
-    let bridge = bridge.read().await;
-    match bridge.get::<Option<Order>>("/api/orders/last").await {
-        Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
-    }
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn verify_order_chain(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    from_hash: Option<String>,
-) -> Result<ApiResponse<bool>, String> {
-    let bridge = bridge.read().await;
-    let query = match from_hash {
-        Some(hash) => format!("/api/orders/verify?from_hash={}", encode(&hash)),
-        None => "/api/orders/verify".to_string(),
-    };
-    match bridge.get::<bool>(&query).await {
-        Ok(valid) => Ok(ApiResponse::success(valid)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }

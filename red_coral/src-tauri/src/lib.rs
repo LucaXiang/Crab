@@ -213,12 +213,6 @@ pub async fn run() {
             // Order commands (Query)
             commands::fetch_order_list,
             commands::fetch_order_detail,
-            commands::list_orders,
-            commands::list_open_orders,
-            commands::get_order,
-            commands::get_order_by_receipt,
-            commands::get_last_order,
-            commands::verify_order_chain,
             // Order Event Sourcing commands
             commands::order_execute_command,
             commands::order_execute,
@@ -233,7 +227,6 @@ pub async fn run() {
             commands::init_genesis,
             commands::update_last_order,
             commands::update_sync_state,
-            commands::get_pending_sync_orders,
             commands::list_employees,
             commands::list_all_employees,
             commands::get_employee,
