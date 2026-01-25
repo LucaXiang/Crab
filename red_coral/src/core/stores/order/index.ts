@@ -4,7 +4,6 @@
 export { useCheckoutStore } from './useCheckoutStore';
 export { useCurrentOrderKey, useCheckoutOrder } from './useCheckoutStore';
 export { useDraftOrderStore } from './useDraftOrderStore';
-export { useReceiptStore } from './useReceiptStore';
 
 // ============================================================================
 // Event Sourcing Architecture - Active Orders (Server-Side State)

@@ -9,7 +9,7 @@
 
 use crate::db::models::{
     serde_helpers, Attribute, AttributeBindingFull, Category, CategoryCreate, CategoryUpdate,
-    Product, ProductCreate, ProductFull, ProductUpdate, Tag,
+    EmbeddedSpec, Product, ProductCreate, ProductFull, ProductUpdate, Tag,
 };
 use crate::db::repository::{RepoError, RepoResult};
 use serde::{Deserialize, Serialize};
@@ -318,8 +318,26 @@ impl CatalogService {
             }
         }
 
-        let product = Product {
-            id: None,
+        // Internal struct without serde_helpers to preserve native RecordId for SurrealDB
+        #[derive(serde::Serialize)]
+        struct InternalProduct {
+            name: String,
+            image: String,
+            category: RecordId,
+            sort_order: i32,
+            tax_rate: i32,
+            receipt_name: Option<String>,
+            kitchen_print_name: Option<String>,
+            kitchen_print_destinations: Vec<RecordId>,
+            label_print_destinations: Vec<RecordId>,
+            is_kitchen_print_enabled: i32,
+            is_label_print_enabled: i32,
+            is_active: bool,
+            tags: Vec<RecordId>,
+            specs: Vec<EmbeddedSpec>,
+        }
+
+        let product = InternalProduct {
             name: data.name,
             image: data.image.unwrap_or_default(),
             category: data.category,
@@ -642,8 +660,23 @@ impl CatalogService {
             .filter_map(|id| id.parse().ok())
             .collect();
 
-        let category = Category {
-            id: None,
+        // Internal struct without serde_helpers to preserve native RecordId for SurrealDB
+        #[derive(serde::Serialize)]
+        struct InternalCategory {
+            name: String,
+            sort_order: i32,
+            kitchen_print_destinations: Vec<RecordId>,
+            label_print_destinations: Vec<RecordId>,
+            is_kitchen_print_enabled: bool,
+            is_label_print_enabled: bool,
+            is_active: bool,
+            is_virtual: bool,
+            tag_ids: Vec<RecordId>,
+            match_mode: String,
+            is_display: bool,
+        }
+
+        let category = InternalCategory {
             name: data.name,
             sort_order: data.sort_order.unwrap_or(0),
             kitchen_print_destinations,

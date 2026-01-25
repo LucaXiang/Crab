@@ -213,6 +213,7 @@ impl ServerState {
         let mut orders_manager =
             OrdersManager::new(&orders_db_path).expect("Failed to initialize orders manager");
         orders_manager.set_catalog_service(catalog_service.clone());
+        orders_manager.set_archive_service(db.clone());
         let orders_manager = Arc::new(orders_manager);
 
         // 5. Initialize PriceRuleEngine

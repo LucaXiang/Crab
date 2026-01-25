@@ -7,7 +7,6 @@ use tauri::State;
 use tokio::sync::RwLock;
 use urlencoding::encode;
 
-use crate::core::response::ErrorCode;
 use crate::core::{ApiResponse, ClientBridge, OrderListData};
 use shared::models::Order;
 
@@ -36,7 +35,16 @@ pub struct OrderSummary {
     pub guest_count: Option<i32>,
 }
 
-/// Fetch order list response with summaries
+/// Backend response for paginated order list
+#[derive(Debug, serde::Deserialize)]
+struct OrderListApiResponse {
+    orders: Vec<OrderSummary>,
+    total: i64,
+    page: i32,
+    limit: i32,
+}
+
+/// Fetch order list response with summaries (for frontend)
 #[derive(Debug, serde::Serialize)]
 pub struct FetchOrderListSummaryResponse {
     pub orders: Vec<OrderSummary>,
@@ -71,27 +79,29 @@ pub async fn fetch_order_list(
     // Calculate offset from page number (1-indexed)
     let offset = (params.page.max(1) - 1) * params.limit;
 
-    let query = format!(
+    // Build query with optional search parameter
+    let mut query = format!(
         "/api/orders/history?start_date={}&end_date={}&limit={}&offset={}",
         encode(&start_date),
         encode(&end_date),
         params.limit,
         offset
     );
+    if let Some(search) = &params.search {
+        if !search.is_empty() {
+            query.push_str(&format!("&search={}", encode(search)));
+        }
+    }
 
-    match bridge.get::<Vec<OrderSummary>>(&query).await {
-        Ok(orders) => {
-            let total = orders.len() as i64;
+    match bridge.get::<OrderListApiResponse>(&query).await {
+        Ok(response) => {
             Ok(ApiResponse::success(FetchOrderListSummaryResponse {
-                orders,
-                total,
-                page: params.page,
+                orders: response.orders,
+                total: response.total,
+                page: response.page,
             }))
         }
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -109,10 +119,7 @@ pub async fn list_orders(
         .await
     {
         Ok(orders) => Ok(ApiResponse::success(OrderListData { orders })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -123,10 +130,7 @@ pub async fn list_open_orders(
     let bridge = bridge.read().await;
     match bridge.get::<Vec<Order>>("/api/orders/open").await {
         Ok(orders) => Ok(ApiResponse::success(OrderListData { orders })),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -141,10 +145,7 @@ pub async fn get_order(
         .await
     {
         Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::OrderNotFound,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -159,10 +160,7 @@ pub async fn get_order_by_receipt(
         .await
     {
         Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::OrderNotFound,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -173,10 +171,7 @@ pub async fn get_last_order(
     let bridge = bridge.read().await;
     match bridge.get::<Option<Order>>("/api/orders/last").await {
         Ok(order) => Ok(ApiResponse::success(order)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
 
@@ -192,9 +187,6 @@ pub async fn verify_order_chain(
     };
     match bridge.get::<bool>(&query).await {
         Ok(valid) => Ok(ApiResponse::success(valid)),
-        Err(e) => Ok(ApiResponse::error_with_code(
-            ErrorCode::DatabaseError,
-            e.to_string(),
-        )),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }

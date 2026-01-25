@@ -8,7 +8,6 @@
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { HeldOrder, CartItem, PaymentRecord, Table, Zone } from '@/core/domain/types';
 import { useActiveOrdersStore } from './useActiveOrdersStore';
-import { useReceiptStore } from './useReceiptStore';
 import { useCheckoutStore } from './useCheckoutStore';
 import { useBridgeStore } from '@/core/stores/bridge/useBridgeStore';
 import type {
@@ -256,15 +255,14 @@ export const completeOrder = async (
   order: HeldOrder,
   newPayments: PaymentRecord[],
 ): Promise<HeldOrder> => {
-  const receiptStore = useReceiptStore.getState();
   const store = useActiveOrdersStore.getState();
 
   const orderId = order.order_id;
 
-  // Ensure receipt number
-  let finalReceiptNumber = order.receipt_number;
-  if (!finalReceiptNumber || !finalReceiptNumber.startsWith('FAC')) {
-    finalReceiptNumber = receiptStore.generateReceiptNumber();
+  // Receipt number is already set by server at OpenTable time
+  const receiptNumber = order.receipt_number;
+  if (!receiptNumber) {
+    throw new Error('Order has no receipt_number - this should be set at OpenTable');
   }
 
   // Add payments
@@ -287,7 +285,7 @@ export const completeOrder = async (
   const completeCommand = createCommand({
     type: 'COMPLETE_ORDER',
     order_id: orderId,
-    receipt_number: finalReceiptNumber,
+    receipt_number: receiptNumber,
   });
   const completeResponse = await sendCommand(completeCommand);
   ensureSuccess(completeResponse, 'Complete order');

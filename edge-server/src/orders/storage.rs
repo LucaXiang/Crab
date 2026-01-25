@@ -43,10 +43,11 @@ const ACTIVE_ORDERS_TABLE: TableDefinition<&str, ()> = TableDefinition::new("act
 const PROCESSED_COMMANDS_TABLE: TableDefinition<&str, ()> =
     TableDefinition::new("processed_commands");
 
-/// Table for sequence counter: key = "seq", value = u64
+/// Table for sequence counter: key = "seq" or "order_count", value = u64
 const SEQUENCE_TABLE: TableDefinition<&str, u64> = TableDefinition::new("sequence_counter");
 
 const SEQUENCE_KEY: &str = "seq";
+const ORDER_COUNT_KEY: &str = "order_count";
 
 /// Storage errors
 #[derive(Debug, Error)]
@@ -185,6 +186,36 @@ impl OrderStorage {
         let mut table = txn.open_table(SEQUENCE_TABLE)?;
         table.insert(SEQUENCE_KEY, sequence)?;
         Ok(())
+    }
+
+    // ========== Order Counter (for receipt number) ==========
+
+    /// Get and increment order count atomically
+    /// Returns the NEW count after increment
+    pub fn next_order_count(&self) -> StorageResult<u64> {
+        tracing::debug!("next_order_count: starting");
+        let txn = self.db.begin_write()?;
+        let mut table = txn.open_table(SEQUENCE_TABLE)?;
+        let current = table
+            .get(ORDER_COUNT_KEY)?
+            .map(|g| g.value())
+            .unwrap_or(0);
+        let next = current + 1;
+        table.insert(ORDER_COUNT_KEY, next)?;
+        drop(table);
+        txn.commit()?;
+        tracing::debug!(current = current, next = next, "next_order_count: incremented");
+        Ok(next)
+    }
+
+    /// Get current order count (without incrementing)
+    pub fn get_order_count(&self) -> StorageResult<u64> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(SEQUENCE_TABLE)?;
+        Ok(table
+            .get(ORDER_COUNT_KEY)?
+            .map(|g| g.value())
+            .unwrap_or(0))
     }
 
     // ========== Command Idempotency ==========
@@ -422,6 +453,31 @@ impl OrderStorage {
     ) -> StorageResult<Option<String>> {
         let active_table = txn.open_table(ACTIVE_ORDERS_TABLE)?;
         let snapshots_table = txn.open_table(SNAPSHOTS_TABLE)?;
+
+        for result in active_table.iter()? {
+            let (key, _) = result?;
+            let order_id = key.value();
+
+            if let Some(value) = snapshots_table.get(order_id)? {
+                let snapshot: OrderSnapshot = serde_json::from_slice(value.value())?;
+                if let Some(ref tid) = snapshot.table_id
+                    && tid == table_id
+                {
+                    return Ok(Some(order_id.to_string()));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Find active order for a specific table (read-only, outside transaction)
+    ///
+    /// Returns the order_id if the table is occupied by an active order.
+    pub fn find_active_order_for_table(&self, table_id: &str) -> StorageResult<Option<String>> {
+        let read_txn = self.db.begin_read()?;
+        let active_table = read_txn.open_table(ACTIVE_ORDERS_TABLE)?;
+        let snapshots_table = read_txn.open_table(SNAPSHOTS_TABLE)?;
 
         for result in active_table.iter()? {
             let (key, _) = result?;

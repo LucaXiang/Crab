@@ -38,11 +38,13 @@ export const FormSection: React.FC<FormSectionProps> = ({
   const [collapsed, setCollapsed] = React.useState(defaultCollapsed);
 
   return (
-    <section className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+    <section className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between pb-2 border-b border-gray-100 mb-4 cursor-pointer hover:bg-gray-50 -mx-4 px-4 rounded-t-xl transition-colors"
+        className={`w-full flex items-center justify-between p-4 bg-white hover:bg-gray-50 transition-colors cursor-pointer ${
+          collapsed ? '' : 'border-b border-gray-100'
+        }`}
       >
         <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900">
           <Icon size={16} className="text-teal-500" />
@@ -57,7 +59,7 @@ export const FormSection: React.FC<FormSectionProps> = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {!collapsed && <div className="space-y-4">{children}</div>}
+      {!collapsed && <div className="p-4 space-y-4">{children}</div>}
     </section>
   );
 };

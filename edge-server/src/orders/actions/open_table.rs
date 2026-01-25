@@ -174,6 +174,8 @@ pub struct OpenTableAction {
     pub zone_name: Option<String>,
     pub guest_count: i32,
     pub is_retail: bool,
+    /// Server-generated receipt number
+    pub receipt_number: String,
 }
 
 #[async_trait]
@@ -183,6 +185,13 @@ impl CommandHandler for OpenTableAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
+        info!(
+            table_id = ?self.table_id,
+            table_name = ?self.table_name,
+            receipt_number = %self.receipt_number,
+            "OpenTableAction::execute starting"
+        );
+
         // 0. Validate table is not occupied (only for non-retail orders with table_id)
         if let Some(ref table_id) = self.table_id
             && let Some(existing_order_id) = ctx.find_active_order_for_table(table_id)?
@@ -196,11 +205,12 @@ impl CommandHandler for OpenTableAction {
 
         // 1. Generate new order ID
         let order_id = Uuid::new_v4().to_string();
+        info!(order_id = %order_id, "Generated new order ID");
 
         // 2. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 3. Create snapshot
+        // 3. Create snapshot with server-generated receipt_number
         let mut snapshot = ctx.create_snapshot(order_id.clone());
         snapshot.table_id = self.table_id.clone();
         snapshot.table_name = self.table_name.clone();
@@ -208,6 +218,7 @@ impl CommandHandler for OpenTableAction {
         snapshot.zone_name = self.zone_name.clone();
         snapshot.guest_count = self.guest_count;
         snapshot.is_retail = self.is_retail;
+        snapshot.receipt_number = Some(self.receipt_number.clone());
         snapshot.status = OrderStatus::Active;
         snapshot.start_time = metadata.timestamp;
         snapshot.created_at = metadata.timestamp;
@@ -220,7 +231,7 @@ impl CommandHandler for OpenTableAction {
         // 5. Save to context
         ctx.save_snapshot(snapshot);
 
-        // 6. Create event
+        // 6. Create event with server-generated receipt_number
         let event = OrderEvent::new(
             seq,
             order_id.clone(),
@@ -236,10 +247,16 @@ impl CommandHandler for OpenTableAction {
                 zone_name: self.zone_name.clone(),
                 guest_count: self.guest_count,
                 is_retail: self.is_retail,
-                receipt_number: None,
+                receipt_number: Some(self.receipt_number.clone()),
             },
         );
 
+        info!(
+            order_id = %order_id,
+            seq = seq,
+            receipt_number = %self.receipt_number,
+            "OpenTableAction::execute completed"
+        );
         Ok(vec![event])
     }
 }
@@ -275,6 +292,7 @@ mod tests {
             zone_name: Some("Zone A".to_string()),
             guest_count: 4,
             is_retail: false,
+            receipt_number: "FAC2026012410001".to_string(),
         };
 
         let metadata = create_test_metadata();
@@ -308,6 +326,7 @@ mod tests {
             zone_name: None,
             guest_count: 2,
             is_retail: false,
+            receipt_number: "FAC2026012410002".to_string(),
         };
 
         let metadata = create_test_metadata();
@@ -332,6 +351,7 @@ mod tests {
             zone_name: None,
             guest_count: 1,
             is_retail: true,
+            receipt_number: "FAC2026012410003".to_string(),
         };
 
         let metadata = create_test_metadata();

@@ -27,9 +27,22 @@ impl SystemStateRepository {
             return Ok(state);
         }
 
-        // Create new singleton
-        let state = SystemState {
-            id: Some(RecordId::from_table_key(TABLE, SINGLETON_ID)),
+        // Create new singleton using internal struct without serde_helpers
+        // (to avoid RecordId being serialized as string)
+        #[derive(serde::Serialize)]
+        struct InternalSystemState {
+            genesis_hash: Option<String>,
+            last_order: Option<RecordId>,
+            last_order_hash: Option<String>,
+            synced_up_to: Option<RecordId>,
+            synced_up_to_hash: Option<String>,
+            last_sync_time: Option<String>,
+            order_count: i32,
+            created_at: Option<String>,
+            updated_at: Option<String>,
+        }
+
+        let state = InternalSystemState {
             genesis_hash: None,
             last_order: None,
             last_order_hash: None,
@@ -87,6 +100,29 @@ impl SystemStateRepository {
             ..Default::default()
         })
         .await
+    }
+
+    /// Atomically increment order_count and return the new value
+    /// Used for generating receipt numbers
+    pub async fn get_next_order_number(&self) -> RepoResult<i32> {
+        // Ensure singleton exists
+        self.get_or_create().await?;
+
+        let singleton_id = RecordId::from_table_key(TABLE, SINGLETON_ID);
+        let mut result = self
+            .base
+            .db()
+            .query(
+                "UPDATE system_state SET \
+                    order_count = order_count + 1, \
+                    updated_at = time::now() \
+                WHERE id = $id RETURN AFTER.order_count",
+            )
+            .bind(("id", singleton_id))
+            .await?;
+
+        let new_count: Option<i32> = result.take(0)?;
+        new_count.ok_or_else(|| RepoError::Database("Failed to get next order number".to_string()))
     }
 
     /// Update last order info with atomic order_count increment

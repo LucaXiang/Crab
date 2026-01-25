@@ -30,6 +30,7 @@ use super::storage::{OrderStorage, StorageError};
 use super::traits::{CommandContext, CommandHandler, CommandMetadata, EventApplier, OrderError};
 use crate::db::models::PriceRule;
 use crate::services::catalog_service::ProductMeta;
+use chrono::Local;
 use shared::order::{
     CommandError, CommandErrorCode, CommandResponse, OrderCommand, OrderEvent, OrderSnapshot,
     OrderStatus,
@@ -202,6 +203,13 @@ impl OrdersManager {
         self.archive_service = Some(super::OrderArchiveService::new(db));
     }
 
+    /// Generate next receipt number (crash-safe via redb)
+    fn next_receipt_number(&self) -> String {
+        let count = self.storage.next_order_count().unwrap_or(1);
+        let date_str = Local::now().format("%Y%m%d").to_string();
+        format!("FAC{}{}", date_str, 10000 + count)
+    }
+
     /// Create an OrdersManager with existing storage (for testing)
     #[cfg(test)]
     pub fn with_storage(storage: OrderStorage) -> Self {
@@ -308,12 +316,37 @@ impl OrdersManager {
         &self,
         cmd: OrderCommand,
     ) -> ManagerResult<(CommandResponse, Vec<OrderEvent>)> {
-        // 1. Idempotency check
+        tracing::info!(command_id = %cmd.command_id, payload = ?cmd.payload, "Processing command");
+        
+        // 1. Idempotency check (before transaction)
         if self.storage.is_command_processed(&cmd.command_id)? {
+            tracing::warn!(command_id = %cmd.command_id, "Duplicate command");
             return Ok((CommandResponse::duplicate(cmd.command_id), vec![]));
         }
 
-        // 2. Begin write transaction
+        // 2. For OpenTable: pre-check table availability before generating receipt_number
+        // This avoids wasting receipt numbers on failed table opens
+        if let shared::order::OrderCommandPayload::OpenTable { table_id: Some(tid), table_name, .. } = &cmd.payload {
+            if let Some(existing) = self.storage.find_active_order_for_table(tid)? {
+                let name = table_name.as_deref().unwrap_or(tid);
+                return Err(ManagerError::TableOccupied(format!(
+                    "桌台 {} 已被占用 (订单: {})", name, existing
+                )));
+            }
+        }
+
+        // 3. Pre-generate receipt_number for OpenTable (BEFORE transaction to avoid deadlock)
+        // redb doesn't allow nested write transactions
+        let pre_generated_receipt = match &cmd.payload {
+            shared::order::OrderCommandPayload::OpenTable { .. } => {
+                let receipt = self.next_receipt_number();
+                tracing::info!(receipt_number = %receipt, "Pre-generated receipt number");
+                Some(receipt)
+            }
+            _ => None,
+        };
+
+        // 3. Begin write transaction
         let txn = self.storage.begin_write()?;
 
         // Double-check idempotency within transaction
@@ -324,10 +357,10 @@ impl OrdersManager {
             return Ok((CommandResponse::duplicate(cmd.command_id), vec![]));
         }
 
-        // 3. Get current sequence for context initialization
+        // 4. Get current sequence for context initialization
         let current_sequence = self.storage.get_current_sequence()?;
 
-        // 4. Create context and metadata
+        // 5. Create context and metadata
         let mut ctx = CommandContext::new(&txn, &self.storage, current_sequence);
         let metadata = CommandMetadata {
             command_id: cmd.command_id.clone(),
@@ -336,9 +369,31 @@ impl OrdersManager {
             timestamp: cmd.timestamp,
         };
 
-        // 5. Convert to action and execute (blocking async)
-        // For AddItems commands, inject cached price rules and product metadata from CatalogService
+        // 6. Convert to action and execute
+        // For OpenTable: use pre-generated receipt_number
+        // For AddItems: inject cached price rules and product metadata from CatalogService
         let action: CommandAction = match &cmd.payload {
+            shared::order::OrderCommandPayload::OpenTable {
+                table_id,
+                table_name,
+                zone_id,
+                zone_name,
+                guest_count,
+                is_retail,
+            } => {
+                tracing::info!(table_id = ?table_id, table_name = ?table_name, "Processing OpenTable command");
+                // Use pre-generated receipt_number (generated before transaction)
+                let receipt_number = pre_generated_receipt.expect("receipt_number must be pre-generated for OpenTable");
+                CommandAction::OpenTable(super::actions::OpenTableAction {
+                    table_id: table_id.clone(),
+                    table_name: table_name.clone(),
+                    zone_id: zone_id.clone(),
+                    zone_name: zone_name.clone(),
+                    guest_count: *guest_count,
+                    is_retail: *is_retail,
+                    receipt_number,
+                })
+            }
             shared::order::OrderCommandPayload::AddItems { order_id, items } => {
                 let rules = self.get_cached_rules(order_id).unwrap_or_default();
                 let product_metadata = self.get_product_metadata_for_items(items);
@@ -456,6 +511,7 @@ impl OrdersManager {
 
         // 14. Return response
         let order_id = events.first().map(|e| e.order_id.clone());
+        tracing::info!(command_id = %cmd.command_id, order_id = ?order_id, event_count = events.len(), "Command processed successfully");
         Ok((CommandResponse::success(cmd.command_id, order_id), events))
     }
 

@@ -15,6 +15,11 @@ import { SystemSettings } from './SystemSettings';
 import { UserManagement } from '@/features/user';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
+import { TableModal } from '@/features/table';
+import { ProductModal } from '@/features/product';
+import { CategoryModal } from '@/features/category';
+import { TagModal } from '@/features/tag';
+import { ZoneModal } from '@/features/zone';
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -90,6 +95,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = React.memo(({ onBac
     <div className="flex h-full w-full bg-gray-100 overflow-hidden font-sans">
       <SettingsSidebar onBack={onBack} />
       <SettingsContent />
+      
+      {/* Global Modals */}
+      <TableModal />
+      <ZoneModal />
+      <CategoryModal />
+      <TagModal />
+      <ProductModal />
     </div>
   );
 });

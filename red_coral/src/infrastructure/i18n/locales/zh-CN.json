@@ -57,6 +57,8 @@
       "unknown_item": "未知项目",
       "none": "N/A",
       "system": "系统",
+      "status": "状态",
+      "is_active": "启用状态",
       "paidQuantity": "已付 {{qty}} 份"
     },
     "message": {

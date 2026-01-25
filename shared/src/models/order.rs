@@ -14,42 +14,57 @@ pub enum OrderStatus {
 }
 
 /// Order item attribute selection
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OrderItemAttribute {
-    /// Attribute reference (String ID)
+    #[serde(default)]
     pub attr_id: String,
+    #[serde(default)]
     pub option_idx: i32,
+    #[serde(default)]
     pub name: String,
-    /// Price in currency unit
+    #[serde(default)]
     pub price: f64,
 }
 
 /// Order item
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OrderItem {
-    /// Product specification reference (String ID)
+    #[serde(default)]
     pub spec: String,
+    #[serde(default)]
     pub name: String,
+    #[serde(default)]
     pub spec_name: Option<String>,
-    /// Price in currency unit
+    #[serde(default)]
     pub price: f64,
+    #[serde(default)]
     pub quantity: i32,
+    #[serde(default)]
     pub attributes: Vec<OrderItemAttribute>,
-    /// Discount amount in currency unit
+    #[serde(default)]
     pub discount_amount: f64,
-    /// Surcharge amount in currency unit
+    #[serde(default)]
     pub surcharge_amount: f64,
+    #[serde(default)]
+    pub unit_price: f64,
+    #[serde(default)]
+    pub line_total: f64,
+    #[serde(default)]
     pub note: Option<String>,
+    #[serde(default)]
     pub is_sent: bool,
 }
 
 /// Order payment
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OrderPayment {
+    #[serde(default)]
     pub method: String,
-    /// Amount in currency unit
+    #[serde(default)]
     pub amount: f64,
+    #[serde(default)]
     pub time: String,
+    #[serde(default)]
     pub reference: Option<String>,
 }
 

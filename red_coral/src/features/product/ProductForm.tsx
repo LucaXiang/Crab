@@ -173,7 +173,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
           <FormField label={t('settings.product.form.price')} required>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">EUR</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">€</span>
               <input
                 type="text"
                 inputMode="decimal"

@@ -8,7 +8,6 @@
 import { useShallow } from 'zustand/react/shallow';
 import { useDraftOrderStore } from './useDraftOrderStore';
 import { useCheckoutStore } from './useCheckoutStore';
-import { useReceiptStore } from './useReceiptStore';
 import * as orderOps from './useOrderOperations';
 
 /**
@@ -30,16 +29,9 @@ export const useOrderActions = () => {
     }))
   );
 
-  const receiptActions = useReceiptStore(
-    useShallow((state) => ({
-      generateReceiptNumber: state.generateReceiptNumber,
-    }))
-  );
-
   return {
     ...draftActions,
     ...checkoutActions,
-    ...receiptActions,
     handleTableSelect: orderOps.handleTableSelect,
     completeOrder: orderOps.completeOrder,
     voidOrder: orderOps.voidOrder,

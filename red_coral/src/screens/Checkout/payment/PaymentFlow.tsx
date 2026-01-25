@@ -13,7 +13,6 @@ import { Currency } from '@/utils/currency';
 import { openCashDrawer, printOrderReceipt } from '@/core/services/order/paymentService';
 import { completeOrder, splitOrder, updateOrderInfo } from '@/core/stores/order/useOrderOperations';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
-import { useReceiptStore } from '@/core/stores/order/useReceiptStore';
 import { useOrderCommands } from '@/core/stores/order/useOrderCommands';
 
 // Components
@@ -232,18 +231,12 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     try {
       const store = useActiveOrdersStore.getState();
       const existingSnapshot = store.getOrder(order.order_id);
-      let currentOrder = existingSnapshot ? existingSnapshot : { ...order };
+      const currentOrder = existingSnapshot ? existingSnapshot : { ...order };
 
-      if (!currentOrder.receipt_number || !currentOrder.receipt_number.startsWith('FAC')) {
-        const receiptStore = useReceiptStore.getState();
-        const newReceiptNumber = receiptStore.generateReceiptNumber();
-        currentOrder.receipt_number = newReceiptNumber;
-
-        import('@/core/stores/cart/useCartStore').then((module) => {
-          module.useCartStore.getState().setReceiptNumber(newReceiptNumber);
-        });
-
-        if (onUpdateOrder) onUpdateOrder(currentOrder);
+      // Receipt number is already set by server at OpenTable time
+      if (!currentOrder.receipt_number) {
+        toast.error('Order has no receipt number');
+        return;
       }
 
       await updateOrderInfo(currentOrder, {
@@ -258,7 +251,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
       console.error('Pre-payment print failed:', error);
       toast.error(t('settings.payment.receipt_print_failed'));
     }
-  }, [order, onUpdateOrder, t]);
+  }, [order, t]);
 
   /**
    * 分账支付处理

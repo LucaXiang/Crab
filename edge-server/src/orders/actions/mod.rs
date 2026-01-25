@@ -93,21 +93,11 @@ impl CommandHandler for CommandAction {
 impl From<&OrderCommand> for CommandAction {
     fn from(cmd: &OrderCommand) -> Self {
         match &cmd.payload {
-            OrderCommandPayload::OpenTable {
-                table_id,
-                table_name,
-                zone_id,
-                zone_name,
-                guest_count,
-                is_retail,
-            } => CommandAction::OpenTable(OpenTableAction {
-                table_id: table_id.clone(),
-                table_name: table_name.clone(),
-                zone_id: zone_id.clone(),
-                zone_name: zone_name.clone(),
-                guest_count: *guest_count,
-                is_retail: *is_retail,
-            }),
+            OrderCommandPayload::OpenTable { .. } => {
+                // OpenTable is handled specially in OrdersManager to generate receipt_number
+                // This path should never be reached
+                unreachable!("OpenTable should be handled by OrdersManager, not From<&OrderCommand>")
+            }
             OrderCommandPayload::AddItems { order_id, items } => {
                 CommandAction::AddItems(AddItemsAction {
                     order_id: order_id.clone(),

@@ -102,8 +102,16 @@ impl DiningTableRepository {
             )));
         }
 
-        let table = DiningTable {
-            id: None,
+        // Internal struct without serde_helpers to preserve native RecordId for SurrealDB
+        #[derive(serde::Serialize)]
+        struct InternalDiningTable {
+            name: String,
+            zone: RecordId,
+            capacity: i32,
+            is_active: bool,
+        }
+
+        let table = InternalDiningTable {
             name: data.name,
             zone: data.zone,
             capacity: data.capacity.unwrap_or(4),

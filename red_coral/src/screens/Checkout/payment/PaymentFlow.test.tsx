@@ -42,14 +42,6 @@ vi.mock('@/core/stores/order/useOrderOperations', () => ({
   splitOrder: vi.fn(),
 }));
 
-vi.mock('@/stores/order/useReceiptStore', () => ({
-  useReceiptStore: {
-    getState: () => ({
-      generateReceiptNumber: () => 'FAC-TEST-001'
-    })
-  }
-}));
-
 vi.mock('@/presentation/components/auth/EscalatableGate', () => ({
   EscalatableGate: ({ children }: { children: React.ReactNode }) => <>{children}</>
 }));

@@ -87,8 +87,20 @@ impl EmployeeRepository {
             .map_err(|e| RepoError::Database(format!("Failed to hash password: {}", e)))?;
 
         let display_name = data.display_name.unwrap_or_else(|| data.username.clone());
-        let employee = Employee {
-            id: None,
+
+        // Internal struct without serde_helpers to preserve native RecordId for SurrealDB
+        #[derive(serde::Serialize)]
+        struct InternalEmployee {
+            username: String,
+            #[serde(rename = "employee_name")]
+            display_name: String,
+            hash_pass: String,
+            role: RecordId,
+            is_system: bool,
+            is_active: bool,
+        }
+
+        let employee = InternalEmployee {
             username: data.username,
             display_name,
             hash_pass,
