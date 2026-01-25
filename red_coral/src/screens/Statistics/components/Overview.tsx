@@ -8,9 +8,9 @@ import { OverviewStats, RevenueTrendPoint, CategorySale, TopProduct, TimeRange }
 
 interface OverviewProps {
   overview: OverviewStats;
-  revenueTrend: RevenueTrendPoint[];
-  categorySales: CategorySale[];
-  topProducts: TopProduct[];
+  revenue_trend: RevenueTrendPoint[];
+  category_sales: CategorySale[];
+  top_products: TopProduct[];
   timeRange: TimeRange;
   onTimeRangeChange: (range: TimeRange) => void;
   customStartDate?: string;
@@ -21,9 +21,9 @@ interface OverviewProps {
 
 export const Overview: React.FC<OverviewProps> = ({
   overview,
-  revenueTrend,
-  categorySales,
-  topProducts,
+  revenue_trend,
+  category_sales,
+  top_products,
   timeRange,
   onTimeRangeChange,
   customStartDate,
@@ -32,7 +32,7 @@ export const Overview: React.FC<OverviewProps> = ({
   onCustomEndDateChange,
 }) => {
   const { t } = useI18n();
-  const hasData = overview.today_orders > 0 || revenueTrend.length > 0;
+  const hasData = overview.today_orders > 0 || revenue_trend.length > 0;
 
   return (
     <div className="space-y-6 min-w-0">
@@ -45,14 +45,14 @@ export const Overview: React.FC<OverviewProps> = ({
         <>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0">
             <RevenueTrendChart 
-              data={revenueTrend} 
+              data={revenue_trend} 
               timeRange={timeRange} 
               onTimeRangeChange={onTimeRangeChange} 
             />
-            <CategoryDistributionChart data={categorySales} />
+            <CategoryDistributionChart data={category_sales} />
           </div>
 
-          <TopProductsChart data={topProducts} />
+          <TopProductsChart data={top_products} />
         </>
       ) : (
         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-100 shadow-sm">

@@ -36,9 +36,9 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
       avg_guest_spend: 0,
       avg_dining_time: 0,
     },
-    revenueTrend: [],
-    categorySales: [],
-    topProducts: [],
+    revenue_trend: [],
+    category_sales: [],
+    top_products: [],
   });
 
   useEffect(() => {
@@ -127,9 +127,9 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
           {activeTab === 'overview' && (
             <Overview 
               overview={data.overview}
-              revenueTrend={data.revenueTrend}
-              categorySales={data.categorySales}
-              topProducts={data.topProducts}
+              revenue_trend={data.revenue_trend}
+              category_sales={data.category_sales}
+              top_products={data.top_products}
               timeRange={timeRange}
               onTimeRangeChange={setTimeRange}
               customStartDate={customStartDate}

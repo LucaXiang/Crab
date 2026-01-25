@@ -196,10 +196,8 @@ export interface UpdateProductRequest {
 
 
 // Category types
-export interface CategoryData extends Category {}
-
 export interface CategoryListData {
-  categories: CategoryData[];
+  categories: Category[];
   total: number;
 }
 
@@ -333,8 +331,6 @@ export interface UpdateAttributeTemplateRequest {
 }
 
 // Attribute Option types
-export interface AttributeOptionData extends AttributeOption {}
-
 export interface AttributeOptionListData {
   options: AttributeOption[];
   total: number;
@@ -360,8 +356,6 @@ export interface UpdateAttributeOptionRequest {
 }
 
 // Tag types
-export interface TagData extends Tag {}
-
 export interface TagListData {
   tags: Tag[];
   total: number;
@@ -379,8 +373,6 @@ export interface UpdateTagRequest {
 }
 
 // Role types
-export interface RoleData extends Role {}
-
 export interface RoleListData {
   roles: Role[];
   total: number;
@@ -404,8 +396,6 @@ export interface CreateRolePermissionsRequest {
 }
 
 // Print Destination types
-export interface PrintDestinationData extends PrintDestination {}
-
 export interface PrintDestinationListData {
   destinations: PrintDestination[];
   total: number;
@@ -440,8 +430,6 @@ export interface UpdatePrintDestinationRequest {
 }
 
 // Zone types
-export interface ZoneData extends Zone {}
-
 export interface ZoneListData {
   zones: Zone[];
   total: number;
@@ -459,8 +447,6 @@ export interface UpdateZoneRequest {
 }
 
 // Table types
-export interface TableData extends Table {}
-
 export interface TableListData {
   tables: Table[];
   total: number;

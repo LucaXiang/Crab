@@ -100,9 +100,9 @@ const topProductSchema = z.object({
 
 const statisticsResponseSchema = z.object({
   overview: overviewStatsSchema,
-  revenueTrend: z.array(revenueTrendPointSchema),
-  categorySales: z.array(categorySaleSchema),
-  topProducts: z.array(topProductSchema),
+  revenue_trend: z.array(revenueTrendPointSchema),
+  category_sales: z.array(categorySaleSchema),
+  top_products: z.array(topProductSchema),
 });
 
 export interface StatisticsResponse {
@@ -120,9 +120,9 @@ export interface StatisticsResponse {
     avg_guest_spend: number;
     avg_dining_time?: number;
   };
-  revenueTrend: Array<{ time: string; value: number }>;
-  categorySales: Array<{ name: string; value: number; color: string }>;
-  topProducts: Array<{ name: string; sales: number }>;
+  revenue_trend: Array<{ time: string; value: number }>;
+  category_sales: Array<{ name: string; value: number; color: string }>;
+  top_products: Array<{ name: string; sales: number }>;
 }
 
 export async function getStatistics(

@@ -210,7 +210,7 @@ export interface SalesReportItem {
 
 export interface StatisticsResponse {
   overview: OverviewStats;
-  revenueTrend: RevenueTrendPoint[];
-  categorySales: CategorySale[];
-  topProducts: TopProduct[];
+  revenue_trend: RevenueTrendPoint[];
+  category_sales: CategorySale[];
+  top_products: TopProduct[];
 }
