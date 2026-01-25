@@ -3,12 +3,11 @@ import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { logger } from '@/utils/logger';
 
 /**
- * Lightweight order summary for list view
- * Only includes essential fields for display in sidebar
+ * Order summary for list view (matches backend OrderSummary)
  */
 export interface OrderSummary {
   order_id: string;
-  receipt_number?: string;
+  receipt_number: string;
   table_name: string;
   total: number;
   status: 'COMPLETED' | 'VOID' | 'MOVED' | 'MERGED';
@@ -17,24 +16,8 @@ export interface OrderSummary {
   guest_count: number;
 }
 
-/**
- * Raw order summary from backend API
- */
-interface RawOrderSummary {
-  id?: string;
-  receipt_number: string;
-  status: string;
-  zone_name?: string;
-  table_name?: string;
-  total_amount: number;
-  paid_amount: number;
-  start_time: string;
-  end_time?: string;
-  guest_count?: number;
-}
-
 interface FetchOrderListResponse {
-  orders: RawOrderSummary[];
+  orders: OrderSummary[];
   total: number;
   page: number;
 }
@@ -54,8 +37,7 @@ interface UseHistoryOrderListResult {
 /**
  * Hook for fetching history order list (summary only, no items/timeline)
  *
- * Performance optimization: Only loads essential fields for list display.
- * Full order details (items, timeline) are loaded separately when selected.
+ * Backend returns OrderSummary directly - no frontend conversion needed.
  */
 export const useHistoryOrderList = (
   initialPageSize: number = 20,
@@ -87,7 +69,6 @@ export const useHistoryOrderList = (
 
     setLoading(true);
     try {
-      // Call Rust backend to get order list (summary only)
       // Only show orders from the last 7 days
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -101,35 +82,11 @@ export const useHistoryOrderList = (
         },
       });
 
-      // Parse ISO date string to timestamp
-      const parseTime = (timeStr: string | undefined): number => {
-        if (!timeStr) return 0;
-        const ts = new Date(timeStr).getTime();
-        return isNaN(ts) ? 0 : ts;
-      };
-
-      // Extract order ID from SurrealDB record ID (e.g., "order:abc123" -> "abc123")
-      const extractId = (id: string | undefined): string => {
-        if (!id) return '';
-        const parts = id.split(':');
-        return parts.length > 1 ? parts[1] : id;
-      };
-
-      const mapped: OrderSummary[] = (response.orders || []).map((o: RawOrderSummary) => ({
-        order_id: extractId(o.id) || o.receipt_number,
-        receipt_number: o.receipt_number,
-        table_name: o.table_name || 'RETAIL',
-        total: o.total_amount,
-        status: o.status as OrderSummary['status'],
-        start_time: parseTime(o.start_time),
-        end_time: parseTime(o.end_time),
-        guest_count: o.guest_count || 1,
-      }));
-      setOrders((prev) => (page === 1 ? mapped : [...prev, ...mapped]));
+      // Backend returns OrderSummary directly - no conversion needed
+      setOrders((prev) => (page === 1 ? response.orders : [...prev, ...response.orders]));
       setTotal(Number(response.total));
     } catch (err) {
       logger.error('Failed to fetch order list', err, { component: 'useHistoryOrderList', action: 'fetchOrderList', page, search: debouncedSearch });
-      // Fallback: empty list
       setOrders([]);
       setTotal(0);
     } finally {

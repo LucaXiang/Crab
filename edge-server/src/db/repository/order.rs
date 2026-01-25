@@ -2,8 +2,7 @@
 
 use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{
-    Order, OrderAddItem, OrderAddPayment, OrderEvent, OrderEventType, OrderItem, OrderPayment,
-    OrderStatus,
+    Order, OrderAddItem, OrderAddPayment, OrderEvent, OrderEventType, OrderPayment, OrderStatus,
 };
 use surrealdb::engine::local::Db;
 use surrealdb::{RecordId, Surreal};
@@ -52,9 +51,12 @@ impl OrderRepository {
         Ok(orders)
     }
 
-    /// Find order by id
+    /// Find order by id (expects "order:abc123" format)
     pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Order>> {
-        let order: Option<Order> = self.base.db().select((TABLE, id)).await?;
+        let record_id: RecordId = id.parse().map_err(|_| {
+            RepoError::NotFound(format!("Invalid order ID format: {}", id))
+        })?;
+        let order: Option<Order> = self.base.db().select(record_id).await?;
         Ok(order)
     }
 
@@ -69,6 +71,23 @@ impl OrderRepository {
             .await?;
         let orders: Vec<Order> = result.take(0)?;
         Ok(orders.into_iter().next())
+    }
+
+    /// Check if order exists by receipt number (for idempotency check, doesn't deserialize full order)
+    pub async fn exists_by_receipt(&self, receipt_number: &str) -> RepoResult<bool> {
+        let receipt_owned = receipt_number.to_string();
+        let mut result = self
+            .base
+            .db()
+            .query("SELECT count() FROM order WHERE receipt_number = $receipt GROUP ALL")
+            .bind(("receipt", receipt_owned))
+            .await?;
+        let counts: Vec<serde_json::Value> = result.take(0)?;
+        let exists = counts.first()
+            .and_then(|v| v.get("count"))
+            .and_then(|c| c.as_i64())
+            .unwrap_or(0) > 0;
+        Ok(exists)
     }
 
     /// Find order by hash
@@ -87,15 +106,58 @@ impl OrderRepository {
     /// Add item to order
     pub async fn add_item(&self, order_id: &str, item: OrderAddItem) -> RepoResult<Order> {
         let order_thing = RecordId::from_table_key(TABLE, order_id);
-        let new_item = OrderItem {
+        // Calculate line_total and unit_price (no discount/surcharge when adding)
+        let line_total = item.price * item.quantity as f64;
+        let unit_price = item.price;
+
+        // Internal struct - use String for RecordId fields to match deserialization format
+        #[derive(serde::Serialize)]
+        struct InternalOrderItemAttribute {
+            attr_id: String,
+            option_idx: i32,
+            name: String,
+            price: f64,
+        }
+
+        #[derive(serde::Serialize)]
+        struct InternalOrderItem {
+            spec: String,
+            name: String,
+            spec_name: Option<String>,
+            price: f64,
+            quantity: i32,
+            attributes: Vec<InternalOrderItemAttribute>,
+            discount_amount: f64,
+            surcharge_amount: f64,
+            unit_price: f64,
+            line_total: f64,
+            note: Option<String>,
+            is_sent: bool,
+        }
+
+        let attrs: Vec<InternalOrderItemAttribute> = item
+            .attributes
+            .unwrap_or_default()
+            .into_iter()
+            .map(|a| InternalOrderItemAttribute {
+                attr_id: a.attr_id,
+                option_idx: a.option_idx,
+                name: a.name,
+                price: a.price,
+            })
+            .collect();
+
+        let new_item = InternalOrderItem {
             spec: item.spec,
             name: item.name,
             spec_name: item.spec_name,
             price: item.price,
             quantity: item.quantity,
-            attributes: item.attributes.unwrap_or_default(),
+            attributes: attrs,
             discount_amount: 0.0,
             surcharge_amount: 0.0,
+            unit_price,
+            line_total,
             note: item.note,
             is_sent: false,
         };
@@ -274,32 +336,108 @@ impl OrderRepository {
     // =========================================================================
 
     /// Create an archived order (from OrderSnapshot)
+    /// Uses raw SQL with explicit datetime casting to ensure proper type handling
     pub async fn create_archived(&self, order: Order) -> RepoResult<Order> {
-        let created: Option<Order> = self.base.db().create(TABLE).content(order).await?;
-        created.ok_or_else(|| RepoError::Database("Failed to create archived order".to_string()))
+        tracing::debug!(
+            receipt = %order.receipt_number,
+            snapshot_json_len = order.snapshot_json.len(),
+            "Creating archived order"
+        );
+
+        // Store snapshot_json for detail queries, items_json/payments_json for list queries
+        let mut result = self
+            .base
+            .db()
+            .query(r#"
+                CREATE order SET
+                    receipt_number = $receipt_number,
+                    zone_name = $zone_name,
+                    table_name = $table_name,
+                    status = $status,
+                    start_time = <datetime>$start_time,
+                    end_time = IF $end_time != NONE THEN <datetime>$end_time ELSE NONE END,
+                    guest_count = $guest_count,
+                    total_amount = $total_amount,
+                    paid_amount = $paid_amount,
+                    discount_amount = $discount_amount,
+                    surcharge_amount = $surcharge_amount,
+                    snapshot_json = $snapshot_json,
+                    items_json = $items_json,
+                    payments_json = $payments_json,
+                    prev_hash = $prev_hash,
+                    curr_hash = $curr_hash,
+                    related_order_id = $related_order_id,
+                    operator_id = $operator_id
+                RETURN AFTER
+            "#)
+            .bind(("receipt_number", order.receipt_number))
+            .bind(("zone_name", order.zone_name))
+            .bind(("table_name", order.table_name))
+            .bind(("status", format!("{:?}", order.status).to_uppercase()))
+            .bind(("start_time", order.start_time))
+            .bind(("end_time", order.end_time))
+            .bind(("guest_count", order.guest_count))
+            .bind(("total_amount", order.total_amount))
+            .bind(("paid_amount", order.paid_amount))
+            .bind(("discount_amount", order.discount_amount))
+            .bind(("surcharge_amount", order.surcharge_amount))
+            .bind(("snapshot_json", order.snapshot_json.clone()))
+            .bind(("items_json", order.items_json.clone()))
+            .bind(("payments_json", order.payments_json.clone()))
+            .bind(("prev_hash", order.prev_hash))
+            .bind(("curr_hash", order.curr_hash))
+            .bind(("related_order_id", order.related_order_id.map(|id| id.to_string())))
+            .bind(("operator_id", order.operator_id))
+            .await?;
+
+        let orders: Vec<Order> = result.take(0)?;
+        orders
+            .into_iter()
+            .next()
+            .ok_or_else(|| RepoError::Database("Failed to create archived order".to_string()))
     }
 
-    /// Find orders by date range (for history query)
+    /// Find orders by date range (for history query), optionally filtering by receipt number
     pub async fn find_by_date_range(
         &self,
         start_date: &str,
         end_date: &str,
         limit: i32,
         offset: i32,
+        search: Option<&str>,
     ) -> RepoResult<Vec<Order>> {
-        let start_owned = start_date.to_string();
-        let end_owned = end_date.to_string();
-        let mut result = self
-            .base
-            .db()
-            .query("SELECT * FROM order WHERE end_time >= $start AND end_time <= $end ORDER BY end_time DESC LIMIT $limit START $offset")
-            .bind(("start", start_owned))
-            .bind(("end", end_owned))
-            .bind(("limit", limit))
-            .bind(("offset", offset))
-            .await?;
-        let orders: Vec<Order> = result.take(0)?;
-        Ok(orders)
+        // Convert date strings to datetime range (start of day to end of day)
+        let start_datetime = format!("{}T00:00:00Z", start_date);
+        let end_datetime = format!("{}T23:59:59Z", end_date);
+
+        // Build query with optional search filter
+        // Use <datetime> cast to properly compare datetime fields
+        let query = if let Some(search_term) = search {
+            // Search by receipt number (case-insensitive partial match)
+            let mut result = self
+                .base
+                .db()
+                .query("SELECT * FROM order WHERE end_time >= <datetime>$start AND end_time <= <datetime>$end AND string::lowercase(receipt_number) CONTAINS $search ORDER BY end_time DESC LIMIT $limit START $offset")
+                .bind(("start", start_datetime))
+                .bind(("end", end_datetime))
+                .bind(("search", search_term.to_lowercase()))
+                .bind(("limit", limit))
+                .bind(("offset", offset))
+                .await?;
+            result.take(0)?
+        } else {
+            let mut result = self
+                .base
+                .db()
+                .query("SELECT * FROM order WHERE end_time >= <datetime>$start AND end_time <= <datetime>$end ORDER BY end_time DESC LIMIT $limit START $offset")
+                .bind(("start", start_datetime))
+                .bind(("end", end_datetime))
+                .bind(("limit", limit))
+                .bind(("offset", offset))
+                .await?;
+            result.take(0)?
+        };
+        Ok(query)
     }
 
     // =========================================================================

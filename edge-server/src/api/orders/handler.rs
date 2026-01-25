@@ -39,18 +39,59 @@ pub async fn list(
     Ok(Json(orders))
 }
 
-/// Get order by id
+/// Get order by id - returns OrderSnapshot directly (no frontend conversion needed)
+/// Includes timeline events from the archived order
 pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<String>,
-) -> AppResult<Json<Order>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let order = repo
-        .find_by_id(&id)
+) -> AppResult<Json<serde_json::Value>> {
+    let record_id: surrealdb::RecordId = id.parse()
+        .map_err(|_| AppError::validation(format!("Invalid order ID: {}", id)))?;
+
+    // Query order snapshot_json and events
+    let mut result = state.db
+        .query(r#"
+            SELECT
+                snapshot_json,
+                (
+                    SELECT
+                        string::concat('', id) AS event_id,
+                        string::uppercase(event_type) AS event_type,
+                        time::millis(timestamp) AS timestamp,
+                        data AS payload,
+                        prev_hash,
+                        curr_hash
+                    FROM ->has_event->order_event
+                    ORDER BY timestamp
+                ) AS timeline
+            FROM order WHERE id = $id
+        "#)
+        .bind(("id", record_id))
         .await
-        .map_err(|e| AppError::database(e.to_string()))?
+        .map_err(|e| AppError::database(e.to_string()))?;
+
+    let orders: Vec<serde_json::Value> = result.take(0)
+        .map_err(|e| AppError::database(e.to_string()))?;
+
+    let order_row = orders.into_iter().next()
         .ok_or_else(|| AppError::not_found(format!("Order {} not found", id)))?;
-    Ok(Json(order))
+
+    // Parse snapshot_json to get the full OrderSnapshot
+    let snapshot_str = order_row.get("snapshot_json")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AppError::database("Missing snapshot_json".to_string()))?;
+
+    let mut snapshot: serde_json::Value = serde_json::from_str(snapshot_str)
+        .map_err(|e| AppError::database(format!("Failed to parse snapshot: {}", e)))?;
+
+    // Add timeline events to the snapshot
+    if let Some(obj) = snapshot.as_object_mut() {
+        if let Some(timeline) = order_row.get("timeline") {
+            obj.insert("timeline".to_string(), timeline.clone());
+        }
+    }
+
+    Ok(Json(snapshot))
 }
 
 /// Get order by receipt number
@@ -275,55 +316,123 @@ pub struct OrderHistoryQuery {
     pub end_date: String,
     pub limit: Option<i32>,
     pub offset: Option<i32>,
+    /// Search by receipt number (partial match)
+    pub search: Option<String>,
 }
 
-/// Order summary for history list
-#[derive(Debug, Serialize)]
+/// Order summary for history list (frontend-compatible format)
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OrderSummary {
-    pub id: Option<String>,
+    pub order_id: String,
     pub receipt_number: String,
     pub status: String,
-    pub zone_name: Option<String>,
-    pub table_name: Option<String>,
-    pub total_amount: f64,
-    pub paid_amount: f64,
-    pub start_time: String,
-    pub end_time: Option<String>,
-    pub guest_count: Option<i32>,
+    pub table_name: String,
+    pub total: f64,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    pub guest_count: i32,
 }
 
-/// Fetch archived order list from SurrealDB
+/// Response wrapper for paginated order list
+#[derive(Debug, Serialize)]
+pub struct OrderListResponse {
+    pub orders: Vec<OrderSummary>,
+    pub total: i64,
+    pub page: i32,
+    pub limit: i32,
+}
+
+/// Fetch archived order list from SurrealDB with pagination
+/// Uses direct SQL query to avoid complex deserialization issues
 pub async fn fetch_order_list(
     State(state): State<ServerState>,
     Query(params): Query<OrderHistoryQuery>,
-) -> AppResult<Json<Vec<OrderSummary>>> {
-    let repo = OrderRepository::new(state.db.clone());
+) -> AppResult<Json<OrderListResponse>> {
+    let start_datetime = format!("{}T00:00:00Z", params.start_date);
+    let end_datetime = format!("{}T23:59:59Z", params.end_date);
+    let limit = params.limit.unwrap_or(100);
+    let offset = params.offset.unwrap_or(0);
+    let page = if limit > 0 { offset / limit + 1 } else { 1 };
 
-    let orders = repo
-        .find_by_date_range(
-            &params.start_date,
-            &params.end_date,
-            params.limit.unwrap_or(100),
-            params.offset.unwrap_or(0),
+    // Build WHERE clause
+    let (where_clause, search_bind) = if let Some(ref search) = params.search {
+        (
+            "WHERE end_time >= <datetime>$start AND end_time <= <datetime>$end AND string::lowercase(receipt_number) CONTAINS $search",
+            Some(search.to_lowercase()),
         )
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+    } else {
+        (
+            "WHERE end_time >= <datetime>$start AND end_time <= <datetime>$end",
+            None,
+        )
+    };
 
-    let summaries: Vec<OrderSummary> = orders
-        .into_iter()
-        .map(|o| OrderSummary {
-            id: o.id.map(|id| id.to_string()),
-            receipt_number: o.receipt_number,
-            status: format!("{:?}", o.status),
-            zone_name: o.zone_name,
-            table_name: o.table_name,
-            total_amount: o.total_amount,
-            paid_amount: o.paid_amount,
-            start_time: o.start_time,
-            end_time: o.end_time,
-            guest_count: o.guest_count,
-        })
-        .collect();
+    // Query 1: Get total count
+    let count_query = format!("SELECT count() FROM order {} GROUP ALL", where_clause);
+    let mut count_result = if let Some(ref search) = search_bind {
+        state.db
+            .query(&count_query)
+            .bind(("start", start_datetime.clone()))
+            .bind(("end", end_datetime.clone()))
+            .bind(("search", search.clone()))
+            .await
+    } else {
+        state.db
+            .query(&count_query)
+            .bind(("start", start_datetime.clone()))
+            .bind(("end", end_datetime.clone()))
+            .await
+    }.map_err(|e| AppError::database(e.to_string()))?;
 
-    Ok(Json(summaries))
+    #[derive(Deserialize)]
+    struct CountResult {
+        count: i64,
+    }
+    let total: i64 = count_result
+        .take::<Option<CountResult>>(0)
+        .map_err(|e| AppError::database(e.to_string()))?
+        .map(|r| r.count)
+        .unwrap_or(0);
+
+    // Query 2: Get paginated results (frontend-compatible format)
+    let data_query = format!(
+        "SELECT \
+         record::id(id) AS order_id, \
+         receipt_number, \
+         string::uppercase(status) AS status, \
+         table_name ?? 'RETAIL' AS table_name, \
+         total_amount AS total, \
+         time::millis(start_time) AS start_time, \
+         time::millis(end_time) AS end_time, \
+         guest_count ?? 1 AS guest_count \
+         FROM order {} ORDER BY end_time DESC LIMIT $limit START $offset",
+        where_clause
+    );
+    let mut data_result = if let Some(ref search) = search_bind {
+        state.db
+            .query(&data_query)
+            .bind(("start", start_datetime))
+            .bind(("end", end_datetime))
+            .bind(("search", search.clone()))
+            .bind(("limit", limit))
+            .bind(("offset", offset))
+            .await
+    } else {
+        state.db
+            .query(&data_query)
+            .bind(("start", start_datetime))
+            .bind(("end", end_datetime))
+            .bind(("limit", limit))
+            .bind(("offset", offset))
+            .await
+    }.map_err(|e| AppError::database(e.to_string()))?;
+
+    let orders: Vec<OrderSummary> = data_result.take(0).map_err(|e| AppError::database(e.to_string()))?;
+
+    Ok(Json(OrderListResponse {
+        orders,
+        total,
+        page,
+        limit,
+    }))
 }

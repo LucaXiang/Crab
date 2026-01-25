@@ -11,7 +11,7 @@ use sha2::{Digest, Sha256};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
 use std::sync::Arc;
 use surrealdb::engine::local::Db;
-use surrealdb::{RecordId, Surreal};
+use surrealdb::Surreal;
 use thiserror::Error;
 use tokio::sync::{Mutex, Semaphore};
 
@@ -55,6 +55,24 @@ impl OrderArchiveService {
         }
     }
 
+    /// Generate the next receipt number atomically
+    ///
+    /// Format: FAC{YYYYMMDD}{sequence}
+    /// Example: FAC2026012410001
+    pub async fn generate_next_receipt_number(&self) -> ArchiveResult<String> {
+        let next_num = self
+            .system_state_repo
+            .get_next_order_number()
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+        let now = chrono::Local::now();
+        let date_str = now.format("%Y%m%d").to_string();
+        // Sequence starts at 10001 to match existing format
+        let sequence = 10000 + next_num;
+        Ok(format!("FAC{}{}", date_str, sequence))
+    }
+
     /// Archive a completed order with its events (with retry logic and concurrency limit)
     pub async fn archive_order(
         &self,
@@ -72,15 +90,19 @@ impl OrderArchiveService {
             match self.archive_order_internal(snapshot, &events).await {
                 Ok(()) => return Ok(()),
                 Err(e) => {
+                    tracing::error!(
+                        order_id = %snapshot.order_id,
+                        error = %e,
+                        attempt = attempt + 1,
+                        "Archive failed"
+                    );
                     last_error = Some(e);
                     if attempt + 1 < MAX_RETRY_ATTEMPTS {
                         let delay_ms = RETRY_BASE_DELAY_MS * 2u64.pow(attempt);
                         tracing::warn!(
                             order_id = %snapshot.order_id,
-                            attempt = attempt + 1,
-                            max_attempts = MAX_RETRY_ATTEMPTS,
                             delay_ms = delay_ms,
-                            "Archive failed, retrying..."
+                            "Retrying..."
                         );
                         tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
                     }
@@ -98,9 +120,9 @@ impl OrderArchiveService {
         events: &[OrderEvent],
     ) -> ArchiveResult<()> {
         // 0. Check idempotency - skip if already archived
-        if let Ok(Some(_)) = self
+        if let Ok(true) = self
             .order_repo
-            .find_by_receipt(snapshot.receipt_number.as_deref().unwrap_or(""))
+            .exists_by_receipt(snapshot.receipt_number.as_deref().unwrap_or(""))
             .await
         {
             tracing::info!(order_id = %snapshot.order_id, "Order already archived, skipping");
@@ -133,6 +155,13 @@ impl OrderArchiveService {
         // 3. Convert and store order
         let surreal_order =
             self.convert_snapshot_to_order(snapshot, prev_hash, order_hash.clone())?;
+        
+        tracing::info!(
+            order_id = %snapshot.order_id,
+            items_json_len = surreal_order.items_json.len(),
+            "Archiving order to SurrealDB"
+        );
+        
         let created_order = self
             .order_repo
             .create_archived(surreal_order)
@@ -225,29 +254,37 @@ impl OrderArchiveService {
 
         // Convert items from CartItemSnapshot to OrderItem
         // Note: snapshot.items only contains active items (removed items are excluded by reducer)
+        // The unit_price and line_total are already calculated by recalculate_totals() in money.rs
         let items: Vec<OrderItem> = snapshot
             .items
             .iter()
             .map(|item| {
-                // Calculate discount amount from manual_discount_percent
-                let manual_discount_amount = item
+                // Use original_price as base for discount calculation
+                let base_price = item.original_price.unwrap_or(item.price);
+
+                // Calculate per-unit discount amounts
+                let manual_discount_per_unit = item
                     .manual_discount_percent
-                    .map(|p| item.price * item.quantity as f64 * p / 100.0)
+                    .map(|p| base_price * p / 100.0)
                     .unwrap_or(0.0);
-                let rule_discount = item.rule_discount_amount.unwrap_or(0.0);
-                let total_discount = manual_discount_amount + rule_discount;
+                let rule_discount_per_unit = item.rule_discount_amount.unwrap_or(0.0);
 
-                let surcharge = item.surcharge.unwrap_or(0.0)
+                // Total discount = per-unit discount * quantity
+                let total_discount = (manual_discount_per_unit + rule_discount_per_unit) * item.quantity as f64;
+
+                // Total surcharge = per-unit surcharge * quantity
+                let surcharge_per_unit = item.surcharge.unwrap_or(0.0)
                     + item.rule_surcharge_amount.unwrap_or(0.0);
+                let total_surcharge = surcharge_per_unit * item.quantity as f64;
 
-                // Convert selected_options to OrderItemAttribute
+                // Convert selected_options to OrderItemAttribute (snapshot as strings)
                 let attributes: Vec<OrderItemAttribute> = item
                     .selected_options
                     .as_ref()
                     .map(|opts| {
                         opts.iter()
                             .map(|opt| OrderItemAttribute {
-                                attr_id: RecordId::from_table_key("attribute", &opt.attribute_id),
+                                attr_id: opt.attribute_id.clone(),
                                 option_idx: opt.option_idx,
                                 name: opt.option_name.clone(),
                                 price: opt.price_modifier.unwrap_or(0.0),
@@ -256,15 +293,28 @@ impl OrderArchiveService {
                     })
                     .unwrap_or_default();
 
+                // Use pre-calculated unit_price and line_total from snapshot
+                // These are computed by money::recalculate_totals() with proper precision
+                let unit_price = item.unit_price.unwrap_or_else(|| {
+                    // Fallback calculation if not set (shouldn't happen normally)
+                    base_price - manual_discount_per_unit - rule_discount_per_unit + surcharge_per_unit
+                });
+                let line_total = item.line_total.unwrap_or_else(|| {
+                    // Fallback calculation if not set
+                    unit_price * item.quantity as f64
+                });
+
                 OrderItem {
-                    spec: RecordId::from_table_key("product_spec", &item.id),
+                    spec: item.id.clone(),
                     name: item.name.clone(),
                     spec_name: item.selected_specification.as_ref().map(|s| s.name.clone()),
-                    price: item.price,
+                    price: base_price, // Store the base price (before discounts)
                     quantity: item.quantity,
                     attributes,
                     discount_amount: total_discount,
-                    surcharge_amount: surcharge,
+                    surcharge_amount: total_surcharge,
+                    unit_price,
+                    line_total,
                     note: item.note.clone(),
                     is_sent: true, // Archived orders have been processed
                 }
@@ -286,6 +336,16 @@ impl OrderArchiveService {
             })
             .collect();
 
+        // Serialize the full OrderSnapshot for detail queries
+        let snapshot_json = serde_json::to_string(snapshot)
+            .map_err(|e| ArchiveError::Conversion(format!("Failed to serialize snapshot: {}", e)))?;
+
+        // Serialize items and payments to JSON strings (deprecated, kept for list queries)
+        let items_json = serde_json::to_string(&items)
+            .map_err(|e| ArchiveError::Conversion(format!("Failed to serialize items: {}", e)))?;
+        let payments_json = serde_json::to_string(&payments)
+            .map_err(|e| ArchiveError::Conversion(format!("Failed to serialize payments: {}", e)))?;
+
         Ok(SurrealOrder {
             id: None,
             receipt_number: snapshot.receipt_number.clone().unwrap_or_default(),
@@ -305,8 +365,9 @@ impl OrderArchiveService {
             paid_amount: snapshot.paid_amount,
             discount_amount: snapshot.total_discount,
             surcharge_amount: snapshot.total_surcharge,
-            items,
-            payments,
+            snapshot_json,
+            items_json,
+            payments_json,
             prev_hash,
             curr_hash,
             related_order_id: None,

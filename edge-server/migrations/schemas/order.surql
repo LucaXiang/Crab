@@ -41,33 +41,33 @@ DEFINE FIELD OVERWRITE end_time ON order TYPE option<datetime>
 DEFINE FIELD OVERWRITE guest_count ON order TYPE option<int>
     PERMISSIONS FULL;
 
--- 金额 (单位: 分)
-DEFINE FIELD OVERWRITE total_amount ON order TYPE int
+-- 金额 (单位: 元，如 10.50 = ¥10.50)
+DEFINE FIELD OVERWRITE total_amount ON order TYPE float
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE paid_amount ON order TYPE int
+DEFINE FIELD OVERWRITE paid_amount ON order TYPE float
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE discount_amount ON order TYPE int
+DEFINE FIELD OVERWRITE discount_amount ON order TYPE float
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE surcharge_amount ON order TYPE int
+DEFINE FIELD OVERWRITE surcharge_amount ON order TYPE float
     DEFAULT 0
     PERMISSIONS FULL;
 
--- 订单项 (嵌入式文档，Graph DB 风格)
--- items: [{ spec: product_specification:1, name: "...", price: 1200, qty: 2, ... }]
-DEFINE FIELD OVERWRITE items ON order TYPE array<object>
-    DEFAULT []
+-- 完整快照 JSON (用于详情查询，包含完整的 OrderSnapshot)
+DEFINE FIELD OVERWRITE snapshot_json ON order TYPE string
     PERMISSIONS FULL;
 
--- 支付记录 (嵌入式)
--- payments: [{ method: "cash", amount: 1500, time: datetime }]
-DEFINE FIELD OVERWRITE payments ON order TYPE array<object>
-    DEFAULT []
+-- 订单项 JSON (已废弃，保留兼容)
+DEFINE FIELD OVERWRITE items_json ON order TYPE option<string>
+    PERMISSIONS FULL;
+
+-- 支付记录 JSON (已废弃，保留兼容)
+DEFINE FIELD OVERWRITE payments_json ON order TYPE option<string>
     PERMISSIONS FULL;
 
 -- 哈希链 (防篡改)

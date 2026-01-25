@@ -14,49 +14,58 @@ pub enum OrderStatus {
     Merged,
 }
 
-/// Embedded order item
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Embedded order item (snapshot - all data copied as strings)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OrderItem {
-    /// Product specification reference
-    #[serde(with = "serde_helpers::record_id")]
-    pub spec: RecordId,
-    /// Snapshot: product name
+    #[serde(default)]
+    pub spec: String,
+    #[serde(default)]
     pub name: String,
-    /// Snapshot: specification name
+    #[serde(default)]
     pub spec_name: Option<String>,
-    /// Price in currency unit (e.g., 10.50 = ¥10.50)
+    #[serde(default)]
     pub price: f64,
+    #[serde(default)]
     pub quantity: i32,
-    /// Selected attributes: [{ attr_id, option_idx, name, price }]
+    #[serde(default)]
     pub attributes: Vec<OrderItemAttribute>,
-    /// Item-level discount amount in currency unit
+    #[serde(default)]
     pub discount_amount: f64,
-    /// Item-level surcharge amount in currency unit
+    #[serde(default)]
     pub surcharge_amount: f64,
-    /// Notes
+    #[serde(default)]
+    pub unit_price: f64,
+    #[serde(default)]
+    pub line_total: f64,
+    #[serde(default)]
     pub note: Option<String>,
-    /// Sent to kitchen
+    #[serde(default)]
     pub is_sent: bool,
 }
 
-/// Embedded attribute selection
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Embedded attribute selection (snapshot - strings only)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OrderItemAttribute {
-    #[serde(with = "serde_helpers::record_id")]
-    pub attr_id: RecordId,
+    #[serde(default)]
+    pub attr_id: String,
+    #[serde(default)]
     pub option_idx: i32,
+    #[serde(default)]
     pub name: String,
-    /// Price in currency unit (e.g., 2.50 = ¥2.50)
+    #[serde(default)]
     pub price: f64,
 }
 
 /// Embedded payment record
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OrderPayment {
+    #[serde(default)]
     pub method: String,
-    /// Amount in currency unit (e.g., 50.00 = ¥50.00)
+    #[serde(default)]
     pub amount: f64,
+    #[serde(default)]
     pub time: String,
+    #[serde(default)]
     pub reference: Option<String>,
 }
 
@@ -82,10 +91,14 @@ pub struct Order {
     pub discount_amount: f64,
     /// Surcharge amount in currency unit
     pub surcharge_amount: f64,
-    /// Embedded order items
-    pub items: Vec<OrderItem>,
-    /// Embedded payments
-    pub payments: Vec<OrderPayment>,
+    /// Full OrderSnapshot JSON (for detail queries)
+    pub snapshot_json: String,
+    /// Order items as JSON string (deprecated, kept for compatibility)
+    #[serde(default)]
+    pub items_json: String,
+    /// Payments as JSON string (deprecated, kept for compatibility)
+    #[serde(default)]
+    pub payments_json: String,
     /// Hash chain: previous hash
     pub prev_hash: String,
     /// Hash chain: current hash
@@ -96,6 +109,18 @@ pub struct Order {
     /// Operator ID who completed/voided the order
     pub operator_id: Option<String>,
     pub created_at: Option<String>,
+}
+
+impl Order {
+    /// Parse items from JSON string
+    pub fn items(&self) -> Vec<OrderItem> {
+        serde_json::from_str(&self.items_json).unwrap_or_default()
+    }
+
+    /// Parse payments from JSON string
+    pub fn payments(&self) -> Vec<OrderPayment> {
+        serde_json::from_str(&self.payments_json).unwrap_or_default()
+    }
 }
 
 /// Order event types (matches shared::order::OrderEventType)
@@ -165,8 +190,8 @@ pub struct OrderCreate {
 /// Add item to order payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderAddItem {
-    #[serde(with = "serde_helpers::record_id")]
-    pub spec: RecordId,
+    /// Product spec ID (string snapshot)
+    pub spec: String,
     pub name: String,
     pub spec_name: Option<String>,
     /// Price in currency unit (e.g., 10.50 = ¥10.50)

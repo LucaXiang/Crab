@@ -27,20 +27,33 @@ pub fn to_f64(value: Decimal) -> f64 {
 
 /// Calculate item unit price with precise decimal arithmetic
 ///
-/// Formula: (price * (1 - manual_discount_percent/100)) + surcharge
+/// Formula: base_price * (1 - manual_discount_percent/100) - rule_discount + surcharge + rule_surcharge
+/// where base_price = original_price if available, otherwise price
+///
 /// This is the final per-unit price shown to customers
 pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
-    let price = to_decimal(item.price);
-    let discount_rate = item
+    // Use original_price as the base for discount calculation (before any discounts)
+    let base_price = to_decimal(item.original_price.unwrap_or(item.price));
+
+    // Manual discount is percentage-based on the base price
+    let manual_discount = item
         .manual_discount_percent
-        .map(|d| to_decimal(d) / Decimal::ONE_HUNDRED)
+        .map(|d| base_price * to_decimal(d) / Decimal::ONE_HUNDRED)
         .unwrap_or(Decimal::ZERO);
+
+    // Rule discount is already calculated as a per-unit amount
+    let rule_discount = item.rule_discount_amount.map(to_decimal).unwrap_or(Decimal::ZERO);
+
+    // Surcharges
     let surcharge = item.surcharge.map(to_decimal).unwrap_or(Decimal::ZERO);
+    let rule_surcharge = item.rule_surcharge_amount.map(to_decimal).unwrap_or(Decimal::ZERO);
 
-    let discounted_price = price * (Decimal::ONE - discount_rate);
-    let unit_price = discounted_price + surcharge;
+    // Final unit price = base - discounts + surcharges
+    let unit_price = base_price - manual_discount - rule_discount + surcharge + rule_surcharge;
 
-    unit_price.round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
+    unit_price
+        .max(Decimal::ZERO) // Ensure non-negative
+        .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
 }
 
 /// Calculate item line total with precise decimal arithmetic
