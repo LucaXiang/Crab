@@ -113,6 +113,7 @@ pub struct OrderDetail {
 
 /// Backend response for paginated order list
 #[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)] // limit field required for deserialization but not used
 struct OrderListApiResponse {
     orders: Vec<OrderSummary>,
     total: i64,

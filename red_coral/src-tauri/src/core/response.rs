@@ -41,39 +41,7 @@ impl<T: Serialize> ApiResponse<T> {
         }
     }
 
-    /// 创建成功响应（带自定义消息）
-    #[allow(dead_code)]
-    pub fn success_with_message(data: T, message: impl Into<String>) -> Self {
-        Self {
-            code: Some(0),
-            message: message.into(),
-            data: Some(data),
-            details: None,
-        }
-    }
-
-    /// Create error response with string code (legacy, for backward compatibility)
-    ///
-    /// NOTE: This method is kept for backward compatibility with existing code.
-    /// Prefer using `error_with_code()` for new code.
-    #[deprecated(since = "0.2.0", note = "Use error_with_code() with ErrorCode instead")]
-    #[allow(deprecated)]
-    pub fn error(code: impl Into<String>, message: impl Into<String>) -> Self {
-        let code_str = code.into();
-        // Try parse as number, fallback to 1 (Unknown)
-        let code_num = code_str.parse::<u16>().unwrap_or(1);
-        Self {
-            code: Some(code_num),
-            message: message.into(),
-            data: None,
-            details: None,
-        }
-    }
-
-    /// Create error response with ErrorCode (new unified error system)
-    ///
-    /// This is the preferred method for creating error responses.
-    /// Uses numeric error codes from `shared::error::ErrorCode`.
+    /// 创建错误响应
     pub fn error_with_code(code: ErrorCode, message: impl Into<String>) -> Self {
         Self {
             code: Some(code.code()),

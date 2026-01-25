@@ -5,10 +5,8 @@
 //! - SessionCache: 员工会话缓存（支持离线登录）
 //! - ClientBridge: 统一的客户端桥接层
 //! - ApiResponse: 统一的 API 响应格式
-//! - ErrorCodes: 标准化错误码
 
 pub mod bridge;
-pub mod error_codes;
 pub mod image_cache;
 pub mod response;
 pub mod session_cache;
