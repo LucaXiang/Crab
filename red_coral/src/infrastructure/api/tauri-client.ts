@@ -123,11 +123,6 @@ export class TauriApiClient {
     return data.tags;
   }
 
-  async getTag(id: string): Promise<Tag> {
-    const data = await invokeAndUnwrap<{ tag: Tag }>('get_tag', { id });
-    return data.tag;
-  }
-
   async createTag(data: TagCreate): Promise<Tag> {
     const result = await invokeAndUnwrap<{ tag: Tag }>('create_tag', { data });
     return result.tag;
@@ -367,10 +362,6 @@ export class TauriApiClient {
   async listPriceRules(): Promise<PriceRule[]> {
     const data = await invokeAndUnwrap<{ rules: PriceRule[] }>('list_price_rules');
     return data.rules;
-  }
-
-  async getPriceRule(id: string): Promise<PriceRule> {
-    return invokeAndUnwrap<PriceRule>('get_price_rule', { id });
   }
 
   async createPriceRule(data: PriceRuleCreate): Promise<PriceRule> {

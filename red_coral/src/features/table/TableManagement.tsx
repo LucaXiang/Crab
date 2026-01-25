@@ -67,7 +67,7 @@ const ZoneList: React.FC = React.memo(() => {
               try {
                 await api.deleteZone(item.id);
                 return { success: true, id: item.id };
-              } catch (e: any) {
+              } catch (e: unknown) {
                 return { success: false, id: item.id, error: e };
               }
             })

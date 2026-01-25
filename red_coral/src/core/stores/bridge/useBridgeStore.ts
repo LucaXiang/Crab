@@ -213,9 +213,9 @@ export const useBridgeStore = create<BridgeStore>()(
           const state = await invokeApi<AppState>('get_app_state');
           set({ appState: state });
           return state;
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error('Failed to fetch app state:', error);
-          set({ error: error.message || 'Failed to fetch app state' });
+          set({ error: error instanceof Error ? error.message : 'Failed to fetch app state' });
           return null;
         }
       },
@@ -225,7 +225,7 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           const info = await invokeApi<ModeInfo>('get_mode_info');
           set({ modeInfo: info });
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error('Failed to fetch mode info:', error);
         }
       },
@@ -244,8 +244,8 @@ export const useBridgeStore = create<BridgeStore>()(
           set({ isLoading: true, error: null });
           await invokeApi('start_server_mode');
           await get().fetchAppState();
-        } catch (error: any) {
-          set({ error: error.message });
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Operation failed' });
           throw error;
         } finally {
           set({ isLoading: false });
@@ -257,8 +257,8 @@ export const useBridgeStore = create<BridgeStore>()(
           set({ isLoading: true, error: null });
           await invokeApi('start_client_mode', { edge_url: edgeUrl, message_addr: messageAddr });
           await get().fetchAppState();
-        } catch (error: any) {
-          set({ error: error.message });
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Operation failed' });
           throw error;
         } finally {
           set({ isLoading: false });
@@ -274,8 +274,8 @@ export const useBridgeStore = create<BridgeStore>()(
             modeInfo: null,
             currentSession: null
           });
-        } catch (error: any) {
-          set({ error: error.message });
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Operation failed' });
         } finally {
           set({ isLoading: false });
         }
@@ -303,8 +303,8 @@ export const useBridgeStore = create<BridgeStore>()(
           await get().fetchTenants();
           await get().fetchAppState();
           return msg;
-        } catch (error: any) {
-          set({ error: error.message });
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Operation failed' });
           throw error;
         } finally {
           set({ isLoading: false });
@@ -316,8 +316,8 @@ export const useBridgeStore = create<BridgeStore>()(
           set({ isLoading: true });
           await invokeApi('switch_tenant', { tenant_id: tenantId });
           await get().fetchAppState();
-        } catch (error: any) {
-          set({ error: error.message });
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Operation failed' });
           throw error;
         } finally {
           set({ isLoading: false });
@@ -328,8 +328,8 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           await invokeApi('remove_tenant', { tenantId });
           await get().fetchTenants();
-        } catch (error: any) {
-          set({ error: error.message });
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Operation failed' });
           throw error;
         }
       },
@@ -364,8 +364,8 @@ export const useBridgeStore = create<BridgeStore>()(
             error: null,
             mode: data.mode
           };
-        } catch (error: any) {
-          set({ error: error.message || 'Login failed' });
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Login failed' });
           throw error;
         } finally {
           set({ isLoading: false });
@@ -378,7 +378,7 @@ export const useBridgeStore = create<BridgeStore>()(
           set({ currentSession: null });
           // 刷新 appState 以反映登出状态
           await get().fetchAppState();
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error('Logout failed:', error);
         }
       },

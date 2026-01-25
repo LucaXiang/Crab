@@ -80,11 +80,11 @@ export const useAuthStore = create<AuthStore>()(
           });
 
           return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error('Login failed:', error);
           set({
             isLoading: false,
-            error: error.message || 'Authentication failed',
+            error: error instanceof Error ? error.message : 'Authentication failed',
           });
           return false;
         }
