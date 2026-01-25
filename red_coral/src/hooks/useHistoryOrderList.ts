@@ -1,29 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { logger } from '@/utils/logger';
-
-/**
- * Order summary for list view (matches backend OrderSummary)
- */
-export interface OrderSummary {
-  order_id: string;
-  receipt_number: string;
-  table_name: string;
-  total: number;
-  status: 'COMPLETED' | 'VOID' | 'MOVED' | 'MERGED';
-  start_time: number;
-  end_time?: number;
-  guest_count: number;
-}
-
-interface FetchOrderListResponse {
-  orders: OrderSummary[];
-  total: number;
-  page: number;
-}
+import type { ArchivedOrderSummary, ArchivedOrderListResponse } from '@/core/domain/types';
 
 interface UseHistoryOrderListResult {
-  orders: OrderSummary[];
+  orders: ArchivedOrderSummary[];
   total: number;
   page: number;
   pageSize: number;
@@ -37,13 +18,13 @@ interface UseHistoryOrderListResult {
 /**
  * Hook for fetching history order list (summary only, no items/timeline)
  *
- * Backend returns OrderSummary directly - no frontend conversion needed.
+ * Backend returns ArchivedOrderSummary directly - no frontend conversion needed.
  */
 export const useHistoryOrderList = (
   initialPageSize: number = 20,
   enabled: boolean = true
 ): UseHistoryOrderListResult => {
-  const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [orders, setOrders] = useState<ArchivedOrderSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -73,7 +54,7 @@ export const useHistoryOrderList = (
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const response = await invokeApi<FetchOrderListResponse>('fetch_order_list', {
+      const response = await invokeApi<ArchivedOrderListResponse>('fetch_order_list', {
         params: {
           page,
           limit: initialPageSize,

@@ -1,11 +1,11 @@
 import React from 'react';
-import { OrderSummary } from '@/hooks/useHistoryOrderList';
+import type { ArchivedOrderSummary } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { Search, Clock, ChevronRight, ArrowLeft } from 'lucide-react';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface HistorySidebarProps {
-  orders: OrderSummary[];
+  orders: ArchivedOrderSummary[];
   selectedKey: string | null;
   onSelect: (id: string) => void;
   search: string;
