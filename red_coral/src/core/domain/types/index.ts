@@ -13,6 +13,9 @@
 // API types (models, requests, responses) - primary source
 export * from './api';
 
+// Archived order types (for history view, from SurrealDB graph model)
+export * from './archivedOrder';
+
 // Print and label types
 export * from './print';
 
