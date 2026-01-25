@@ -7,7 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
-use crate::db::models::{Order, OrderAddItem, OrderAddPayment, OrderDetail, OrderEvent, OrderEventType};
+use crate::db::models::{Order, OrderAddItem, OrderAddPayment, OrderDetail, OrderEvent, OrderEventType, OrderSummary};
 use crate::db::repository::OrderRepository;
 use crate::utils::{AppError, AppResult};
 
@@ -276,20 +276,6 @@ pub struct OrderHistoryQuery {
     pub offset: Option<i32>,
     /// Search by receipt number (partial match)
     pub search: Option<String>,
-}
-
-/// Order summary for history list (graph model)
-#[derive(Debug, Serialize, Deserialize)]
-pub struct OrderSummary {
-    pub order_id: String,
-    pub receipt_number: String,
-    pub table_name: Option<String>,
-    pub status: String,
-    pub is_retail: bool,
-    pub total: f64,
-    pub guest_count: i32,
-    pub start_time: i64,
-    pub end_time: Option<i64>,
 }
 
 /// Response wrapper for paginated order list

@@ -326,14 +326,13 @@ impl OrdersManager {
 
         // 2. For OpenTable: pre-check table availability before generating receipt_number
         // This avoids wasting receipt numbers on failed table opens
-        if let shared::order::OrderCommandPayload::OpenTable { table_id: Some(tid), table_name, .. } = &cmd.payload {
-            if let Some(existing) = self.storage.find_active_order_for_table(tid)? {
+        if let shared::order::OrderCommandPayload::OpenTable { table_id: Some(tid), table_name, .. } = &cmd.payload
+            && let Some(existing) = self.storage.find_active_order_for_table(tid)? {
                 let name = table_name.as_deref().unwrap_or(tid);
                 return Err(ManagerError::TableOccupied(format!(
                     "桌台 {} 已被占用 (订单: {})", name, existing
                 )));
             }
-        }
 
         // 3. Pre-generate receipt_number for OpenTable (BEFORE transaction to avoid deadlock)
         // redb doesn't allow nested write transactions

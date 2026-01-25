@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { ArchivedOrderDetail, ArchivedOrderItem, ArchivedPayment, ArchivedEvent } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/currency';
-import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Trash2, Ban } from 'lucide-react';
+import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban } from 'lucide-react';
 import { Permission } from '@/core/domain/types';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 

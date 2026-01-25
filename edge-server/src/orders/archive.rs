@@ -207,7 +207,7 @@ impl OrderArchiveService {
                 .add_event(
                     &order_id.key().to_string(),
                     self.convert_event_type(&event.event_type),
-                    Some(serde_json::to_value(&event.payload).unwrap()),
+                    serde_json::to_value(&event.payload).ok(),
                     prev_event_hash,
                     curr_event_hash,
                 )
@@ -366,12 +366,12 @@ impl OrderArchiveService {
             let total_surcharge = surcharge_per_unit * item.quantity as f64;
 
             // Use pre-calculated values from snapshot
-            let unit_price = item.unit_price.unwrap_or_else(|| {
+            let unit_price = item.unit_price.unwrap_or({
                 base_price - manual_discount_per_unit - rule_discount_per_unit + surcharge_per_unit
             });
             let line_total = item
                 .line_total
-                .unwrap_or_else(|| unit_price * item.quantity as f64);
+                .unwrap_or(unit_price * item.quantity as f64);
 
             // Get spec_name from selected specification
             let spec_name = item
