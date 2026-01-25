@@ -9,6 +9,7 @@
 //! | `active_orders` | `order_id` | `()` | Active order index |
 //! | `processed_commands` | `command_id` | `()` | Idempotency check |
 //! | `sequence_counter` | `()` | `u64` | Global sequence |
+//! | `pending_archive` | `order_id` | `PendingArchive` | Archive queue |
 //!
 //! # Durability
 //!
@@ -46,8 +47,20 @@ const PROCESSED_COMMANDS_TABLE: TableDefinition<&str, ()> =
 /// Table for sequence counter: key = "seq" or "order_count", value = u64
 const SEQUENCE_TABLE: TableDefinition<&str, u64> = TableDefinition::new("sequence_counter");
 
+/// Table for pending archive queue: key = order_id, value = JSON-serialized PendingArchive
+const PENDING_ARCHIVE_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("pending_archive");
+
 const SEQUENCE_KEY: &str = "seq";
 const ORDER_COUNT_KEY: &str = "order_count";
+
+/// Pending archive queue entry
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PendingArchive {
+    pub order_id: String,
+    pub created_at: i64,
+    pub retry_count: u32,
+    pub last_error: Option<String>,
+}
 
 /// Storage errors
 #[derive(Debug, Error)]
@@ -108,6 +121,7 @@ impl OrderStorage {
             let _ = write_txn.open_table(SNAPSHOTS_TABLE)?;
             let _ = write_txn.open_table(ACTIVE_ORDERS_TABLE)?;
             let _ = write_txn.open_table(PROCESSED_COMMANDS_TABLE)?;
+            let _ = write_txn.open_table(PENDING_ARCHIVE_TABLE)?;
 
             // Initialize sequence counter if not exists
             let mut seq_table = write_txn.open_table(SEQUENCE_TABLE)?;
@@ -132,6 +146,7 @@ impl OrderStorage {
             let _ = write_txn.open_table(SNAPSHOTS_TABLE)?;
             let _ = write_txn.open_table(ACTIVE_ORDERS_TABLE)?;
             let _ = write_txn.open_table(PROCESSED_COMMANDS_TABLE)?;
+            let _ = write_txn.open_table(PENDING_ARCHIVE_TABLE)?;
             let mut seq_table = write_txn.open_table(SEQUENCE_TABLE)?;
             seq_table.insert(SEQUENCE_KEY, 0u64)?;
         }
