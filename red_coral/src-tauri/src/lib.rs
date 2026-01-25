@@ -212,6 +212,7 @@ pub async fn run() {
             commands::delete_table,
             // Order commands (Query)
             commands::fetch_order_list,
+            commands::fetch_order_detail,
             commands::list_orders,
             commands::list_open_orders,
             commands::get_order,

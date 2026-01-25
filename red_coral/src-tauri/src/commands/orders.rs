@@ -18,21 +18,97 @@ pub struct FetchOrderListParams {
     pub start_time: Option<u64>,
 }
 
-// ============ Order Queries ============
+// ============ Order History (Archived) ============
 
-/// Order summary from history API
+/// Order summary for list view (matches backend OrderSummary)
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct OrderSummary {
-    pub id: Option<String>,
+    pub order_id: String,
     pub receipt_number: String,
-    pub status: String,
-    pub zone_name: Option<String>,
     pub table_name: Option<String>,
-    pub total_amount: f64,
+    pub status: String,
+    pub is_retail: bool,
+    pub total: f64,
+    pub guest_count: i32,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+}
+
+/// Split item in a payment
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct SplitItem {
+    pub instance_id: String,
+    pub name: String,
+    pub quantity: i32,
+}
+
+/// Order item option for detail view
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct OrderItemOptionDetail {
+    pub attribute_name: String,
+    pub option_name: String,
+    pub price_modifier: f64,
+}
+
+/// Order item for detail view
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct OrderItemDetail {
+    pub id: String,
+    pub instance_id: String,
+    pub name: String,
+    pub spec_name: Option<String>,
+    pub price: f64,
+    pub quantity: i32,
+    pub unpaid_quantity: i32,
+    pub unit_price: f64,
+    pub line_total: f64,
+    pub discount_amount: f64,
+    pub surcharge_amount: f64,
+    pub note: Option<String>,
+    pub selected_options: Vec<OrderItemOptionDetail>,
+}
+
+/// Payment for detail view
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct OrderPaymentDetail {
+    pub method: String,
+    pub amount: f64,
+    pub timestamp: i64,
+    pub note: Option<String>,
+    pub cancelled: bool,
+    pub cancel_reason: Option<String>,
+    pub split_items: Vec<SplitItem>,
+}
+
+/// Event for detail view
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct OrderEventDetail {
+    pub event_id: String,
+    pub event_type: String,
+    pub timestamp: i64,
+    pub payload: Option<serde_json::Value>,
+}
+
+/// Full order detail (matches backend OrderDetail)
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct OrderDetail {
+    pub order_id: String,
+    pub receipt_number: String,
+    pub table_name: Option<String>,
+    pub zone_name: Option<String>,
+    pub status: String,
+    pub is_retail: bool,
+    pub guest_count: i32,
+    pub total: f64,
     pub paid_amount: f64,
-    pub start_time: String,
-    pub end_time: Option<String>,
-    pub guest_count: Option<i32>,
+    pub total_discount: f64,
+    pub total_surcharge: f64,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    pub operator_name: Option<String>,
+    pub items: Vec<OrderItemDetail>,
+    pub payments: Vec<OrderPaymentDetail>,
+    pub timeline: Vec<OrderEventDetail>,
 }
 
 /// Backend response for paginated order list
@@ -101,6 +177,22 @@ pub async fn fetch_order_list(
                 page: response.page,
             }))
         }
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+    }
+}
+
+/// Fetch archived order detail by ID (graph model)
+#[tauri::command(rename_all = "snake_case")]
+pub async fn fetch_order_detail(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    order_id: String,
+) -> Result<ApiResponse<OrderDetail>, String> {
+    let bridge = bridge.read().await;
+    match bridge
+        .get::<OrderDetail>(&format!("/api/orders/{}", encode(&order_id)))
+        .await
+    {
+        Ok(detail) => Ok(ApiResponse::success(detail)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
