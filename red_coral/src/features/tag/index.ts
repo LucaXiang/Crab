@@ -5,6 +5,7 @@
 export { TagManagement } from './TagManagement';
 export { TagForm } from './TagForm';
 export { TagModal } from './TagModal';
+export { TagSelectionModal } from './TagSelectionModal';
 
 // Store
 export {

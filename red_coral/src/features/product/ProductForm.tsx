@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Image as ImageIcon, Tag, Hash, FileText, Layers, ImagePlus, Printer, List, Star, Check } from 'lucide-react';
+import { Image as ImageIcon, Tag, Hash, FileText, Layers, ImagePlus, Printer, List, Star, Check, Lock } from 'lucide-react';
 import { FormField, FormSection, inputClass, selectClass, SelectField, KitchenPrinterSelector, AttributeDisplayTag } from '@/shared/components/FormField';
 import { AttributeSelectionModal } from '@/features/attribute';
+import { TagSelectionModal, useTags } from '@/features/tag';
 import { ProductImage } from './ProductImage';
 import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions, usePrintDestinationStore } from '@/core/stores/resources';
 import { useIsKitchenPrintEnabled, useIsLabelPrintEnabled } from '@/core/stores/ui';
@@ -80,6 +81,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const isGlobalKitchenEnabled = useIsKitchenPrintEnabled();
   const isGlobalLabelEnabled = useIsLabelPrintEnabled();
   const [showAttributeModal, setShowAttributeModal] = useState(false);
+  const [showTagModal, setShowTagModal] = useState(false);
+  const allTags = useTags();
   const allAttributes = useAttributes();
   const optionsMap = useAttributeStore(state => state.options);
   const { loadAttributes } = useAttributeActions();
@@ -479,6 +482,90 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         }}
         t={t}
         inheritedAttributeIds={inheritedAttributeIds}
+      />
+
+      {/* Tags */}
+      <FormSection title={t('settings.product.tags.title')} icon={Tag}>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-gray-500">{t('settings.product.tags.description')}</p>
+          <button
+            type="button"
+            onClick={() => setShowTagModal(true)}
+            className="text-xs font-bold text-teal-600 hover:text-teal-700 hover:underline"
+          >
+            {t('settings.product.tags.manage')}
+          </button>
+        </div>
+
+        <div className="min-h-[3.75rem]">
+          {(() => {
+            // Get selected tags (user-editable) and system tags
+            const selectedTagIds = formData.selected_tag_ids || [];
+            const selectedTagObjects = allTags.filter((tag) => selectedTagIds.includes(tag.id));
+            // System tags that are on this product (read-only display)
+            const systemTagsOnProduct = allTags.filter(
+              (tag) => tag.is_system && selectedTagIds.includes(tag.id)
+            );
+            const userTagsOnProduct = selectedTagObjects.filter((tag) => !tag.is_system);
+
+            const hasAnyTags = userTagsOnProduct.length > 0 || systemTagsOnProduct.length > 0;
+
+            if (!hasAnyTags) {
+              return (
+                <div className="flex flex-col items-center justify-center py-4 text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                  <p className="text-sm">{t('settings.product.tags.no_selected')}</p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="flex flex-wrap gap-2">
+                {/* System tags (read-only with lock icon) */}
+                {systemTagsOnProduct.map((tag) => (
+                  <div
+                    key={tag.id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium text-white shadow-sm"
+                    style={{ backgroundColor: tag.color || '#14b8a6' }}
+                    title={t('settings.product.tags.system_tag_hint')}
+                  >
+                    <Lock size={12} />
+                    <span>{tag.name}</span>
+                  </div>
+                ))}
+                {/* User-editable tags */}
+                {userTagsOnProduct.map((tag) => (
+                  <div
+                    key={tag.id}
+                    className="px-3 py-1.5 rounded-full text-sm font-medium text-white shadow-sm"
+                    style={{ backgroundColor: tag.color || '#14b8a6' }}
+                  >
+                    {tag.name}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      </FormSection>
+
+      <TagSelectionModal
+        isOpen={showTagModal}
+        onClose={() => setShowTagModal(false)}
+        selectedTagIds={(formData.selected_tag_ids || []).filter((id) => {
+          // Only allow editing non-system tags
+          const tag = allTags.find((t) => t.id === id);
+          return !tag?.is_system;
+        })}
+        onChange={(newUserTagIds) => {
+          // Preserve system tags, update user tags
+          const currentTagIds = formData.selected_tag_ids || [];
+          const systemTagIds = currentTagIds.filter((id) => {
+            const tag = allTags.find((t) => t.id === id);
+            return tag?.is_system;
+          });
+          onFieldChange('tags', [...systemTagIds, ...newUserTagIds]);
+        }}
+        t={t}
       />
 
       {/* Specifications - only show when multiple specs exist */}

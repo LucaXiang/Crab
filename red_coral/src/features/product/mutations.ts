@@ -49,6 +49,7 @@ export async function createProduct(
     label_print_destinations: formData.label_print_destinations ?? [],
     is_kitchen_print_enabled: formData.is_kitchen_print_enabled ?? -1,
     is_label_print_enabled: formData.is_label_print_enabled ?? -1,
+    tags: formData.tags ?? [],
     specs: [{
       name: formData.name.trim(),
       price: Math.max(0.01, price),
@@ -161,6 +162,7 @@ export async function updateProduct(
     is_kitchen_print_enabled: formData.is_kitchen_print_enabled ?? -1,
     is_label_print_enabled: formData.is_label_print_enabled ?? -1,
     is_active: formData.is_active ?? true,
+    tags: formData.tags ?? [],
     specs: updatedSpecs,
   };
 
