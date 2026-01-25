@@ -46,9 +46,8 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
       await resetPassword(user.id, newPassword);
       toast.success(t("settings.user.message.reset_password_success"));
       onClose();
-    } catch (error: any) {
-      console.error('Reset password error:', error);
-      toast.error(error || t("settings.user.message.reset_password_failed"));
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : t("settings.user.message.reset_password_failed"));
     } finally {
       setIsSubmitting(false);
     }

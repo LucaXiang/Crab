@@ -10,10 +10,10 @@ import { useState, useEffect } from 'react';
  * @param dependencies - Additional dependencies to trigger reinitialization
  * @returns [formData, setFormData] tuple
  */
-export function useFormInitialization<T extends Record<string, any>>(
+export function useFormInitialization<T>(
   item: T | null,
-  defaultValues: Partial<T> & Record<string, any>,
-  dependencies: any[] = []
+  defaultValues: Partial<T>,
+  dependencies: unknown[] = []
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [formData, setFormData] = useState<T>(defaultValues as T);
 

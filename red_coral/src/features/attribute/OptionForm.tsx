@@ -121,7 +121,7 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
     }
   );
 
-  const handleFieldChange = (field: string, value: any) => {
+  const handleFieldChange = <K extends keyof OptionFormData>(field: K, value: OptionFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 

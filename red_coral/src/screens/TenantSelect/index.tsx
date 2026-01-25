@@ -28,8 +28,8 @@ export const TenantSelectScreen: React.FC = () => {
     try {
       await switchTenant(tenantId);
       navigate('/login', { replace: true });
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to switch tenant');
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Failed to switch tenant');
     }
   };
 
@@ -38,8 +38,8 @@ export const TenantSelectScreen: React.FC = () => {
     try {
       await removeTenant(tenantId);
       setShowDeleteConfirm(null);
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to remove tenant');
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Failed to remove tenant');
     }
   };
 

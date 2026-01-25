@@ -229,13 +229,12 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         }
 
         // Parse test data
-        let testData: any = {};
+        let testData: Record<string, unknown> = {};
         try {
           if (template.testData) {
-            testData = JSON.parse(template.testData);
+            testData = JSON.parse(template.testData) as Record<string, unknown>;
           }
-        } catch (e) {
-          console.warn("Invalid test data JSON:", e);
+        } catch {
           alert(t("settings.label.invalid_json"));
           return;
         }

@@ -1,5 +1,5 @@
 export interface ItemActionPanelProps {
-  t: (key: string, params?: any) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
   quantity: number;
   discount: number;
   basePrice: number;

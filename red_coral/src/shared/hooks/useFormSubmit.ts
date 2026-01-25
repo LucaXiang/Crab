@@ -3,8 +3,8 @@ import { useI18n } from '@/hooks/useI18n';
 
 export interface FormSubmitOptions<T> {
   validationRules?: (data: T) => string | null;
-  onCreate: (data: T) => Promise<any>;
-  onUpdate: (data: T) => Promise<any>;
+  onCreate: (data: T) => Promise<unknown>;
+  onUpdate: (data: T) => Promise<unknown>;
   onSuccess?: () => void;
   successMessage?: { create?: string; update?: string };
 }
@@ -23,8 +23,8 @@ export interface UseFormSubmitReturn {
  * @param options - Submit configuration options
  * @returns { handleSubmit, isSubmitting }
  */
-export function useFormSubmit<T extends Record<string, any>>(
-  editingItem: any,
+export function useFormSubmit<T>(
+  editingItem: unknown,
   formData: T,
   options: FormSubmitOptions<T>
 ): UseFormSubmitReturn {
@@ -58,9 +58,8 @@ export function useFormSubmit<T extends Record<string, any>>(
 
       // Trigger success callback
       onSuccess?.();
-    } catch (error: any) {
-      console.error('Form submission error:', error);
-      const errorMessage = error.message || t('settings.user.message.update_failed');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : t('settings.user.message.update_failed');
       toast.error(errorMessage);
     }
   };

@@ -72,7 +72,7 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
     }
   );
 
-  const handleFieldChange = (field: string, value: any) => {
+  const handleFieldChange = <K extends keyof SpecFormData>(field: K, value: SpecFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 

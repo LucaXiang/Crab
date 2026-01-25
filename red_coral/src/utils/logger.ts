@@ -13,7 +13,7 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 interface LogContext {
   component?: string;
   action?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 class Logger {

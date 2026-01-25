@@ -110,7 +110,7 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
     }
   );
 
-  const handleFieldChange = (field: string, value: any) => {
+  const handleFieldChange = <K extends keyof AttributeFormData>(field: K, value: AttributeFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 

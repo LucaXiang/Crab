@@ -124,9 +124,8 @@ export const UserManagement: React.FC = React.memo(() => {
             toast.success(t('settings.user.message.update_success'));
             const updatedUsers = await fetchUsers();
             setUsers(updatedUsers);
-          } catch (error: any) {
-            console.error('Disable user error:', error);
-            toast.error(error || t('settings.user.message.update_failed'));
+          } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : t('settings.user.message.update_failed'));
           }
         },
       });
@@ -143,9 +142,8 @@ export const UserManagement: React.FC = React.memo(() => {
             toast.success(t('settings.user.message.delete_success'));
             const updatedUsers = await fetchUsers();
             setUsers(updatedUsers);
-          } catch (error: any) {
-            console.error('Delete user error:', error);
-            toast.error(error || t('settings.user.message.delete_failed'));
+          } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : t('settings.user.message.delete_failed'));
           }
         },
       });

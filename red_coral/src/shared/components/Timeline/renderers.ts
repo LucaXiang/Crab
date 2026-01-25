@@ -113,14 +113,14 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
     const formatChange = (
       key: keyof typeof changes,
       labelKey: string,
-      formatter: (v: any) => string = String
+      formatter: (v: number) => string = String
     ) => {
-      if (changes[key] !== undefined && changes[key] !== null) {
+      const newVal = changes[key];
+      if (typeof newVal === 'number') {
         const oldVal = previousValues[key];
-        const newVal = changes[key];
         if (oldVal !== newVal) {
           details.push(
-            `${t(labelKey)}: ${oldVal !== undefined ? formatter(oldVal) : '0'} -> ${formatter(newVal)}`
+            `${t(labelKey)}: ${typeof oldVal === 'number' ? formatter(oldVal) : '0'} -> ${formatter(newVal)}`
           );
         }
       }

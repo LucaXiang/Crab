@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 export interface AnimationItem {
   id: string;
   type: string;
-  data?: any;
+  data?: unknown;
   image?: string;
   startRect?: DOMRect;
   targetX?: number;

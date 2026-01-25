@@ -111,8 +111,8 @@ export const LoginScreen: React.FC = () => {
       } else {
         setError(response.error || t('auth.login.error.invalid_credentials'));
       }
-    } catch (err: any) {
-      setError(err.message || t('auth.login.error.invalid_credentials'));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t('auth.login.error.invalid_credentials'));
     }
   };
 

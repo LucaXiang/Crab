@@ -51,8 +51,8 @@ export const SetupScreen: React.FC = () => {
       // Client mode requires connecting after activation
 
       setStep('complete');
-    } catch (err: any) {
-      setActivationError(err.message || 'Activation failed');
+    } catch (err: unknown) {
+      setActivationError(err instanceof Error ? err.message : 'Activation failed');
     }
   };
 
