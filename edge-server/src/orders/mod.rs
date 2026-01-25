@@ -30,6 +30,7 @@
 pub mod actions;
 pub mod appliers;
 pub mod archive;
+pub mod archive_worker;
 pub mod manager;
 pub mod money;
 pub mod reducer;
@@ -39,6 +40,7 @@ pub mod traits;
 
 // Re-exports
 pub use archive::{ArchiveError, ArchiveResult, OrderArchiveService};
+pub use archive_worker::ArchiveWorker;
 pub use manager::OrdersManager;
 pub use reducer::{generate_instance_id, input_to_snapshot};
 pub use storage::OrderStorage;
