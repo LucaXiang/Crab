@@ -142,7 +142,7 @@ export async function getStatistics(
 // ============================================================================
 
 const salesReportItemSchema = z.object({
-  order_id: positiveIntSchema,
+  order_id: z.string(),
   receipt_number: z.string().nullable(),
   date: z.string().min(1),
   total: currencySchema,
@@ -158,7 +158,7 @@ const salesReportResponseSchema = z.object({
 });
 
 export interface SalesReportResponse {
-  items: Array<{ order_id: number; receipt_number: string | null; date: string; total: number; status: string }>;
+  items: Array<{ order_id: string; receipt_number: string | null; date: string; total: number; status: string }>;
   total: number;
   page: number;
   pageSize: number;

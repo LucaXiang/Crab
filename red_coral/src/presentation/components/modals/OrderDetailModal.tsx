@@ -8,7 +8,7 @@ import { toast } from '@/presentation/components/Toast';
 interface OrderDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  orderId: number | null;
+  orderId: string | null;
 }
 
 export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
