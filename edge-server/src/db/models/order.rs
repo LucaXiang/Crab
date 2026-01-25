@@ -93,12 +93,6 @@ pub struct Order {
     pub surcharge_amount: f64,
     /// Full OrderSnapshot JSON (for detail queries)
     pub snapshot_json: String,
-    /// Order items as JSON string (deprecated, kept for compatibility)
-    #[serde(default)]
-    pub items_json: String,
-    /// Payments as JSON string (deprecated, kept for compatibility)
-    #[serde(default)]
-    pub payments_json: String,
     /// Hash chain: previous hash
     pub prev_hash: String,
     /// Hash chain: current hash
@@ -111,17 +105,6 @@ pub struct Order {
     pub created_at: Option<String>,
 }
 
-impl Order {
-    /// Parse items from JSON string
-    pub fn items(&self) -> Vec<OrderItem> {
-        serde_json::from_str(&self.items_json).unwrap_or_default()
-    }
-
-    /// Parse payments from JSON string
-    pub fn payments(&self) -> Vec<OrderPayment> {
-        serde_json::from_str(&self.payments_json).unwrap_or_default()
-    }
-}
 
 /// Order event types (matches shared::order::OrderEventType)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

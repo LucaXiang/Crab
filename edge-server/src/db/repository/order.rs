@@ -344,7 +344,7 @@ impl OrderRepository {
             "Creating archived order"
         );
 
-        // Store snapshot_json for detail queries, items_json/payments_json for list queries
+        // Store snapshot_json for detail queries, normalized tables for analytics
         let mut result = self
             .base
             .db()
@@ -362,8 +362,6 @@ impl OrderRepository {
                     discount_amount = $discount_amount,
                     surcharge_amount = $surcharge_amount,
                     snapshot_json = $snapshot_json,
-                    items_json = $items_json,
-                    payments_json = $payments_json,
                     prev_hash = $prev_hash,
                     curr_hash = $curr_hash,
                     related_order_id = $related_order_id,
@@ -382,8 +380,6 @@ impl OrderRepository {
             .bind(("discount_amount", order.discount_amount))
             .bind(("surcharge_amount", order.surcharge_amount))
             .bind(("snapshot_json", order.snapshot_json.clone()))
-            .bind(("items_json", order.items_json.clone()))
-            .bind(("payments_json", order.payments_json.clone()))
             .bind(("prev_hash", order.prev_hash))
             .bind(("curr_hash", order.curr_hash))
             .bind(("related_order_id", order.related_order_id.map(|id| id.to_string())))

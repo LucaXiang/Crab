@@ -3,9 +3,10 @@
 //! Archives completed orders from redb to SurrealDB with hash chain integrity.
 
 use crate::db::models::{
-    Order as SurrealOrder, OrderEventType as SurrealEventType, OrderItem, OrderItemAttribute,
-    OrderPayment, OrderStatus as SurrealOrderStatus,
+    Order as SurrealOrder, OrderEventType as SurrealEventType,
+    OrderStatus as SurrealOrderStatus,
 };
+use surrealdb::RecordId;
 use crate::db::repository::{OrderRepository, SystemStateRepository};
 use sha2::{Digest, Sha256};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
@@ -37,6 +38,7 @@ const MAX_CONCURRENT_ARCHIVES: usize = 5;
 /// Service for archiving orders to SurrealDB
 #[derive(Clone)]
 pub struct OrderArchiveService {
+    db: Surreal<Db>,
     order_repo: OrderRepository,
     system_state_repo: SystemStateRepository,
     /// Semaphore to limit concurrent archive tasks
@@ -48,6 +50,7 @@ pub struct OrderArchiveService {
 impl OrderArchiveService {
     pub fn new(db: Surreal<Db>) -> Self {
         Self {
+            db: db.clone(),
             order_repo: OrderRepository::new(db.clone()),
             system_state_repo: SystemStateRepository::new(db),
             archive_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_ARCHIVES)),
@@ -158,7 +161,7 @@ impl OrderArchiveService {
         
         tracing::info!(
             order_id = %snapshot.order_id,
-            items_json_len = surreal_order.items_json.len(),
+            items_count = snapshot.items.len(),
             "Archiving order to SurrealDB"
         );
         
@@ -172,7 +175,11 @@ impl OrderArchiveService {
             .id
             .ok_or_else(|| ArchiveError::Database("Order has no ID".to_string()))?;
 
-        // 4. Store events with RELATE
+        // 4. Store normalized order items and payments
+        self.store_normalized_items(&order_id, snapshot).await?;
+        self.store_normalized_payments(&order_id, snapshot).await?;
+
+        // 5. Store events with RELATE
         for (i, event) in events.iter().enumerate() {
             let prev_event_hash = if i == 0 {
                 "order_start".to_string()
@@ -252,99 +259,9 @@ impl OrderArchiveService {
             }
         };
 
-        // Convert items from CartItemSnapshot to OrderItem
-        // Note: snapshot.items only contains active items (removed items are excluded by reducer)
-        // The unit_price and line_total are already calculated by recalculate_totals() in money.rs
-        let items: Vec<OrderItem> = snapshot
-            .items
-            .iter()
-            .map(|item| {
-                // Use original_price as base for discount calculation
-                let base_price = item.original_price.unwrap_or(item.price);
-
-                // Calculate per-unit discount amounts
-                let manual_discount_per_unit = item
-                    .manual_discount_percent
-                    .map(|p| base_price * p / 100.0)
-                    .unwrap_or(0.0);
-                let rule_discount_per_unit = item.rule_discount_amount.unwrap_or(0.0);
-
-                // Total discount = per-unit discount * quantity
-                let total_discount = (manual_discount_per_unit + rule_discount_per_unit) * item.quantity as f64;
-
-                // Total surcharge = per-unit surcharge * quantity
-                let surcharge_per_unit = item.surcharge.unwrap_or(0.0)
-                    + item.rule_surcharge_amount.unwrap_or(0.0);
-                let total_surcharge = surcharge_per_unit * item.quantity as f64;
-
-                // Convert selected_options to OrderItemAttribute (snapshot as strings)
-                let attributes: Vec<OrderItemAttribute> = item
-                    .selected_options
-                    .as_ref()
-                    .map(|opts| {
-                        opts.iter()
-                            .map(|opt| OrderItemAttribute {
-                                attr_id: opt.attribute_id.clone(),
-                                option_idx: opt.option_idx,
-                                name: opt.option_name.clone(),
-                                price: opt.price_modifier.unwrap_or(0.0),
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default();
-
-                // Use pre-calculated unit_price and line_total from snapshot
-                // These are computed by money::recalculate_totals() with proper precision
-                let unit_price = item.unit_price.unwrap_or_else(|| {
-                    // Fallback calculation if not set (shouldn't happen normally)
-                    base_price - manual_discount_per_unit - rule_discount_per_unit + surcharge_per_unit
-                });
-                let line_total = item.line_total.unwrap_or_else(|| {
-                    // Fallback calculation if not set
-                    unit_price * item.quantity as f64
-                });
-
-                OrderItem {
-                    spec: item.id.clone(),
-                    name: item.name.clone(),
-                    spec_name: item.selected_specification.as_ref().map(|s| s.name.clone()),
-                    price: base_price, // Store the base price (before discounts)
-                    quantity: item.quantity,
-                    attributes,
-                    discount_amount: total_discount,
-                    surcharge_amount: total_surcharge,
-                    unit_price,
-                    line_total,
-                    note: item.note.clone(),
-                    is_sent: true, // Archived orders have been processed
-                }
-            })
-            .collect();
-
-        // Convert payments from PaymentRecord to OrderPayment
-        let payments: Vec<OrderPayment> = snapshot
-            .payments
-            .iter()
-            .filter(|p| !p.cancelled) // Only include non-cancelled payments
-            .map(|payment| OrderPayment {
-                method: payment.method.clone(),
-                amount: payment.amount,
-                time: chrono::DateTime::from_timestamp_millis(payment.timestamp)
-                    .map(|dt| dt.to_rfc3339())
-                    .unwrap_or_default(),
-                reference: payment.note.clone(),
-            })
-            .collect();
-
         // Serialize the full OrderSnapshot for detail queries
         let snapshot_json = serde_json::to_string(snapshot)
             .map_err(|e| ArchiveError::Conversion(format!("Failed to serialize snapshot: {}", e)))?;
-
-        // Serialize items and payments to JSON strings (deprecated, kept for list queries)
-        let items_json = serde_json::to_string(&items)
-            .map_err(|e| ArchiveError::Conversion(format!("Failed to serialize items: {}", e)))?;
-        let payments_json = serde_json::to_string(&payments)
-            .map_err(|e| ArchiveError::Conversion(format!("Failed to serialize payments: {}", e)))?;
 
         Ok(SurrealOrder {
             id: None,
@@ -366,8 +283,6 @@ impl OrderArchiveService {
             discount_amount: snapshot.total_discount,
             surcharge_amount: snapshot.total_surcharge,
             snapshot_json,
-            items_json,
-            payments_json,
             prev_hash,
             curr_hash,
             related_order_id: None,
@@ -404,6 +319,159 @@ impl OrderArchiveService {
             // Price Rules
             OrderEventType::RuleSkipToggled => SurrealEventType::RuleSkipToggled,
         }
+    }
+
+    /// Store normalized order items to order_item and order_item_attribute tables
+    async fn store_normalized_items(
+        &self,
+        order_id: &RecordId,
+        snapshot: &OrderSnapshot,
+    ) -> ArchiveResult<()> {
+        for item in &snapshot.items {
+            // Use original_price as base for discount calculation
+            let base_price = item.original_price.unwrap_or(item.price);
+
+            // Calculate per-unit discount amounts
+            let manual_discount_per_unit = item
+                .manual_discount_percent
+                .map(|p| base_price * p / 100.0)
+                .unwrap_or(0.0);
+            let rule_discount_per_unit = item.rule_discount_amount.unwrap_or(0.0);
+
+            // Total discount = per-unit discount * quantity
+            let total_discount =
+                (manual_discount_per_unit + rule_discount_per_unit) * item.quantity as f64;
+
+            // Total surcharge = per-unit surcharge * quantity
+            let surcharge_per_unit =
+                item.surcharge.unwrap_or(0.0) + item.rule_surcharge_amount.unwrap_or(0.0);
+            let total_surcharge = surcharge_per_unit * item.quantity as f64;
+
+            // Use pre-calculated values from snapshot
+            let unit_price = item.unit_price.unwrap_or_else(|| {
+                base_price - manual_discount_per_unit - rule_discount_per_unit + surcharge_per_unit
+            });
+            let line_total = item
+                .line_total
+                .unwrap_or_else(|| unit_price * item.quantity as f64);
+
+            // Create order_item
+            let spec_name = item
+                .selected_specification
+                .as_ref()
+                .map(|s| s.name.clone());
+
+            let mut result = self
+                .db
+                .query(
+                    r#"
+                    CREATE order_item SET
+                        order_id = $order_id,
+                        spec = $spec,
+                        name = $name,
+                        spec_name = $spec_name,
+                        price = $price,
+                        quantity = $quantity,
+                        discount_amount = $discount_amount,
+                        surcharge_amount = $surcharge_amount,
+                        unit_price = $unit_price,
+                        line_total = $line_total,
+                        note = $note
+                    RETURN id
+                "#,
+                )
+                .bind(("order_id", order_id.clone()))
+                .bind(("spec", item.id.clone()))
+                .bind(("name", item.name.clone()))
+                .bind(("spec_name", spec_name))
+                .bind(("price", base_price))
+                .bind(("quantity", item.quantity))
+                .bind(("discount_amount", total_discount))
+                .bind(("surcharge_amount", total_surcharge))
+                .bind(("unit_price", unit_price))
+                .bind(("line_total", line_total))
+                .bind(("note", item.note.clone()))
+                .await
+                .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+            #[derive(serde::Deserialize)]
+            struct IdResult {
+                id: RecordId,
+            }
+            let items: Vec<IdResult> = result
+                .take(0)
+                .map_err(|e| ArchiveError::Database(e.to_string()))?;
+            let item_id = items
+                .into_iter()
+                .next()
+                .ok_or_else(|| ArchiveError::Database("Failed to create order_item".to_string()))?
+                .id;
+
+            // Create order_item_attribute for each selected option
+            if let Some(options) = &item.selected_options {
+                for opt in options {
+                    self.db
+                        .query(
+                            r#"
+                            CREATE order_item_attribute SET
+                                item_id = $item_id,
+                                attr_id = $attr_id,
+                                option_idx = $option_idx,
+                                name = $name,
+                                price = $price
+                        "#,
+                        )
+                        .bind(("item_id", item_id.clone()))
+                        .bind(("attr_id", opt.attribute_id.clone()))
+                        .bind(("option_idx", opt.option_idx))
+                        .bind(("name", opt.option_name.clone()))
+                        .bind(("price", opt.price_modifier.unwrap_or(0.0)))
+                        .await
+                        .map_err(|e| ArchiveError::Database(e.to_string()))?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Store normalized payments to order_payment table
+    async fn store_normalized_payments(
+        &self,
+        order_id: &RecordId,
+        snapshot: &OrderSnapshot,
+    ) -> ArchiveResult<()> {
+        for payment in &snapshot.payments {
+            // Skip cancelled payments
+            if payment.cancelled {
+                continue;
+            }
+
+            let time = chrono::DateTime::from_timestamp_millis(payment.timestamp)
+                .map(|dt| dt.to_rfc3339())
+                .unwrap_or_default();
+
+            self.db
+                .query(
+                    r#"
+                    CREATE order_payment SET
+                        order_id = $order_id,
+                        method = $method,
+                        amount = $amount,
+                        time = <datetime>$time,
+                        reference = $reference
+                "#,
+                )
+                .bind(("order_id", order_id.clone()))
+                .bind(("method", payment.method.clone()))
+                .bind(("amount", payment.amount))
+                .bind(("time", time))
+                .bind(("reference", payment.note.clone()))
+                .await
+                .map_err(|e| ArchiveError::Database(e.to_string()))?;
+        }
+
+        Ok(())
     }
 }
 

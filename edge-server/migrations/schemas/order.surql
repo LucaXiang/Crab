@@ -62,13 +62,6 @@ DEFINE FIELD OVERWRITE surcharge_amount ON order TYPE float
 DEFINE FIELD OVERWRITE snapshot_json ON order TYPE string
     PERMISSIONS FULL;
 
--- 订单项 JSON (已废弃，保留兼容)
-DEFINE FIELD OVERWRITE items_json ON order TYPE option<string>
-    PERMISSIONS FULL;
-
--- 支付记录 JSON (已废弃，保留兼容)
-DEFINE FIELD OVERWRITE payments_json ON order TYPE option<string>
-    PERMISSIONS FULL;
 
 -- 哈希链 (防篡改)
 DEFINE FIELD OVERWRITE prev_hash ON order TYPE string
@@ -126,3 +119,119 @@ DEFINE TABLE OVERWRITE has_event TYPE RELATION
             WHERE $auth.role = role:admin OR $auth.id = employee:admin;
 
 DEFINE INDEX OVERWRITE event_time ON order_event FIELDS timestamp;
+
+-- =============================================================================
+-- 订单项表 (规范化，用于数据分析)
+-- =============================================================================
+-- 关联: order->order_item (通过 order_id 字段)
+
+DEFINE TABLE OVERWRITE order_item TYPE NORMAL SCHEMAFULL
+    PERMISSIONS
+        FOR select, create
+            WHERE $auth.role = role:admin OR $auth.id = employee:admin;
+
+DEFINE FIELD OVERWRITE order_id ON order_item TYPE record<order>
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE spec ON order_item TYPE string
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE name ON order_item TYPE string
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE spec_name ON order_item TYPE option<string>
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE price ON order_item TYPE float
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE quantity ON order_item TYPE int
+    DEFAULT 1
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE discount_amount ON order_item TYPE float
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE surcharge_amount ON order_item TYPE float
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE unit_price ON order_item TYPE float
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE line_total ON order_item TYPE float
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE note ON order_item TYPE option<string>
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE created_at ON order_item TYPE datetime
+    DEFAULT time::now()
+    PERMISSIONS FULL;
+
+DEFINE INDEX OVERWRITE order_item_order ON order_item FIELDS order_id;
+DEFINE INDEX OVERWRITE order_item_spec ON order_item FIELDS spec;
+
+-- =============================================================================
+-- 订单项属性表 (规范化)
+-- =============================================================================
+-- 关联: order_item->order_item_attribute (通过 item_id 字段)
+
+DEFINE TABLE OVERWRITE order_item_attribute TYPE NORMAL SCHEMAFULL
+    PERMISSIONS
+        FOR select, create
+            WHERE $auth.role = role:admin OR $auth.id = employee:admin;
+
+DEFINE FIELD OVERWRITE item_id ON order_item_attribute TYPE record<order_item>
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE attr_id ON order_item_attribute TYPE string
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE option_idx ON order_item_attribute TYPE int
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE name ON order_item_attribute TYPE string
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE price ON order_item_attribute TYPE float
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE INDEX OVERWRITE item_attr_item ON order_item_attribute FIELDS item_id;
+
+-- =============================================================================
+-- 支付记录表 (规范化)
+-- =============================================================================
+-- 关联: order->order_payment (通过 order_id 字段)
+
+DEFINE TABLE OVERWRITE order_payment TYPE NORMAL SCHEMAFULL
+    PERMISSIONS
+        FOR select, create
+            WHERE $auth.role = role:admin OR $auth.id = employee:admin;
+
+DEFINE FIELD OVERWRITE order_id ON order_payment TYPE record<order>
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE method ON order_payment TYPE string
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE amount ON order_payment TYPE float
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE time ON order_payment TYPE datetime
+    DEFAULT time::now()
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE reference ON order_payment TYPE option<string>
+    PERMISSIONS FULL;
+
+DEFINE INDEX OVERWRITE payment_order ON order_payment FIELDS order_id;
+DEFINE INDEX OVERWRITE payment_method ON order_payment FIELDS method;
+DEFINE INDEX OVERWRITE payment_time ON order_payment FIELDS time;
