@@ -1174,6 +1174,7 @@
         "set_default": "设为默认规格",
         "set_default_hint": "点单时将作为默认选项",
         "name_required": "请输入规格名称",
+        "price_required": "请输入有效价格",
         "receipt_name": "小票名称",
         "receipt_name_placeholder": "小票上显示的名称",
         "is_root": "基础规格",

@@ -23,6 +23,8 @@ export { ProductImage } from './ProductImage';
 export { ProductForm } from './ProductForm';
 export { ProductManagement } from './ProductManagement';
 export { ProductModal } from './ProductModal';
+export { SpecificationManagementModal } from './SpecificationManagementModal';
+export { SpecificationFormModal } from './SpecificationFormModal';
 
 // Mutations
 export {

@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Utensils, Plus, Filter, Search, ListChecks } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Utensils, Plus, Filter, Search, ListChecks, Edit3, Trash2, Settings } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
-import { Permission } from '@/core/domain/types';
+import { Permission, PrintState } from '@/core/domain/types';
 import { useCanDeleteProduct, useCanUpdateProduct } from '@/hooks/usePermission';
 import {
   useSettingsModal,
@@ -20,6 +20,7 @@ import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ProductImage } from './ProductImage';
 import { formatCurrency } from '@/utils/currency';
 import { displayThingId } from '@/utils/formatting';
+import { SpecificationManagementModal } from './SpecificationManagementModal';
 
 // ProductItem matches Product type from models.ts (snake_case naming)
 interface ProductItem {
@@ -32,8 +33,8 @@ interface ProductItem {
   tax_rate?: number;
   kitchen_printer?: string | null;
   kitchen_print_name?: string | null;
-  is_kitchen_print_enabled?: number;
-  is_label_print_enabled?: number;
+  is_kitchen_print_enabled?: PrintState;
+  is_label_print_enabled?: PrintState;
   is_active?: boolean;
   has_multi_spec?: boolean;
 }
@@ -89,6 +90,15 @@ export const ProductManagement: React.FC = React.memo(() => {
   });
 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
+
+  // Specification management modal state
+  const [specModalOpen, setSpecModalOpen] = useState(false);
+  const [selectedProductForSpec, setSelectedProductForSpec] = useState<ProductItem | null>(null);
+
+  const handleManageSpecs = useCallback((product: ProductItem) => {
+    setSelectedProductForSpec(product);
+    setSpecModalOpen(true);
+  }, []);
 
   useEffect(() => {
     // Load data from resources stores
@@ -224,8 +234,54 @@ export const ProductManagement: React.FC = React.memo(() => {
           );
         },
       },
+      {
+        key: 'actions',
+        header: t('settings.common.actions'),
+        width: '140px',
+        align: 'right',
+        render: (item) => (
+          <div className="flex items-center justify-end gap-1">
+            {canUpdateProduct && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleManageSpecs(item);
+                }}
+                className="p-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200/50"
+                title={t('specification.manage')}
+              >
+                <Settings size={14} />
+              </button>
+            )}
+            {canUpdateProduct && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openModal('PRODUCT', 'EDIT', item);
+                }}
+                className="p-2 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors border border-amber-200/50"
+                title={t('common.action.edit')}
+              >
+                <Edit3 size={14} />
+              </button>
+            )}
+            {canDeleteProduct && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openModal('PRODUCT', 'DELETE', item);
+                }}
+                className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors border border-red-200/50"
+                title={t('common.action.delete')}
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+        ),
+      },
     ],
-    [t, categories]
+    [t, categories, canUpdateProduct, canDeleteProduct, openModal, handleManageSpecs]
   );
 
   return (
@@ -320,8 +376,6 @@ export const ProductManagement: React.FC = React.memo(() => {
         columns={columns}
         loading={loading}
         getRowKey={(item) => item.id}
-        onEdit={canUpdateProduct ? (item) => openModal('PRODUCT', 'EDIT', item) : undefined}
-        onDelete={canDeleteProduct ? (item) => openModal('PRODUCT', 'DELETE', item) : undefined}
         onBatchDelete={canDeleteProduct ? handleBatchDelete : undefined}
         emptyText={t('common.empty.no_data')}
         pageSize={5}
@@ -340,6 +394,19 @@ export const ProductManagement: React.FC = React.memo(() => {
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
       />
+
+      {/* Specification Management Modal */}
+      {specModalOpen && selectedProductForSpec && (
+        <SpecificationManagementModal
+          isOpen={specModalOpen}
+          onClose={() => {
+            setSpecModalOpen(false);
+            setSelectedProductForSpec(null);
+          }}
+          productId={selectedProductForSpec.id}
+          productName={selectedProductForSpec.name}
+        />
+      )}
     </div>
   );
 });
