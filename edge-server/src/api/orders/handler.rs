@@ -7,7 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
-use crate::db::models::{Order, OrderAddItem, OrderAddPayment, OrderEvent, OrderEventType};
+use crate::db::models::{Order, OrderAddItem, OrderAddPayment, OrderDetail, OrderEvent, OrderEventType};
 use crate::db::repository::OrderRepository;
 use crate::utils::{AppError, AppResult};
 
@@ -39,59 +39,17 @@ pub async fn list(
     Ok(Json(orders))
 }
 
-/// Get order by id - returns OrderSnapshot directly (no frontend conversion needed)
-/// Includes timeline events from the archived order
+/// Get order by id - uses graph traversal for items/payments/timeline
 pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<String>,
-) -> AppResult<Json<serde_json::Value>> {
-    let record_id: surrealdb::RecordId = id.parse()
-        .map_err(|_| AppError::validation(format!("Invalid order ID: {}", id)))?;
-
-    // Query order snapshot_json and events
-    let mut result = state.db
-        .query(r#"
-            SELECT
-                snapshot_json,
-                (
-                    SELECT
-                        string::concat('', id) AS event_id,
-                        string::uppercase(event_type) AS event_type,
-                        time::millis(timestamp) AS timestamp,
-                        data AS payload,
-                        prev_hash,
-                        curr_hash
-                    FROM ->has_event->order_event
-                    ORDER BY timestamp
-                ) AS timeline
-            FROM order WHERE id = $id
-        "#)
-        .bind(("id", record_id))
+) -> AppResult<Json<OrderDetail>> {
+    let repo = OrderRepository::new(state.db.clone());
+    let detail = repo
+        .get_order_detail(&id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
-
-    let orders: Vec<serde_json::Value> = result.take(0)
-        .map_err(|e| AppError::database(e.to_string()))?;
-
-    let order_row = orders.into_iter().next()
-        .ok_or_else(|| AppError::not_found(format!("Order {} not found", id)))?;
-
-    // Parse snapshot_json to get the full OrderSnapshot
-    let snapshot_str = order_row.get("snapshot_json")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| AppError::database("Missing snapshot_json".to_string()))?;
-
-    let mut snapshot: serde_json::Value = serde_json::from_str(snapshot_str)
-        .map_err(|e| AppError::database(format!("Failed to parse snapshot: {}", e)))?;
-
-    // Add timeline events to the snapshot
-    if let Some(obj) = snapshot.as_object_mut() {
-        if let Some(timeline) = order_row.get("timeline") {
-            obj.insert("timeline".to_string(), timeline.clone());
-        }
-    }
-
-    Ok(Json(snapshot))
+    Ok(Json(detail))
 }
 
 /// Get order by receipt number
@@ -320,17 +278,18 @@ pub struct OrderHistoryQuery {
     pub search: Option<String>,
 }
 
-/// Order summary for history list (frontend-compatible format)
+/// Order summary for history list (graph model)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OrderSummary {
     pub order_id: String,
     pub receipt_number: String,
+    pub table_name: Option<String>,
     pub status: String,
-    pub table_name: String,
+    pub is_retail: bool,
     pub total: f64,
+    pub guest_count: i32,
     pub start_time: i64,
     pub end_time: Option<i64>,
-    pub guest_count: i32,
 }
 
 /// Response wrapper for paginated order list
@@ -343,7 +302,6 @@ pub struct OrderListResponse {
 }
 
 /// Fetch archived order list from SurrealDB with pagination
-/// Uses direct SQL query to avoid complex deserialization issues
 pub async fn fetch_order_list(
     State(state): State<ServerState>,
     Query(params): Query<OrderHistoryQuery>,
@@ -394,17 +352,18 @@ pub async fn fetch_order_list(
         .map(|r| r.count)
         .unwrap_or(0);
 
-    // Query 2: Get paginated results (frontend-compatible format)
+    // Query 2: Get paginated results (graph model format)
     let data_query = format!(
         "SELECT \
          record::id(id) AS order_id, \
          receipt_number, \
+         table_name, \
          string::uppercase(status) AS status, \
-         table_name ?? 'RETAIL' AS table_name, \
+         is_retail, \
          total_amount AS total, \
+         guest_count ?? 1 AS guest_count, \
          time::millis(start_time) AS start_time, \
-         time::millis(end_time) AS end_time, \
-         guest_count ?? 1 AS guest_count \
+         time::millis(end_time) AS end_time \
          FROM order {} ORDER BY end_time DESC LIMIT $limit START $offset",
         where_clause
     );
