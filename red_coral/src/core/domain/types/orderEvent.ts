@@ -34,7 +34,6 @@ export type OrderEventType =
   | 'ORDER_MERGED'
   | 'ORDER_MERGED_OUT'
   | 'TABLE_REASSIGNED'
-  | 'SURCHARGE_EXEMPT_SET'
   | 'ORDER_INFO_UPDATED'
   | 'RULE_SKIP_TOGGLED';
 
@@ -114,6 +113,8 @@ export interface OrderCompletedPayload {
 export interface OrderVoidedPayload {
   type: 'ORDER_VOIDED';
   reason?: string | null;
+  authorizer_id?: string | null;
+  authorizer_name?: string | null;
 }
 
 export interface OrderRestoredPayload {
@@ -159,6 +160,8 @@ export interface ItemRemovedPayload {
   item_name: string;
   quantity?: number | null;
   reason?: string | null;
+  authorizer_id?: string | null;
+  authorizer_name?: string | null;
 }
 
 export interface ItemRestoredPayload {
@@ -183,6 +186,8 @@ export interface PaymentCancelledPayload {
   method: string;
   amount: number;
   reason?: string | null;
+  authorizer_id?: string | null;
+  authorizer_name?: string | null;
 }
 
 export interface OrderSplitPayload {
@@ -329,7 +334,10 @@ export interface ModifyItemCommand {
   type: 'MODIFY_ITEM';
   order_id: string;
   instance_id: string;
+  affected_quantity?: number | null;
   changes: ItemChanges;
+  authorizer_id?: string | null;
+  authorizer_name?: string | null;
 }
 
 export interface RemoveItemCommand {
@@ -597,9 +605,9 @@ export interface AppliedRule {
   name: string;
   display_name: string;
   receipt_name: string;
-  rule_type: 'discount' | 'surcharge';
-  adjustment_type: 'percentage' | 'fixed';
-  product_scope: 'global' | 'category' | 'product';
+  rule_type: 'DISCOUNT' | 'SURCHARGE';
+  adjustment_type: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  product_scope: 'GLOBAL' | 'CATEGORY' | 'TAG' | 'PRODUCT';
   /** Zone scope: "zone:all", "zone:retail", or specific zone ID */
   zone_scope: string;
   adjustment_value: number;

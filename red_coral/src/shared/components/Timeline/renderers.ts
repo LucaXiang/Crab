@@ -393,7 +393,6 @@ export const EVENT_RENDERERS: Record<OrderEventType, EventRenderer<any>> = {
   ORDER_MERGED_OUT: OrderMergedOutRenderer,
   TABLE_REASSIGNED: TableReassignedRenderer,
   ORDER_INFO_UPDATED: OrderInfoUpdatedRenderer,
-  SURCHARGE_EXEMPT_SET: OrderInfoUpdatedRenderer, // Reuse for now
   RULE_SKIP_TOGGLED: RuleSkipToggledRenderer,
 };
 
