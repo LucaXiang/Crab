@@ -49,5 +49,3 @@ export const ProductImage = memo(function ProductImage({
     />
   );
 });
-
-export default ProductImage;

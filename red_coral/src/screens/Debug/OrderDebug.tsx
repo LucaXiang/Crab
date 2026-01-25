@@ -547,5 +547,3 @@ export const OrderDebug: React.FC = () => {
     </div>
   );
 };
-
-export default OrderDebug;

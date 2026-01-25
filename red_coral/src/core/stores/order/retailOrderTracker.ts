@@ -44,10 +44,3 @@ export function getPendingRetailOrder(): PendingRetailOrder | null {
 export function clearPendingRetailOrder(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
-
-/**
- * 检查是否有待处理的零售订单
- */
-export function hasPendingRetailOrder(): boolean {
-  return getPendingRetailOrder() !== null;
-}

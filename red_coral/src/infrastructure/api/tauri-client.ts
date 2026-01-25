@@ -412,6 +412,3 @@ export function createTauriClient(): TauriApiClient {
   }
   return clientInstance;
 }
-
-// 默认导出
-export default TauriApiClient;
