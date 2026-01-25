@@ -620,7 +620,7 @@ mod tests {
 
     #[test]
     fn test_compute_event_hash_includes_payload() {
-        let mut event1 = create_test_event("order-1", 1);
+        let event1 = create_test_event("order-1", 1);
         let mut event2 = create_test_event("order-1", 1);
 
         // Modify payload

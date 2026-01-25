@@ -548,39 +548,7 @@ impl OrderStorage {
     }
 
 
-    /// Cleanup an archived order from redb
-    /// Removes snapshot and all events for the order
-    pub fn cleanup_archived_order(&self, order_id: &str) -> StorageResult<()> {
-        let txn = self.begin_write()?;
-        
-        // Remove snapshot
-        {
-            let mut table = txn.open_table(SNAPSHOTS_TABLE)?;
-            table.remove(order_id)?;
-        }
-        
-        // Remove events
-        {
-            let mut table = txn.open_table(EVENTS_TABLE)?;
-            let range_start = (order_id, 0u64);
-            let range_end = (order_id, u64::MAX);
-            
-            let mut keys_to_remove: Vec<(String, u64)> = Vec::new();
-            for result in table.range(range_start..=range_end)? {
-                let (key, _) = result?;
-                let key_value = key.value();
-                keys_to_remove.push((key_value.0.to_string(), key_value.1));
-            }
-            
-            for (oid, seq) in &keys_to_remove {
-                table.remove((oid.as_str(), *seq))?;
-            }
-        }
-        
-        txn.commit()?;
-        tracing::debug!(order_id = %order_id, "Cleaned up archived order from redb");
-        Ok(())
-    }
+
 
     /// Clean up processed command IDs for a given order
     /// (Called after archival - removes command_ids that belong to archived orders)
