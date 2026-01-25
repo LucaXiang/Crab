@@ -596,6 +596,111 @@ impl OrderStorage {
         Ok(())
     }
 
+    // ========== Pending Archive Queue ==========
+
+    /// Add order to archive queue (within transaction)
+    pub fn queue_for_archive(&self, txn: &WriteTransaction, order_id: &str) -> StorageResult<()> {
+        let mut table = txn.open_table(PENDING_ARCHIVE_TABLE)?;
+        let pending = PendingArchive {
+            order_id: order_id.to_string(),
+            created_at: chrono::Utc::now().timestamp_millis(),
+            retry_count: 0,
+            last_error: None,
+        };
+        let value = serde_json::to_vec(&pending)?;
+        table.insert(order_id, value.as_slice())?;
+        Ok(())
+    }
+
+    /// Get all pending archive entries
+    pub fn get_pending_archives(&self) -> StorageResult<Vec<PendingArchive>> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(PENDING_ARCHIVE_TABLE)?;
+
+        let mut entries = Vec::new();
+        for result in table.iter()? {
+            let (_key, value) = result?;
+            let pending: PendingArchive = serde_json::from_slice(value.value())?;
+            entries.push(pending);
+        }
+        Ok(entries)
+    }
+
+    /// Complete archive: remove from pending queue and cleanup order data
+    pub fn complete_archive(&self, order_id: &str) -> StorageResult<()> {
+        let txn = self.begin_write()?;
+
+        // 1. Remove from pending queue
+        {
+            let mut table = txn.open_table(PENDING_ARCHIVE_TABLE)?;
+            table.remove(order_id)?;
+        }
+
+        // 2. Remove snapshot
+        {
+            let mut table = txn.open_table(SNAPSHOTS_TABLE)?;
+            table.remove(order_id)?;
+        }
+
+        // 3. Remove events
+        {
+            let mut table = txn.open_table(EVENTS_TABLE)?;
+            let range_start = (order_id, 0u64);
+            let range_end = (order_id, u64::MAX);
+
+            let mut keys_to_remove: Vec<(String, u64)> = Vec::new();
+            for result in table.range(range_start..=range_end)? {
+                let (key, _) = result?;
+                let key_value = key.value();
+                keys_to_remove.push((key_value.0.to_string(), key_value.1));
+            }
+
+            for (oid, seq) in &keys_to_remove {
+                table.remove((oid.as_str(), *seq))?;
+            }
+        }
+
+        txn.commit()?;
+        tracing::debug!(order_id = %order_id, "Archive completed, cleaned up from redb");
+        Ok(())
+    }
+
+    /// Mark archive as failed, increment retry count
+    pub fn mark_archive_failed(&self, order_id: &str, error: &str) -> StorageResult<()> {
+        let txn = self.begin_write()?;
+        {
+            let mut table = txn.open_table(PENDING_ARCHIVE_TABLE)?;
+
+            // Read and clone first to avoid borrow conflict
+            let pending_opt = if let Some(value) = table.get(order_id)? {
+                let pending: PendingArchive = serde_json::from_slice(value.value())?;
+                Some(pending)
+            } else {
+                None
+            };
+
+            if let Some(mut pending) = pending_opt {
+                pending.retry_count += 1;
+                pending.last_error = Some(error.to_string());
+                let new_value = serde_json::to_vec(&pending)?;
+                table.insert(order_id, new_value.as_slice())?;
+            }
+        }
+        txn.commit()?;
+        Ok(())
+    }
+
+    /// Remove from pending queue without cleanup (for dead letter)
+    pub fn remove_from_pending(&self, order_id: &str) -> StorageResult<()> {
+        let txn = self.begin_write()?;
+        {
+            let mut table = txn.open_table(PENDING_ARCHIVE_TABLE)?;
+            table.remove(order_id)?;
+        }
+        txn.commit()?;
+        Ok(())
+    }
+
     // ========== Statistics ==========
 
     /// Get storage statistics
