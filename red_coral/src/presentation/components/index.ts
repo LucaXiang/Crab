@@ -1,9 +1,7 @@
 /**
- * Presentation Components - Main index for backward compatibility
+ * Presentation Components
  */
 export * from './ui';
-export * from './form';
 export * from './cart';
 export * from './modals';
-export * from './shared';
 export * from './auth';

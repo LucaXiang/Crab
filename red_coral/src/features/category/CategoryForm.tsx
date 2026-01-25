@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
-import { FormField, FormSection, SubField, inputClass } from '@/shared/components/FormField';
+import { FormField, FormSection, SubField, inputClass, SelectField, KitchenPrinterSelector, AttributeDisplayTag } from '@/shared/components/FormField';
 import { Printer, Filter, Tags, Settings } from 'lucide-react';
 import { attributeHelpers, useTags } from '@/core/stores/resources';
 import { AttributeSelectionModal } from '@/features/attribute';
-import { SelectField } from '@/presentation/components/form/FormField/SelectField';
-import { KitchenPrinterSelector } from '@/presentation/components/form/FormField/KitchenPrinterSelector';
-import { AttributeDisplayTag } from '@/presentation/components/form/FormField/AttributeDisplayTag';
 
 import type { PrintState } from '@/core/domain/types';
 

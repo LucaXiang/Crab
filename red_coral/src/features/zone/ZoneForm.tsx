@@ -1,7 +1,6 @@
 import React from 'react';
-import { FormField, FormSection, inputClass } from '@/shared/components/FormField';
+import { FormField, FormSection, inputClass, SelectField } from '@/shared/components/FormField';
 import { Settings } from 'lucide-react';
-import { SelectField } from '@/presentation/components/form/FormField/SelectField';
 
 interface ZoneFormProps {
   formData: {

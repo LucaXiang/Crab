@@ -1,14 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Image as ImageIcon, Tag, Hash, FileText, Layers, ImagePlus, Printer, List, Star, Check } from 'lucide-react';
-import { FormField, FormSection, inputClass, selectClass } from '@/shared/components/FormField';
+import { FormField, FormSection, inputClass, selectClass, SelectField, KitchenPrinterSelector, AttributeDisplayTag } from '@/shared/components/FormField';
 import { AttributeSelectionModal } from '@/features/attribute';
 import { ProductImage } from './ProductImage';
 import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions, usePrintDestinationStore } from '@/core/stores/resources';
 import { useIsKitchenPrintEnabled, useIsLabelPrintEnabled } from '@/core/stores/ui';
 import { usePriceInput } from '@/hooks/usePriceInput';
-import { SelectField } from '@/presentation/components/form/FormField/SelectField';
-import { KitchenPrinterSelector } from '@/presentation/components/form/FormField/KitchenPrinterSelector';
-import { AttributeDisplayTag } from '@/presentation/components/form/FormField/AttributeDisplayTag';
 import { Category, EmbeddedSpec, PrintState } from '@/core/domain/types';
 
 interface ProductFormProps {

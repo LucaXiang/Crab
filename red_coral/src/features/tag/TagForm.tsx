@@ -1,7 +1,6 @@
 import React from 'react';
 import { Tag, Palette, Settings } from 'lucide-react';
-import { FormField, FormSection, inputClass } from '@/shared/components/FormField';
-import { SelectField } from '@/presentation/components/form/FormField/SelectField';
+import { FormField, FormSection, inputClass, SelectField } from '@/shared/components/FormField';
 
 interface TagFormProps {
   formData: {

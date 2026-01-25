@@ -12,7 +12,7 @@ import { formatCurrency } from '@/utils/currency';
 
 // Lazy load TimelineList - only loads when user clicks Timeline tab
 const TimelineList = lazy(() =>
-  import('@/presentation/components/shared/TimelineList').then(module => ({ default: module.TimelineList }))
+  import('@/shared/components/TimelineList').then(module => ({ default: module.TimelineList }))
 );
 
 interface OrderSidebarProps {
