@@ -41,14 +41,6 @@ use std::sync::{Arc, RwLock};
 use thiserror::Error;
 use tokio::sync::broadcast;
 
-/// Terminal event types that trigger archiving
-const TERMINAL_EVENT_TYPES: &[shared::order::OrderEventType] = &[
-    shared::order::OrderEventType::OrderCompleted,
-    shared::order::OrderEventType::OrderVoided,
-    shared::order::OrderEventType::OrderMoved,
-    shared::order::OrderEventType::OrderMerged,
-];
-
 /// Manager errors
 #[derive(Debug, Error)]
 pub enum ManagerError {
@@ -429,8 +421,6 @@ impl OrdersManager {
         }
 
         // 8. Persist snapshots and update active order tracking
-        // Also collect snapshots for terminal events (for archiving after commit)
-        let mut archive_snapshot: Option<OrderSnapshot> = None;
         for snapshot in ctx.modified_snapshots() {
             self.storage.store_snapshot(&txn, snapshot)?;
 
@@ -444,12 +434,9 @@ impl OrdersManager {
                 | OrderStatus::Merged
                 | OrderStatus::Moved => {
                     self.storage.mark_order_inactive(&txn, &snapshot.order_id)?;
-                    // Check if this order has a terminal event
-                    if events
-                        .iter()
-                        .any(|e| e.order_id == snapshot.order_id && TERMINAL_EVENT_TYPES.contains(&e.event_type))
-                    {
-                        archive_snapshot = Some(snapshot.clone());
+                    // Queue for archive if archive service is configured
+                    if self.archive_service.is_some() {
+                        self.storage.queue_for_archive(&txn, &snapshot.order_id)?;
                     }
                 }
             }
@@ -480,35 +467,8 @@ impl OrdersManager {
             _ => {}
         }
 
-        // 13. Archive to SurrealDB if terminal event
-        if let (Some(archive_service), Some(snapshot)) =
-            (&self.archive_service, archive_snapshot)
-        {
-            // Get all events for this order
-            if let Ok(order_events) = self.storage.get_events_for_order(&snapshot.order_id) {
-                let archive_svc = archive_service.clone();
-                let order_id = snapshot.order_id.clone();
-                let storage = self.storage.clone();
-
-                // Spawn async archive task
-                tokio::spawn(async move {
-                    if let Err(e) = archive_svc.archive_order(&snapshot, order_events).await {
-                        tracing::error!(order_id = %order_id, error = %e, "Failed to archive order");
-                    } else {
-                        tracing::info!(order_id = %order_id, "Order archived successfully");
-                        // Clean up redb after successful archive
-                        let order_id_cleanup = order_id.clone();
-                        if let Err(e) = tokio::task::spawn_blocking(move || {
-                            storage.cleanup_archived_order(&order_id_cleanup)
-                        }).await {
-                            tracing::error!(order_id = %order_id, error = ?e, "Failed to cleanup archived order from redb");
-                        }
-                    }
-                });
-            }
-        }
-
-        // 14. Return response
+        // 13. Return response
+        // Note: Archive is now handled by ArchiveWorker listening to event broadcasts
         let order_id = events.first().map(|e| e.order_id.clone());
         tracing::info!(command_id = %cmd.command_id, order_id = ?order_id, event_count = events.len(), "Command processed successfully");
         Ok((CommandResponse::success(cmd.command_id, order_id), events))
