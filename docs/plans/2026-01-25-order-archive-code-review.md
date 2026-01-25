@@ -79,14 +79,31 @@ Some(serde_json::to_value(&event.payload).unwrap()),
 - 归档订单使用 `ArchivedOrderDetail` (图模型)
 - 两个系统职责分离清晰
 
+#### 6. 前端废弃 Order 类型
+**位置:** `red_coral/src/core/domain/types/api/models.ts`
+
+**问题:** 包含 18 个废弃的 Order 相关类型，已被 `orderEvent.ts` 和 `archivedOrder.ts` 替代：
+- `OrderApiStatus`, `OrderItemAttribute`, `OrderItem`, `OrderPayment`, `Order`
+- `OrderEventType` (与 orderEvent.ts 重复)
+- `OrderEvent`, `OrderCreate`, `OrderAddItem`, `OrderAddPayment`
+- `OrderUpdateTotals`, `OrderUpdateStatus`, `OrderUpdateHash`, `OrderAddEvent`
+- `OrderRemoveItem`, `InitGenesisRequest`, `UpdateLastOrderRequest`, `UpdateSyncStateRequest`
+- `Payment` (alias for OrderPayment)
+
+**修复:** 删除所有废弃类型，前端类型系统已重构为：
+- 活跃订单: `HeldOrder`/`OrderSnapshot` (from `orderEvent.ts`)
+- 归档订单: `ArchivedOrderDetail` (from `archivedOrder.ts`)
+
 ## 修复计划
 
 1. [x] 删除 handler.rs 中重复的 OrderSummary ✅
 2. [x] 移除 HistoryDetail.tsx 中未使用的 Trash2 导入 ✅
 3. [x] 修复 archive.rs 中的 unwrap() ✅
 4. [x] 运行 cargo clippy --fix 修复警告 ✅
+5. [x] 删除 api/models.ts 中 18 个废弃 Order 类型 ✅
 
 ## 修复提交
 
-- Commit: `5433e8a`
-- 测试: 438 后端测试通过, TypeScript 编译通过
+- Commit 1: `5433e8a` - 修复 P1/P2/P3 问题
+- Commit 2: `9938787` - 删除废弃 Order 类型
+- 测试: TypeScript 编译通过
