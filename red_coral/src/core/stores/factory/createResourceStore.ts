@@ -78,48 +78,36 @@ export function createResourceStore<T extends { id: string }>(
     lastVersion: 0,
 
     fetchAll: async (force = false) => {
-      // Guard: skip if already loading, or already loaded (unless forced)
       const state = get();
-      console.log(`[${resourceName}] fetchAll called, force=${force}, isLoading=${state.isLoading}, isLoaded=${state.isLoaded}`);
       if (state.isLoading) return;
       if (state.isLoaded && !force) return;
 
       set({ isLoading: true, error: null });
       try {
         const items = await fetchFn();
-        console.log(`[${resourceName}] fetchAll success, got ${items.length} items`);
         set({ items, isLoading: false, isLoaded: true });
       } catch (e: unknown) {
         const errorMsg = e instanceof Error ? e.message : 'Failed to fetch';
         set({ error: errorMsg, isLoading: false });
-        console.error(`[${resourceName}] fetch failed:`, errorMsg);
       }
     },
 
-    // 版本同步：根据版本号决定增量更新或全量刷新
     applySync: (payload: SyncPayload<T>) => {
       const state = get();
       const { id, version, action, data } = payload;
 
-      console.log(`[${resourceName}] applySync called, id=${id}, version=${version}, action=${action}, lastVersion=${state.lastVersion}, itemCount=${state.items.length}`);
-
-      // Skip if duplicate (version already seen)
+      // Skip if duplicate
       if (version <= state.lastVersion) {
-        console.log(`[${resourceName}] applySync skipped for id=${id} (duplicate, version=${version} <= lastVersion=${state.lastVersion})`);
         return;
       }
 
       // Gap detected: need full refresh
       if (version > state.lastVersion + 1) {
-        console.log(`[${resourceName}] applySync detected gap (version=${version}, lastVersion=${state.lastVersion}), triggering fetchAll`);
         if (state.isLoaded) {
           get().fetchAll(true);
         }
         return;
       }
-
-      // Incremental update: version === lastVersion + 1
-      console.log(`[${resourceName}] applySync performing incremental update for action=${action}`);
 
       switch (action) {
         case 'created':
@@ -196,48 +184,36 @@ export function createCrudResourceStore<
     lastVersion: 0,
 
     fetchAll: async (force = false) => {
-      // Guard: skip if already loading, or already loaded (unless forced)
       const state = get();
-      console.log(`[${resourceName}] fetchAll called, force=${force}, isLoading=${state.isLoading}, isLoaded=${state.isLoaded}`);
       if (state.isLoading) return;
       if (state.isLoaded && !force) return;
 
       set({ isLoading: true, error: null });
       try {
         const items = await fetchFn();
-        console.log(`[${resourceName}] fetchAll success, got ${items.length} items`);
         set({ items, isLoading: false, isLoaded: true });
       } catch (e: unknown) {
         const errorMsg = e instanceof Error ? e.message : 'Failed to fetch';
         set({ error: errorMsg, isLoading: false });
-        console.error(`[${resourceName}] fetch failed:`, errorMsg);
       }
     },
 
-    // 版本同步：根据版本号决定增量更新或全量刷新
     applySync: (payload: SyncPayload<T>) => {
       const state = get();
       const { id, version, action, data } = payload;
 
-      console.log(`[${resourceName}] applySync called, id=${id}, version=${version}, action=${action}, lastVersion=${state.lastVersion}, itemCount=${state.items.length}`);
-
-      // Skip if duplicate (version already seen)
+      // Skip if duplicate
       if (version <= state.lastVersion) {
-        console.log(`[${resourceName}] applySync skipped for id=${id} (duplicate, version=${version} <= lastVersion=${state.lastVersion})`);
         return;
       }
 
       // Gap detected: need full refresh
       if (version > state.lastVersion + 1) {
-        console.log(`[${resourceName}] applySync detected gap (version=${version}, lastVersion=${state.lastVersion}), triggering fetchAll`);
         if (state.isLoaded) {
           get().fetchAll(true);
         }
         return;
       }
-
-      // Incremental update: version === lastVersion + 1
-      console.log(`[${resourceName}] applySync performing incremental update for action=${action}`);
 
       switch (action) {
         case 'created':
@@ -324,12 +300,8 @@ export function createCrudResourceStore<
 
     optimisticAdd: (item) => {
       set((state) => {
-        // Check if item already exists to prevent duplicates
         const exists = state.items.some((i) => i.id === item.id);
-        if (exists) {
-          console.log(`[optimisticAdd] Item ${item.id} already exists, skipping`);
-          return state;
-        }
+        if (exists) return state;
         return { items: [...state.items, item] };
       });
     },
