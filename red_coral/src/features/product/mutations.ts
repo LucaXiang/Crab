@@ -9,7 +9,7 @@ export interface ProductFormData {
   id?: string;
   name: string;
   receipt_name?: string;
-  category?: string | number;
+  category?: string;
   image?: string;
   tax_rate?: number;
   sort_order?: number;
@@ -22,7 +22,7 @@ export interface ProductFormData {
   tags?: string[];
   specs?: EmbeddedSpec[];
   selected_attribute_ids?: string[];
-  attribute_default_options?: Record<string, string[]>;
+  attribute_default_options?: Record<string, string | string[]>;
 }
 
 /**

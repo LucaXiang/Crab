@@ -2,13 +2,15 @@ import React from 'react';
 import { FormField, FormSection, inputClass, SelectField } from '@/shared/components/FormField';
 import { Settings } from 'lucide-react';
 
+interface ZoneFormData {
+  name: string;
+  description?: string;
+  is_active?: boolean;
+}
+
 interface ZoneFormProps {
-  formData: {
-    name: string;
-    description?: string;
-    is_active?: boolean;
-  };
-  onFieldChange: (field: string, value: any) => void;
+  formData: ZoneFormData;
+  onFieldChange: <K extends keyof ZoneFormData>(field: K, value: ZoneFormData[K]) => void;
   t: (key: string) => string;
 }
 

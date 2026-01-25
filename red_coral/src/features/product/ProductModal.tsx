@@ -68,8 +68,8 @@ export const ProductModal: React.FC = React.memo(() => {
         try {
           const fullData = await loadProductFullData(String(modal.data.id));
           setAsyncFormData(fullData);
-        } catch (error) {
-          console.error('Failed to load product full data:', error, JSON.stringify(error));
+        } catch {
+          // Silently fail - form will show empty values
         }
       };
       loadData();
@@ -216,10 +216,10 @@ export const ProductModal: React.FC = React.memo(() => {
           is_label_print_enabled: formData.is_label_print_enabled ?? -1,
           is_active: formData.is_active ?? true,
           specs: formData.specs,
-          selected_tag_ids: formData.tags,
+          tags: formData.tags,
         }}
         categories={categories}
-        onFieldChange={setFormField as (field: string, value: any) => void}
+        onFieldChange={setFormField}
         onSelectImage={handleSelectImage}
         t={t}
         inheritedAttributeIds={inheritedAttributeIds}

@@ -127,7 +127,7 @@ export const TagModal: React.FC = React.memo(() => {
           display_order: formData.display_order ?? 0,
           is_active: formData.is_active ?? true,
         }}
-        onFieldChange={setFormField as (field: string, value: any) => void}
+        onFieldChange={setFormField}
         t={t}
       />
     );

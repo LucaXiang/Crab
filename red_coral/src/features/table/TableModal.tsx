@@ -124,7 +124,7 @@ export const TableModal: React.FC = React.memo(() => {
           is_active: formData.is_active ?? true,
         }}
         zones={zones}
-        onFieldChange={setFormField as (field: string, value: any) => void}
+        onFieldChange={setFormField}
         t={t}
       />
     );

@@ -9,29 +9,31 @@ import { useIsKitchenPrintEnabled, useIsLabelPrintEnabled } from '@/core/stores/
 import { usePriceInput } from '@/hooks/usePriceInput';
 import { Category, EmbeddedSpec, PrintState } from '@/core/domain/types';
 
+interface ProductFormData {
+  id?: string; // Product ID (for editing existing product)
+  name: string;
+  receipt_name?: string;
+  price: number;
+  category?: string;
+  image: string;
+  externalId?: number;
+  tax_rate: number;
+  selected_attribute_ids?: string[];
+  attribute_default_options?: Record<string, string | string[]>; // Product-level default options (array for multi-select)
+  print_destinations?: string[];
+  kitchen_print_name?: string;
+  is_kitchen_print_enabled?: PrintState; // Kitchen print state: -1=inherit, 0=disabled, 1=enabled
+  is_label_print_enabled?: PrintState;
+  label_print_destinations?: string[]; // Label printer destinations
+  is_active?: boolean;
+  specs?: EmbeddedSpec[]; // Embedded specifications
+  tags?: string[]; // Tag IDs (user + system tags)
+}
+
 interface ProductFormProps {
-  formData: {
-    id?: string; // Product ID (for editing existing product)
-    name: string;
-    receipt_name?: string;
-    price: number;
-    category?: string | number;
-    image: string;
-    externalId?: number;
-    tax_rate: number;
-    selected_attribute_ids?: string[];
-    attribute_default_options?: Record<string, string[]>; // Product-level default options (array for multi-select)
-    print_destinations?: string[];
-    kitchen_print_name?: string;
-    is_kitchen_print_enabled?: PrintState; // Kitchen print state: -1=inherit, 0=disabled, 1=enabled
-    is_label_print_enabled?: PrintState;
-    label_print_destinations?: string[]; // Label printer destinations
-    is_active?: boolean;
-    specs?: EmbeddedSpec[]; // Embedded specifications
-    selected_tag_ids?: string[]; // Tag IDs loaded from getProductFull API
-  };
+  formData: ProductFormData;
   categories: Category[];
-  onFieldChange: (field: string, value: any) => void;
+  onFieldChange: <K extends keyof ProductFormData>(field: K, value: ProductFormData[K]) => void;
   onSelectImage: () => void;
   t: (key: string) => string;
   inheritedAttributeIds?: string[];
@@ -89,7 +91,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
   // Memoize selected tags computation
   const { systemTagsOnProduct, userTagsOnProduct } = useMemo(() => {
-    const selectedTagIds = formData.selected_tag_ids || [];
+    const selectedTagIds = formData.tags || [];
     const system: typeof allTags = [];
     const user: typeof allTags = [];
     for (const id of selectedTagIds) {
@@ -100,7 +102,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       }
     }
     return { systemTagsOnProduct: system, userTagsOnProduct: user };
-  }, [formData.selected_tag_ids, tagMap]);
+  }, [formData.tags, tagMap]);
   const allAttributes = useAttributes();
   const optionsMap = useAttributeStore(state => state.options);
   const { fetchAll } = useAttributeActions();
@@ -183,7 +185,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           <SelectField
             label={t('settings.product.form.category')}
             value={formData.category ?? ''}
-            onChange={(value) => onFieldChange('category', value)}
+            onChange={(value) => onFieldChange('category', String(value))}
             options={categories.map(c => ({ value: c.id ?? '', label: c.name }))}
             placeholder={t('settings.product.form.select_category')}
             required

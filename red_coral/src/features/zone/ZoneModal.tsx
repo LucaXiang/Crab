@@ -117,7 +117,7 @@ export const ZoneModal: React.FC = React.memo(() => {
           description: formData.description ?? '',
           is_active: formData.is_active ?? true,
         }}
-        onFieldChange={setFormField as (field: string, value: any) => void}
+        onFieldChange={setFormField}
         t={t}
       />
     );

@@ -3,15 +3,17 @@ import { SquareMenu, Settings } from 'lucide-react';
 import { FormField, FormSection, inputClass, SelectField } from '@/shared/components/FormField';
 import { Zone } from '@/core/domain/types';
 
+interface TableFormData {
+  name: string;
+  capacity: number;
+  zone: string;
+  is_active?: boolean;
+}
+
 interface TableFormProps {
-  formData: {
-    name: string;
-    capacity: number;
-    zone: string;
-    is_active?: boolean;
-  };
+  formData: TableFormData;
   zones: Zone[];
-  onFieldChange: (field: string, value: any) => void;
+  onFieldChange: <K extends keyof TableFormData>(field: K, value: TableFormData[K]) => void;
   t: (key: string) => string;
 }
 

@@ -41,8 +41,8 @@ export const CategoryModal: React.FC = React.memo(() => {
             selected_attribute_ids: attributeIds,
             attribute_default_options: defaultOptions
           });
-        } catch (error) {
-          console.error('Failed to load category attributes:', error);
+        } catch {
+          // Silently fail - attributes will be empty
         }
       };
       loadAttributes();
@@ -166,7 +166,7 @@ export const CategoryModal: React.FC = React.memo(() => {
           tag_ids: formData.tag_ids,
           match_mode: formData.match_mode,
         }}
-        onFieldChange={setFormField as (field: string, value: any) => void}
+        onFieldChange={setFormField}
         t={t}
         isEditMode={action === 'EDIT'}
       />

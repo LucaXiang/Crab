@@ -6,21 +6,23 @@ import { AttributeSelectionModal } from '@/features/attribute';
 
 import type { PrintState } from '@/core/domain/types';
 
+interface CategoryFormData {
+  name: string;
+  print_destinations?: string[];
+  is_kitchen_print_enabled?: PrintState;  // 0=disabled, 1=enabled
+  is_label_print_enabled?: PrintState;    // 0=disabled, 1=enabled
+  is_active?: boolean;
+  selected_attribute_ids?: string[];
+  attribute_default_options?: Record<string, string | string[]>;
+  is_virtual?: boolean;
+  tag_ids?: string[];
+  match_mode?: 'any' | 'all';
+  is_display?: boolean;
+}
+
 interface CategoryFormProps {
-  formData: {
-    name: string;
-    print_destinations?: string[];
-    is_kitchen_print_enabled?: PrintState;  // 0=disabled, 1=enabled
-    is_label_print_enabled?: PrintState;    // 0=disabled, 1=enabled
-    is_active?: boolean;
-    selected_attribute_ids?: string[];
-    attribute_default_options?: Record<string, string | string[]>;
-    is_virtual?: boolean;
-    tag_ids?: string[];
-    match_mode?: 'any' | 'all';
-    is_display?: boolean;
-  };
-  onFieldChange: (field: string, value: any) => void;
+  formData: CategoryFormData;
+  onFieldChange: <K extends keyof CategoryFormData>(field: K, value: CategoryFormData[K]) => void;
   t: (key: string) => string;
   /** Edit mode disables changing category type */
   isEditMode?: boolean;
@@ -87,7 +89,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
           <SelectField
             label={t('settings.category.form.match_mode')}
             value={matchMode}
-            onChange={(value) => onFieldChange('match_mode', value)}
+            onChange={(value) => onFieldChange('match_mode', value as 'any' | 'all')}
             options={[
               { value: 'any', label: t('settings.category.form.match_any') },
               { value: 'all', label: t('settings.category.form.match_all') }

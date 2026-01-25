@@ -100,15 +100,18 @@ interface FormData {
   tags?: string[];         // Tag IDs
   specs?: EmbeddedSpec[];  // 嵌入式规格
   has_multi_spec?: boolean; // UI only: 是否多规格
+  price?: number;          // UI only: derived from specs[root].price
+  externalId?: number;     // UI only: derived from specs[root].external_id
 
   // === Category & Product shared ===
   is_kitchen_print_enabled?: PrintState;  // Product: -1=继承, 0=禁用, 1=启用; Category: 0=禁用, 1=启用
   label_print_destinations?: string[];  // Label PrintDestination IDs
   is_virtual?: boolean;
+  is_display?: boolean;     // Virtual category display in menu
   tag_ids?: string[];      // Virtual category tag filter
   match_mode?: 'any' | 'all';
   selected_attribute_ids?: string[];  // UI only: 已选属性
-  attribute_default_options?: Record<string, string[]>;  // UI only
+  attribute_default_options?: Record<string, string | string[]>;  // UI only
 
   // === Tag ===
   color?: string;

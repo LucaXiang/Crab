@@ -2,14 +2,16 @@ import React from 'react';
 import { Tag, Palette, Settings } from 'lucide-react';
 import { FormField, FormSection, inputClass, SelectField } from '@/shared/components/FormField';
 
+interface TagFormData {
+  name: string;
+  color: string;
+  display_order?: number;
+  is_active?: boolean;
+}
+
 interface TagFormProps {
-  formData: {
-    name: string;
-    color: string;
-    display_order?: number;
-    is_active?: boolean;
-  };
-  onFieldChange: (field: string, value: any) => void;
+  formData: TagFormData;
+  onFieldChange: <K extends keyof TagFormData>(field: K, value: TagFormData[K]) => void;
   t: (key: string) => string;
 }
 
