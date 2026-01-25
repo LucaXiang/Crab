@@ -23,7 +23,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
 }) => {
   const attributes = useAttributes();
   const optionsMap = useAttributeStore(state => state.options);
-  const { loadAttributes } = useAttributeActions();
+  const { fetchAll } = useAttributeActions();
   const { loadOptions } = useOptionActions();
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,7 +34,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
   // Load attributes on mount
   useEffect(() => {
     if (attributes.length === 0) {
-      loadAttributes();
+      fetchAll();
     }
   }, []);
 

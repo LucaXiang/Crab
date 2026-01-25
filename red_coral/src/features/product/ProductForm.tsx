@@ -103,7 +103,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   }, [formData.selected_tag_ids, tagMap]);
   const allAttributes = useAttributes();
   const optionsMap = useAttributeStore(state => state.options);
-  const { loadAttributes } = useAttributeActions();
+  const { fetchAll } = useAttributeActions();
   const { loadOptions } = useOptionActions();
 
   const { priceInput, handlePriceChange, commitPrice, handlePriceKeyDown } = usePriceInput(
@@ -136,7 +136,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
   useEffect(() => {
     if (allAttributes.length === 0) {
-      loadAttributes();
+      fetchAll();
     }
   }, []);
 

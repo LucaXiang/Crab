@@ -32,7 +32,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
   const attributes = useAttributes();
   const isLoading = useAttributesLoading();
   const {
-    loadAttributes,
+    fetchAll,
     deleteAttribute,
   } = useAttributeActions();
   const { loadOptions, deleteOption } = useOptionActions();
@@ -71,7 +71,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
 
   // Load attributes on mount
   useEffect(() => {
-    loadAttributes();
+    fetchAll();
   }, []);
 
   // Load options for expanded attributes

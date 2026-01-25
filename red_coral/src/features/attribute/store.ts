@@ -37,10 +37,6 @@ interface AttributeStore {
   getOptionsByAttributeId: (attributeId: string) => AttributeOptionWithIndex[];
   loadOptions: (attributeId: string) => Promise<void>;
 
-  // Legacy compatibility - attributes alias
-  attributes: AttributeEntity[];
-  loadAttributes: () => Promise<void>;
-
   // CRUD operations
   createAttribute: (params: {
     name: string;
@@ -166,14 +162,6 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       console.error('[Store] attribute: loadOptions failed -', msg);
       set({ error: msg, isLoading: false });
     }
-  },
-
-  get attributes() {
-    return get().items;
-  },
-
-  loadAttributes: async () => {
-    await get().fetchAll();
   },
 
   // CRUD operations
@@ -336,7 +324,7 @@ export const useAttributeActions = () =>
   useAttributeStore(
     useShallow((state) => ({
       setSelectedAttributeId: state.setSelectedAttributeId,
-      loadAttributes: state.loadAttributes,
+      fetchAll: state.fetchAll,
       createAttribute: state.createAttribute,
       updateAttribute: state.updateAttribute,
       deleteAttribute: state.deleteAttribute,
