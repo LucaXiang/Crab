@@ -1,19 +1,58 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ArchivedOrderDetail, ArchivedOrderItem, ArchivedPayment, ArchivedEvent } from '@/core/domain/types';
+import type { OrderEvent, OrderEventType, EventPayload } from '@/core/domain/types/orderEvent';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/currency';
 import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban } from 'lucide-react';
 import { Permission } from '@/core/domain/types';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
+import { TimelineList } from '@/shared/components/TimelineList';
 
 interface HistoryDetailProps {
   order?: ArchivedOrderDetail;
   onReprint: () => void;
 }
 
+/**
+ * Convert ArchivedEvent to OrderEvent format for TimelineList compatibility
+ *
+ * Backend stores:
+ * - event_type: SCREAMING_SNAKE_CASE (e.g., "TABLE_OPENED")
+ * - payload: JSON with `type` field from serde(tag = "type")
+ */
+function convertArchivedEventToOrderEvent(event: ArchivedEvent, index: number): OrderEvent {
+  // Backend uses SCREAMING_SNAKE_CASE via serde(rename_all)
+  const eventType = event.event_type as OrderEventType;
+
+  // Backend payload already has `type` field from serde serialization
+  // If payload is null/empty, create minimal payload with type
+  const rawPayload = event.payload as Record<string, unknown> | null;
+  const payload: EventPayload = (rawPayload && Object.keys(rawPayload).length > 0)
+    ? rawPayload as unknown as EventPayload
+    : { type: eventType } as unknown as EventPayload;
+
+  return {
+    event_id: event.event_id,
+    sequence: index,
+    order_id: '',
+    timestamp: event.timestamp,
+    operator_id: '',
+    operator_name: '',
+    command_id: '',
+    event_type: eventType,
+    payload,
+  };
+}
+
 export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }) => {
   const { t } = useI18n();
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+
+  // Convert archived events to OrderEvent format for TimelineList
+  const timelineEvents = useMemo(() => {
+    if (!order?.timeline) return [];
+    return order.timeline.map((event, index) => convertArchivedEventToOrderEvent(event, index));
+  }, [order?.timeline]);
 
   useEffect(() => {
     setExpandedItems(new Set());
@@ -193,10 +232,14 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
             <Clock size={18} />
             <span>{t('checkout.timeline.label')}</span>
           </div>
-          <div className="p-4 divide-y divide-gray-50">
-            {order.timeline.map((event, idx) => (
-              <TimelineEventRow key={event.event_id || idx} event={event} t={t} />
-            ))}
+          <div className="p-4">
+            {timelineEvents.length > 0 ? (
+              <TimelineList events={timelineEvents} showNoteTags={true} />
+            ) : (
+              <div className="text-center text-gray-400 text-sm py-4">
+                {t('timeline.empty')}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -371,34 +414,3 @@ const PaymentRow: React.FC<PaymentRowProps> = React.memo(({ payment, t }) => {
 });
 
 PaymentRow.displayName = 'PaymentRow';
-
-// =============================================================================
-// Timeline Event Row
-// =============================================================================
-
-interface TimelineEventRowProps {
-  event: ArchivedEvent;
-  t: (key: string, params?: Record<string, string | number>) => string;
-}
-
-const TimelineEventRow: React.FC<TimelineEventRowProps> = React.memo(({ event, t }) => {
-  // Format event type for display
-  const eventLabel = event.event_type
-    .replace(/_/g, ' ')
-    .toLowerCase()
-    .replace(/\b\w/g, c => c.toUpperCase());
-
-  return (
-    <div className="py-3 flex items-start gap-3">
-      <div className="w-2 h-2 rounded-full bg-gray-300 mt-2 shrink-0" />
-      <div className="flex-1">
-        <div className="text-sm font-medium text-gray-700">{eventLabel}</div>
-        <div className="text-xs text-gray-400">
-          {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
-        </div>
-      </div>
-    </div>
-  );
-});
-
-TimelineEventRow.displayName = 'TimelineEventRow';

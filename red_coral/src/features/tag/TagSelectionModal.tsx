@@ -17,9 +17,10 @@ export const TagSelectionModal: React.FC<TagSelectionModalProps> = ({
   onChange,
   t,
 }) => {
-  if (!isOpen) return null;
-
+  // Hook must be called unconditionally before any early return
   const allTags = useTags();
+
+  if (!isOpen) return null;
 
   // Filter: only show active, non-system tags (system tags are managed by the system)
   const selectableTags = allTags

@@ -57,30 +57,30 @@ async fn check_duplicate_external_ids(
 // =============================================================================
 
 /// GET /api/products - 获取所有商品
-pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<ProductFull>>> {
+pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<shared::models::Product>>> {
     let products = state.catalog_service.list_products();
-    Ok(Json(products))
+    Ok(Json(products.into_iter().map(Into::into).collect()))
 }
 
 /// GET /api/products/by-category/:category_id - 按分类获取商品
 pub async fn list_by_category(
     State(state): State<ServerState>,
     Path(category_id): Path<String>,
-) -> AppResult<Json<Vec<ProductFull>>> {
+) -> AppResult<Json<Vec<shared::models::Product>>> {
     let products = state.catalog_service.get_products_by_category(&category_id);
-    Ok(Json(products))
+    Ok(Json(products.into_iter().map(Into::into).collect()))
 }
 
 /// GET /api/products/:id - 获取单个商品
 pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<String>,
-) -> AppResult<Json<ProductFull>> {
+) -> AppResult<Json<shared::models::Product>> {
     let product = state
         .catalog_service
         .get_product(&id)
         .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
-    Ok(Json(product))
+    Ok(Json(product.into()))
 }
 
 /// GET /api/products/:id/full - 获取商品完整信息 (含规格、属性、标签)
@@ -100,7 +100,7 @@ pub async fn get_full(
 pub async fn create(
     State(state): State<ServerState>,
     Json(payload): Json<ProductCreate>,
-) -> AppResult<Json<ProductFull>> {
+) -> AppResult<Json<shared::models::Product>> {
     // 检查 external_id 是否已存在
     let external_ids: Vec<i64> = payload.specs.iter().filter_map(|s| s.external_id).collect();
     if !external_ids.is_empty()
@@ -118,11 +118,12 @@ pub async fn create(
 
     // 广播同步通知
     let id = product.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+    let product_for_api: shared::models::Product = product.into();
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&product))
+        .broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&product_for_api))
         .await;
 
-    Ok(Json(product))
+    Ok(Json(product_for_api))
 }
 
 /// PUT /api/products/:id - 更新商品
@@ -130,7 +131,7 @@ pub async fn update(
     State(state): State<ServerState>,
     Path(id): Path<String>,
     Json(payload): Json<ProductUpdate>,
-) -> AppResult<Json<ProductFull>> {
+) -> AppResult<Json<shared::models::Product>> {
     tracing::debug!(
         "Product update - id: {}, tax_rate: {:?}, is_kitchen_print_enabled: {:?}",
         id,
@@ -163,11 +164,12 @@ pub async fn update(
     );
 
     // 广播同步通知
+    let product_for_api: shared::models::Product = product.into();
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "updated", &id, Some(&product))
+        .broadcast_sync(RESOURCE_PRODUCT, "updated", &id, Some(&product_for_api))
         .await;
 
-    Ok(Json(product))
+    Ok(Json(product_for_api))
 }
 
 /// DELETE /api/products/:id - 删除商品

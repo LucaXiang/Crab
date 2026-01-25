@@ -173,15 +173,14 @@ impl EmployeeRepository {
             is_active: data.is_active,
         };
 
-        self.base
+        let mut result = self.base
             .db()
-            .query("UPDATE $thing MERGE $data")
-            .bind(("thing", thing.clone()))
+            .query("UPDATE $thing MERGE $data RETURN AFTER")
+            .bind(("thing", thing))
             .bind(("data", update_doc))
             .await?;
 
-        self.find_by_id(id)
-            .await?
+        result.take::<Option<Employee>>(0)?
             .ok_or_else(|| RepoError::NotFound(format!("Employee {} not found", id)))
     }
 

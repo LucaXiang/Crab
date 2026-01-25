@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, ArrowLeftRight, Percent, Users, Check, ArrowLeft, LayoutGrid, Split, Minus, Plus, CreditCard, Banknote } from 'lucide-react';
+import { X, ArrowLeftRight, Users, Check, ArrowLeft, LayoutGrid, Split, Minus, Plus, CreditCard, Banknote } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 
@@ -7,7 +7,6 @@ const api = createTauriClient();
 import { Table, Zone, HeldOrder, Permission } from '@/core/domain/types';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
-import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { ZoneSidebar } from '../ZoneSidebar';
 import { TableCard } from '../TableCard';
 import { toast } from '@/presentation/components/Toast';
@@ -78,13 +77,10 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         const store = useActiveOrdersStore.getState();
         const targetSnapshot = store.getOrder(selectedTargetTable.id as string);
         if (!targetSnapshot) return;
-        const targetOrder = targetSnapshot;
 
         try {
-            const mergedOrder = await orderOps.mergeOrders(sourceOrder, targetOrder);
-            const checkout = useCheckoutStore.getState();
-            checkout.setCurrentOrderKey(selectedTargetTable.id as string);
-            checkout.setCheckoutOrder(mergedOrder);
+            // Fire & forget - UI updates via WebSocket
+            await orderOps.mergeOrders(sourceOrder.order_id, targetSnapshot.order_id);
             onSuccess(selectedTargetTable.id as string);
         } catch (err) {
             console.error('Merge failed:', err);
@@ -97,15 +93,13 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         const targetZone = zones.find(z => z.id === selectedTargetTable.zone);
 
         try {
-            const movedOrder = await orderOps.moveOrder(
-                sourceOrder,
+            // Fire & forget - UI updates via WebSocket
+            await orderOps.moveOrder(
+                sourceOrder.order_id,
                 selectedTargetTable.id as string,
                 selectedTargetTable.name,
                 targetZone?.name
             );
-            const checkout = useCheckoutStore.getState();
-            checkout.setCurrentOrderKey(selectedTargetTable.id as string);
-            checkout.setCheckoutOrder(movedOrder);
             onSuccess(selectedTargetTable.id as string);
         } catch (err) {
             console.error('Move failed:', err);
@@ -124,7 +118,8 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                     instance_id: instanceId,
                     quantity: qty,
                     name: originalItem?.name || t('common.label.unknown_item'),
-                    price: originalItem?.price || 0
+                    price: originalItem?.price || 0,
+                    unit_price: originalItem?.unit_price ?? originalItem?.price ?? 0
                 };
             });
 
@@ -133,14 +128,11 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         setIsProcessingSplit(true);
 
         try {
-            // Server calculates amount from items (server-authoritative)
-            await orderOps.splitOrder(sourceOrder, {
+            // Fire & forget - UI updates via WebSocket
+            await orderOps.splitOrder(sourceOrder.order_id, {
                 items: itemsToSplit,
                 paymentMethod: method
             });
-
-            // Server handles everything via event sourcing
-            // State will be updated when server emits OrderUpdated event
 
             onClose();
             toast.success(t('checkout.split.success'));

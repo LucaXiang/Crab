@@ -140,11 +140,10 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       <div className="h-full flex flex-col bg-gray-50 relative">
         {/* Payment Flow */}
         <div className="flex-1 overflow-hidden">
-          <PaymentFlow 
-            order={localOrder} 
-            onComplete={handlePaymentComplete} 
+          <PaymentFlow
+            order={localOrder}
+            onComplete={handlePaymentComplete}
             onCancel={onCancel}
-            onUpdateOrder={handleUpdateOrder}
             onVoid={handleVoidClick}
             onManageTable={onManageTable}
           />

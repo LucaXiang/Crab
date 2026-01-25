@@ -61,7 +61,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
       }
     } catch (error) {
       console.error('Failed to load specs:', error);
-      toast.error(t('specification.message.load_failed'));
+      toast.error(t('settings.specification.message.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -102,20 +102,20 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
 
   const handleDeleteSpec = (spec: EmbeddedSpec, index: number) => {
     if (!canDeleteSpec(spec)) {
-      toast.error(t('specification.message.root_cannot_delete'));
+      toast.error(t('settings.specification.message.root_cannot_delete'));
       return;
     }
 
     setConfirmDialog({
       isOpen: true,
-      title: t('specification.action.delete'),
-      description: t('specification.confirm.delete'),
+      title: t('settings.specification.action.delete'),
+      description: t('settings.specification.confirm.delete'),
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         const newSpecs = specs.filter((_, i) => i !== index);
         const success = await saveSpecs(newSpecs);
         if (success) {
-          toast.success(t('specification.message.deleted'));
+          toast.success(t('settings.specification.message.deleted'));
         }
       },
     });
@@ -129,7 +129,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
     const newSpecs = setDefaultSpec(specs, isCurrentlyDefault ? null : index);
     const success = await saveSpecs(newSpecs);
     if (success) {
-      toast.success(t('specification.message.updated'));
+      toast.success(t('settings.specification.message.updated'));
     }
   };
 
@@ -152,7 +152,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
 
     const success = await saveSpecs(newSpecs);
     if (success) {
-      toast.success(index === null ? t('specification.message.created') : t('specification.message.updated'));
+      toast.success(index === null ? t('settings.specification.message.created') : t('settings.specification.message.updated'));
     }
   };
 
@@ -172,7 +172,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-gray-900">
-                {t('specification.manage')}
+                {t('settings.specification.manage')}
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">{productName}</p>
             </div>
@@ -183,7 +183,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-xl text-sm font-semibold hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20 disabled:opacity-50"
               >
                 <Plus size={16} />
-                <span>{t('specification.add_new')}</span>
+                <span>{t('settings.specification.add_new')}</span>
               </button>
               <button
                 onClick={onClose}
@@ -206,23 +206,23 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <List className="text-gray-300" size={32} />
               </div>
-              <p className="text-gray-500 font-medium">{t('specification.no_specs')}</p>
+              <p className="text-gray-500 font-medium">{t('settings.specification.no_specs')}</p>
               <button
                 onClick={handleAddSpec}
                 className="mt-3 text-orange-600 hover:text-orange-700 font-medium text-sm hover:underline"
               >
-                {t('specification.create_first')}
+                {t('settings.specification.create_first')}
               </button>
             </div>
           ) : (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               {/* Table Header */}
               <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                <div className="col-span-3">{t('specification.form.name')}</div>
-                <div className="col-span-2">{t('specification.form.receipt_name')}</div>
-                <div className="col-span-2 text-right">{t('specification.form.price')}</div>
-                <div className="col-span-2 text-center">{t('specification.form.external_id')}</div>
-                <div className="col-span-1 text-center">{t('specification.label.default')}</div>
+                <div className="col-span-3">{t('settings.specification.form.name')}</div>
+                <div className="col-span-2">{t('settings.specification.form.receipt_name')}</div>
+                <div className="col-span-2 text-right">{t('settings.specification.form.price')}</div>
+                <div className="col-span-2 text-center">{t('settings.specification.form.external_id')}</div>
+                <div className="col-span-1 text-center">{t('settings.specification.label.default')}</div>
                 <div className="col-span-2 text-right">{t('common.action.actions')}</div>
               </div>
 
@@ -240,7 +240,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
                       <span className="font-medium text-gray-900 truncate">{spec.name}</span>
                       {spec.is_root && (
                         <span className="px-1.5 py-0.5 text-[0.625rem] font-medium bg-amber-100 text-amber-700 rounded">
-                          {t('specification.label.root')}
+                          {t('settings.specification.label.root')}
                         </span>
                       )}
                     </div>
@@ -270,7 +270,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
                             ? 'bg-orange-100 text-orange-600'
                             : 'text-gray-300 hover:text-orange-500 hover:bg-orange-50'
                         }`}
-                        title={spec.is_default ? t('specification.label.cancel_default') : t('specification.label.set_default')}
+                        title={spec.is_default ? t('settings.specification.label.cancel_default') : t('settings.specification.label.set_default')}
                       >
                         <Star size={16} className={spec.is_default ? 'fill-current' : ''} />
                       </button>

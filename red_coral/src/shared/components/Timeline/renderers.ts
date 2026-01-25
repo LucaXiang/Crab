@@ -72,7 +72,7 @@ const TableOpenedRenderer: EventRenderer<TableOpenedPayload> = {
   render(event, payload, t) {
     return {
       title: t('timeline.table_order'),
-      summary: t('timeline.guests_count', { n: payload.guest_count }),
+      summary: payload.guest_count != null ? t('timeline.guests_count', { n: payload.guest_count }) : '',
       details: [],
       icon: Utensils,
       colorClass: 'bg-blue-500',
@@ -83,19 +83,19 @@ const TableOpenedRenderer: EventRenderer<TableOpenedPayload> = {
 
 const ItemsAddedRenderer: EventRenderer<ItemsAddedPayload> = {
   render(event, payload, t) {
-    const items = payload.items;
+    const items = payload.items || [];
     const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
     const details = items.map((item) => {
-      const spec = item.selected_specification ? `(${item.selected_specification.name})` : '';
+      const instanceId = item.instance_id ? `#${item.instance_id.slice(-5)}` : '';
       const modifiers: string[] = [];
       if (item.manual_discount_percent) modifiers.push(`-${item.manual_discount_percent}%`);
       if (item.surcharge) modifiers.push(`+${formatCurrency(item.surcharge)}`);
-      return `${item.name} ${spec} x${item.quantity}${modifiers.length ? ` (${modifiers.join(', ')})` : ''}`;
+      return `${item.name} ${instanceId} x${item.quantity}${modifiers.length ? ` (${modifiers.join(', ')})` : ''}`;
     });
 
     return {
       title: t('timeline.add_items'),
-      summary: t('timeline.added_items', { n: totalQty }),
+      summary: items.length > 0 ? t('timeline.added_items', { n: totalQty }) : '',
       details,
       icon: ShoppingBag,
       colorClass: 'bg-orange-500',
@@ -106,7 +106,7 @@ const ItemsAddedRenderer: EventRenderer<ItemsAddedPayload> = {
 
 const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
   render(event, payload, t) {
-    const changes = payload.changes;
+    const changes = payload.changes || {};
     const previousValues = payload.previous_values || {};
     const details: string[] = [];
 
@@ -131,14 +131,15 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
     formatChange('manual_discount_percent', 'timeline.labels.discount', v => `${v}%`);
     formatChange('surcharge', 'timeline.labels.surcharge', v => formatCurrency(v || 0));
 
+    const source = payload.source;
     return {
       title: t('timeline.item_modified'),
-      summary: payload.source.name || '',
+      summary: source?.name || '',
       details,
       icon: Edit3,
       colorClass: 'bg-yellow-500',
       timestamp: event.timestamp,
-      tags: payload.source.instance_id ? [`#${payload.source.instance_id.slice(-5)}`] : [],
+      tags: source?.instance_id ? [`#${source.instance_id.slice(-5)}`] : [],
     };
   }
 };
@@ -172,11 +173,16 @@ const ItemRestoredRenderer: EventRenderer<ItemRestoredPayload> = {
 
 const PaymentAddedRenderer: EventRenderer<PaymentAddedPayload> = {
   render(event, payload, t) {
-    const methodKey = `payment.${payload.method}`;
-    let methodDisplay = t(methodKey) !== methodKey ? t(methodKey) : payload.method;
+    const method = payload.method || 'unknown';
+    const methodKey = `payment.${method}`;
+    let methodDisplay = t(methodKey) !== methodKey ? t(methodKey) : method;
 
-    if (methodDisplay.toLowerCase() === 'cash') methodDisplay = t('checkout.method.cash');
-    else if (methodDisplay.toLowerCase() === 'card') methodDisplay = t('checkout.method.card');
+    const methodLower = method.toLowerCase();
+    if (methodLower === 'cash') {
+      methodDisplay = t('checkout.method.cash');
+    } else if (methodLower === 'card') {
+      methodDisplay = t('checkout.method.card');
+    }
 
     const details = payload.tendered !== undefined && payload.tendered !== null
       ? [
@@ -187,7 +193,7 @@ const PaymentAddedRenderer: EventRenderer<PaymentAddedPayload> = {
 
     return {
       title: `${t('timeline.payment')}: ${methodDisplay}`,
-      summary: formatCurrency(payload.amount),
+      summary: payload.amount != null ? formatCurrency(payload.amount) : '',
       details,
       icon: Coins,
       colorClass: 'bg-green-500',
@@ -211,13 +217,25 @@ const PaymentCancelledRenderer: EventRenderer<PaymentCancelledPayload> = {
 
 const OrderSplitRenderer: EventRenderer<OrderSplitPayload> = {
   render(event, payload, t) {
-    const details = payload.items.map(item =>
-      `${item.name} x${item.quantity}`
-    );
+    const items = payload.items || [];
+    const details = items.map(item => {
+      const instanceId = item.instance_id ? `#${item.instance_id.slice(-5)}` : '';
+      return `${item.name} ${instanceId} x${item.quantity}`;
+    });
+
+    let methodDisplay = payload.payment_method || '';
+    const methodLower = methodDisplay.toLowerCase();
+    if (methodLower === 'cash') {
+      methodDisplay = t('checkout.method.cash');
+    } else if (methodLower === 'card') {
+      methodDisplay = t('checkout.method.card');
+    }
 
     return {
       title: t('timeline.split_bill'),
-      summary: `${formatCurrency(payload.split_amount)} (${payload.payment_method})`,
+      summary: payload.split_amount != null
+        ? `${formatCurrency(payload.split_amount)} (${methodDisplay})`
+        : '',
       details,
       icon: Split,
       colorClass: 'bg-teal-500',
@@ -270,7 +288,7 @@ const OrderMergedRenderer: EventRenderer<OrderMergedPayload> = {
   render(event, payload, t) {
     return {
       title: t('timeline.order_merged'),
-      summary: `${t('timeline.from')} ${payload.source_table_name}`,
+      summary: payload.source_table_name ? `${t('timeline.from')} ${payload.source_table_name}` : '',
       details: [],
       icon: ArrowLeft,
       colorClass: 'bg-purple-500',
@@ -283,7 +301,9 @@ const OrderMovedRenderer: EventRenderer<OrderMovedPayload> = {
   render(event, payload, t) {
     return {
       title: t('timeline.table_moved'),
-      summary: `${payload.source_table_name} → ${payload.target_table_name}`,
+      summary: (payload.source_table_name && payload.target_table_name)
+        ? `${payload.source_table_name} → ${payload.target_table_name}`
+        : '',
       details: [],
       icon: ArrowRight,
       colorClass: 'bg-indigo-500',
@@ -296,7 +316,7 @@ const OrderMovedOutRenderer: EventRenderer<OrderMovedOutPayload> = {
   render(event, payload, t) {
     return {
       title: t('timeline.moved_out'),
-      summary: `${t('timeline.to')} ${payload.target_table_name}`,
+      summary: payload.target_table_name ? `${t('timeline.to')} ${payload.target_table_name}` : '',
       details: [],
       icon: ArrowRight,
       colorClass: 'bg-indigo-600',
@@ -309,7 +329,7 @@ const OrderMergedOutRenderer: EventRenderer<OrderMergedOutPayload> = {
   render(event, payload, t) {
     return {
       title: t('timeline.merged_out'),
-      summary: `${t('timeline.to')} ${payload.target_table_name}`,
+      summary: payload.target_table_name ? `${t('timeline.to')} ${payload.target_table_name}` : '',
       details: [],
       icon: ArrowRight,
       colorClass: 'bg-purple-600',
@@ -322,7 +342,9 @@ const TableReassignedRenderer: EventRenderer<TableReassignedPayload> = {
   render(event, payload, t) {
     return {
       title: t('timeline.table_reassigned'),
-      summary: `${payload.source_table_name} → ${payload.target_table_name}`,
+      summary: (payload.source_table_name && payload.target_table_name)
+        ? `${payload.source_table_name} → ${payload.target_table_name}`
+        : '',
       details: [],
       icon: ArrowRight,
       colorClass: 'bg-blue-600',

@@ -224,3 +224,36 @@ pub struct ProductFull {
     /// Tags attached to this product
     pub tags: Vec<Tag>,
 }
+
+/// Convert internal ProductFull to shared::models::Product for API responses
+/// (tags converted to string IDs)
+impl From<ProductFull> for shared::models::Product {
+    fn from(p: ProductFull) -> Self {
+        shared::models::Product {
+            id: p.id.map(|id| id.to_string()),
+            name: p.name,
+            image: p.image,
+            category: p.category.to_string(),
+            sort_order: p.sort_order,
+            tax_rate: p.tax_rate,
+            receipt_name: p.receipt_name,
+            kitchen_print_name: p.kitchen_print_name,
+            kitchen_print_destinations: p.kitchen_print_destinations.into_iter().map(|id| id.to_string()).collect(),
+            label_print_destinations: p.label_print_destinations.into_iter().map(|id| id.to_string()).collect(),
+            is_kitchen_print_enabled: p.is_kitchen_print_enabled,
+            is_label_print_enabled: p.is_label_print_enabled,
+            is_active: p.is_active,
+            tags: p.tags.into_iter().filter_map(|t| t.id.map(|id| id.to_string())).collect(),
+            specs: p.specs.into_iter().map(|s| shared::models::EmbeddedSpec {
+                name: s.name,
+                price: s.price,
+                display_order: s.display_order,
+                is_default: s.is_default,
+                is_active: s.is_active,
+                external_id: s.external_id,
+                receipt_name: s.receipt_name,
+                is_root: s.is_root,
+            }).collect(),
+        }
+    }
+}

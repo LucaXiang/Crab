@@ -34,11 +34,16 @@ pub struct OrderSummary {
 }
 
 /// Split item in a payment
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Default)]
 pub struct SplitItem {
+    #[serde(default)]
     pub instance_id: String,
+    #[serde(default)]
     pub name: String,
+    #[serde(default)]
     pub quantity: i32,
+    #[serde(default)]
+    pub unit_price: f64,
 }
 
 /// Order item option for detail view

@@ -75,16 +75,14 @@ impl AttributeRepository {
             .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
 
         // Update using raw query to avoid deserialization issues with null fields
-        self.base
+        let mut result = self.base
             .db()
-            .query("UPDATE $thing MERGE $data")
+            .query("UPDATE $thing MERGE $data RETURN AFTER")
             .bind(("thing", thing))
             .bind(("data", data))
             .await?;
 
-        // Fetch the updated record
-        self.find_by_id(id)
-            .await?
+        result.take::<Option<Attribute>>(0)?
             .ok_or_else(|| RepoError::NotFound(format!("Attribute {} not found", id)))
     }
 

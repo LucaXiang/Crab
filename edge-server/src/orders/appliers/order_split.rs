@@ -3,7 +3,7 @@
 //! Applies the OrderSplit event to track paid item quantities and update paid amount.
 //! This is used for split bill payments where specific items are paid for.
 
-use crate::orders::traits::EventApplier;
+use crate::orders::{money, traits::EventApplier};
 use shared::order::{CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot, PaymentRecord};
 
 /// OrderSplit applier
@@ -73,6 +73,9 @@ impl EventApplier for OrderSplitApplier {
             };
             snapshot.payments.push(payment);
 
+            // Recalculate totals to update unpaid_quantity for each item
+            money::recalculate_totals(snapshot);
+
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
             snapshot.updated_at = event.timestamp;
@@ -115,6 +118,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            tax: None,
         };
         let item2 = CartItemSnapshot {
             id: "product:2".to_string(),
@@ -136,6 +140,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            tax: None,
         };
         snapshot.items.push(item1);
         snapshot.items.push(item2);
@@ -182,6 +187,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 2,
+                unit_price: 10.0,
             }],
         );
 
@@ -189,6 +195,35 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         assert_eq!(snapshot.paid_item_quantities.get("item-1"), Some(&2));
+    }
+
+    #[test]
+    fn test_order_split_updates_unpaid_quantity() {
+        let mut snapshot = create_test_snapshot("order-1");
+        // Items have unpaid_quantity = quantity initially
+        assert_eq!(snapshot.items[0].unpaid_quantity, 3); // Coffee: qty=3
+        assert_eq!(snapshot.items[1].unpaid_quantity, 2); // Tea: qty=2
+
+        let event = create_order_split_event(
+            "order-1",
+            2,
+            20.0,
+            "cash",
+            vec![SplitItem {
+                instance_id: "item-1".to_string(),
+                name: "Coffee".to_string(),
+                quantity: 2,
+                unit_price: 10.0,
+            }],
+        );
+
+        let applier = OrderSplitApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // unpaid_quantity should be updated: 3 - 2 = 1
+        assert_eq!(snapshot.items[0].unpaid_quantity, 1);
+        // item-2 unchanged
+        assert_eq!(snapshot.items[1].unpaid_quantity, 2);
     }
 
     #[test]
@@ -205,6 +240,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 2,
+                unit_price: 10.0,
             }],
         );
 
@@ -235,11 +271,13 @@ mod tests {
                     instance_id: "item-1".to_string(),
                     name: "Coffee".to_string(),
                     quantity: 2,
+                    unit_price: 10.0,
                 },
                 SplitItem {
                     instance_id: "item-2".to_string(),
                     name: "Tea".to_string(),
                     quantity: 1,
+                    unit_price: 8.0,
                 },
             ],
         );
@@ -268,11 +306,13 @@ mod tests {
                     instance_id: "item-1".to_string(),
                     name: "Coffee".to_string(),
                     quantity: 2,
+                    unit_price: 10.0,
                 },
                 SplitItem {
                     instance_id: "item-2".to_string(),
                     name: "Tea".to_string(),
                     quantity: 1,
+                    unit_price: 8.0,
                 },
             ],
         );
@@ -298,6 +338,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 2,
+                unit_price: 10.0,
             }],
         );
 
@@ -324,6 +365,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 2,
+                unit_price: 10.0,
             }],
         );
 
@@ -378,6 +420,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 1,
+                unit_price: 10.0,
             }],
         );
 
@@ -424,6 +467,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 2,
+                unit_price: 10.0,
             }],
         );
 
@@ -450,6 +494,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 2,
+                unit_price: 10.0,
             }],
         );
 
@@ -502,6 +547,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 1,
+                unit_price: 10.0,
             }],
         );
 
@@ -528,6 +574,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 1,
+                unit_price: 10.0,
             }],
         );
 
@@ -553,6 +600,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 0, // Zero quantity
+                unit_price: 10.0,
             }],
         );
 
@@ -578,6 +626,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 1,
+                unit_price: 10.0,
             }],
         );
 

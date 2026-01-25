@@ -171,6 +171,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            tax: None,
         };
         let item2 = CartItemSnapshot {
             id: "product:2".to_string(),
@@ -192,6 +193,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            tax: None,
         };
         snapshot.items.push(item1);
         snapshot.items.push(item2);
@@ -219,7 +221,7 @@ mod tests {
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
-                quantity: 2,
+                quantity: 2, unit_price: 10.0,
             }],
         };
 
@@ -266,12 +268,12 @@ mod tests {
                 SplitItem {
                     instance_id: "item-1".to_string(),
                     name: "Coffee".to_string(),
-                    quantity: 2,
+                    quantity: 2, unit_price: 10.0,
                 },
                 SplitItem {
                     instance_id: "item-2".to_string(),
                     name: "Tea".to_string(),
-                    quantity: 1,
+                    quantity: 1, unit_price: 10.0,
                 },
             ],
         };
@@ -305,7 +307,7 @@ mod tests {
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
-                quantity: 1,
+                quantity: 1, unit_price: 10.0,
             }],
         };
 
@@ -333,7 +335,7 @@ mod tests {
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
-                quantity: 1,
+                quantity: 1, unit_price: 10.0,
             }],
         };
 
@@ -361,7 +363,7 @@ mod tests {
             items: vec![SplitItem {
                 instance_id: "nonexistent".to_string(),
                 name: "Unknown".to_string(),
-                quantity: 1,
+                quantity: 1, unit_price: 10.0,
             }],
         };
 
@@ -390,6 +392,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 5, // Only 3 available
+                unit_price: 10.0,
             }],
         };
 
@@ -423,6 +426,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 2, // Only 1 available (3 total - 2 paid)
+                unit_price: 10.0,
             }],
         };
 
@@ -440,6 +444,7 @@ mod tests {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
                 quantity: 1, // Exactly 1 available
+                unit_price: 10.0,
             }],
         };
 
@@ -467,7 +472,7 @@ mod tests {
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
-                quantity: 1,
+                quantity: 1, unit_price: 10.0,
             }],
         };
 
@@ -496,7 +501,7 @@ mod tests {
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
-                quantity: 1,
+                quantity: 1, unit_price: 10.0,
             }],
         };
 
@@ -521,7 +526,7 @@ mod tests {
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
-                quantity: 1,
+                quantity: 1, unit_price: 10.0,
             }],
         };
 
@@ -549,7 +554,7 @@ mod tests {
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
-                quantity: 1,
+                quantity: 1, unit_price: 10.0,
             }],
         };
 
@@ -577,7 +582,7 @@ mod tests {
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
-                quantity: 1,
+                quantity: 1, unit_price: 10.0,
             }],
         };
 

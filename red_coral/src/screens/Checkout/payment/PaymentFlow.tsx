@@ -12,7 +12,6 @@ import { Currency } from '@/utils/currency';
 // Services & Operations
 import { openCashDrawer, printOrderReceipt } from '@/core/services/order/paymentService';
 import { completeOrder, splitOrder, updateOrderInfo } from '@/core/stores/order/useOrderOperations';
-import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useOrderCommands } from '@/core/stores/order/useOrderCommands';
 
 // Components
@@ -30,14 +29,13 @@ interface PaymentFlowProps {
   order: HeldOrder;
   onComplete: () => void;
   onCancel?: () => void;
-  onUpdateOrder?: (order: HeldOrder) => void;
   onVoid?: () => void;
   onManageTable?: () => void;
 }
 
 type PaymentMode = 'SELECT' | 'ITEM_SPLIT' | 'PAYMENT_RECORDS';
 
-export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onCancel, onUpdateOrder, onVoid, onManageTable }) => {
+export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onCancel, onVoid, onManageTable }) => {
   const { t } = useI18n();
   const serviceType = useRetailServiceType();
   const { cancelPayment } = useOrderCommands();
@@ -107,7 +105,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   const handleConfirmCancelPayment = useCallback(async () => {
     if (!cancelConfirm) return;
 
-    const { paymentId, isSplit } = cancelConfirm;
+    const { paymentId } = cancelConfirm;
     setCancelConfirm(null);
     setCancellingPaymentId(paymentId);
 
@@ -159,8 +157,8 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           change: Currency.sub(tenderedAmount, remaining).toNumber(),
         };
 
-        // Complete order via backend
-        const completed = await completeOrder(order, [payment]);
+        // Complete order via backend (fire & forget)
+        await completeOrder(order.order_id, order.receipt_number!, [payment]);
         const is_retail = order.is_retail;
 
         setShowCashModal(false);
@@ -170,7 +168,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           change: payment.change,
           onClose: handleComplete,
           onPrint: is_retail ? async () => {
-            await printOrderReceipt(completed);
+            await printOrderReceipt(order);
             toast.success(t('settings.payment.receipt_print_success'));
           } : undefined,
           autoCloseDelay: is_retail ? 0 : 10000,
@@ -198,12 +196,13 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     try {
       const payment: PaymentRecord = {
         payment_id: `pay-${Date.now()}`,
-        method: 'VISA',
+        method: 'CARD',
         amount: remaining,
         timestamp: Date.now(),
       };
 
-      const completed = await completeOrder(order, [payment]);
+      // Complete order via backend (fire & forget)
+      await completeOrder(order.order_id, order.receipt_number!, [payment]);
       const is_retail = order.is_retail;
 
       setSuccessModal({
@@ -211,7 +210,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         type: 'NORMAL',
         onClose: handleComplete,
         onPrint: is_retail ? async () => {
-          await printOrderReceipt(completed);
+          await printOrderReceipt(order);
           toast.success(t('settings.payment.receipt_print_success'));
         } : undefined,
         autoCloseDelay: is_retail ? 0 : 5000,
@@ -229,23 +228,20 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
    */
   const handlePrintPrePayment = useCallback(async () => {
     try {
-      const store = useActiveOrdersStore.getState();
-      const existingSnapshot = store.getOrder(order.order_id);
-      const currentOrder = existingSnapshot ? existingSnapshot : { ...order };
-
       // Receipt number is already set by server at OpenTable time
-      if (!currentOrder.receipt_number) {
+      if (!order.receipt_number) {
         toast.error('Order has no receipt number');
         return;
       }
 
-      await updateOrderInfo(currentOrder, {
+      await updateOrderInfo(order.order_id, {
         is_pre_payment: true,
-        receipt_number: currentOrder.receipt_number,
+        receipt_number: order.receipt_number,
       });
 
-      currentOrder.is_pre_payment = true;
-      await printOrderReceipt(currentOrder);
+      // Print with current order (WebSocket will update if needed)
+      const orderToPrint = { ...order, is_pre_payment: true };
+      await printOrderReceipt(orderToPrint);
       toast.success(t('settings.payment.receipt_print_success'));
     } catch (error) {
       console.error('Pre-payment print failed:', error);
@@ -255,6 +251,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
   /**
    * 分账支付处理
+   * Fire & forget - UI updates via WebSocket
    */
   const handleSplitPayment = useCallback(
     async (method: 'CASH' | 'CARD', cashDetails?: { tendered: number }) => {
@@ -269,6 +266,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
             quantity: qty,
             name: originalItem?.name || t('common.label.unknown_item'),
             price: originalItem?.price || 0,
+            unit_price: originalItem?.unit_price ?? originalItem?.price ?? 0,
           };
         });
 
@@ -279,7 +277,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
       try {
         let total = 0;
         itemsToSplit.forEach((splitItem) => {
-          total += splitItem.price * splitItem.quantity;
+          total += splitItem.unit_price * splitItem.quantity;
         });
 
         if (method === 'CASH') {
@@ -287,58 +285,21 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         }
 
         // Server calculates amount from items (server-authoritative)
-        const updatedOrder = await splitOrder(order, {
+        // Fire & forget - UI updates via WebSocket
+        await splitOrder(order.order_id, {
           items: itemsToSplit.map((i) => ({
             instance_id: i.instance_id,
             name: i.name,
             quantity: i.quantity,
+            unit_price: i.unit_price,
           })),
           paymentMethod: method,
           tendered: cashDetails?.tendered,
           change: cashDetails ? cashDetails.tendered - total : undefined,
         });
 
-        if (onUpdateOrder) {
-          onUpdateOrder(updatedOrder);
-        }
-
-        const isFullyPaid =
-          updatedOrder.total > 0 &&
-          (updatedOrder.paid_amount ?? 0) >= updatedOrder.total - 0.01;
-
-        if (isFullyPaid) {
-          try {
-            const completed = await completeOrder(updatedOrder, []);
-            const is_retail = updatedOrder.is_retail;
-
-            if (method === 'CASH' && cashDetails?.tendered !== undefined) {
-              setSuccessModal({
-                isOpen: true,
-                type: 'CASH',
-                change: cashDetails.tendered - total,
-                onClose: handleComplete,
-                onPrint: is_retail ? async () => {
-                  await printOrderReceipt(completed);
-                  toast.success(t('settings.payment.receipt_print_success'));
-                } : undefined,
-                autoCloseDelay: is_retail ? 0 : 10000,
-              });
-            } else {
-              setSuccessModal({
-                isOpen: true,
-                type: 'NORMAL',
-                onClose: handleComplete,
-                onPrint: is_retail ? async () => {
-                  await printOrderReceipt(completed);
-                  toast.success(t('settings.payment.receipt_print_success'));
-                } : undefined,
-                autoCloseDelay: is_retail ? 0 : 5000,
-              });
-            }
-          } catch (error) {
-            console.error('Auto-complete failed:', error);
-          }
-        } else if (method === 'CASH' && cashDetails?.tendered !== undefined) {
+        // Show success modal for cash payments
+        if (method === 'CASH' && cashDetails?.tendered !== undefined) {
           setSuccessModal({
             isOpen: true,
             type: 'CASH',
@@ -359,7 +320,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         setIsProcessingSplit(false);
       }
     },
-    [order, isProcessingSplit, splitItems, onUpdateOrder, t, handleComplete]
+    [order, isProcessingSplit, splitItems, t]
   );
 
   const handleConfirmSplitCash = useCallback(
@@ -468,7 +429,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     }
 
     return result;
-  }, [order.items, productInfoMap, categories, t]);
+  }, [order.items, order.paid_item_quantities, productInfoMap, categories, t]);
 
   const renderSplitMode = () => {
     return (
@@ -487,7 +448,6 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           order={order}
           totalPaid={totalPaid}
           remaining={remaining}
-          onUpdateOrder={onUpdateOrder}
           onManage={onManageTable}
         />
         <div className="flex-1 flex flex-col bg-gray-50">
@@ -636,7 +596,6 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           order={order}
           totalPaid={totalPaid}
           remaining={remaining}
-          onUpdateOrder={onUpdateOrder}
           onManage={onManageTable}
         />
         <div className="flex-1 flex flex-col bg-gray-50">
@@ -765,7 +724,6 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           order={order}
           totalPaid={totalPaid}
           remaining={remaining}
-          onUpdateOrder={onUpdateOrder}
           onManage={onManageTable}
         />
         <div className="flex-1 flex flex-col bg-gray-50">

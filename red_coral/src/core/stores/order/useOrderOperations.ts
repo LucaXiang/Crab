@@ -3,10 +3,15 @@
  *
  * These functions handle complex order workflows using the new event-sourcing architecture.
  * All write operations are async and go through the backend.
+ *
+ * **Server Authority Model:**
+ * - Client only sends commands, never expects data back
+ * - UI updates reactively through WebSocket events -> Store -> React re-render
+ * - Multi-terminal: all clients subscribe to same event stream
  */
 
 import { invokeApi } from '@/infrastructure/api/tauri-client';
-import { HeldOrder, CartItem, PaymentRecord, Table, Zone } from '@/core/domain/types';
+import { CartItem, PaymentRecord, Table, Zone } from '@/core/domain/types';
 import { useActiveOrdersStore } from './useActiveOrdersStore';
 import { useCheckoutStore } from './useCheckoutStore';
 import { createCommand } from './commandUtils';
@@ -137,12 +142,12 @@ const handleCreateNewOrder = async (
 };
 
 // ============================================================================
-// Exported Operations (Async)
+// Exported Operations (Async) - Fire & Forget Commands
 // ============================================================================
 
 /**
  * Create a retail order with cart items
- * Returns the new order_id directly (no waiting for WebSocket events)
+ * Returns the new order_id directly (needed for navigation)
  */
 export const createRetailOrder = async (
   cart: CartItem[]
@@ -220,21 +225,13 @@ export const handleTableSelect = async (
 
 /**
  * Complete an order with payments
+ * Fire & forget - UI updates via WebSocket event
  */
 export const completeOrder = async (
-  order: HeldOrder,
+  orderId: string,
+  receiptNumber: string,
   newPayments: PaymentRecord[],
-): Promise<HeldOrder> => {
-  const store = useActiveOrdersStore.getState();
-
-  const orderId = order.order_id;
-
-  // Receipt number is already set by server at OpenTable time
-  const receiptNumber = order.receipt_number;
-  if (!receiptNumber) {
-    throw new Error('Order has no receipt_number - this should be set at OpenTable');
-  }
-
+): Promise<void> => {
   // Add payments
   for (const payment of newPayments) {
     const paymentCommand = createCommand({
@@ -259,22 +256,16 @@ export const completeOrder = async (
   });
   const completeResponse = await sendCommand(completeCommand);
   ensureSuccess(completeResponse, 'Complete order');
-
-  // Return updated order (may take a moment for event to arrive)
-  const snapshot = store.getOrder(orderId);
-  return snapshot ? snapshot : order;
 };
 
 /**
  * Void an order
+ * Fire & forget - UI updates via WebSocket event
  */
 export const voidOrder = async (
-  order: HeldOrder,
+  orderId: string,
   reason?: string
-): Promise<HeldOrder> => {
-  const store = useActiveOrdersStore.getState();
-  const orderId = order.order_id;
-
+): Promise<void> => {
   const command = createCommand({
     type: 'VOID_ORDER',
     order_id: orderId,
@@ -282,24 +273,16 @@ export const voidOrder = async (
   });
   const response = await sendCommand(command);
   ensureSuccess(response, 'Void order');
-
-  const snapshot = store.getOrder(orderId);
-  return snapshot ? snapshot : order;
 };
 
 /**
  * Partial settle (add payments without completing)
+ * Fire & forget - UI updates via WebSocket event
  */
 export const partialSettle = async (
-  order: HeldOrder,
+  orderId: string,
   newPayments: PaymentRecord[],
-): Promise<HeldOrder> => {
-  const store = useActiveOrdersStore.getState();
-  const checkoutStore = useCheckoutStore.getState();
-
-  const orderId = order.order_id;
-
-  // Add payments
+): Promise<void> => {
   for (const payment of newPayments) {
     const command = createCommand({
       type: 'ADD_PAYMENT',
@@ -314,23 +297,13 @@ export const partialSettle = async (
     const response = await sendCommand(command);
     ensureSuccess(response, 'Add payment');
   }
-
-  // Sync checkout store
-  const snapshot = store.getOrder(orderId);
-  const updatedOrder = snapshot ? snapshot : order;
-
-  if (checkoutStore.checkoutOrder?.order_id === orderId) {
-    checkoutStore.setCheckoutOrder(updatedOrder);
-  }
-
-  return updatedOrder;
 };
 
 /**
  * Ensure order exists in store (no-op with event sourcing - orders come from backend)
  * Kept for API compatibility
  */
-export const ensureActiveOrder = (_order: HeldOrder): void => {
+export const ensureActiveOrder = (): void => {
   // With event sourcing architecture, orders are managed by the backend
   // and synced via events. This function is a no-op for compatibility.
 };
@@ -338,53 +311,46 @@ export const ensureActiveOrder = (_order: HeldOrder): void => {
 /**
  * Split order - process a split payment for specific items
  * Amount is calculated by server from items (server-authoritative)
+ * Fire & forget - UI updates via WebSocket event
  */
 export const splitOrder = async (
-  order: HeldOrder,
+  orderId: string,
   splitData: {
-    items: { instance_id: string; name: string; quantity: number }[];
+    items: { instance_id: string; name: string; quantity: number; unit_price: number }[];
     paymentMethod: string;
     tendered?: number;
     change?: number;
   }
-): Promise<HeldOrder> => {
-  const store = useActiveOrdersStore.getState();
-  const orderId = order.order_id;
-
+): Promise<void> => {
   const command = createCommand({
     type: 'SPLIT_ORDER',
     order_id: orderId,
-    // split_amount omitted - server calculates from items (server-authoritative)
     payment_method: splitData.paymentMethod,
     items: splitData.items.map(item => ({
       instance_id: item.instance_id,
       name: item.name,
       quantity: item.quantity,
+      unit_price: item.unit_price,
     })),
   });
 
   const response = await sendCommand(command);
   ensureSuccess(response, 'Split order');
-
-  const snapshot = store.getOrder(orderId);
-  return snapshot ? snapshot : order;
 };
 
 /**
  * Update order info (receipt number, guest count, etc.)
+ * Fire & forget - UI updates via WebSocket event
  */
 export const updateOrderInfo = async (
-  order: HeldOrder,
+  orderId: string,
   info: {
     receipt_number?: string;
     guest_count?: number;
     table_name?: string;
     is_pre_payment?: boolean;
   }
-): Promise<HeldOrder> => {
-  const store = useActiveOrdersStore.getState();
-  const orderId = order.order_id;
-
+): Promise<void> => {
   const command = createCommand({
     type: 'UPDATE_ORDER_INFO',
     order_id: orderId,
@@ -396,23 +362,18 @@ export const updateOrderInfo = async (
 
   const response = await sendCommand(command);
   ensureSuccess(response, 'Update order info');
-
-  const snapshot = store.getOrder(orderId);
-  return snapshot ? snapshot : order;
 };
 
 /**
  * Move order to a different table
+ * Fire & forget - UI updates via WebSocket event
  */
 export const moveOrder = async (
-  order: HeldOrder,
+  orderId: string,
   targetTableId: string,
   targetTableName: string,
   targetZoneName?: string
-): Promise<HeldOrder> => {
-  const store = useActiveOrdersStore.getState();
-  const orderId = order.order_id;
-
+): Promise<void> => {
   const command = createCommand({
     type: 'MOVE_ORDER',
     order_id: orderId,
@@ -423,34 +384,24 @@ export const moveOrder = async (
 
   const response = await sendCommand(command);
   ensureSuccess(response, 'Move order');
-
-  // Order will be at new table ID after move
-  const snapshot = store.getOrder(targetTableId);
-  return snapshot ? snapshot : order;
 };
 
 /**
  * Merge source order into target order
+ * Fire & forget - UI updates via WebSocket event
  */
 export const mergeOrders = async (
-  sourceOrder: HeldOrder,
-  targetOrder: HeldOrder
-): Promise<HeldOrder> => {
-  const store = useActiveOrdersStore.getState();
-  const sourceId = sourceOrder.order_id;
-  const targetId = targetOrder.order_id;
-
+  sourceOrderId: string,
+  targetOrderId: string
+): Promise<void> => {
   const command = createCommand({
     type: 'MERGE_ORDERS',
-    source_order_id: sourceId,
-    target_order_id: targetId,
+    source_order_id: sourceOrderId,
+    target_order_id: targetOrderId,
   });
 
   const response = await sendCommand(command);
   ensureSuccess(response, 'Merge orders');
-
-  const snapshot = store.getOrder(targetId);
-  return snapshot ? snapshot : targetOrder;
 };
 
 // ============================================================================

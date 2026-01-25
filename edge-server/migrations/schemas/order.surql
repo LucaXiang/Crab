@@ -31,6 +31,14 @@ DEFINE FIELD OVERWRITE is_retail ON order TYPE bool
 DEFINE FIELD OVERWRITE guest_count ON order TYPE option<int>
     PERMISSIONS FULL;
 
+DEFINE FIELD OVERWRITE original_total ON order TYPE float
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE subtotal ON order TYPE float
+    DEFAULT 0
+    PERMISSIONS FULL;
+
 DEFINE FIELD OVERWRITE total_amount ON order TYPE float
     DEFAULT 0
     PERMISSIONS FULL;
@@ -44,6 +52,10 @@ DEFINE FIELD OVERWRITE discount_amount ON order TYPE float
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE surcharge_amount ON order TYPE float
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE tax ON order TYPE float
     DEFAULT 0
     PERMISSIONS FULL;
 
@@ -127,6 +139,10 @@ DEFINE FIELD OVERWRITE surcharge_amount ON order_item TYPE float
     DEFAULT 0
     PERMISSIONS FULL;
 
+DEFINE FIELD OVERWRITE tax ON order_item TYPE float
+    DEFAULT 0
+    PERMISSIONS FULL;
+
 DEFINE FIELD OVERWRITE note ON order_item TYPE option<string>
     PERMISSIONS FULL;
 
@@ -182,8 +198,7 @@ DEFINE FIELD OVERWRITE cancelled ON order_payment TYPE bool
 DEFINE FIELD OVERWRITE cancel_reason ON order_payment TYPE option<string>
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE split_items ON order_payment TYPE array
-    DEFAULT []
+DEFINE FIELD OVERWRITE split_items ON order_payment TYPE option<string>
     PERMISSIONS FULL;
 
 DEFINE INDEX OVERWRITE payment_method ON order_payment FIELDS method;
@@ -205,7 +220,7 @@ DEFINE FIELD OVERWRITE timestamp ON order_event TYPE datetime
     DEFAULT time::now()
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE data ON order_event TYPE option<object>
+DEFINE FIELD OVERWRITE data ON order_event TYPE option<string>
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE prev_hash ON order_event TYPE string

@@ -2,17 +2,17 @@
 //!
 //! Archives completed orders from redb to SurrealDB with hash chain integrity.
 //! Uses graph model with RELATE edges for items, options, payments, events.
+//! All archive operations are atomic - either everything succeeds or nothing is written.
 
 use crate::db::models::{
-    Order as SurrealOrder, OrderEventType as SurrealEventType, OrderStatus as SurrealOrderStatus,
-    SplitItem,
+    Order as SurrealOrder, OrderStatus as SurrealOrderStatus, SplitItem,
 };
-use crate::db::repository::{OrderRepository, SystemStateRepository};
+use crate::db::repository::SystemStateRepository;
 use sha2::{Digest, Sha256};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
+use std::path::PathBuf;
 use std::sync::Arc;
 use surrealdb::engine::local::Db;
-use surrealdb::RecordId;
 use surrealdb::Surreal;
 use thiserror::Error;
 use tokio::sync::{Mutex, Semaphore};
@@ -40,22 +40,28 @@ const MAX_CONCURRENT_ARCHIVES: usize = 5;
 #[derive(Clone)]
 pub struct OrderArchiveService {
     db: Surreal<Db>,
-    order_repo: OrderRepository,
     system_state_repo: SystemStateRepository,
     /// Semaphore to limit concurrent archive tasks
     archive_semaphore: Arc<Semaphore>,
     /// Mutex to ensure hash chain updates are serialized (prevents race conditions)
     hash_chain_lock: Arc<Mutex<()>>,
+    /// Directory for storing failed archives
+    bad_archive_dir: PathBuf,
 }
 
 impl OrderArchiveService {
     pub fn new(db: Surreal<Db>) -> Self {
+        let bad_archive_dir = std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join("data")
+            .join("bad_archives");
+
         Self {
             db: db.clone(),
-            order_repo: OrderRepository::new(db.clone()),
             system_state_repo: SystemStateRepository::new(db),
             archive_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_ARCHIVES)),
             hash_chain_lock: Arc::new(Mutex::new(())),
+            bad_archive_dir,
         }
     }
 
@@ -78,6 +84,8 @@ impl OrderArchiveService {
     }
 
     /// Archive a completed order with its events (with retry logic and concurrency limit)
+    /// Uses a single atomic transaction - either everything succeeds or nothing is written.
+    /// On complete failure, saves data to bad archive file for manual recovery.
     pub async fn archive_order(
         &self,
         snapshot: &OrderSnapshot,
@@ -114,21 +122,84 @@ impl OrderArchiveService {
             }
         }
 
-        Err(last_error.unwrap_or_else(|| ArchiveError::Database("Unknown error".to_string())))
+        // All retries failed - save to bad archive file
+        let error = last_error.unwrap_or_else(|| ArchiveError::Database("Unknown error".to_string()));
+        self.save_to_bad_archive_sync(snapshot, &events, &error);
+        Err(error)
     }
 
-    /// Internal archive implementation (single attempt)
+    /// Save failed archive data to a JSON file for manual recovery
+    fn save_to_bad_archive_sync(
+        &self,
+        snapshot: &OrderSnapshot,
+        events: &[OrderEvent],
+        error: &ArchiveError,
+    ) {
+        #[derive(serde::Serialize)]
+        struct BadArchive {
+            snapshot: OrderSnapshot,
+            events: Vec<OrderEvent>,
+            error: String,
+            timestamp: String,
+        }
+
+        let bad_archive = BadArchive {
+            snapshot: snapshot.clone(),
+            events: events.to_vec(),
+            error: error.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        };
+
+        // Create directory if needed
+        if let Err(e) = std::fs::create_dir_all(&self.bad_archive_dir) {
+            tracing::error!(error = %e, "Failed to create bad archive directory");
+            return;
+        }
+
+        let filename = format!(
+            "{}-{}.json",
+            chrono::Utc::now().format("%Y%m%d%H%M%S"),
+            snapshot.order_id
+        );
+        let path = self.bad_archive_dir.join(&filename);
+
+        match serde_json::to_string_pretty(&bad_archive) {
+            Ok(json) => {
+                if let Err(e) = std::fs::write(&path, &json) {
+                    tracing::error!(error = %e, path = ?path, "Failed to write bad archive file");
+                } else {
+                    tracing::warn!(
+                        order_id = %snapshot.order_id,
+                        path = ?path,
+                        "Order saved to bad archive file for manual recovery"
+                    );
+                }
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to serialize bad archive");
+            }
+        }
+    }
+
+    /// Internal archive implementation (single attempt, atomic transaction)
     async fn archive_order_internal(
         &self,
         snapshot: &OrderSnapshot,
         events: &[OrderEvent],
     ) -> ArchiveResult<()> {
         // 0. Check idempotency - skip if already archived
-        if let Ok(true) = self
-            .order_repo
-            .exists_by_receipt(snapshot.receipt_number.as_deref().unwrap_or(""))
+        let receipt = snapshot.receipt_number.clone().unwrap_or_default();
+        let exists: Option<bool> = self
+            .db
+            .query("SELECT count() > 0 AS exists FROM order WHERE receipt_number = $receipt GROUP ALL")
+            .bind(("receipt", receipt.clone()))
             .await
-        {
+            .map_err(|e| ArchiveError::Database(e.to_string()))?
+            .take::<Option<serde_json::Value>>(0)
+            .map_err(|e| ArchiveError::Database(e.to_string()))?
+            .and_then(|v| v.get("exists").and_then(|e| e.as_bool()));
+
+        if exists == Some(true) {
             tracing::info!(order_id = %snapshot.order_id, "Order already archived, skipping");
             return Ok(());
         }
@@ -168,33 +239,259 @@ impl OrderArchiveService {
             .map(|e| (Some(e.operator_id.clone()), Some(e.operator_name.clone())))
             .unwrap_or((None, None));
 
-        // 4. Convert and store order
+        // 4. Convert snapshot to order struct for building query
         let surreal_order =
             self.convert_snapshot_to_order(snapshot, prev_hash, order_hash.clone(), operator_id, operator_name)?;
 
         tracing::info!(
             order_id = %snapshot.order_id,
             items_count = snapshot.items.len(),
-            "Archiving order to SurrealDB (graph model)"
+            payments_count = snapshot.payments.len(),
+            events_count = events.len(),
+            "Archiving order to SurrealDB (atomic transaction)"
         );
 
-        let created_order = self
-            .order_repo
-            .create_archived(surreal_order)
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+        // 5. Build and execute atomic transaction
+        self.execute_archive_transaction(snapshot, events, &surreal_order, &order_hash).await?;
 
-        let order_id = created_order
-            .id
-            .ok_or_else(|| ArchiveError::Database("Order has no ID".to_string()))?;
+        tracing::info!(order_id = %snapshot.order_id, "Order archived to SurrealDB (graph model)");
+        Ok(())
+    }
 
-        // 5. Store items with RELATE has_item edges
-        self.store_items_with_edges(&order_id, snapshot).await?;
+    /// Execute the entire archive as a single atomic transaction
+    async fn execute_archive_transaction(
+        &self,
+        snapshot: &OrderSnapshot,
+        events: &[OrderEvent],
+        order: &SurrealOrder,
+        order_hash: &str,
+    ) -> ArchiveResult<()> {
+        // Build a single transaction query
+        let mut query = String::from("BEGIN TRANSACTION;\n");
 
-        // 6. Store payments with RELATE has_payment edges
-        self.store_payments_with_edges(&order_id, snapshot).await?;
+        // Create order
+        query.push_str(
+            r#"
+            LET $order = CREATE order SET
+                receipt_number = $receipt_number,
+                zone_name = $zone_name,
+                table_name = $table_name,
+                status = $status,
+                is_retail = $is_retail,
+                guest_count = $guest_count,
+                original_total = $original_total,
+                subtotal = $subtotal,
+                total_amount = $total_amount,
+                paid_amount = $paid_amount,
+                discount_amount = $discount_amount,
+                surcharge_amount = $surcharge_amount,
+                tax = $tax,
+                start_time = <datetime>$start_time,
+                end_time = <datetime>$end_time,
+                operator_id = $operator_id,
+                operator_name = $operator_name,
+                prev_hash = $prev_hash,
+                curr_hash = $curr_hash,
+                created_at = time::now();
+            "#,
+        );
 
-        // 7. Store events with RELATE has_event edges
+        // For each item, create item and its options, then RELATE
+        for (i, item) in snapshot.items.iter().enumerate() {
+            let var_name = format!("$item{}", i);
+            query.push_str(&format!(
+                r#"
+                LET {} = CREATE order_item SET
+                    spec = $item{}_spec,
+                    instance_id = $item{}_instance_id,
+                    name = $item{}_name,
+                    spec_name = $item{}_spec_name,
+                    price = $item{}_price,
+                    quantity = $item{}_quantity,
+                    unpaid_quantity = $item{}_unpaid_quantity,
+                    unit_price = $item{}_unit_price,
+                    line_total = $item{}_line_total,
+                    discount_amount = $item{}_discount_amount,
+                    surcharge_amount = $item{}_surcharge_amount,
+                    tax = $item{}_tax,
+                    note = $item{}_note;
+                RELATE ($order[0].id)->has_item->({}[0].id);
+                "#,
+                var_name,
+                i, i, i, i, i, i, i, i, i, i, i, i, i,
+                var_name
+            ));
+
+            // Create options for this item
+            if let Some(options) = &item.selected_options {
+                for (j, _opt) in options.iter().enumerate() {
+                    query.push_str(&format!(
+                        r#"
+                        LET $item{}_opt{} = CREATE order_item_option SET
+                            attribute_name = $item{}_opt{}_attr,
+                            option_name = $item{}_opt{}_name,
+                            price = $item{}_opt{}_price;
+                        RELATE ({}[0].id)->has_option->($item{}_opt{}[0].id);
+                        "#,
+                        i, j, i, j, i, j, i, j, var_name, i, j
+                    ));
+                }
+            }
+        }
+
+        // For each payment, create and RELATE
+        for i in 0..snapshot.payments.len() {
+            query.push_str(&format!(
+                r#"
+                LET $payment{} = CREATE order_payment SET
+                    method = $payment{}_method,
+                    amount = $payment{}_amount,
+                    time = <datetime>$payment{}_time,
+                    reference = $payment{}_reference,
+                    cancelled = $payment{}_cancelled,
+                    cancel_reason = $payment{}_cancel_reason,
+                    split_items = $payment{}_split_items;
+                RELATE ($order[0].id)->has_payment->($payment{}[0].id);
+                "#,
+                i, i, i, i, i, i, i, i, i
+            ));
+        }
+
+        // For each event, create and RELATE
+        for i in 0..events.len() {
+            query.push_str(&format!(
+                r#"
+                LET $event{} = CREATE order_event SET
+                    event_type = $event{}_type,
+                    timestamp = <datetime>$event{}_timestamp,
+                    data = $event{}_data,
+                    prev_hash = $event{}_prev_hash,
+                    curr_hash = $event{}_curr_hash;
+                RELATE ($order[0].id)->has_event->($event{}[0].id);
+                "#,
+                i, i, i, i, i, i, i
+            ));
+        }
+
+        // Update system_state
+        query.push_str(
+            r#"
+            UPDATE system_state SET
+                last_order_id = <string>$order[0].id,
+                last_order_hash = $order_hash
+            WHERE id = system_state:global;
+            COMMIT TRANSACTION;
+            RETURN { success: true, order_id: <string>$order[0].id };
+            "#,
+        );
+
+        // Build the query with all bindings
+        let mut db_query = self.db.query(&query);
+
+        // Bind order fields
+        let status_str = match order.status {
+            SurrealOrderStatus::Completed => "COMPLETED",
+            SurrealOrderStatus::Void => "VOID",
+            SurrealOrderStatus::Moved => "MOVED",
+            SurrealOrderStatus::Merged => "MERGED",
+        };
+
+        db_query = db_query
+            .bind(("receipt_number", order.receipt_number.clone()))
+            .bind(("zone_name", order.zone_name.clone()))
+            .bind(("table_name", order.table_name.clone()))
+            .bind(("status", status_str))
+            .bind(("is_retail", order.is_retail))
+            .bind(("guest_count", order.guest_count))
+            .bind(("original_total", order.original_total))
+            .bind(("subtotal", order.subtotal))
+            .bind(("total_amount", order.total_amount))
+            .bind(("paid_amount", order.paid_amount))
+            .bind(("discount_amount", order.discount_amount))
+            .bind(("surcharge_amount", order.surcharge_amount))
+            .bind(("tax", order.tax))
+            .bind(("start_time", order.start_time.clone()))
+            .bind(("end_time", order.end_time.clone()))
+            .bind(("operator_id", order.operator_id.clone()))
+            .bind(("operator_name", order.operator_name.clone()))
+            .bind(("prev_hash", order.prev_hash.clone()))
+            .bind(("curr_hash", order.curr_hash.clone()))
+            .bind(("order_hash", order_hash.to_string()));
+
+        // Bind item fields
+        for (i, item) in snapshot.items.iter().enumerate() {
+            let base_price = item.original_price.unwrap_or(item.price);
+            let manual_discount_per_unit = item
+                .manual_discount_percent
+                .map(|p| base_price * p / 100.0)
+                .unwrap_or(0.0);
+            let rule_discount_per_unit = item.rule_discount_amount.unwrap_or(0.0);
+            let total_discount = (manual_discount_per_unit + rule_discount_per_unit) * item.quantity as f64;
+            let surcharge_per_unit = item.surcharge.unwrap_or(0.0) + item.rule_surcharge_amount.unwrap_or(0.0);
+            let total_surcharge = surcharge_per_unit * item.quantity as f64;
+            let unit_price = item.unit_price.unwrap_or(base_price - manual_discount_per_unit - rule_discount_per_unit + surcharge_per_unit);
+            let line_total = item.line_total.unwrap_or(unit_price * item.quantity as f64);
+            let spec_name = item.selected_specification.as_ref().map(|s| s.name.clone());
+            let instance_id = item.instance_id.clone();
+            let paid_qty = snapshot.paid_item_quantities.get(&instance_id).copied().unwrap_or(0);
+            let unpaid_quantity = (item.quantity - paid_qty).max(0);
+
+            db_query = db_query
+                .bind((format!("item{}_spec", i), item.id.clone()))
+                .bind((format!("item{}_instance_id", i), instance_id))
+                .bind((format!("item{}_name", i), item.name.clone()))
+                .bind((format!("item{}_spec_name", i), spec_name))
+                .bind((format!("item{}_price", i), base_price))
+                .bind((format!("item{}_quantity", i), item.quantity))
+                .bind((format!("item{}_unpaid_quantity", i), unpaid_quantity))
+                .bind((format!("item{}_unit_price", i), unit_price))
+                .bind((format!("item{}_line_total", i), line_total))
+                .bind((format!("item{}_discount_amount", i), total_discount))
+                .bind((format!("item{}_surcharge_amount", i), total_surcharge))
+                .bind((format!("item{}_tax", i), item.tax.unwrap_or(0.0)))
+                .bind((format!("item{}_note", i), item.note.clone()));
+
+            // Bind option fields
+            if let Some(options) = &item.selected_options {
+                for (j, opt) in options.iter().enumerate() {
+                    db_query = db_query
+                        .bind((format!("item{}_opt{}_attr", i, j), opt.attribute_name.clone()))
+                        .bind((format!("item{}_opt{}_name", i, j), opt.option_name.clone()))
+                        .bind((format!("item{}_opt{}_price", i, j), opt.price_modifier.unwrap_or(0.0)));
+                }
+            }
+        }
+
+        // Bind payment fields
+        for (i, payment) in snapshot.payments.iter().enumerate() {
+            let time = chrono::DateTime::from_timestamp_millis(payment.timestamp)
+                .map(|dt| dt.to_rfc3339())
+                .unwrap_or_default();
+            // Serialize split_items to JSON string (SurrealDB SDK has issues with Vec binding)
+            let split_items_str: Option<String> = payment
+                .split_items
+                .as_ref()
+                .map(|items| {
+                    let split_items: Vec<SplitItem> = items.iter().map(|si| SplitItem {
+                        instance_id: si.instance_id.clone(),
+                        name: si.name.clone(),
+                        quantity: si.quantity,
+                        unit_price: si.unit_price.unwrap_or(si.price),
+                    }).collect();
+                    serde_json::to_string(&split_items).unwrap_or_else(|_| "[]".to_string())
+                });
+
+            db_query = db_query
+                .bind((format!("payment{}_method", i), payment.method.clone()))
+                .bind((format!("payment{}_amount", i), payment.amount))
+                .bind((format!("payment{}_time", i), time))
+                .bind((format!("payment{}_reference", i), payment.note.clone()))
+                .bind((format!("payment{}_cancelled", i), payment.cancelled))
+                .bind((format!("payment{}_cancel_reason", i), payment.cancel_reason.clone()))
+                .bind((format!("payment{}_split_items", i), split_items_str));
+        }
+
+        // Bind event fields
         for (i, event) in events.iter().enumerate() {
             let prev_event_hash = if i == 0 {
                 "order_start".to_string()
@@ -203,25 +500,38 @@ impl OrderArchiveService {
             };
             let curr_event_hash = self.compute_event_hash(event);
 
-            self.order_repo
-                .add_event(
-                    &order_id.key().to_string(),
-                    self.convert_event_type(&event.event_type),
-                    serde_json::to_value(&event.payload).ok(),
-                    prev_event_hash,
-                    curr_event_hash,
-                )
-                .await
-                .map_err(|e| ArchiveError::Database(e.to_string()))?;
+            // Use serde to get correct SCREAMING_SNAKE_CASE format (e.g., "TABLE_OPENED")
+            let event_type_str = serde_json::to_value(&event.event_type)
+                .ok()
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| format!("{:?}", event.event_type).to_uppercase());
+
+            // Convert timestamp (millis) to RFC3339 for SurrealDB datetime
+            let timestamp_str = chrono::DateTime::from_timestamp_millis(event.timestamp)
+                .map(|dt| dt.to_rfc3339())
+                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
+
+            // Serialize payload to JSON string
+            let payload_str = serde_json::to_string(&event.payload)
+                .unwrap_or_else(|_| "{}".to_string());
+
+            db_query = db_query
+                .bind((format!("event{}_type", i), event_type_str))
+                .bind((format!("event{}_timestamp", i), timestamp_str))
+                .bind((format!("event{}_data", i), payload_str))
+                .bind((format!("event{}_prev_hash", i), prev_event_hash))
+                .bind((format!("event{}_curr_hash", i), curr_event_hash));
         }
 
-        // 8. Update system_state with new last_order_hash
-        self.system_state_repo
-            .update_last_order(&order_id.to_string(), order_hash)
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+        // Execute the transaction
+        let result = db_query.await.map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        tracing::info!(order_id = %snapshot.order_id, "Order archived to SurrealDB (graph model)");
+        // Check for errors in response
+        let errors = result.check();
+        if let Err(e) = errors {
+            return Err(ArchiveError::Database(e.to_string()));
+        }
+
         Ok(())
     }
 
@@ -288,10 +598,13 @@ impl OrderArchiveService {
             status,
             is_retail: snapshot.is_retail,
             guest_count: Some(snapshot.guest_count),
+            original_total: snapshot.original_total,
+            subtotal: snapshot.subtotal,
             total_amount: snapshot.total,
             paid_amount: snapshot.paid_amount,
             discount_amount: snapshot.total_discount,
             surcharge_amount: snapshot.total_surcharge,
+            tax: snapshot.tax,
             start_time: chrono::DateTime::from_timestamp_millis(snapshot.start_time)
                 .map(|dt| dt.to_rfc3339())
                 .unwrap_or_default(),
@@ -309,215 +622,6 @@ impl OrderArchiveService {
         })
     }
 
-    fn convert_event_type(&self, event_type: &OrderEventType) -> SurrealEventType {
-        match event_type {
-            // Lifecycle
-            OrderEventType::TableOpened => SurrealEventType::TableOpened,
-            OrderEventType::OrderCompleted => SurrealEventType::OrderCompleted,
-            OrderEventType::OrderVoided => SurrealEventType::OrderVoided,
-            OrderEventType::OrderRestored => SurrealEventType::OrderRestored,
-            // Items
-            OrderEventType::ItemsAdded => SurrealEventType::ItemsAdded,
-            OrderEventType::ItemModified => SurrealEventType::ItemModified,
-            OrderEventType::ItemRemoved => SurrealEventType::ItemRemoved,
-            OrderEventType::ItemRestored => SurrealEventType::ItemRestored,
-            // Payments
-            OrderEventType::PaymentAdded => SurrealEventType::PaymentAdded,
-            OrderEventType::PaymentCancelled => SurrealEventType::PaymentCancelled,
-            // Split
-            OrderEventType::OrderSplit => SurrealEventType::OrderSplit,
-            // Table operations
-            OrderEventType::OrderMoved => SurrealEventType::OrderMoved,
-            OrderEventType::OrderMovedOut => SurrealEventType::OrderMovedOut,
-            OrderEventType::OrderMerged => SurrealEventType::OrderMerged,
-            OrderEventType::OrderMergedOut => SurrealEventType::OrderMergedOut,
-            OrderEventType::TableReassigned => SurrealEventType::TableReassigned,
-            // Other
-            OrderEventType::OrderInfoUpdated => SurrealEventType::OrderInfoUpdated,
-            // Price Rules
-            OrderEventType::RuleSkipToggled => SurrealEventType::RuleSkipToggled,
-        }
-    }
-
-    /// Store order items with RELATE has_item edges
-    async fn store_items_with_edges(
-        &self,
-        order_id: &RecordId,
-        snapshot: &OrderSnapshot,
-    ) -> ArchiveResult<()> {
-        for item in &snapshot.items {
-            // Use original_price as base for discount calculation
-            let base_price = item.original_price.unwrap_or(item.price);
-
-            // Calculate per-unit discount amounts
-            let manual_discount_per_unit = item
-                .manual_discount_percent
-                .map(|p| base_price * p / 100.0)
-                .unwrap_or(0.0);
-            let rule_discount_per_unit = item.rule_discount_amount.unwrap_or(0.0);
-
-            // Total discount = per-unit discount * quantity
-            let total_discount =
-                (manual_discount_per_unit + rule_discount_per_unit) * item.quantity as f64;
-
-            // Total surcharge = per-unit surcharge * quantity
-            let surcharge_per_unit =
-                item.surcharge.unwrap_or(0.0) + item.rule_surcharge_amount.unwrap_or(0.0);
-            let total_surcharge = surcharge_per_unit * item.quantity as f64;
-
-            // Use pre-calculated values from snapshot
-            let unit_price = item.unit_price.unwrap_or({
-                base_price - manual_discount_per_unit - rule_discount_per_unit + surcharge_per_unit
-            });
-            let line_total = item
-                .line_total
-                .unwrap_or(unit_price * item.quantity as f64);
-
-            // Get spec_name from selected specification
-            let spec_name = item
-                .selected_specification
-                .as_ref()
-                .map(|s| s.name.clone());
-
-            // Get instance_id (content-addressable hash)
-            let instance_id = item.instance_id.clone();
-
-            // Calculate unpaid_quantity
-            let paid_qty = snapshot.paid_item_quantities.get(&instance_id).copied().unwrap_or(0);
-            let unpaid_quantity = (item.quantity - paid_qty).max(0);
-
-            // Create order_item and RELATE to order
-            let mut result = self
-                .db
-                .query(
-                    r#"
-                    LET $item = (CREATE order_item SET
-                        spec = $spec,
-                        instance_id = $instance_id,
-                        name = $name,
-                        spec_name = $spec_name,
-                        price = $price,
-                        quantity = $quantity,
-                        unpaid_quantity = $unpaid_quantity,
-                        unit_price = $unit_price,
-                        line_total = $line_total,
-                        discount_amount = $discount_amount,
-                        surcharge_amount = $surcharge_amount,
-                        note = $note
-                    );
-                    RELATE $order_id->has_item->$item;
-                    RETURN $item.id;
-                "#,
-                )
-                .bind(("order_id", order_id.clone()))
-                .bind(("spec", item.id.clone()))
-                .bind(("instance_id", instance_id.clone()))
-                .bind(("name", item.name.clone()))
-                .bind(("spec_name", spec_name))
-                .bind(("price", base_price))
-                .bind(("quantity", item.quantity))
-                .bind(("unpaid_quantity", unpaid_quantity))
-                .bind(("unit_price", unit_price))
-                .bind(("line_total", line_total))
-                .bind(("discount_amount", total_discount))
-                .bind(("surcharge_amount", total_surcharge))
-                .bind(("note", item.note.clone()))
-                .await
-                .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-            // Get created item ID for storing options
-            let item_ids: Vec<RecordId> = result
-                .take(0)
-                .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-            let item_id = item_ids
-                .into_iter()
-                .next()
-                .ok_or_else(|| ArchiveError::Database("Failed to create order_item".to_string()))?;
-
-            // Store options with RELATE has_option edges
-            if let Some(options) = &item.selected_options {
-                for opt in options {
-                    self.db
-                        .query(
-                            r#"
-                            LET $opt = (CREATE order_item_option SET
-                                attribute_name = $attribute_name,
-                                option_name = $option_name,
-                                price = $price
-                            );
-                            RELATE $item_id->has_option->$opt;
-                        "#,
-                        )
-                        .bind(("item_id", item_id.clone()))
-                        .bind(("attribute_name", opt.attribute_name.clone()))
-                        .bind(("option_name", opt.option_name.clone()))
-                        .bind(("price", opt.price_modifier.unwrap_or(0.0)))
-                        .await
-                        .map_err(|e| ArchiveError::Database(e.to_string()))?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Store payments with RELATE has_payment edges
-    async fn store_payments_with_edges(
-        &self,
-        order_id: &RecordId,
-        snapshot: &OrderSnapshot,
-    ) -> ArchiveResult<()> {
-        for payment in &snapshot.payments {
-            let time = chrono::DateTime::from_timestamp_millis(payment.timestamp)
-                .map(|dt| dt.to_rfc3339())
-                .unwrap_or_default();
-
-            // Build split_items from payment if available
-            let split_items: Vec<SplitItem> = payment
-                .split_items
-                .as_ref()
-                .map(|items| {
-                    items
-                        .iter()
-                        .map(|si| SplitItem {
-                            instance_id: si.instance_id.clone(),
-                            name: si.name.clone(),
-                            quantity: si.quantity,
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-
-            self.db
-                .query(
-                    r#"
-                    LET $payment = (CREATE order_payment SET
-                        method = $method,
-                        amount = $amount,
-                        time = <datetime>$time,
-                        reference = $reference,
-                        cancelled = $cancelled,
-                        cancel_reason = $cancel_reason,
-                        split_items = $split_items
-                    );
-                    RELATE $order_id->has_payment->$payment;
-                "#,
-                )
-                .bind(("order_id", order_id.clone()))
-                .bind(("method", payment.method.clone()))
-                .bind(("amount", payment.amount))
-                .bind(("time", time))
-                .bind(("reference", payment.note.clone()))
-                .bind(("cancelled", payment.cancelled))
-                .bind(("cancel_reason", payment.cancel_reason.clone()))
-                .bind(("split_items", split_items))
-                .await
-                .map_err(|e| ArchiveError::Database(e.to_string()))?;
-        }
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]

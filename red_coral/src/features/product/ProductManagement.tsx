@@ -248,7 +248,7 @@ export const ProductManagement: React.FC = React.memo(() => {
                   handleManageSpecs(item);
                 }}
                 className="p-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200/50"
-                title={t('specification.manage')}
+                title={t('settings.specification.manage')}
               >
                 <Settings size={14} />
               </button>

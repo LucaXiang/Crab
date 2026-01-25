@@ -94,6 +94,7 @@ mod tests {
             surcharge: None,
             unit_price: None,
             line_total: None,
+            tax: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,

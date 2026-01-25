@@ -152,18 +152,17 @@ impl DiningTableRepository {
         let capacity = data.capacity.unwrap_or(existing.capacity);
         let is_active = data.is_active.unwrap_or(existing.is_active);
 
-        self.base
+        let mut result = self.base
             .db()
-            .query("UPDATE $thing SET name = $name, zone = $zone, capacity = $capacity, is_active = $is_active")
-            .bind(("thing", thing.clone()))
+            .query("UPDATE $thing SET name = $name, zone = $zone, capacity = $capacity, is_active = $is_active RETURN AFTER")
+            .bind(("thing", thing))
             .bind(("name", name))
             .bind(("zone", zone))
             .bind(("capacity", capacity))
             .bind(("is_active", is_active))
             .await?;
 
-        self.find_by_id(id)
-            .await?
+        result.take::<Option<DiningTable>>(0)?
             .ok_or_else(|| RepoError::NotFound(format!("Dining table {} not found", id)))
     }
 

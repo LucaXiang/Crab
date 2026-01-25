@@ -565,7 +565,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
       {/* Specifications - only show when multiple specs exist */}
       {formData.specs && formData.specs.length > 1 && (
-        <FormSection title={t('specification.list')} icon={List} defaultCollapsed>
+        <FormSection title={t('settings.specification.list')} icon={List} defaultCollapsed>
           <div className="space-y-3">
             {formData.specs.map((spec, index) => (
               <div
@@ -577,12 +577,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <span className="font-medium text-gray-900">{spec.name}</span>
                     {spec.is_root && (
                       <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded">
-                        {t('specification.label.root')}
+                        {t('settings.specification.label.root')}
                       </span>
                     )}
                     {spec.is_default && (
                       <span className="px-2 py-0.5 text-xs font-medium bg-teal-100 text-teal-700 rounded">
-                        {t('specification.label.default')}
+                        {t('settings.specification.label.default')}
                       </span>
                     )}
                   </div>
@@ -591,7 +591,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
                   {/* Receipt Name */}
-                  <FormField label={t('specification.form.receipt_name')}>
+                  <FormField label={t('settings.specification.form.receipt_name')}>
                     <input
                       value={spec.receipt_name || ''}
                       onChange={(e) => {
@@ -599,13 +599,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         newSpecs[index] = { ...newSpecs[index], receipt_name: e.target.value || null };
                         onFieldChange('specs', newSpecs);
                       }}
-                      placeholder={t('specification.form.receipt_name_placeholder')}
+                      placeholder={t('settings.specification.form.receipt_name_placeholder')}
                       className={inputClass}
                     />
                   </FormField>
 
                   {/* Is Root Toggle */}
-                  <FormField label={t('specification.form.is_root')}>
+                  <FormField label={t('settings.specification.form.is_root')}>
                     <button
                       type="button"
                       onClick={() => {
@@ -623,10 +623,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     >
                       {spec.is_root ? <Check size={16} /> : <Star size={16} />}
                       <span className="text-sm">
-                        {spec.is_root ? t('specification.label.root') : t('specification.form.is_root')}
+                        {spec.is_root ? t('settings.specification.label.root') : t('settings.specification.form.is_root')}
                       </span>
                     </button>
-                    <p className="mt-1 text-xs text-gray-500">{t('specification.form.is_root_hint')}</p>
+                    <p className="mt-1 text-xs text-gray-500">{t('settings.specification.form.is_root_hint')}</p>
                   </FormField>
                 </div>
               </div>

@@ -55,6 +55,9 @@ pub struct CartItemSnapshot {
     /// Line total (computed by backend: unit_price * quantity)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub line_total: Option<f64>,
+    /// Tax amount for this item
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tax: Option<f64>,
 
     /// Item note
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -151,11 +154,16 @@ pub struct ItemChanges {
 }
 
 /// Split item for split bill
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SplitItem {
+    #[serde(default)]
     pub instance_id: String,
+    #[serde(default)]
     pub name: String,
+    #[serde(default)]
     pub quantity: i32,
+    #[serde(default)]
+    pub unit_price: f64,
 }
 
 /// Payment input for adding payment
@@ -330,6 +338,7 @@ mod tests {
             applied_rules: Some(vec![]),
             unit_price: None,
             line_total: None,
+            tax: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,

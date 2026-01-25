@@ -129,8 +129,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     if (containerSize.width === 0 || containerSize.height === 0) return;
     if (viewState.scale !== 1.0 || viewState.x !== 0 || viewState.y !== 0) return;
 
-    const labelWidth = (template.widthMm ?? 0) * MM_TO_PX_SCALE;
-    const labelHeight = (template.heightMm ?? 0) * MM_TO_PX_SCALE;
+    const labelWidth = (template.widthMm ?? template.width ?? 0) * MM_TO_PX_SCALE;
+    const labelHeight = (template.heightMm ?? template.height ?? 0) * MM_TO_PX_SCALE;
     const padding = 40;
 
     // Calculate available area respecting insets
@@ -147,7 +147,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
     setViewState({ x, y, scale: initialScale });
     setNeedsRedraw(true);
-  }, [containerSize, template.widthMm, template.heightMm, viewState, visibleAreaInsets]);
+  }, [containerSize, template.widthMm, template.heightMm, template.width, template.height, viewState, visibleAreaInsets]);
 
   // Ensure selected field is visible
   useEffect(() => {
@@ -230,8 +230,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
   // Pre-render static background (grid + paper shadow) to OffscreenCanvas
   const renderBackground = useCallback(() => {
-    const labelWidth = (template.widthMm ?? 0) * MM_TO_PX_SCALE;
-    const labelHeight = (template.heightMm ?? 0) * MM_TO_PX_SCALE;
+    const labelWidth = (template.widthMm ?? template.width ?? 0) * MM_TO_PX_SCALE;
+    const labelHeight = (template.heightMm ?? template.height ?? 0) * MM_TO_PX_SCALE;
 
     if (!backgroundCanvasRef.current ||
         backgroundCanvasRef.current.width !== labelWidth ||
@@ -255,7 +255,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
     // Grid removed from background to avoid duplication and confusion when offset is applied
     // The grid will be drawn in drawTemplate relative to content
-  }, [template.widthMm, template.heightMm]);
+  }, [template.widthMm, template.heightMm, template.width, template.height]);
 
   // Draw template on canvas (optimized)
   const drawTemplate = useCallback(() => {
@@ -279,8 +279,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     ctx.translate(viewState.x, viewState.y);
     ctx.scale(viewState.scale, viewState.scale);
 
-    const labelWidth = (template.widthMm ?? 0) * MM_TO_PX_SCALE;
-    const labelHeight = (template.heightMm ?? 0) * MM_TO_PX_SCALE;
+    const labelWidth = (template.widthMm ?? template.width ?? 0) * MM_TO_PX_SCALE;
+    const labelHeight = (template.heightMm ?? template.height ?? 0) * MM_TO_PX_SCALE;
     const { x: paddingX, y: paddingY } = getPadding();
 
     // Calculate paper position
@@ -526,7 +526,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       const field = template.fields[i];
       if (field.type === 'separator') {
         // Separator is drawn relative to padding too
-        if (x >= 8 && x <= (template.widthMm ?? 0) * MM_TO_PX_SCALE - 8 && Math.abs(y - field.y) <= 5) return field;
+        if (x >= 8 && x <= (template.widthMm ?? template.width ?? 0) * MM_TO_PX_SCALE - 8 && Math.abs(y - field.y) <= 5) return field;
         continue;
       }
       if (x >= field.x && x <= field.x + field.width &&
@@ -535,7 +535,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       }
     }
     return null;
-  }, [template.fields, template.widthMm]);
+  }, [template.fields, template.widthMm, template.width]);
 
   const getResizeHandle = useCallback((
     field: LabelField, x: number, y: number
@@ -787,8 +787,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
         <button
           onClick={() => {
             if (containerSize.width === 0) return;
-            const labelWidth = (template.widthMm ?? 0) * MM_TO_PX_SCALE;
-            const labelHeight = (template.heightMm ?? 0) * MM_TO_PX_SCALE;
+            const labelWidth = (template.widthMm ?? template.width ?? 0) * MM_TO_PX_SCALE;
+            const labelHeight = (template.heightMm ?? template.height ?? 0) * MM_TO_PX_SCALE;
             const padding = 40;
 
             // Calculate available area respecting insets

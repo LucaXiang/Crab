@@ -107,15 +107,14 @@ impl TagRepository {
             )));
         }
 
-        self.base
+        let mut result = self.base
             .db()
-            .query("UPDATE $thing MERGE $data")
-            .bind(("thing", thing.clone()))
+            .query("UPDATE $thing MERGE $data RETURN AFTER")
+            .bind(("thing", thing))
             .bind(("data", data))
             .await?;
 
-        self.find_by_id(id)
-            .await?
+        result.take::<Option<Tag>>(0)?
             .ok_or_else(|| RepoError::NotFound(format!("Tag {} not found", id)))
     }
 

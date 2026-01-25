@@ -26,7 +26,8 @@
       "expand": "展开",
       "collapse": "收起",
       "batch_delete": "批量删除",
-      "upload_image": "上传图片"
+      "upload_image": "上传图片",
+      "actions": "操作"
     },
     "status": {
       "all": "全部",
@@ -784,6 +785,10 @@
       "update_category_success": "分类更新成功",
       "label": {
         "virtual": "虚拟"
+      },
+      "tab": {
+        "normal": "实体分类",
+        "virtual": "虚拟分类"
       },
       "form": {
         "name": "分类名称",

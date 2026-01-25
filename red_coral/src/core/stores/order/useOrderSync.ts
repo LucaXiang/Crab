@@ -1,14 +1,18 @@
 /**
- * Order Sync Hook
+ * Order Sync Hook (Server Authority Model)
  *
  * Handles reconnection and synchronization of order state after network disconnection.
  *
+ * Server Authority Model:
+ * - Client NEVER computes snapshots locally
+ * - All sync operations use server-provided snapshots via _fullSync
+ * - No incremental event application (no local computation)
+ *
  * Sync Protocol:
  * 1. On disconnect: Mark connection state as 'disconnected'
- * 2. On reconnect: Request incremental events since lastSequence
- * 3. Server returns: events + active orders + server sequence
- * 4. If gap > threshold: Full sync with snapshots
- * 5. Otherwise: Apply incremental events
+ * 2. On reconnect: Request full sync from server
+ * 3. Server returns: active orders (snapshots) + events (for timeline)
+ * 4. Always use _fullSync to replace state with server data
  *
  * Usage:
  * const { syncOrders, reconnect, isReconnecting } = useOrderSync();
@@ -21,7 +25,7 @@ import { useCallback, useState } from 'react';
 import { invokeApi } from '@/infrastructure/api';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { useActiveOrdersStore } from './useActiveOrdersStore';
-import type { SyncResponse, OrderEvent } from '@/core/domain/types/orderEvent';
+import type { SyncResponse, OrderEvent, OrderSnapshot } from '@/core/domain/types/orderEvent';
 
 // ============================================================================
 // Constants
@@ -85,15 +89,13 @@ export function useOrderSync() {
   }, []);
 
   /**
-   * Perform reconnection and sync
+   * Perform reconnection and sync (Server Authority Model)
    *
-   * Server Epoch Check:
-   * If the server's epoch differs from our stored epoch, it means the server
-   * has restarted. In this case, we MUST perform a full sync regardless of
-   * the sequence gap, as the server's in-memory state was reset.
+   * Always performs full sync - client never computes snapshots locally.
+   * Server provides both snapshots and events (for timeline display).
    */
   const reconnect = useCallback(async (): Promise<boolean> => {
-    const { lastSequence, serverEpoch, _applyEvents, _fullSync, _setConnectionState } =
+    const { _fullSync, _setConnectionState } =
       useActiveOrdersStore.getState();
 
     setIsReconnecting(true);
@@ -101,41 +103,17 @@ export function useOrderSync() {
     setError(null);
 
     try {
-      // Request sync from server
-      const response = await syncOrders(lastSequence);
+      // Always request full sync from sequence 0 (Server Authority Model)
+      // This ensures we get server-computed snapshots, not incremental events
+      const response = await syncOrders(0);
 
       if (!response) {
         throw new Error('Failed to get sync response');
       }
 
-      // Check for server restart (epoch change)
-      const epochChanged = serverEpoch !== null && response.server_epoch !== serverEpoch;
-      if (epochChanged) {
-        console.warn(
-          `[Sync] Server epoch changed: ${serverEpoch} → ${response.server_epoch}. ` +
-          `Server has restarted, forcing full sync.`
-        );
-      }
-
-      // Determine sync strategy
-      const eventGap = response.server_sequence - lastSequence;
-      const needsFullSync = response.requires_full_sync || eventGap > MAX_EVENT_GAP || epochChanged;
-
-      if (needsFullSync) {
-        // Full sync: replace all state with server snapshots
-        const reason = epochChanged ? 'epoch_change' : eventGap > MAX_EVENT_GAP ? 'large_gap' : 'server_request';
-        console.log(`[Sync] Full sync: reason=${reason}, gap=${eventGap}, epoch=${response.server_epoch}`);
-        _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
-      } else if (response.events.length > 0) {
-        // Incremental sync: apply missing events
-        console.log(`[Sync] Incremental: ${response.events.length} events`);
-        _applyEvents(response.events);
-        _setConnectionState('connected');
-      } else {
-        // No events to sync, already up to date
-        console.log('[Sync] Already up to date');
-        _setConnectionState('connected');
-      }
+      // Server Authority: always use full sync with server-provided snapshots
+      console.log(`[Sync] Full sync: ${response.active_orders.length} orders, epoch=${response.server_epoch}`);
+      _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
 
       setReconnectAttempts(0);
       setIsReconnecting(false);
@@ -236,12 +214,23 @@ export function useOrderSync() {
   };
 }
 
+/** Payload structure for order-sync Tauri events (matches Rust OrderSyncPayload) */
+interface OrderSyncPayload {
+  event: OrderEvent;
+  snapshot: OrderSnapshot;
+}
+
 // ============================================================================
-// Event Listener Setup
+// Event Listener Setup (Server Authority Model)
 // ============================================================================
 
 /**
- * Setup Tauri event listeners for order events and connection status
+ * Setup Tauri event listeners for order sync and connection status
+ *
+ * Server Authority Model:
+ * - Backend sends 'order-sync' events containing BOTH event AND snapshot
+ * - No API calls needed - snapshot is provided directly
+ * - On sync request, always perform full sync
  *
  * Call this once in App.tsx or a provider component:
  *
@@ -253,12 +242,15 @@ export function useOrderSync() {
 export async function setupOrderEventListeners(): Promise<() => void> {
   const unlistenFns: UnlistenFn[] = [];
 
-  // Listen for order events
-  const unlistenOrderEvent = await listen<OrderEvent>('order-event', (event) => {
-    const orderEvent = event.payload;
-    useActiveOrdersStore.getState()._applyEvent(orderEvent);
+  // Listen for order-sync events (Server Authority: event + snapshot bundled)
+  const unlistenOrderSync = await listen<OrderSyncPayload>('order-sync', (event) => {
+    const { event: orderEvent, snapshot } = event.payload;
+    console.log(`[OrderSync] Received sync: ${orderEvent.event_type} for order ${orderEvent.order_id}`);
+
+    // Apply with server-computed snapshot directly (no API call)
+    useActiveOrdersStore.getState()._applyOrderSync(orderEvent, snapshot);
   });
-  unlistenFns.push(unlistenOrderEvent);
+  unlistenFns.push(unlistenOrderSync);
 
   // Listen for connection status changes
   const unlistenConnectionStatus = await listen<'connected' | 'disconnected'>(
@@ -276,35 +268,22 @@ export async function setupOrderEventListeners(): Promise<() => void> {
   unlistenFns.push(unlistenConnectionStatus);
 
   // Listen for sync requests (server can request client to resync)
+  // Server Authority: always perform full sync
   const unlistenSyncRequest = await listen<{ since_sequence: number }>(
     'order-sync-request',
     async () => {
       console.log('[Sync] Server requested sync');
-      // Trigger reconnect to resync state
-      const { lastSequence, serverEpoch, _applyEvents, _fullSync, _setConnectionState } =
-        useActiveOrdersStore.getState();
+      const { _fullSync, _setConnectionState } = useActiveOrdersStore.getState();
 
       _setConnectionState('syncing');
 
       try {
+        // Always full sync (Server Authority Model)
         const response = await invokeApi<SyncResponse>('order_sync_since', {
-          since_sequence: lastSequence,
+          since_sequence: 0,
         });
 
-        // Check for epoch change (server restart)
-        const epochChanged = serverEpoch !== null && response.server_epoch !== serverEpoch;
-        if (epochChanged) {
-          console.warn(`[Sync] Server epoch changed during sync request, forcing full sync`);
-        }
-
-        if (response.requires_full_sync || epochChanged) {
-          _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
-        } else if (response.events.length > 0) {
-          _applyEvents(response.events);
-          _setConnectionState('connected');
-        } else {
-          _setConnectionState('connected');
-        }
+        _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
       } catch (err) {
         console.error('[Sync] Sync request failed:', err);
         _setConnectionState('disconnected');

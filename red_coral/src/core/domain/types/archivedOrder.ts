@@ -38,6 +38,7 @@ export interface ArchivedSplitItem {
   instance_id: string;
   name: string;
   quantity: number;
+  unit_price: number;
 }
 
 /** Order item option for detail view */

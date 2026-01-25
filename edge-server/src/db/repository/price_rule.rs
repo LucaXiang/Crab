@@ -265,15 +265,14 @@ impl PriceRuleRepository {
             is_active: data.is_active,
         };
 
-        self.base
+        let mut result = self.base
             .db()
-            .query("UPDATE $thing MERGE $data")
-            .bind(("thing", thing.clone()))
+            .query("UPDATE $thing MERGE $data RETURN AFTER")
+            .bind(("thing", thing))
             .bind(("data", internal))
             .await?;
 
-        self.find_by_id(id)
-            .await?
+        result.take::<Option<PriceRule>>(0)?
             .ok_or_else(|| RepoError::NotFound(format!("Price rule {} not found", id)))
     }
 

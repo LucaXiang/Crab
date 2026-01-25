@@ -198,6 +198,7 @@ pub fn input_to_snapshot_with_rules(
         surcharge: input.surcharge,
         unit_price: None,  // Computed by recalculate_totals
         line_total: None,  // Computed by recalculate_totals
+        tax: None,         // Computed by recalculate_totals
         note: input.note.clone(),
         authorizer_id: input.authorizer_id.clone(),
         authorizer_name: input.authorizer_name.clone(),

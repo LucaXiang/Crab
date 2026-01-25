@@ -238,6 +238,7 @@ mod tests {
             authorizer_name: None,
             unit_price: None,
             line_total: None,
+            tax: None,
         };
 
         let total = calculate_item_total(&item);
@@ -266,6 +267,7 @@ mod tests {
             authorizer_name: None,
             unit_price: None,
             line_total: None,
+            tax: None,
         };
 
         let total = calculate_item_total(&item);
@@ -295,6 +297,7 @@ mod tests {
             authorizer_name: None,
             unit_price: None,
             line_total: None,
+            tax: None,
         };
 
         let total = calculate_item_total(&item);
@@ -353,6 +356,7 @@ mod tests {
                 authorizer_name: None,
                 unit_price: None,
                 line_total: None,
+            tax: None,
             })
             .collect();
 
@@ -385,6 +389,7 @@ mod tests {
             authorizer_name: None,
             unit_price: None,
             line_total: None,
+            tax: None,
         });
 
         // Initial calculation
@@ -419,6 +424,7 @@ mod tests {
             authorizer_name: None,
             unit_price: None,
             line_total: None,
+            tax: None,
         });
 
         recalculate_totals(&mut snapshot);
@@ -451,6 +457,7 @@ mod tests {
             authorizer_name: None,
             unit_price: None,
             line_total: None,
+            tax: None,
         });
 
         // is_pre_payment is false by default

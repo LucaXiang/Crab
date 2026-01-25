@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { X, Type, Hash, FileText, Star } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { FormField, FormSection, inputClass } from '@/shared/components/FormField';
@@ -56,8 +56,16 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
   const { t } = useI18n();
   const isEditing = spec !== null;
 
+  // Memoize the initial form data to prevent useEffect from re-running on every render
+  // Specs don't have id, use specIndex from parent as stable key
+  const initialFormData = useMemo(
+    () => (spec ? mapToFormData(spec) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [specIndex]
+  );
+
   const [formData, setFormData] = useFormInitialization<SpecFormData>(
-    spec ? mapToFormData(spec) : null,
+    initialFormData,
     mapToFormData(null),
     [isOpen]
   );
@@ -135,11 +143,11 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold text-gray-900">
-                {isEditing ? t('specification.edit') : t('specification.add_new')}
+                {isEditing ? t('settings.specification.edit') : t('settings.specification.add_new')}
               </h2>
               {isRootSpec && (
                 <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded">
-                  {t('specification.label.root')}
+                  {t('settings.specification.label.root')}
                 </span>
               )}
             </div>
@@ -155,17 +163,17 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
         {/* Content */}
         <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
           <FormSection title={t('settings.attribute.section.basic')} icon={Type}>
-            <FormField label={t('specification.form.name')} required>
+            <FormField label={t('settings.specification.form.name')} required>
               <input
                 value={formData.name}
                 onChange={(e) => handleFieldChange('name', e.target.value)}
-                placeholder={t('specification.form.name_placeholder')}
+                placeholder={t('settings.specification.form.name_placeholder')}
                 className={inputClass}
                 autoFocus
               />
             </FormField>
 
-            <FormField label={t('specification.form.receipt_name')}>
+            <FormField label={t('settings.specification.form.receipt_name')}>
               <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                   <FileText size={14} />
@@ -173,13 +181,13 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
                 <input
                   value={formData.receiptName}
                   onChange={(e) => handleFieldChange('receiptName', e.target.value)}
-                  placeholder={t('specification.form.receipt_name_placeholder')}
+                  placeholder={t('settings.specification.form.receipt_name_placeholder')}
                   className={`${inputClass} pl-9`}
                 />
               </div>
             </FormField>
 
-            <FormField label={t('specification.form.price')} required={!isRootSpec}>
+            <FormField label={t('settings.specification.form.price')} required={!isRootSpec}>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">EUR</span>
                 <input
@@ -197,12 +205,12 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
               </div>
               {isRootSpec && isEditing && (
                 <p className="mt-1 text-xs text-gray-500">
-                  {t('specification.form.base_spec_price_hint')}
+                  {t('settings.specification.form.base_spec_price_hint')}
                 </p>
               )}
             </FormField>
 
-            <FormField label={t('specification.form.external_id')} required={!isRootSpec}>
+            <FormField label={t('settings.specification.form.external_id')} required={!isRootSpec}>
               <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                   <Hash size={14} />
@@ -214,7 +222,7 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
                     const val = e.target.value;
                     handleFieldChange('externalId', val ? parseInt(val, 10) : null);
                   }}
-                  placeholder={t('specification.form.external_id_placeholder')}
+                  placeholder={t('settings.specification.form.external_id_placeholder')}
                   className={`${inputClass} pl-9 ${isRootSpec && isEditing ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
                   disabled={isRootSpec && isEditing}
                 />
@@ -223,7 +231,7 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
           </FormSection>
 
           {/* Default Toggle */}
-          <FormSection title={t('specification.form.set_default')} icon={Star}>
+          <FormSection title={t('settings.specification.form.set_default')} icon={Star}>
             <div
               onClick={() => handleFieldChange('isDefault', !formData.isDefault)}
               className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
@@ -245,10 +253,10 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
               </div>
               <div className="flex-1">
                 <span className={`font-medium ${formData.isDefault ? 'text-orange-700' : 'text-gray-700'}`}>
-                  {formData.isDefault ? t('specification.label.default') : t('specification.label.set_default')}
+                  {formData.isDefault ? t('settings.specification.label.default') : t('settings.specification.label.set_default')}
                 </span>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {t('specification.form.set_default_hint')}
+                  {t('settings.specification.form.set_default_hint')}
                 </p>
               </div>
             </div>

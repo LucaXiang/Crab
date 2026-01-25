@@ -589,6 +589,8 @@ export interface CartItemSnapshot {
   unit_price?: number | null;
   /** Line total (computed by backend: unit_price * quantity) */
   line_total?: number | null;
+  /** Tax amount for this item */
+  tax?: number | null;
 
   note?: string | null;
   authorizer_id?: string | null;
@@ -671,6 +673,7 @@ export interface SplitItem {
   instance_id: string;
   name: string;
   quantity: number;
+  unit_price: number;
 }
 
 export interface PaymentSummaryItem {

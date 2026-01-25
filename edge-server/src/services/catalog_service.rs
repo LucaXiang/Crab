@@ -782,16 +782,16 @@ impl CatalogService {
             is_display: data.is_display,
         };
 
-        self.db
-            .query("UPDATE $thing MERGE $data")
+        // Update and return the updated record directly
+        let mut result = self.db
+            .query("UPDATE $thing MERGE $data RETURN AFTER")
             .bind(("thing", thing.clone()))
             .bind(("data", update_data))
             .await?;
 
-        // Fetch updated category
-        let updated: Option<Category> = self.db.select(("category", thing.key().to_string())).await?;
+        let updated: Option<Category> = result.take(0)?;
         let updated =
-            updated.ok_or_else(|| RepoError::NotFound(format!("Category {} not found", id)))?;
+            updated.ok_or_else(|| RepoError::NotFound(format!("Category {} not found after update", id)))?;
 
         // Update cache
         {

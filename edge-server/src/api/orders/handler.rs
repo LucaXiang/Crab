@@ -341,13 +341,13 @@ pub async fn fetch_order_list(
     // Query 2: Get paginated results (graph model format)
     let data_query = format!(
         "SELECT \
-         record::id(id) AS order_id, \
+         <string>id AS order_id, \
          receipt_number, \
          table_name, \
          string::uppercase(status) AS status, \
-         is_retail ?? false AS is_retail, \
+         is_retail, \
          total_amount AS total, \
-         guest_count ?? 1 AS guest_count, \
+         guest_count, \
          time::millis(start_time) AS start_time, \
          time::millis(end_time) AS end_time \
          FROM order {} ORDER BY end_time DESC LIMIT $limit START $offset",

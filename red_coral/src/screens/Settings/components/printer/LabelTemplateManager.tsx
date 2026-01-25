@@ -75,6 +75,8 @@ export const LabelTemplateManager: React.FC = () => {
       name: templateName,
       width: templateWidth,
       height: templateHeight,
+      widthMm: templateWidth,
+      heightMm: templateHeight,
       padding: 2,
       isDefault: false,
       isActive: true,

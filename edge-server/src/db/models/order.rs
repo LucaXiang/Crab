@@ -31,10 +31,13 @@ pub struct Order {
     pub status: OrderStatus,
     pub is_retail: bool,
     pub guest_count: Option<i32>,
+    pub original_total: f64,
+    pub subtotal: f64,
     pub total_amount: f64,
     pub paid_amount: f64,
     pub discount_amount: f64,
     pub surcharge_amount: f64,
+    pub tax: f64,
     pub start_time: String,
     pub end_time: Option<String>,
     pub operator_id: Option<String>,
@@ -66,6 +69,7 @@ pub struct OrderItem {
     pub line_total: f64,
     pub discount_amount: f64,
     pub surcharge_amount: f64,
+    pub tax: f64,
     pub note: Option<String>,
 }
 
@@ -89,6 +93,8 @@ pub struct SplitItem {
     pub instance_id: String,
     pub name: String,
     pub quantity: i32,
+    #[serde(default)]
+    pub unit_price: f64,
 }
 
 /// Archived payment record (connected via has_payment edge)
@@ -223,11 +229,19 @@ pub struct OrderSummary {
     pub receipt_number: String,
     pub table_name: Option<String>,
     pub status: String,
+    #[serde(default)]
     pub is_retail: bool,
+    #[serde(default)]
     pub total: f64,
+    #[serde(default = "default_guest_count")]
     pub guest_count: i32,
+    #[serde(default)]
     pub start_time: i64,
     pub end_time: Option<i64>,
+}
+
+fn default_guest_count() -> i32 {
+    1
 }
 
 /// Order item option for detail view
@@ -245,14 +259,22 @@ pub struct OrderItemDetail {
     pub instance_id: String,
     pub name: String,
     pub spec_name: Option<String>,
+    #[serde(default)]
     pub price: f64,
+    #[serde(default)]
     pub quantity: i32,
+    #[serde(default)]
     pub unpaid_quantity: i32,
+    #[serde(default)]
     pub unit_price: f64,
+    #[serde(default)]
     pub line_total: f64,
+    #[serde(default)]
     pub discount_amount: f64,
+    #[serde(default)]
     pub surcharge_amount: f64,
     pub note: Option<String>,
+    #[serde(default)]
     pub selected_options: Vec<OrderItemOptionDetail>,
 }
 
@@ -263,8 +285,10 @@ pub struct OrderPaymentDetail {
     pub amount: f64,
     pub timestamp: i64,
     pub note: Option<String>,
+    #[serde(default)]
     pub cancelled: bool,
     pub cancel_reason: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_split_items")]
     pub split_items: Vec<SplitItem>,
 }
 
@@ -274,7 +298,38 @@ pub struct OrderEventDetail {
     pub event_id: String,
     pub event_type: String,
     pub timestamp: i64,
+    #[serde(deserialize_with = "deserialize_json_string")]
     pub payload: Option<serde_json::Value>,
+}
+
+/// Deserialize JSON string to Value
+fn deserialize_json_string<'de, D>(deserializer: D) -> Result<Option<serde_json::Value>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    match opt {
+        Some(s) if !s.is_empty() => {
+            serde_json::from_str(&s).map(Some).map_err(serde::de::Error::custom)
+        }
+        _ => Ok(Some(serde_json::Value::Object(serde_json::Map::new()))),
+    }
+}
+
+/// Deserialize JSON string to Vec<SplitItem>
+fn deserialize_split_items<'de, D>(deserializer: D) -> Result<Vec<SplitItem>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    match opt {
+        Some(s) if !s.is_empty() => {
+            serde_json::from_str(&s).map_err(serde::de::Error::custom)
+        }
+        _ => Ok(Vec::new()),
+    }
 }
 
 /// Full order detail (for frontend)
@@ -285,16 +340,26 @@ pub struct OrderDetail {
     pub table_name: Option<String>,
     pub zone_name: Option<String>,
     pub status: String,
+    #[serde(default)]
     pub is_retail: bool,
+    #[serde(default = "default_guest_count")]
     pub guest_count: i32,
+    #[serde(default)]
     pub total: f64,
+    #[serde(default)]
     pub paid_amount: f64,
+    #[serde(default)]
     pub total_discount: f64,
+    #[serde(default)]
     pub total_surcharge: f64,
+    #[serde(default)]
     pub start_time: i64,
     pub end_time: Option<i64>,
     pub operator_name: Option<String>,
+    #[serde(default)]
     pub items: Vec<OrderItemDetail>,
+    #[serde(default)]
     pub payments: Vec<OrderPaymentDetail>,
+    #[serde(default)]
     pub timeline: Vec<OrderEventDetail>,
 }

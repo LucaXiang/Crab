@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { X, Type, Printer, Settings2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useOptionActions } from './store';
@@ -62,9 +62,17 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
   const { t } = useI18n();
   const { createOption, updateOption } = useOptionActions();
 
+  // Memoize the initial form data to prevent useEffect from re-running on every render
+  // Use attributeId + index as stable key - options don't have their own id
+  const initialFormData = useMemo(
+    () => (editingOption ? mapToFormData(editingOption) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editingOption?.attributeId, editingOption?.index]
+  );
+
   // Use form initialization hook with mapped data
   const [formData, setFormData] = useFormInitialization<OptionFormData>(
-    editingOption ? mapToFormData(editingOption) : null,
+    initialFormData,
     mapToFormData(null),
     [isOpen]
   );

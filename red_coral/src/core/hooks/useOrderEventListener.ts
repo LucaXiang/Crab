@@ -1,14 +1,18 @@
 /**
- * Order Event Listener Hook
+ * Order Event Listener Hook (Server Authority Model)
  *
- * Sets up Tauri event listeners for order events and handles initialization.
+ * Sets up Tauri event listeners for order sync and handles initialization.
  * This hook should be called once at the app level (App.tsx) after server mode starts.
  *
- * Responsibilities:
- * 1. Listen for 'order-event' events from Tauri backend
- * 2. Apply events to useActiveOrdersStore
- * 3. Initialize order state on first connection
- * 4. Handle reconnection scenarios
+ * Server Authority Model:
+ * - Client NEVER computes snapshots locally
+ * - Backend sends 'order-sync' events containing BOTH event AND snapshot
+ * - Store uses server-provided snapshots directly
+ *
+ * Event Flow:
+ * 1. Listen for 'order-sync' events from Tauri backend
+ * 2. Event payload contains { event, snapshot } - no API call needed
+ * 3. Apply (event, snapshot) pair to store directly
  */
 
 import { useEffect, useRef, useCallback } from 'react';
@@ -17,6 +21,12 @@ import { invokeApi } from '@/infrastructure/api';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useBridgeStore } from '@/core/stores/bridge/useBridgeStore';
 import type { OrderEvent, OrderSnapshot, SyncResponse } from '@/core/domain/types/orderEvent';
+
+/** Payload structure for order-sync Tauri events (matches Rust OrderSyncPayload) */
+interface OrderSyncPayload {
+  event: OrderEvent;
+  snapshot: OrderSnapshot;
+}
 
 /**
  * Hook to set up order event listeners and initialize order state
@@ -48,8 +58,8 @@ export function useOrderEventListener() {
         since_sequence: 0,
       });
 
-      // Full sync with server state (including events for timeline)
-      store._fullSync(response.active_orders, response.server_sequence, undefined, response.events);
+      // Full sync with server state (including events for timeline and server_epoch)
+      store._fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
       store._setInitialized(true);
       isInitializedRef.current = true;
 
@@ -62,7 +72,7 @@ export function useOrderEventListener() {
     }
   }, []);
 
-  // Set up event listener
+  // Set up event listener (Server Authority Model)
   const setupListener = useCallback(async () => {
     // Clean up existing listener
     if (unlistenRef.current) {
@@ -70,17 +80,20 @@ export function useOrderEventListener() {
       unlistenRef.current = null;
     }
 
-    // Listen for order events from Tauri
-    const unlisten = await listen<OrderEvent>('order-event', (event) => {
-      const orderEvent = event.payload;
+    // Listen for order-sync events from Tauri (contains event + snapshot)
+    // Server Authority: backend sends snapshot directly, no API call needed
+    const unlisten = await listen<OrderSyncPayload>('order-sync', (event) => {
+      const { event: orderEvent, snapshot } = event.payload;
       console.log(
-        `[OrderEventListener] Received event: ${orderEvent.event_type} for order ${orderEvent.order_id}`
+        `[OrderEventListener] Received sync: ${orderEvent.event_type} for order ${orderEvent.order_id}`
       );
-      useActiveOrdersStore.getState()._applyEvent(orderEvent);
+
+      // Apply with server-computed snapshot directly (no API call)
+      useActiveOrdersStore.getState()._applyOrderSync(orderEvent, snapshot);
     });
 
     unlistenRef.current = unlisten;
-    console.log('[OrderEventListener] Event listener set up');
+    console.log('[OrderEventListener] Event listener set up (Server Authority Mode)');
   }, []);
 
   useEffect(() => {
@@ -113,28 +126,23 @@ export function useOrderEventListener() {
 }
 
 /**
- * Hook to get order sync utilities
+ * Hook to get order sync utilities (Server Authority Model)
  *
  * Provides methods for manual sync operations (reconnection, refresh, etc.)
+ * Always uses full sync - client never computes snapshots locally.
  */
 export function useOrderSyncActions() {
-  const syncOrders = useCallback(async (since_sequence: number = 0) => {
+  // Server Authority: always perform full sync (since_sequence = 0)
+  const syncOrders = useCallback(async () => {
     const store = useActiveOrdersStore.getState();
     store._setConnectionState('syncing');
 
     try {
       const response = await invokeApi<SyncResponse>('order_sync_since', {
-        since_sequence,
+        since_sequence: 0, // Always full sync (Server Authority Model)
       });
 
-      if (response.requires_full_sync || since_sequence === 0) {
-        store._fullSync(response.active_orders, response.server_sequence, undefined, response.events);
-      } else if (response.events.length > 0) {
-        store._applyEvents(response.events);
-        store._setConnectionState('connected');
-      } else {
-        store._setConnectionState('connected');
-      }
+      store._fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
 
       return true;
     } catch (error) {
@@ -145,11 +153,118 @@ export function useOrderSyncActions() {
   }, []);
 
   const refreshOrders = useCallback(async () => {
-    return syncOrders(0);
+    return syncOrders();
   }, [syncOrders]);
 
   return {
     syncOrders,
     refreshOrders,
   };
+}
+
+/** Response type for order events API */
+interface OrderEventsResponse {
+  events: OrderEvent[];
+}
+
+/** Max retry attempts for timeline sync */
+const MAX_SYNC_RETRIES = 3;
+
+/** Base delay for retry backoff (ms) */
+const RETRY_BASE_DELAY = 1000;
+
+/**
+ * Hook to automatically sync timelines when sequence gaps are detected
+ *
+ * This hook watches for orders that need timeline sync (due to sequence gaps)
+ * and automatically fetches their events from the server.
+ *
+ * Features:
+ * - Deduplication: prevents concurrent syncs for the same order
+ * - Retry with exponential backoff on failure
+ * - Cleanup on unmount
+ *
+ * Usage in App.tsx (after useOrderEventListener):
+ * ```tsx
+ * const App = () => {
+ *   useOrderEventListener();
+ *   useOrderTimelineSync(); // Auto-sync timelines on gap
+ *   // ...
+ * };
+ * ```
+ */
+export function useOrderTimelineSync() {
+  const syncingRef = useRef<Set<string>>(new Set());
+  const retryCountRef = useRef<Map<string, number>>(new Map());
+  const mountedRef = useRef(true);
+
+  // 使用导出的 selector（带 useShallow）
+  const ordersNeedingSync = useActiveOrdersStore(
+    (state) => Array.from(state.ordersNeedingTimelineSync)
+  );
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    const syncTimeline = async (orderId: string) => {
+      // 防止重复同步
+      if (syncingRef.current.has(orderId)) return;
+      syncingRef.current.add(orderId);
+
+      console.log(`[TimelineSync] Fetching events for order ${orderId}`);
+
+      try {
+        const response = await invokeApi<OrderEventsResponse>(
+          'order_get_events_for_order',
+          { order_id: orderId }
+        );
+
+        // 检查组件是否仍然挂载
+        if (!mountedRef.current) return;
+
+        useActiveOrdersStore.getState()._syncOrderTimeline(orderId, response.events);
+        retryCountRef.current.delete(orderId); // 成功后清除重试计数
+        console.log(
+          `[TimelineSync] Synced ${response.events.length} events for order ${orderId}`
+        );
+      } catch (error) {
+        console.error(`[TimelineSync] Failed to sync order ${orderId}:`, error);
+
+        if (!mountedRef.current) return;
+
+        // 重试逻辑
+        const retries = retryCountRef.current.get(orderId) || 0;
+        if (retries < MAX_SYNC_RETRIES) {
+          retryCountRef.current.set(orderId, retries + 1);
+          const delay = RETRY_BASE_DELAY * Math.pow(2, retries);
+          console.log(`[TimelineSync] Retry ${retries + 1}/${MAX_SYNC_RETRIES} for ${orderId} in ${delay}ms`);
+          
+          setTimeout(() => {
+            if (mountedRef.current) {
+              syncingRef.current.delete(orderId); // 允许重新同步
+              syncTimeline(orderId);
+            }
+          }, delay);
+        } else {
+          console.error(`[TimelineSync] Max retries exceeded for ${orderId}`);
+          useActiveOrdersStore.getState()._clearTimelineSyncRequest(orderId);
+          retryCountRef.current.delete(orderId);
+        }
+      } finally {
+        if (retryCountRef.current.get(orderId) === undefined) {
+          // 只有在不重试时才清除 syncing 标记
+          syncingRef.current.delete(orderId);
+        }
+      }
+    };
+
+    // 同步所有需要补全的订单
+    ordersNeedingSync.forEach((orderId) => {
+      syncTimeline(orderId);
+    });
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [ordersNeedingSync]);
 }

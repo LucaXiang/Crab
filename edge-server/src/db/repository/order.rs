@@ -360,10 +360,13 @@ impl OrderRepository {
                     status = $status,
                     is_retail = $is_retail,
                     guest_count = $guest_count,
+                    original_total = $original_total,
+                    subtotal = $subtotal,
                     total_amount = $total_amount,
                     paid_amount = $paid_amount,
                     discount_amount = $discount_amount,
                     surcharge_amount = $surcharge_amount,
+                    tax = $tax,
                     start_time = <datetime>$start_time,
                     end_time = IF $end_time != NONE THEN <datetime>$end_time ELSE NONE END,
                     operator_id = $operator_id,
@@ -379,10 +382,13 @@ impl OrderRepository {
             .bind(("status", format!("{:?}", order.status).to_uppercase()))
             .bind(("is_retail", order.is_retail))
             .bind(("guest_count", order.guest_count))
+            .bind(("original_total", order.original_total))
+            .bind(("subtotal", order.subtotal))
             .bind(("total_amount", order.total_amount))
             .bind(("paid_amount", order.paid_amount))
             .bind(("discount_amount", order.discount_amount))
             .bind(("surcharge_amount", order.surcharge_amount))
+            .bind(("tax", order.tax))
             .bind(("start_time", order.start_time))
             .bind(("end_time", order.end_time))
             .bind(("operator_id", order.operator_id))
@@ -411,13 +417,13 @@ impl OrderRepository {
             .db()
             .query(r#"
                 SELECT
-                    record::id(id) AS order_id,
+                    <string>id AS order_id,
                     receipt_number,
                     table_name,
                     zone_name,
                     string::uppercase(status) AS status,
                     is_retail,
-                    guest_count ?? 1 AS guest_count,
+                    guest_count,
                     total_amount AS total,
                     paid_amount,
                     discount_amount AS total_discount,
@@ -427,7 +433,7 @@ impl OrderRepository {
                     operator_name,
                     (
                         SELECT
-                            record::id(id) AS id,
+                            <string>id AS id,
                             instance_id,
                             name,
                             spec_name,
@@ -461,7 +467,7 @@ impl OrderRepository {
                     ) AS payments,
                     (
                         SELECT
-                            record::id(id) AS event_id,
+                            <string>id AS event_id,
                             string::uppercase(event_type) AS event_type,
                             time::millis(timestamp) AS timestamp,
                             data AS payload

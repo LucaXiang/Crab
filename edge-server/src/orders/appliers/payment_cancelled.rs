@@ -6,7 +6,7 @@
 //! For split payments with `split_items`, this applier also restores items
 //! using "add items" logic - merging with existing items or creating new ones.
 
-use crate::orders::traits::EventApplier;
+use crate::orders::{money, traits::EventApplier};
 use shared::order::{CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot};
 
 /// PaymentCancelled applier
@@ -50,6 +50,9 @@ impl EventApplier for PaymentCancelledApplier {
             if let Some(items_to_restore) = split_items {
                 restore_split_items(snapshot, &items_to_restore);
             }
+
+            // Recalculate totals to update unpaid_quantity and financial fields
+            money::recalculate_totals(snapshot);
 
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
@@ -409,7 +412,33 @@ mod tests {
     #[test]
     fn test_payment_cancelled_remaining_amount_calculation() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        
+        // Add items so recalculate_totals computes correct total
+        let item = CartItemSnapshot {
+            id: "product:1".to_string(),
+            instance_id: "inst-1".to_string(),
+            name: "Coffee".to_string(),
+            price: 100.0,
+            original_price: None,
+            quantity: 1,
+            unpaid_quantity: 0, // All paid initially
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            unit_price: None,
+            line_total: None,
+            tax: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+        snapshot.items.push(item);
         snapshot.total = 100.0;
+        snapshot.subtotal = 100.0;
         snapshot.paid_amount = 100.0;
         snapshot
             .payments
@@ -467,6 +496,7 @@ mod tests {
             applied_rules: None,
             unit_price: None,
             line_total: None,
+            tax: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -537,6 +567,7 @@ mod tests {
             applied_rules: None,
             unit_price: None,
             line_total: None,
+            tax: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -561,6 +592,7 @@ mod tests {
             applied_rules: None,
             unit_price: None,
             line_total: None,
+            tax: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -637,6 +669,7 @@ mod tests {
             applied_rules: None,
             unit_price: None,
             line_total: None,
+            tax: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { X, Type, Printer, Settings2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useAttributeActions } from './store';
@@ -62,9 +62,18 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
   const { t } = useI18n();
   const { createAttribute, updateAttribute } = useAttributeActions();
 
+  // Memoize the initial form data to prevent useEffect from re-running on every render
+  // Use id as stable key - when editing same attribute, form won't reset
+  // When switching to different attribute (different id), form reinitializes
+  const initialFormData = useMemo(
+    () => (editingAttribute ? mapToFormData(editingAttribute) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editingAttribute?.id]
+  );
+
   // Use form initialization hook with mapped data
   const [formData, setFormData] = useFormInitialization<AttributeFormData>(
-    editingAttribute ? mapToFormData(editingAttribute) : null,
+    initialFormData,
     mapToFormData(null),
     [isOpen]
   );

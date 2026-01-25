@@ -39,6 +39,7 @@ export {
   useIsOrderConnected,
   useOrderQueries,
   useOrderStoreInternal,
+  useOrdersNeedingTimelineSync,
 } from './useActiveOrdersStore';
 
 // Order Commands Hook - Send commands to server
@@ -49,5 +50,7 @@ export type { OpenTableParams, PaymentInput, OrderCommandsHook } from './useOrde
 export { useOrderSync, setupOrderEventListeners } from './useOrderSync';
 export type { OrderSyncHook } from './useOrderSync';
 
-// Order Reducer - Event to snapshot transformation
-export { applyEvent, rebuildFromEvents, createEmptySnapshot } from './orderReducer';
+// Order Reducer - DEPRECATED under Server Authority Model
+// These functions are kept for debugging/reference only.
+// Client should NEVER compute snapshots locally - always use server-provided snapshots.
+// export { applyEvent, rebuildFromEvents, createEmptySnapshot } from './orderReducer';

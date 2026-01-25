@@ -14,7 +14,7 @@ export function validateSpecData(
   t: (key: string) => string
 ): string | null {
   if (!spec.name?.trim()) {
-    return t('specification.form.name_required');
+    return t('settings.specification.form.name_required');
   }
 
   // Non-root specs require external_id and valid price
@@ -24,7 +24,7 @@ export function validateSpecData(
     }
 
     if (spec.price === undefined || spec.price === null || spec.price < 0) {
-      return t('specification.form.price_required');
+      return t('settings.specification.form.price_required');
     }
   }
 

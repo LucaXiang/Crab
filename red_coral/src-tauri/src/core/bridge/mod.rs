@@ -445,10 +445,11 @@ impl ClientBridge {
                             // Route messages to appropriate channels
                             use crate::events::MessageRoute;
                             match MessageRoute::from_bus_message(msg) {
-                                MessageRoute::OrderEvent(order_event) => {
-                                    tracing::debug!("Emitting order-event");
-                                    if let Err(e) = handle_clone.emit("order-event", &order_event) {
-                                        tracing::warn!("Failed to emit order event: {}", e);
+                                MessageRoute::OrderSync(order_sync) => {
+                                    // Server Authority: emit event + snapshot together
+                                    tracing::debug!("Emitting order-sync (event + snapshot)");
+                                    if let Err(e) = handle_clone.emit("order-sync", &*order_sync) {
+                                        tracing::warn!("Failed to emit order sync: {}", e);
                                     }
                                 }
                                 MessageRoute::ServerMessage(event) => {
@@ -595,11 +596,12 @@ impl ClientBridge {
                             Ok(msg) => {
                                 use crate::events::MessageRoute;
                                 match MessageRoute::from_bus_message(msg) {
-                                    MessageRoute::OrderEvent(order_event) => {
+                                    MessageRoute::OrderSync(order_sync) => {
+                                        // Server Authority: emit event + snapshot together
                                         if let Err(e) =
-                                            handle_clone.emit("order-event", &order_event)
+                                            handle_clone.emit("order-sync", &*order_sync)
                                         {
-                                            tracing::warn!("Failed to emit order event: {}", e);
+                                            tracing::warn!("Failed to emit order sync: {}", e);
                                         }
                                     }
                                     MessageRoute::ServerMessage(event) => {

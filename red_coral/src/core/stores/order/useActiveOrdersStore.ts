@@ -1,19 +1,19 @@
 /**
- * Active Orders Store (Read-Only Mirror)
+ * Active Orders Store (Server Authority Model)
  *
  * This store maintains a read-only mirror of server-side order state.
- * All state changes come from server events - no local mutations allowed.
+ * All state changes come from server - NO local computation allowed.
  *
  * Architecture:
- * - State is updated only through internal methods (_applyEvent, _fullSync)
- * - These methods are called by event listeners in App.tsx
+ * - State is updated only through server-computed snapshots (_applyOrderSync, _fullSync)
+ * - Client NEVER computes snapshots locally
  * - UI components read state through selectors
- * - Commands are sent via useOrderCommands hook (separate file)
+ * - Commands are sent via useOrderCommands hook (fire & forget)
  *
  * Event Flow:
- * 1. Server broadcasts OrderEvent
- * 2. Tauri emits 'order-event' to frontend
- * 3. Listener calls _applyEvent
+ * 1. Server broadcasts OrderEvent with computed snapshot
+ * 2. Event listener receives (event, snapshot) pair
+ * 3. Listener calls _applyOrderSync with server-computed snapshot
  * 4. Store updates, React re-renders
  */
 
@@ -24,7 +24,13 @@ import type {
   OrderEvent,
   OrderConnectionState,
 } from '@/core/domain/types/orderEvent';
-import { applyEvent, createEmptySnapshot } from './orderReducer';
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Maximum sequence gap before triggering timeline sync for an order */
+const MAX_SEQUENCE_GAP = 5;
 
 // ============================================================================
 // Store Interface
@@ -46,6 +52,11 @@ interface ActiveOrdersState {
    * Used to detect server restarts - if epoch changes, full sync is required
    */
   serverEpoch: string | null;
+  /**
+   * Orders that need timeline sync due to sequence gap
+   * External listeners can watch this and trigger sync
+   */
+  ordersNeedingTimelineSync: Set<string>;
 }
 
 interface ActiveOrdersActions {
@@ -76,29 +87,18 @@ interface ActiveOrdersActions {
    */
   hasActiveOrderOnTable: (tableId: string) => boolean;
 
-  // ==================== Internal Methods (Event-Driven) ====================
+  // ==================== Internal Methods (Server Authority) ====================
   // These methods are prefixed with _ to indicate they should only be called
   // by event listeners, not by UI components directly.
-
-  /**
-   * Apply a single event to update state
-   * Called when receiving 'order-event' from Tauri (Server Mode local)
-   */
-  _applyEvent: (event: OrderEvent) => void;
+  // IMPORTANT: Client NEVER computes snapshots locally - always use server-computed snapshots.
 
   /**
    * Apply order sync (Server Authority Model)
-   * Called when receiving 'order_sync' from MessageBus
-   * - event: 追加到时间线 (用于 UI)
+   * Called when receiving events with server-computed snapshots
+   * - event: 追加到时间线 (用于 UI 渲染操作记录)
    * - snapshot: 替换状态 (服务端权威，无本地计算)
    */
   _applyOrderSync: (event: OrderEvent, snapshot: OrderSnapshot) => void;
-
-  /**
-   * Apply multiple events in sequence
-   * Called during reconnection sync
-   */
-  _applyEvents: (events: OrderEvent[]) => void;
 
   /**
    * Full sync: replace all orders with server state
@@ -126,6 +126,17 @@ interface ActiveOrdersActions {
    * Reset store to initial state (for logout/tenant switch)
    */
   _reset: () => void;
+
+  /**
+   * Sync timeline for a specific order (called after fetching events)
+   * Replaces the timeline with server-provided events
+   */
+  _syncOrderTimeline: (orderId: string, events: OrderEvent[]) => void;
+
+  /**
+   * Clear timeline sync request for an order (after sync completes)
+   */
+  _clearTimelineSyncRequest: (orderId: string) => void;
 }
 
 type ActiveOrdersStore = ActiveOrdersState & ActiveOrdersActions;
@@ -137,6 +148,7 @@ type ActiveOrdersStore = ActiveOrdersState & ActiveOrdersActions;
 const initialState: ActiveOrdersState = {
   orders: new Map(),
   timelines: new Map(),
+  ordersNeedingTimelineSync: new Set(),
   lastSequence: 0,
   connectionState: 'disconnected',
   isInitialized: false,
@@ -178,122 +190,82 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
     );
   },
 
-  // ==================== Internal Methods ====================
-
-  _applyEvent: (event: OrderEvent) => {
-    set((state) => {
-      // Skip if event is older than our last sequence (duplicate)
-      if (event.sequence <= state.lastSequence) {
-        console.warn(
-          `Skipping duplicate event: sequence ${event.sequence} <= ${state.lastSequence}`
-        );
-        return state;
-      }
-
-      // Detect sequence gap (missed events)
-      if (event.sequence > state.lastSequence + 1) {
-        console.warn(
-          `Event sequence gap detected: expected ${state.lastSequence + 1}, got ${event.sequence}`
-        );
-        // The sync hook will handle reconnection
-      }
-
-      // Get or create the order snapshot
-      const orders = new Map(state.orders);
-      let snapshot = orders.get(event.order_id);
-
-      if (!snapshot) {
-        // New order - create empty snapshot
-        snapshot = createEmptySnapshot(event.order_id);
-      }
-
-      // Apply the event
-      const newSnapshot = applyEvent(snapshot, event);
-      orders.set(event.order_id, newSnapshot);
-
-      // If order is no longer active, we might want to remove it from memory
-      // For now, keep all orders to support timeline views
-      // Could add a cleanup mechanism later if memory becomes an issue
-
-      return {
-        ...state,
-        orders,
-        lastSequence: event.sequence,
-      };
-    });
-  },
+  // ==================== Internal Methods (Server Authority) ====================
 
   _applyOrderSync: (event: OrderEvent, snapshot: OrderSnapshot) => {
-    set((state) => {
-      // Gap 检测：如果 sequence 跳跃超过 1，说明丢失了消息
-      const expectedSequence = state.lastSequence + 1;
-      if (event.sequence > expectedSequence) {
-        console.warn(
-          `[OrderSync] Sequence gap detected: expected ${expectedSequence}, got ${event.sequence}. ` +
-          `Missed ${event.sequence - expectedSequence} events. Triggering full sync...`
-        );
-        // 标记需要全量同步（设置 syncing 状态，让 useOrderSync 检测并触发）
-        // 注意：这里不直接调用 sync，因为我们在 set() 回调中
-        setTimeout(() => {
-          const syncState = useActiveOrdersStore.getState();
-          if (syncState.connectionState === 'connected') {
-            syncState._setConnectionState('syncing');
-            // 触发全量同步（通过 custom event）
-            window.dispatchEvent(new CustomEvent('order-sync-gap-detected'));
-          }
-        }, 0);
-      }
+    const state = get();
+    const orderId = snapshot.order_id;
+    const localSnapshot = state.orders.get(orderId);
+    let needsTimelineSync = false;
 
-      // 服务端权威：直接替换快照，无需本地计算
-      const orders = new Map(state.orders);
-      orders.set(snapshot.order_id, snapshot);
+    // 检测订单级别的 sequence gap
+    if (localSnapshot) {
+      const localSeq = localSnapshot.last_sequence;
+      const serverSeq = snapshot.last_sequence;
+      const gap = serverSeq - localSeq;
+
+      if (gap > MAX_SEQUENCE_GAP) {
+        // Gap 过大，标记需要 timeline 补全
+        console.warn(
+          `[OrderSync] Large sequence gap for order ${orderId}: ` +
+          `local=${localSeq} → server=${serverSeq} (missed ${gap - 1} events, triggering sync)`
+        );
+        needsTimelineSync = true;
+      } else if (gap > 1) {
+        // 小 gap，记录警告但不触发补全
+        console.warn(
+          `[OrderSync] Sequence gap for order ${orderId}: ` +
+          `local=${localSeq} → server=${serverSeq} (missed ${gap - 1} events)`
+        );
+      }
+    } else if (event.sequence > 1) {
+      // 新订单但首个事件不是 sequence=1，说明错过了前面的事件
+      console.warn(
+        `[OrderSync] New order ${orderId} first event is sequence=${event.sequence}, triggering sync`
+      );
+      needsTimelineSync = true;
+    }
+
+    set((prevState) => {
+      // 服务端权威：直接替换快照
+      const orders = new Map(prevState.orders);
+      orders.set(orderId, snapshot);
 
       // 追加 event 到 timeline（用于 UI 渲染操作记录）
-      const timelines = new Map(state.timelines);
-      const existingTimeline = timelines.get(snapshot.order_id) || [];
+      const timelines = new Map(prevState.timelines);
+      const existingTimeline = timelines.get(orderId) || [];
+
       // 去重：检查 event_id 是否已存在
-      if (!existingTimeline.some(e => e.event_id === event.event_id)) {
-        timelines.set(snapshot.order_id, [...existingTimeline, event]);
+      if (!existingTimeline.some((e) => e.event_id === event.event_id)) {
+        // 插入并保持 sequence 顺序
+        // 优化：事件通常按顺序到达，先检查末尾
+        const newTimeline = [...existingTimeline];
+        if (
+          existingTimeline.length === 0 ||
+          event.sequence > existingTimeline[existingTimeline.length - 1].sequence
+        ) {
+          // 常见情况：新事件序列号最大，直接追加
+          newTimeline.push(event);
+        } else {
+          // 少见情况：乱序到达，找到正确位置插入
+          const insertIdx = newTimeline.findIndex((e) => e.sequence > event.sequence);
+          newTimeline.splice(insertIdx === -1 ? newTimeline.length : insertIdx, 0, event);
+        }
+        timelines.set(orderId, newTimeline);
+      }
+
+      // 标记需要 timeline 补全的订单
+      const ordersNeedingTimelineSync = new Set(prevState.ordersNeedingTimelineSync);
+      if (needsTimelineSync) {
+        ordersNeedingTimelineSync.add(orderId);
       }
 
       return {
-        ...state,
+        ...prevState,
         orders,
         timelines,
-        lastSequence: Math.max(state.lastSequence, snapshot.last_sequence),
-      };
-    });
-  },
-
-  _applyEvents: (events: OrderEvent[]) => {
-    if (events.length === 0) return;
-
-    set((state) => {
-      // Sort events by sequence
-      const sortedEvents = [...events].sort((a, b) => a.sequence - b.sequence);
-
-      // Apply each event
-      const orders = new Map(state.orders);
-      let lastSequence = state.lastSequence;
-
-      for (const event of sortedEvents) {
-        // Skip duplicates
-        if (event.sequence <= lastSequence) continue;
-
-        let snapshot = orders.get(event.order_id);
-        if (!snapshot) {
-          snapshot = createEmptySnapshot(event.order_id);
-        }
-
-        const newSnapshot = applyEvent(snapshot, event);
-        orders.set(event.order_id, newSnapshot);
-        lastSequence = event.sequence;
-      }
-
-      return {
-        ...state,
-        orders,
-        lastSequence,
+        ordersNeedingTimelineSync,
+        lastSequence: Math.max(prevState.lastSequence, snapshot.last_sequence),
       };
     });
   },
@@ -324,6 +296,7 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
         ...state,
         orders: newOrders,
         timelines: newTimelines,
+        ordersNeedingTimelineSync: new Set(), // Full sync 清除所有补全请求
         lastSequence: serverSequence,
         isInitialized: true,
         connectionState: 'connected',
@@ -343,6 +316,33 @@ export const useActiveOrdersStore = create<ActiveOrdersStore>((set, get) => ({
 
   _reset: () => {
     set(initialState);
+  },
+
+  _syncOrderTimeline: (orderId: string, events: OrderEvent[]) => {
+    set((state) => {
+      const timelines = new Map(state.timelines);
+      // 替换该订单的 timeline，按 sequence 排序
+      const sortedEvents = [...events].sort((a, b) => a.sequence - b.sequence);
+      timelines.set(orderId, sortedEvents);
+
+      // 清除补全请求标记
+      const ordersNeedingTimelineSync = new Set(state.ordersNeedingTimelineSync);
+      ordersNeedingTimelineSync.delete(orderId);
+
+      return {
+        ...state,
+        timelines,
+        ordersNeedingTimelineSync,
+      };
+    });
+  },
+
+  _clearTimelineSyncRequest: (orderId: string) => {
+    set((state) => {
+      const ordersNeedingTimelineSync = new Set(state.ordersNeedingTimelineSync);
+      ordersNeedingTimelineSync.delete(orderId);
+      return { ...state, ordersNeedingTimelineSync };
+    });
   },
 }));
 
@@ -410,6 +410,15 @@ export const useOrdersInitialized = () =>
   useActiveOrdersStore((state) => state.isInitialized);
 
 /**
+ * Select orders needing timeline sync
+ * Uses useShallow to prevent unnecessary re-renders when array contents haven't changed
+ */
+export const useOrdersNeedingTimelineSync = () =>
+  useActiveOrdersStore(
+    useShallow((state) => Array.from(state.ordersNeedingTimelineSync))
+  );
+
+/**
  * Select last sequence number
  */
 export const useLastSequence = () =>
@@ -442,9 +451,7 @@ export const useOrderQueries = () =>
 export const useOrderStoreInternal = () =>
   useActiveOrdersStore(
     useShallow((state) => ({
-      _applyEvent: state._applyEvent,
       _applyOrderSync: state._applyOrderSync,
-      _applyEvents: state._applyEvents,
       _fullSync: state._fullSync,
       _setConnectionState: state._setConnectionState,
       _setInitialized: state._setInitialized,

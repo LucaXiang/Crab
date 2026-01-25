@@ -53,8 +53,34 @@ fn apply_item_modified(
     {
         let original_qty = snapshot.items[idx].quantity;
 
-        if affected_quantity >= original_qty {
-            // Full modification: update entire item in place
+        // Check if this item has been partially paid (split bill)
+        let paid_qty = snapshot
+            .paid_item_quantities
+            .get(&source.instance_id)
+            .copied()
+            .unwrap_or(0);
+
+        if paid_qty > 0 && affected_quantity >= original_qty {
+            // Item has been partially paid - need to split to preserve paid portion
+            // 1. Keep paid portion with original instance_id (so split_items can find it)
+            snapshot.items[idx].quantity = paid_qty;
+            snapshot.items[idx].unpaid_quantity = 0;
+            // Don't apply changes or update instance_id for paid portion
+
+            // 2. Create new item for unpaid portion with modifications
+            let unpaid_qty = original_qty - paid_qty;
+            if unpaid_qty > 0 {
+                if let Some(result) = results.iter().find(|r| r.action == "UPDATED") {
+                    let mut new_item = source.clone();
+                    new_item.instance_id = result.instance_id.clone();
+                    new_item.quantity = unpaid_qty;
+                    new_item.unpaid_quantity = unpaid_qty;
+                    apply_changes_to_item(&mut new_item, changes);
+                    snapshot.items.push(new_item);
+                }
+            }
+        } else if affected_quantity >= original_qty {
+            // Full modification (no paid portion): update entire item in place
             apply_changes_to_item(&mut snapshot.items[idx], changes);
 
             // Update instance_id from results (it may have changed due to modifications)
@@ -155,6 +181,7 @@ mod tests {
             applied_rules: None,
             unit_price: None,
             line_total: None,
+            tax: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
