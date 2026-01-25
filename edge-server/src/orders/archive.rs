@@ -1,17 +1,18 @@
 //! Order Archiving Service
 //!
 //! Archives completed orders from redb to SurrealDB with hash chain integrity.
+//! Uses graph model with RELATE edges for items, options, payments, events.
 
 use crate::db::models::{
-    Order as SurrealOrder, OrderEventType as SurrealEventType,
-    OrderStatus as SurrealOrderStatus,
+    Order as SurrealOrder, OrderEventType as SurrealEventType, OrderStatus as SurrealOrderStatus,
+    SplitItem,
 };
-use surrealdb::RecordId;
 use crate::db::repository::{OrderRepository, SystemStateRepository};
 use sha2::{Digest, Sha256};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
 use std::sync::Arc;
 use surrealdb::engine::local::Db;
+use surrealdb::RecordId;
 use surrealdb::Surreal;
 use thiserror::Error;
 use tokio::sync::{Mutex, Semaphore};
@@ -133,7 +134,6 @@ impl OrderArchiveService {
         }
 
         // Acquire hash chain lock to prevent concurrent hash chain corruption
-        // This ensures only one archive operation can read-modify-write the hash chain at a time
         let _hash_lock = self.hash_chain_lock.lock().await;
 
         // 1. Get last order hash from system_state
@@ -147,7 +147,7 @@ impl OrderArchiveService {
             .last_order_hash
             .unwrap_or_else(|| "genesis".to_string());
 
-        // 2. Compute order hash (includes last event hash)
+        // 2. Compute order hash (includes last event hash with payload)
         let last_event_hash = events
             .last()
             .map(|e| self.compute_event_hash(e))
@@ -155,16 +155,29 @@ impl OrderArchiveService {
 
         let order_hash = self.compute_order_hash(snapshot, &prev_hash, &last_event_hash);
 
-        // 3. Convert and store order
+        // 3. Get operator info from last event (OrderCompleted or OrderVoided)
+        let (operator_id, operator_name) = events
+            .iter()
+            .rev()
+            .find(|e| {
+                matches!(
+                    e.event_type,
+                    OrderEventType::OrderCompleted | OrderEventType::OrderVoided
+                )
+            })
+            .map(|e| (Some(e.operator_id.clone()), Some(e.operator_name.clone())))
+            .unwrap_or((None, None));
+
+        // 4. Convert and store order
         let surreal_order =
-            self.convert_snapshot_to_order(snapshot, prev_hash, order_hash.clone())?;
-        
+            self.convert_snapshot_to_order(snapshot, prev_hash, order_hash.clone(), operator_id, operator_name)?;
+
         tracing::info!(
             order_id = %snapshot.order_id,
             items_count = snapshot.items.len(),
-            "Archiving order to SurrealDB"
+            "Archiving order to SurrealDB (graph model)"
         );
-        
+
         let created_order = self
             .order_repo
             .create_archived(surreal_order)
@@ -175,11 +188,13 @@ impl OrderArchiveService {
             .id
             .ok_or_else(|| ArchiveError::Database("Order has no ID".to_string()))?;
 
-        // 4. Store normalized order items and payments
-        self.store_normalized_items(&order_id, snapshot).await?;
-        self.store_normalized_payments(&order_id, snapshot).await?;
+        // 5. Store items with RELATE has_item edges
+        self.store_items_with_edges(&order_id, snapshot).await?;
 
-        // 5. Store events with RELATE
+        // 6. Store payments with RELATE has_payment edges
+        self.store_payments_with_edges(&order_id, snapshot).await?;
+
+        // 7. Store events with RELATE has_event edges
         for (i, event) in events.iter().enumerate() {
             let prev_event_hash = if i == 0 {
                 "order_start".to_string()
@@ -200,13 +215,13 @@ impl OrderArchiveService {
                 .map_err(|e| ArchiveError::Database(e.to_string()))?;
         }
 
-        // 5. Update system_state with new last_order_hash
+        // 8. Update system_state with new last_order_hash
         self.system_state_repo
             .update_last_order(&order_id.to_string(), order_hash)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        tracing::info!(order_id = %snapshot.order_id, "Order archived to SurrealDB");
+        tracing::info!(order_id = %snapshot.order_id, "Order archived to SurrealDB (graph model)");
         Ok(())
     }
 
@@ -231,12 +246,16 @@ impl OrderArchiveService {
         format!("{:x}", hasher.finalize())
     }
 
+    /// Compute event hash including payload for tamper-proofing
     fn compute_event_hash(&self, event: &OrderEvent) -> String {
         let mut hasher = Sha256::new();
         hasher.update(event.event_id.as_bytes());
         hasher.update(event.order_id.as_bytes());
         hasher.update(format!("{}", event.sequence).as_bytes());
         hasher.update(format!("{:?}", event.event_type).as_bytes());
+        // Include payload in hash for tamper-proofing
+        let payload_json = serde_json::to_string(&event.payload).unwrap_or_default();
+        hasher.update(payload_json.as_bytes());
         format!("{:x}", hasher.finalize())
     }
 
@@ -245,6 +264,8 @@ impl OrderArchiveService {
         snapshot: &OrderSnapshot,
         prev_hash: String,
         curr_hash: String,
+        operator_id: Option<String>,
+        operator_name: Option<String>,
     ) -> ArchiveResult<SurrealOrder> {
         let status = match snapshot.status {
             OrderStatus::Completed => SurrealOrderStatus::Completed,
@@ -259,16 +280,18 @@ impl OrderArchiveService {
             }
         };
 
-        // Serialize the full OrderSnapshot for detail queries
-        let snapshot_json = serde_json::to_string(snapshot)
-            .map_err(|e| ArchiveError::Conversion(format!("Failed to serialize snapshot: {}", e)))?;
-
         Ok(SurrealOrder {
             id: None,
             receipt_number: snapshot.receipt_number.clone().unwrap_or_default(),
             zone_name: snapshot.zone_name.clone(),
             table_name: snapshot.table_name.clone(),
             status,
+            is_retail: snapshot.is_retail,
+            guest_count: Some(snapshot.guest_count),
+            total_amount: snapshot.total,
+            paid_amount: snapshot.paid_amount,
+            discount_amount: snapshot.total_discount,
+            surcharge_amount: snapshot.total_surcharge,
             start_time: chrono::DateTime::from_timestamp_millis(snapshot.start_time)
                 .map(|dt| dt.to_rfc3339())
                 .unwrap_or_default(),
@@ -277,16 +300,11 @@ impl OrderArchiveService {
                     .map(|dt| dt.to_rfc3339())
                     .unwrap_or_default()
             }),
-            guest_count: Some(snapshot.guest_count),
-            total_amount: snapshot.total,
-            paid_amount: snapshot.paid_amount,
-            discount_amount: snapshot.total_discount,
-            surcharge_amount: snapshot.total_surcharge,
-            snapshot_json,
+            operator_id,
+            operator_name,
             prev_hash,
             curr_hash,
             related_order_id: None,
-            operator_id: None,
             created_at: None,
         })
     }
@@ -321,8 +339,8 @@ impl OrderArchiveService {
         }
     }
 
-    /// Store normalized order items to order_item and order_item_attribute tables
-    async fn store_normalized_items(
+    /// Store order items with RELATE has_item edges
+    async fn store_items_with_edges(
         &self,
         order_id: &RecordId,
         snapshot: &OrderSnapshot,
@@ -355,76 +373,85 @@ impl OrderArchiveService {
                 .line_total
                 .unwrap_or_else(|| unit_price * item.quantity as f64);
 
-            // Create order_item
+            // Get spec_name from selected specification
             let spec_name = item
                 .selected_specification
                 .as_ref()
                 .map(|s| s.name.clone());
 
+            // Get instance_id (content-addressable hash)
+            let instance_id = item.instance_id.clone();
+
+            // Calculate unpaid_quantity
+            let paid_qty = snapshot.paid_item_quantities.get(&instance_id).copied().unwrap_or(0);
+            let unpaid_quantity = (item.quantity - paid_qty).max(0);
+
+            // Create order_item and RELATE to order
             let mut result = self
                 .db
                 .query(
                     r#"
-                    CREATE order_item SET
-                        order_id = $order_id,
+                    LET $item = (CREATE order_item SET
                         spec = $spec,
+                        instance_id = $instance_id,
                         name = $name,
                         spec_name = $spec_name,
                         price = $price,
                         quantity = $quantity,
-                        discount_amount = $discount_amount,
-                        surcharge_amount = $surcharge_amount,
+                        unpaid_quantity = $unpaid_quantity,
                         unit_price = $unit_price,
                         line_total = $line_total,
+                        discount_amount = $discount_amount,
+                        surcharge_amount = $surcharge_amount,
                         note = $note
-                    RETURN id
+                    );
+                    RELATE $order_id->has_item->$item;
+                    RETURN $item.id;
                 "#,
                 )
                 .bind(("order_id", order_id.clone()))
                 .bind(("spec", item.id.clone()))
+                .bind(("instance_id", instance_id.clone()))
                 .bind(("name", item.name.clone()))
                 .bind(("spec_name", spec_name))
                 .bind(("price", base_price))
                 .bind(("quantity", item.quantity))
-                .bind(("discount_amount", total_discount))
-                .bind(("surcharge_amount", total_surcharge))
+                .bind(("unpaid_quantity", unpaid_quantity))
                 .bind(("unit_price", unit_price))
                 .bind(("line_total", line_total))
+                .bind(("discount_amount", total_discount))
+                .bind(("surcharge_amount", total_surcharge))
                 .bind(("note", item.note.clone()))
                 .await
                 .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-            #[derive(serde::Deserialize)]
-            struct IdResult {
-                id: RecordId,
-            }
-            let items: Vec<IdResult> = result
+            // Get created item ID for storing options
+            let item_ids: Vec<RecordId> = result
                 .take(0)
                 .map_err(|e| ArchiveError::Database(e.to_string()))?;
-            let item_id = items
+
+            let item_id = item_ids
                 .into_iter()
                 .next()
-                .ok_or_else(|| ArchiveError::Database("Failed to create order_item".to_string()))?
-                .id;
+                .ok_or_else(|| ArchiveError::Database("Failed to create order_item".to_string()))?;
 
-            // Create order_item_attribute for each selected option
+            // Store options with RELATE has_option edges
             if let Some(options) = &item.selected_options {
                 for opt in options {
                     self.db
                         .query(
                             r#"
-                            CREATE order_item_attribute SET
-                                item_id = $item_id,
-                                attr_id = $attr_id,
-                                option_idx = $option_idx,
-                                name = $name,
+                            LET $opt = (CREATE order_item_option SET
+                                attribute_name = $attribute_name,
+                                option_name = $option_name,
                                 price = $price
+                            );
+                            RELATE $item_id->has_option->$opt;
                         "#,
                         )
                         .bind(("item_id", item_id.clone()))
-                        .bind(("attr_id", opt.attribute_id.clone()))
-                        .bind(("option_idx", opt.option_idx))
-                        .bind(("name", opt.option_name.clone()))
+                        .bind(("attribute_name", opt.attribute_name.clone()))
+                        .bind(("option_name", opt.option_name.clone()))
                         .bind(("price", opt.price_modifier.unwrap_or(0.0)))
                         .await
                         .map_err(|e| ArchiveError::Database(e.to_string()))?;
@@ -435,31 +462,46 @@ impl OrderArchiveService {
         Ok(())
     }
 
-    /// Store normalized payments to order_payment table
-    async fn store_normalized_payments(
+    /// Store payments with RELATE has_payment edges
+    async fn store_payments_with_edges(
         &self,
         order_id: &RecordId,
         snapshot: &OrderSnapshot,
     ) -> ArchiveResult<()> {
         for payment in &snapshot.payments {
-            // Skip cancelled payments
-            if payment.cancelled {
-                continue;
-            }
-
             let time = chrono::DateTime::from_timestamp_millis(payment.timestamp)
                 .map(|dt| dt.to_rfc3339())
+                .unwrap_or_default();
+
+            // Build split_items from payment if available
+            let split_items: Vec<SplitItem> = payment
+                .split_items
+                .as_ref()
+                .map(|items| {
+                    items
+                        .iter()
+                        .map(|si| SplitItem {
+                            instance_id: si.instance_id.clone(),
+                            name: si.name.clone(),
+                            quantity: si.quantity,
+                        })
+                        .collect()
+                })
                 .unwrap_or_default();
 
             self.db
                 .query(
                     r#"
-                    CREATE order_payment SET
-                        order_id = $order_id,
+                    LET $payment = (CREATE order_payment SET
                         method = $method,
                         amount = $amount,
                         time = <datetime>$time,
-                        reference = $reference
+                        reference = $reference,
+                        cancelled = $cancelled,
+                        cancel_reason = $cancel_reason,
+                        split_items = $split_items
+                    );
+                    RELATE $order_id->has_payment->$payment;
                 "#,
                 )
                 .bind(("order_id", order_id.clone()))
@@ -467,6 +509,9 @@ impl OrderArchiveService {
                 .bind(("amount", payment.amount))
                 .bind(("time", time))
                 .bind(("reference", payment.note.clone()))
+                .bind(("cancelled", payment.cancelled))
+                .bind(("cancel_reason", payment.cancel_reason.clone()))
+                .bind(("split_items", split_items))
                 .await
                 .map_err(|e| ArchiveError::Database(e.to_string()))?;
         }
@@ -543,7 +588,6 @@ mod tests {
 
     #[test]
     fn test_compute_order_hash_deterministic() {
-        // Hash should be deterministic for same inputs
         let snapshot = create_test_snapshot();
 
         let hash1 = compute_order_hash_standalone(&snapshot, "prev_hash", "event_hash");
@@ -574,8 +618,34 @@ mod tests {
         assert_eq!(hash1.len(), 64);
     }
 
+    #[test]
+    fn test_compute_event_hash_includes_payload() {
+        let mut event1 = create_test_event("order-1", 1);
+        let mut event2 = create_test_event("order-1", 1);
+
+        // Modify payload
+        event2.payload = shared::order::EventPayload::TableOpened {
+            table_id: Some("T2".to_string()), // Different table
+            table_name: Some("Table 2".to_string()),
+            zone_id: None,
+            zone_name: None,
+            guest_count: 2,
+            is_retail: false,
+            receipt_number: None,
+        };
+
+        let hash1 = compute_event_hash_standalone(&event1);
+        let hash2 = compute_event_hash_standalone(&event2);
+
+        assert_ne!(hash1, hash2); // Different payload should produce different hash
+    }
+
     // Standalone functions for testing without OrderArchiveService
-    fn compute_order_hash_standalone(snapshot: &OrderSnapshot, prev_hash: &str, last_event_hash: &str) -> String {
+    fn compute_order_hash_standalone(
+        snapshot: &OrderSnapshot,
+        prev_hash: &str,
+        last_event_hash: &str,
+    ) -> String {
         let mut hasher = Sha256::new();
         hasher.update(prev_hash.as_bytes());
         hasher.update(snapshot.order_id.as_bytes());
@@ -591,6 +661,9 @@ mod tests {
         hasher.update(event.order_id.as_bytes());
         hasher.update(format!("{}", event.sequence).as_bytes());
         hasher.update(format!("{:?}", event.event_type).as_bytes());
+        // Include payload in hash for tamper-proofing
+        let payload_json = serde_json::to_string(&event.payload).unwrap_or_default();
+        hasher.update(payload_json.as_bytes());
         format!("{:x}", hasher.finalize())
     }
 }

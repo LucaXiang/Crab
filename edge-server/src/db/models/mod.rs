@@ -34,7 +34,10 @@ pub use dining_table::{DiningTable, DiningTableCreate, DiningTableUpdate};
 pub use employee::{Employee, EmployeeCreate, EmployeeId, EmployeeUpdate};
 pub use order::{
     HasEvent, Order, OrderAddItem, OrderAddPayment, OrderCreate, OrderEvent, OrderEventType,
-    OrderItem, OrderItemAttribute, OrderPayment, OrderStatus,
+    OrderItem, OrderItemAttribute, OrderItemOption, OrderPayment, OrderStatus, SplitItem,
+    // API response types
+    OrderDetail, OrderEventDetail, OrderItemDetail, OrderItemOptionDetail, OrderPaymentDetail,
+    OrderSummary,
 };
 pub use price_rule::{
     AdjustmentType, PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope, RuleType,
