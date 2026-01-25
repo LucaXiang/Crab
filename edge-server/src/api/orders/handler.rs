@@ -345,7 +345,7 @@ pub async fn fetch_order_list(
          receipt_number, \
          table_name, \
          string::uppercase(status) AS status, \
-         is_retail, \
+         is_retail ?? false AS is_retail, \
          total_amount AS total, \
          guest_count ?? 1 AS guest_count, \
          time::millis(start_time) AS start_time, \
