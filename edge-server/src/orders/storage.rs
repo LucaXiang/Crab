@@ -927,4 +927,69 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert!(events.iter().all(|e| e.sequence > 1));
     }
+
+    #[test]
+    fn test_pending_archive_queue() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let order_id = "order-archive-1";
+
+        // Initially empty
+        let pending = storage.get_pending_archives().unwrap();
+        assert!(pending.is_empty());
+
+        // Queue for archive
+        let txn = storage.begin_write().unwrap();
+        storage.queue_for_archive(&txn, order_id).unwrap();
+        txn.commit().unwrap();
+
+        // Should have one pending
+        let pending = storage.get_pending_archives().unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].order_id, order_id);
+        assert_eq!(pending[0].retry_count, 0);
+        assert!(pending[0].last_error.is_none());
+
+        // Mark as failed
+        storage.mark_archive_failed(order_id, "test error").unwrap();
+
+        let pending = storage.get_pending_archives().unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].retry_count, 1);
+        assert_eq!(pending[0].last_error.as_deref(), Some("test error"));
+
+        // Remove from pending
+        storage.remove_from_pending(order_id).unwrap();
+
+        let pending = storage.get_pending_archives().unwrap();
+        assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn test_complete_archive_cleanup() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let order_id = "order-cleanup-1";
+
+        // Create snapshot and events
+        let snapshot = create_test_snapshot(order_id);
+        let event = create_test_event(order_id, 0);
+
+        let txn = storage.begin_write().unwrap();
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+        storage.store_event(&txn, &event).unwrap();
+        storage.queue_for_archive(&txn, order_id).unwrap();
+        txn.commit().unwrap();
+
+        // Verify data exists
+        assert!(storage.get_snapshot(order_id).unwrap().is_some());
+        assert!(!storage.get_events_for_order(order_id).unwrap().is_empty());
+        assert!(!storage.get_pending_archives().unwrap().is_empty());
+
+        // Complete archive (cleans up all data)
+        storage.complete_archive(order_id).unwrap();
+
+        // All data should be cleaned up
+        assert!(storage.get_snapshot(order_id).unwrap().is_none());
+        assert!(storage.get_events_for_order(order_id).unwrap().is_empty());
+        assert!(storage.get_pending_archives().unwrap().is_empty());
+    }
 }
