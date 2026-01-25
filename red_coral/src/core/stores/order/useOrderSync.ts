@@ -77,9 +77,9 @@ export function useOrderSync() {
         since_sequence,
       });
       return response;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to sync orders:', err);
-      setError(err.message || 'Sync failed');
+      setError(err instanceof Error ? err.message : 'Sync failed');
       return null;
     }
   }, []);
@@ -140,9 +140,9 @@ export function useOrderSync() {
       setReconnectAttempts(0);
       setIsReconnecting(false);
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Sync] Reconnection failed:', err);
-      setError(err.message || 'Reconnection failed');
+      setError(err instanceof Error ? err.message : 'Reconnection failed');
       _setConnectionState('disconnected');
       setIsReconnecting(false);
 
@@ -200,9 +200,9 @@ export function useOrderSync() {
       _setInitialized(true);
 
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Sync] Failed to initialize from server:', err);
-      setError(err.message || 'Initialization failed');
+      setError(err instanceof Error ? err.message : 'Initialization failed');
       _setConnectionState('disconnected');
       return false;
     }

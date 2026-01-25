@@ -453,11 +453,11 @@ export const useOrderStoreInternal = () =>
   );
 
 // ============================================================================
-// Legacy Selectors (for backwards compatibility)
+// Convenience Selectors
 // ============================================================================
 
 /**
- * Alias for useActiveOrders - returns all held (active) orders
+ * Returns all held (active) orders
  */
 export const useHeldOrders = () => {
   return useActiveOrdersStore(useShallow((state) => state.getActiveOrders()));

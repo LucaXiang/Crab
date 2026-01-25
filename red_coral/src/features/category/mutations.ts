@@ -152,9 +152,10 @@ export async function updateCategory(id: string, formData: CategoryFormData): Pr
   try {
     const catAttrs = await api.listCategoryAttributes(id);
     // Transform to expected format for syncAttributeBindings
-    existingBindings = (catAttrs as Attribute[]).map((ca: any) => ({
-      attributeId: ca.to,
-      id: ca.id
+    // API returns relation records with 'to' pointing to attribute
+    existingBindings = catAttrs.map((ca) => ({
+      attributeId: (ca as unknown as { to: string }).to,
+      id: ca.id as string
     }));
   } catch (error) {
     console.error('Failed to fetch existing category attributes:', error);

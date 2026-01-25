@@ -120,8 +120,8 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     try {
       const attributes = await api.listAttributeTemplates() as AttributeEntity[];
       set({ items: attributes ?? [], isLoading: false, isLoaded: true });
-    } catch (e: any) {
-      const errorMsg = e.message || 'Failed to fetch attributes';
+    } catch (e: unknown) {
+      const errorMsg = (e instanceof Error ? e.message : '') || 'Failed to fetch attributes';
       set({ error: errorMsg, isLoading: false });
       console.error('[Store] attribute: fetch failed -', errorMsg);
     }
@@ -161,13 +161,13 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         newOptions.set(attributeId, optionsWithIndex);
         return { options: newOptions, isLoading: false };
       });
-    } catch (e: any) {
-      console.error('[Store] attribute: loadOptions failed -', e.message);
-      set({ error: e.message, isLoading: false });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      console.error('[Store] attribute: loadOptions failed -', msg);
+      set({ error: msg, isLoading: false });
     }
   },
 
-  // Legacy compatibility
   get attributes() {
     return get().items;
   },
@@ -181,8 +181,8 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     try {
       await api.createAttribute(params);
       await get().fetchAll(true);
-    } catch (e: any) {
-      console.error('[Store] createAttribute failed:', e.message);
+    } catch (e: unknown) {
+      console.error('[Store] createAttribute failed:', e);
       throw e;
     }
   },
@@ -191,8 +191,8 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       const { id, ...data } = params;
       await api.updateAttribute(id, data);
       await get().fetchAll(true);
-    } catch (e: any) {
-      console.error('[Store] updateAttribute failed:', e.message);
+    } catch (e: unknown) {
+      console.error('[Store] updateAttribute failed:', e);
       throw e;
     }
   },
@@ -200,8 +200,8 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     try {
       await api.deleteAttribute(id);
       await get().fetchAll(true);
-    } catch (e: any) {
-      console.error('[Store] deleteAttribute failed:', e.message);
+    } catch (e: unknown) {
+      console.error('[Store] deleteAttribute failed:', e);
       throw e;
     }
   },
@@ -221,8 +221,8 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         return { options: newOptions };
       });
       await get().fetchAll(true);
-    } catch (e: any) {
-      console.error('[Store] createOption failed:', e.message);
+    } catch (e: unknown) {
+      console.error('[Store] createOption failed:', e);
       throw e;
     }
   },
@@ -242,8 +242,8 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         return { options: newOptions };
       });
       await get().fetchAll(true);
-    } catch (e: any) {
-      console.error('[Store] updateOption failed:', e.message);
+    } catch (e: unknown) {
+      console.error('[Store] updateOption failed:', e);
       throw e;
     }
   },
@@ -262,8 +262,8 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         return { options: newOptions };
       });
       await get().fetchAll(true);
-    } catch (e: any) {
-      console.error('[Store] deleteOption failed:', e.message);
+    } catch (e: unknown) {
+      console.error('[Store] deleteOption failed:', e);
       throw e;
     }
   },
@@ -296,8 +296,8 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         })));
         return { items: newItems, options: newOptionsMap };
       });
-    } catch (e: any) {
-      console.error('[Store] reorderOptions failed:', e.message);
+    } catch (e: unknown) {
+      console.error('[Store] reorderOptions failed:', e);
       throw e;
     }
   },
@@ -310,16 +310,16 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         is_required: params.is_required,
         display_order: params.display_order,
       });
-    } catch (e: any) {
-      console.error('[Store] bindProductAttribute failed:', e.message);
+    } catch (e: unknown) {
+      console.error('[Store] bindProductAttribute failed:', e);
       throw e;
     }
   },
   unbindProductAttribute: async (bindingId) => {
     try {
       await api.unbindProductAttribute(bindingId);
-    } catch (e: any) {
-      console.error('[Store] unbindProductAttribute failed:', e.message);
+    } catch (e: unknown) {
+      console.error('[Store] unbindProductAttribute failed:', e);
       throw e;
     }
   },

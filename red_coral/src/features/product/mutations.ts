@@ -166,7 +166,6 @@ export async function updateProduct(
     specs: updatedSpecs,
   };
 
-  console.log('[DEBUG] Update product payload:', JSON.stringify(updatePayload, null, 2));
   const updated = await api.updateProduct(id, updatePayload);
 
   // Update ProductStore cache with API response data
@@ -178,12 +177,13 @@ export async function updateProduct(
   const selectedAttributeIds = formData.selected_attribute_ids || [];
 
   // Get existing bindings
-  let existingBindings: any[] = [];
+  let existingBindings: { attributeId: string; id: string }[] = [];
   try {
     const productAttrs = await api.fetchProductAttributes(id);
-    existingBindings = (productAttrs ?? []).map((pa: any) => ({
-      attributeId: pa.to,
-      id: pa.id
+    // API returns relation records with 'to' pointing to attribute
+    existingBindings = (productAttrs ?? []).map((pa) => ({
+      attributeId: (pa as unknown as { to: string }).to,
+      id: pa.id as string
     }));
   } catch (error) {
     console.error('Failed to fetch existing attributes:', error);

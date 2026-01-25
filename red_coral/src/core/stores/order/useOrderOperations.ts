@@ -9,42 +9,12 @@ import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { HeldOrder, CartItem, PaymentRecord, Table, Zone } from '@/core/domain/types';
 import { useActiveOrdersStore } from './useActiveOrdersStore';
 import { useCheckoutStore } from './useCheckoutStore';
-import { useBridgeStore } from '@/core/stores/bridge/useBridgeStore';
+import { createCommand } from './commandUtils';
 import type {
   OrderCommand,
-  OrderCommandPayload,
   CommandResponse,
   CartItemInput,
 } from '@/core/domain/types/orderEvent';
-
-// ============================================================================
-// Command Helpers
-// ============================================================================
-
-function generateCommandId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-function createCommand(payload: OrderCommandPayload): OrderCommand {
-  const session = useBridgeStore.getState().currentSession;
-  const operatorId = session?.user_info?.id ?? 'unknown';
-  const operatorName = session?.user_info?.username ?? 'Unknown';
-
-  return {
-    command_id: generateCommandId(),
-    timestamp: Date.now(),
-    operator_id: String(operatorId),
-    operator_name: operatorName,
-    payload,
-  };
-}
 
 async function sendCommand(command: OrderCommand): Promise<CommandResponse> {
   try {

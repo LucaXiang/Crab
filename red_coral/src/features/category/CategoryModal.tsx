@@ -84,7 +84,7 @@ export const CategoryModal: React.FC = React.memo(() => {
       await deleteCategory(String(data.id));
       toast.success(t('settings.category.category_deleted'));
       closeModal();
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(getErrorMessage(e));
     }
   };

@@ -111,7 +111,7 @@ export const ProductModal: React.FC = React.memo(() => {
       await deleteProduct(String(data.id));
       toast.success(t('settings.product.product_deleted'));
       closeModal();
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error(getErrorMessage(e));
     }
   };
