@@ -169,6 +169,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
       {
         key: 'operator',
         header: t('settings.shift.header.operator'),
+        width: '100px',
         render: (item) => (
           <span className="font-medium text-gray-900">{item.operator_name}</span>
         ),
@@ -194,7 +195,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
       {
         key: 'expected_cash',
         header: t('settings.shift.header.expected_cash'),
-        width: '120px',
+        width: '140px',
         align: 'right',
         render: (item) => (
           <span className="font-mono text-gray-700">{formatCurrency(item.expected_cash)}</span>
@@ -203,7 +204,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
       {
         key: 'actual_cash',
         header: t('settings.shift.header.actual_cash'),
-        width: '120px',
+        width: '140px',
         align: 'right',
         render: (item) => (
           <span className="font-mono text-gray-700">
