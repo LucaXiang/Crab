@@ -169,7 +169,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
       {
         key: 'operator',
         header: t('settings.shift.header.operator'),
-        width: '10%',
+        width: '12%',
         render: (item) => (
           <span className="font-medium text-gray-900">{item.operator_name}</span>
         ),
@@ -222,7 +222,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
       {
         key: 'actions',
         header: t('common.actions'),
-        width: '8%',
+        width: '6%',
         align: 'right',
         render: (item) => {
           if (item.status !== 'OPEN') return null;
