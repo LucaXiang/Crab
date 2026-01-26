@@ -52,6 +52,9 @@ pub fn build_app() -> Router<ServerState> {
         .merge(crate::api::system_state::router())
         .merge(crate::api::store_info::router())
         .merge(crate::api::label_template::router())
+        // Operations (班次与日结)
+        .merge(crate::api::shifts::router())
+        .merge(crate::api::daily_reports::router())
         // Sync API
         .merge(crate::api::sync::router())
 }

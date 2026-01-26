@@ -50,6 +50,13 @@ import type {
   LabelTemplate,
   LabelTemplateCreate,
   LabelTemplateUpdate,
+  Shift,
+  ShiftCreate,
+  ShiftClose,
+  ShiftForceClose,
+  ShiftUpdate,
+  DailyReport,
+  DailyReportGenerate,
 } from '@/core/domain/types/api';
 
 // API Error class - aligned with shared::error::ErrorCode (u16)
@@ -428,6 +435,66 @@ export class TauriApiClient {
 
   async refreshToken(): Promise<void> {
     await invokeAndUnwrap<void>('refresh_token');
+  }
+
+  // ============ Shifts (班次管理) ============
+
+  async listShifts(params?: { limit?: number; offset?: number; start_date?: string; end_date?: string }): Promise<Shift[]> {
+    return invokeAndUnwrap<Shift[]>('list_shifts', params);
+  }
+
+  async getShift(id: string): Promise<Shift> {
+    return invokeAndUnwrap<Shift>('get_shift', { id });
+  }
+
+  async getCurrentShift(operatorId?: string): Promise<Shift | null> {
+    return invokeAndUnwrap<Shift | null>('get_current_shift', { operator_id: operatorId });
+  }
+
+  async openShift(data: ShiftCreate): Promise<Shift> {
+    return invokeAndUnwrap<Shift>('open_shift', { data });
+  }
+
+  async updateShift(id: string, data: ShiftUpdate): Promise<Shift> {
+    return invokeAndUnwrap<Shift>('update_shift', { id, data });
+  }
+
+  async closeShift(id: string, data: ShiftClose): Promise<Shift> {
+    return invokeAndUnwrap<Shift>('close_shift', { id, data });
+  }
+
+  async forceCloseShift(id: string, data?: ShiftForceClose): Promise<Shift> {
+    return invokeAndUnwrap<Shift>('force_close_shift', { id, data: data ?? {} });
+  }
+
+  async heartbeatShift(id: string): Promise<boolean> {
+    return invokeAndUnwrap<boolean>('heartbeat_shift', { id });
+  }
+
+  async recoverStaleShifts(today?: string): Promise<Shift[]> {
+    return invokeAndUnwrap<Shift[]>('recover_stale_shifts', { today });
+  }
+
+  // ============ Daily Reports (日结报告) ============
+
+  async listDailyReports(params?: { limit?: number; offset?: number; start_date?: string; end_date?: string }): Promise<DailyReport[]> {
+    return invokeAndUnwrap<DailyReport[]>('list_daily_reports', params);
+  }
+
+  async getDailyReport(id: string): Promise<DailyReport> {
+    return invokeAndUnwrap<DailyReport>('get_daily_report', { id });
+  }
+
+  async getDailyReportByDate(date: string): Promise<DailyReport> {
+    return invokeAndUnwrap<DailyReport>('get_daily_report_by_date', { date });
+  }
+
+  async generateDailyReport(data: DailyReportGenerate): Promise<DailyReport> {
+    return invokeAndUnwrap<DailyReport>('generate_daily_report', { data });
+  }
+
+  async deleteDailyReport(id: string): Promise<boolean> {
+    return invokeAndUnwrap<boolean>('delete_daily_report', { id });
   }
 }
 

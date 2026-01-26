@@ -17,6 +17,10 @@ pub mod system_state;
 pub mod tag;
 pub mod zone;
 
+// Operations (班次与日结)
+pub mod shift;
+pub mod daily_report;
+
 // Re-exports
 pub use attribute::*;
 pub use category::*;
@@ -31,3 +35,5 @@ pub use store_info::*;
 pub use system_state::*;
 pub use tag::*;
 pub use zone::*;
+pub use shift::*;
+pub use daily_report::*;

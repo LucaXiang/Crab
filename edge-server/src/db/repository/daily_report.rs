@@ -1,0 +1,251 @@
+//! Daily Report Repository
+
+use super::{BaseRepository, RepoError, RepoResult};
+use crate::db::models::{DailyReport, DailyReportGenerate};
+use chrono::{Local, NaiveDate};
+use surrealdb::engine::local::Db;
+use surrealdb::{RecordId, Surreal};
+
+/// Validate date format (YYYY-MM-DD)
+fn validate_date(date: &str) -> RepoResult<NaiveDate> {
+    NaiveDate::parse_from_str(date, "%Y-%m-%d")
+        .map_err(|_| RepoError::Validation(format!("Invalid date format: {}", date)))
+}
+
+/// Validate date is not in the future
+fn validate_not_future_date(date: &str) -> RepoResult<()> {
+    let parsed_date = validate_date(date)?;
+    let today = Local::now().date_naive();
+
+    if parsed_date > today {
+        return Err(RepoError::Validation(format!(
+            "Cannot generate report for future date: {}",
+            date
+        )));
+    }
+    Ok(())
+}
+
+#[derive(Clone)]
+pub struct DailyReportRepository {
+    base: BaseRepository,
+}
+
+impl DailyReportRepository {
+    pub fn new(db: Surreal<Db>) -> Self {
+        Self {
+            base: BaseRepository::new(db),
+        }
+    }
+
+    /// Generate daily report for a specific date
+    pub async fn generate(
+        &self,
+        data: DailyReportGenerate,
+        operator_id: Option<String>,
+        operator_name: Option<String>,
+    ) -> RepoResult<DailyReport> {
+        // Validate date format and ensure not future
+        validate_not_future_date(&data.business_date)?;
+
+        // Check if report already exists
+        if self.find_by_date(&data.business_date).await?.is_some() {
+            return Err(RepoError::Duplicate(format!(
+                "Daily report for {} already exists",
+                data.business_date
+            )));
+        }
+
+        let start_dt = format!("{}T00:00:00Z", data.business_date);
+        let end_dt = format!("{}T23:59:59Z", data.business_date);
+
+        // Complex aggregation query for daily report
+        let mut result = self
+            .base
+            .db()
+            .query(
+                r#"
+                -- Get all orders for the day (archived orders)
+                LET $all_orders = SELECT * FROM order
+                    WHERE created_at >= <datetime>$start
+                    AND created_at <= <datetime>$end;
+
+                -- Filter by status
+                LET $completed = SELECT * FROM $all_orders WHERE status = 'COMPLETED';
+                LET $void = SELECT * FROM $all_orders WHERE status = 'VOID';
+
+                -- Calculate totals
+                LET $total_sales = math::sum($completed.total_amount) OR 0;
+                LET $total_paid = math::sum($completed.paid_amount) OR 0;
+                LET $total_unpaid = $total_sales - $total_paid;
+                LET $void_amount = math::sum($void.total_amount) OR 0;
+                LET $total_tax = math::sum($completed.tax) OR 0;
+                LET $total_discount = math::sum($completed.discount_amount) OR 0;
+                LET $total_surcharge = math::sum($completed.surcharge_amount) OR 0;
+
+                -- Payment breakdowns (from order_payment via has_payment edge)
+                LET $payments = (
+                    SELECT method, amount FROM order_payment
+                    WHERE <-has_payment<-order IN $completed
+                    AND cancelled = false
+                );
+                LET $payment_breakdown = (
+                    SELECT
+                        method,
+                        math::sum(amount) AS amount,
+                        count() AS count
+                    FROM $payments
+                    GROUP BY method
+                );
+
+                -- Tax breakdowns by rate (Spain IVA: 0%, 4%, 10%, 21%)
+                -- Group order items by tax_rate
+                LET $order_items = (
+                    SELECT
+                        tax_rate,
+                        (quantity * unit_price) AS gross_amount,
+                        ((quantity * unit_price) * tax_rate / (100 + tax_rate)) AS tax_amount,
+                        order_id
+                    FROM order_item
+                    WHERE order_id IN (SELECT id FROM $completed)
+                );
+
+                LET $tax_breakdown = (
+                    SELECT
+                        tax_rate,
+                        math::sum(gross_amount) AS gross_amount,
+                        math::sum(tax_amount) AS tax_amount,
+                        (math::sum(gross_amount) - math::sum(tax_amount)) AS net_amount,
+                        count(DISTINCT order_id) AS order_count
+                    FROM $order_items
+                    GROUP BY tax_rate
+                    ORDER BY tax_rate DESC
+                );
+
+                -- Create the report
+                CREATE daily_report SET
+                    business_date = $date,
+                    total_orders = count($all_orders),
+                    completed_orders = count($completed),
+                    void_orders = count($void),
+                    total_sales = $total_sales,
+                    total_paid = $total_paid,
+                    total_unpaid = $total_unpaid,
+                    void_amount = $void_amount,
+                    total_tax = $total_tax,
+                    total_discount = $total_discount,
+                    total_surcharge = $total_surcharge,
+                    tax_breakdowns = $tax_breakdown,
+                    payment_breakdowns = $payment_breakdown,
+                    generated_at = time::now(),
+                    generated_by_id = $gen_id,
+                    generated_by_name = $gen_name,
+                    note = $note
+                RETURN AFTER
+            "#,
+            )
+            .bind(("date", data.business_date))
+            .bind(("start", start_dt))
+            .bind(("end", end_dt))
+            .bind(("gen_id", operator_id))
+            .bind(("gen_name", operator_name))
+            .bind(("note", data.note))
+            .await?;
+
+        let reports: Vec<DailyReport> = result.take(0)?;
+        reports
+            .into_iter()
+            .next()
+            .ok_or_else(|| RepoError::Database("Failed to generate daily report".to_string()))
+    }
+
+    /// Find report by date
+    pub async fn find_by_date(&self, date: &str) -> RepoResult<Option<DailyReport>> {
+        let mut result = self
+            .base
+            .db()
+            .query("SELECT * FROM daily_report WHERE business_date = $date LIMIT 1")
+            .bind(("date", date.to_string()))
+            .await?;
+
+        let reports: Vec<DailyReport> = result.take(0)?;
+        Ok(reports.into_iter().next())
+    }
+
+    /// Find report by id
+    pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<DailyReport>> {
+        let record_id: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+        let report: Option<DailyReport> = self.base.db().select(record_id).await?;
+        Ok(report)
+    }
+
+    /// Find all reports (paginated)
+    pub async fn find_all(&self, limit: i32, offset: i32) -> RepoResult<Vec<DailyReport>> {
+        let mut result = self
+            .base
+            .db()
+            .query(
+                "SELECT * FROM daily_report ORDER BY business_date DESC LIMIT $limit START $offset",
+            )
+            .bind(("limit", limit))
+            .bind(("offset", offset))
+            .await?;
+
+        let reports: Vec<DailyReport> = result.take(0)?;
+        Ok(reports)
+    }
+
+    /// Find reports by date range
+    pub async fn find_by_date_range(
+        &self,
+        start_date: &str,
+        end_date: &str,
+    ) -> RepoResult<Vec<DailyReport>> {
+        // Validate date formats
+        validate_date(start_date)?;
+        validate_date(end_date)?;
+
+        let mut result = self
+            .base
+            .db()
+            .query(
+                r#"
+                SELECT * FROM daily_report
+                WHERE business_date >= $start AND business_date <= $end
+                ORDER BY business_date DESC
+            "#,
+            )
+            .bind(("start", start_date.to_string()))
+            .bind(("end", end_date.to_string()))
+            .await?;
+
+        let reports: Vec<DailyReport> = result.take(0)?;
+        Ok(reports)
+    }
+
+    /// Delete report (admin only)
+    pub async fn delete(&self, id: &str) -> RepoResult<bool> {
+        let record_id: RecordId = id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+
+        self.base
+            .db()
+            .query("DELETE $id")
+            .bind(("id", record_id))
+            .await?;
+
+        Ok(true)
+    }
+
+    /// Calculate unpaid amount from active orders (not archived yet)
+    /// This queries the order storage, not the archived orders
+    pub async fn get_current_unpaid_amount(&self) -> RepoResult<f64> {
+        // Query from active orders (OrderSnapshot in memory/redb)
+        // For now, we return 0 as this requires OrdersManager integration
+        // TODO: Integrate with OrdersManager to get real unpaid amount
+        Ok(0.0)
+    }
+}

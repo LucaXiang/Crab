@@ -32,6 +32,10 @@ pub mod system_state;
 // Image
 pub mod image_ref;
 
+// Operations (班次与日结)
+pub mod shift;
+pub mod daily_report;
+
 // Re-exports
 pub use attribute::{Attribute, AttributeBinding, AttributeBindingFull, AttributeCreate, AttributeOption, AttributeUpdate};
 pub use category::{Category, CategoryCreate, CategoryUpdate};
@@ -62,3 +66,5 @@ pub use system_state::{SystemState, SystemStateUpdate};
 pub use tag::{Tag, TagCreate, TagUpdate};
 pub use zone::{Zone, ZoneCreate, ZoneUpdate};
 pub use image_ref::{ImageRef, ImageRefCreate, ImageRefEntityType};
+pub use shift::{Shift, ShiftCreate, ShiftClose, ShiftForceClose, ShiftUpdate, ShiftStatus, ShiftId};
+pub use daily_report::{DailyReport, DailyReportGenerate, TaxBreakdown, PaymentMethodBreakdown, DailyReportId};

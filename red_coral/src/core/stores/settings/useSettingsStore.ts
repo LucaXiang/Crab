@@ -10,7 +10,7 @@ import type { EmbeddedSpec, Category, Product, Tag, DiningTable, Zone, PrintStat
  * 本 Store 仅管理: 导航、Modal、表单、筛选/分页 UI 状态
  */
 
-type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS';
+type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS' | 'SHIFTS' | 'DAILY_REPORTS';
 type ModalAction = 'CREATE' | 'EDIT' | 'DELETE';
 type ModalEntity = 'TABLE' | 'ZONE' | 'PRODUCT' | 'CATEGORY' | 'TAG';
 

@@ -16,6 +16,7 @@ pub mod printer;
 pub mod sync;
 pub mod system;
 pub mod tenant;
+pub mod shift;
 
 pub use api::*;
 pub use auth::*;
@@ -31,3 +32,4 @@ pub use printer::*;
 pub use sync::*;
 pub use system::*;
 pub use tenant::*;
+pub use shift::*;

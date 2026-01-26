@@ -17,6 +17,8 @@ import {
   ChevronRight,
   Menu,
   Percent,
+  Clock,
+  FileText,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useSettingsCategory, useSettingsStore } from '@/core/stores/settings/useSettingsStore';
@@ -24,7 +26,7 @@ import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
 import { usePermission } from '@/hooks/usePermission';
 
-type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS';
+type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS' | 'SHIFTS' | 'DAILY_REPORTS';
 
 interface SettingsSidebarProps {
   onBack: () => void;
@@ -232,6 +234,25 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
               </div>
             </div>
           )}
+
+          {/* Operations Group (班次与日结) */}
+          <div>
+            <div className="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              {t('settings.group.operations')}
+            </div>
+            <CategoryItem
+              category="SHIFTS"
+              icon={Clock}
+              label={t('settings.shift.title')}
+            />
+            <ProtectedGate permission={Permission.SYSTEM_SETTINGS}>
+              <CategoryItem
+                category="DAILY_REPORTS"
+                icon={FileText}
+                label={t('settings.daily_report.title')}
+              />
+            </ProtectedGate>
+          </div>
 
           {/* System Settings Group */}
           <div>

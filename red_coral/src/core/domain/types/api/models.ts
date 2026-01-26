@@ -729,3 +729,147 @@ export interface LabelTemplateUpdate {
   render_dpi?: number;
   test_data?: string;
 }
+
+// ============ Shift (班次管理) ============
+
+/** Shift status */
+export type ShiftStatus = 'OPEN' | 'CLOSED';
+
+/**
+ * Shift record - represents an operator's work shift
+ * Used for cash tracking and shift management
+ */
+export interface Shift {
+  id: string | null;
+  /** Operator employee ID (RecordId format: "employee:xxx") */
+  operator_id: string;
+  /** Operator display name */
+  operator_name: string;
+  /** Shift status */
+  status: ShiftStatus;
+  /** Shift start time (ISO 8601) */
+  start_time: string;
+  /** Shift end time (ISO 8601), null if still open */
+  end_time: string | null;
+  /** Starting cash amount */
+  starting_cash: number;
+  /** Expected cash amount (starting + cash payments received) */
+  expected_cash: number;
+  /** Actual cash counted at close */
+  actual_cash: number | null;
+  /** Cash variance (actual - expected) */
+  cash_variance: number | null;
+  /** Whether shift was closed abnormally (power failure, etc.) */
+  abnormal_close: boolean;
+  /** Last heartbeat timestamp */
+  last_active_at: string | null;
+  /** Notes */
+  note: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ShiftCreate {
+  /** Operator employee ID */
+  operator_id: string;
+  /** Operator display name */
+  operator_name: string;
+  /** Starting cash amount (default 0) */
+  starting_cash?: number;
+  /** Notes */
+  note?: string;
+}
+
+export interface ShiftClose {
+  /** Actual cash counted */
+  actual_cash: number;
+  /** Notes */
+  note?: string;
+}
+
+export interface ShiftForceClose {
+  /** Notes */
+  note?: string;
+}
+
+export interface ShiftUpdate {
+  /** Update starting cash (only when OPEN) */
+  starting_cash?: number;
+  /** Notes */
+  note?: string;
+}
+
+// ============ Daily Report (日结报告) ============
+
+/** Tax breakdown by rate (Spain: 0%, 4%, 10%, 21%) */
+export interface TaxBreakdown {
+  /** Tax rate (0, 4, 10, 21) */
+  tax_rate: number;
+  /** Net amount (before tax) */
+  net_amount: number;
+  /** Tax amount */
+  tax_amount: number;
+  /** Gross amount (after tax) */
+  gross_amount: number;
+  /** Number of orders with this tax rate */
+  order_count: number;
+}
+
+/** Payment method breakdown */
+export interface PaymentMethodBreakdown {
+  /** Payment method name */
+  method: string;
+  /** Total amount */
+  amount: number;
+  /** Number of payments */
+  count: number;
+}
+
+/**
+ * Daily Report - end-of-day settlement report
+ * Contains aggregated sales data for a business date
+ */
+export interface DailyReport {
+  id: string | null;
+  /** Business date (YYYY-MM-DD format) */
+  business_date: string;
+  /** Total number of orders */
+  total_orders: number;
+  /** Completed orders count */
+  completed_orders: number;
+  /** Voided orders count */
+  void_orders: number;
+  /** Total sales amount */
+  total_sales: number;
+  /** Total paid amount */
+  total_paid: number;
+  /** Total unpaid amount */
+  total_unpaid: number;
+  /** Voided order total amount */
+  void_amount: number;
+  /** Total tax collected */
+  total_tax: number;
+  /** Total discount applied */
+  total_discount: number;
+  /** Total surcharge applied */
+  total_surcharge: number;
+  /** Tax breakdown by rate */
+  tax_breakdowns: TaxBreakdown[];
+  /** Payment breakdown by method */
+  payment_breakdowns: PaymentMethodBreakdown[];
+  /** When the report was generated (ISO 8601) */
+  generated_at: string | null;
+  /** Who generated the report (employee ID) */
+  generated_by_id: string | null;
+  /** Who generated the report (name) */
+  generated_by_name: string | null;
+  /** Notes */
+  note: string | null;
+}
+
+export interface DailyReportGenerate {
+  /** Business date to generate report for (YYYY-MM-DD) */
+  business_date: string;
+  /** Notes */
+  note?: string;
+}

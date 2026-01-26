@@ -8,6 +8,7 @@ use surrealdb::RecordId;
 
 /// Store info entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct StoreInfo {
     #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<RecordId>,
@@ -35,22 +36,6 @@ pub struct StoreInfo {
     pub updated_at: Option<String>,
 }
 
-impl Default for StoreInfo {
-    fn default() -> Self {
-        Self {
-            id: None,
-            name: String::new(),
-            address: String::new(),
-            nif: String::new(),
-            logo_url: None,
-            phone: None,
-            email: None,
-            website: None,
-            created_at: None,
-            updated_at: None,
-        }
-    }
-}
 
 /// Update store info payload
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

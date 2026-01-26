@@ -69,8 +69,8 @@ fn apply_item_modified(
 
             // 2. Create new item for unpaid portion with modifications
             let unpaid_qty = original_qty - paid_qty;
-            if unpaid_qty > 0 {
-                if let Some(result) = results.iter().find(|r| r.action == "UPDATED") {
+            if unpaid_qty > 0
+                && let Some(result) = results.iter().find(|r| r.action == "UPDATED") {
                     let mut new_item = source.clone();
                     new_item.instance_id = result.instance_id.clone();
                     new_item.quantity = unpaid_qty;
@@ -78,7 +78,6 @@ fn apply_item_modified(
                     apply_changes_to_item(&mut new_item, changes);
                     snapshot.items.push(new_item);
                 }
-            }
         } else if affected_quantity >= original_qty {
             // Full modification (no paid portion): update entire item in place
             apply_changes_to_item(&mut snapshot.items[idx], changes);

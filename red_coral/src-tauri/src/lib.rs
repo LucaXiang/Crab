@@ -275,6 +275,22 @@ pub async fn run() {
             commands::print_label,
             // Health commands
             commands::get_health_status,
+            // Shift commands (班次管理)
+            commands::list_shifts,
+            commands::get_shift,
+            commands::get_current_shift,
+            commands::open_shift,
+            commands::update_shift,
+            commands::close_shift,
+            commands::force_close_shift,
+            commands::heartbeat_shift,
+            commands::recover_stale_shifts,
+            // Daily Report commands (日结报告)
+            commands::list_daily_reports,
+            commands::get_daily_report,
+            commands::get_daily_report_by_date,
+            commands::generate_daily_report,
+            commands::delete_daily_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

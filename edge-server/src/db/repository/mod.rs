@@ -29,6 +29,10 @@ pub mod system_state;
 // Image
 pub mod image_ref;
 
+// Operations (班次与日结)
+pub mod shift;
+pub mod daily_report;
+
 // Re-exports
 pub use attribute::AttributeRepository;
 pub use dining_table::DiningTableRepository;
@@ -43,6 +47,8 @@ pub use system_state::SystemStateRepository;
 pub use tag::TagRepository;
 pub use zone::ZoneRepository;
 pub use image_ref::ImageRefRepository;
+pub use shift::ShiftRepository;
+pub use daily_report::DailyReportRepository;
 
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;

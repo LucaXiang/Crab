@@ -9,6 +9,8 @@ import { CategoryManagement } from '@/features/category';
 import { TagManagement } from '@/features/tag';
 import { AttributeManagement } from '@/features/attribute';
 import { PriceRuleManagement } from '@/features/price-rule';
+import { ShiftManagement } from '@/features/shift';
+import { DailyReportManagement } from '@/features/daily-report';
 import { DataTransfer } from './DataTransfer';
 import { StoreSettings } from './StoreSettings';
 import { SystemSettings } from './SystemSettings';
@@ -57,6 +59,16 @@ const SettingsContent: React.FC = React.memo(() => {
         {activeCategory === 'PRICE_RULES' && (
           <ProtectedGate permission={Permission.SYSTEM_SETTINGS}>
             <PriceRuleManagement />
+          </ProtectedGate>
+        )}
+        {activeCategory === 'SHIFTS' && (
+          <ProtectedGate permission={Permission.SYSTEM_SETTINGS}>
+            <ShiftManagement />
+          </ProtectedGate>
+        )}
+        {activeCategory === 'DAILY_REPORTS' && (
+          <ProtectedGate permission={Permission.SYSTEM_SETTINGS}>
+            <DailyReportManagement />
           </ProtectedGate>
         )}
         {activeCategory === 'USERS' && (

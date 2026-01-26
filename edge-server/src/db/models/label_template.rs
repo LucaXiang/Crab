@@ -9,7 +9,9 @@ use surrealdb::RecordId;
 /// Label field type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum LabelFieldType {
+    #[default]
     Text,
     Barcode,
     Qrcode,
@@ -20,11 +22,6 @@ pub enum LabelFieldType {
     Counter,
 }
 
-impl Default for LabelFieldType {
-    fn default() -> Self {
-        Self::Text
-    }
-}
 
 /// Label field alignment
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

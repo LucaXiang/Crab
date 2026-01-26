@@ -1,5 +1,9 @@
 {
   "common": {
+    "cancel": "取消",
+    "confirm": "确认",
+    "loading": "加载中...",
+    "close": "关闭",
     "action": {
       "save": "保存",
       "cancel": "取消",
@@ -515,6 +519,7 @@
     "group": {
       "general": "通用设置",
       "data": "数据管理",
+      "operations": "营业管理",
       "system": "系统设置"
     },
     "price_rule": {
@@ -1384,6 +1389,135 @@
       "untitled": "未命名",
       "properties": "属性",
       "actions": "操作"
+    },
+    "shift": {
+      "title": "班次管理",
+      "description": "管理收银班次、现金盘点和交接",
+      "unit": "个班次",
+      "search_placeholder": "搜索班次...",
+      "empty": "暂无班次记录",
+      "load_failed": "加载班次列表失败",
+      "header": {
+        "operator": "操作员",
+        "start_time": "开始时间",
+        "end_time": "结束时间",
+        "duration": "时长",
+        "starting_cash": "备用金",
+        "expected_cash": "应结现金",
+        "actual_cash": "实际现金",
+        "variance": "差异",
+        "status": "状态"
+      },
+      "status": {
+        "open": "进行中",
+        "closed": "已结束"
+      },
+      "open_shift": "开班",
+      "close_shift": "收班",
+      "force_close_shift": "强制关闭",
+      "no_active_shift": "当前没有进行中的班次",
+      "no_active_shift_hint": "请点击开班按钮开始新的班次",
+      "active_shift_warning": "存在进行中的班次",
+      "active_shift_hint": "请先收班后再开始新班次",
+      "stale_shift_warning": "检测到异常关闭的班次",
+      "stale_shift_hint": "系统检测到有班次未正常关闭，可能是由于断电或系统崩溃导致",
+      "recover_stale": "处理异常班次",
+      "open_success": "开班成功",
+      "close_success_balanced": "收班成功，现金无差异",
+      "close_success_variance": "收班成功，差异: {{variance}}",
+      "force_close_success": "班次已强制关闭",
+      "action_failed": "操作失败",
+      "invalid_amount": "请输入有效金额",
+      "variance": {
+        "balanced": "平衡",
+        "over": "长款",
+        "short": "短款"
+      },
+      "modal": {
+        "open_title": "开班",
+        "close_title": "收班盘点",
+        "force_close_title": "强制关闭班次",
+        "operator": "操作员",
+        "starting_cash": "备用金",
+        "starting_cash_hint": "输入开班时收银机内的现金金额",
+        "expected_cash": "应结现金",
+        "actual_cash": "实际现金",
+        "variance": "差异",
+        "note": "备注",
+        "note_placeholder": "输入备注信息（可选）",
+        "force_close_warning_title": "确认强制关闭？",
+        "force_close_warning": "强制关闭将跳过现金盘点，通常用于系统异常恢复场景。此操作不可撤销。",
+        "force_close_default_note": "系统异常恢复"
+      },
+      "exit_guard": {
+        "title": "班次未结束",
+        "message": "当前有进行中的班次，是否收班后再退出？",
+        "close_and_exit": "收班后退出",
+        "exit_directly": "直接退出"
+      }
+    },
+    "daily_report": {
+      "title": "日结报告",
+      "description": "查看和生成每日营业报告",
+      "unit": "份报告",
+      "search_placeholder": "搜索日期...",
+      "empty": "暂无日结报告",
+      "load_failed": "加载报告失败",
+      "header": {
+        "date": "营业日期",
+        "orders": "订单",
+        "sales": "销售额",
+        "paid": "已收款",
+        "unpaid": "未收款",
+        "void": "作废",
+        "tax": "税额"
+      },
+      "no_today_report": "今日尚未生成日结报告",
+      "no_today_report_hint": "建议在每日营业结束后生成日结报告",
+      "generate": "生成报告",
+      "generate_today": "生成今日报告",
+      "detail_title": "日结报告详情",
+      "summary": {
+        "total_sales": "销售总额",
+        "total_paid": "已收款",
+        "total_unpaid": "未收款"
+      },
+      "section": {
+        "orders": "订单统计",
+        "tax": "税率分类",
+        "payment": "支付方式",
+        "additional": "附加信息"
+      },
+      "stat": {
+        "total": "总计",
+        "completed": "完成",
+        "void": "作废",
+        "void_amount": "作废金额"
+      },
+      "orders_count": "笔订单",
+      "payments_count": "笔",
+      "tax_amount": "税额",
+      "no_tax_data": "暂无税率数据",
+      "no_payment_data": "暂无支付数据",
+      "total_discount": "总折扣",
+      "total_surcharge": "总附加费",
+      "generated_by": "生成人",
+      "generated_at": "生成时间",
+      "note": "备注",
+      "generate": {
+        "title": "生成日结报告",
+        "date_label": "营业日期",
+        "date_hint": "选择要生成报告的营业日期",
+        "date_required": "请选择营业日期",
+        "future_date_warning": "不能为未来日期生成报告",
+        "note_label": "备注",
+        "note_placeholder": "添加备注（可选）",
+        "info": "日结报告将汇总该日期的所有订单数据，包括销售额、税率分类和支付方式统计。",
+        "submit": "生成报告",
+        "success": "日结报告生成成功",
+        "failed": "生成报告失败",
+        "already_exists": "该日期的报告已存在"
+      }
     }
   },
   "errors": {

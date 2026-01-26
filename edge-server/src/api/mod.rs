@@ -41,5 +41,9 @@ pub mod tables;
 pub mod tags;
 pub mod zones;
 
+// Operations (班次与日结)
+pub mod shifts;
+pub mod daily_reports;
+
 // Re-export common types for handlers
 pub use crate::utils::{AppResponse, AppResult};
