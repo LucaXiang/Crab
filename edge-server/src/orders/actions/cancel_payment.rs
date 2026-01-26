@@ -121,7 +121,7 @@ mod tests {
         snapshot.paid_amount = 50.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "credit_card", 50.0));
+            .push(create_payment_record("payment-1", "CARD", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -153,7 +153,7 @@ mod tests {
         } = &event.payload
         {
             assert_eq!(payment_id, "payment-1");
-            assert_eq!(method, "credit_card");
+            assert_eq!(method, "CARD");
             assert_eq!(*amount, 50.0);
             assert_eq!(*reason, Some("Customer changed mind".to_string()));
             assert_eq!(*authorizer_id, Some("manager-1".to_string()));
@@ -175,7 +175,7 @@ mod tests {
         snapshot.paid_amount = 50.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "cash", 50.0));
+            .push(create_payment_record("payment-1", "CASH", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -220,7 +220,7 @@ mod tests {
         snapshot.paid_amount = 50.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "cash", 50.0));
+            .push(create_payment_record("payment-1", "CASH", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -250,7 +250,7 @@ mod tests {
         snapshot.status = OrderStatus::Active;
         snapshot.total = 100.0;
         snapshot.paid_amount = 0.0; // Already cancelled, so paid_amount is 0
-        let mut payment = create_payment_record("payment-1", "cash", 50.0);
+        let mut payment = create_payment_record("payment-1", "CASH", 50.0);
         payment.cancelled = true;
         payment.cancel_reason = Some("Previous cancellation".to_string());
         snapshot.payments.push(payment);
@@ -286,7 +286,7 @@ mod tests {
         snapshot.paid_amount = 100.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "cash", 100.0));
+            .push(create_payment_record("payment-1", "CASH", 100.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -316,7 +316,7 @@ mod tests {
         snapshot.status = OrderStatus::Void;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "cash", 50.0));
+            .push(create_payment_record("payment-1", "CASH", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -370,10 +370,10 @@ mod tests {
         snapshot.paid_amount = 80.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "credit_card", 30.0));
+            .push(create_payment_record("payment-1", "CARD", 30.0));
         snapshot
             .payments
-            .push(create_payment_record("payment-2", "cash", 50.0));
+            .push(create_payment_record("payment-2", "CASH", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -400,7 +400,7 @@ mod tests {
         } = &events[0].payload
         {
             assert_eq!(payment_id, "payment-2");
-            assert_eq!(method, "cash");
+            assert_eq!(method, "CASH");
             assert_eq!(*amount, 50.0);
         } else {
             panic!("Expected PaymentCancelled payload");

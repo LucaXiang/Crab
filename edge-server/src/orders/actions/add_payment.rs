@@ -108,7 +108,7 @@ mod tests {
 
     fn create_cash_payment_input(amount: f64, tendered: f64) -> PaymentInput {
         PaymentInput {
-            method: "cash".to_string(),
+            method: "CASH".to_string(),
             amount,
             tendered: Some(tendered),
             note: None,
@@ -132,7 +132,7 @@ mod tests {
 
         let action = AddPaymentAction {
             order_id: "order-1".to_string(),
-            payment: create_payment_input("credit_card", 50.0),
+            payment: create_payment_input("CARD", 50.0),
         };
 
         let metadata = create_test_metadata();
@@ -153,7 +153,7 @@ mod tests {
         } = &event.payload
         {
             assert!(!payment_id.is_empty());
-            assert_eq!(method, "credit_card");
+            assert_eq!(method, "CARD");
             assert_eq!(*amount, 50.0);
             assert!(tendered.is_none());
             assert!(change.is_none());
@@ -212,7 +212,7 @@ mod tests {
 
         let action = AddPaymentAction {
             order_id: "order-1".to_string(),
-            payment: create_payment_input("credit_card", 50.0),
+            payment: create_payment_input("CARD", 50.0),
         };
 
         let metadata = create_test_metadata();
@@ -236,7 +236,7 @@ mod tests {
 
         let action = AddPaymentAction {
             order_id: "order-1".to_string(),
-            payment: create_payment_input("credit_card", 50.0),
+            payment: create_payment_input("CARD", 50.0),
         };
 
         let metadata = create_test_metadata();
@@ -255,7 +255,7 @@ mod tests {
 
         let action = AddPaymentAction {
             order_id: "nonexistent".to_string(),
-            payment: create_payment_input("credit_card", 50.0),
+            payment: create_payment_input("CARD", 50.0),
         };
 
         let metadata = create_test_metadata();
@@ -279,7 +279,7 @@ mod tests {
 
         let action = AddPaymentAction {
             order_id: "order-1".to_string(),
-            payment: create_payment_input("cash", 0.0),
+            payment: create_payment_input("CASH", 0.0),
         };
 
         let metadata = create_test_metadata();
@@ -303,7 +303,7 @@ mod tests {
 
         let action = AddPaymentAction {
             order_id: "order-1".to_string(),
-            payment: create_payment_input("cash", -10.0),
+            payment: create_payment_input("CASH", -10.0),
         };
 
         let metadata = create_test_metadata();
@@ -326,7 +326,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let payment = PaymentInput {
-            method: "credit_card".to_string(),
+            method: "CARD".to_string(),
             amount: 50.0,
             tendered: None,
             note: Some("Visa ending in 1234".to_string()),

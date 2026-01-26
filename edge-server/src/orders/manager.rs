@@ -701,7 +701,7 @@ mod tests {
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
                 payment: PaymentInput {
-                    method: "cash".to_string(),
+                    method: "CASH".to_string(),
                     amount: 10.0,
                     tendered: Some(20.0),
                     note: None,

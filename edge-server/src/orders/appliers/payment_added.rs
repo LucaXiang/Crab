@@ -93,7 +93,7 @@ mod tests {
             "order-1",
             1,
             "payment-1",
-            "credit_card",
+            "CARD",
             50.0,
             None,
             None,
@@ -105,7 +105,7 @@ mod tests {
 
         assert_eq!(snapshot.payments.len(), 1);
         assert_eq!(snapshot.payments[0].payment_id, "payment-1");
-        assert_eq!(snapshot.payments[0].method, "credit_card");
+        assert_eq!(snapshot.payments[0].method, "CARD");
         assert_eq!(snapshot.payments[0].amount, 50.0);
         assert!(!snapshot.payments[0].cancelled);
         assert_eq!(snapshot.paid_amount, 50.0);
@@ -122,7 +122,7 @@ mod tests {
             "order-1",
             1,
             "payment-1",
-            "cash",
+            "CASH",
             85.0,
             Some(100.0),
             Some(15.0),
@@ -133,7 +133,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         assert_eq!(snapshot.payments.len(), 1);
-        assert_eq!(snapshot.payments[0].method, "cash");
+        assert_eq!(snapshot.payments[0].method, "CASH");
         assert_eq!(snapshot.payments[0].amount, 85.0);
         assert_eq!(snapshot.payments[0].tendered, Some(100.0));
         assert_eq!(snapshot.payments[0].change, Some(15.0));
@@ -148,7 +148,7 @@ mod tests {
             "order-1",
             1,
             "payment-1",
-            "credit_card",
+            "CARD",
             50.0,
             None,
             None,
@@ -174,7 +174,7 @@ mod tests {
             "order-1",
             1,
             "payment-1",
-            "credit_card",
+            "CARD",
             30.0,
             None,
             None,
@@ -192,7 +192,7 @@ mod tests {
             "order-1",
             2,
             "payment-2",
-            "cash",
+            "CASH",
             70.0,
             Some(100.0),
             Some(30.0),
@@ -216,7 +216,7 @@ mod tests {
         snapshot.last_sequence = 5;
 
         let event =
-            create_payment_added_event("order-1", 6, "payment-1", "cash", 50.0, None, None, None);
+            create_payment_added_event("order-1", 6, "payment-1", "CASH", 50.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -230,7 +230,7 @@ mod tests {
         let initial_checksum = snapshot.state_checksum.clone();
 
         let event =
-            create_payment_added_event("order-1", 1, "payment-1", "cash", 50.0, None, None, None);
+            create_payment_added_event("order-1", 1, "payment-1", "CASH", 50.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -244,7 +244,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
 
         let event =
-            create_payment_added_event("order-1", 1, "payment-1", "cash", 50.0, None, None, None);
+            create_payment_added_event("order-1", 1, "payment-1", "CASH", 50.0, None, None, None);
 
         let applier = PaymentAddedApplier;
         applier.apply(&mut snapshot, &event);
@@ -265,7 +265,7 @@ mod tests {
             "order-1",
             1,
             "payment-1",
-            "credit_card",
+            "CARD",
             40.0,
             None,
             None,
@@ -289,7 +289,7 @@ mod tests {
             "order-1",
             1,
             "payment-1",
-            "credit_card",
+            "CARD",
             100.0,
             None,
             None,

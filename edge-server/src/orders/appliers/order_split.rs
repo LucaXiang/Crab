@@ -182,7 +182,7 @@ mod tests {
             "order-1",
             2,
             20.0,
-            "cash",
+            "CASH",
             vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -208,7 +208,7 @@ mod tests {
             "order-1",
             2,
             20.0,
-            "cash",
+            "CASH",
             vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -235,7 +235,7 @@ mod tests {
             "order-1",
             2,
             20.0,
-            "cash",
+            "CASH",
             vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -251,7 +251,7 @@ mod tests {
         assert_eq!(snapshot.payments.len(), 1);
         let payment = &snapshot.payments[0];
         assert!(payment.payment_id.starts_with("split-"));
-        assert_eq!(payment.method, "cash");
+        assert_eq!(payment.method, "CASH");
         assert_eq!(payment.amount, 20.0);
         assert_eq!(payment.note, Some("Split: Coffee".to_string()));
         assert!(!payment.cancelled);
@@ -265,7 +265,7 @@ mod tests {
             "order-1",
             2,
             28.0,
-            "card",
+            "CARD",
             vec![
                 SplitItem {
                     instance_id: "item-1".to_string(),
@@ -287,7 +287,7 @@ mod tests {
 
         assert_eq!(snapshot.payments.len(), 1);
         let payment = &snapshot.payments[0];
-        assert_eq!(payment.method, "card");
+        assert_eq!(payment.method, "CARD");
         assert_eq!(payment.amount, 28.0);
         assert_eq!(payment.note, Some("Split: Coffee, Tea".to_string()));
     }
@@ -300,7 +300,7 @@ mod tests {
             "order-1",
             2,
             28.0,
-            "card",
+            "CARD",
             vec![
                 SplitItem {
                     instance_id: "item-1".to_string(),
@@ -333,7 +333,7 @@ mod tests {
             "order-1",
             2,
             20.0,
-            "cash",
+            "CASH",
             vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -360,7 +360,7 @@ mod tests {
             "order-1",
             2,
             20.0,
-            "cash",
+            "CASH",
             vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -383,7 +383,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         snapshot.last_sequence = 5;
 
-        let event = create_order_split_event("order-1", 10, 20.0, "cash", vec![]);
+        let event = create_order_split_event("order-1", 10, 20.0, "CASH", vec![]);
 
         let applier = OrderSplitApplier;
         applier.apply(&mut snapshot, &event);
@@ -396,7 +396,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         snapshot.updated_at = 1000000000;
 
-        let event = create_order_split_event("order-1", 2, 20.0, "cash", vec![]);
+        let event = create_order_split_event("order-1", 2, 20.0, "CASH", vec![]);
         let expected_timestamp = event.timestamp;
 
         let applier = OrderSplitApplier;
@@ -415,7 +415,7 @@ mod tests {
             "order-1",
             2,
             20.0,
-            "cash",
+            "CASH",
             vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -440,7 +440,7 @@ mod tests {
             "order-1",
             2,
             20.0,
-            "cash",
+            "CASH",
             vec![], // Empty items
         );
 
@@ -462,7 +462,7 @@ mod tests {
             "order-1",
             2,
             20.0,
-            "cash",
+            "CASH",
             vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -489,7 +489,7 @@ mod tests {
             "order-1",
             2,
             20.0,
-            "cash",
+            "CASH",
             vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -542,7 +542,7 @@ mod tests {
             "order-1",
             2,
             20.0,
-            "cash",
+            "CASH",
             vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -595,7 +595,7 @@ mod tests {
             "order-1",
             2,
             0.0,
-            "cash",
+            "CASH",
             vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -621,7 +621,7 @@ mod tests {
             "order-1",
             2,
             20.0,
-            "cash",
+            "CASH",
             vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),

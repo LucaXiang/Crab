@@ -217,7 +217,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(20.0),
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -240,7 +240,7 @@ mod tests {
         } = &event.payload
         {
             assert_eq!(*split_amount, 20.0);
-            assert_eq!(payment_method, "cash");
+            assert_eq!(payment_method, "CASH");
             assert_eq!(items.len(), 1);
             assert_eq!(items[0].instance_id, "item-1");
             assert_eq!(items[0].quantity, 2);
@@ -263,7 +263,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(28.0),
-            payment_method: "card".to_string(),
+            payment_method: "CARD".to_string(),
             items: vec![
                 SplitItem {
                     instance_id: "item-1".to_string(),
@@ -303,7 +303,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(0.0), // Invalid
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -331,7 +331,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(-10.0), // Negative
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -359,7 +359,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(10.0),
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![SplitItem {
                 instance_id: "nonexistent".to_string(),
                 name: "Unknown".to_string(),
@@ -387,7 +387,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(50.0),
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -421,7 +421,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(20.0),
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -439,7 +439,7 @@ mod tests {
         let action_valid = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(10.0),
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -468,7 +468,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(10.0),
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -497,7 +497,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(10.0),
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -522,7 +522,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "nonexistent".to_string(),
             split_amount: Some(10.0),
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -550,7 +550,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(10.0),
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -578,7 +578,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(10.0),
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![SplitItem {
                 instance_id: "item-1".to_string(),
                 name: "Coffee".to_string(),
@@ -615,7 +615,7 @@ mod tests {
         let action = SplitOrderAction {
             order_id: "order-1".to_string(),
             split_amount: Some(10.0),
-            payment_method: "cash".to_string(),
+            payment_method: "CASH".to_string(),
             items: vec![],
         };
 

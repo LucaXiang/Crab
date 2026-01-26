@@ -175,11 +175,11 @@ impl ArchiveWorker {
 
     /// Update shift expected_cash for cash payments in the order
     async fn update_shift_cash(&self, snapshot: &OrderSnapshot, events: &[OrderEvent]) {
-        // Calculate total cash payments (non-cancelled)
+        // Calculate total cash payments (non-cancelled) - method is always "CASH" or "CARD"
         let cash_total: f64 = snapshot
             .payments
             .iter()
-            .filter(|p| !p.cancelled && p.method.to_lowercase() == "cash")
+            .filter(|p| !p.cancelled && p.method == "CASH")
             .map(|p| p.amount)
             .sum();
 

@@ -163,13 +163,13 @@ mod tests {
         snapshot.last_sequence = 0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "credit_card", 50.0));
+            .push(create_payment_record("payment-1", "CARD", 50.0));
 
         let event = create_payment_cancelled_event(
             "order-1",
             1,
             "payment-1",
-            "credit_card",
+            "CARD",
             50.0,
             Some("Refund requested".to_string()),
             None,
@@ -196,13 +196,13 @@ mod tests {
         snapshot.paid_amount = 50.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "cash", 50.0));
+            .push(create_payment_record("payment-1", "CASH", 50.0));
 
         let event = create_payment_cancelled_event(
             "order-1",
             1,
             "payment-1",
-            "cash",
+            "CASH",
             50.0,
             None,
             None,
@@ -224,17 +224,17 @@ mod tests {
         snapshot.paid_amount = 80.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "credit_card", 30.0));
+            .push(create_payment_record("payment-1", "CARD", 30.0));
         snapshot
             .payments
-            .push(create_payment_record("payment-2", "cash", 50.0));
+            .push(create_payment_record("payment-2", "CASH", 50.0));
 
         // Cancel only the first payment
         let event = create_payment_cancelled_event(
             "order-1",
             1,
             "payment-1",
-            "credit_card",
+            "CARD",
             30.0,
             None,
             None,
@@ -257,17 +257,17 @@ mod tests {
         snapshot.paid_amount = 80.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "credit_card", 30.0));
+            .push(create_payment_record("payment-1", "CARD", 30.0));
         snapshot
             .payments
-            .push(create_payment_record("payment-2", "cash", 50.0));
+            .push(create_payment_record("payment-2", "CASH", 50.0));
 
         // Cancel the second payment
         let event = create_payment_cancelled_event(
             "order-1",
             1,
             "payment-2",
-            "cash",
+            "CASH",
             50.0,
             Some("Wrong amount".to_string()),
             None,
@@ -292,7 +292,7 @@ mod tests {
         snapshot.total = 100.0;
         snapshot.paid_amount = 0.0; // Already subtracted
         snapshot.last_sequence = 5;
-        let mut payment = create_payment_record("payment-1", "cash", 50.0);
+        let mut payment = create_payment_record("payment-1", "CASH", 50.0);
         payment.cancelled = true;
         payment.cancel_reason = Some("Previous cancellation".to_string());
         snapshot.payments.push(payment);
@@ -302,7 +302,7 @@ mod tests {
             "order-1",
             6,
             "payment-1",
-            "cash",
+            "CASH",
             50.0,
             Some("New reason".to_string()),
             None,
@@ -330,14 +330,14 @@ mod tests {
         snapshot.last_sequence = 0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "cash", 50.0));
+            .push(create_payment_record("payment-1", "CASH", 50.0));
 
         // Try to cancel a non-existent payment
         let event = create_payment_cancelled_event(
             "order-1",
             1,
             "nonexistent",
-            "cash",
+            "CASH",
             50.0,
             None,
             None,
@@ -360,7 +360,7 @@ mod tests {
         snapshot.paid_amount = 50.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "cash", 50.0));
+            .push(create_payment_record("payment-1", "CASH", 50.0));
         snapshot.update_checksum();
         let initial_checksum = snapshot.state_checksum.clone();
 
@@ -368,7 +368,7 @@ mod tests {
             "order-1",
             1,
             "payment-1",
-            "cash",
+            "CASH",
             50.0,
             None,
             None,
@@ -390,13 +390,13 @@ mod tests {
         snapshot.updated_at = 1000000000;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "cash", 50.0));
+            .push(create_payment_record("payment-1", "CASH", 50.0));
 
         let event = create_payment_cancelled_event(
             "order-1",
             1,
             "payment-1",
-            "cash",
+            "CASH",
             50.0,
             None,
             None,
@@ -442,10 +442,10 @@ mod tests {
         snapshot.paid_amount = 100.0;
         snapshot
             .payments
-            .push(create_payment_record("payment-1", "credit_card", 60.0));
+            .push(create_payment_record("payment-1", "CARD", 60.0));
         snapshot
             .payments
-            .push(create_payment_record("payment-2", "cash", 40.0));
+            .push(create_payment_record("payment-2", "CASH", 40.0));
 
         assert!(snapshot.is_fully_paid());
         assert_eq!(snapshot.remaining_amount(), 0.0);
@@ -455,7 +455,7 @@ mod tests {
             "order-1",
             1,
             "payment-1",
-            "credit_card",
+            "CARD",
             60.0,
             None,
             None,
@@ -508,7 +508,7 @@ mod tests {
         split_item.quantity = 2;
         split_item.unpaid_quantity = 0;
 
-        let mut payment = create_payment_record("split-pay-1", "cash", 20.0);
+        let mut payment = create_payment_record("split-pay-1", "CASH", 20.0);
         payment.split_items = Some(vec![split_item]);
         snapshot.payments.push(payment);
         snapshot
@@ -520,7 +520,7 @@ mod tests {
             "order-1",
             1,
             "split-pay-1",
-            "cash",
+            "CASH",
             20.0,
             None,
             None,
@@ -598,7 +598,7 @@ mod tests {
             authorizer_name: None,
         };
 
-        let mut payment = create_payment_record("split-pay-1", "cash", 20.0);
+        let mut payment = create_payment_record("split-pay-1", "CASH", 20.0);
         payment.split_items = Some(vec![original_item]);
         snapshot.payments.push(payment);
         snapshot
@@ -610,7 +610,7 @@ mod tests {
             "order-1",
             1,
             "split-pay-1",
-            "cash",
+            "CASH",
             20.0,
             None,
             None,
@@ -679,14 +679,14 @@ mod tests {
         // Normal payment (no split_items)
         snapshot
             .payments
-            .push(create_payment_record("pay-1", "cash", 50.0));
+            .push(create_payment_record("pay-1", "CASH", 50.0));
 
         // Cancel normal payment
         let event = create_payment_cancelled_event(
             "order-1",
             1,
             "pay-1",
-            "cash",
+            "CASH",
             50.0,
             None,
             None,
