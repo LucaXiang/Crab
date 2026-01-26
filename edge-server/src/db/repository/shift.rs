@@ -274,13 +274,14 @@ impl ShiftRepository {
         })
     }
 
-    /// Recover stale shifts (启动时自动关闭跨天的班次)
-    pub async fn recover_stale_shifts(&self, today: &str) -> RepoResult<Vec<Shift>> {
-        // Validate date format
-        validate_date(today)?;
-
-        let today_start = format!("{}T00:00:00Z", today);
-
+    /// Recover stale shifts (启动时自动关闭跨营业日的班次)
+    ///
+    /// `business_day_start` - 当前营业日开始时间 (ISO 8601 格式)
+    /// 例如: 如果 cutoff 是 06:00，当前时间是 2024-01-15 10:00
+    ///       则 business_day_start = "2024-01-15T06:00:00Z"
+    ///       如果当前时间是 2024-01-15 03:00 (凌晨)
+    ///       则 business_day_start = "2024-01-14T06:00:00Z" (昨天的 06:00)
+    pub async fn recover_stale_shifts(&self, business_day_start: &str) -> RepoResult<Vec<Shift>> {
         let mut result = self
             .base
             .db()
@@ -290,14 +291,14 @@ impl ShiftRepository {
                     status = 'CLOSED',
                     end_time = last_active_at,
                     abnormal_close = true,
-                    note = '系统异常关闭，自动结算',
+                    note = '跨营业日自动结算',
                     updated_at = time::now()
                 WHERE status = 'OPEN'
-                AND start_time < <datetime>$today_start
+                AND start_time < <datetime>$business_day_start
                 RETURN AFTER
             "#,
             )
-            .bind(("today_start", today_start))
+            .bind(("business_day_start", business_day_start.to_string()))
             .await?;
 
         let recovered: Vec<Shift> = result.take(0)?;

@@ -677,7 +677,14 @@
         "tax_id": "税号 / 营业执照",
         "phone": "联系电话",
         "email": "电子邮箱",
-        "website": "官方网站"
+        "website": "官方网站",
+        "business_settings": "营业设置",
+        "business_day_cutoff": "营业日分界时间",
+        "business_day_cutoff_help": "用于班次跨天判断和日结报告。普通餐厅设为 00:00，酒吧/夜店设为 06:00",
+        "cutoff_presets": {
+          "midnight": "午夜 (00:00) - 普通餐厅",
+          "early_morning": "凌晨 (06:00) - 酒吧/夜店"
+        }
       }
     },
     "batch_delete": {
