@@ -9,7 +9,7 @@
  * UI 风格与 CashPaymentModal 保持一致
  */
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Play, CheckCircle, AlertTriangle, Banknote } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
@@ -45,7 +45,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
   const [cashInput, setCashInput] = useState('0');
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
-  const isTypingRef = useRef(false);
+  const [isSelected, setIsSelected] = useState(true); // 覆盖模式：输入时替换全部
 
   // Reset form when modal opens
   useEffect(() => {
@@ -56,7 +56,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
         setCashInput('0');
       }
       setNote('');
-      isTypingRef.current = false;
+      setIsSelected(true); // 重新打开时进入覆盖模式
     }
   }, [open, action, shift]);
 
@@ -70,26 +70,31 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
 
   // Numpad handlers
   const handleNumPress = useCallback((num: string) => {
+    if (isSelected) {
+      // 覆盖模式：替换全部
+      setIsSelected(false);
+      setCashInput(num === '.' ? '0.' : num);
+      return;
+    }
     setCashInput((prev) => {
-      if (!isTypingRef.current) {
-        isTypingRef.current = true;
-        return num === '.' ? '0.' : num;
-      }
       if (num === '.' && prev.includes('.')) return prev;
       if (prev.includes('.') && prev.split('.')[1].length >= 2) return prev;
       if (prev === '0' && num !== '.') return num;
       return prev + num;
     });
-  }, []);
+  }, [isSelected]);
 
   const handleClear = useCallback(() => {
-    setCashInput('');
-    isTypingRef.current = true;
+    setCashInput('0');
+    setIsSelected(true); // 清空后重新进入覆盖模式
   }, []);
 
   const handleDelete = useCallback(() => {
-    setCashInput((prev) => prev.slice(0, -1) || '0');
-    isTypingRef.current = true;
+    setIsSelected(false);
+    setCashInput((prev) => {
+      const newVal = prev.slice(0, -1);
+      return newVal || '0';
+    });
   }, []);
 
   // Quick amount buttons
@@ -321,7 +326,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
                   key={amt}
                   onClick={() => {
                     setCashInput(amt.toString());
-                    isTypingRef.current = true;
+                    setIsSelected(false);
                   }}
                   disabled={loading}
                   className="h-12 bg-white border border-green-200 text-green-700 font-bold rounded-xl hover:bg-green-50 active:scale-95 transition-all disabled:opacity-50"
@@ -366,10 +371,18 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
             <div className="h-16 md:h-20 bg-white rounded-xl flex items-center justify-between px-6 mt-2 border-2 border-green-200 shadow-sm">
               <div className="flex items-center">
                 <span className="text-green-500 mr-2 text-xl md:text-2xl font-bold">€</span>
-                <span className="text-2xl md:text-4xl font-mono font-bold text-gray-800">
+                <span
+                  className={`text-2xl md:text-4xl font-mono font-bold px-1 rounded transition-colors ${
+                    isSelected
+                      ? 'bg-green-500 text-white'
+                      : 'text-gray-800'
+                  }`}
+                >
                   {cashInput || '0'}
                 </span>
-                <span className="animate-pulse ml-0.5 w-0.5 h-8 bg-green-400 rounded" />
+                {!isSelected && (
+                  <span className="animate-pulse ml-0.5 w-0.5 h-8 bg-green-400 rounded" />
+                )}
               </div>
             </div>
             {isOpenAction && (
