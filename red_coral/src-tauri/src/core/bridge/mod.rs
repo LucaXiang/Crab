@@ -23,7 +23,9 @@ use tokio::sync::RwLock;
 
 use crab_client::CrabClient;
 use edge_server::services::tenant_binding::SubscriptionStatus;
+use shared::app_state::{ActivationRequiredReason, ClockDirection, SubscriptionBlockedInfo};
 use shared::order::{CommandResponse, OrderCommand, OrderEvent, OrderSnapshot, SyncResponse};
+use time::OffsetDateTime;
 
 use super::tenant_manager::{TenantError, TenantManager};
 
@@ -262,6 +264,107 @@ impl ClientBridge {
         }
     }
 
+    /// 检测需要激活的具体原因
+    fn detect_activation_reason(&self, tenant_manager: &TenantManager) -> ActivationRequiredReason {
+        // 1. 检查是否有证书管理器
+        let cert_manager = match tenant_manager.current_cert_manager() {
+            Some(cm) => cm,
+            None => return ActivationRequiredReason::FirstTimeSetup,
+        };
+
+        // 2. 检查证书是否存在
+        if !cert_manager.has_local_certificates() {
+            return ActivationRequiredReason::FirstTimeSetup;
+        }
+
+        // 3. 执行自检
+        match cert_manager.self_check() {
+            Ok(()) => {
+                // 证书有效，检查是否快过期
+                if let Ok((cert_pem, _, _)) = cert_manager.load_local_certificates() {
+                    if let Ok(metadata) = crab_cert::CertMetadata::from_pem(&cert_pem) {
+                        let now = OffsetDateTime::now_utc();
+                        let duration = metadata.not_after - now;
+                        let days_remaining = duration.whole_days();
+                        if days_remaining <= 30 && days_remaining > 0 {
+                            return ActivationRequiredReason::CertificateExpiringSoon {
+                                expires_at: metadata.not_after.to_string(),
+                                days_remaining,
+                            };
+                        }
+                    }
+                }
+                // 证书有效且不快过期，可能是其他原因
+                ActivationRequiredReason::FirstTimeSetup
+            }
+            Err(e) => {
+                let error_str = e.to_string();
+
+                // 解析具体错误类型
+                if error_str.contains("expired") || error_str.contains("Expired") {
+                    // 尝试获取过期信息
+                    if let Ok((cert_pem, _, _)) = cert_manager.load_local_certificates() {
+                        if let Ok(metadata) = crab_cert::CertMetadata::from_pem(&cert_pem) {
+                            let now = OffsetDateTime::now_utc();
+                            let duration = metadata.not_after - now;
+                            let days_overdue = -duration.whole_days();
+                            return ActivationRequiredReason::CertificateExpired {
+                                expired_at: metadata.not_after.to_string(),
+                                days_overdue,
+                            };
+                        }
+                    }
+                    ActivationRequiredReason::CertificateExpired {
+                        expired_at: "unknown".to_string(),
+                        days_overdue: 0,
+                    }
+                } else if error_str.contains("Hardware ID mismatch")
+                    || error_str.contains("device_id")
+                    || error_str.contains("Device ID mismatch")
+                {
+                    // 尝试解析设备 ID
+                    let (expected, actual) = if let Some(idx) = error_str.find("expected ") {
+                        let rest = &error_str[idx + 9..];
+                        if let Some(comma_idx) = rest.find(", ") {
+                            let exp = rest[..comma_idx].to_string();
+                            let act_start = rest.find("got ").map(|i| i + 4).unwrap_or(comma_idx + 2);
+                            let act = rest[act_start..].trim().to_string();
+                            (exp, act)
+                        } else {
+                            ("***".to_string(), "***".to_string())
+                        }
+                    } else {
+                        ("***".to_string(), "***".to_string())
+                    };
+                    ActivationRequiredReason::DeviceMismatch { expected, actual }
+                } else if error_str.contains("Clock tampering") || error_str.contains("clock") {
+                    let direction = if error_str.contains("backward") {
+                        ClockDirection::Backward
+                    } else {
+                        ClockDirection::Forward
+                    };
+                    // 提取秒数
+                    let drift_seconds = error_str
+                        .split_whitespace()
+                        .find_map(|s| s.parse::<i64>().ok())
+                        .unwrap_or(0);
+                    ActivationRequiredReason::ClockTampering {
+                        direction,
+                        drift_seconds,
+                        last_verified_at: "unknown".to_string(),
+                    }
+                } else if error_str.contains("signature") || error_str.contains("Signature") {
+                    ActivationRequiredReason::SignatureInvalid {
+                        component: "certificate".to_string(),
+                        error: error_str,
+                    }
+                } else {
+                    ActivationRequiredReason::CertificateInvalid { error: error_str }
+                }
+            }
+        }
+    }
+
     /// 获取应用状态 (用于前端路由守卫)
     pub async fn get_app_state(&self) -> AppState {
         let mode_guard = self.mode.read().await;
@@ -280,7 +383,12 @@ impl ClientBridge {
                     if has_certs {
                         AppState::Uninitialized
                     } else {
-                        AppState::ServerNeedActivation
+                        let reason = ActivationRequiredReason::FirstTimeSetup;
+                        AppState::ServerNeedActivation {
+                            can_auto_recover: reason.can_auto_recover(),
+                            recovery_hint: reason.recovery_hint().to_string(),
+                            reason,
+                        }
                     }
                 }
             }
@@ -293,7 +401,12 @@ impl ClientBridge {
                 let is_activated = server_state.is_activated().await;
 
                 if !is_activated {
-                    return AppState::ServerNeedActivation;
+                    let reason = self.detect_activation_reason(&tenant_manager);
+                    return AppState::ServerNeedActivation {
+                        can_auto_recover: reason.can_auto_recover(),
+                        recovery_hint: reason.recovery_hint().to_string(),
+                        reason,
+                    };
                 }
 
                 let credential = server_state
@@ -312,12 +425,37 @@ impl ClientBridge {
                     });
 
                     if subscription_blocked {
-                        let reason = cred
-                            .subscription
-                            .as_ref()
-                            .map(|s| format!("订阅状态: {:?}", s.status))
-                            .unwrap_or_default();
-                        AppState::ServerSubscriptionBlocked { reason }
+                        let sub = cred.subscription.as_ref().unwrap();
+                        // Convert edge_server types to shared types
+                        let status = match sub.status {
+                            SubscriptionStatus::Active => shared::activation::SubscriptionStatus::Active,
+                            SubscriptionStatus::Trial => shared::activation::SubscriptionStatus::Trial,
+                            SubscriptionStatus::PastDue => shared::activation::SubscriptionStatus::PastDue,
+                            SubscriptionStatus::Canceled => shared::activation::SubscriptionStatus::Canceled,
+                            SubscriptionStatus::Unpaid => shared::activation::SubscriptionStatus::Unpaid,
+                        };
+                        let plan = match sub.plan {
+                            edge_server::services::tenant_binding::PlanType::Free => shared::activation::PlanType::Free,
+                            edge_server::services::tenant_binding::PlanType::Pro => shared::activation::PlanType::Pro,
+                            edge_server::services::tenant_binding::PlanType::Enterprise => shared::activation::PlanType::Enterprise,
+                        };
+                        let expired_at = sub.expires_at.map(|dt| dt.to_rfc3339());
+                        let info = SubscriptionBlockedInfo {
+                            status,
+                            plan,
+                            expired_at,
+                            grace_period_days: None,
+                            grace_period_ends_at: None,
+                            in_grace_period: false,
+                            support_url: Some("https://support.example.com".to_string()),
+                            renewal_url: Some("https://billing.example.com/renew".to_string()),
+                            user_message: match sub.status {
+                                SubscriptionStatus::Canceled => "订阅已取消".to_string(),
+                                SubscriptionStatus::Unpaid => "订阅欠费".to_string(),
+                                _ => format!("订阅状态异常: {:?}", sub.status),
+                            },
+                        };
+                        AppState::ServerSubscriptionBlocked { info }
                     } else {
                         match client {
                             Some(LocalClientState::Authenticated(_)) => {
@@ -350,7 +488,12 @@ impl ClientBridge {
                         }
                     }
                 } else {
-                    AppState::ServerNeedActivation
+                    let reason = self.detect_activation_reason(&tenant_manager);
+                    AppState::ServerNeedActivation {
+                        can_auto_recover: reason.can_auto_recover(),
+                        recovery_hint: reason.recovery_hint().to_string(),
+                        reason,
+                    }
                 }
             }
 
@@ -391,8 +534,10 @@ impl ClientBridge {
 
         let tenant_manager = self.tenant_manager.read().await;
         let work_dir = if let Some(path) = tenant_manager.current_tenant_path() {
-            tracing::info!("Using tenant directory for server: {:?}", path);
-            path.to_string_lossy().to_string()
+            // Server work_dir is {tenant}/server/
+            let server_dir = path.join("server");
+            tracing::info!("Using server directory: {:?}", server_dir);
+            server_dir.to_string_lossy().to_string()
         } else {
             tracing::warn!(
                 "No active tenant, falling back to default data dir: {:?}",
