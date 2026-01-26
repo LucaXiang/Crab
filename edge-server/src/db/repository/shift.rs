@@ -55,7 +55,7 @@ impl ShiftRepository {
                 r#"
                 LET $existing = (SELECT id FROM shift WHERE operator_id = $operator_id AND status = 'OPEN' LIMIT 1);
                 IF count($existing) > 0 {
-                    RETURN NONE;
+                    RETURN [];
                 } ELSE {
                     CREATE shift SET
                         operator_id = $operator_id,
@@ -79,7 +79,8 @@ impl ShiftRepository {
             .bind(("note", data.note))
             .await?;
 
-        let shifts: Vec<Shift> = result.take(0)?;
+        // LET is statement 0, IF block result is statement 1
+        let shifts: Vec<Shift> = result.take(1)?;
         shifts.into_iter().next().ok_or_else(|| {
             RepoError::Duplicate("Operator already has an open shift".to_string())
         })

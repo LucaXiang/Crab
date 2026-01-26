@@ -4,6 +4,7 @@
     "confirm": "确认",
     "loading": "加载中...",
     "close": "关闭",
+    "actions": "操作",
     "action": {
       "save": "保存",
       "cancel": "取消",
@@ -1404,6 +1405,13 @@
       "search_placeholder": "搜索班次...",
       "empty": "暂无班次记录",
       "load_failed": "加载班次列表失败",
+      "current_shift": "当前班次",
+      "started_at": "开始于",
+      "expected_cash": "应结现金",
+      "action": {
+        "close": "收班",
+        "force_close": "强制关闭"
+      },
       "header": {
         "operator": "操作员",
         "start_time": "开始时间",
