@@ -5,6 +5,7 @@ import { toast } from '@/presentation/components/Toast';
 import { Sidebar } from './components/Sidebar';
 import { Overview } from './components/Overview';
 import { SalesReport } from './components/SalesReport';
+import { DailyReportManagement } from '@/features/daily-report/DailyReportManagement';
 import { TimeRange, ActiveTab, StatisticsResponse } from '@/core/domain/types';
 import { getStatistics } from '@/infrastructure/apiValidator';
 
@@ -86,9 +87,10 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
           <div className="flex items-center justify-between mb-8">
             <h1 className="text-2xl font-bold text-gray-800">
               {activeTab === 'overview' && t('statistics.sidebar.overview')}
-              {activeTab === 'sales' && t("statistics.report.sales")}
-              {activeTab === 'products' && t("statistics.report.product")}
-              {activeTab === 'categories' && t("statistics.report.category")}
+              {activeTab === 'sales' && t('statistics.report.sales')}
+              {activeTab === 'daily_report' && t('statistics.sidebar.daily_report')}
+              {activeTab === 'products' && t('statistics.report.product')}
+              {activeTab === 'categories' && t('statistics.report.category')}
             </h1>
 
             <div className="flex items-center gap-3">
@@ -140,11 +142,15 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
           )}
 
           {activeTab === 'sales' && (
-            <SalesReport 
+            <SalesReport
               timeRange={timeRange}
               customStartDate={customStartDate}
               customEndDate={customEndDate}
             />
+          )}
+
+          {activeTab === 'daily_report' && (
+            <DailyReportManagement />
           )}
 
           {(activeTab === 'products' || activeTab === 'categories') && (

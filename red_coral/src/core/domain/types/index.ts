@@ -164,7 +164,7 @@ export const Permission = {
 
 // Statistics types
 export type TimeRange = 'today' | 'week' | 'month' | 'year' | 'custom';
-export type ActiveTab = 'overview' | 'sales' | 'products' | 'categories';
+export type ActiveTab = 'overview' | 'sales' | 'products' | 'categories' | 'daily_report';
 
 export interface OverviewStats {
   today_revenue: number;

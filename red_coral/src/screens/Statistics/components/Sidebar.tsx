@@ -1,12 +1,13 @@
 import React from 'react';
-import { 
-  ArrowLeft, 
-  Activity, 
-  TrendingUp, 
-  BarChart as BarChartIcon, 
-  ShoppingCart, 
-  PieChart as PieChartIcon, 
-  Calendar 
+import {
+  ArrowLeft,
+  Activity,
+  TrendingUp,
+  BarChart as BarChartIcon,
+  ShoppingCart,
+  PieChart as PieChartIcon,
+  Calendar,
+  FileText
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { ActiveTab } from '@/core/domain/types';
@@ -65,9 +66,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const menuItems = [
     { id: 'overview' as const, icon: TrendingUp, label: t('statistics.sidebar.overview') },
-    { id: 'sales' as const, icon: BarChartIcon, label: t("statistics.report.sales") },
-    { id: 'products' as const, icon: ShoppingCart, label: t("statistics.report.product") },
-    { id: 'categories' as const, icon: PieChartIcon, label: t("statistics.report.category") },
+    { id: 'sales' as const, icon: BarChartIcon, label: t('statistics.report.sales') },
+    { id: 'daily_report' as const, icon: FileText, label: t('statistics.sidebar.daily_report') },
+    { id: 'products' as const, icon: ShoppingCart, label: t('statistics.report.product') },
+    { id: 'categories' as const, icon: PieChartIcon, label: t('statistics.report.category') },
   ];
 
   return (

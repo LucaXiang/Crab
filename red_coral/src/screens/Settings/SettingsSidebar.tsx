@@ -18,7 +18,6 @@ import {
   Menu,
   Percent,
   Clock,
-  FileText,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { useSettingsCategory, useSettingsStore } from '@/core/stores/settings/useSettingsStore';
@@ -26,7 +25,7 @@ import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
 import { usePermission } from '@/hooks/usePermission';
 
-type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS' | 'SHIFTS' | 'DAILY_REPORTS';
+type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS' | 'SHIFTS';
 
 interface SettingsSidebarProps {
   onBack: () => void;
@@ -245,13 +244,6 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
               icon={Clock}
               label={t('settings.shift.title')}
             />
-            <ProtectedGate permission={Permission.SYSTEM_SETTINGS}>
-              <CategoryItem
-                category="DAILY_REPORTS"
-                icon={FileText}
-                label={t('settings.daily_report.title')}
-              />
-            </ProtectedGate>
           </div>
 
           {/* System Settings Group */}
