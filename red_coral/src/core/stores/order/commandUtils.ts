@@ -28,7 +28,7 @@ export function generateCommandId(): string {
 export function createCommand(payload: OrderCommandPayload): OrderCommand {
   const session = useBridgeStore.getState().currentSession;
   const operatorId = session?.user_info?.id ?? 'unknown';
-  const operatorName = session?.user_info?.username ?? 'Unknown';
+  const operatorName = session?.user_info?.display_name ?? 'Unknown';
 
   return {
     command_id: generateCommandId(),
