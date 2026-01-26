@@ -516,6 +516,199 @@ impl ClientBridge {
         }
     }
 
+    /// 获取健康检查组件 (订阅、网络、数据库)
+    pub async fn get_health_components(
+        &self,
+    ) -> (
+        shared::app_state::SubscriptionHealth,
+        shared::app_state::NetworkHealth,
+        shared::app_state::DatabaseHealth,
+    ) {
+        use shared::app_state::{DatabaseHealth, HealthLevel, NetworkHealth, SubscriptionHealth};
+
+        let mode_guard = self.mode.read().await;
+
+        match &*mode_guard {
+            ClientMode::Server { server_state, .. } => {
+                // === 订阅健康状态 ===
+                let subscription = match server_state.activation_service().get_credential().await {
+                    Ok(Some(cred)) => {
+                        if let Some(sub) = &cred.subscription {
+                            let status = match sub.status {
+                                SubscriptionStatus::Active | SubscriptionStatus::Trial => {
+                                    HealthLevel::Healthy
+                                }
+                                SubscriptionStatus::PastDue => HealthLevel::Warning,
+                                SubscriptionStatus::Canceled | SubscriptionStatus::Unpaid => {
+                                    HealthLevel::Critical
+                                }
+                            };
+                            let needs_refresh = sub.is_signature_expired();
+                            SubscriptionHealth {
+                                status: if needs_refresh {
+                                    HealthLevel::Warning
+                                } else {
+                                    status
+                                },
+                                plan: Some(format!("{:?}", sub.plan)),
+                                subscription_status: Some(format!("{:?}", sub.status)),
+                                signature_valid_until: sub
+                                    .signature_valid_until
+                                    .map(|dt| dt.to_rfc3339()),
+                                needs_refresh,
+                            }
+                        } else {
+                            SubscriptionHealth {
+                                status: HealthLevel::Unknown,
+                                plan: None,
+                                subscription_status: None,
+                                signature_valid_until: None,
+                                needs_refresh: false,
+                            }
+                        }
+                    }
+                    _ => SubscriptionHealth {
+                        status: HealthLevel::Unknown,
+                        plan: None,
+                        subscription_status: None,
+                        signature_valid_until: None,
+                        needs_refresh: false,
+                    },
+                };
+
+                // === 网络健康状态 ===
+                // 尝试连接 auth server 检查可达性
+                let network = {
+                    let auth_url = std::env::var("AUTH_SERVER_URL")
+                        .unwrap_or_else(|_| "https://localhost:3001".to_string());
+                    let client = reqwest::Client::builder()
+                        .danger_accept_invalid_certs(true) // 开发环境
+                        .timeout(std::time::Duration::from_secs(3))
+                        .build();
+
+                    let (reachable, last_connected) = match client {
+                        Ok(c) => {
+                            match c.get(format!("{}/health", auth_url)).send().await {
+                                Ok(resp) if resp.status().is_success() => {
+                                    (true, Some(chrono::Utc::now().to_rfc3339()))
+                                }
+                                _ => (false, None),
+                            }
+                        }
+                        Err(_) => (false, None),
+                    };
+
+                    NetworkHealth {
+                        status: if reachable {
+                            HealthLevel::Healthy
+                        } else {
+                            HealthLevel::Warning
+                        },
+                        auth_server_reachable: reachable,
+                        last_connected_at: last_connected,
+                    }
+                };
+
+                // === 数据库健康状态 ===
+                let database = {
+                    // 尝试执行简单查询检查数据库是否正常
+                    let db_ok: bool = server_state
+                        .db
+                        .query("SELECT count() FROM employee GROUP ALL")
+                        .await
+                        .is_ok();
+
+                    DatabaseHealth {
+                        status: if db_ok {
+                            HealthLevel::Healthy
+                        } else {
+                            HealthLevel::Critical
+                        },
+                        size_bytes: None, // SurrealDB embedded 不易获取大小
+                        last_write_at: None,
+                    }
+                };
+
+                (subscription, network, database)
+            }
+
+            ClientMode::Client { client, edge_url, .. } => {
+                // Client 模式: 检查与 edge server 的连接
+                let (network_status, reachable) = if let Some(state) = client {
+                    let http = match state {
+                        RemoteClientState::Connected(c) => c.edge_http_client().cloned(),
+                        RemoteClientState::Authenticated(c) => c.edge_http_client().cloned(),
+                    };
+                    if let Some(http) = http {
+                        match http
+                            .get(format!("{}/health", edge_url))
+                            .timeout(std::time::Duration::from_secs(2))
+                            .send()
+                            .await
+                        {
+                            Ok(resp) if resp.status().is_success() => (HealthLevel::Healthy, true),
+                            _ => (HealthLevel::Warning, false),
+                        }
+                    } else {
+                        (HealthLevel::Unknown, false)
+                    }
+                } else {
+                    (HealthLevel::Critical, false)
+                };
+
+                let subscription = SubscriptionHealth {
+                    status: HealthLevel::Unknown, // Client 模式不直接访问订阅
+                    plan: None,
+                    subscription_status: None,
+                    signature_valid_until: None,
+                    needs_refresh: false,
+                };
+
+                let network = NetworkHealth {
+                    status: network_status,
+                    auth_server_reachable: reachable,
+                    last_connected_at: if reachable {
+                        Some(chrono::Utc::now().to_rfc3339())
+                    } else {
+                        None
+                    },
+                };
+
+                let database = DatabaseHealth {
+                    status: HealthLevel::Unknown, // Client 模式不直接访问数据库
+                    size_bytes: None,
+                    last_write_at: None,
+                };
+
+                (subscription, network, database)
+            }
+
+            ClientMode::Disconnected => {
+                let subscription = SubscriptionHealth {
+                    status: HealthLevel::Unknown,
+                    plan: None,
+                    subscription_status: None,
+                    signature_valid_until: None,
+                    needs_refresh: false,
+                };
+
+                let network = NetworkHealth {
+                    status: HealthLevel::Critical,
+                    auth_server_reachable: false,
+                    last_connected_at: None,
+                };
+
+                let database = DatabaseHealth {
+                    status: HealthLevel::Unknown,
+                    size_bytes: None,
+                    last_write_at: None,
+                };
+
+                (subscription, network, database)
+            }
+        }
+    }
+
     /// 以 Server 模式启动
     pub async fn start_server_mode(&self) -> Result<(), BridgeError> {
         let mut mode_guard = self.mode.write().await;

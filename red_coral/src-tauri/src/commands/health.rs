@@ -7,8 +7,7 @@ use tokio::sync::RwLock;
 use crate::core::bridge::ClientBridge;
 use crate::core::response::ApiResponse;
 use shared::app_state::{
-    CertificateHealth, ComponentsHealth, DatabaseHealth, DeviceInfo, HealthLevel, HealthStatus,
-    NetworkHealth, SubscriptionHealth,
+    CertificateHealth, ComponentsHealth, DeviceInfo, HealthLevel, HealthStatus,
 };
 use time::OffsetDateTime;
 
@@ -22,7 +21,6 @@ pub async fn get_health_status(
 
     // 获取设备信息
     let device_id = crab_cert::generate_hardware_id();
-    let tenant_id = tenant_manager.current_tenant_id().map(|s| s.to_string());
 
     // 检查证书健康状态
     let certificate = if let Some(cm) = tenant_manager.current_cert_manager() {
@@ -83,36 +81,30 @@ pub async fn get_health_status(
         }
     };
 
-    // 检查订阅健康状态 (简化)
-    let subscription = SubscriptionHealth {
-        status: HealthLevel::Unknown,
-        plan: None,
-        subscription_status: None,
-        signature_valid_until: None,
-        needs_refresh: false,
-    };
+    // 释放 tenant_manager 锁
+    drop(tenant_manager);
 
-    // 检查网络健康状态 (简化)
-    let network = NetworkHealth {
-        status: HealthLevel::Unknown,
-        auth_server_reachable: false,
-        last_connected_at: None,
-    };
+    // 获取订阅、网络、数据库健康状态
+    let (subscription, network, database) = bridge.get_health_components().await;
 
-    // 检查数据库健康状态 (简化)
-    let database = DatabaseHealth {
-        status: HealthLevel::Healthy,
-        size_bytes: None,
-        last_write_at: None,
-    };
+    // 计算整体健康状态 (考虑所有组件)
+    let overall = {
+        let statuses = [
+            &certificate.status,
+            &subscription.status,
+            &network.status,
+            &database.status,
+        ];
 
-    // 计算整体健康状态
-    let overall = if certificate.status == HealthLevel::Critical {
-        HealthLevel::Critical
-    } else if certificate.status == HealthLevel::Warning {
-        HealthLevel::Warning
-    } else {
-        HealthLevel::Healthy
+        if statuses.iter().any(|s| **s == HealthLevel::Critical) {
+            HealthLevel::Critical
+        } else if statuses.iter().any(|s| **s == HealthLevel::Warning) {
+            HealthLevel::Warning
+        } else if statuses.iter().all(|s| **s == HealthLevel::Unknown) {
+            HealthLevel::Unknown
+        } else {
+            HealthLevel::Healthy
+        }
     };
 
     let health = HealthStatus {
@@ -127,7 +119,7 @@ pub async fn get_health_status(
         device_info: DeviceInfo {
             device_id: format!("{}...", &device_id[..8]),
             entity_id: None,
-            tenant_id,
+            tenant_id: bridge.tenant_manager().read().await.current_tenant_id().map(|s| s.to_string()),
         },
     };
 
