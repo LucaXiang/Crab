@@ -91,8 +91,12 @@ export const AppStateHelpers = {
       case 'ServerNoTenant':
         return '/setup';
 
-      // 需要激活 - 显示具体原因
+      // 需要激活
       case 'ServerNeedActivation':
+        // FirstTimeSetup 直接进入设置页面，其他问题显示具体原因
+        if (state.data.reason.code === 'FirstTimeSetup') {
+          return '/setup';
+        }
         return '/status/activation-required';
 
       // 激活中 - 显示进度

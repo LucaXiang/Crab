@@ -68,13 +68,19 @@
       "error": "错误",
       "submitting": "提交中...",
       "processing": "处理中",
+      "saving": "保存中...",
       "save_success": "保存成功",
       "save_failed": "保存失败",
       "delete_failed": "删除失败",
       "load_failed": "加载数据失败",
       "invalid_form": "表单无效",
       "sent_to_printer": "已发送至打印机",
-      "exported": "已导出"
+      "exported": "已导出",
+      "operation_failed": "操作失败",
+      "table_occupied_refresh": "桌台 {table} 已被占用，请刷新列表",
+      "order_load_failed": "订单创建成功但加载失败，请重试",
+      "retail_order_failed": "创建零售订单失败",
+      "cash_drawer_failed": "打开钱箱失败: {message}"
     },
     "hint": {
       "search_placeholder": "搜索...",
@@ -137,6 +143,25 @@
       "loading": "加载中..."
     }
   },
+  "system": {
+    "syncing": "系统同步中...",
+    "syncing_wait": "系统同步中，请稍候...",
+    "disconnected": "连接已断开",
+    "disconnected_reconnecting": "连接已断开，请等待重连...",
+    "initializing": "初始化中...",
+    "initializing_wait": "系统初始化中..."
+  },
+  "calendar": {
+    "days": {
+      "sunday": "日",
+      "monday": "一",
+      "tuesday": "二",
+      "wednesday": "三",
+      "thursday": "四",
+      "friday": "五",
+      "saturday": "六"
+    }
+  },
   "auth": {
     "unauthorized": {
       "message": "您没有权限访问此页面"
@@ -184,6 +209,8 @@
     },
     "cart": {
       "empty": "购物车为空",
+      "uncategorized": "未分类",
+      "unknown_category": "未知分类",
       "original": "原价",
       "surcharge": "附加费",
       "unit_price": "单价",
@@ -986,11 +1013,36 @@
       "kitchen_printing": {
         "title": "厨房打印",
         "disabled": "厨房打印已关闭",
-        "enable_to_configure": "启用厨房打印后，您可以配置多个工位、路由规则和小票格式"
+        "enable_to_configure": "启用厨房打印后，您可以配置多个工位、路由规则和小票格式",
+        "select_printer_to_enable": "请先选择收据打印机以启用厨房打印功能"
       },
       "label_printing": "标签打印",
       "hardware": "硬件",
       "templates": "标签模板",
+      "tab": {
+        "local": "本地打印机",
+        "stations": "打印站点",
+        "templates": "标签模板"
+      },
+      "local_printers": {
+        "description": "配置连接到此设备的本地打印机，用于收据打印、标签打印和钱箱控制。",
+        "current": "当前使用"
+      },
+      "print_stations": {
+        "title": "打印站点",
+        "description": "打印站点是服务端配置的抽象打印路由。您可以创建多个站点用于厨房打印、收据打印等不同用途，并将本地打印机或网络打印机绑定到站点。",
+        "unit": "个站点",
+        "add": "添加站点",
+        "edit": "编辑站点",
+        "bound_printers": "绑定的打印机",
+        "type_local": "本地",
+        "type_network": "网络",
+        "name_placeholder": "如：厨房打印、收据打印",
+        "printer_config": "打印机配置",
+        "ip_address": "IP 地址",
+        "port": "端口",
+        "port_hint": "默认端口为 9100"
+      },
       "badge": {
         "pos": "POS",
         "label": "标签",
@@ -1016,9 +1068,19 @@
         "main_station": "打印机",
         "receipt_printer": "收据打印机",
         "receipt_printer_desc": "顾客收据",
+        "cash_drawer_printer": "钱箱打印机",
+        "cash_drawer_printer_desc": "控制钱箱开启",
         "label_printer_desc": "标签和贴纸",
         "default_global_printer": "默认厨房打印机",
         "default_global_printer_desc": "未指定具体工位时的备用打印机"
+      },
+      "cash_drawer": {
+        "test": "测试钱箱",
+        "testing": "正在测试...",
+        "test_success": "钱箱已打开",
+        "test_failed": "打开钱箱失败",
+        "use_receipt_printer": "使用收据打印机",
+        "auto_open_after_receipt": "打印收据后自动开钱箱"
       },
       "routing_system": {
         "title": "厨房路由系统",
@@ -1246,7 +1308,18 @@
       "text_align": "水平对齐",
       "vertical_align": "垂直对齐",
       "content_template": "内容模板",
+      "text_template_hint": "使用 {字段名} 引用数据，如 {product_name}",
       "image_template_hint": "使用 {字段名} 引用数据",
+      "source_type": "来源类型",
+      "source_type_image": "静态图片",
+      "source_type_product_image": "商品图片",
+      "source_type_qrcode": "二维码",
+      "source_type_barcode": "条形码",
+      "static_image": "图片",
+      "static_image_hint": "选择图片后保存模板时上传",
+      "select_image": "选择图片",
+      "pending_upload": "待上传",
+      "maintain_aspect_ratio": "保持宽高比",
       "separator_hint": "分隔线用于分割标签内容",
       "field": {
         "new_text": "新建文本",
@@ -1383,7 +1456,18 @@
     "9102": "未连接到服务器",
     "9103": "连接服务器失败",
     "9201": "打印机不可用",
-    "9202": "打印失败"
+    "9202": "打印失败",
+    "9203": "标签打印功能正在开发中",
+    "9301": "客户端已断开连接",
+    "3006": "订阅已被暂停"
+  },
+  "subscription": {
+    "status": {
+      "Active": "已激活",
+      "Canceled": "已取消",
+      "Unpaid": "未付款",
+      "Expired": "已过期"
+    }
   },
   "fonts": {
     "arial": "Arial",
@@ -1391,5 +1475,43 @@
     "segoe_u_i": "Segoe UI",
     "times_new_roman": "Times New Roman",
     "courier_new": "Courier New"
+  },
+  "activation": {
+    "title": "需要重新激活",
+    "button_reactivate": "重新激活设备",
+    "button_retry_later": "稍后再试",
+    "reason": {
+      "FirstTimeSetup": "欢迎！请激活您的设备",
+      "CertificateExpired": "设备证书已过期 {{days_overdue}} 天",
+      "CertificateExpiringSoon": "证书将在 {{days_remaining}} 天后过期",
+      "CertificateInvalid": "证书文件损坏或无效",
+      "SignatureInvalid": "安全验证失败",
+      "DeviceMismatch": "检测到硬件变更",
+      "ClockTampering_backward": "系统时间异常：回拨了 {{hours}} 小时",
+      "ClockTampering_forward": "系统时间异常：前跳了 {{days}} 天",
+      "BindingInvalid": "设备绑定无效",
+      "TokenExpired": "凭据已过期",
+      "NetworkError": "无法连接服务器",
+      "Revoked": "此设备已被停用"
+    },
+    "hint": {
+      "first_time_setup": "输入管理员提供的凭据完成激活",
+      "certificate_expired": "请重新激活设备以更新证书",
+      "certificate_expiring_soon": "建议尽快重新激活以更新证书",
+      "certificate_invalid": "证书文件损坏，请重新激活",
+      "signature_invalid": "安全验证失败，请重新激活",
+      "device_mismatch": "如果更换了设备，请联系管理员重新激活",
+      "clock_tampering": "请检查系统时间设置是否正确",
+      "binding_invalid": "设备绑定无效，请重新激活",
+      "token_expired": "凭据已过期，请重新激活",
+      "network_error_offline_ok": "可以离线继续使用，联网后将自动同步",
+      "network_error": "请检查网络连接后重试",
+      "revoked": "请联系管理员了解详情"
+    },
+    "detail": {
+      "certificate_expired_at": "证书过期时间：{{expired_at}}",
+      "clock_backward": "检测到系统时间回拨，请检查系统时间设置。",
+      "clock_forward": "检测到系统时间前跳，请检查系统时间设置。"
+    }
   }
 }

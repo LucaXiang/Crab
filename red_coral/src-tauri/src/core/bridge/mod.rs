@@ -287,7 +287,110 @@ impl ClientBridge {
         }
     }
 
-    /// 检测需要激活的具体原因
+    /// 从 edge-server 检测需要激活的具体原因
+    async fn detect_activation_reason_from_server(
+        &self,
+        server_state: &edge_server::ServerState,
+        tenant_manager: &TenantManager,
+    ) -> ActivationRequiredReason {
+        // 尝试调用 edge-server 的自检获取具体错误
+        let cert_service = server_state.cert_service();
+        let credential = server_state.activation_service().get_credential().await.ok().flatten();
+        
+        match cert_service.self_check_with_binding(credential.as_ref()).await {
+            Ok(()) => {
+                // 自检通过但未激活，说明 Credential.json 不存在
+                ActivationRequiredReason::FirstTimeSetup
+            }
+            Err(e) => {
+                self.parse_activation_error(&e.to_string(), tenant_manager)
+            }
+        }
+    }
+
+    /// 解析激活错误消息
+    fn parse_activation_error(&self, error_str: &str, tenant_manager: &TenantManager) -> ActivationRequiredReason {
+        let error_lower = error_str.to_lowercase();
+        
+        if error_lower.contains("expired") {
+            // 证书过期
+            if let Some(cm) = tenant_manager.current_cert_manager() {
+                if let Ok((cert_pem, _, _)) = cm.load_local_certificates() {
+                    if let Ok(metadata) = crab_cert::CertMetadata::from_pem(&cert_pem) {
+                        let now = OffsetDateTime::now_utc();
+                        let duration = metadata.not_after - now;
+                        let days_overdue = -duration.whole_days();
+                        return ActivationRequiredReason::CertificateExpired {
+                            expired_at: metadata.not_after.to_string(),
+                            days_overdue,
+                        };
+                    }
+                }
+            }
+            ActivationRequiredReason::CertificateExpired {
+                expired_at: "unknown".to_string(),
+                days_overdue: 0,
+            }
+        } else if error_lower.contains("hardware id mismatch") || error_lower.contains("device id mismatch") || error_lower.contains("device_id") {
+            // 设备 ID 不匹配
+            let (expected, actual) = self.extract_device_ids(error_str);
+            ActivationRequiredReason::DeviceMismatch { expected, actual }
+        } else if error_lower.contains("clock") || error_lower.contains("time") && error_lower.contains("tamper") {
+            // 时钟篡改
+            let direction = if error_lower.contains("backward") {
+                ClockDirection::Backward
+            } else {
+                ClockDirection::Forward
+            };
+            let drift_seconds = error_str
+                .split_whitespace()
+                .find_map(|s| s.parse::<i64>().ok())
+                .unwrap_or(0);
+            ActivationRequiredReason::ClockTampering {
+                direction,
+                drift_seconds,
+                last_verified_at: "unknown".to_string(),
+            }
+        } else if error_lower.contains("signature") {
+            // 签名无效
+            ActivationRequiredReason::SignatureInvalid {
+                component: "credential".to_string(),
+                error: error_str.to_string(),
+            }
+        } else if error_lower.contains("chain") || error_lower.contains("certificate") && error_lower.contains("invalid") {
+            // 证书链无效
+            ActivationRequiredReason::CertificateInvalid {
+                error: error_str.to_string(),
+            }
+        } else if error_lower.contains("not found") || error_lower.contains("missing") {
+            // 文件缺失
+            ActivationRequiredReason::FirstTimeSetup
+        } else {
+            // 未知错误，返回通用的绑定无效
+            ActivationRequiredReason::BindingInvalid {
+                error: error_str.to_string(),
+            }
+        }
+    }
+
+    /// 从错误消息中提取设备 ID
+    fn extract_device_ids(&self, error_str: &str) -> (String, String) {
+        // 尝试解析格式如 "expected xxx, got yyy" 或类似格式
+        if let Some(idx) = error_str.find("expected ") {
+            let rest = &error_str[idx + 9..];
+            if let Some(comma_idx) = rest.find(", ") {
+                let exp = rest[..comma_idx].trim().to_string();
+                let act_start = rest.find("got ").map(|i| i + 4).unwrap_or(comma_idx + 2);
+                let act_end = rest[act_start..].find(|c: char| !c.is_alphanumeric() && c != '-').unwrap_or(rest.len() - act_start);
+                let act = rest[act_start..act_start + act_end].trim().to_string();
+                return (exp, act);
+            }
+        }
+        // 无法解析，返回掩码值
+        ("***".to_string(), crab_cert::generate_hardware_id()[..8].to_string())
+    }
+
+    /// 检测需要激活的具体原因 (仅基于 CertManager，用于非 Server 模式)
     fn detect_activation_reason(&self, tenant_manager: &TenantManager) -> ActivationRequiredReason {
         // 1. 检查是否有证书管理器
         let cert_manager = match tenant_manager.current_cert_manager() {
@@ -409,7 +512,7 @@ impl ClientBridge {
                         let reason = ActivationRequiredReason::FirstTimeSetup;
                         AppState::ServerNeedActivation {
                             can_auto_recover: reason.can_auto_recover(),
-                            recovery_hint: reason.recovery_hint().to_string(),
+                            recovery_hint: reason.recovery_hint_code().to_string(),
                             reason,
                         }
                     }
@@ -425,10 +528,11 @@ impl ClientBridge {
                 let is_activated = server_state.is_activated().await;
 
                 if !is_activated {
-                    let reason = self.detect_activation_reason(&tenant_manager);
+                    // 调用 edge-server 自检获取具体错误
+                    let reason = self.detect_activation_reason_from_server(server_state, &tenant_manager).await;
                     return AppState::ServerNeedActivation {
                         can_auto_recover: reason.can_auto_recover(),
-                        recovery_hint: reason.recovery_hint().to_string(),
+                        recovery_hint: reason.recovery_hint_code().to_string(),
                         reason,
                     };
                 }
@@ -498,7 +602,7 @@ impl ClientBridge {
                     let reason = self.detect_activation_reason(&tenant_manager);
                     AppState::ServerNeedActivation {
                         can_auto_recover: reason.can_auto_recover(),
-                        recovery_hint: reason.recovery_hint().to_string(),
+                        recovery_hint: reason.recovery_hint_code().to_string(),
                         reason,
                     }
                 }
