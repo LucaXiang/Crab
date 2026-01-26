@@ -4,6 +4,7 @@
 //! error types, response structures, and utility types.
 
 pub mod activation;
+pub mod app_state;
 pub mod client;
 pub mod error;
 pub mod intent;
@@ -27,3 +28,10 @@ pub use intent::{CrudAction, DataIntent, DataResult, PaginatedResponse, QueryReq
 
 // Unified error system re-exports
 pub use error::{ApiResponse as UnifiedApiResponse, AppError, AppResult, ErrorCategory, ErrorCode};
+
+// App state re-exports
+pub use app_state::{
+    ActivationProgress, ActivationRequiredReason, ActivationStep, CertificateHealth,
+    ClockDirection, ComponentsHealth, DatabaseHealth, DeviceInfo, HealthLevel, HealthStatus,
+    NetworkHealth, SubscriptionBlockedInfo, SubscriptionHealth,
+};
