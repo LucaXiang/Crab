@@ -363,12 +363,13 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
             <label className="text-xs text-gray-500 font-bold uppercase ml-1">
               {isOpenAction ? t('settings.shift.modal.starting_cash') : t('settings.shift.modal.actual_cash')}
             </label>
-            <div className="h-16 md:h-20 bg-white rounded-xl flex items-center px-6 mt-2 border-2 border-green-200 shadow-sm">
-              <Banknote className="text-green-500 mr-3" size={24} />
-              <span className="text-2xl md:text-4xl font-mono font-bold text-gray-800 truncate">
-                {formatCurrency(cashValue)}
-              </span>
-              <span className="animate-pulse ml-1 w-0.5 h-6 md:h-8 bg-green-400" />
+            <div className="h-16 md:h-20 bg-white rounded-xl flex items-center justify-between px-6 mt-2 border-2 border-green-200 shadow-sm">
+              <div className="flex items-center">
+                <Banknote className="text-green-500 mr-3 shrink-0" size={24} />
+                <span className="text-2xl md:text-4xl font-mono font-bold text-gray-800">
+                  {formatCurrency(cashValue)}
+                </span>
+              </div>
             </div>
             {isOpenAction && (
               <p className="mt-2 text-xs text-gray-500 ml-1">
