@@ -1,0 +1,140 @@
+/**
+ * Shift Store - 班次状态管理
+ *
+ * 管理当前用户的班次状态:
+ * - 当前班次信息
+ * - 开班/收班/强制关闭操作
+ * - 自动检测未关闭班次
+ */
+
+import { create } from 'zustand';
+import { createTauriClient } from '@/infrastructure/api';
+import type { Shift, ShiftCreate, ShiftClose, ShiftForceClose } from '@/core/domain/types/api';
+
+const api = createTauriClient();
+
+interface ShiftStore {
+  // State
+  currentShift: Shift | null;
+  isLoading: boolean;
+  error: string | null;
+
+  // 需要开班的标记 (登录后检测到没有班次)
+  needsOpenShift: boolean;
+
+  // Actions
+  fetchCurrentShift: (operatorId: string) => Promise<Shift | null>;
+  openShift: (data: ShiftCreate) => Promise<Shift>;
+  closeShift: (shiftId: string, data: ShiftClose) => Promise<Shift>;
+  forceCloseShift: (shiftId: string, data: ShiftForceClose) => Promise<Shift>;
+  clearShift: () => void;
+  setNeedsOpenShift: (needs: boolean) => void;
+}
+
+export const useShiftStore = create<ShiftStore>((set, get) => ({
+  // Initial State
+  currentShift: null,
+  isLoading: false,
+  error: null,
+  needsOpenShift: false,
+
+  /**
+   * Fetch current open shift for operator
+   */
+  fetchCurrentShift: async (operatorId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const shift = await api.getCurrentShift(operatorId);
+      set({ currentShift: shift, isLoading: false });
+
+      // 如果没有班次，标记需要开班
+      if (!shift) {
+        set({ needsOpenShift: true });
+      }
+
+      return shift;
+    } catch (error) {
+      console.error('Failed to fetch current shift:', error);
+      set({
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch shift',
+      });
+      return null;
+    }
+  },
+
+  /**
+   * Open a new shift
+   */
+  openShift: async (data: ShiftCreate) => {
+    set({ isLoading: true, error: null });
+    try {
+      const shift = await api.openShift(data);
+      set({ currentShift: shift, isLoading: false, needsOpenShift: false });
+      return shift;
+    } catch (error) {
+      console.error('Failed to open shift:', error);
+      set({
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to open shift',
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Close current shift (正常收班)
+   */
+  closeShift: async (shiftId: string, data: ShiftClose) => {
+    set({ isLoading: true, error: null });
+    try {
+      const shift = await api.closeShift(shiftId, data);
+      set({ currentShift: null, isLoading: false });
+      return shift;
+    } catch (error) {
+      console.error('Failed to close shift:', error);
+      set({
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to close shift',
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Force close shift (强制关闭)
+   */
+  forceCloseShift: async (shiftId: string, data: ShiftForceClose) => {
+    set({ isLoading: true, error: null });
+    try {
+      const shift = await api.forceCloseShift(shiftId, data);
+      set({ currentShift: null, isLoading: false });
+      return shift;
+    } catch (error) {
+      console.error('Failed to force close shift:', error);
+      set({
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to force close shift',
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Clear shift state (on logout)
+   */
+  clearShift: () => {
+    set({ currentShift: null, needsOpenShift: false, error: null });
+  },
+
+  /**
+   * Set needs open shift flag
+   */
+  setNeedsOpenShift: (needs: boolean) => {
+    set({ needsOpenShift: needs });
+  },
+}));
+
+// Selectors
+export const useCurrentShift = () => useShiftStore((state) => state.currentShift);
+export const useNeedsOpenShift = () => useShiftStore((state) => state.needsOpenShift);

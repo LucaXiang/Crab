@@ -11,6 +11,7 @@ import { ToastContainer } from '@/presentation/components/Toast';
 import { ProtectedRoute } from '@/presentation/components/ProtectedRoute';
 import { PermissionEscalationProvider } from '@/presentation/components/auth/PermissionEscalationProvider';
 import { NotificationProvider } from '@/presentation/components/notifications';
+import { ShiftGuard } from '@/presentation/components/shift';
 
 // Screens
 import { LoginScreen } from '@/screens/Login';
@@ -272,7 +273,9 @@ const App: React.FC = () => {
           path="/pos"
           element={
             <ProtectedRoute>
-              <POSScreen />
+              <ShiftGuard>
+                <POSScreen />
+              </ShiftGuard>
             </ProtectedRoute>
           }
         />

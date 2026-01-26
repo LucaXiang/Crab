@@ -5,6 +5,8 @@ import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { voidOrder } from '@/core/stores/order/useOrderOperations';
 import { useCanManageProducts } from '@/hooks/usePermission';
 import { ProductModal } from '@/features/product/ProductModal';
+import { useShiftStore } from '@/core/stores/shift';
+import { ShiftActionModal } from '@/features/shift';
 
 // Components
 import { Sidebar } from '@/presentation/components/Sidebar';
@@ -518,11 +520,16 @@ export const POSScreen: React.FC = () => {
   }, [handleCheckoutStart]);
 
   const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore((state) => state.user);
+  const { currentShift, clearShift } = useShiftStore();
   const [exitDialog, setExitDialog] = useState({ open: false, title: '', description: '', isBlocking: false });
+  const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
 
+  // 真正的登出操作 (清除 auth 和 shift)
   const handleLogout = useCallback(() => {
+    clearShift();
     logout();
-  }, [logout]);
+  }, [logout, clearShift]);
 
   const handleSidebarCheckout = useCallback(() => {
     handleCheckoutStart(cart.length > 0 ? null : currentOrderKey);
@@ -560,9 +567,22 @@ export const POSScreen: React.FC = () => {
         isBlocking: true,
       });
     } else {
-      handleLogout();
+      // 检查是否有打开的班次
+      if (currentShift) {
+        // 有班次，需要先收班
+        setShowCloseShiftModal(true);
+      } else {
+        // 没有班次，直接登出
+        handleLogout();
+      }
     }
-  }, [t, handleLogout]);
+  }, [t, handleLogout, currentShift]);
+
+  // 收班成功后登出
+  const handleCloseShiftSuccess = useCallback(() => {
+    setShowCloseShiftModal(false);
+    handleLogout();
+  }, [handleLogout]);
 
   const overlaysProps = useMemo(
     () => ({
@@ -687,6 +707,15 @@ export const POSScreen: React.FC = () => {
           onConfirm={handleOptionsConfirmed}
         />
       )}
+
+      {/* 收班弹窗 (登出前) */}
+      <ShiftActionModal
+        open={showCloseShiftModal}
+        action="close"
+        shift={currentShift}
+        onClose={() => setShowCloseShiftModal(false)}
+        onSuccess={handleCloseShiftSuccess}
+      />
     </div>
   );
 };

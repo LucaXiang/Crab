@@ -1422,6 +1422,7 @@
       "stale_shift_warning": "检测到异常关闭的班次",
       "stale_shift_hint": "系统检测到有班次未正常关闭，可能是由于断电或系统崩溃导致",
       "recover_stale": "处理异常班次",
+      "checking": "正在检查班次状态...",
       "open_success": "开班成功",
       "close_success_balanced": "收班成功，现金无差异",
       "close_success_variance": "收班成功，差异: {{variance}}",
