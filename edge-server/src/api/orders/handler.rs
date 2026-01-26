@@ -1,4 +1,7 @@
 //! Order API Handlers
+//!
+//! Only provides read-only access to archived orders in SurrealDB.
+//! All order mutations are handled through OrderManager event sourcing.
 
 use axum::{
     Json,
@@ -6,39 +9,93 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use crate::core::ServerState;
-use crate::db::models::{Order, OrderAddItem, OrderAddPayment, OrderDetail, OrderEvent, OrderEventType, OrderSummary};
+use crate::db::models::OrderSummary;
 use crate::db::repository::OrderRepository;
 use crate::utils::{AppError, AppResult};
 
-const RESOURCE: &str = "order";
+// =========================================================================
+// Order Detail (Archived)
+// =========================================================================
 
-/// Query params for listing orders
-#[derive(Debug, Deserialize)]
-pub struct ListQuery {
-    #[serde(default = "default_limit")]
-    pub limit: i32,
-    #[serde(default)]
-    pub offset: i32,
+/// Order item option for detail view
+#[derive(Debug, Serialize)]
+pub struct OrderItemOptionDetail {
+    pub attribute_name: String,
+    pub option_name: String,
+    pub price_modifier: f64,
 }
 
-fn default_limit() -> i32 {
-    50
+/// Order item for detail view
+#[derive(Debug, Serialize)]
+pub struct OrderItemDetail {
+    pub id: String,
+    pub instance_id: String,
+    pub name: String,
+    pub spec_name: Option<String>,
+    pub price: f64,
+    pub quantity: i32,
+    pub unpaid_quantity: i32,
+    pub unit_price: f64,
+    pub line_total: f64,
+    pub discount_amount: f64,
+    pub surcharge_amount: f64,
+    pub note: Option<String>,
+    pub selected_options: Vec<OrderItemOptionDetail>,
 }
 
-/// List all orders (paginated)
-pub async fn list(
-    State(state): State<ServerState>,
-    Query(query): Query<ListQuery>,
-) -> AppResult<Json<Vec<Order>>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let orders = repo
-        .find_all(query.limit, query.offset)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(orders))
+/// Payment for detail view
+#[derive(Debug, Serialize)]
+pub struct OrderPaymentDetail {
+    pub method: String,
+    pub amount: f64,
+    pub timestamp: i64,
+    pub note: Option<String>,
+    pub cancelled: bool,
+    pub cancel_reason: Option<String>,
+    pub split_items: Vec<SplitItemDetail>,
 }
 
-/// Get order by id - uses graph traversal for items/payments/timeline
+/// Split item detail
+#[derive(Debug, Serialize)]
+pub struct SplitItemDetail {
+    pub instance_id: String,
+    pub name: String,
+    pub quantity: i32,
+    pub unit_price: f64,
+}
+
+/// Event for detail view
+#[derive(Debug, Serialize)]
+pub struct OrderEventDetail {
+    pub event_id: String,
+    pub event_type: String,
+    pub timestamp: i64,
+    pub payload: Option<serde_json::Value>,
+}
+
+/// Full order detail response
+#[derive(Debug, Serialize)]
+pub struct OrderDetail {
+    pub order_id: String,
+    pub receipt_number: String,
+    pub table_name: Option<String>,
+    pub zone_name: Option<String>,
+    pub status: String,
+    pub is_retail: bool,
+    pub guest_count: i32,
+    pub total: f64,
+    pub paid_amount: f64,
+    pub total_discount: f64,
+    pub total_surcharge: f64,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    pub operator_name: Option<String>,
+    pub items: Vec<OrderItemDetail>,
+    pub payments: Vec<OrderPaymentDetail>,
+    pub timeline: Vec<OrderEventDetail>,
+}
+
+/// Get archived order by id - uses graph traversal for items/payments/timeline
 pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<String>,
@@ -48,222 +105,69 @@ pub async fn get_by_id(
         .get_order_detail(&id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(detail))
-}
 
-/// Get order by receipt number
-pub async fn get_by_receipt(
-    State(state): State<ServerState>,
-    Path(receipt): Path<String>,
-) -> AppResult<Json<Order>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let order = repo
-        .find_by_receipt(&receipt)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?
-        .ok_or_else(|| AppError::not_found(format!("Order with receipt {} not found", receipt)))?;
-    Ok(Json(order))
-}
+    // Convert from db model to API response
+    let response = OrderDetail {
+        order_id: detail.order_id,
+        receipt_number: detail.receipt_number,
+        table_name: detail.table_name,
+        zone_name: detail.zone_name,
+        status: detail.status,
+        is_retail: detail.is_retail,
+        guest_count: detail.guest_count,
+        total: detail.total,
+        paid_amount: detail.paid_amount,
+        total_discount: detail.total_discount,
+        total_surcharge: detail.total_surcharge,
+        start_time: detail.start_time,
+        end_time: detail.end_time,
+        operator_name: detail.operator_name,
+        items: detail.items.into_iter().map(|i| OrderItemDetail {
+            id: i.id,
+            instance_id: i.instance_id,
+            name: i.name,
+            spec_name: i.spec_name,
+            price: i.price,
+            quantity: i.quantity,
+            unpaid_quantity: i.unpaid_quantity,
+            unit_price: i.unit_price,
+            line_total: i.line_total,
+            discount_amount: i.discount_amount,
+            surcharge_amount: i.surcharge_amount,
+            note: i.note,
+            selected_options: i.selected_options.into_iter().map(|o| OrderItemOptionDetail {
+                attribute_name: o.attribute_name,
+                option_name: o.option_name,
+                price_modifier: o.price_modifier,
+            }).collect(),
+        }).collect(),
+        payments: detail.payments.into_iter().map(|p| OrderPaymentDetail {
+            method: p.method,
+            amount: p.amount,
+            timestamp: p.timestamp,
+            note: p.note,
+            cancelled: p.cancelled,
+            cancel_reason: p.cancel_reason,
+            split_items: p.split_items.into_iter().map(|s| SplitItemDetail {
+                instance_id: s.instance_id,
+                name: s.name,
+                quantity: s.quantity,
+                unit_price: s.unit_price,
+            }).collect(),
+        }).collect(),
+        timeline: detail.timeline.into_iter().map(|e| OrderEventDetail {
+            event_id: e.event_id,
+            event_type: e.event_type,
+            timestamp: e.timestamp,
+            payload: e.payload,
+        }).collect(),
+    };
 
-/// Add item to order
-pub async fn add_item(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-    Json(payload): Json<OrderAddItem>,
-) -> AppResult<Json<Order>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let order = repo
-        .add_item(&id, payload)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-
-    state
-        .broadcast_sync(RESOURCE, "item_added", &id, Some(&order))
-        .await;
-
-    Ok(Json(order))
-}
-
-/// Remove item request
-#[derive(Debug, Deserialize)]
-pub struct RemoveItemRequest {
-    pub index: usize,
-}
-
-/// Remove item from order by index
-pub async fn remove_item(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-    Json(payload): Json<RemoveItemRequest>,
-) -> AppResult<Json<Order>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let order = repo
-        .remove_item(&id, payload.index)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-
-    state
-        .broadcast_sync(RESOURCE, "item_removed", &id, Some(&order))
-        .await;
-
-    Ok(Json(order))
-}
-
-/// Add payment to order (DEPRECATED: Use OrderManager event sourcing instead)
-pub async fn add_payment(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-    Json(payload): Json<OrderAddPayment>,
-) -> AppResult<Json<Order>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let order = repo
-        .add_payment(&id, payload)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-
-    state
-        .broadcast_sync(RESOURCE, "payment_added", &id, Some(&order))
-        .await;
-
-    Ok(Json(order))
-}
-
-/// Update totals request
-#[derive(Debug, Deserialize)]
-pub struct UpdateTotalsRequest {
-    pub total_amount: i32,
-    pub discount_amount: i32,
-    pub surcharge_amount: i32,
-}
-
-/// Update order totals
-pub async fn update_totals(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-    Json(payload): Json<UpdateTotalsRequest>,
-) -> AppResult<Json<Order>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let order = repo
-        .update_totals(
-            &id,
-            payload.total_amount,
-            payload.discount_amount,
-            payload.surcharge_amount,
-        )
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-
-    state
-        .broadcast_sync(RESOURCE, "totals_updated", &id, Some(&order))
-        .await;
-
-    Ok(Json(order))
-}
-
-/// Update hash request
-#[derive(Debug, Deserialize)]
-pub struct UpdateHashRequest {
-    pub prev_hash: String,
-    pub curr_hash: String,
-}
-
-/// Update order hash
-pub async fn update_hash(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-    Json(payload): Json<UpdateHashRequest>,
-) -> AppResult<Json<Order>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let order = repo
-        .update_hash(&id, payload.prev_hash, payload.curr_hash)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-
-    state
-        .broadcast_sync(RESOURCE, "hash_updated", &id, Some(&order))
-        .await;
-
-    Ok(Json(order))
-}
-
-/// Add event request
-#[derive(Debug, Deserialize)]
-pub struct AddEventRequest {
-    pub event_type: OrderEventType,
-    pub data: Option<serde_json::Value>,
-    pub prev_hash: String,
-    pub curr_hash: String,
-}
-
-/// Add event to order
-pub async fn add_event(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-    Json(payload): Json<AddEventRequest>,
-) -> AppResult<Json<OrderEvent>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let event = repo
-        .add_event(
-            &id,
-            payload.event_type,
-            payload.data,
-            payload.prev_hash,
-            payload.curr_hash,
-        )
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-
-    state
-        .broadcast_sync(RESOURCE, "event_added", &id, Some(&event))
-        .await;
-
-    Ok(Json(event))
-}
-
-/// Get order events
-pub async fn get_events(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-) -> AppResult<Json<Vec<OrderEvent>>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let events = repo
-        .get_events(&id)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(events))
-}
-
-/// Get last order (for hash chain)
-pub async fn get_last(State(state): State<ServerState>) -> AppResult<Json<Option<Order>>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let order = repo
-        .get_last_order()
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(order))
-}
-
-/// Verify chain request
-#[derive(Debug, Deserialize)]
-pub struct VerifyChainQuery {
-    pub from_hash: Option<String>,
-}
-
-/// Verify hash chain integrity
-pub async fn verify_chain(
-    State(state): State<ServerState>,
-    Query(query): Query<VerifyChainQuery>,
-) -> AppResult<Json<bool>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let valid = repo
-        .verify_chain(query.from_hash)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-    Ok(Json(valid))
+    Ok(Json(response))
 }
 
 // =========================================================================
-// Order History
+// Order History (Archived)
 // =========================================================================
 
 /// Query params for order history

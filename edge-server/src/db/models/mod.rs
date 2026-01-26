@@ -42,9 +42,9 @@ pub use category::{Category, CategoryCreate, CategoryUpdate};
 pub use dining_table::{DiningTable, DiningTableCreate, DiningTableUpdate};
 pub use employee::{Employee, EmployeeCreate, EmployeeId, EmployeeUpdate};
 pub use order::{
-    HasEvent, Order, OrderAddItem, OrderAddPayment, OrderCreate, OrderEvent, OrderEventType,
-    OrderItem, OrderItemAttribute, OrderItemOption, OrderPayment, OrderStatus, SplitItem,
-    // API response types
+    // Archived order types (used by archive service)
+    Order, OrderStatus, SplitItem,
+    // API response types (for frontend)
     OrderDetail, OrderEventDetail, OrderItemDetail, OrderItemOptionDetail, OrderPaymentDetail,
     OrderSummary,
 };
