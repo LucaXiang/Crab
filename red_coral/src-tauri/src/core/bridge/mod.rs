@@ -398,34 +398,7 @@ impl ClientBridge {
                 client,
                 ..
             } => {
-                // 优先检查员工会话 - 开发模式下可能未激活但已登录
-                if let Some(session) = tenant_manager.current_session() {
-                    // 检查会话是否过期
-                    let expires_at = session.expires_at.or_else(|| {
-                        super::session_cache::EmployeeSession::parse_jwt_exp(&session.token)
-                    });
-
-                    if let Some(exp) = expires_at {
-                        let now = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map(|d| d.as_secs())
-                            .unwrap_or(0);
-                        if now < exp {
-                            // 会话有效，返回已认证状态
-                            return AppState::ServerAuthenticated;
-                        }
-                    } else {
-                        // 无过期时间，假设有效
-                        return AppState::ServerAuthenticated;
-                    }
-                }
-
-                // 检查 LocalClient 状态
-                if matches!(client, Some(LocalClientState::Authenticated(_))) {
-                    return AppState::ServerAuthenticated;
-                }
-
-                // 检查激活状态
+                // 1. 首先检查 edge-server 激活状态 (权威)
                 let is_activated = server_state.is_activated().await;
 
                 if !is_activated {
@@ -485,7 +458,16 @@ impl ClientBridge {
                         };
                         AppState::ServerSubscriptionBlocked { info }
                     } else {
-                        // 已在前面检查过会话，到这里说明没有有效会话
+                        // 2. 检查员工登录状态
+                        // 优先检查 CrabClient 状态（权威）
+                        if matches!(client, Some(LocalClientState::Authenticated(_))) {
+                            return AppState::ServerAuthenticated;
+                        }
+                        // 其次检查内存中的 session
+                        if tenant_manager.current_session().is_some() {
+                            return AppState::ServerAuthenticated;
+                        }
+                        // 未登录
                         AppState::ServerReady
                     }
                 } else {
