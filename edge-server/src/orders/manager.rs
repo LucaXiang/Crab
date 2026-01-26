@@ -137,8 +137,8 @@ impl From<OrderError> for ManagerError {
 
 pub type ManagerResult<T> = Result<T, ManagerError>;
 
-/// Event broadcast channel capacity
-const EVENT_CHANNEL_CAPACITY: usize = 1024;
+/// Event broadcast channel capacity (支持高并发: 10000订单 × 4事件)
+const EVENT_CHANNEL_CAPACITY: usize = 65536;
 
 /// OrdersManager for command processing
 ///

@@ -9,6 +9,7 @@ use super::storage::{OrderStorage, PendingArchive};
 use crate::db::repository::ShiftRepository;
 use rust_decimal::prelude::*;
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot};
+use std::sync::Arc;
 use std::time::Duration;
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
@@ -27,12 +28,15 @@ const MAX_RETRY_COUNT: u32 = 10;
 const RETRY_BASE_DELAY_SECS: u64 = 5;
 const RETRY_MAX_DELAY_SECS: u64 = 3600; // 1 hour
 const QUEUE_SCAN_INTERVAL_SECS: u64 = 60;
+/// 并发归档数量
+const ARCHIVE_CONCURRENCY: usize = 50;
 
-/// Worker for processing archive queue
+/// Worker for processing archive queue (支持并发归档)
 pub struct ArchiveWorker {
     storage: OrderStorage,
     archive_service: OrderArchiveService,
     db: Surreal<Db>,
+    semaphore: Arc<tokio::sync::Semaphore>,
 }
 
 impl ArchiveWorker {
@@ -41,15 +45,18 @@ impl ArchiveWorker {
             storage,
             archive_service,
             db,
+            semaphore: Arc::new(tokio::sync::Semaphore::new(ARCHIVE_CONCURRENCY)),
         }
     }
 
-    /// Run the archive worker
+    /// Run the archive worker (并发处理归档)
     pub async fn run(self, mut event_rx: broadcast::Receiver<OrderEvent>) {
-        tracing::info!("ArchiveWorker started");
+        tracing::info!("ArchiveWorker started with concurrency={}", ARCHIVE_CONCURRENCY);
+
+        let worker = Arc::new(self);
 
         // Process any pending archives from previous run
-        self.process_pending_queue().await;
+        worker.process_pending_queue().await;
 
         let mut scan_interval =
             tokio::time::interval(Duration::from_secs(QUEUE_SCAN_INTERVAL_SECS));
@@ -61,12 +68,17 @@ impl ArchiveWorker {
                     match result {
                         Ok(event) if TERMINAL_EVENT_TYPES.contains(&event.event_type) => {
                             tracing::debug!(order_id = %event.order_id, event_type = ?event.event_type, "Received terminal event");
-                            self.process_order(&event.order_id).await;
+                            // 并发处理归档
+                            let w = worker.clone();
+                            let order_id = event.order_id.clone();
+                            tokio::spawn(async move {
+                                w.process_order_concurrent(&order_id).await;
+                            });
                         }
                         Ok(_) => {} // Ignore non-terminal events
                         Err(broadcast::error::RecvError::Lagged(n)) => {
                             tracing::warn!(skipped = n, "Event receiver lagged, processing queue");
-                            self.process_pending_queue().await;
+                            worker.process_pending_queue().await;
                         }
                         Err(broadcast::error::RecvError::Closed) => {
                             tracing::info!("Event channel closed, shutting down ArchiveWorker");
@@ -76,18 +88,30 @@ impl ArchiveWorker {
                 }
                 // Periodic queue scan for retries
                 _ = scan_interval.tick() => {
-                    self.process_pending_queue().await;
+                    worker.process_pending_queue().await;
                 }
             }
         }
     }
 
+    /// 带并发限制的订单处理
+    async fn process_order_concurrent(&self, order_id: &str) {
+        let _permit = self.semaphore.acquire().await.unwrap();
+        self.process_order(order_id).await;
+    }
+
     /// Process all pending archives
     async fn process_pending_queue(&self) {
-        let pending = match self.storage.get_pending_archives() {
-            Ok(p) => p,
-            Err(e) => {
+        // Get pending archives (blocking I/O -> spawn_blocking)
+        let storage = self.storage.clone();
+        let pending = match tokio::task::spawn_blocking(move || storage.get_pending_archives()).await {
+            Ok(Ok(p)) => p,
+            Ok(Err(e)) => {
                 tracing::error!(error = %e, "Failed to get pending archives");
+                return;
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "spawn_blocking panicked");
                 return;
             }
         };
@@ -99,14 +123,14 @@ impl ArchiveWorker {
         tracing::info!(count = pending.len(), "Processing pending archive queue");
 
         for entry in pending {
-            if self.should_retry(&entry) {
+            if self.should_retry(&entry).await {
                 self.process_order(&entry.order_id).await;
             }
         }
     }
 
     /// Check if entry should be retried based on backoff
-    fn should_retry(&self, entry: &PendingArchive) -> bool {
+    async fn should_retry(&self, entry: &PendingArchive) -> bool {
         if entry.retry_count >= MAX_RETRY_COUNT {
             tracing::error!(
                 order_id = %entry.order_id,
@@ -115,7 +139,9 @@ impl ArchiveWorker {
                 "Max retry count exceeded, removing from queue"
             );
             // Remove from queue - order data remains in redb for manual recovery
-            let _ = self.storage.remove_from_pending(&entry.order_id);
+            let storage = self.storage.clone();
+            let order_id = entry.order_id.clone();
+            let _ = tokio::task::spawn_blocking(move || storage.remove_from_pending(&order_id)).await;
             return false;
         }
 
@@ -129,47 +155,60 @@ impl ArchiveWorker {
     }
 
     /// Process a single order archive
+    ///
+    /// Uses spawn_blocking for redb operations to avoid blocking tokio runtime.
     async fn process_order(&self, order_id: &str) {
-        // 1. Load snapshot from redb
-        let snapshot = match self.storage.get_snapshot(order_id) {
-            Ok(Some(s)) => s,
-            Ok(None) => {
-                tracing::warn!(order_id = %order_id, "Snapshot not found, removing from queue");
-                let _ = self.storage.remove_from_pending(order_id);
+        let order_id_owned = order_id.to_string();
+        let storage = self.storage.clone();
+
+        // 1. Load snapshot and events from redb (blocking I/O -> spawn_blocking)
+        let load_result = tokio::task::spawn_blocking(move || {
+            let snapshot = storage.get_snapshot(&order_id_owned)?;
+            let events = storage.get_events_for_order(&order_id_owned)?;
+            Ok::<_, super::storage::StorageError>((snapshot, events, order_id_owned))
+        })
+        .await;
+
+        let (snapshot, events, order_id_owned) = match load_result {
+            Ok(Ok((Some(s), e, oid))) => (s, e, oid),
+            Ok(Ok((None, _, oid))) => {
+                tracing::warn!(order_id = %oid, "Snapshot not found, removing from queue");
+                let storage = self.storage.clone();
+                let _ = tokio::task::spawn_blocking(move || storage.remove_from_pending(&oid)).await;
+                return;
+            }
+            Ok(Err(e)) => {
+                tracing::error!(order_id = %order_id, error = %e, "Failed to load data from redb");
                 return;
             }
             Err(e) => {
-                tracing::error!(order_id = %order_id, error = %e, "Failed to load snapshot");
+                tracing::error!(order_id = %order_id, error = %e, "spawn_blocking panicked");
                 return;
             }
         };
 
-        // 2. Load events from redb
-        let events = match self.storage.get_events_for_order(order_id) {
-            Ok(e) => e,
-            Err(e) => {
-                tracing::error!(order_id = %order_id, error = %e, "Failed to load events");
-                return;
-            }
-        };
-
-        // 3. Archive to SurrealDB
+        // 2. Archive to SurrealDB (async)
         match self.archive_service.archive_order(&snapshot, events.clone()).await {
             Ok(()) => {
-                tracing::info!(order_id = %order_id, "Order archived successfully");
+                tracing::info!(order_id = %order_id_owned, "Order archived successfully");
 
-                // 4. Update shift expected_cash for cash payments
+                // 3. Update shift expected_cash for cash payments
                 self.update_shift_cash(&snapshot, &events).await;
 
-                // 5. Cleanup redb (removes pending, snapshot, events atomically)
-                if let Err(e) = self.storage.complete_archive(order_id) {
-                    tracing::error!(order_id = %order_id, error = %e, "Failed to complete archive cleanup");
+                // 4. Cleanup redb (blocking I/O -> spawn_blocking)
+                let storage = self.storage.clone();
+                let oid = order_id_owned.clone();
+                if let Err(e) = tokio::task::spawn_blocking(move || storage.complete_archive(&oid)).await {
+                    tracing::error!(order_id = %order_id_owned, error = %e, "Failed to complete archive cleanup");
                 }
             }
             Err(e) => {
-                tracing::error!(order_id = %order_id, error = %e, "Archive failed");
-                if let Err(e2) = self.storage.mark_archive_failed(order_id, &e.to_string()) {
-                    tracing::error!(order_id = %order_id, error = %e2, "Failed to mark archive failed");
+                tracing::error!(order_id = %order_id_owned, error = %e, "Archive failed");
+                let storage = self.storage.clone();
+                let oid = order_id_owned.clone();
+                let err_msg = e.to_string();
+                if let Err(e2) = tokio::task::spawn_blocking(move || storage.mark_archive_failed(&oid, &err_msg)).await {
+                    tracing::error!(order_id = %order_id_owned, error = %e2, "Failed to mark archive failed");
                 }
             }
         }
@@ -177,6 +216,23 @@ impl ArchiveWorker {
 
     /// Update shift expected_cash for cash payments in the order
     async fn update_shift_cash(&self, snapshot: &OrderSnapshot, events: &[OrderEvent]) {
+        use shared::order::{OrderStatus, VoidType};
+
+        // Skip cash tracking for CANCELLED void orders (no money changed hands)
+        // LOSS_SETTLED void orders should still count cash (it was actually received)
+        if snapshot.status == OrderStatus::Void {
+            if let Some(ref void_type) = snapshot.void_type {
+                if *void_type == VoidType::Cancelled {
+                    tracing::info!(
+                        order_id = %snapshot.order_id,
+                        void_type = ?void_type,
+                        "Skipping cash tracking for CANCELLED void order"
+                    );
+                    return;
+                }
+            }
+        }
+
         // Debug: log all payment methods for troubleshooting
         tracing::info!(
             order_id = %snapshot.order_id,
