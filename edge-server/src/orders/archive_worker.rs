@@ -177,6 +177,13 @@ impl ArchiveWorker {
 
     /// Update shift expected_cash for cash payments in the order
     async fn update_shift_cash(&self, snapshot: &OrderSnapshot, events: &[OrderEvent]) {
+        // Debug: log all payment methods for troubleshooting
+        tracing::info!(
+            order_id = %snapshot.order_id,
+            payments = ?snapshot.payments.iter().map(|p| (&p.method, p.amount, p.cancelled)).collect::<Vec<_>>(),
+            "Processing shift cash update"
+        );
+
         // Calculate total cash payments (non-cancelled) using Decimal for precision
         let cash_total: Decimal = snapshot
             .payments
@@ -186,23 +193,23 @@ impl ArchiveWorker {
             .sum();
 
         if cash_total <= Decimal::ZERO {
+            tracing::info!(order_id = %snapshot.order_id, "No cash payments to track");
             return;
         }
 
-        // Get operator_id from the terminal event (OrderCompleted or OrderVoided)
+        // Get operator_id from terminal event (any terminal event type)
         let operator_id = events
             .iter()
             .rev()
-            .find(|e| {
-                matches!(
-                    e.event_type,
-                    OrderEventType::OrderCompleted | OrderEventType::OrderVoided
-                )
-            })
+            .find(|e| TERMINAL_EVENT_TYPES.contains(&e.event_type))
             .map(|e| e.operator_id.clone());
 
         let Some(operator_id) = operator_id else {
-            tracing::warn!(order_id = %snapshot.order_id, "No operator found for cash tracking");
+            tracing::warn!(
+                order_id = %snapshot.order_id,
+                event_types = ?events.iter().map(|e| &e.event_type).collect::<Vec<_>>(),
+                "No terminal event found for cash tracking"
+            );
             return;
         };
 

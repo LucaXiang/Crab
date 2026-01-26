@@ -150,7 +150,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         // Create payment record
         const payment: PaymentRecord = {
           payment_id: `pay-${Date.now()}`,
-          method: 'Cash',
+          method: 'CASH',
           amount: remaining,
           timestamp: Date.now(),
           tendered: tenderedAmount,
