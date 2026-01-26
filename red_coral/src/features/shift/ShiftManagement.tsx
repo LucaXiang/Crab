@@ -222,33 +222,33 @@ export const ShiftManagement: React.FC = React.memo(() => {
       {
         key: 'actions',
         header: t('common.actions'),
-        width: '6%',
+        width: '100px',
         align: 'right',
         render: (item) => {
           if (item.status !== 'OPEN') return null;
           // Only show actions for current user's shift
           if (user && item.operator_id !== user.id) return null;
           return (
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex items-center justify-end gap-1">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handleCloseShift(item);
                 }}
-                className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors border border-green-200/50"
                 title={t('settings.shift.action.close')}
               >
-                <CheckCircle size={16} />
+                <CheckCircle size={14} />
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handleForceClose(item);
                 }}
-                className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                className="p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors border border-orange-200/50"
                 title={t('settings.shift.action.force_close')}
               >
-                <XCircle size={16} />
+                <XCircle size={14} />
               </button>
             </div>
           );
