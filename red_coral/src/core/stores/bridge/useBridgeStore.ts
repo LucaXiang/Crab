@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import type { ApiResponse } from '@/core/domain/types/api';
+import type {
+  ActivationRequiredReason,
+  ActivationProgress,
+  SubscriptionBlockedInfo,
+  HealthStatus,
+} from '@/core/domain/types/appState';
+import { getActivationReasonMessage } from '@/core/domain/types/appState';
 
 // Import ConnectionStatus from the hook (canonical source)
 import type { ConnectionStatus } from '@/core/hooks/useConnectionStatus';
@@ -13,24 +20,31 @@ export type LoginMode = 'Online' | 'Offline';
 /**
  * AppState - 应用状态枚举
  *
- * 与 Rust 定义保持一致: `src-tauri/src/core/client_bridge.rs`
- * 参考设计文档: `docs/plans/2026-01-18-application-state-machine.md`
+ * 与 Rust 定义保持一致: `src-tauri/src/core/bridge/types.rs`
+ * 参考设计文档: `docs/plans/2026-01-26-tenant-auth-detailed-status-design.md`
  */
 export type AppState =
   // 通用状态
   | { type: 'Uninitialized' }
   // Server 模式专属
   | { type: 'ServerNoTenant' }
-  | { type: 'ServerNeedActivation' }
-  | { type: 'ServerActivating' }
+  | {
+      type: 'ServerNeedActivation';
+      data: {
+        reason: ActivationRequiredReason;
+        can_auto_recover: boolean;
+        recovery_hint: string;
+      };
+    }
+  | { type: 'ServerActivating'; data: { progress: ActivationProgress } }
   | { type: 'ServerCheckingSubscription' }
-  | { type: 'ServerSubscriptionBlocked'; data: { reason: string } }
+  | { type: 'ServerSubscriptionBlocked'; data: { info: SubscriptionBlockedInfo } }
   | { type: 'ServerReady' }
   | { type: 'ServerAuthenticated' }
   // Client 模式专属
   | { type: 'ClientDisconnected' }
   | { type: 'ClientNeedSetup' }
-  | { type: 'ClientConnecting' }
+  | { type: 'ClientConnecting'; data: { server_url: string } }
   | { type: 'ClientConnected' }
   | { type: 'ClientAuthenticated' };
 
@@ -73,20 +87,32 @@ export const AppStateHelpers = {
     if (!state) return '/setup';
 
     switch (state.type) {
-      // 需要设置
-      case 'Uninitialized':
+      // 首次设置
       case 'ServerNoTenant':
+        return '/setup';
+
+      // 需要激活 - 显示具体原因
       case 'ServerNeedActivation':
+        return '/status/activation-required';
+
+      // 激活中 - 显示进度
       case 'ServerActivating':
+        return '/status/activating';
+
+      // 检查订阅
       case 'ServerCheckingSubscription':
+        return '/status/checking';
+
+      // 订阅阻止
+      case 'ServerSubscriptionBlocked':
+        return '/status/subscription-blocked';
+
+      // 未初始化
+      case 'Uninitialized':
       case 'ClientDisconnected':
       case 'ClientNeedSetup':
       case 'ClientConnecting':
         return '/setup';
-
-      // 订阅阻止
-      case 'ServerSubscriptionBlocked':
-        return '/blocked';
 
       // 需要登录
       case 'ServerReady':
@@ -102,6 +128,9 @@ export const AppStateHelpers = {
         return '/setup';
     }
   },
+
+  /** 获取激活原因消息 */
+  getActivationReasonMessage,
 };
 
 // Re-export for consumers who import from this file
@@ -171,6 +200,7 @@ interface BridgeStore {
 
   // App State Actions
   fetchAppState: () => Promise<AppState | null>;
+  fetchHealthStatus: () => Promise<HealthStatus | null>;
 
   // Mode Actions
   fetchModeInfo: () => Promise<void>;
@@ -216,6 +246,15 @@ export const useBridgeStore = create<BridgeStore>()(
         } catch (error: unknown) {
           console.error('Failed to fetch app state:', error);
           set({ error: error instanceof Error ? error.message : 'Failed to fetch app state' });
+          return null;
+        }
+      },
+
+      fetchHealthStatus: async () => {
+        try {
+          return await invokeApi<HealthStatus>('get_health_status');
+        } catch (error) {
+          console.error('Failed to fetch health status:', error);
           return null;
         }
       },
@@ -269,7 +308,7 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           set({ isLoading: true });
           await invokeApi('stop_mode');
-          set({ 
+          set({
             appState: { type: 'Uninitialized' },
             modeInfo: null,
             currentSession: null
@@ -351,13 +390,13 @@ export const useBridgeStore = create<BridgeStore>()(
             username,
             password,
           });
-          
+
           if (data.session) {
             set({ currentSession: data.session });
             // 刷新 appState 以反映认证状态变化
             await get().fetchAppState();
           }
-          
+
           return {
             success: true,
             session: data.session,

@@ -214,3 +214,6 @@ export interface StatisticsResponse {
   category_sales: CategorySale[];
   top_products: TopProduct[];
 }
+
+// App state types
+export * from './appState';
