@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crab_client::{Authenticated, Connected, CrabClient, Local, Remote};
+use shared::app_state::{ActivationProgress, ActivationRequiredReason, SubscriptionBlockedInfo};
 
 /// 运行模式类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -25,8 +26,8 @@ impl std::fmt::Display for ModeType {
 /// 应用状态 (统一 Server/Client 模式)
 ///
 /// 用于前端路由守卫和状态展示。
-/// 参考设计文档: `docs/plans/2026-01-18-application-state-machine.md`
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// 参考设计文档: `docs/plans/2026-01-26-tenant-auth-detailed-status-design.md`
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum AppState {
     // === 通用状态 ===
@@ -36,28 +37,42 @@ pub enum AppState {
     // === Server 模式专属 ===
     /// Server: 无租户
     ServerNoTenant,
-    /// Server: 需要激活 (有租户目录但证书不完整或自检失败)
-    ServerNeedActivation,
-    /// Server: 正在激活
-    ServerActivating,
+
+    /// Server: 需要激活 - 携带详细原因
+    ServerNeedActivation {
+        reason: ActivationRequiredReason,
+        can_auto_recover: bool,
+        recovery_hint: String,
+    },
+
+    /// Server: 正在激活 - 携带进度
+    ServerActivating { progress: ActivationProgress },
+
     /// Server: 已激活，验证订阅中
     ServerCheckingSubscription,
-    /// Server: 订阅无效，阻止使用
-    ServerSubscriptionBlocked { reason: String },
+
+    /// Server: 订阅无效 - 携带详细信息
+    ServerSubscriptionBlocked { info: SubscriptionBlockedInfo },
+
     /// Server: 服务器就绪，等待员工登录
     ServerReady,
+
     /// Server: 员工已登录
     ServerAuthenticated,
 
     // === Client 模式专属 ===
     /// Client: 未连接
     ClientDisconnected,
+
     /// Client: 需要设置 (无缓存证书)
     ClientNeedSetup,
+
     /// Client: 正在连接
-    ClientConnecting,
+    ClientConnecting { server_url: String },
+
     /// Client: 已连接，等待员工登录
     ClientConnected,
+
     /// Client: 员工已登录
     ClientAuthenticated,
 }
@@ -82,7 +97,7 @@ impl AppState {
             self,
             AppState::Uninitialized
                 | AppState::ServerNoTenant
-                | AppState::ServerNeedActivation
+                | AppState::ServerNeedActivation { .. }
                 | AppState::ClientDisconnected
                 | AppState::ClientNeedSetup
         )
