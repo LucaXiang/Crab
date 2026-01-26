@@ -17,6 +17,7 @@
 //! - Full sync is always available as fallback
 
 use super::manager::{ManagerError, OrdersManager};
+use super::money::to_decimal;
 use serde::{Deserialize, Serialize};
 use shared::order::{OrderEvent, OrderSnapshot};
 
@@ -151,7 +152,7 @@ impl SyncService {
                         // Compare key fields
                         let match_status = s.status == rebuilt.status;
                         let match_items = s.items.len() == rebuilt.items.len();
-                        let match_total = (s.total - rebuilt.total).abs() < 0.01;
+                        let match_total = (to_decimal(s.total) - to_decimal(rebuilt.total)).abs() < to_decimal(0.01);
                         let match_sequence = s.last_sequence == rebuilt.last_sequence;
 
                         Ok(match_status && match_items && match_total && match_sequence)

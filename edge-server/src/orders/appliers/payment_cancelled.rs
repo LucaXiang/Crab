@@ -6,7 +6,8 @@
 //! For split payments with `split_items`, this applier also restores items
 //! using "add items" logic - merging with existing items or creating new ones.
 
-use crate::orders::{money, traits::EventApplier};
+use crate::orders::money::{self, to_decimal, to_f64};
+use crate::orders::traits::EventApplier;
 use shared::order::{CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot};
 
 /// PaymentCancelled applier
@@ -43,8 +44,8 @@ impl EventApplier for PaymentCancelledApplier {
                 payment.cancel_reason = reason.clone();
             }
 
-            // Subtract from paid_amount
-            snapshot.paid_amount -= amount;
+            // Subtract from paid_amount using Decimal for precision
+            snapshot.paid_amount = to_f64(to_decimal(snapshot.paid_amount) - to_decimal(amount));
 
             // If this was a split payment, restore items using "add items" logic
             if let Some(items_to_restore) = split_items {

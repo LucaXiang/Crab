@@ -3,7 +3,8 @@
 //! Applies the OrderSplit event to track paid item quantities and update paid amount.
 //! This is used for split bill payments where specific items are paid for.
 
-use crate::orders::{money, traits::EventApplier};
+use crate::orders::money::{self, to_decimal, to_f64};
+use crate::orders::traits::EventApplier;
 use shared::order::{CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot, PaymentRecord};
 
 /// OrderSplit applier
@@ -25,8 +26,8 @@ impl EventApplier for OrderSplitApplier {
                     .or_insert(0) += split_item.quantity;
             }
 
-            // Update paid amount
-            snapshot.paid_amount += split_amount;
+            // Update paid amount using Decimal for precision
+            snapshot.paid_amount = to_f64(to_decimal(snapshot.paid_amount) + to_decimal(*split_amount));
 
             // Create PaymentRecord for audit trail
             let item_names: Vec<&str> = items.iter().map(|i| i.name.as_str()).collect();

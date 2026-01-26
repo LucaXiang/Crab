@@ -4,8 +4,10 @@
 //! Decoupled from OrderManager for better separation of concerns.
 
 use super::archive::OrderArchiveService;
+use super::money::{to_decimal, to_f64};
 use super::storage::{OrderStorage, PendingArchive};
 use crate::db::repository::ShiftRepository;
+use rust_decimal::prelude::*;
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot};
 use std::time::Duration;
 use surrealdb::engine::local::Db;
@@ -175,15 +177,15 @@ impl ArchiveWorker {
 
     /// Update shift expected_cash for cash payments in the order
     async fn update_shift_cash(&self, snapshot: &OrderSnapshot, events: &[OrderEvent]) {
-        // Calculate total cash payments (non-cancelled) - method is always "CASH" or "CARD"
-        let cash_total: f64 = snapshot
+        // Calculate total cash payments (non-cancelled) using Decimal for precision
+        let cash_total: Decimal = snapshot
             .payments
             .iter()
             .filter(|p| !p.cancelled && p.method == "CASH")
-            .map(|p| p.amount)
+            .map(|p| to_decimal(p.amount))
             .sum();
 
-        if cash_total <= 0.0 {
+        if cash_total <= Decimal::ZERO {
             return;
         }
 
@@ -205,12 +207,13 @@ impl ArchiveWorker {
         };
 
         let shift_repo = ShiftRepository::new(self.db.clone());
-        if let Err(e) = shift_repo.add_cash_payment(&operator_id, cash_total).await {
+        let cash_amount = to_f64(cash_total);
+        if let Err(e) = shift_repo.add_cash_payment(&operator_id, cash_amount).await {
             // Log but don't fail the archive - shift tracking is secondary
             tracing::warn!(
                 order_id = %snapshot.order_id,
                 operator_id = %operator_id,
-                cash_total = cash_total,
+                cash_total = cash_amount,
                 error = %e,
                 "Failed to update shift expected_cash"
             );
@@ -218,7 +221,7 @@ impl ArchiveWorker {
             tracing::debug!(
                 order_id = %snapshot.order_id,
                 operator_id = %operator_id,
-                cash_total = cash_total,
+                cash_total = cash_amount,
                 "Updated shift expected_cash"
             );
         }

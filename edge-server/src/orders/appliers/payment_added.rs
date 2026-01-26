@@ -2,6 +2,7 @@
 //!
 //! Applies the PaymentAdded event to add a payment to the snapshot.
 
+use crate::orders::money::{to_decimal, to_f64};
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot, PaymentRecord};
 
@@ -36,8 +37,8 @@ impl EventApplier for PaymentAddedApplier {
             // Add payment to snapshot
             snapshot.payments.push(payment);
 
-            // Update paid_amount
-            snapshot.paid_amount += amount;
+            // Update paid_amount using Decimal for precision
+            snapshot.paid_amount = to_f64(to_decimal(snapshot.paid_amount) + to_decimal(*amount));
 
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
