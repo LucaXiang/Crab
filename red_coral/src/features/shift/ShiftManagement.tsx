@@ -14,6 +14,7 @@ import { createTauriClient } from '@/infrastructure/api';
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
+import { formatCurrency } from '@/utils/currency';
 import type { Shift, ShiftStatus } from '@/core/domain/types/api';
 
 const api = createTauriClient();
@@ -151,7 +152,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
     const isPositive = variance > 0;
     return (
       <span className={`inline-flex items-center gap-1 ${isPositive ? 'text-blue-600' : 'text-red-600'}`}>
-        {isPositive ? '+' : ''}¥{variance.toFixed(2)}
+        {isPositive ? '+' : ''}{formatCurrency(variance)}
       </span>
     );
   };
@@ -196,7 +197,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
         width: '120px',
         align: 'right',
         render: (item) => (
-          <span className="font-mono text-gray-700">¥{item.expected_cash.toFixed(2)}</span>
+          <span className="font-mono text-gray-700">{formatCurrency(item.expected_cash)}</span>
         ),
       },
       {
@@ -206,7 +207,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
         align: 'right',
         render: (item) => (
           <span className="font-mono text-gray-700">
-            {item.actual_cash !== null ? `¥${item.actual_cash.toFixed(2)}` : '-'}
+            {item.actual_cash !== null ? formatCurrency(item.actual_cash) : '-'}
           </span>
         ),
       },
@@ -285,7 +286,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
                 <p className="text-sm text-emerald-700">
                   {t('settings.shift.started_at')}: {formatTime(currentShift.start_time)}
                   {' | '}
-                  {t('settings.shift.expected_cash')}: ¥{currentShift.expected_cash.toFixed(2)}
+                  {t('settings.shift.expected_cash')}: {formatCurrency(currentShift.expected_cash)}
                 </p>
               </div>
             </div>

@@ -13,6 +13,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
+import { formatCurrency } from '@/utils/currency';
 import type { DailyReport } from '@/core/domain/types/api';
 
 const api = createTauriClient();
@@ -71,9 +72,6 @@ export const DailyReportManagement: React.FC = React.memo(() => {
   const handleGenerate = useCallback(() => {
     setGenerateModalOpen(true);
   }, []);
-
-  // Format currency
-  const formatCurrency = (amount: number) => `¥${amount.toFixed(2)}`;
 
   // Format date
   const formatDate = (dateStr: string) => {

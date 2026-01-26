@@ -10,6 +10,7 @@
 import React from 'react';
 import { X, Calendar, TrendingUp, Receipt, CreditCard, Percent } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
+import { formatCurrency } from '@/utils/currency';
 import type { DailyReport, TaxBreakdown, PaymentMethodBreakdown } from '@/core/domain/types/api';
 
 interface DailyReportDetailModalProps {
@@ -26,8 +27,6 @@ export const DailyReportDetailModal: React.FC<DailyReportDetailModalProps> = ({
   const { t } = useI18n();
 
   if (!open || !report) return null;
-
-  const formatCurrency = (amount: number) => `¥${amount.toFixed(2)}`;
 
   const formatDate = (dateStr: string) => {
     try {
