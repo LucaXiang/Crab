@@ -129,13 +129,15 @@ impl ClientBridge {
     }
 
     /// 激活设备并自动切换租户，保存配置
+    ///
+    /// 如果当前在 Server mode，会自动通知 edge-server 更新激活状态
     pub async fn handle_activation(
         &self,
         auth_url: &str,
         username: &str,
         password: &str,
     ) -> Result<String, BridgeError> {
-        // 1. 调用 TenantManager 激活
+        // 1. 调用 TenantManager 激活（保存证书和 credential 到磁盘）
         let tenant_id = {
             let mut tm = self.tenant_manager.write().await;
             tm.activate_device(auth_url, username, password).await?
@@ -149,6 +151,27 @@ impl ClientBridge {
             }
             config.current_tenant = Some(tenant_id.clone());
             config.save(&self.config_path)?;
+        }
+
+        // 3. 如果当前在 Server mode，通知 edge-server 更新激活状态
+        {
+            let mode_guard = self.mode.read().await;
+            if let ClientMode::Server { server_state, .. } = &*mode_guard {
+                // 从磁盘加载刚保存的 credential 并通知 ActivationService
+                let tenant_manager = self.tenant_manager.read().await;
+                if let Some(tenant_path) = tenant_manager.current_tenant_path() {
+                    let credential_path = tenant_path.join("auth").join("Credential.json");
+                    if let Ok(content) = std::fs::read_to_string(&credential_path) {
+                        if let Ok(binding) = serde_json::from_str::<edge_server::services::tenant_binding::TenantBinding>(&content) {
+                            if let Err(e) = server_state.activation_service().activate(binding).await {
+                                tracing::warn!("Failed to notify ActivationService: {}", e);
+                            } else {
+                                tracing::info!("ActivationService notified of new activation");
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         tracing::info!(tenant_id = %tenant_id, "Device activated and config saved");
