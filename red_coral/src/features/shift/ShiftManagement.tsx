@@ -116,7 +116,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
   }) => {
     if (status === 'OPEN') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 whitespace-nowrap">
           <Play size={12} />
           {t('settings.shift.status.open')}
         </span>
@@ -124,14 +124,14 @@ export const ShiftManagement: React.FC = React.memo(() => {
     }
     if (abnormalClose) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 whitespace-nowrap">
           <AlertCircle size={12} />
           {t('settings.shift.status.abnormal_closed')}
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">
         <Square size={12} />
         {t('settings.shift.status.closed')}
       </span>
