@@ -1426,7 +1426,8 @@
       },
       "status": {
         "open": "进行中",
-        "closed": "已结束"
+        "closed": "已结束",
+        "abnormal_closed": "异常关闭"
       },
       "open_shift": "开班",
       "close_shift": "收班",
