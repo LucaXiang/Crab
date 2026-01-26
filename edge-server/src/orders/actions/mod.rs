@@ -162,12 +162,19 @@ impl From<&OrderCommand> for CommandAction {
                 order_id: order_id.clone(),
                 receipt_number: receipt_number.clone(),
             }),
-            OrderCommandPayload::VoidOrder { order_id, reason } => {
-                CommandAction::VoidOrder(VoidOrderAction {
-                    order_id: order_id.clone(),
-                    reason: reason.clone(),
-                })
-            }
+            OrderCommandPayload::VoidOrder {
+                order_id,
+                void_type,
+                loss_reason,
+                loss_amount,
+                note,
+            } => CommandAction::VoidOrder(VoidOrderAction {
+                order_id: order_id.clone(),
+                void_type: void_type.clone(),
+                loss_reason: loss_reason.clone(),
+                loss_amount: *loss_amount,
+                note: note.clone(),
+            }),
             OrderCommandPayload::RestoreOrder { order_id } => {
                 CommandAction::RestoreOrder(RestoreOrderAction {
                     order_id: order_id.clone(),

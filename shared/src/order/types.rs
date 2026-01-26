@@ -3,6 +3,37 @@
 use super::AppliedRule;
 use serde::{Deserialize, Serialize};
 
+// ============================================================================
+// Void Types
+// ============================================================================
+
+/// 作废类型
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum VoidType {
+    /// 取消订单 - 未付款，直接取消
+    #[default]
+    Cancelled,
+    /// 损失结算 - 已付部分，剩余计入损失（用于报税）
+    LossSettled,
+}
+
+/// 损失原因（预设选项）
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum LossReason {
+    /// 客人逃单
+    CustomerFled,
+    /// 客人无力支付
+    CustomerInsolvent,
+    /// 其他
+    Other,
+}
+
+// ============================================================================
+// Cart Item Types
+// ============================================================================
+
 /// Cart item snapshot - complete snapshot for event recording
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CartItemSnapshot {

@@ -5,13 +5,16 @@
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
+use shared::order::{EventPayload, LossReason, OrderEvent, OrderEventType, OrderStatus, VoidType};
 
 /// VoidOrder action
 #[derive(Debug, Clone)]
 pub struct VoidOrderAction {
     pub order_id: String,
-    pub reason: Option<String>,
+    pub void_type: VoidType,
+    pub loss_reason: Option<LossReason>,
+    pub loss_amount: Option<f64>,
+    pub note: Option<String>,
 }
 
 #[async_trait]
@@ -54,7 +57,10 @@ impl CommandHandler for VoidOrderAction {
             Some(metadata.timestamp),
             OrderEventType::OrderVoided,
             EventPayload::OrderVoided {
-                reason: self.reason.clone(),
+                void_type: self.void_type.clone(),
+                loss_reason: self.loss_reason.clone(),
+                loss_amount: self.loss_amount,
+                note: self.note.clone(),
                 authorizer_id: None,
                 authorizer_name: None,
             },
@@ -80,6 +86,16 @@ mod tests {
         }
     }
 
+    fn create_void_action(order_id: &str, note: Option<String>) -> VoidOrderAction {
+        VoidOrderAction {
+            order_id: order_id.to_string(),
+            void_type: VoidType::Cancelled,
+            loss_reason: None,
+            loss_amount: None,
+            note,
+        }
+    }
+
     #[tokio::test]
     async fn test_void_order_success() {
         let storage = OrderStorage::open_in_memory().unwrap();
@@ -93,10 +109,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = VoidOrderAction {
-            order_id: "order-1".to_string(),
-            reason: Some("Customer cancelled".to_string()),
-        };
+        let action = create_void_action("order-1", Some("Customer cancelled".to_string()));
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
@@ -107,12 +120,13 @@ mod tests {
         assert_eq!(event.event_type, OrderEventType::OrderVoided);
 
         if let EventPayload::OrderVoided {
-            reason,
+            note,
             authorizer_id,
             authorizer_name,
+            ..
         } = &event.payload
         {
-            assert_eq!(*reason, Some("Customer cancelled".to_string()));
+            assert_eq!(*note, Some("Customer cancelled".to_string()));
             assert_eq!(*authorizer_id, None);
             assert_eq!(*authorizer_name, None);
         } else {
@@ -121,7 +135,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_void_order_without_reason() {
+    async fn test_void_order_without_note() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -132,17 +146,14 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = VoidOrderAction {
-            order_id: "order-1".to_string(),
-            reason: None,
-        };
+        let action = create_void_action("order-1", None);
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
         assert_eq!(events.len(), 1);
-        if let EventPayload::OrderVoided { reason, .. } = &events[0].payload {
-            assert_eq!(*reason, None);
+        if let EventPayload::OrderVoided { note, .. } = &events[0].payload {
+            assert_eq!(*note, None);
         } else {
             panic!("Expected OrderVoided payload");
         }
@@ -160,10 +171,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = VoidOrderAction {
-            order_id: "order-1".to_string(),
-            reason: None,
-        };
+        let action = create_void_action("order-1", None);
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
@@ -183,10 +191,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = VoidOrderAction {
-            order_id: "order-1".to_string(),
-            reason: None,
-        };
+        let action = create_void_action("order-1", None);
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
@@ -202,10 +207,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = VoidOrderAction {
-            order_id: "nonexistent".to_string(),
-            reason: None,
-        };
+        let action = create_void_action("nonexistent", None);
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
@@ -225,10 +227,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = VoidOrderAction {
-            order_id: "order-1".to_string(),
-            reason: None,
-        };
+        let action = create_void_action("order-1", None);
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
@@ -251,10 +250,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = VoidOrderAction {
-            order_id: "order-1".to_string(),
-            reason: None,
-        };
+        let action = create_void_action("order-1", None);
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
@@ -278,10 +274,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = VoidOrderAction {
-            order_id: "order-1".to_string(),
-            reason: Some("Order error".to_string()),
-        };
+        let action = create_void_action("order-1", Some("Order error".to_string()));
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
@@ -303,10 +296,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = VoidOrderAction {
-            order_id: "order-1".to_string(),
-            reason: None,
-        };
+        let action = create_void_action("order-1", None);
 
         let metadata = CommandMetadata {
             command_id: "cmd-void-1".to_string(),

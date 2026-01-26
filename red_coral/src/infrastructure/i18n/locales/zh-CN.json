@@ -283,8 +283,25 @@
     "void": {
       "title": "作废订单",
       "auth_required": "作废订单需要主管审批",
-      "confirm": "确定要作废此订单吗？",
-      "reason": "选择作废原因"
+      "confirm": "确认作废",
+      "select_type": "选择作废类型",
+      "paid_amount": "已付金额",
+      "unpaid_amount": "未付金额",
+      "type": {
+        "cancelled": "取消订单",
+        "cancelled_desc": "订单未付款，直接取消",
+        "loss_settled": "损失结算",
+        "loss_settled_desc": "部分付款，剩余计入损失"
+      },
+      "loss_reason": {
+        "title": "选择损失原因",
+        "customer_fled": "顾客逃单",
+        "customer_insolvent": "顾客无力支付",
+        "other": "其他原因"
+      },
+      "note": "备注",
+      "note_placeholder": "请输入备注信息...",
+      "loss_amount_notice": "未付金额 {{amount}} 将计入损失"
     },
     "retail": {
       "cancel_title": "确认返回",
@@ -486,8 +503,16 @@
     "labels": {
       "guests": "客人",
       "receipt": "小票",
-      "table": "桌台"
-    }
+      "table": "桌台",
+      "price": "价格",
+      "quantity": "数量",
+      "discount": "折扣",
+      "surcharge": "附加费",
+      "total": "总计"
+    },
+    "rule_toggled": "价格规则切换",
+    "rule_skipped": "已跳过",
+    "rule_applied": "已应用"
   },
   "draft": {
     "action": {

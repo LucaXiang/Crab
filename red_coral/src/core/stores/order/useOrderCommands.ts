@@ -139,15 +139,26 @@ export function useOrderCommands() {
     []
   );
 
+  /** 作废订单选项 */
+  interface VoidOrderOptions {
+    voidType?: 'CANCELLED' | 'LOSS_SETTLED';
+    lossReason?: 'CUSTOMER_FLED' | 'CUSTOMER_INSOLVENT' | 'OTHER';
+    lossAmount?: number;
+    note?: string;
+  }
+
   /**
    * Void an order
    */
   const voidOrder = useCallback(
-    async (orderId: string, reason?: string): Promise<CommandResponse> => {
+    async (orderId: string, options?: VoidOrderOptions): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'VOID_ORDER',
         order_id: orderId,
-        reason: reason || null,
+        void_type: options?.voidType ?? 'CANCELLED',
+        loss_reason: options?.lossReason ?? null,
+        loss_amount: options?.lossAmount ?? null,
+        note: options?.note ?? null,
       });
 
       return sendCommand(command);

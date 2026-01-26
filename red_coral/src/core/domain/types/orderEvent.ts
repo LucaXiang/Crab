@@ -110,9 +110,22 @@ export interface OrderCompletedPayload {
   payment_summary: PaymentSummaryItem[];
 }
 
+/** 作废类型 */
+export type VoidType = 'CANCELLED' | 'LOSS_SETTLED';
+
+/** 损失原因（预设选项） */
+export type LossReason = 'CUSTOMER_FLED' | 'CUSTOMER_INSOLVENT' | 'OTHER';
+
 export interface OrderVoidedPayload {
   type: 'ORDER_VOIDED';
-  reason?: string | null;
+  /** 作废类型（默认 CANCELLED） */
+  void_type?: VoidType;
+  /** 损失原因（仅 LOSS_SETTLED 时使用） */
+  loss_reason?: LossReason | null;
+  /** 损失金额（仅 LOSS_SETTLED 时使用，用于报税） */
+  loss_amount?: number | null;
+  /** 备注 */
+  note?: string | null;
   authorizer_id?: string | null;
   authorizer_name?: string | null;
 }
@@ -316,7 +329,14 @@ export interface CompleteOrderCommand {
 export interface VoidOrderCommand {
   type: 'VOID_ORDER';
   order_id: string;
-  reason?: string | null;
+  /** 作废类型（默认 CANCELLED） */
+  void_type?: VoidType;
+  /** 损失原因（仅 LOSS_SETTLED 时使用） */
+  loss_reason?: LossReason | null;
+  /** 损失金额（仅 LOSS_SETTLED 时使用） */
+  loss_amount?: number | null;
+  /** 备注 */
+  note?: string | null;
 }
 
 export interface RestoreOrderCommand {
@@ -507,6 +527,17 @@ export interface OrderSnapshot {
   guest_count: number;
   is_retail: boolean;
   status: OrderStatus;
+
+  // === Void Information (only when status === 'VOID') ===
+  /** Void type (CANCELLED or LOSS_SETTLED) */
+  void_type?: VoidType;
+  /** Loss reason (only for LOSS_SETTLED) */
+  loss_reason?: LossReason;
+  /** Loss amount (only for LOSS_SETTLED) */
+  loss_amount?: number;
+  /** Void note */
+  void_note?: string;
+
   items: CartItemSnapshot[];
   payments: PaymentRecord[];
 

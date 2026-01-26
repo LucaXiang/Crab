@@ -1,6 +1,6 @@
 //! Order commands - requests from clients to modify orders
 
-use super::types::{CartItemInput, ItemChanges, PaymentInput, SplitItem};
+use super::types::{CartItemInput, ItemChanges, LossReason, PaymentInput, SplitItem, VoidType};
 use serde::{Deserialize, Serialize};
 
 /// Order command wrapper
@@ -48,8 +48,18 @@ pub enum OrderCommandPayload {
     /// Void an order
     VoidOrder {
         order_id: String,
+        /// 作废类型（默认 Cancelled）
+        #[serde(default)]
+        void_type: VoidType,
+        /// 损失原因（仅 LossSettled 时使用）
         #[serde(skip_serializing_if = "Option::is_none")]
-        reason: Option<String>,
+        loss_reason: Option<LossReason>,
+        /// 损失金额（仅 LossSettled 时使用）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        loss_amount: Option<f64>,
+        /// 备注
+        #[serde(skip_serializing_if = "Option::is_none")]
+        note: Option<String>,
     },
 
     /// Restore a voided order (reserved, not implemented)

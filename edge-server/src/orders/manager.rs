@@ -560,7 +560,7 @@ impl Clone for OrdersManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::order::{CartItemInput, OrderCommandPayload, OrderEventType, PaymentInput};
+    use shared::order::{CartItemInput, OrderCommandPayload, OrderEventType, PaymentInput, VoidType};
 
     fn create_test_manager() -> OrdersManager {
         let storage = OrderStorage::open_in_memory().unwrap();
@@ -748,7 +748,10 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
-                reason: Some("Customer cancelled".to_string()),
+                void_type: VoidType::Cancelled,
+                loss_reason: None,
+                loss_amount: None,
+                note: Some("Customer cancelled".to_string()),
             },
         );
         let void_response = manager.execute_command(void_cmd);

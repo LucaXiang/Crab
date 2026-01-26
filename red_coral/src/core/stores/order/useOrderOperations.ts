@@ -258,18 +258,33 @@ export const completeOrder = async (
   ensureSuccess(completeResponse, 'Complete order');
 };
 
+/** 作废订单选项 */
+export interface VoidOrderOptions {
+  /** 作废类型（默认 CANCELLED） */
+  voidType?: 'CANCELLED' | 'LOSS_SETTLED';
+  /** 损失原因（仅 LOSS_SETTLED 时使用） */
+  lossReason?: 'CUSTOMER_FLED' | 'CUSTOMER_INSOLVENT' | 'OTHER';
+  /** 损失金额（仅 LOSS_SETTLED 时使用） */
+  lossAmount?: number;
+  /** 备注 */
+  note?: string;
+}
+
 /**
  * Void an order
  * Fire & forget - UI updates via WebSocket event
  */
 export const voidOrder = async (
   orderId: string,
-  reason?: string
+  options?: VoidOrderOptions
 ): Promise<void> => {
   const command = createCommand({
     type: 'VOID_ORDER',
     order_id: orderId,
-    reason: reason || null,
+    void_type: options?.voidType ?? 'CANCELLED',
+    loss_reason: options?.lossReason ?? null,
+    loss_amount: options?.lossAmount ?? null,
+    note: options?.note ?? null,
   });
   const response = await sendCommand(command);
   ensureSuccess(response, 'Void order');

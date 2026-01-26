@@ -11,13 +11,22 @@ pub struct OrderVoidedApplier;
 impl EventApplier for OrderVoidedApplier {
     fn apply(&self, snapshot: &mut OrderSnapshot, event: &OrderEvent) {
         if let EventPayload::OrderVoided {
-            reason: _,
+            void_type,
+            loss_reason,
+            loss_amount,
+            note,
             authorizer_id: _,
             authorizer_name: _,
         } = &event.payload
         {
             // Set status to Void
             snapshot.status = OrderStatus::Void;
+
+            // Store void information in snapshot
+            snapshot.void_type = Some(void_type.clone());
+            snapshot.loss_reason = loss_reason.clone();
+            snapshot.loss_amount = *loss_amount;
+            snapshot.void_note = note.clone();
 
             // Set end time (voided_at)
             snapshot.end_time = Some(event.timestamp);
@@ -35,12 +44,12 @@ impl EventApplier for OrderVoidedApplier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::order::OrderEventType;
+    use shared::order::{OrderEventType, VoidType};
 
     fn create_order_voided_event(
         order_id: &str,
         seq: u64,
-        reason: Option<String>,
+        note: Option<String>,
         authorizer_id: Option<String>,
         authorizer_name: Option<String>,
     ) -> OrderEvent {
@@ -53,7 +62,10 @@ mod tests {
             Some(1234567890),
             OrderEventType::OrderVoided,
             EventPayload::OrderVoided {
-                reason,
+                void_type: VoidType::Cancelled,
+                loss_reason: None,
+                loss_amount: None,
+                note,
                 authorizer_id,
                 authorizer_name,
             },

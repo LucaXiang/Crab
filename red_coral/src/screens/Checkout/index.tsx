@@ -8,13 +8,13 @@
  * 4. 处理订单作废
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { HeldOrder } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { useConfirm } from '@/hooks/useConfirm';
 import { PaymentFlow } from './payment/PaymentFlow';
 import { useOrderCommands } from '@/core/stores/order';
-import { VoidReasonModal } from './VoidReasonModal';
+import { VoidReasonModal, VoidOrderOptions } from './VoidReasonModal';
 import { SupervisorAuthModal } from '@/presentation/components/auth/SupervisorAuthModal';
 import { usePermission } from '@/hooks/usePermission';
 import { Permission } from '@/core/domain/types';
@@ -24,7 +24,7 @@ interface CheckoutScreenProps {
   order: HeldOrder;
   onCancel: () => void;
   onComplete: () => void;
-  onVoid?: (reason?: string) => void;
+  onVoid?: (options?: VoidOrderOptions) => void;
   onUpdateOrder?: (order: HeldOrder) => void;
   onManageTable?: () => void;
 }
@@ -45,10 +45,20 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   
   const [isVoidModalOpen, setIsVoidModalOpen] = useState(false);
   const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false);
-  const [pendingVoidReason, setPendingVoidReason] = useState<string | null>(null);
+  const [pendingVoidOptions, setPendingVoidOptions] = useState<VoidOrderOptions | null>(null);
 
   // Local state for modified order (for discounts and item edits)
   const [localOrder, setLocalOrder] = useState<HeldOrder>(order);
+
+  // 计算已付金额和未付金额
+  const { paidAmount, unpaidAmount } = useMemo(() => {
+    const paid = localOrder.paid_amount ?? 0;
+    const total = localOrder.total ?? 0;
+    return {
+      paidAmount: paid,
+      unpaidAmount: Math.max(0, total - paid),
+    };
+  }, [localOrder.paid_amount, localOrder.total]);
 
   // Keep localOrder in sync when the incoming order prop changes (e.g., after merge/move)
   useEffect(() => {
@@ -90,15 +100,15 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   /**
    * 执行作废操作
    */
-  const processVoid = useCallback(async (reason: string) => {
+  const processVoid = useCallback(async (options: VoidOrderOptions) => {
     if (propOnVoid) {
-      propOnVoid(reason);
+      propOnVoid(options);
       setIsVoidModalOpen(false);
     } else {
       const orderKey = order.order_id;
 
       // Execute async command
-      const response = await voidOrder(orderKey, reason);
+      const response = await voidOrder(orderKey, options);
 
       if (!response.success) {
         // Display error to user
@@ -116,24 +126,24 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   /**
    * 确认作废订单
    */
-  const handleVoidConfirm = useCallback((reason: string) => {
+  const handleVoidConfirm = useCallback((options: VoidOrderOptions) => {
     // If user cannot void orders, require supervisor auth
     if (!hasPermission(Permission.VOID_ORDER)) {
-      setPendingVoidReason(reason);
+      setPendingVoidOptions(options);
       setIsVoidModalOpen(false); // Close void modal first
       setIsSupervisorModalOpen(true);
     } else {
-      processVoid(reason);
+      processVoid(options);
     }
   }, [hasPermission, processVoid]);
 
   const handleSupervisorSuccess = useCallback(() => {
-    if (pendingVoidReason) {
-      processVoid(pendingVoidReason);
-      setPendingVoidReason(null);
+    if (pendingVoidOptions) {
+      processVoid(pendingVoidOptions);
+      setPendingVoidOptions(null);
     }
     setIsSupervisorModalOpen(false);
-  }, [pendingVoidReason, processVoid]);
+  }, [pendingVoidOptions, processVoid]);
 
   return (
     <>
@@ -150,8 +160,10 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         </div>
       </div>
 
-      <VoidReasonModal 
+      <VoidReasonModal
         isOpen={isVoidModalOpen}
+        paidAmount={paidAmount}
+        unpaidAmount={unpaidAmount}
         onClose={() => setIsVoidModalOpen(false)}
         onConfirm={handleVoidConfirm}
       />
@@ -160,7 +172,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         isOpen={isSupervisorModalOpen}
         onClose={() => {
           setIsSupervisorModalOpen(false);
-          setPendingVoidReason(null);
+          setPendingVoidOptions(null);
         }}
         onSuccess={handleSupervisorSuccess}
         requiredPermission={Permission.VOID_ORDER}

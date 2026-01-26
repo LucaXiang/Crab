@@ -146,10 +146,22 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
 
 const ItemRemovedRenderer: EventRenderer<ItemRemovedPayload> = {
   render(event, payload, t) {
+    const details: string[] = [];
+
+    // Show quantity if available
+    if (payload.quantity != null && payload.quantity > 0) {
+      details.push(`${t('timeline.labels.quantity')}: ${payload.quantity}`);
+    }
+
+    // Show reason if available
+    if (payload.reason) {
+      details.push(payload.reason);
+    }
+
     return {
       title: t('timeline.item_removed'),
-      summary: payload.item_name || payload.reason || '',
-      details: [],
+      summary: payload.item_name || '',
+      details,
       icon: Trash2,
       colorClass: 'bg-red-500',
       timestamp: event.timestamp,
@@ -162,11 +174,12 @@ const ItemRestoredRenderer: EventRenderer<ItemRestoredPayload> = {
   render(event, payload, t) {
     return {
       title: t('timeline.item_restored'),
-      summary: payload.instance_id,
+      summary: payload.item_name || '',
       details: [],
       icon: Utensils,
       colorClass: 'bg-green-400',
       timestamp: event.timestamp,
+      tags: payload.instance_id ? [`#${payload.instance_id.slice(-5)}`] : [],
     };
   }
 };
@@ -174,26 +187,35 @@ const ItemRestoredRenderer: EventRenderer<ItemRestoredPayload> = {
 const PaymentAddedRenderer: EventRenderer<PaymentAddedPayload> = {
   render(event, payload, t) {
     const method = payload.method || 'unknown';
-    const methodKey = `payment.${method}`;
-    let methodDisplay = t(methodKey) !== methodKey ? t(methodKey) : method;
-
     const methodLower = method.toLowerCase();
+    let methodDisplay = method;
     if (methodLower === 'cash') {
       methodDisplay = t('checkout.method.cash');
     } else if (methodLower === 'card') {
       methodDisplay = t('checkout.method.card');
     }
 
-    const details = payload.tendered !== undefined && payload.tendered !== null
-      ? [
-          `${t('checkout.amount.tendered')}: ${formatCurrency(payload.tendered)}`,
-          `${t('checkout.amount.change')}: ${formatCurrency(payload.change || 0)}`
-        ]
-      : payload.note ? [payload.note] : [];
+    const details: string[] = [];
+
+    // Show payment ID (short form)
+    if (payload.payment_id) {
+      details.push(`ID: #${payload.payment_id.slice(-6)}`);
+    }
+
+    // Show tendered/change for cash payments
+    if (payload.tendered !== undefined && payload.tendered !== null) {
+      details.push(`${t('checkout.amount.tendered')}: ${formatCurrency(payload.tendered)}`);
+      details.push(`${t('checkout.amount.change')}: ${formatCurrency(payload.change || 0)}`);
+    }
+
+    // Show note if available
+    if (payload.note) {
+      details.push(payload.note);
+    }
 
     return {
       title: `${t('timeline.payment')}: ${methodDisplay}`,
-      summary: payload.amount != null ? formatCurrency(payload.amount) : '',
+      summary: payload.amount != null ? `+${formatCurrency(payload.amount)}` : '',
       details,
       icon: Coins,
       colorClass: 'bg-green-500',
@@ -204,12 +226,34 @@ const PaymentAddedRenderer: EventRenderer<PaymentAddedPayload> = {
 
 const PaymentCancelledRenderer: EventRenderer<PaymentCancelledPayload> = {
   render(event, payload, t) {
+    // Format payment method display
+    const methodKey = `checkout.method.${payload.method?.toLowerCase() || 'other'}`;
+    const methodDisplay = t(methodKey);
+
+    // Build details array
+    const details: string[] = [];
+
+    // Show payment ID (short form)
+    if (payload.payment_id) {
+      details.push(`ID: #${payload.payment_id.slice(-6)}`);
+    }
+
+    // Show cancelled amount
+    if (payload.amount != null) {
+      details.push(`${t('checkout.amount.paid')}: ${formatCurrency(payload.amount)}`);
+    }
+
+    // Show reason if available
+    if (payload.reason) {
+      details.push(payload.reason);
+    }
+
     return {
-      title: t('timeline.payment_cancelled'),
-      summary: payload.reason || '',
-      details: [],
+      title: `${t('timeline.payment_cancelled')}: ${methodDisplay}`,
+      summary: payload.amount != null ? `-${formatCurrency(payload.amount)}` : '',
+      details,
       icon: Ban,
-      colorClass: 'bg-gray-500',
+      colorClass: 'bg-red-400',
       timestamp: event.timestamp,
     };
   }
@@ -261,12 +305,27 @@ const OrderCompletedRenderer: EventRenderer<OrderCompletedPayload> = {
 
 const OrderVoidedRenderer: EventRenderer<OrderVoidedPayload> = {
   render(event, payload, t) {
+    const isLossSettled = payload.void_type === 'LOSS_SETTLED';
+    const summary = isLossSettled
+      ? t('checkout.void.type.loss_settled')
+      : t('checkout.void.type.cancelled');
+    const details: string[] = [];
+
+    if (payload.loss_reason) {
+      const reasonKey = `checkout.void.loss_reason.${payload.loss_reason.toLowerCase()}`;
+      details.push(t(reasonKey));
+    }
+
+    if (payload.note) {
+      details.push(payload.note);
+    }
+
     return {
       title: t('timeline.order_voided'),
-      summary: payload.reason || '',
-      details: [],
+      summary,
+      details,
       icon: Ban,
-      colorClass: 'bg-red-700',
+      colorClass: isLossSettled ? 'bg-orange-600' : 'bg-red-700',
       timestamp: event.timestamp,
     };
   }
@@ -372,13 +431,15 @@ const OrderInfoUpdatedRenderer: EventRenderer<OrderInfoUpdatedPayload> = {
 
 const RuleSkipToggledRenderer: EventRenderer<RuleSkipToggledPayload> = {
   render(event, payload, t) {
-    const action = payload.skipped ? 'Skipped' : 'Applied';
+    const actionLabel = payload.skipped
+      ? t('timeline.rule_skipped')
+      : t('timeline.rule_applied');
 
     return {
-      title: 'Price Rule Toggled',
-      summary: `${action}: ${payload.rule_id}`,
+      title: t('timeline.rule_toggled'),
+      summary: `${actionLabel}: ${payload.rule_id}`,
       details: [
-        `Total: ${formatCurrency(payload.total)}`,
+        `${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`,
       ],
       icon: Tag,
       colorClass: payload.skipped ? 'bg-orange-400' : 'bg-green-400',

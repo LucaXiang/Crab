@@ -122,7 +122,7 @@ export const OrderDebug: React.FC = () => {
 
     for (const order of activeOrders) {
       try {
-        const response = await voidOrder(order.order_id, 'Debug: Batch void');
+        const response = await voidOrder(order.order_id, { voidType: 'CANCELLED', note: 'Debug: Batch void' });
         if (response.success) {
           successCount++;
         } else {

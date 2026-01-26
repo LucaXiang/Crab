@@ -72,7 +72,10 @@ describe('Timeline Renderers - Architecture Tests', () => {
         }),
         createMockEvent('ORDER_VOIDED', {
           type: 'ORDER_VOIDED',
-          reason: null,
+          void_type: 'CANCELLED',
+          loss_reason: null,
+          loss_amount: null,
+          note: null,
         }),
       ];
 
@@ -187,7 +190,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
         createMockEvent('ITEMS_ADDED', { type: 'ITEMS_ADDED', items: [] }),
         createMockEvent('PAYMENT_ADDED', { type: 'PAYMENT_ADDED', payment_id: 'p1', method: 'cash', amount: 100, tendered: null, change: null, note: null }),
         createMockEvent('ORDER_COMPLETED', { type: 'ORDER_COMPLETED', final_total: 100, receipt_number: 'R1', payment_summary: [] }),
-        createMockEvent('ORDER_VOIDED', { type: 'ORDER_VOIDED', reason: null }),
+        createMockEvent('ORDER_VOIDED', { type: 'ORDER_VOIDED', void_type: 'CANCELLED', loss_reason: null, loss_amount: null, note: null }),
       ];
 
       const colors = new Set<string>();

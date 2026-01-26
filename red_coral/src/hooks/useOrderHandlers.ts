@@ -4,6 +4,7 @@ import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { useCartStore } from '@/core/stores/cart/useCartStore';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
+import type { VoidOrderOptions } from '@/core/stores/order/useOrderOperations';
 import { toast } from '@/presentation/components/Toast';
 import {
   savePendingRetailOrder,
@@ -19,7 +20,7 @@ interface UseOrderHandlersParams {
     totalAmount: number,
     zone?: Zone
   ) => Promise<'MERGED' | 'CREATED' | 'RETRIEVED' | 'EMPTY'>;
-  voidOrder: (orderId: string, reason?: string) => Promise<void>;
+  voidOrder: (orderId: string, options?: VoidOrderOptions) => Promise<void>;
   setCheckoutOrder: (order: HeldOrder | null) => void;
   setCurrentOrderKey: (key: string | null) => void;
   setViewMode: (mode: 'pos' | 'checkout') => void;
@@ -155,7 +156,7 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
     // Retail orders should not remain active when user exits checkout
     if (checkoutOrder?.is_retail) {
       try {
-        await voidOrder(checkoutOrder.order_id, 'Retail checkout cancelled');
+        await voidOrder(checkoutOrder.order_id, { voidType: 'CANCELLED', note: 'Retail checkout cancelled' });
         // Clear pending retail order tracker after successful void
         clearPendingRetailOrder();
       } catch (error) {
@@ -173,7 +174,7 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
     const { checkoutOrder } = useCheckoutStore.getState();
     if (!checkoutOrder) return;
 
-    await voidOrder(checkoutOrder.order_id, 'Manual Void');
+    await voidOrder(checkoutOrder.order_id, { voidType: 'CANCELLED', note: 'Manual Void' });
     setViewMode('pos');
     setCheckoutOrder(null);
     useCartStore.getState().clearCart();

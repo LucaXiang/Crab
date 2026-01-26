@@ -153,7 +153,10 @@ describe('TimelineList Integration Tests', () => {
       const events: OrderEvent[] = [
         createMockEvent('ORDER_VOIDED', {
           type: 'ORDER_VOIDED',
-          reason: 'Test cancellation',
+          void_type: 'CANCELLED',
+          loss_reason: null,
+          loss_amount: null,
+          note: 'Test cancellation',
         }),
       ];
 

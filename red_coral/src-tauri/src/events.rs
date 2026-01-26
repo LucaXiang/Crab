@@ -168,6 +168,10 @@ mod tests {
             updated_at: 1705900000000,
             last_sequence: 1,
             state_checksum: String::new(),
+            void_type: None,
+            loss_reason: None,
+            loss_amount: None,
+            void_note: None,
         };
 
         // Create a Sync message with resource="order_sync" (like edge-server does)

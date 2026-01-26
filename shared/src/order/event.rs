@@ -1,7 +1,8 @@
 //! Order events - immutable facts recorded after command processing
 
 use super::types::{
-    CartItemSnapshot, ItemChanges, ItemModificationResult, PaymentSummaryItem, SplitItem,
+    CartItemSnapshot, ItemChanges, ItemModificationResult, LossReason, PaymentSummaryItem,
+    SplitItem, VoidType,
 };
 use serde::{Deserialize, Serialize};
 
@@ -123,8 +124,18 @@ pub enum EventPayload {
     },
 
     OrderVoided {
+        /// 作废类型（默认 Cancelled）
+        #[serde(default)]
+        void_type: VoidType,
+        /// 损失原因（仅 LossSettled 时使用）
         #[serde(skip_serializing_if = "Option::is_none")]
-        reason: Option<String>,
+        loss_reason: Option<LossReason>,
+        /// 损失金额（仅 LossSettled 时使用，用于报税）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        loss_amount: Option<f64>,
+        /// 备注
+        #[serde(skip_serializing_if = "Option::is_none")]
+        note: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_id: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]

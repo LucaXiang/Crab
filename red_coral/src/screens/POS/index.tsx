@@ -544,7 +544,7 @@ export const POSScreen: React.FC = () => {
     // Void retail orders
     for (const snapshot of retailActive) {
       try {
-        await voidOrder(snapshot.order_id, 'Retail session cancelled on logout');
+        await voidOrder(snapshot.order_id, { voidType: 'CANCELLED', note: 'Retail session cancelled on logout' });
       } catch {
         // Ignore errors - best effort cleanup
       }

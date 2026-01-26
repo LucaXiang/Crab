@@ -4,7 +4,7 @@
 //! Clients can compare their locally computed checksum with the server's
 //! to detect if the reducer logic has diverged.
 
-use super::types::{CartItemSnapshot, PaymentRecord};
+use super::types::{CartItemSnapshot, LossReason, PaymentRecord, VoidType};
 use super::AppliedRule;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
@@ -45,6 +45,20 @@ pub struct OrderSnapshot {
     pub is_retail: bool,
     /// Order status
     pub status: OrderStatus,
+
+    // === Void Information (only when status == Void) ===
+    /// Void type (CANCELLED or LOSS_SETTLED)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub void_type: Option<VoidType>,
+    /// Loss reason (only for LOSS_SETTLED)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loss_reason: Option<LossReason>,
+    /// Loss amount (only for LOSS_SETTLED, equals remaining_amount at void time)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loss_amount: Option<f64>,
+    /// Void note
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub void_note: Option<String>,
     /// Items in the order
     pub items: Vec<CartItemSnapshot>,
     /// Payment records
@@ -137,6 +151,10 @@ impl OrderSnapshot {
             guest_count: 1,
             is_retail: false,
             status: OrderStatus::Active,
+            void_type: None,
+            loss_reason: None,
+            loss_amount: None,
+            void_note: None,
             items: Vec::new(),
             payments: Vec::new(),
             original_total: 0.0,
