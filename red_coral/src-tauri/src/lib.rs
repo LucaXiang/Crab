@@ -158,6 +158,7 @@ pub async fn run() {
             // Auth commands (ClientBridge-based - unified)
             commands::login_employee,
             commands::logout_employee,
+            commands::get_current_session,
             // Data commands
             commands::list_tags,
             commands::get_tag,

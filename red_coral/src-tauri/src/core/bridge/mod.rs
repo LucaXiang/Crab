@@ -600,6 +600,12 @@ impl ClientBridge {
         }
     }
 
+    /// 获取当前活动会话 (用于启动时恢复登录状态)
+    pub async fn get_current_session(&self) -> Option<super::session_cache::EmployeeSession> {
+        let tenant_manager = self.tenant_manager.read().await;
+        tenant_manager.current_session().cloned()
+    }
+
     /// 获取健康检查组件 (订阅、网络、数据库)
     pub async fn get_health_components(
         &self,

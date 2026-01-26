@@ -30,6 +30,7 @@ const InitialRoute: React.FC = () => {
     tenants,
     fetchTenants,
     fetchAppState,
+    fetchCurrentSession,
     startServerMode,
   } = useBridgeStore();
   const [isChecking, setIsChecking] = useState(true);
@@ -57,13 +58,20 @@ const InitialRoute: React.FC = () => {
         }
       }
 
+      // 4. 尝试恢复缓存的员工会话 (从后端获取)
+      const currentAppState = useBridgeStore.getState().appState;
+      if (currentAppState?.type === 'ServerAuthenticated' || currentAppState?.type === 'ClientAuthenticated') {
+        console.log('[InitialRoute] Restoring session from backend...');
+        await fetchCurrentSession();
+      }
+
       const finalState = useBridgeStore.getState().appState;
       console.log('[InitialRoute] final appState:', finalState);
       console.log('[InitialRoute] route:', AppStateHelpers.getRouteForState(finalState));
       setIsChecking(false);
     };
     init();
-  }, [fetchTenants, fetchAppState, startServerMode]);
+  }, [fetchTenants, fetchAppState, fetchCurrentSession, startServerMode]);
 
   if (isChecking) {
     return (

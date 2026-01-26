@@ -5,6 +5,7 @@ use tauri::State;
 use tokio::sync::RwLock;
 
 use crate::core::response::ErrorCode;
+use crate::core::session_cache::EmployeeSession;
 use crate::core::{ApiResponse, AuthData, ClientBridge};
 
 /// 统一登录命令 (使用 ClientBridge)
@@ -45,4 +46,15 @@ pub async fn logout_employee(
             e.to_string(),
         )),
     }
+}
+
+/// 获取当前活动会话 (用于启动时恢复登录状态)
+///
+/// 返回从磁盘恢复的会话，如果没有缓存会话则返回 null
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_current_session(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+) -> Result<ApiResponse<Option<EmployeeSession>>, String> {
+    let bridge = bridge.read().await;
+    Ok(ApiResponse::success(bridge.get_current_session().await))
 }

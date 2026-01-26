@@ -225,6 +225,7 @@ interface BridgeStore {
   // Auth Actions (unified - ClientBridge based)
   loginEmployee: (username: string, password: string) => Promise<LoginResponse>;
   logoutEmployee: () => Promise<void>;
+  fetchCurrentSession: () => Promise<EmployeeSession | null>;
 
   // Connection Status Actions
   setConnectionStatus: (status: ConnectionStatus) => void;
@@ -425,6 +426,20 @@ export const useBridgeStore = create<BridgeStore>()(
           await get().fetchAppState();
         } catch (error: unknown) {
           console.error('Logout failed:', error);
+        }
+      },
+
+      fetchCurrentSession: async () => {
+        try {
+          const session = await invokeApi<EmployeeSession | null>('get_current_session');
+          if (session) {
+            set({ currentSession: session });
+            console.log('[Bridge] Restored session from backend:', session.username);
+          }
+          return session;
+        } catch (error) {
+          console.error('Failed to fetch current session:', error);
+          return null;
         }
       },
 
