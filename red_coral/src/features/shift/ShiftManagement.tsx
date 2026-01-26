@@ -229,7 +229,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
           // Only show actions for current user's shift
           if (user && item.operator_id !== user.id) return null;
           return (
-            <div className="flex items-center justify-end gap-1">
+            <div className="w-full flex items-center justify-end gap-1">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
