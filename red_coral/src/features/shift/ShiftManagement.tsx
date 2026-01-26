@@ -163,13 +163,13 @@ export const ShiftManagement: React.FC = React.memo(() => {
       {
         key: 'status',
         header: t('settings.shift.header.status'),
-        width: '120px',
+        width: '10%',
         render: (item) => <StatusBadge status={item.status} abnormalClose={item.abnormal_close} />,
       },
       {
         key: 'operator',
         header: t('settings.shift.header.operator'),
-        width: '100px',
+        width: '10%',
         render: (item) => (
           <span className="font-medium text-gray-900">{item.operator_name}</span>
         ),
@@ -177,7 +177,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
       {
         key: 'start_time',
         header: t('settings.shift.header.start_time'),
-        width: '140px',
+        width: '12%',
         render: (item) => (
           <span className="text-gray-600">{formatTime(item.start_time)}</span>
         ),
@@ -185,7 +185,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
       {
         key: 'end_time',
         header: t('settings.shift.header.end_time'),
-        width: '140px',
+        width: '12%',
         render: (item) => (
           <span className="text-gray-600">
             {item.end_time ? formatTime(item.end_time) : '-'}
@@ -195,7 +195,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
       {
         key: 'expected_cash',
         header: t('settings.shift.header.expected_cash'),
-        width: '140px',
+        width: '14%',
         align: 'right',
         render: (item) => (
           <span className="font-mono text-gray-700">{formatCurrency(item.expected_cash)}</span>
@@ -204,7 +204,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
       {
         key: 'actual_cash',
         header: t('settings.shift.header.actual_cash'),
-        width: '140px',
+        width: '14%',
         align: 'right',
         render: (item) => (
           <span className="font-mono text-gray-700">
@@ -215,14 +215,14 @@ export const ShiftManagement: React.FC = React.memo(() => {
       {
         key: 'variance',
         header: t('settings.shift.header.variance'),
-        width: '120px',
+        width: '12%',
         align: 'right',
         render: (item) => <VarianceIndicator variance={item.cash_variance} />,
       },
       {
         key: 'actions',
         header: t('common.actions'),
-        width: '100px',
+        width: '8%',
         align: 'center',
         render: (item) => {
           if (item.status !== 'OPEN') return null;
