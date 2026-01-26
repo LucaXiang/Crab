@@ -45,32 +45,33 @@ impl ShiftRepository {
         // Validate starting cash is non-negative
         validate_cash_amount(data.starting_cash, "Starting cash")?;
 
-        // Atomic check-and-create to prevent race condition
-        // Only creates if no open shift exists for this operator
-        // Returns created shift if successful, empty if duplicate exists
+        // Check if operator already has an open shift
+        let existing = self.find_open_by_operator(&data.operator_id).await?;
+        if existing.is_some() {
+            return Err(RepoError::Duplicate(
+                "Operator already has an open shift".to_string(),
+            ));
+        }
+
+        // Create new shift
         let mut result = self
             .base
             .db()
             .query(
                 r#"
-                LET $existing = (SELECT id FROM shift WHERE operator_id = $operator_id AND status = 'OPEN' LIMIT 1);
-                IF count($existing) > 0 {
-                    RETURN [];
-                } ELSE {
-                    CREATE shift SET
-                        operator_id = $operator_id,
-                        operator_name = $operator_name,
-                        status = 'OPEN',
-                        start_time = time::now(),
-                        starting_cash = $starting_cash,
-                        expected_cash = $starting_cash,
-                        abnormal_close = false,
-                        last_active_at = time::now(),
-                        note = $note,
-                        created_at = time::now(),
-                        updated_at = time::now()
-                    RETURN AFTER;
-                };
+                CREATE shift SET
+                    operator_id = $operator_id,
+                    operator_name = $operator_name,
+                    status = 'OPEN',
+                    start_time = time::now(),
+                    starting_cash = $starting_cash,
+                    expected_cash = $starting_cash,
+                    abnormal_close = false,
+                    last_active_at = time::now(),
+                    note = $note,
+                    created_at = time::now(),
+                    updated_at = time::now()
+                RETURN AFTER;
             "#,
             )
             .bind(("operator_id", operator_id))
@@ -79,10 +80,9 @@ impl ShiftRepository {
             .bind(("note", data.note))
             .await?;
 
-        // LET is statement 0, IF block result is statement 1
-        let shifts: Vec<Shift> = result.take(1)?;
+        let shifts: Vec<Shift> = result.take(0)?;
         shifts.into_iter().next().ok_or_else(|| {
-            RepoError::Duplicate("Operator already has an open shift".to_string())
+            RepoError::Database("Failed to create shift".to_string())
         })
     }
 

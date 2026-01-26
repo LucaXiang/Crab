@@ -152,7 +152,7 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         fontSize: 12,
         fontWeight: 'bold',
         dataSource: 'product.price',
-        format: '¥{value}',
+        format: '€{value}',
         visible: true,
       },
       {
@@ -220,7 +220,7 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         fontSize: 12,
         fontWeight: 'bold',
         dataSource: 'product.price',
-        format: '¥{value}',
+        format: '€{value}',
         alignment: 'right',
         visible: true,
       },
@@ -395,7 +395,7 @@ export const LabelFieldHelpers = {
           height: 5,
           fontSize: 12,
           dataSource: 'product.price',
-          format: '¥{value}',
+          format: '€{value}',
         }),
       ];
     }
@@ -421,7 +421,7 @@ export const LabelFieldHelpers = {
         height: 6,
         fontSize: 16,
         dataSource: 'product.price',
-        format: '¥{value}',
+        format: '€{value}',
         alignment: 'center',
       }),
     ];

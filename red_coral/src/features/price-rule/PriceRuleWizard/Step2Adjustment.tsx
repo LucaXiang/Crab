@@ -109,7 +109,7 @@ export const Step2Adjustment: React.FC<Step2AdjustmentProps> = ({ state, updateS
             placeholder={isPercentage ? '10' : '5.00'}
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">
-            {isPercentage ? '%' : '¥'}
+            {isPercentage ? '%' : '€'}
           </span>
         </div>
         <p className="mt-1.5 text-xs text-gray-500">

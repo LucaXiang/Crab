@@ -157,7 +157,7 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
           <span className="font-mono text-sm">
             {item.adjustment_type === 'PERCENTAGE'
               ? `${item.adjustment_value}%`
-              : `¥${item.adjustment_value.toFixed(2)}`}
+              : `€${item.adjustment_value.toFixed(2)}`}
           </span>
         ),
       },

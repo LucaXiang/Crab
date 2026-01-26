@@ -205,7 +205,7 @@ export const OrderDebug: React.FC = () => {
                 </span>
                 <span className="flex items-center gap-1">
                   <DollarSign size={12} />
-                  ¥{order.total.toFixed(2)}
+                  €{order.total.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -244,28 +244,28 @@ export const OrderDebug: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
                 <div className="text-gray-500">Original Total</div>
-                <div>¥{order.original_total.toFixed(2)}</div>
+                <div>€{order.original_total.toFixed(2)}</div>
               </div>
               <div>
                 <div className="text-gray-500">Subtotal</div>
-                <div>¥{order.subtotal.toFixed(2)}</div>
+                <div>€{order.subtotal.toFixed(2)}</div>
               </div>
               <div>
                 <div className="text-gray-500">Discount</div>
-                <div className="text-red-600">-¥{order.total_discount.toFixed(2)}</div>
+                <div className="text-red-600">-€{order.total_discount.toFixed(2)}</div>
               </div>
               <div>
                 <div className="text-gray-500">Total</div>
-                <div className="font-bold">¥{order.total.toFixed(2)}</div>
+                <div className="font-bold">€{order.total.toFixed(2)}</div>
               </div>
               <div>
                 <div className="text-gray-500">Paid</div>
-                <div className="text-green-600">¥{order.paid_amount.toFixed(2)}</div>
+                <div className="text-green-600">€{order.paid_amount.toFixed(2)}</div>
               </div>
               <div>
                 <div className="text-gray-500">Remaining</div>
                 <div className={order.remaining_amount > 0 ? 'text-orange-600' : ''}>
-                  ¥{order.remaining_amount.toFixed(2)}
+                  €{order.remaining_amount.toFixed(2)}
                 </div>
               </div>
             </div>
@@ -306,7 +306,7 @@ export const OrderDebug: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <div>¥{(item.price * item.quantity).toFixed(2)}</div>
+                      <div>€{(item.price * item.quantity).toFixed(2)}</div>
                     </div>
                   ))}
                 </div>

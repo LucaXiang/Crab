@@ -43,7 +43,7 @@ export const Step5Naming: React.FC<Step5NamingProps> = ({ state, updateState }) 
     parts.push(
       state.adjustment_type === 'PERCENTAGE'
         ? `${state.adjustment_value}%`
-        : `¥${state.adjustment_value.toFixed(2)}`
+        : `€${state.adjustment_value.toFixed(2)}`
     );
 
     // Scope

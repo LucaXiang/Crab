@@ -12,6 +12,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { confirm, message } from '@tauri-apps/plugin-dialog';
 import { createTauriClient } from '@/infrastructure/api/tauri-client';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
+import { formatCurrency } from '@/utils/currency';
 import type { Shift } from '@/core/domain/types/api';
 
 const client = createTauriClient();
@@ -43,7 +44,7 @@ export function useShiftCloseGuard() {
       // 有打开的班次，显示确认对话框
       const shouldClose = await confirm(
         `您有一个未关闭的班次 (开始于 ${formatTime(openShift.start_time)})。\n\n` +
-        `预期现金: ¥${openShift.expected_cash.toFixed(2)}\n\n` +
+        `预期现金: ${formatCurrency(openShift.expected_cash)}\n\n` +
         `是否强制关闭班次并退出？\n` +
         `(建议先进行收班操作以核对现金)`,
         {
