@@ -398,6 +398,34 @@ impl ClientBridge {
                 client,
                 ..
             } => {
+                // 优先检查员工会话 - 开发模式下可能未激活但已登录
+                if let Some(session) = tenant_manager.current_session() {
+                    // 检查会话是否过期
+                    let expires_at = session.expires_at.or_else(|| {
+                        super::session_cache::EmployeeSession::parse_jwt_exp(&session.token)
+                    });
+
+                    if let Some(exp) = expires_at {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0);
+                        if now < exp {
+                            // 会话有效，返回已认证状态
+                            return AppState::ServerAuthenticated;
+                        }
+                    } else {
+                        // 无过期时间，假设有效
+                        return AppState::ServerAuthenticated;
+                    }
+                }
+
+                // 检查 LocalClient 状态
+                if matches!(client, Some(LocalClientState::Authenticated(_))) {
+                    return AppState::ServerAuthenticated;
+                }
+
+                // 检查激活状态
                 let is_activated = server_state.is_activated().await;
 
                 if !is_activated {
@@ -457,37 +485,11 @@ impl ClientBridge {
                         };
                         AppState::ServerSubscriptionBlocked { info }
                     } else {
-                        match client {
-                            Some(LocalClientState::Authenticated(_)) => {
-                                AppState::ServerAuthenticated
-                            }
-                            _ => {
-                                if let Some(session) = tenant_manager.current_session() {
-                                    // 检查会话是否过期 (优先使用 expires_at，否则从 token 解析)
-                                    let expires_at = session.expires_at.or_else(|| {
-                                        super::session_cache::EmployeeSession::parse_jwt_exp(
-                                            &session.token,
-                                        )
-                                    });
-
-                                    if let Some(exp) = expires_at {
-                                        let now = std::time::SystemTime::now()
-                                            .duration_since(std::time::UNIX_EPOCH)
-                                            .map(|d| d.as_secs())
-                                            .unwrap_or(0);
-                                        if now >= exp {
-                                            // Token 已过期，返回 ServerReady (需要重新登录)
-                                            return AppState::ServerReady;
-                                        }
-                                    }
-                                    AppState::ServerAuthenticated
-                                } else {
-                                    AppState::ServerReady
-                                }
-                            }
-                        }
+                        // 已在前面检查过会话，到这里说明没有有效会话
+                        AppState::ServerReady
                     }
                 } else {
+                    // 无 credential，需要激活
                     let reason = self.detect_activation_reason(&tenant_manager);
                     AppState::ServerNeedActivation {
                         can_auto_recover: reason.can_auto_recover(),
@@ -1221,9 +1223,17 @@ impl ClientBridge {
         drop(mode_guard);
 
         if let Ok(ref session) = result {
-            let tenant_manager = self.tenant_manager.read().await;
-            if let Err(e) = tenant_manager.save_current_session(session) {
-                tracing::warn!("Failed to persist session: {}", e);
+            // 1. 保存到磁盘
+            {
+                let tenant_manager = self.tenant_manager.read().await;
+                if let Err(e) = tenant_manager.save_current_session(session) {
+                    tracing::warn!("Failed to persist session: {}", e);
+                }
+            }
+            // 2. 更新内存中的 current_session
+            {
+                let mut tenant_manager = self.tenant_manager.write().await;
+                tenant_manager.set_current_session(session.clone());
             }
         }
 
