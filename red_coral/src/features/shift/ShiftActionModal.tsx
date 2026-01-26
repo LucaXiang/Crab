@@ -365,10 +365,11 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
             </label>
             <div className="h-16 md:h-20 bg-white rounded-xl flex items-center justify-between px-6 mt-2 border-2 border-green-200 shadow-sm">
               <div className="flex items-center">
-                <Banknote className="text-green-500 mr-3 shrink-0" size={24} />
+                <span className="text-green-500 mr-2 text-xl md:text-2xl font-bold">€</span>
                 <span className="text-2xl md:text-4xl font-mono font-bold text-gray-800">
-                  {formatCurrency(cashValue)}
+                  {cashInput || '0'}
                 </span>
+                <span className="animate-pulse ml-0.5 w-0.5 h-8 bg-green-400 rounded" />
               </div>
             </div>
             {isOpenAction && (
