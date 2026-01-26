@@ -5,8 +5,11 @@
 
 use super::archive::OrderArchiveService;
 use super::storage::{OrderStorage, PendingArchive};
-use shared::order::{OrderEvent, OrderEventType};
+use crate::db::repository::ShiftRepository;
+use shared::order::{OrderEvent, OrderEventType, OrderSnapshot};
 use std::time::Duration;
+use surrealdb::engine::local::Db;
+use surrealdb::Surreal;
 use tokio::sync::broadcast;
 
 /// Terminal event types that trigger archiving
@@ -27,13 +30,15 @@ const QUEUE_SCAN_INTERVAL_SECS: u64 = 60;
 pub struct ArchiveWorker {
     storage: OrderStorage,
     archive_service: OrderArchiveService,
+    db: Surreal<Db>,
 }
 
 impl ArchiveWorker {
-    pub fn new(storage: OrderStorage, archive_service: OrderArchiveService) -> Self {
+    pub fn new(storage: OrderStorage, archive_service: OrderArchiveService, db: Surreal<Db>) -> Self {
         Self {
             storage,
             archive_service,
+            db,
         }
     }
 
@@ -147,10 +152,14 @@ impl ArchiveWorker {
         };
 
         // 3. Archive to SurrealDB
-        match self.archive_service.archive_order(&snapshot, events).await {
+        match self.archive_service.archive_order(&snapshot, events.clone()).await {
             Ok(()) => {
                 tracing::info!(order_id = %order_id, "Order archived successfully");
-                // 4. Cleanup redb (removes pending, snapshot, events atomically)
+
+                // 4. Update shift expected_cash for cash payments
+                self.update_shift_cash(&snapshot, &events).await;
+
+                // 5. Cleanup redb (removes pending, snapshot, events atomically)
                 if let Err(e) = self.storage.complete_archive(order_id) {
                     tracing::error!(order_id = %order_id, error = %e, "Failed to complete archive cleanup");
                 }
@@ -161,6 +170,57 @@ impl ArchiveWorker {
                     tracing::error!(order_id = %order_id, error = %e2, "Failed to mark archive failed");
                 }
             }
+        }
+    }
+
+    /// Update shift expected_cash for cash payments in the order
+    async fn update_shift_cash(&self, snapshot: &OrderSnapshot, events: &[OrderEvent]) {
+        // Calculate total cash payments (non-cancelled)
+        let cash_total: f64 = snapshot
+            .payments
+            .iter()
+            .filter(|p| !p.cancelled && p.method.to_lowercase() == "cash")
+            .map(|p| p.amount)
+            .sum();
+
+        if cash_total <= 0.0 {
+            return;
+        }
+
+        // Get operator_id from the terminal event (OrderCompleted or OrderVoided)
+        let operator_id = events
+            .iter()
+            .rev()
+            .find(|e| {
+                matches!(
+                    e.event_type,
+                    OrderEventType::OrderCompleted | OrderEventType::OrderVoided
+                )
+            })
+            .map(|e| e.operator_id.clone());
+
+        let Some(operator_id) = operator_id else {
+            tracing::warn!(order_id = %snapshot.order_id, "No operator found for cash tracking");
+            return;
+        };
+
+        let shift_repo = ShiftRepository::new(self.db.clone());
+        if let Err(e) = shift_repo.add_cash_payment(&operator_id, cash_total).await {
+            // Log but don't fail the archive - shift tracking is secondary
+            tracing::warn!(
+                order_id = %snapshot.order_id,
+                operator_id = %operator_id,
+                cash_total = cash_total,
+                error = %e,
+                "Failed to update shift expected_cash"
+            );
+        } else {
+            tracing::debug!(
+                order_id = %snapshot.order_id,
+                operator_id = %operator_id,
+                cash_total = cash_total,
+                "Updated shift expected_cash"
+            );
         }
     }
 }

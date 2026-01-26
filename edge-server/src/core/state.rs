@@ -216,6 +216,7 @@ impl ServerState {
             let worker = ArchiveWorker::new(
                 orders_manager.storage().clone(),
                 archive_service.clone(),
+                db.clone(),
             );
             let event_rx = orders_manager.subscribe();
             tokio::spawn(async move {
