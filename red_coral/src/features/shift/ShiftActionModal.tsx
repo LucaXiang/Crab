@@ -5,15 +5,19 @@
  * - open: 开班 (输入开班现金)
  * - close: 收班 (输入实际现金，计算差异)
  * - force_close: 强制关闭 (不盘点现金)
+ *
+ * UI 风格与 CashPaymentModal 保持一致
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Play, CheckCircle, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { X, Play, CheckCircle, AlertTriangle, Banknote } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
-import { Currency } from '@/utils/currency';
+import { useShiftStore } from '@/core/stores/shift';
+import { Currency, formatCurrency } from '@/utils/currency';
+import { Numpad } from '@/presentation/components/ui/Numpad';
 import type { Shift } from '@/core/domain/types/api';
 
 const api = createTauriClient();
@@ -35,68 +39,85 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
 }) => {
   const { t } = useI18n();
   const user = useAuthStore(state => state.user);
+  const { openShift: storeOpenShift, closeShift: storeCloseShift, forceCloseShift: storeForceCloseShift } = useShiftStore();
 
   // Form state
-  const [startingCash, setStartingCash] = useState('0');
-  const [actualCash, setActualCash] = useState('');
+  const [cashInput, setCashInput] = useState('0');
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
+  const isTypingRef = useRef(false);
 
   // Reset form when modal opens
   useEffect(() => {
     if (open) {
-      setStartingCash('0');
-      setActualCash(shift?.expected_cash ? Currency.floor2(shift.expected_cash).toString() : '');
+      if (action === 'close' && shift?.expected_cash) {
+        setCashInput(Currency.floor2(shift.expected_cash).toString());
+      } else {
+        setCashInput('0');
+      }
       setNote('');
+      isTypingRef.current = false;
     }
-  }, [open, shift]);
+  }, [open, action, shift]);
 
-  // Calculate variance preview using Currency utility
+  const cashValue = parseFloat(cashInput) || 0;
+
+  // Calculate variance preview for close action
   const variancePreview = useMemo(() => {
-    if (action !== 'close' || !shift || !actualCash) return null;
-    try {
-      const actual = Currency.toDecimal(actualCash);
-      const expected = Currency.toDecimal(shift.expected_cash);
-      return Currency.sub(actual, expected);
-    } catch {
-      return null;
-    }
-  }, [action, shift, actualCash]);
+    if (action !== 'close' || !shift) return null;
+    return Currency.sub(cashValue, shift.expected_cash);
+  }, [action, shift, cashValue]);
+
+  // Numpad handlers
+  const handleNumPress = useCallback((num: string) => {
+    setCashInput((prev) => {
+      if (!isTypingRef.current) {
+        isTypingRef.current = true;
+        return num === '.' ? '0.' : num;
+      }
+      if (num === '.' && prev.includes('.')) return prev;
+      if (prev.includes('.') && prev.split('.')[1].length >= 2) return prev;
+      if (prev === '0' && num !== '.') return num;
+      return prev + num;
+    });
+  }, []);
+
+  const handleClear = useCallback(() => {
+    setCashInput('');
+    isTypingRef.current = true;
+  }, []);
+
+  // Quick amount buttons
+  const quickAmounts = [0, 100, 200, 500];
 
   // Handle submit
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
+  const handleSubmit = async () => {
+    if (!user || loading) return;
 
     setLoading(true);
     try {
       if (action === 'open') {
-        const cashValue = Currency.floor2(startingCash || '0').toNumber();
-        if (cashValue < 0) {
+        const cashAmount = Currency.floor2(cashInput || '0').toNumber();
+        if (cashAmount < 0) {
           toast.error(t('settings.shift.invalid_amount'));
           setLoading(false);
           return;
         }
-        await api.openShift({
+        await storeOpenShift({
           operator_id: user.id,
           operator_name: user.display_name,
-          starting_cash: cashValue,
+          starting_cash: cashAmount,
           note: note || undefined,
         });
         toast.success(t('settings.shift.open_success'));
       } else if (action === 'close' && shift?.id) {
-        if (!actualCash) {
-          toast.error(t('settings.shift.invalid_amount'));
-          setLoading(false);
-          return;
-        }
-        const actual = Currency.floor2(actualCash).toNumber();
+        const actual = Currency.floor2(cashInput).toNumber();
         if (actual < 0) {
           toast.error(t('settings.shift.invalid_amount'));
           setLoading(false);
           return;
         }
-        await api.closeShift(shift.id, {
+        await storeCloseShift(shift.id, {
           actual_cash: actual,
           note: note || undefined,
         });
@@ -111,7 +132,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
           );
         }
       } else if (action === 'force_close' && shift?.id) {
-        await api.forceCloseShift(shift.id, {
+        await storeForceCloseShift(shift.id, {
           note: note || t('settings.shift.force_close_default_note'),
         });
         toast.success(t('settings.shift.force_close_success'));
@@ -127,161 +148,188 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-        {/* Header */}
-        <div
-          className={`px-6 py-4 flex items-center justify-between ${
-            action === 'force_close'
-              ? 'bg-orange-500'
-              : action === 'close'
-              ? 'bg-emerald-500'
-              : 'bg-blue-500'
-          }`}
-        >
-          <div className="flex items-center gap-3 text-white">
-            {action === 'open' && <Play size={24} />}
-            {action === 'close' && <CheckCircle size={24} />}
-            {action === 'force_close' && <AlertTriangle size={24} />}
-            <h2 className="text-lg font-bold">
-              {action === 'open' && t('settings.shift.modal.open_title')}
-              {action === 'close' && t('settings.shift.modal.close_title')}
-              {action === 'force_close' && t('settings.shift.modal.force_close_title')}
-            </h2>
+  // Force close - simple confirmation dialog
+  if (action === 'force_close') {
+    return (
+      <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          {/* Header */}
+          <div className="p-6 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                  <AlertTriangle className="text-orange-500" size={20} />
+                </div>
+                {t('settings.shift.modal.force_close_title')}
+              </h3>
+              <button
+                onClick={onClose}
+                disabled={loading}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-white/20 rounded-lg transition-colors text-white"
-          >
-            <X size={20} />
-          </button>
+
+          {/* Content */}
+          <div className="p-6 space-y-4">
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+              <p className="text-sm text-orange-800">
+                {t('settings.shift.modal.force_close_warning')}
+              </p>
+            </div>
+
+            {/* Note */}
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">
+                {t('settings.shift.modal.note')}
+              </label>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t('settings.shift.modal.note_placeholder')}
+                rows={2}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 focus:border-orange-400 resize-none"
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="p-6 pt-0 flex gap-3">
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="flex-1 py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <AlertTriangle size={18} />
+                  {t('settings.shift.force_close_shift')}
+                </>
+              )}
+            </button>
+          </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Content */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Open shift form */}
-          {action === 'open' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('settings.shift.modal.operator')}
-                </label>
-                <input
-                  type="text"
-                  value={user?.display_name || ''}
-                  disabled
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('settings.shift.modal.starting_cash')}
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">¥</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={startingCash}
-                    onChange={(e) => setStartingCash(e.target.value)}
-                    className="w-full pl-8 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    autoFocus
-                  />
-                </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  {t('settings.shift.modal.starting_cash_hint')}
-                </p>
-              </div>
-            </>
-          )}
+  // Open / Close - full numpad layout
+  const isOpenAction = action === 'open';
+  const accentColor = isOpenAction ? 'green' : 'emerald';
 
-          {/* Close shift form */}
+  return (
+    <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-gray-100 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col md:flex-row overflow-hidden">
+        {/* Left Panel - Info */}
+        <div className="md:w-1/2 p-6 md:p-8 flex flex-col border-b md:border-b-0 md:border-r border-gray-200 bg-white">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full bg-${accentColor}-100 flex items-center justify-center`}>
+                {isOpenAction ? (
+                  <Play className={`text-${accentColor}-600`} size={20} />
+                ) : (
+                  <CheckCircle className={`text-${accentColor}-600`} size={20} />
+                )}
+              </div>
+              {isOpenAction ? t('settings.shift.modal.open_title') : t('settings.shift.modal.close_title')}
+            </h3>
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X size={20} className="text-gray-500" />
+            </button>
+          </div>
+
+          {/* Operator Info */}
+          <div className="p-4 bg-gray-50 rounded-xl mb-4">
+            <div className="text-xs text-gray-500 uppercase font-bold mb-1">
+              {t('settings.shift.modal.operator')}
+            </div>
+            <div className="text-lg font-medium text-gray-800">
+              {user?.display_name || '-'}
+            </div>
+          </div>
+
+          {/* Close action: Show expected cash */}
           {action === 'close' && shift && (
-            <>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">{t('settings.shift.modal.expected_cash')}</span>
-                  <span className="font-mono font-medium">¥{Currency.floor2(shift.expected_cash).toString()}</span>
+            <div className="space-y-3 mb-4">
+              <div className="p-4 bg-gray-50 rounded-xl">
+                <div className="text-xs text-gray-500 uppercase font-bold">
+                  {t('settings.shift.modal.expected_cash')}
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">{t('settings.shift.modal.starting_cash')}</span>
-                  <span className="font-mono">¥{Currency.floor2(shift.starting_cash).toString()}</span>
+                <div className="text-2xl md:text-3xl font-bold text-gray-900 mt-1 font-mono">
+                  {formatCurrency(shift.expected_cash)}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('settings.shift.modal.actual_cash')}
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">¥</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={actualCash}
-                    onChange={(e) => setActualCash(e.target.value)}
-                    className="w-full pl-8 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              {/* Variance preview */}
+              {/* Variance Preview */}
               {variancePreview !== null && (
                 <div
-                  className={`p-3 rounded-lg ${
+                  className={`p-4 rounded-xl border transition-colors ${
                     variancePreview.isZero()
-                      ? 'bg-green-50 text-green-700'
+                      ? 'bg-green-50 border-green-200'
                       : variancePreview.isPositive()
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'bg-red-50 text-red-700'
+                      ? 'bg-blue-50 border-blue-200'
+                      : 'bg-red-50 border-red-200'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                      {t('settings.shift.modal.variance')}
-                    </span>
-                    <span className="font-mono font-bold">
-                      {variancePreview.isZero()
-                        ? t('settings.shift.variance.balanced')
-                        : `${variancePreview.isPositive() ? '+' : ''}¥${Currency.floor2(variancePreview).toString()}`}
-                    </span>
+                  <div className="text-xs text-gray-500 uppercase font-bold">
+                    {t('settings.shift.modal.variance')}
+                  </div>
+                  <div
+                    className={`text-2xl md:text-3xl font-bold mt-1 font-mono ${
+                      variancePreview.isZero()
+                        ? 'text-green-600'
+                        : variancePreview.isPositive()
+                        ? 'text-blue-600'
+                        : 'text-red-600'
+                    }`}
+                  >
+                    {variancePreview.isZero()
+                      ? t('settings.shift.variance.balanced')
+                      : `${variancePreview.isPositive() ? '+' : ''}${formatCurrency(variancePreview.toNumber())}`}
                   </div>
                 </div>
               )}
-            </>
+            </div>
           )}
 
-          {/* Force close warning */}
-          {action === 'force_close' && (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <div className="flex gap-3">
-                <AlertTriangle className="text-orange-500 shrink-0" size={20} />
-                <div>
-                  <p className="text-sm font-medium text-orange-800">
-                    {t('settings.shift.modal.force_close_warning_title')}
-                  </p>
-                  <p className="text-sm text-orange-700 mt-1">
-                    {t('settings.shift.modal.force_close_warning')}
-                  </p>
-                </div>
-              </div>
+          {/* Quick amounts for open action */}
+          {isOpenAction && (
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {quickAmounts.map((amt) => (
+                <button
+                  key={amt}
+                  onClick={() => {
+                    setCashInput(amt.toString());
+                    isTypingRef.current = true;
+                  }}
+                  disabled={loading}
+                  className="h-12 bg-white border border-green-200 text-green-700 font-bold rounded-xl hover:bg-green-50 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {formatCurrency(amt)}
+                </button>
+              ))}
             </div>
           )}
 
           {/* Note field */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="mt-auto">
+            <label className="block text-xs text-gray-500 uppercase font-bold mb-2">
               {t('settings.shift.modal.note')}
             </label>
             <textarea
@@ -289,35 +337,67 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
               onChange={(e) => setNote(e.target.value)}
               placeholder={t('settings.shift.modal.note_placeholder')}
               rows={2}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-gray-400 resize-none"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-200 focus:border-green-400 resize-none text-sm"
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-2">
+          {/* Cancel button */}
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="mt-4 w-full py-3 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition-colors"
+          >
+            {t('common.cancel')}
+          </button>
+        </div>
+
+        {/* Right Panel - Numpad */}
+        <div className="md:w-1/2 p-6 md:p-8 bg-gray-50 flex flex-col min-h-0">
+          {/* Cash Input Display */}
+          <div className="flex-shrink-0 mb-6">
+            <label className="text-xs text-gray-500 font-bold uppercase ml-1">
+              {isOpenAction ? t('settings.shift.modal.starting_cash') : t('settings.shift.modal.actual_cash')}
+            </label>
+            <div className="h-16 md:h-20 bg-white rounded-xl flex items-center px-6 mt-2 border-2 border-green-200 shadow-sm">
+              <Banknote className="text-green-500 mr-3" size={24} />
+              <span className="text-2xl md:text-4xl font-mono font-bold text-gray-800 truncate">
+                {formatCurrency(cashValue)}
+              </span>
+              <span className="animate-pulse ml-1 w-0.5 h-6 md:h-8 bg-green-400" />
+            </div>
+            {isOpenAction && (
+              <p className="mt-2 text-xs text-gray-500 ml-1">
+                {t('settings.shift.modal.starting_cash_hint')}
+              </p>
+            )}
+          </div>
+
+          {/* Numpad */}
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="flex-1 min-h-0">
+              <Numpad onNumber={handleNumPress} onClear={handleClear} className="h-full" showEnter={false} />
+            </div>
+
+            {/* Confirm Button */}
             <button
-              type="button"
-              onClick={onClose}
+              onClick={handleSubmit}
               disabled={loading}
-              className="flex-1 px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="mt-4 h-14 md:h-20 bg-green-600 text-white rounded-xl text-lg md:text-2xl font-bold shadow-lg shadow-green-200 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shrink-0"
             >
-              {t('common.cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 ${
-                action === 'force_close'
-                  ? 'bg-orange-500 hover:bg-orange-600'
-                  : action === 'close'
-                  ? 'bg-emerald-500 hover:bg-emerald-600'
-                  : 'bg-blue-500 hover:bg-blue-600'
-              }`}
-            >
-              {loading ? t('common.loading') : t('common.confirm')}
+              {loading ? (
+                <>
+                  <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                  {t('common.loading')}
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={24} />
+                  {isOpenAction ? t('settings.shift.open_shift') : t('settings.shift.close_shift')}
+                </>
+              )}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

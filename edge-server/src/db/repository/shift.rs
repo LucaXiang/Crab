@@ -45,19 +45,18 @@ impl ShiftRepository {
         // Validate starting cash is non-negative
         validate_cash_amount(data.starting_cash, "Starting cash")?;
 
-        // Use atomic INSERT to prevent race condition
-        // SurrealDB will fail if the same operator tries to create concurrent shifts
         // Atomic check-and-create to prevent race condition
         // Only creates if no open shift exists for this operator
+        // Returns created shift if successful, empty if duplicate exists
         let mut result = self
             .base
             .db()
             .query(
                 r#"
                 LET $existing = (SELECT id FROM shift WHERE operator_id = $operator_id AND status = 'OPEN' LIMIT 1);
-                IF count($existing) > 0 THEN
-                    THROW "Operator already has an open shift"
-                ELSE {
+                IF count($existing) > 0 {
+                    RETURN NONE;
+                } ELSE {
                     CREATE shift SET
                         operator_id = $operator_id,
                         operator_name = $operator_name,
@@ -70,9 +69,8 @@ impl ShiftRepository {
                         note = $note,
                         created_at = time::now(),
                         updated_at = time::now()
-                    RETURN AFTER
-                }
-                END
+                    RETURN AFTER;
+                };
             "#,
             )
             .bind(("operator_id", operator_id))
@@ -82,10 +80,9 @@ impl ShiftRepository {
             .await?;
 
         let shifts: Vec<Shift> = result.take(0)?;
-        shifts
-            .into_iter()
-            .next()
-            .ok_or_else(|| RepoError::Database("Failed to create shift".to_string()))
+        shifts.into_iter().next().ok_or_else(|| {
+            RepoError::Duplicate("Operator already has an open shift".to_string())
+        })
     }
 
     /// Find shift by id
