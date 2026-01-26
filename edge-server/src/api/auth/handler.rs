@@ -106,8 +106,11 @@ pub async fn login(
         .generate_token(
             &user_id,
             &employee.username,
+            &employee.display_name,
+            &employee.role.to_string(),
             &role.role_name,
             &role.permissions,
+            employee.is_system,
         )
         .map_err(|e| AppError::internal(format!("Failed to generate token: {}", e)))?;
 
@@ -125,9 +128,12 @@ pub async fn login(
         token,
         user: UserInfo {
             id: user_id,
-            username: employee.username,
-            role: role.role_name,
+            username: employee.username.clone(),
+            display_name: employee.display_name.clone(),
+            role_id: employee.role.to_string(),
+            role_name: role.role_name,
             permissions: role.permissions,
+            is_system: employee.is_system,
         },
     };
 
@@ -141,8 +147,11 @@ pub async fn me(
     let user_info = UserInfo {
         id: user.id,
         username: user.username,
-        role: user.role,
+        display_name: user.display_name,
+        role_id: user.role_id,
+        role_name: user.role_name,
         permissions: user.permissions,
+        is_system: user.is_system,
     };
 
     Ok(crate::ok!(user_info))

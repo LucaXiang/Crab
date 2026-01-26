@@ -161,7 +161,7 @@ pub async fn require_admin(req: Request, next: Next) -> Result<Response, AppErro
             "admin_required",
             user_id = user.id.clone(),
             username = user.username.clone(),
-            user_role = user.role.clone()
+            user_role = user.role_name.clone()
         );
         return Err(AppError::forbidden("Admin access required".to_string()));
     }

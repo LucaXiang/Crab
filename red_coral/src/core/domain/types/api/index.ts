@@ -87,22 +87,25 @@ export interface LoginRequest {
   password: string;
 }
 
+/**
+ * Login response - aligned with shared::client::LoginResponse
+ */
 export interface LoginResponseData {
-  access_token: string;
-  expires_in: number;
-  token_type: string;
+  token: string;
   user: CurrentUser;
 }
 
+/**
+ * Current user info - aligned with shared::client::UserInfo
+ */
 export interface CurrentUser {
   id: string;
   username: string;
-  display_name: string | null;
+  display_name: string;
   role_id: string;
   role_name: string;
   permissions: string[];
-  avatar: string | null;
-  is_system?: boolean;
+  is_system: boolean;
 }
 
 export interface RegisterRequest {

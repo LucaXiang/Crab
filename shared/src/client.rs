@@ -26,21 +26,19 @@ pub struct LoginResponse {
     pub user: UserInfo,
 }
 
-/// User information
+/// User information returned after login
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserInfo {
     pub id: String,
     pub username: String,
-    pub role: String,
+    pub display_name: String,
+    pub role_id: String,
+    pub role_name: String,
     #[serde(default)]
     pub permissions: Vec<String>,
+    #[serde(default)]
+    pub is_system: bool,
 }
 
-/// Current user response
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CurrentUserResponse {
-    pub id: String,
-    pub username: String,
-    pub role: String,
-    pub permissions: Vec<String>,
-}
+/// Current user response (same as UserInfo)
+pub type CurrentUserResponse = UserInfo;

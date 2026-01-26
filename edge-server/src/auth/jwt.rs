@@ -68,10 +68,16 @@ pub struct Claims {
     pub sub: String,
     /// 用户名
     pub username: String,
+    /// 显示名称
+    pub display_name: String,
+    /// 角色 ID (RecordId 字符串)
+    pub role_id: String,
     /// 角色名称
-    pub role: String,
+    pub role_name: String,
     /// 权限列表 (逗号分隔)
     pub permissions: String,
+    /// 是否系统用户
+    pub is_system: bool,
     /// 令牌类型
     pub token_type: String,
     /// 过期时间戳
@@ -208,8 +214,11 @@ impl JwtService {
         &self,
         user_id: &str,
         username: &str,
-        role: &str,
+        display_name: &str,
+        role_id: &str,
+        role_name: &str,
         permissions: &[String],
+        is_system: bool,
     ) -> Result<String, JwtError> {
         let now = Utc::now();
         let expiration = now + Duration::minutes(self.config.expiration_minutes);
@@ -219,8 +228,11 @@ impl JwtService {
         let claims = Claims {
             sub: user_id.to_string(),
             username: username.to_string(),
-            role: role.to_string(),
+            display_name: display_name.to_string(),
+            role_id: role_id.to_string(),
+            role_name: role_name.to_string(),
             permissions: permissions_str,
+            is_system,
             token_type: "access".to_string(),
             exp: expiration.timestamp(),
             iat: now.timestamp(),
@@ -298,10 +310,16 @@ pub struct CurrentUser {
     pub id: String,
     /// 用户名
     pub username: String,
+    /// 显示名称
+    pub display_name: String,
+    /// 角色 ID
+    pub role_id: String,
     /// 角色名称
-    pub role: String,
+    pub role_name: String,
     /// 权限列表
     pub permissions: Vec<String>,
+    /// 是否系统用户
+    pub is_system: bool,
 }
 
 impl From<Claims> for CurrentUser {
@@ -319,8 +337,11 @@ impl From<Claims> for CurrentUser {
         Self {
             id: claims.sub,
             username: claims.username,
-            role: claims.role,
+            display_name: claims.display_name,
+            role_id: claims.role_id,
+            role_name: claims.role_name,
             permissions,
+            is_system: claims.is_system,
         }
     }
 }
@@ -328,9 +349,9 @@ impl From<Claims> for CurrentUser {
 impl CurrentUser {
     /// 是否管理员
     ///
-    /// 管理员角色 (`role == "admin"`) 拥有所有权限
+    /// 管理员角色 (`role_name == "admin"`) 拥有所有权限
     pub fn is_admin(&self) -> bool {
-        self.role == "admin"
+        self.role_name == "admin"
     }
 
     /// 检查是否拥有指定权限
@@ -396,7 +417,15 @@ mod tests {
         let permissions = vec!["products:read".to_string(), "products:write".to_string()];
 
         let token = service
-            .generate_token("user123", "john_doe", "user", &permissions)
+            .generate_token(
+                "user123",
+                "john_doe",
+                "John Doe",
+                "role:user",
+                "user",
+                &permissions,
+                false,
+            )
             .expect("Failed to generate test token");
 
         let claims = service
@@ -405,8 +434,11 @@ mod tests {
 
         assert_eq!(claims.sub, "user123");
         assert_eq!(claims.username, "john_doe");
-        assert_eq!(claims.role, "user");
+        assert_eq!(claims.display_name, "John Doe");
+        assert_eq!(claims.role_id, "role:user");
+        assert_eq!(claims.role_name, "user");
         assert_eq!(claims.permissions, "products:read,products:write");
+        assert!(!claims.is_system);
     }
 
     #[test]
@@ -414,8 +446,11 @@ mod tests {
         let user = CurrentUser {
             id: "1".to_string(),
             username: "john".to_string(),
-            role: "user".to_string(),
+            display_name: "John Doe".to_string(),
+            role_id: "role:user".to_string(),
+            role_name: "user".to_string(),
             permissions: vec!["products:read".to_string(), "products:*".to_string()],
+            is_system: false,
         };
 
         assert!(user.has_permission("products:read"));
@@ -428,8 +463,11 @@ mod tests {
         let admin = CurrentUser {
             id: "1".to_string(),
             username: "admin".to_string(),
-            role: "admin".to_string(),
+            display_name: "Admin".to_string(),
+            role_id: "role:admin".to_string(),
+            role_name: "admin".to_string(),
             permissions: vec![],
+            is_system: true,
         };
 
         assert!(admin.has_permission("products:read"));
@@ -459,7 +497,15 @@ mod tests {
         let permissions = vec!["products:read".to_string(), "products:write".to_string()];
 
         let token = service
-            .generate_token("user123", "john_doe", "user", &permissions)
+            .generate_token(
+                "user123",
+                "john_doe",
+                "John Doe",
+                "role:user",
+                "user",
+                &permissions,
+                false,
+            )
             .expect("Failed to generate test token");
 
         let claims = service
@@ -468,7 +514,10 @@ mod tests {
 
         assert_eq!(claims.sub, "user123");
         assert_eq!(claims.username, "john_doe");
-        assert_eq!(claims.role, "user");
+        assert_eq!(claims.display_name, "John Doe");
+        assert_eq!(claims.role_id, "role:user");
+        assert_eq!(claims.role_name, "user");
         assert_eq!(claims.permissions, "products:read,products:write");
+        assert!(!claims.is_system);
     }
 }

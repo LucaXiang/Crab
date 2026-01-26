@@ -159,9 +159,11 @@ export interface TenantInfo {
 export interface UserInfo {
   id: string;
   username: string;
-  role: string;
+  display_name: string;
+  role_id: string;
+  role_name: string;
   permissions: string[];
-  is_system?: boolean;
+  is_system: boolean;
 }
 
 export interface EmployeeSession {

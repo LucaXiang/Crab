@@ -94,17 +94,16 @@ export const LoginScreen: React.FC = () => {
         const userInfo = response.session.user_info;
 
         // Update auth store for ProtectedRoute compatibility
+        // UserInfo from backend now has all required fields
         setAuthUser({
           id: userInfo.id,
           username: userInfo.username,
-          display_name: userInfo.username, // Fallback to username
-          role_id: userInfo.role,
-          role_name: userInfo.role.replace(/^role:/, ''), // Extract role name from "role:admin" format
-          avatar: null,
+          display_name: userInfo.display_name,
+          role_id: userInfo.role_id,
+          role_name: userInfo.role_name,
+          permissions: userInfo.permissions,
+          is_system: userInfo.is_system,
           is_active: true,
-          is_system: userInfo.is_system ?? false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         });
 
         // Navigation handled by useEffect

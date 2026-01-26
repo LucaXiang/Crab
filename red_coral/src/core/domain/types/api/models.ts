@@ -539,17 +539,22 @@ export interface RolePermissionListData {
  * Maps to CurrentUser from login response with additional fields.
  * Note: password_hash is NOT included - it should never be sent to frontend.
  */
+/**
+ * User for auth store - aligned with shared::client::UserInfo
+ * Note: created_at/updated_at are frontend-only fields for compatibility
+ */
 export interface User {
   id: string;
   username: string;
-  display_name: string | null;
+  display_name: string;
   role_id: string;
-  role_name?: string;
-  avatar: string | null;
-  is_active: boolean;
+  role_name: string;
+  permissions: string[];
   is_system: boolean;
-  created_at: string;
-  updated_at: string;
+  is_active: boolean;
+  // Frontend-only fields (not from backend)
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ============ Product/Category Attribute Bindings ============

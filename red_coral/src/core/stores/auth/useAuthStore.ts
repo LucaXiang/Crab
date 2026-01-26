@@ -47,33 +47,31 @@ export const useAuthStore = create<AuthStore>()(
 
       /**
        * Login with username and password
+       * 
+       * Backend returns complete user info including permissions,
+       * no need for additional API calls.
        */
       login: async (username: string, password: string) => {
         set({ isLoading: true, error: null });
 
         try {
-          const { access_token, user: userData } = await api.login({ username, password });
+          const { token, user: userData } = await api.login({ username, password });
 
-          // 将 API 用户数据转换为本地 User 类型
+          // UserInfo from backend already has all fields we need
           const user: User = {
             id: userData.id,
             username: userData.username,
             display_name: userData.display_name,
             role_id: userData.role_id,
-            avatar: userData.avatar,
+            role_name: userData.role_name,
+            permissions: userData.permissions,
+            is_system: userData.is_system,
             is_active: true,
-            is_system: userData.is_system ?? false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           };
-
-          // 获取权限 - API 返回 RolePermission[]，提取 permission 字段
-          const rolePermissions = await api.getRolePermissions(userData.role_id);
-          const permissions = rolePermissions.permissions.map(p => p.permission);
 
           set({
             user,
-            permissions,
+            permissions: userData.permissions,
             isAuthenticated: true,
             isLoading: false,
             error: null,
@@ -110,15 +108,16 @@ export const useAuthStore = create<AuthStore>()(
 
       /**
        * Fetch permissions for a role
+       * 
+       * Note: Permissions are now included in login response,
+       * so this is mainly for refreshing permissions after role changes.
        */
-      fetchUserPermissions: async (roleId: string) => {
-        try {
-          const rolePermissions = await api.getRolePermissions(roleId);
-          const permissions = rolePermissions.permissions.map(p => p.permission);
-          set({ permissions });
-        } catch (error) {
-          console.error('Failed to fetch permissions:', error);
-          set({ permissions: [] });
+      fetchUserPermissions: async (_roleId: string) => {
+        // Permissions are now embedded in user object from login
+        // To refresh, we should re-fetch current user from /api/auth/me
+        const { user } = get();
+        if (user?.permissions) {
+          set({ permissions: user.permissions });
         }
       },
 
@@ -137,12 +136,33 @@ export const useAuthStore = create<AuthStore>()(
 
       /**
        * Check if current user has a specific permission
+       * 
+       * Supports:
+       * - Admin role has all permissions
+       * - "all" permission grants everything
+       * - Wildcard matching: "products:*" matches "products:read"
        */
       hasPermission: (permission: string) => {
         const { permissions, user } = get();
+        if (!user) return false;
+
         // Admin always has all permissions
-        if (user?.role_name === 'admin' || user?.role_id === 'role:admin' || permissions.includes('*')) return true;
-        return permissions.includes(permission);
+        if (user.role_name === 'admin') return true;
+        
+        // "all" permission grants everything
+        if (permissions.includes('all')) return true;
+
+        // Exact match
+        if (permissions.includes(permission)) return true;
+
+        // Wildcard matching: "products:*" matches "products:read"
+        return permissions.some(p => {
+          if (p.endsWith(':*')) {
+            const prefix = p.slice(0, -1); // "products:*" -> "products:"
+            return permission.startsWith(prefix);
+          }
+          return false;
+        });
       },
 
       /**
@@ -150,7 +170,7 @@ export const useAuthStore = create<AuthStore>()(
        */
       hasRole: (role: string | string[]) => {
         const { user } = get();
-        if (!user || !user.role_name) return false;
+        if (!user) return false;
 
         if (Array.isArray(role)) {
           return role.includes(user.role_name);
@@ -162,18 +182,17 @@ export const useAuthStore = create<AuthStore>()(
 
       fetchUsers: async () => {
         const employees = await api.listEmployees();
-        // 转换 Employee -> User
+        // Convert Employee -> User for display
+        // Note: role_name is extracted from role_id (e.g., "role:admin" -> "admin")
         return employees.map((e) => ({
           id: e.id ?? '',
           username: e.username,
           display_name: e.display_name,
           role_id: e.role,
-          role_name: undefined,
-          avatar: null,
+          role_name: e.role.replace(/^role:/, ''), // Extract name from RecordId
+          permissions: [], // Permissions not loaded for list view
           is_active: e.is_active,
           is_system: e.is_system,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         })) as User[];
       },
 
@@ -188,11 +207,10 @@ export const useAuthStore = create<AuthStore>()(
           username: result.username,
           display_name: data.displayName || result.display_name,
           role_id: result.role,
-          avatar: null,
+          role_name: result.role.replace(/^role:/, ''),
+          permissions: [],
           is_active: result.is_active,
           is_system: result.is_system,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         } as User;
       },
 
@@ -206,11 +224,10 @@ export const useAuthStore = create<AuthStore>()(
           username: result.username,
           display_name: data.displayName || result.display_name,
           role_id: result.role,
-          avatar: null,
+          role_name: result.role.replace(/^role:/, ''),
+          permissions: [],
           is_active: result.is_active,
           is_system: result.is_system,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         } as User;
       },
 

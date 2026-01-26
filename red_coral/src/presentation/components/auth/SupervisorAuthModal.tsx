@@ -11,9 +11,11 @@ interface AuthData {
     user_info: {
       id: string;
       username: string;
-      role: string;
+      display_name: string;
+      role_id: string;
+      role_name: string;
       permissions: string[];
-      is_system?: boolean;
+      is_system: boolean;
     };
   } | null;
 }
@@ -63,26 +65,24 @@ export const SupervisorAuthModal: React.FC<SupervisorAuthModalProps> = ({
 
       // 检查权限: admin 有所有权限，或者检查特定权限
       const hasPermission =
-        userInfo.role === 'admin' ||
-        userInfo.permissions.includes('*') ||
+        userInfo.role_name === 'admin' ||
+        userInfo.permissions.includes('all') ||
         userInfo.permissions.includes(requiredPermission);
 
       if (!hasPermission) {
         throw new Error(t('auth.unauthorized.permission'));
       }
 
-      // 构造 User 对象返回
+      // 构造 User 对象返回 (UserInfo from backend has all required fields)
       const supervisor: User = {
         id: userInfo.id,
         username: userInfo.username,
-        display_name: null,
-        role_id: `role:${userInfo.role}`,
-        role_name: userInfo.role,
-        avatar: null,
+        display_name: userInfo.display_name,
+        role_id: userInfo.role_id,
+        role_name: userInfo.role_name,
+        permissions: userInfo.permissions,
         is_active: true,
-        is_system: userInfo.is_system ?? false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        is_system: userInfo.is_system,
       };
 
       onSuccess(supervisor);
