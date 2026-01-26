@@ -87,6 +87,11 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
     isTypingRef.current = true;
   }, []);
 
+  const handleDelete = useCallback(() => {
+    setCashInput((prev) => prev.slice(0, -1) || '0');
+    isTypingRef.current = true;
+  }, []);
+
   // Quick amount buttons
   const quickAmounts = [0, 100, 200, 500];
 
@@ -375,7 +380,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
           {/* Numpad */}
           <div className="flex-1 min-h-0 flex flex-col">
             <div className="flex-1 min-h-0">
-              <Numpad onNumber={handleNumPress} onClear={handleClear} className="h-full" showEnter={false} />
+              <Numpad onNumber={handleNumPress} onDelete={handleDelete} onClear={handleClear} className="h-full" showEnter={false} />
             </div>
 
             {/* Confirm Button */}
