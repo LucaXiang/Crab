@@ -1,7 +1,11 @@
+import { useMemo } from 'react';
 import { LabelField, TextAlign, VerticalAlign } from '@/core/domain/types/print';
-import { Type, Image as ImageIcon, X, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical } from 'lucide-react';
+import { Type, Image as ImageIcon, X, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Upload, Trash2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { NumberInput } from '@/presentation/components/ui/NumberInput';
+import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
+import { useImageUrl } from '@/core/hooks/useImageUrl';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 interface FieldPropertiesPanelProps {
   field: LabelField | null;
@@ -15,6 +19,19 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
   onClose,
 }) => {
   const { t } = useI18n();
+
+  // Get image URL for preview
+  // Priority: pending local path > uploaded hash
+  const imageHash = field?.sourceType === 'image' && !field?._pendingImagePath ? field?.template : null;
+  const [hashUrl] = useImageUrl(imageHash);
+
+  // Convert local path to asset URL for preview
+  const previewUrl = useMemo(() => {
+    if (field?._pendingImagePath) {
+      return convertFileSrc(field._pendingImagePath);
+    }
+    return hashUrl;
+  }, [field?._pendingImagePath, hashUrl]);
 
   if (!field) {
     return (
@@ -30,6 +47,26 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
 
   const handleUpdate = (updates: Partial<LabelField>) => {
     onFieldUpdate({ ...field, ...updates } as LabelField);
+  };
+
+  const handleSelectImage = async () => {
+    if (!field) return;
+    try {
+      const file = await dialogOpen({
+        multiple: false,
+        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+      });
+      if (!file || Array.isArray(file)) return;
+
+      // Save local path for preview, actual upload happens on template save
+      handleUpdate({ _pendingImagePath: file, template: '' });
+    } catch (e) {
+      console.error('Failed to select image:', e);
+    }
+  };
+
+  const handleClearImage = () => {
+    handleUpdate({ template: '', _pendingImagePath: undefined });
   };
 
   const renderAlignIcon = (align: TextAlign) => {
@@ -134,6 +171,23 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
         {/* Text-specific properties */}
         {isTextField && (
           <>
+            {/* Content Template */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t("settings.label.content_template")}
+              </label>
+              <textarea
+                value={field.template || ''}
+                onChange={(e) => handleUpdate({ template: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                placeholder="{product_name}"
+                rows={2}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                {t("settings.label.text_template_hint")}
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.font_size")}</label>
@@ -220,21 +274,102 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
         {/* Image/Barcode-specific properties */}
         {isImageField && (
           <div className="space-y-4">
-             {/* Data Source */}
+             {/* Source Type */}
              <div>
                <label className="block text-sm font-medium text-gray-700 mb-1">
-                 {t("settings.label.content_template")}
+                 {t("settings.label.source_type")}
                </label>
+               <select
+                 value={field.sourceType || 'image'}
+                 onChange={(e) => handleUpdate({ sourceType: e.target.value as 'productImage' | 'qrCode' | 'barcode' | 'image', template: '' })}
+                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+               >
+                 <option value="image">{t("settings.label.source_type_image")}</option>
+                 <option value="productImage">{t("settings.label.source_type_product_image")}</option>
+                 <option value="qrCode">{t("settings.label.source_type_qrcode")}</option>
+                 <option value="barcode">{t("settings.label.source_type_barcode")}</option>
+               </select>
+             </div>
+
+             {/* Static Image Upload (only for 'image' sourceType) */}
+             {field.sourceType === 'image' && (
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                   {t("settings.label.static_image")}
+                 </label>
+                 {previewUrl ? (
+                   <div className="relative group">
+                     <img
+                       src={previewUrl}
+                       alt="Preview"
+                       className="w-full h-32 object-contain bg-gray-100 rounded-lg border border-gray-200"
+                     />
+                     {field._pendingImagePath && (
+                       <div className="absolute top-2 left-2 px-2 py-0.5 bg-amber-500 text-white text-xs rounded-full">
+                         {t("settings.label.pending_upload")}
+                       </div>
+                     )}
+                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                       <button
+                         onClick={handleSelectImage}
+                         className="p-2 bg-white rounded-lg text-gray-700 hover:bg-gray-100"
+                       >
+                         <Upload size={18} />
+                       </button>
+                       <button
+                         onClick={handleClearImage}
+                         className="p-2 bg-white rounded-lg text-red-600 hover:bg-red-50"
+                       >
+                         <Trash2 size={18} />
+                       </button>
+                     </div>
+                   </div>
+                 ) : (
+                   <button
+                     onClick={handleSelectImage}
+                     className="w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center gap-2 text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-all"
+                   >
+                     <Upload size={24} />
+                     <span className="text-sm font-medium">{t("settings.label.select_image")}</span>
+                   </button>
+                 )}
+                 <p className="mt-1 text-xs text-gray-500">
+                   {t("settings.label.static_image_hint")}
+                 </p>
+               </div>
+             )}
+
+             {/* Content Template (for dynamic sourceTypes) */}
+             {field.sourceType !== 'image' && (
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                   {t("settings.label.content_template")}
+                 </label>
+                 <input
+                    type="text"
+                    value={field.template || ''}
+                    onChange={(e) => handleUpdate({ template: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                    placeholder={field.sourceType === 'productImage' ? '{product_image}' : field.sourceType === 'qrCode' ? '{product_code}' : '{barcode}'}
+                 />
+                 <p className="mt-1 text-xs text-gray-500">
+                    {t("settings.label.image_template_hint")}
+                 </p>
+               </div>
+             )}
+
+             {/* Maintain Aspect Ratio */}
+             <div className="flex items-center gap-2">
                <input
-                  type="text"
-                  value={field.dataSource || ''}
-                  onChange={(e) => handleUpdate({ dataSource: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-                  placeholder="{product_code}"
+                 type="checkbox"
+                 id="maintainAspectRatio"
+                 checked={field.maintainAspectRatio ?? true}
+                 onChange={(e) => handleUpdate({ maintainAspectRatio: e.target.checked })}
+                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
                />
-               <p className="mt-1 text-xs text-gray-500">
-                  {t("settings.label.image_template_hint")}
-               </p>
+               <label htmlFor="maintainAspectRatio" className="text-sm text-gray-600 select-none cursor-pointer">
+                 {t("settings.label.maintain_aspect_ratio")}
+               </label>
              </div>
           </div>
         )}

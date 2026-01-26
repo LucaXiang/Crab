@@ -9,18 +9,18 @@ interface Step4TimeProps {
   updateState: (updates: Partial<WizardState>) => void;
 }
 
-const DAYS_OF_WEEK = [
-  { value: 0, label: '日' },
-  { value: 1, label: '一' },
-  { value: 2, label: '二' },
-  { value: 3, label: '三' },
-  { value: 4, label: '四' },
-  { value: 5, label: '五' },
-  { value: 6, label: '六' },
-];
-
 export const Step4Time: React.FC<Step4TimeProps> = ({ state, updateState }) => {
   const { t } = useI18n();
+
+  const DAYS_OF_WEEK = [
+    { value: 0, label: t('calendar.days.sunday') },
+    { value: 1, label: t('calendar.days.monday') },
+    { value: 2, label: t('calendar.days.tuesday') },
+    { value: 3, label: t('calendar.days.wednesday') },
+    { value: 4, label: t('calendar.days.thursday') },
+    { value: 5, label: t('calendar.days.friday') },
+    { value: 6, label: t('calendar.days.saturday') },
+  ];
 
   const timeModeOptions = [
     {

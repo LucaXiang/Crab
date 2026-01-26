@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { invokeApi } from '@/infrastructure/api';
-import { ArrowLeft, Save, Layers, Type, Image as ImageIcon, Trash2, GripVertical, Settings, Minus, Printer, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Save, Layers, Type, Image as ImageIcon, Trash2, GripVertical, Settings, Minus, Printer, HelpCircle, Loader2 } from 'lucide-react';
 import { LabelTemplate, LabelField, SUPPORTED_LABEL_FIELDS } from '@/core/domain/types/print';
 import { convertTemplateToRust } from '@/infrastructure/print';
 import { LabelTemplateEditor } from './LabelTemplateEditor';
@@ -216,9 +217,45 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
     }
   };
 
-  const saveAndExit = () => {
-    onSave(template);
-    setIsDirty(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const saveAndExit = async () => {
+    setIsSaving(true);
+    try {
+      // Upload any pending images first
+      const fieldsWithPendingImages = template.fields.filter(
+        f => f.sourceType === 'image' && f._pendingImagePath
+      );
+
+      let updatedFields = [...template.fields];
+
+      for (const field of fieldsWithPendingImages) {
+        try {
+          const hash = await invoke<string>('save_image', { source_path: field._pendingImagePath });
+          // Update the field with the hash and clear pending path
+          updatedFields = updatedFields.map(f =>
+            f.id === field.id
+              ? { ...f, template: hash, _pendingImagePath: undefined }
+              : f
+          );
+        } catch (e) {
+          console.error(`Failed to upload image for field ${field.id}:`, e);
+          // Continue with other fields even if one fails
+        }
+      }
+
+      // Clean up _pendingImagePath from all fields before saving
+      const cleanedFields = updatedFields.map(f => {
+        const { _pendingImagePath, ...rest } = f;
+        return rest as LabelField;
+      });
+
+      const templateToSave = { ...template, fields: cleanedFields };
+      onSave(templateToSave);
+      setIsDirty(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handlePrintTest = async () => {
@@ -438,15 +475,15 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
             <HelpCircle size={20} />
           </button>
 
-          <button 
+          <button
             onClick={saveAndExit}
-            disabled={!isDirty}
+            disabled={!isDirty || isSaving}
             className={`flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg transition-colors font-medium shadow-lg shadow-gray-200 ${
-              !isDirty ? 'opacity-50 cursor-not-allowed' : 'hover:bg-black'
+              (!isDirty || isSaving) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-black'
             }`}
           >
-            <Save size={18} />
-            {t('common.action.save')}
+            {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+            {isSaving ? t('common.status.saving') : t('common.action.save')}
           </button>
         </div>
       </div>

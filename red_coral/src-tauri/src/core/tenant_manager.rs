@@ -5,12 +5,19 @@
 //! - 设备激活（获取租户证书）
 //! - 租户切换
 //! - 员工登录（在线/离线）
+//!
+//! ## 路径管理
+//!
+//! 使用 `TenantPaths` 统一管理路径，不再依赖 `CertManager`。
+//! - Server 模式: edge-server 自行处理证书，我们只检查文件存在性
+//! - Client 模式: 路径与 CertManager 兼容，CrabClient 可直接使用
 
-use crab_client::{CertError, CertManager};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use thiserror::Error;
 
+use super::paths::TenantPaths;
 use super::session_cache::{EmployeeSession, LoginMode, SessionCache};
 
 #[derive(Debug, Error)]
@@ -22,7 +29,7 @@ pub enum TenantError {
     NoTenantSelected,
 
     #[error("Certificate error: {0}")]
-    Certificate(#[from] CertError),
+    Certificate(String),
 
     #[error("Session cache error: {0}")]
     SessionCache(#[from] super::session_cache::SessionCacheError),
@@ -40,6 +47,55 @@ pub enum TenantError {
     OfflineNotAvailable(String),
 }
 
+/// 使用 TenantPaths 构建 mTLS HTTP 客户端
+///
+/// 用于 Client 模式连接远程 edge-server
+fn build_mtls_http_client(paths: &TenantPaths) -> Result<reqwest::Client, TenantError> {
+    // 加载证书
+    let cert_pem = std::fs::read_to_string(paths.client_cert())
+        .map_err(|e| TenantError::Certificate(format!("Failed to read client cert: {}", e)))?;
+    let key_pem = std::fs::read_to_string(paths.client_key())
+        .map_err(|e| TenantError::Certificate(format!("Failed to read client key: {}", e)))?;
+    let ca_cert_pem = std::fs::read_to_string(paths.client_tenant_ca())
+        .map_err(|e| TenantError::Certificate(format!("Failed to read CA cert: {}", e)))?;
+
+    // 解析客户端证书
+    let client_certs = crab_cert::to_rustls_certs(&cert_pem)
+        .map_err(|e| TenantError::Certificate(format!("Failed to parse client cert: {}", e)))?;
+
+    // 解析客户端私钥
+    let client_key = crab_cert::to_rustls_key(&key_pem)
+        .map_err(|e| TenantError::Certificate(format!("Failed to parse client key: {}", e)))?;
+
+    // 解析 CA 证书
+    let ca_certs = crab_cert::to_rustls_certs(&ca_cert_pem)
+        .map_err(|e| TenantError::Certificate(format!("Failed to parse CA cert: {}", e)))?;
+
+    let mut root_store = rustls::RootCertStore::empty();
+    for cert in ca_certs {
+        root_store
+            .add(cert)
+            .map_err(|e| TenantError::Certificate(format!("Failed to add CA cert: {}", e)))?;
+    }
+
+    // 创建 SkipHostnameVerifier
+    let verifier = Arc::new(crab_cert::SkipHostnameVerifier::new(root_store));
+
+    // 创建 rustls ClientConfig
+    let config = rustls::ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(verifier)
+        .with_client_auth_cert(client_certs, client_key)
+        .map_err(|e| TenantError::Certificate(format!("Failed to build TLS config: {}", e)))?;
+
+    // 创建 reqwest 客户端
+    reqwest::Client::builder()
+        .use_preconfigured_tls(config)
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| TenantError::Network(format!("Failed to build HTTP client: {}", e)))
+}
+
 /// 租户信息
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TenantInfo {
@@ -50,13 +106,15 @@ pub struct TenantInfo {
 }
 
 /// 多租户管理器
+///
+/// 使用 TenantPaths 管理路径，不依赖 CertManager。
 pub struct TenantManager {
     /// 基础路径 (~/.red_coral/tenants)
     base_path: PathBuf,
     /// 当前活跃租户 ID
     current_tenant: Option<String>,
-    /// 各租户的证书管理器
-    cert_managers: HashMap<String, CertManager>,
+    /// 各租户的路径管理器
+    tenant_paths: HashMap<String, TenantPaths>,
     /// 各租户的会话缓存
     session_caches: HashMap<String, SessionCache>,
     /// 当前员工会话
@@ -76,7 +134,7 @@ impl TenantManager {
         Self {
             base_path,
             current_tenant: None,
-            cert_managers: HashMap::new(),
+            tenant_paths: HashMap::new(),
             session_caches: HashMap::new(),
             current_session: None,
             client_name: client_name.to_string(),
@@ -108,10 +166,9 @@ impl TenantManager {
     fn load_tenant(&mut self, tenant_id: &str) -> Result<(), TenantError> {
         let tenant_path = self.base_path.join(tenant_id);
 
-        // 创建 CertManager
-        let cert_manager = CertManager::new(&tenant_path, &self.client_name);
-        self.cert_managers
-            .insert(tenant_id.to_string(), cert_manager);
+        // 创建 TenantPaths
+        let paths = TenantPaths::new(&tenant_path);
+        self.tenant_paths.insert(tenant_id.to_string(), paths);
 
         // 加载 SessionCache
         let session_cache = SessionCache::load(&tenant_path)?;
@@ -125,16 +182,14 @@ impl TenantManager {
 
     /// 列出所有已激活的租户
     pub fn list_tenants(&self) -> Vec<TenantInfo> {
-        self.cert_managers
+        self.tenant_paths
             .iter()
-            .map(
-                |(tenant_id, cert_manager): (&String, &CertManager)| TenantInfo {
-                    tenant_id: tenant_id.clone(),
-                    tenant_name: None, // TODO: Load from credential
-                    has_certificates: cert_manager.has_local_certificates(),
-                    last_used: None, // TODO: Track last used time
-                },
-            )
+            .map(|(tenant_id, paths)| TenantInfo {
+                tenant_id: tenant_id.clone(),
+                tenant_name: None, // TODO: Load from credential
+                has_certificates: paths.is_server_activated(),
+                last_used: None, // TODO: Track last used time
+            })
             .collect()
     }
 
@@ -191,50 +246,50 @@ impl TenantManager {
 
         let tenant_id = data.tenant_id.clone();
 
-        // 4. 准备租户目录
+        // 4. 准备租户目录 (使用 TenantPaths)
         let tenant_path = self.base_path.join(&tenant_id);
-        let certs_path = tenant_path.join("certs");
-        let auth_path = tenant_path.join("auth_storage");
+        let paths = TenantPaths::new(&tenant_path);
 
-        std::fs::create_dir_all(&certs_path)?;
-        std::fs::create_dir_all(&auth_path)?;
+        // 创建所有必要的目录
+        paths.ensure_server_dirs()?;
 
         // 5. 验证证书链 (简化版，完整验证由 edge-server 启动时进行)
         // 这里主要确保我们拿到了看起来正确的东西
 
-        // 6. 保存证书 (使用 edge-server 兼容的文件名)
-        std::fs::write(certs_path.join("root_ca.pem"), &data.root_ca_cert)?;
-        std::fs::write(certs_path.join("tenant_ca.pem"), &data.tenant_ca_cert)?;
-        std::fs::write(certs_path.join("edge_cert.pem"), &data.entity_cert)?;
-        std::fs::write(certs_path.join("edge_key.pem"), &data.entity_key)?;
+        // 6. 保存客户端证书到 {tenant}/certs/ (用于 mTLS Client Mode)
+        // 使用 CertManager 兼容的文件名: entity.crt, entity.key, tenant_ca.crt
+        paths.ensure_client_dirs()?;
+        std::fs::write(paths.client_cert(), &data.entity_cert)?;
+        std::fs::write(paths.client_key(), &data.entity_key)?;
+        std::fs::write(paths.client_tenant_ca(), &data.tenant_ca_cert)?;
 
-        // 兼容 crab-client 的文件名 (用于 Client Mode)
-        // 也可以使用软链接，但为了 Windows 兼容性，复制一份
-        std::fs::write(certs_path.join("cert.pem"), &data.entity_cert)?;
-        std::fs::write(certs_path.join("key.pem"), &data.entity_key)?;
-        std::fs::write(certs_path.join("ca.pem"), &data.tenant_ca_cert)?;
+        // 7. 保存 Edge Server 证书到 {tenant}/server/certs/
+        // edge-server 的 work_dir = {tenant}/server/，从 work_dir/certs/ 读取
+        std::fs::write(paths.edge_cert(), &data.entity_cert)?;
+        std::fs::write(paths.edge_key(), &data.entity_key)?;
+        std::fs::write(paths.server_tenant_ca(), &data.tenant_ca_cert)?;
+        std::fs::write(paths.server_root_ca(), &data.root_ca_cert)?;
 
-        // 7. 保存 Credential (用于 activation check)
-        // 保存为 Credential.json 到 auth_storage (注意首字母大写，与 edge-server 保持一致)
-        let credential_path = auth_path.join("Credential.json");
+        // 8. 保存 Credential (用于 activation check)
+        let credential_path = paths.credential_file();
+        tracing::info!("Saving credential to: {:?}", credential_path);
+        
         // 需要包装在 TenantBinding 中，因为 edge-server 期望 {"binding": {...}, "subscription": ...}
         let tenant_binding =
             edge_server::services::tenant_binding::TenantBinding::from_signed(data.binding.clone());
         let credential_json = serde_json::to_string_pretty(&tenant_binding).map_err(|e| {
+            tracing::error!("Failed to serialize credential: {}", e);
             TenantError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
         })?;
-        std::fs::write(credential_path, credential_json)?;
+        
+        std::fs::write(&credential_path, &credential_json).map_err(|e| {
+            tracing::error!("Failed to write credential to {:?}: {}", credential_path, e);
+            TenantError::Io(e)
+        })?;
+        
+        tracing::info!("Credential saved successfully ({} bytes)", credential_json.len());
 
-        // 8. 更新内存状态
-        // 我们创建一个 CertManager 指向这个目录，以便兼容现有逻辑
-        // 注意：CertManager 默认期望在 base_path/client_name 下
-        // 这里我们稍微 hack 一下，直接指向 tenant_path
-        // 但 CertManager::new 接受 base_path 和 client_name，然后 join。
-        // 所以我们传 tenant_path 的父目录? 不行，结构不一样。
-
-        // 我们需要手动构建 CertManager 或更新 TenantInfo
-        // 这里暂时不更新 self.cert_managers，因为我们改变了目录结构
-        // 而是重新加载
+        // 8. 更新内存状态 - 使用 TenantPaths
         self.load_tenant(&tenant_id)?;
 
         // 9. 自动切换
@@ -247,7 +302,7 @@ impl TenantManager {
 
     /// 切换当前租户
     pub fn switch_tenant(&mut self, tenant_id: &str) -> Result<(), TenantError> {
-        if !self.cert_managers.contains_key(tenant_id) {
+        if !self.tenant_paths.contains_key(tenant_id) {
             return Err(TenantError::NotFound(tenant_id.to_string()));
         }
 
@@ -269,7 +324,7 @@ impl TenantManager {
         }
 
         // 移除管理器
-        self.cert_managers.remove(tenant_id);
+        self.tenant_paths.remove(tenant_id);
         self.session_caches.remove(tenant_id);
 
         // 删除文件
@@ -298,13 +353,13 @@ impl TenantManager {
             .ok_or(TenantError::NoTenantSelected)?
             .clone();
 
-        let cert_manager = self
-            .cert_managers
+        let paths = self
+            .tenant_paths
             .get(&tenant_id)
             .ok_or_else(|| TenantError::NotFound(tenant_id.clone()))?;
 
         // 构建 mTLS HTTP 客户端
-        let http_client = cert_manager.build_mtls_http_client()?;
+        let http_client = build_mtls_http_client(paths)?;
 
         // 发送登录请求
         let response: reqwest::Response = http_client
@@ -466,11 +521,11 @@ impl TenantManager {
         Vec::new()
     }
 
-    /// 获取当前租户的 CertManager
-    pub fn current_cert_manager(&self) -> Option<&CertManager> {
+    /// 获取当前租户的路径管理器
+    pub fn current_paths(&self) -> Option<&TenantPaths> {
         self.current_tenant
             .as_ref()
-            .and_then(|id| self.cert_managers.get(id))
+            .and_then(|id| self.tenant_paths.get(id))
     }
 
     /// 获取当前租户目录

@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::auth::JwtConfig;
 
@@ -210,57 +210,57 @@ impl Config {
 
     /// 确保工作目录结构存在
     ///
-    /// 创建标准化的目录结构:
-    /// - `certs/` - 证书目录
-    /// - `database/` - 数据库目录
-    /// - `logs/` - 日志目录
-    /// - `auth_storage/` - 认证存储目录
+    /// work_dir 是 `{tenant}/server/`，创建结构:
+    /// - `data/` - 数据目录 (SurrealDB, orders.redb, print.redb)
+    /// - `images/` - 图片存储目录
+    ///
+    /// 注意: 证书目录 `{tenant}/certs/` 由 TenantManager 创建
     pub fn ensure_work_dir_structure(&self) -> std::io::Result<()> {
         let base = PathBuf::from(&self.work_dir);
-        std::fs::create_dir_all(base.join("certs"))?;
-        std::fs::create_dir_all(base.join("database"))?;
-        std::fs::create_dir_all(base.join("logs"))?;
-        std::fs::create_dir_all(base.join("auth_storage"))?;
+        std::fs::create_dir_all(base.join("data"))?;
+        std::fs::create_dir_all(base.join("images"))?;
         Ok(())
     }
 
-    /// 获取证书目录路径
+    /// 获取证书目录路径: {tenant}/certs/
+    /// 获取证书目录路径: {tenant}/server/certs/
+    ///
+    /// 注意: work_dir 是 `{tenant}/server/`，证书在 server 目录下的 certs/ 子目录
     pub fn certs_dir(&self) -> PathBuf {
         PathBuf::from(&self.work_dir).join("certs")
     }
 
-    /// 获取数据库目录路径
+    /// 获取数据目录路径: {tenant}/server/data/
+    pub fn data_dir(&self) -> PathBuf {
+        PathBuf::from(&self.work_dir).join("data")
+    }
+
+    /// 获取 SurrealDB 数据库目录路径: {tenant}/server/data/main.db/
     pub fn database_dir(&self) -> PathBuf {
-        PathBuf::from(&self.work_dir).join("database")
+        self.data_dir().join("main.db")
     }
 
-    /// 获取日志目录路径
-    pub fn logs_dir(&self) -> PathBuf {
-        PathBuf::from(&self.work_dir).join("logs")
+    /// 获取订单数据库文件路径: {tenant}/server/data/orders.redb
+    pub fn orders_db_file(&self) -> PathBuf {
+        self.data_dir().join("orders.redb")
     }
 
-    /// 获取认证存储目录路径
+    /// 获取打印队列数据库文件路径: {tenant}/server/data/print.redb
+    pub fn print_db_file(&self) -> PathBuf {
+        self.data_dir().join("print.redb")
+    }
+
+    /// 获取图片存储目录路径: {tenant}/server/images/
+    pub fn images_dir(&self) -> PathBuf {
+        PathBuf::from(&self.work_dir).join("images")
+    }
+
+    /// 获取认证存储目录路径: {tenant}/server/ (与 work_dir 相同)
+    ///
+    /// credential.json 存储在 work_dir 根目录下
     pub fn auth_storage_dir(&self) -> PathBuf {
-        PathBuf::from(&self.work_dir).join("auth_storage")
+        PathBuf::from(&self.work_dir)
     }
-}
-
-/// 检查并迁移旧目录结构
-///
-/// 如果 `work_dir/crab.db` 存在且 `work_dir/database/crab.db` 不存在，
-/// 则将数据库迁移到新位置。
-pub fn migrate_legacy_structure(work_dir: &Path) -> std::io::Result<()> {
-    let legacy_db = work_dir.join("crab.db");
-    let new_db_dir = work_dir.join("database");
-
-    if legacy_db.exists() && !new_db_dir.join("crab.db").exists() {
-        tracing::info!("Migrating legacy database location...");
-        std::fs::create_dir_all(&new_db_dir)?;
-        std::fs::rename(&legacy_db, new_db_dir.join("crab.db"))?;
-        tracing::info!("Database migration complete");
-    }
-
-    Ok(())
 }
 
 impl Default for Config {

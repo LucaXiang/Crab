@@ -13,8 +13,10 @@ use crate::core::response::{
 };
 use crate::core::ClientBridge;
 use shared::models::{
-    Employee, EmployeeCreate, EmployeeUpdate, InitGenesisRequest, PriceRule, PriceRuleCreate,
-    PriceRuleUpdate, SystemState, SystemStateUpdate, UpdateLastOrderRequest, UpdateSyncStateRequest,
+    Employee, EmployeeCreate, EmployeeUpdate, InitGenesisRequest, LabelTemplate,
+    LabelTemplateCreate, LabelTemplateUpdate, PriceRule, PriceRuleCreate, PriceRuleUpdate,
+    StoreInfo, StoreInfoUpdate, SystemState, SystemStateUpdate, UpdateLastOrderRequest,
+    UpdateSyncStateRequest,
 };
 
 // ============ System State ============
@@ -86,6 +88,120 @@ pub async fn update_sync_state(
     let bridge = bridge.read().await;
     match bridge.put("/api/system-state/sync-state", &data).await {
         Ok(state) => Ok(ApiResponse::success(state)),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
+    }
+}
+
+// ============ Store Info ============
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_store_info(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+) -> Result<ApiResponse<StoreInfo>, String> {
+    let bridge = bridge.read().await;
+    match bridge.get("/api/store-info").await {
+        Ok(info) => Ok(ApiResponse::success(info)),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn update_store_info(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    data: StoreInfoUpdate,
+) -> Result<ApiResponse<StoreInfo>, String> {
+    let bridge = bridge.read().await;
+    match bridge.put("/api/store-info", &data).await {
+        Ok(info) => Ok(ApiResponse::success(info)),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
+    }
+}
+
+// ============ Label Templates ============
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn list_label_templates(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+) -> Result<ApiResponse<Vec<LabelTemplate>>, String> {
+    let bridge = bridge.read().await;
+    match bridge.get("/api/label-templates").await {
+        Ok(templates) => Ok(ApiResponse::success(templates)),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_label_template(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    id: String,
+) -> Result<ApiResponse<LabelTemplate>, String> {
+    let bridge = bridge.read().await;
+    match bridge.get(&format!("/api/label-templates/{}", encode(&id))).await {
+        Ok(template) => Ok(ApiResponse::success(template)),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::NotFound,
+            e.to_string(),
+        )),
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn create_label_template(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    data: LabelTemplateCreate,
+) -> Result<ApiResponse<LabelTemplate>, String> {
+    let bridge = bridge.read().await;
+    match bridge.post("/api/label-templates", &data).await {
+        Ok(template) => Ok(ApiResponse::success(template)),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn update_label_template(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    id: String,
+    data: LabelTemplateUpdate,
+) -> Result<ApiResponse<LabelTemplate>, String> {
+    let bridge = bridge.read().await;
+    match bridge
+        .put(&format!("/api/label-templates/{}", encode(&id)), &data)
+        .await
+    {
+        Ok(template) => Ok(ApiResponse::success(template)),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::DatabaseError,
+            e.to_string(),
+        )),
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn delete_label_template(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    id: String,
+) -> Result<ApiResponse<bool>, String> {
+    let bridge = bridge.read().await;
+    match bridge
+        .delete::<bool>(&format!("/api/label-templates/{}", encode(&id)))
+        .await
+    {
+        Ok(deleted) => Ok(ApiResponse::success(deleted)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),

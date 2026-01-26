@@ -13,12 +13,11 @@ use crate::utils::AppError;
 ///
 /// ```text
 /// 1. 服务器启动，credential.json 可能存在或不存在
-/// 2. wait_for_activation() 检查激活状态
-///    - 已激活：返回，继续启动服务
-///    - 未激活：等待 notify.notified()
-/// 3. 外部通过 ProvisioningService 完成激活
-/// 4. 激活成功后调用 notify.notify_waiters()
-/// 5. wait_for_activation() 返回，继续启动服务
+/// 2. check_activation() 检查激活状态
+///    - 已激活且自检通过：返回 Ok(())
+///    - 未激活：返回 Err(NotActivated)
+///    - 自检失败：清理损坏数据，返回 Err(具体错误)
+/// 3. 调用方 (red_coral) 决定如何处理未激活状态
 /// ```
 ///
 /// # 状态存储
@@ -87,20 +86,66 @@ impl ActivationService {
         &self.auth_server_url
     }
 
-    /// 等待激活信号
+    /// 检查激活状态并执行自检
+    ///
+    /// # 行为
+    ///
+    /// - 已激活且自检通过：返回 Ok(())
+    /// - 未激活：返回 Err(NotActivated)
+    /// - 自检失败：清理损坏数据，返回 Err(具体错误)
+    ///
+    /// # 与旧版 wait_for_activation 的区别
+    ///
+    /// 旧版会阻塞等待激活，新版立即返回结果。
+    /// 调用方（red_coral）负责决定如何处理未激活状态。
+    pub async fn check_activation(
+        &self,
+        cert_service: &crate::services::cert::CertService,
+    ) -> Result<(), AppError> {
+        // 1. Check activation status
+        if !self.is_activated().await {
+            tracing::info!("⏳ Server not activated");
+            return Err(AppError::not_activated("Server not activated"));
+        }
+
+        // 2. Perform self-check (cert chain + hardware binding + credential signature + clock)
+        tracing::info!("🔍 Performing self-check...");
+        let cached_binding = self.credential_cache.read().await.clone();
+        
+        if let Err(e) = cert_service
+            .self_check_with_binding(cached_binding.as_ref())
+            .await
+        {
+            tracing::error!("❌ Self-check failed: {}", e);
+            
+            // 进入未绑定状态
+            self.enter_unbound_state(cert_service).await;
+            
+            return Err(e);
+        }
+
+        tracing::info!("✅ Self-check passed!");
+
+        // 3. Update last_verified_at timestamp (防止时钟篡改)
+        self.update_last_verified_at().await;
+
+        // 4. Subscription Sync (only after successful self-check)
+        self.sync_subscription().await;
+
+        Ok(())
+    }
+
+    /// 等待激活并执行自检（阻塞）
     ///
     /// # 行为
     ///
     /// - 已激活且自检通过：立即返回
-    /// - 未激活或自检失败：进入等待循环，直到激活成功
+    /// - 未激活：阻塞等待 `notify.notified()`
+    /// - 自检失败：清理后继续等待
     ///
-    /// # 容错设计
+    /// # 用途
     ///
-    /// 证书或 Credential.json 被篡改/损坏时：
-    /// 1. 不会 panic
-    /// 2. 清理损坏的文件
-    /// 3. 进入未绑定状态
-    /// 4. 等待重新激活
+    /// 供 `Server::run()` 使用，确保 HTTPS 只在激活成功后启动。
     pub async fn wait_for_activation(&self, cert_service: &crate::services::cert::CertService) {
         loop {
             // 1. Check activation status
@@ -111,9 +156,9 @@ impl ActivationService {
             }
 
             // 2. Perform self-check (cert chain + hardware binding + credential signature + clock)
-            //    使用缓存的 credential，避免重复读取磁盘
             tracing::info!("🔍 Performing self-check...");
-            let cached_binding = self.credential_cache.read().await.clone(); // clone 后立即释放读锁
+            let cached_binding = self.credential_cache.read().await.clone();
+            
             match cert_service
                 .self_check_with_binding(cached_binding.as_ref())
                 .await
@@ -138,7 +183,7 @@ impl ActivationService {
             }
         }
 
-        // 3. Initial Subscription Sync (only after successful self-check)
+        // 4. Subscription Sync (only after successful self-check)
         self.sync_subscription().await;
     }
 
@@ -320,7 +365,7 @@ impl ActivationService {
     }
 
     /// Sync subscription status (Local Cache -> Remote Fetch -> Update Cache)
-    /// integrated into wait_for_activation flow.
+    /// integrated into check_activation flow.
     pub async fn sync_subscription(&self) {
         tracing::info!("Running subscription synchronization...");
 
@@ -426,12 +471,8 @@ impl ActivationService {
         };
 
         // Verify subscription signature using local tenant_ca.pem
-        // Note: cert_dir is {work_dir}/auth_storage, tenant_ca is in {work_dir}/certs/
-        let tenant_ca_path = self
-            .cert_dir
-            .parent()
-            .map(|p| p.join("certs").join("tenant_ca.pem"))
-            .unwrap_or_else(|| self.cert_dir.join("certs").join("tenant_ca.pem"));
+        // Note: cert_dir is {work_dir} = {tenant}/server/, tenant_ca is in {tenant}/server/certs/
+        let tenant_ca_path = self.cert_dir.join("certs").join("tenant_ca.pem");
         let tenant_ca_pem = match std::fs::read_to_string(&tenant_ca_path) {
             Ok(pem) => pem,
             Err(e) => {

@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { Printer, Tag, ChefHat, AlertCircle, Settings, Info } from 'lucide-react';
+import { Printer, Tag, ChefHat, AlertCircle, Settings, Info, DollarSign, Play } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
+import { toast } from '@/presentation/components/Toast';
 import {
   useReceiptPrinter,
   useLabelPrinter,
   useKitchenPrinter,
+  useCashDrawerPrinter,
   usePrinterActions,
+  useAutoOpenCashDrawerAfterReceipt,
 } from '@/core/stores/ui';
+import { openCashDrawer } from '@/infrastructure/print/printService';
 import { PrinterSelect } from './PrinterSelect';
 import { KitchenPrinterList } from './KitchenPrinterList';
 
@@ -17,17 +21,38 @@ interface HardwareSettingsProps {
 
 export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, loading }) => {
   const { t } = useI18n();
-  const { setReceiptPrinter, setLabelPrinter, setKitchenPrinter } = usePrinterActions();
+  const { setReceiptPrinter, setLabelPrinter, setKitchenPrinter, setCashDrawerPrinter, setAutoOpenCashDrawerAfterReceipt } = usePrinterActions();
 
   const receiptPrinter = useReceiptPrinter();
   const labelPrinter = useLabelPrinter();
   const kitchenPrinter = useKitchenPrinter();
+  const cashDrawerPrinter = useCashDrawerPrinter();
+  const autoOpenCashDrawerAfterReceipt = useAutoOpenCashDrawerAfterReceipt();
   const [showHierarchyInfo, setShowHierarchyInfo] = useState(false);
+  const [testingCashDrawer, setTestingCashDrawer] = useState(false);
 
-  // TODO: 当前全局默认都是启用的，需要讨论是否应该：
-  // 1. 从服务端获取全局配置状态
-  // 2. 或者改为"是否配置了打印机"来决定启用状态（当前实现）
-  // 当前实现：启用状态由"是否配置了打印机"决定（与服务端逻辑一致）
+  // 钱箱使用的打印机：如果设置了专用钱箱打印机则使用，否则使用收据打印机
+  const effectiveCashDrawerPrinter = cashDrawerPrinter || receiptPrinter;
+
+  const handleTestCashDrawer = async () => {
+    if (!effectiveCashDrawerPrinter) return;
+    setTestingCashDrawer(true);
+    try {
+      await openCashDrawer(effectiveCashDrawerPrinter);
+      toast.success(t('settings.printer.cash_drawer.test_success'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`${t('settings.printer.cash_drawer.test_failed')}: ${message}`);
+    } finally {
+      setTestingCashDrawer(false);
+    }
+  };
+
+  // 打印功能启用状态：由"是否配置了打印机"决定
+  // 设计决策：
+  // - 简单直观：有打印机 = 启用，无打印机 = 禁用
+  // - 与服务端 PrintDestination 逻辑一致（通过 is_active 字段控制）
+  // - 避免额外的开关状态管理，减少用户困惑
   const isLabelPrintEnabled = !!labelPrinter;
   const isKitchenPrintEnabled = !!kitchenPrinter;
 
@@ -51,6 +76,95 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
             loading={loading}
             badge={<span className="text-[0.625rem] bg-gray-100 text-gray-600 px-1.5 rounded uppercase font-bold tracking-wider">{t('settings.printer.badge.pos')}</span>}
           />
+
+          {/* Cash Drawer Section */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-sm hover:border-green-300 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-green-50 text-green-600 rounded-lg">
+                  <DollarSign size={20} />
+                </div>
+                <div>
+                   <div className="font-bold text-gray-800">{t('settings.printer.form.cash_drawer_printer')}</div>
+                   <div className="text-xs text-gray-500 mt-0.5">{t('settings.printer.form.cash_drawer_printer_desc')}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {/* Use Receipt Printer Checkbox */}
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  checked={!cashDrawerPrinter}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setCashDrawerPrinter(null);
+                    }
+                  }}
+                />
+                <span className="text-sm text-gray-600 group-hover:text-gray-900">
+                  {t('settings.printer.cash_drawer.use_receipt_printer')}
+                </span>
+              </label>
+
+              {/* Custom Printer Select (only if not using receipt printer) */}
+              {cashDrawerPrinter !== null && (
+                <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                  <select
+                    value={cashDrawerPrinter || ''}
+                    onChange={(e) => setCashDrawerPrinter(e.target.value || null)}
+                    className="w-full border border-gray-200 rounded-xl p-2.5 pl-3 pr-10 bg-gray-50 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-100 focus:border-green-500 transition-all cursor-pointer hover:bg-white appearance-none"
+                  >
+                    <option value="">{t('settings.printer.form.select_printer_placeholder')}</option>
+                    {printers.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Auto Open After Receipt Option */}
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  checked={autoOpenCashDrawerAfterReceipt}
+                  onChange={(e) => setAutoOpenCashDrawerAfterReceipt(e.target.checked)}
+                />
+                <span className="text-sm text-gray-600 group-hover:text-gray-900">
+                  {t('settings.printer.cash_drawer.auto_open_after_receipt')}
+                </span>
+              </label>
+
+              {/* Test Button */}
+              <button
+                onClick={handleTestCashDrawer}
+                disabled={!effectiveCashDrawerPrinter || testingCashDrawer || loading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-50 text-green-700 rounded-xl font-medium text-sm hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {testingCashDrawer ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-green-300 border-t-green-600 rounded-full animate-spin" />
+                    {t('settings.printer.cash_drawer.testing')}
+                  </>
+                ) : (
+                  <>
+                    <Play size={16} />
+                    {t('settings.printer.cash_drawer.test')}
+                  </>
+                )}
+              </button>
+
+              {/* Show which printer will be used */}
+              {effectiveCashDrawerPrinter && (
+                <div className="text-xs text-gray-500 text-center">
+                  {effectiveCashDrawerPrinter}
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Label Printer Section with Toggle */}
           <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-sm hover:border-blue-300 transition-all duration-300">

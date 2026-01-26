@@ -51,7 +51,7 @@ pub fn verify_cert_pair(cert_pem: &str, ca_pem: &str) -> Result<(), AppError> {
 }
 
 /// 凭证存储位置
-pub const CREDENTIAL_FILE: &str = "Credential.json";
+pub const CREDENTIAL_FILE: &str = "credential.json";
 
 /// 订阅状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

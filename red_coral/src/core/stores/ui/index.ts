@@ -19,9 +19,11 @@ export {
   useReceiptPrinter,
   useKitchenPrinter,
   useLabelPrinter,
+  useCashDrawerPrinter,
   useActiveLabelTemplateId,
   useSelectedPrinter,
   usePrinterActions,
+  useAutoOpenCashDrawerAfterReceipt,
 } from '../printer';
 
 // UI Scale Store

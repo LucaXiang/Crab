@@ -33,6 +33,8 @@ pub mod price_rules;
 pub mod print_config;
 pub mod print_destinations;
 pub mod products;
+pub mod store_info;
+pub mod label_template;
 pub mod sync;
 pub mod system_state;
 pub mod tables;

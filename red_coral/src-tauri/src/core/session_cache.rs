@@ -93,7 +93,7 @@ struct SessionCacheFile {
 
 /// 员工会话缓存管理器
 pub struct SessionCache {
-    /// 缓存文件路径
+    /// 缓存文件路径: {tenant}/auth/session.json
     file_path: PathBuf,
     /// 缓存数据
     data: SessionCacheFile,
@@ -102,7 +102,7 @@ pub struct SessionCache {
 impl SessionCache {
     /// 创建新的 SessionCache
     pub fn new(tenant_path: &Path) -> Self {
-        let file_path = tenant_path.join("session_cache.json");
+        let file_path = tenant_path.join("auth/session.json");
         Self {
             file_path,
             data: SessionCacheFile::default(),
@@ -111,7 +111,7 @@ impl SessionCache {
 
     /// 从文件加载 SessionCache
     pub fn load(tenant_path: &Path) -> Result<Self, SessionCacheError> {
-        let file_path = tenant_path.join("session_cache.json");
+        let file_path = tenant_path.join("auth/session.json");
 
         let data = if file_path.exists() {
             let content = std::fs::read_to_string(&file_path)?;
@@ -232,18 +232,24 @@ impl SessionCache {
 
     // ============ 当前活动会话持久化 ============
 
-    /// 保存当前活动会话 (用于刷新后恢复登录状态)
-    pub fn save_current_session(&self, session: &EmployeeSession) -> Result<(), SessionCacheError> {
-        let path = self
-            .file_path
+    /// 获取当前活动会话文件路径: {tenant}/auth/current_session.json
+    fn current_session_path(&self) -> PathBuf {
+        // file_path 是 {tenant}/auth/session.json
+        // 所以 parent 是 {tenant}/auth/
+        self.file_path
             .parent()
             .map(|p| p.join("current_session.json"))
-            .ok_or_else(|| {
-                SessionCacheError::Io(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "Invalid session cache path",
-                ))
-            })?;
+            .unwrap_or_else(|| self.file_path.with_file_name("current_session.json"))
+    }
+
+    /// 保存当前活动会话 (用于刷新后恢复登录状态)
+    pub fn save_current_session(&self, session: &EmployeeSession) -> Result<(), SessionCacheError> {
+        let path = self.current_session_path();
+
+        // 确保 auth 目录存在
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
 
         let content = serde_json::to_string_pretty(session)?;
         std::fs::write(&path, content)?;
@@ -253,16 +259,7 @@ impl SessionCache {
 
     /// 加载当前活动会话
     pub fn load_current_session(&self) -> Result<Option<EmployeeSession>, SessionCacheError> {
-        let path = self
-            .file_path
-            .parent()
-            .map(|p| p.join("current_session.json"))
-            .ok_or_else(|| {
-                SessionCacheError::Io(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "Invalid session cache path",
-                ))
-            })?;
+        let path = self.current_session_path();
 
         if !path.exists() {
             return Ok(None);
@@ -292,16 +289,7 @@ impl SessionCache {
 
     /// 清除当前活动会话
     pub fn clear_current_session(&self) -> Result<(), SessionCacheError> {
-        let path = self
-            .file_path
-            .parent()
-            .map(|p| p.join("current_session.json"))
-            .ok_or_else(|| {
-                SessionCacheError::Io(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "Invalid session cache path",
-                ))
-            })?;
+        let path = self.current_session_path();
 
         if path.exists() {
             std::fs::remove_file(&path)?;

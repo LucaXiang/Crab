@@ -9,6 +9,7 @@ import {
   savePendingRetailOrder,
   clearPendingRetailOrder,
 } from '@/core/stores/order/retailOrderTracker';
+import { t } from '@/infrastructure/i18n';
 
 interface UseOrderHandlersParams {
   handleTableSelectStore: (
@@ -65,9 +66,9 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
         }
       } catch (error) {
         // Handle TABLE_OCCUPIED and other errors
-        const message = error instanceof Error ? error.message : '操作失败';
-        if (message.includes('已被占用')) {
-          toast.error(`桌台 ${table.name || table.id} 已被占用，请刷新列表`);
+        const message = error instanceof Error ? error.message : t('common.message.operation_failed');
+        if (message.includes('occupied') || message.includes('7002')) {
+          toast.error(t('common.message.table_occupied_refresh', { table: table.name || table.id }));
         } else {
           toast.error(message);
         }
@@ -126,11 +127,11 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
           setViewMode('checkout');
         } else {
           console.error('Retail order created but not found in store after polling');
-          toast.error('订单创建成功但加载失败，请重试');
+          toast.error(t('common.message.order_load_failed'));
         }
       } catch (error) {
         console.error('Failed to create retail order:', error);
-        toast.error('创建零售订单失败');
+        toast.error(t('common.message.retail_order_failed'));
       }
     },
     [setCurrentOrderKey, setViewMode]

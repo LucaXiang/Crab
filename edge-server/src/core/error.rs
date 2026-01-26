@@ -8,22 +8,22 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ServerError {
-    #[error("资源未找到")]
+    #[error("Resource not found")]
     NotFound,
 
-    #[error("验证错误: {0}")]
+    #[error("Validation error: {0}")]
     Validation(String),
 
-    #[error("未授权")]
+    #[error("Unauthorized")]
     Unauthorized,
 
-    #[error("禁止访问")]
+    #[error("Forbidden")]
     Forbidden,
 
-    #[error("冲突: {0}")]
+    #[error("Conflict: {0}")]
     Conflict(String),
 
-    #[error("内部服务器错误")]
+    #[error("Internal server error")]
     Internal(#[from] anyhow::Error),
 }
 

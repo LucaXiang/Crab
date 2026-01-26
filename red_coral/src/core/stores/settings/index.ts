@@ -8,6 +8,8 @@ export { useSettingsCategory } from './useSettingsStore';
 export { useSettingsModal } from './useSettingsStore';
 export { useSettingsForm } from './useSettingsStore';
 export { useSettingsFormMeta } from './useSettingsStore';
-export { useStoreInfo } from './useSettingsStore';
 export { useDataVersion } from './useSettingsStore';
 export { useSettingsFilters } from './useSettingsStore';
+
+// Store Info - fetched from server API
+export { useStoreInfoStore, useStoreInfo, useStoreInfoLoading, useStoreInfoActions } from './useStoreInfoStore';

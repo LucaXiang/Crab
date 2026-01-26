@@ -9,9 +9,10 @@
 
 use crate::db::models::{
     serde_helpers, Attribute, AttributeBindingFull, Category, CategoryCreate, CategoryUpdate,
-    EmbeddedSpec, Product, ProductCreate, ProductFull, ProductUpdate, Tag,
+    EmbeddedSpec, ImageRefEntityType, Product, ProductCreate, ProductFull, ProductUpdate, Tag,
 };
-use crate::db::repository::{RepoError, RepoResult};
+use crate::db::repository::{ImageRefRepository, RepoError, RepoResult};
+use super::ImageCleanupService;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -103,6 +104,10 @@ pub struct CatalogService {
     categories: Arc<RwLock<HashMap<String, Category>>>,
     /// System default print destinations
     print_defaults: Arc<RwLock<PrintDefaults>>,
+    /// Image reference repository
+    image_ref_repo: ImageRefRepository,
+    /// Image cleanup service
+    image_cleanup: ImageCleanupService,
 }
 
 impl std::fmt::Debug for CatalogService {
@@ -118,8 +123,12 @@ impl std::fmt::Debug for CatalogService {
 
 impl CatalogService {
     /// Create a new CatalogService
-    pub fn new(db: Surreal<Db>) -> Self {
+    ///
+    /// `images_dir` is the path to the images directory: {tenant}/server/images/
+    pub fn new(db: Surreal<Db>, images_dir: std::path::PathBuf) -> Self {
         Self {
+            image_ref_repo: ImageRefRepository::new(db.clone()),
+            image_cleanup: ImageCleanupService::new(images_dir),
             db,
             products: Arc::new(RwLock::new(HashMap::new())),
             categories: Arc::new(RwLock::new(HashMap::new())),
@@ -364,6 +373,13 @@ impl CatalogService {
         // Fetch the created product with tags
         let full = self.fetch_product_full(&product_id).await?;
 
+        // Sync image references
+        let image_hashes = Self::extract_product_image_hashes(&full);
+        let _ = self
+            .image_ref_repo
+            .sync_refs(ImageRefEntityType::Product, &product_id, image_hashes)
+            .await;
+
         // Update cache
         {
             let mut cache = self.products.write().unwrap();
@@ -440,6 +456,24 @@ impl CatalogService {
         // Fetch full product data
         let full = self.fetch_product_full(id).await?;
 
+        // Sync image references and cleanup orphans
+        let image_hashes = Self::extract_product_image_hashes(&full);
+        let removed_hashes = self
+            .image_ref_repo
+            .sync_refs(ImageRefEntityType::Product, id, image_hashes)
+            .await
+            .unwrap_or_default();
+
+        // Cleanup orphan images (do this after transaction committed)
+        if !removed_hashes.is_empty() {
+            let orphans = self
+                .image_ref_repo
+                .find_orphan_hashes(&removed_hashes)
+                .await
+                .unwrap_or_default();
+            self.image_cleanup.cleanup_orphan_images(&orphans).await;
+        }
+
         // Update cache
         {
             let mut cache = self.products.write().unwrap();
@@ -458,6 +492,13 @@ impl CatalogService {
         let thing = id.parse::<RecordId>()
             .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", id)))?;
 
+        // Get image references before deleting
+        let image_hashes = self
+            .image_ref_repo
+            .delete_entity_refs(ImageRefEntityType::Product, id)
+            .await
+            .unwrap_or_default();
+
         // Clean up attribute_binding edges
         self.db
             .query("DELETE attribute_binding WHERE in = $product")
@@ -474,6 +515,16 @@ impl CatalogService {
         {
             let mut cache = self.products.write().unwrap();
             cache.remove(id);
+        }
+
+        // Cleanup orphan images (after transaction committed)
+        if !image_hashes.is_empty() {
+            let orphans = self
+                .image_ref_repo
+                .find_orphan_hashes(&image_hashes)
+                .await
+                .unwrap_or_default();
+            self.image_cleanup.cleanup_orphan_images(&orphans).await;
         }
 
         Ok(())
@@ -605,6 +656,17 @@ impl CatalogService {
             attributes,
             tags,
         })
+    }
+
+    /// Extract image hashes from a product
+    ///
+    /// Product only has a single image field, so return a set with 0 or 1 hash.
+    fn extract_product_image_hashes(product: &ProductFull) -> std::collections::HashSet<String> {
+        let mut hashes = std::collections::HashSet::new();
+        if !product.image.is_empty() {
+            hashes.insert(product.image.clone());
+        }
+        hashes
     }
 
     // =========================================================================

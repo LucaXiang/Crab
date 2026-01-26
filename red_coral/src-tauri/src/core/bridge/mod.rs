@@ -130,13 +130,25 @@ impl ClientBridge {
 
     /// 激活设备并自动切换租户，保存配置
     ///
-    /// 如果当前在 Server mode，会自动通知 edge-server 更新激活状态
+    /// 如果当前在 Server mode，会重启服务器以使用新租户配置
     pub async fn handle_activation(
         &self,
         auth_url: &str,
         username: &str,
         password: &str,
     ) -> Result<String, BridgeError> {
+        // 检查是否在 Server 模式
+        let was_server_mode = {
+            let mode = self.mode.read().await;
+            matches!(*mode, ClientMode::Server { .. })
+        };
+
+        // 如果在 Server 模式，先停止服务器
+        if was_server_mode {
+            tracing::info!("Stopping server before activation...");
+            self.stop().await?;
+        }
+
         // 1. 调用 TenantManager 激活（保存证书和 credential 到磁盘）
         let tenant_id = {
             let mut tm = self.tenant_manager.write().await;
@@ -153,25 +165,10 @@ impl ClientBridge {
             config.save(&self.config_path)?;
         }
 
-        // 3. 如果当前在 Server mode，通知 edge-server 更新激活状态
-        {
-            let mode_guard = self.mode.read().await;
-            if let ClientMode::Server { server_state, .. } = &*mode_guard {
-                // 从磁盘加载刚保存的 credential 并通知 ActivationService
-                let tenant_manager = self.tenant_manager.read().await;
-                if let Some(tenant_path) = tenant_manager.current_tenant_path() {
-                    let credential_path = tenant_path.join("auth").join("Credential.json");
-                    if let Ok(content) = std::fs::read_to_string(&credential_path) {
-                        if let Ok(binding) = serde_json::from_str::<edge_server::services::tenant_binding::TenantBinding>(&content) {
-                            if let Err(e) = server_state.activation_service().activate(binding).await {
-                                tracing::warn!("Failed to notify ActivationService: {}", e);
-                            } else {
-                                tracing::info!("ActivationService notified of new activation");
-                            }
-                        }
-                    }
-                }
-            }
+        // 3. 如果之前在 Server 模式，重启服务器（使用新租户的 work_dir）
+        if was_server_mode {
+            tracing::info!("Restarting server with new tenant...");
+            self.start_server_mode().await?;
         }
 
         tracing::info!(tenant_id = %tenant_id, "Device activated and config saved");
@@ -314,8 +311,8 @@ impl ClientBridge {
         
         if error_lower.contains("expired") {
             // 证书过期
-            if let Some(cm) = tenant_manager.current_cert_manager() {
-                if let Ok((cert_pem, _, _)) = cm.load_local_certificates() {
+            if let Some(paths) = tenant_manager.current_paths() {
+                if let Ok(cert_pem) = std::fs::read_to_string(paths.edge_cert()) {
                     if let Ok(metadata) = crab_cert::CertMetadata::from_pem(&cert_pem) {
                         let now = OffsetDateTime::now_utc();
                         let duration = metadata.not_after - now;
@@ -390,105 +387,81 @@ impl ClientBridge {
         ("***".to_string(), crab_cert::generate_hardware_id()[..8].to_string())
     }
 
-    /// 检测需要激活的具体原因 (仅基于 CertManager，用于非 Server 模式)
-    fn detect_activation_reason(&self, tenant_manager: &TenantManager) -> ActivationRequiredReason {
-        // 1. 检查是否有证书管理器
-        let cert_manager = match tenant_manager.current_cert_manager() {
-            Some(cm) => cm,
+    /// 检测需要激活的具体原因 (基于 TenantPaths)
+    ///
+    /// Server 模式: 检查 server/certs/ 下的证书
+    /// Client 模式: 检查 certs/ 下的证书
+    fn detect_activation_reason(&self, tenant_manager: &TenantManager, for_server: bool) -> ActivationRequiredReason {
+        // 1. 检查是否有路径管理器
+        let paths = match tenant_manager.current_paths() {
+            Some(p) => p,
             None => return ActivationRequiredReason::FirstTimeSetup,
         };
 
         // 2. 检查证书是否存在
-        if !cert_manager.has_local_certificates() {
+        let has_certs = if for_server {
+            paths.has_server_certificates()
+        } else {
+            paths.has_client_certificates()
+        };
+
+        if !has_certs {
             return ActivationRequiredReason::FirstTimeSetup;
         }
 
-        // 3. 执行自检
-        match cert_manager.self_check() {
-            Ok(()) => {
-                // 证书有效，检查是否快过期
-                if let Ok((cert_pem, _, _)) = cert_manager.load_local_certificates() {
-                    if let Ok(metadata) = crab_cert::CertMetadata::from_pem(&cert_pem) {
-                        let now = OffsetDateTime::now_utc();
-                        let duration = metadata.not_after - now;
-                        let days_remaining = duration.whole_days();
-                        if days_remaining <= 30 && days_remaining > 0 {
-                            return ActivationRequiredReason::CertificateExpiringSoon {
-                                expires_at: metadata.not_after.to_string(),
-                                days_remaining,
-                            };
-                        }
-                    }
-                }
-                // 证书有效且不快过期，可能是其他原因
-                ActivationRequiredReason::FirstTimeSetup
-            }
-            Err(e) => {
-                let error_str = e.to_string();
+        // 3. 读取证书检查有效性
+        let cert_path = if for_server {
+            paths.edge_cert()
+        } else {
+            paths.client_cert()
+        };
 
-                // 解析具体错误类型
-                if error_str.contains("expired") || error_str.contains("Expired") {
-                    // 尝试获取过期信息
-                    if let Ok((cert_pem, _, _)) = cert_manager.load_local_certificates() {
-                        if let Ok(metadata) = crab_cert::CertMetadata::from_pem(&cert_pem) {
-                            let now = OffsetDateTime::now_utc();
-                            let duration = metadata.not_after - now;
-                            let days_overdue = -duration.whole_days();
-                            return ActivationRequiredReason::CertificateExpired {
-                                expired_at: metadata.not_after.to_string(),
-                                days_overdue,
-                            };
-                        }
-                    }
-                    ActivationRequiredReason::CertificateExpired {
-                        expired_at: "unknown".to_string(),
-                        days_overdue: 0,
-                    }
-                } else if error_str.contains("Hardware ID mismatch")
-                    || error_str.contains("device_id")
-                    || error_str.contains("Device ID mismatch")
-                {
-                    // 尝试解析设备 ID
-                    let (expected, actual) = if let Some(idx) = error_str.find("expected ") {
-                        let rest = &error_str[idx + 9..];
-                        if let Some(comma_idx) = rest.find(", ") {
-                            let exp = rest[..comma_idx].to_string();
-                            let act_start = rest.find("got ").map(|i| i + 4).unwrap_or(comma_idx + 2);
-                            let act = rest[act_start..].trim().to_string();
-                            (exp, act)
-                        } else {
-                            ("***".to_string(), "***".to_string())
-                        }
-                    } else {
-                        ("***".to_string(), "***".to_string())
-                    };
-                    ActivationRequiredReason::DeviceMismatch { expected, actual }
-                } else if error_str.contains("Clock tampering") || error_str.contains("clock") {
-                    let direction = if error_str.contains("backward") {
-                        ClockDirection::Backward
-                    } else {
-                        ClockDirection::Forward
-                    };
-                    // 提取秒数
-                    let drift_seconds = error_str
-                        .split_whitespace()
-                        .find_map(|s| s.parse::<i64>().ok())
-                        .unwrap_or(0);
-                    ActivationRequiredReason::ClockTampering {
-                        direction,
-                        drift_seconds,
-                        last_verified_at: "unknown".to_string(),
-                    }
-                } else if error_str.contains("signature") || error_str.contains("Signature") {
-                    ActivationRequiredReason::SignatureInvalid {
-                        component: "certificate".to_string(),
-                        error: error_str,
-                    }
-                } else {
-                    ActivationRequiredReason::CertificateInvalid { error: error_str }
-                }
+        let cert_pem = match std::fs::read_to_string(&cert_path) {
+            Ok(pem) => pem,
+            Err(_) => return ActivationRequiredReason::CertificateInvalid {
+                error: "Cannot read certificate file".to_string(),
+            },
+        };
+
+        let metadata = match crab_cert::CertMetadata::from_pem(&cert_pem) {
+            Ok(m) => m,
+            Err(e) => return ActivationRequiredReason::CertificateInvalid {
+                error: format!("Invalid certificate: {}", e),
+            },
+        };
+
+        // 4. 检查证书过期
+        let now = OffsetDateTime::now_utc();
+        let duration = metadata.not_after - now;
+        let days_remaining = duration.whole_days();
+
+        if days_remaining < 0 {
+            return ActivationRequiredReason::CertificateExpired {
+                expired_at: metadata.not_after.to_string(),
+                days_overdue: -days_remaining,
+            };
+        }
+
+        if days_remaining <= 30 {
+            return ActivationRequiredReason::CertificateExpiringSoon {
+                expires_at: metadata.not_after.to_string(),
+                days_remaining,
+            };
+        }
+
+        // 5. 检查设备 ID 绑定
+        let current_device_id = crab_cert::generate_hardware_id();
+        if let Some(cert_device_id) = &metadata.device_id {
+            if cert_device_id != &current_device_id {
+                return ActivationRequiredReason::DeviceMismatch {
+                    expected: cert_device_id[..8].to_string(),
+                    actual: current_device_id[..8].to_string(),
+                };
             }
         }
+
+        // 证书有效，可能是其他原因或需要检查 credential
+        ActivationRequiredReason::FirstTimeSetup
     }
 
     /// 获取应用状态 (用于前端路由守卫)
@@ -502,8 +475,8 @@ impl ClientBridge {
                     AppState::ServerNoTenant
                 } else {
                     let has_certs = tenant_manager
-                        .current_cert_manager()
-                        .map(|cm| cm.has_local_certificates())
+                        .current_paths()
+                        .map(|p| p.is_server_activated())
                         .unwrap_or(false);
 
                     if has_certs {
@@ -599,7 +572,7 @@ impl ClientBridge {
                     }
                 } else {
                     // 无 credential，需要激活
-                    let reason = self.detect_activation_reason(&tenant_manager);
+                    let reason = self.detect_activation_reason(&tenant_manager, true); // Server mode
                     AppState::ServerNeedActivation {
                         can_auto_recover: reason.can_auto_recover(),
                         recovery_hint: reason.recovery_hint_code().to_string(),
@@ -613,8 +586,8 @@ impl ClientBridge {
                 Some(RemoteClientState::Connected(_)) => AppState::ClientConnected,
                 None => {
                     let has_certs = tenant_manager
-                        .current_cert_manager()
-                        .map(|cm| cm.has_local_certificates())
+                        .current_paths()
+                        .map(|p| p.has_client_certificates())
                         .unwrap_or(false);
 
                     if has_certs {
@@ -821,16 +794,20 @@ impl ClientBridge {
     }
 
     /// 以 Server 模式启动
+    ///
+    /// 如果已经在 Server 模式，直接返回成功（幂等操作）
     pub async fn start_server_mode(&self) -> Result<(), BridgeError> {
         let mut mode_guard = self.mode.write().await;
 
-        if !matches!(&*mode_guard, ClientMode::Disconnected) {
-            let current = match &*mode_guard {
-                ClientMode::Server { .. } => "server",
-                ClientMode::Client { .. } => "client",
-                ClientMode::Disconnected => "disconnected",
-            };
-            return Err(BridgeError::AlreadyRunning(current.to_string()));
+        // 如果已经在 Server 模式，直接返回成功
+        if matches!(&*mode_guard, ClientMode::Server { .. }) {
+            tracing::info!("Already in Server mode, skipping start");
+            return Ok(());
+        }
+
+        // 如果在 Client 模式，需要先停止
+        if matches!(&*mode_guard, ClientMode::Client { .. }) {
+            return Err(BridgeError::AlreadyRunning("client".to_string()));
         }
 
         let config = self.config.read().await;
@@ -1004,8 +981,8 @@ impl ClientBridge {
         }
 
         let tenant_manager = self.tenant_manager.read().await;
-        let cert_manager = tenant_manager
-            .current_cert_manager()
+        let paths = tenant_manager
+            .current_paths()
             .ok_or(TenantError::NoTenantSelected)?;
 
         let config = self.config.read().await;
@@ -1016,17 +993,20 @@ impl ClientBridge {
             .unwrap_or_else(|| "https://auth.example.com".to_string());
         drop(config);
 
-        if !cert_manager.has_local_certificates() {
+        if !paths.has_client_certificates() {
             return Err(BridgeError::Config(
                 "No cached certificates. Please activate tenant first.".into(),
             ));
         }
 
+        // CrabClient 使用 cert_path + client_name 构建 CertManager
+        // 我们传 certs_dir 作为 cert_path，空字符串作为 client_name
+        // 这样 CertManager 会在 {tenant}/certs/ 查找证书
         let client = CrabClient::remote()
             .auth_server(&auth_url)
             .edge_server(edge_url)
-            .cert_path(cert_manager.cert_path())
-            .client_name(tenant_manager.client_name())
+            .cert_path(paths.certs_dir())
+            .client_name("") // 空字符串使 CertManager 直接使用 certs_dir
             .build()?;
 
         let connected_client = client.reconnect(message_addr).await?;

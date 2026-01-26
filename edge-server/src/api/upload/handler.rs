@@ -116,9 +116,9 @@ pub async fn upload(
     Extension(_current_user): Extension<CurrentUser>,
     mut multipart: Multipart,
 ) -> Result<Json<AppResponse<UploadResponse>>, AppError> {
-    // Use work_dir from state (relative path since we change to it at startup)
+    // Images dir: {tenant}/server/images/
     let work_dir = state.work_dir().clone();
-    let images_dir = work_dir.join("uploads/images");
+    let images_dir = work_dir.join("images");
     fs::create_dir_all(&images_dir)
         .map_err(|e| AppError::internal(format!("Failed to create images directory: {}", e)))?;
 

@@ -22,11 +22,11 @@ pub async fn get_health_status(
     // 获取设备信息
     let device_id = crab_cert::generate_hardware_id();
 
-    // 检查证书健康状态
-    let certificate = if let Some(cm) = tenant_manager.current_cert_manager() {
-        if cm.has_local_certificates() {
-            match cm.load_local_certificates() {
-                Ok((cert_pem, _, _)) => match crab_cert::CertMetadata::from_pem(&cert_pem) {
+    // 检查证书健康状态 (Server 模式使用 edge_cert)
+    let certificate = if let Some(paths) = tenant_manager.current_paths() {
+        if paths.has_server_certificates() {
+            match std::fs::read_to_string(paths.edge_cert()) {
+                Ok(cert_pem) => match crab_cert::CertMetadata::from_pem(&cert_pem) {
                     Ok(metadata) => {
                         let now = OffsetDateTime::now_utc();
                         let duration = metadata.not_after - now;

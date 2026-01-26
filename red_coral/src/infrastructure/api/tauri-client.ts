@@ -45,6 +45,11 @@ import type {
   PriceRuleUpdate,
   CreateProductAttributeRequest,
   CreateCategoryAttributeRequest,
+  StoreInfo,
+  StoreInfoUpdate,
+  LabelTemplate,
+  LabelTemplateCreate,
+  LabelTemplateUpdate,
 } from '@/core/domain/types/api';
 
 // API Error class - aligned with shared::error::ErrorCode (u16)
@@ -355,6 +360,38 @@ export class TauriApiClient {
 
   async deleteEmployee(id: string): Promise<void> {
     await invokeAndUnwrap<{ deleted: boolean }>('delete_employee', { id });
+  }
+
+  // ============ Store Info ============
+
+  async getStoreInfo(): Promise<StoreInfo> {
+    return invokeAndUnwrap<StoreInfo>('get_store_info');
+  }
+
+  async updateStoreInfo(data: StoreInfoUpdate): Promise<StoreInfo> {
+    return invokeAndUnwrap<StoreInfo>('update_store_info', { data });
+  }
+
+  // ============ Label Templates ============
+
+  async listLabelTemplates(): Promise<LabelTemplate[]> {
+    return invokeAndUnwrap<LabelTemplate[]>('list_label_templates');
+  }
+
+  async getLabelTemplate(id: string): Promise<LabelTemplate> {
+    return invokeAndUnwrap<LabelTemplate>('get_label_template', { id });
+  }
+
+  async createLabelTemplate(data: LabelTemplateCreate): Promise<LabelTemplate> {
+    return invokeAndUnwrap<LabelTemplate>('create_label_template', { data });
+  }
+
+  async updateLabelTemplate(id: string, data: LabelTemplateUpdate): Promise<LabelTemplate> {
+    return invokeAndUnwrap<LabelTemplate>('update_label_template', { id, data });
+  }
+
+  async deleteLabelTemplate(id: string): Promise<boolean> {
+    return invokeAndUnwrap<boolean>('delete_label_template', { id });
   }
 
   // ============ Price Rules ============

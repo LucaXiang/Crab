@@ -87,22 +87,22 @@ pub struct Claims {
 /// JWT 错误
 #[derive(Error, Debug)]
 pub enum JwtError {
-    #[error("无效令牌: {0}")]
+    #[error("Invalid token: {0}")]
     InvalidToken(String),
 
-    #[error("令牌已过期")]
+    #[error("Token expired")]
     ExpiredToken,
 
-    #[error("无效签名")]
+    #[error("Invalid signature")]
     InvalidSignature,
 
-    #[error("令牌生成失败: {0}")]
+    #[error("Token generation failed: {0}")]
     GenerationFailed(String),
 
-    #[error("密钥生成失败: {0}")]
+    #[error("Key generation failed: {0}")]
     KeyGenerationFailed(String),
 
-    #[error("配置错误: {0}")]
+    #[error("Configuration error: {0}")]
     ConfigError(String),
 }
 

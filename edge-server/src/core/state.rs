@@ -7,7 +7,7 @@ use surrealdb::engine::local::Db;
 
 use crate::auth::JwtService;
 use crate::core::Config;
-use crate::core::config::migrate_legacy_structure;
+
 use crate::db::DbService;
 use crate::orders::{ArchiveWorker, OrdersManager};
 use crate::orders::actions::open_table::load_matching_rules;
@@ -181,14 +181,9 @@ impl ServerState {
             .ensure_work_dir_structure()
             .expect("Failed to create work directory structure");
 
-        // 0.1 Migrate legacy structure if needed
-        let work_dir = PathBuf::from(&config.work_dir);
-        migrate_legacy_structure(&work_dir).expect("Failed to migrate legacy directory structure");
-
         // 1. Initialize DB
-        // Use work_dir/database/crab.db for database path
-        let db_dir = config.database_dir();
-        let db_path = db_dir.join("crab.db");
+        // Database path: {tenant}/server/data/main.db/
+        let db_path = config.database_dir();
         let db_path_str = db_path.to_string_lossy();
 
         let db_service = DbService::new(&db_path_str)
@@ -206,10 +201,11 @@ impl ServerState {
         let resource_versions = Arc::new(ResourceVersions::new());
 
         // 3. Initialize CatalogService first (OrdersManager and PriceRuleEngine depend on it)
-        let catalog_service = Arc::new(CatalogService::new(db.clone()));
+        let images_dir = config.images_dir();
+        let catalog_service = Arc::new(CatalogService::new(db.clone(), images_dir));
 
         // 4. Initialize OrdersManager (event sourcing) with CatalogService
-        let orders_db_path = db_dir.join("orders.redb");
+        let orders_db_path = config.orders_db_file();
         let mut orders_manager =
             OrdersManager::new(&orders_db_path).expect("Failed to initialize orders manager");
         orders_manager.set_catalog_service(catalog_service.clone());
@@ -233,7 +229,7 @@ impl ServerState {
         let price_rule_engine = PriceRuleEngine::new(db.clone(), catalog_service.clone());
 
         // 6. Initialize KitchenPrintService
-        let print_db_path = db_dir.join("print.redb");
+        let print_db_path = config.print_db_file();
         let print_storage =
             PrintStorage::open(&print_db_path).expect("Failed to initialize print storage");
         let kitchen_print_service = Arc::new(KitchenPrintService::new(print_storage));
@@ -598,6 +594,11 @@ impl ServerState {
         PathBuf::from(&self.config.work_dir)
     }
 
+    /// 获取图片目录: {tenant}/server/images/
+    pub fn images_dir(&self) -> PathBuf {
+        self.config.images_dir()
+    }
+
     /// 获取 JWT 服务
     pub fn get_jwt_service(&self) -> Arc<JwtService> {
         self.jwt_service.clone()
@@ -672,10 +673,20 @@ impl ServerState {
         self.activation.is_activated().await
     }
 
-    /// 等待激活信号
+    /// 检查激活状态（非阻塞）
     ///
-    /// 如果未激活，阻塞等待 `notify.notified()`
-    /// 激活成功后返回，继续启动服务
+    /// 返回 Ok(()) 如果已激活且自检通过
+    /// 返回 Err 如果未激活或自检失败
+    pub async fn check_activation(&self) -> Result<(), crate::utils::AppError> {
+        self.activation
+            .check_activation(&self.cert_service)
+            .await
+    }
+
+    /// 等待激活（阻塞）
+    ///
+    /// 阻塞直到激活成功且自检通过。
+    /// 用于 `Server::run()`，确保 HTTPS 只在激活后启动。
     pub async fn wait_for_activation(&self) {
         self.activation
             .wait_for_activation(&self.cert_service)

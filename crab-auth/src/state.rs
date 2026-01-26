@@ -1,4 +1,5 @@
 use crab_cert::CertificateAuthority;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -8,6 +9,64 @@ pub struct AppState {
     pub auth_storage: AuthStorage,
     pub user_store: UserStore,
     pub jwt_secret: String,
+    pub revocation_store: RevocationStore,
+}
+
+/// 实体撤销存储
+///
+/// 存储被撤销的实体 ID，防止已禁用设备继续刷新 binding
+pub struct RevocationStore {
+    /// tenant_id -> Set<entity_id>
+    revoked: Arc<RwLock<HashMap<String, HashSet<String>>>>,
+}
+
+impl RevocationStore {
+    pub fn new() -> Self {
+        Self {
+            revoked: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// 检查实体是否被撤销
+    pub async fn is_revoked(&self, tenant_id: &str, entity_id: &str) -> bool {
+        let revoked = self.revoked.read().await;
+        revoked
+            .get(tenant_id)
+            .is_some_and(|entities| entities.contains(entity_id))
+    }
+
+    /// 撤销实体
+    pub async fn revoke(&self, tenant_id: &str, entity_id: &str) {
+        let mut revoked = self.revoked.write().await;
+        revoked
+            .entry(tenant_id.to_string())
+            .or_default()
+            .insert(entity_id.to_string());
+        info!("🚫 Revoked entity={} for tenant={}", entity_id, tenant_id);
+    }
+
+    /// 恢复实体
+    pub async fn restore(&self, tenant_id: &str, entity_id: &str) -> bool {
+        let mut revoked = self.revoked.write().await;
+        if let Some(entities) = revoked.get_mut(tenant_id) {
+            let removed = entities.remove(entity_id);
+            if removed {
+                info!("✅ Restored entity={} for tenant={}", entity_id, tenant_id);
+            }
+            removed
+        } else {
+            false
+        }
+    }
+
+    /// 获取租户的所有已撤销实体
+    pub async fn list_revoked(&self, tenant_id: &str) -> Vec<String> {
+        let revoked = self.revoked.read().await;
+        revoked
+            .get(tenant_id)
+            .map(|s| s.iter().cloned().collect())
+            .unwrap_or_default()
+    }
 }
 
 pub struct AuthStorage {

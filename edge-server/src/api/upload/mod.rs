@@ -4,9 +4,8 @@
 
 mod handler;
 
-use axum::{Router, body::Bytes, extract::Path, response::IntoResponse, routing::post};
+use axum::{Router, body::Bytes, extract::{Path, State}, response::IntoResponse, routing::post};
 use http::header;
-use std::path::PathBuf;
 
 use crate::core::ServerState;
 
@@ -37,7 +36,10 @@ impl IntoResponse for UploadFileResponse {
 }
 
 /// Serve uploaded file handler
-async fn serve_uploaded_file(Path(filename): Path<String>) -> UploadFileResponse {
+async fn serve_uploaded_file(
+    State(state): State<ServerState>,
+    Path(filename): Path<String>,
+) -> UploadFileResponse {
     tracing::info!("[serve_uploaded_file] filename: {}", filename);
 
     // Security check: prevent path traversal
@@ -49,7 +51,8 @@ async fn serve_uploaded_file(Path(filename): Path<String>) -> UploadFileResponse
         return UploadFileResponse::BadRequest("Invalid filename");
     }
 
-    let file_path = PathBuf::from("uploads/images").join(&filename);
+    // Images dir: {tenant}/server/images/
+    let file_path = state.work_dir().join("images").join(&filename);
     tracing::info!("[serve_uploaded_file] file_path: {:?}", file_path);
 
     // Read file

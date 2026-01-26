@@ -3,7 +3,9 @@
 //! This module provides a high-level printing API for the Tauri application,
 //! using crab-printer for low-level printer operations.
 
-use tracing::{error, info, instrument, warn};
+use tracing::{instrument, warn};
+#[cfg(target_os = "windows")]
+use tracing::{error, info};
 
 pub trait PrinterAdapter {
     fn list_printers(&self) -> Result<Vec<String>, String>;
@@ -13,7 +15,7 @@ pub trait PrinterAdapter {
     fn print_receipt(
         &self,
         printer_name: Option<String>,
-        receipt: crate::api::printers::ReceiptData,
+        receipt: crate::api::ReceiptData,
     ) -> Result<(), String>;
 }
 
@@ -74,7 +76,7 @@ mod windows_adapter {
         fn print_receipt(
             &self,
             printer_name: Option<String>,
-            receipt: crate::api::printers::ReceiptData,
+            receipt: crate::api::ReceiptData,
         ) -> Result<(), String> {
             let name = self.resolve_printer(printer_name)?;
             info!(printer = name, "printing receipt");
@@ -151,7 +153,7 @@ mod fallback_adapter {
         fn print_receipt(
             &self,
             _printer_name: Option<String>,
-            _receipt: crate::api::printers::ReceiptData,
+            _receipt: crate::api::ReceiptData,
         ) -> Result<(), String> {
             Err("PRINTING_NOT_SUPPORTED".to_string())
         }
@@ -190,7 +192,7 @@ pub fn open_cash_drawer(printer_name: Option<String>) -> Result<(), String> {
 #[instrument(skip(receipt))]
 pub fn print_receipt(
     printer_name: Option<String>,
-    receipt: crate::api::printers::ReceiptData,
+    receipt: crate::api::ReceiptData,
 ) -> Result<(), String> {
     current_adapter().print_receipt(printer_name, receipt)
 }

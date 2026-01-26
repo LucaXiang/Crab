@@ -22,7 +22,12 @@ pub mod price_rule;
 pub mod order;
 
 // System
+pub mod store_info;
+pub mod label_template;
 pub mod system_state;
+
+// Image
+pub mod image_ref;
 
 // Re-exports
 pub use attribute::AttributeRepository;
@@ -32,9 +37,12 @@ pub use order::OrderRepository;
 pub use price_rule::PriceRuleRepository;
 pub use print_destination::PrintDestinationRepository;
 pub use role::RoleRepository;
+pub use store_info::StoreInfoRepository;
+pub use label_template::LabelTemplateRepository;
 pub use system_state::SystemStateRepository;
 pub use tag::TagRepository;
 pub use zone::ZoneRepository;
+pub use image_ref::ImageRefRepository;
 
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;

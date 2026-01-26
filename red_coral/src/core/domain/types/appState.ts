@@ -120,6 +120,31 @@ export interface HealthStatus {
 }
 
 // =============================================================================
+// AppState
+// =============================================================================
+
+export type AppState =
+  // 通用状态
+  | { type: 'Uninitialized' }
+  // Server 模式
+  | { type: 'ServerNoTenant' }
+  | {
+      type: 'ServerNeedActivation';
+      data: { reason: ActivationRequiredReason; can_auto_recover: boolean; recovery_hint: string };
+    }
+  | { type: 'ServerActivating'; data: { progress: ActivationProgress } }
+  | { type: 'ServerCheckingSubscription' }
+  | { type: 'ServerSubscriptionBlocked'; data: { info: SubscriptionBlockedInfo } }
+  | { type: 'ServerReady' }
+  | { type: 'ServerAuthenticated' }
+  // Client 模式
+  | { type: 'ClientDisconnected' }
+  | { type: 'ClientNeedSetup' }
+  | { type: 'ClientConnecting'; data: { server_url: string } }
+  | { type: 'ClientConnected' }
+  | { type: 'ClientAuthenticated' };
+
+// =============================================================================
 // 辅助函数
 // =============================================================================
 

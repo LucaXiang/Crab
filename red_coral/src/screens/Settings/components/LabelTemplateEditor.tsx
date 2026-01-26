@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { LabelTemplate, LabelField } from '@/core/domain/types/print';
 import { getImageUrl } from '@/core/services/imageCache';
 import { useI18n } from '../../../hooks/useI18n';
@@ -61,40 +62,45 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       const imageFields = template.fields.filter(f => f.type === 'image' || f.type === 'barcode' || f.type === 'qrcode');
 
       await Promise.all(imageFields.map(async (field) => {
-        let content = field.template || field.dataKey || '';
-
-        // Inject test data variables
-        content = content.replace(/\{(\w+)\}/g, (_, key) =>
-          testDataObj[key] !== undefined ? String(testDataObj[key]) : `{${key}}`
-        );
-
-        if (!content) return;
-
         const sourceType = (field.sourceType || 'image').toLowerCase();
         let src = '';
 
         try {
-          if (sourceType === 'qrcode') {
-            src = await QRCode.toDataURL(content, { margin: 1, errorCorrectionLevel: 'M' });
-          } else if (sourceType === 'barcode') {
-            // Generate barcode on Canvas (converts to PNG for backend compatibility)
-            const canvas = document.createElement('canvas');
-            JsBarcode(canvas, content, {
-              format: 'CODE128',
-              displayValue: false,
-              margin: 0,
-              width: 2,
-              height: 80
-            });
-            src = canvas.toDataURL('image/png');
+          // Check for pending local image first (not yet uploaded)
+          if (field._pendingImagePath && sourceType === 'image') {
+            src = convertFileSrc(field._pendingImagePath);
           } else {
-            // Skip extremely short strings that are likely partial inputs to avoid 404/500 errors
-            if (!content.startsWith('http') && !content.startsWith('data:') && content.length < 3) {
-              return;
-            }
+            let content = field.template || field.dataKey || '';
 
-            // Use image cache which handles hash -> path conversion and caching
-            src = await getImageUrl(content);
+            // Inject test data variables
+            content = content.replace(/\{(\w+)\}/g, (_, key) =>
+              testDataObj[key] !== undefined ? String(testDataObj[key]) : `{${key}}`
+            );
+
+            if (!content) return;
+
+            if (sourceType === 'qrcode') {
+              src = await QRCode.toDataURL(content, { margin: 1, errorCorrectionLevel: 'M' });
+            } else if (sourceType === 'barcode') {
+              // Generate barcode on Canvas (converts to PNG for backend compatibility)
+              const canvas = document.createElement('canvas');
+              JsBarcode(canvas, content, {
+                format: 'CODE128',
+                displayValue: false,
+                margin: 0,
+                width: 2,
+                height: 80
+              });
+              src = canvas.toDataURL('image/png');
+            } else {
+              // Skip extremely short strings that are likely partial inputs to avoid 404/500 errors
+              if (!content.startsWith('http') && !content.startsWith('data:') && content.length < 3) {
+                return;
+              }
+
+              // Use image cache which handles hash -> path conversion and caching
+              src = await getImageUrl(content);
+            }
           }
 
           if (src) {
@@ -459,7 +465,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     }
 
     // Draw Physical Paper Border (Offset Border) - Conspicuous
-    if (showOffsetBorder && (paddingX !== 0 || paddingY !== 0)) {
+    // Always show when checkbox is checked, even if padding is 0
+    if (showOffsetBorder) {
         ctx.strokeStyle = '#ef4444'; // Red-500
         ctx.lineWidth = 2 / viewState.scale;
         ctx.strokeRect(paperX, paperY, labelWidth, labelHeight);
@@ -474,7 +481,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     ctx.strokeStyle = '#9ca3af'; // Gray-400
     ctx.lineWidth = 1 / viewState.scale;
     // Make it dashed if offset is shown to distinguish
-    if (showOffsetBorder && (paddingX !== 0 || paddingY !== 0)) {
+    if (showOffsetBorder) {
        ctx.setLineDash([4 / viewState.scale, 2 / viewState.scale]);
     } else {
        ctx.setLineDash([]);
@@ -483,7 +490,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     ctx.setLineDash([]); // Reset
 
     // Label the content area if offset is shown
-    if (showOffsetBorder && (paddingX !== 0 || paddingY !== 0)) {
+    if (showOffsetBorder) {
         ctx.font = `${10 / viewState.scale}px sans-serif`;
         ctx.fillStyle = '#9ca3af';
         ctx.fillText('Content', 2, -4);

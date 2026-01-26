@@ -55,15 +55,7 @@ interface EntityDataMap {
   TAG: TagEditData;
 }
 
-interface StoreInfo {
-  name: string;
-  address: string;
-  nif: string;
-  logoUrl?: string;
-  phone?: string;
-  email?: string;
-  website?: string;
-}
+// StoreInfo moved to useStoreInfoStore - fetched from server API
 
 interface ModalState<E extends ModalEntity = ModalEntity> {
   open: boolean;
@@ -126,10 +118,6 @@ interface SettingsStore {
   // Navigation
   activeCategory: SettingsCategory;
   setActiveCategory: (category: SettingsCategory) => void;
-
-  // Store Info (persisted)
-  storeInfo: StoreInfo;
-  setStoreInfo: (info: StoreInfo) => void;
 
   // Filter & Pagination UI State
   selectedZoneFilter: string | 'all';
@@ -208,10 +196,6 @@ export const useSettingsStore = create<SettingsStore>()(
       // Navigation
       activeCategory: 'LANG',
       setActiveCategory: (category) => set({ activeCategory: category }),
-
-      // Store Info
-      storeInfo: { name: 'Red Coral POS', address: '', nif: '' },
-      setStoreInfo: (info) => set({ storeInfo: info }),
 
       // Filter & Pagination UI State
       selectedZoneFilter: 'all',
@@ -416,13 +400,7 @@ export const useSettingsFormMeta = () =>
     }))
   );
 
-export const useStoreInfo = () =>
-  useSettingsStore(
-    useShallow((state) => ({
-      info: state.storeInfo,
-      setInfo: state.setStoreInfo,
-    }))
-  );
+// useStoreInfo moved to useStoreInfoStore.ts
 
 export const useDataVersion = () => useSettingsStore((state) => state.dataVersion);
 

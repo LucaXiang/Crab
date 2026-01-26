@@ -52,9 +52,9 @@ export const CartList = React.memo<CartListProps>(({
   }, [groupedItems, categories]);
 
   const getCategoryName = (categoryId: string) => {
-    if (categoryId === 'uncategorized') return '未分类';
+    if (categoryId === 'uncategorized') return t('pos.cart.uncategorized');
     const category = categories.find(c => c.id === categoryId);
-    return category?.name || '未知分类';
+    return category?.name || t('pos.cart.unknown_category');
   };
 
   if (cart.length === 0) {

@@ -42,6 +42,8 @@ export interface LabelField {
   dataKey?: string;
   sourceType?: 'productImage' | 'qrCode' | 'barcode' | 'image';
   maintainAspectRatio?: boolean;
+  /** Temporary local file path for pending image upload (editor only, not persisted) */
+  _pendingImagePath?: string;
   style?: string;
   align?: 'left' | 'center' | 'right';
   verticalAlign?: 'top' | 'middle' | 'bottom';

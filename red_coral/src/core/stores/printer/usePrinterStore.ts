@@ -10,13 +10,17 @@ interface PrinterStore {
   receiptPrinter: string | null;
   kitchenPrinter: string | null;
   labelPrinter: string | null;
+  cashDrawerPrinter: string | null;
   activeLabelTemplateId: string | null;
+  autoOpenCashDrawerAfterReceipt: boolean;
 
   // Actions
   setReceiptPrinter: (name: string | null) => void;
   setKitchenPrinter: (name: string | null) => void;
   setLabelPrinter: (name: string | null) => void;
+  setCashDrawerPrinter: (name: string | null) => void;
   setActiveLabelTemplateId: (id: string | null) => void;
+  setAutoOpenCashDrawerAfterReceipt: (enabled: boolean) => void;
 }
 
 const getItem = (key: string): string | null => {
@@ -38,7 +42,9 @@ export const usePrinterStore = create<PrinterStore>((set) => ({
   receiptPrinter: getItem('printer_receipt'),
   kitchenPrinter: getItem('printer_kitchen'),
   labelPrinter: getItem('printer_label'),
+  cashDrawerPrinter: getItem('printer_cash_drawer'),
   activeLabelTemplateId: getItem('active_label_template_id'),
+  autoOpenCashDrawerAfterReceipt: getItem('auto_open_cash_drawer_after_receipt') === 'true',
 
   // Actions
   setReceiptPrinter: (name) => {
@@ -56,9 +62,19 @@ export const usePrinterStore = create<PrinterStore>((set) => ({
     set({ labelPrinter: name });
   },
 
+  setCashDrawerPrinter: (name) => {
+    setItem('printer_cash_drawer', name);
+    set({ cashDrawerPrinter: name });
+  },
+
   setActiveLabelTemplateId: (id) => {
     setItem('active_label_template_id', id);
     set({ activeLabelTemplateId: id });
+  },
+
+  setAutoOpenCashDrawerAfterReceipt: (enabled) => {
+    setItem('auto_open_cash_drawer_after_receipt', enabled ? 'true' : null);
+    set({ autoOpenCashDrawerAfterReceipt: enabled });
   },
 }));
 
@@ -66,7 +82,9 @@ export const usePrinterStore = create<PrinterStore>((set) => ({
 export const useReceiptPrinter = () => usePrinterStore((state) => state.receiptPrinter);
 export const useKitchenPrinter = () => usePrinterStore((state) => state.kitchenPrinter);
 export const useLabelPrinter = () => usePrinterStore((state) => state.labelPrinter);
+export const useCashDrawerPrinter = () => usePrinterStore((state) => state.cashDrawerPrinter);
 export const useActiveLabelTemplateId = () => usePrinterStore((state) => state.activeLabelTemplateId);
+export const useAutoOpenCashDrawerAfterReceipt = () => usePrinterStore((state) => state.autoOpenCashDrawerAfterReceipt);
 
 // Alias for backward compatibility
 export const useSelectedPrinter = useReceiptPrinter;
@@ -77,6 +95,8 @@ export const usePrinterActions = () => usePrinterStore(
     setReceiptPrinter: state.setReceiptPrinter,
     setKitchenPrinter: state.setKitchenPrinter,
     setLabelPrinter: state.setLabelPrinter,
+    setCashDrawerPrinter: state.setCashDrawerPrinter,
     setActiveLabelTemplateId: state.setActiveLabelTemplateId,
+    setAutoOpenCashDrawerAfterReceipt: state.setAutoOpenCashDrawerAfterReceipt,
   }))
 );

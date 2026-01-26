@@ -538,10 +538,22 @@ pub struct RefreshBindingRequest {
     pub binding: SignedBinding,
 }
 
+/// 统一的认证失败响应（防止信息泄露）
+fn auth_failed() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "success": false,
+        "error": "Authentication failed"
+    }))
+}
+
 /// 刷新 Binding (更新 last_verified_at 并重新签名)
 ///
 /// 边缘服务器和客户端定期调用此 API 来刷新 binding，
 /// 用于防止时钟篡改。
+///
+/// 安全检查：
+/// 1. 验证 binding 签名
+/// 2. 检查实体是否被撤销
 async fn refresh_binding(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RefreshBindingRequest>,
@@ -555,30 +567,48 @@ async fn refresh_binding(
     let tenant_ca = match CertificateAuthority::load_from_file(&cert_path, &key_path) {
         Ok(ca) => ca,
         Err(e) => {
-            return Json(serde_json::json!({
-                "success": false,
-                "error": format!("Tenant not found or CA error: {}", e)
-            }));
+            // 统一错误消息，不泄露租户是否存在
+            tracing::warn!(
+                "Failed to load Tenant CA for tenant={}: {}",
+                req.binding.tenant_id,
+                e
+            );
+            return auth_failed();
         }
     };
 
     // 2. Verify the current binding signature (防止伪造请求)
     if let Err(e) = req.binding.verify_signature(tenant_ca.cert_pem()) {
-        return Json(serde_json::json!({
-            "success": false,
-            "error": format!("Invalid binding signature: {}", e)
-        }));
+        tracing::warn!(
+            "Invalid binding signature for entity={}, tenant={}: {}",
+            req.binding.entity_id,
+            req.binding.tenant_id,
+            e
+        );
+        return auth_failed();
     }
 
-    // 3. Refresh and re-sign
+    // 3. 检查实体是否被撤销
+    if state
+        .revocation_store
+        .is_revoked(&req.binding.tenant_id, &req.binding.entity_id)
+        .await
+    {
+        tracing::warn!(
+            "🚫 Rejected refresh for revoked entity={}, tenant={}",
+            req.binding.entity_id,
+            req.binding.tenant_id
+        );
+        return auth_failed();
+    }
+
+    // 4. Refresh and re-sign
     let refreshed = req.binding.refresh();
     let signed = match refreshed.sign(&tenant_ca.key_pem()) {
         Ok(b) => b,
         Err(e) => {
-            return Json(serde_json::json!({
-                "success": false,
-                "error": format!("Failed to sign binding: {}", e)
-            }));
+            tracing::error!("Failed to sign binding: {}", e);
+            return auth_failed();
         }
     };
 
@@ -659,7 +689,138 @@ async fn refresh_credential(
     }))
 }
 
+// ============================================================================
+// 实体撤销管理 API
+// ============================================================================
+
+/// 撤销实体请求
+#[derive(Deserialize)]
+pub struct RevokeEntityRequest {
+    pub tenant_id: String,
+    pub entity_id: String,
+}
+
+/// 撤销实体（需要管理员权限）
+async fn revoke_entity(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<RevokeEntityRequest>,
+) -> Json<serde_json::Value> {
+    // 验证管理员 JWT
+    if !verify_admin_token(&state, &headers) {
+        return Json(serde_json::json!({
+            "success": false,
+            "error": "Unauthorized"
+        }));
+    }
+
+    state
+        .revocation_store
+        .revoke(&req.tenant_id, &req.entity_id)
+        .await;
+
+    Json(serde_json::json!({
+        "success": true,
+        "message": format!("Entity {} has been revoked", req.entity_id)
+    }))
+}
+
+/// 恢复实体（需要管理员权限）
+async fn restore_entity(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<RevokeEntityRequest>,
+) -> Json<serde_json::Value> {
+    // 验证管理员 JWT
+    if !verify_admin_token(&state, &headers) {
+        return Json(serde_json::json!({
+            "success": false,
+            "error": "Unauthorized"
+        }));
+    }
+
+    let restored = state
+        .revocation_store
+        .restore(&req.tenant_id, &req.entity_id)
+        .await;
+
+    if restored {
+        Json(serde_json::json!({
+            "success": true,
+            "message": format!("Entity {} has been restored", req.entity_id)
+        }))
+    } else {
+        Json(serde_json::json!({
+            "success": false,
+            "error": "Entity was not revoked"
+        }))
+    }
+}
+
+/// 列出已撤销的实体
+#[derive(Deserialize)]
+pub struct ListRevokedRequest {
+    pub tenant_id: String,
+}
+
+async fn list_revoked_entities(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<ListRevokedRequest>,
+) -> Json<serde_json::Value> {
+    // 验证管理员 JWT
+    if !verify_admin_token(&state, &headers) {
+        return Json(serde_json::json!({
+            "success": false,
+            "error": "Unauthorized"
+        }));
+    }
+
+    let entities = state.revocation_store.list_revoked(&req.tenant_id).await;
+
+    Json(serde_json::json!({
+        "success": true,
+        "revoked_entities": entities
+    }))
+}
+
+/// 验证管理员 JWT token
+fn verify_admin_token(state: &AppState, headers: &HeaderMap) -> bool {
+    let auth_header = match headers.get("Authorization") {
+        Some(h) => h,
+        None => return false,
+    };
+
+    let auth_str = match auth_header.to_str() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    if !auth_str.starts_with("Bearer ") {
+        return false;
+    }
+
+    let token = &auth_str[7..];
+
+    match decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &Validation::new(Algorithm::HS256),
+    ) {
+        Ok(data) => {
+            // 检查是否有 cert:issue 权限（管理员权限）
+            data.claims.scopes.contains(&"cert:issue".to_string())
+        }
+        Err(_) => false,
+    }
+}
+
 pub fn router(state: Arc<AppState>) -> Router {
+    use tower::limit::ConcurrencyLimitLayer;
+
+    // 并发限制：最多 100 个并发请求（防止 DoS）
+    let concurrency_limit = ConcurrencyLimitLayer::new(100);
+
     Router::new()
         .route("/api/auth/login", post(login))
         .route("/api/server/activate", post(activate))
@@ -668,5 +829,11 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/credential/refresh", post(refresh_credential))
         .route("/pki/root_ca", get(get_root_ca))
         .route("/api/tenant/subscription", post(get_subscription_status))
+        // 撤销管理 API
+        .route("/api/entity/revoke", post(revoke_entity))
+        .route("/api/entity/restore", post(restore_entity))
+        .route("/api/entity/revoked", post(list_revoked_entities))
+        // 并发限制
+        .layer(concurrency_limit)
         .with_state(state)
 }

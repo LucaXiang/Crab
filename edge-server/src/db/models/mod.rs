@@ -25,7 +25,12 @@ pub mod price_rule;
 pub mod order;
 
 // System
+pub mod store_info;
+pub mod label_template;
 pub mod system_state;
+
+// Image
+pub mod image_ref;
 
 // Re-exports
 pub use attribute::{Attribute, AttributeBinding, AttributeBindingFull, AttributeCreate, AttributeOption, AttributeUpdate};
@@ -48,6 +53,12 @@ pub use print_destination::{
 };
 pub use product::{EmbeddedSpec, Product, ProductCreate, ProductFull, ProductUpdate};
 pub use role::{Role, RoleCreate, RoleId, RoleUpdate};
+pub use store_info::{StoreInfo, StoreInfoUpdate};
+pub use label_template::{
+    LabelField, LabelFieldAlignment, LabelFieldType, LabelTemplate, LabelTemplateCreate,
+    LabelTemplateUpdate,
+};
 pub use system_state::{SystemState, SystemStateUpdate};
 pub use tag::{Tag, TagCreate, TagUpdate};
 pub use zone::{Zone, ZoneCreate, ZoneUpdate};
+pub use image_ref::{ImageRef, ImageRefCreate, ImageRefEntityType};

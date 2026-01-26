@@ -23,6 +23,7 @@ async fn main() {
         auth_storage: state::AuthStorage::new(work_dir.clone()),
         user_store: state::UserStore::new(),
         jwt_secret: "crab-auth-secret-key-2024".to_string(),
+        revocation_store: state::RevocationStore::new(),
     });
 
     // Ensure Root CA exists on startup

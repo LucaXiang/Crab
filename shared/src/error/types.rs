@@ -146,6 +146,16 @@ impl AppError {
     pub fn client_disconnected() -> Self {
         Self::new(ErrorCode::ClientDisconnected)
     }
+
+    /// Create a not activated error
+    pub fn not_activated(msg: impl Into<String>) -> Self {
+        Self::with_message(ErrorCode::ActivationFailed, msg)
+    }
+
+    /// Create a subscription blocked error
+    pub fn subscription_blocked(msg: impl Into<String>) -> Self {
+        Self::with_message(ErrorCode::SubscriptionBlocked, msg)
+    }
 }
 
 /// Unified API response structure

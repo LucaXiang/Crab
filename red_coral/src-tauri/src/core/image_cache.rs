@@ -68,8 +68,8 @@ pub struct ImageDownloadContext {
 
 /// 图片缓存服务
 pub struct ImageCacheService {
-    /// Client 模式的缓存目录: {tenant}/image_cache/images/
-    images_dir: PathBuf,
+    /// Client 模式的缓存目录: {tenant}/cache/images/
+    cache_images_dir: PathBuf,
 }
 
 impl ImageCacheService {
@@ -77,12 +77,13 @@ impl ImageCacheService {
     ///
     /// `tenant_path` 是当前租户的数据目录
     pub fn new(tenant_path: &Path) -> Self {
-        let images_dir = tenant_path.join("image_cache/images");
+        // 新路径: {tenant}/cache/images/
+        let cache_images_dir = tenant_path.join("cache/images");
         // 创建目录（如果不存在）
-        if let Err(e) = std::fs::create_dir_all(&images_dir) {
+        if let Err(e) = std::fs::create_dir_all(&cache_images_dir) {
             tracing::warn!("Failed to create image cache directory: {}", e);
         }
-        Self { images_dir }
+        Self { cache_images_dir }
     }
 
     /// 验证 hash 格式 (SHA256 = 64 hex chars)
@@ -96,6 +97,7 @@ impl ImageCacheService {
     /// 获取图片本地路径 - Server 模式
     ///
     /// 直接返回 EdgeServer 的图片路径
+    /// `server_work_dir` 是 `{tenant}/server/`
     pub fn get_server_image_path(
         &self,
         hash: &str,
@@ -103,12 +105,13 @@ impl ImageCacheService {
     ) -> Result<PathBuf, ImageCacheError> {
         Self::validate_hash(hash)?;
 
+        // 新路径: {tenant}/server/images/{hash}.jpg
         let path = server_work_dir
-            .join("uploads/images")
+            .join("images")
             .join(format!("{}.jpg", hash));
 
         if !path.exists() {
-            tracing::warn!(hash = %hash, "Image not found in server uploads");
+            tracing::warn!(hash = %hash, "Image not found in server images");
             return Err(ImageCacheError::NotFound(hash.to_string()));
         }
 
@@ -125,7 +128,7 @@ impl ImageCacheService {
     ) -> Result<PathBuf, ImageCacheError> {
         Self::validate_hash(hash)?;
 
-        let local_path = self.images_dir.join(format!("{}.jpg", hash));
+        let local_path = self.cache_images_dir.join(format!("{}.jpg", hash));
 
         if local_path.exists() {
             return Ok(local_path);
@@ -137,6 +140,8 @@ impl ImageCacheService {
     }
 
     /// 批量解析图片路径 - Server 模式
+    ///
+    /// `server_work_dir` 是 `{tenant}/server/`
     pub fn resolve_server_image_paths(
         &self,
         hashes: &[String],
@@ -145,7 +150,8 @@ impl ImageCacheService {
         let mut paths = std::collections::HashMap::new();
         let mut failed = Vec::new();
 
-        let images_base = server_work_dir.join("uploads/images");
+        // 新路径: {tenant}/server/images/
+        let images_base = server_work_dir.join("images");
 
         for hash in hashes {
             if hash.is_empty() {
@@ -188,7 +194,7 @@ impl ImageCacheService {
                 continue;
             }
 
-            let local_path = self.images_dir.join(format!("{}.jpg", hash));
+            let local_path = self.cache_images_dir.join(format!("{}.jpg", hash));
             if local_path.exists() {
                 paths.insert(hash.clone(), local_path.to_string_lossy().to_string());
             } else {
@@ -228,12 +234,12 @@ impl ImageCacheService {
         for hash in hashes {
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let hash = hash.clone();
-            let images_dir = self.images_dir.clone();
+            let cache_images_dir = self.cache_images_dir.clone();
             let ctx = ctx.clone();
 
             handles.push(tokio::spawn(async move {
                 let _permit = permit;
-                let local_path = images_dir.join(format!("{}.jpg", hash));
+                let local_path = cache_images_dir.join(format!("{}.jpg", hash));
 
                 let url = format!("{}/api/image/{}.jpg", ctx.edge_url, hash);
                 match ctx.http_client.get(&url).send().await {
@@ -282,7 +288,7 @@ impl ImageCacheService {
                 continue;
             }
 
-            let local_path = self.images_dir.join(format!("{}.jpg", hash));
+            let local_path = self.cache_images_dir.join(format!("{}.jpg", hash));
 
             if local_path.exists() {
                 already_cached += 1;
@@ -291,12 +297,12 @@ impl ImageCacheService {
 
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let hash = hash.clone();
-            let images_dir = self.images_dir.clone();
+            let cache_images_dir = self.cache_images_dir.clone();
             let ctx = ctx.clone();
 
             handles.push(tokio::spawn(async move {
                 let _permit = permit;
-                let local_path = images_dir.join(format!("{}.jpg", hash));
+                let local_path = cache_images_dir.join(format!("{}.jpg", hash));
 
                 let url = format!("{}/api/image/{}.jpg", ctx.edge_url, hash);
                 match ctx.http_client.get(&url).send().await {
@@ -343,7 +349,7 @@ impl ImageCacheService {
         let mut removed_count = 0u32;
         let mut freed_bytes = 0u64;
 
-        let mut entries = match tokio::fs::read_dir(&self.images_dir).await {
+        let mut entries = match tokio::fs::read_dir(&self.cache_images_dir).await {
             Ok(e) => e,
             Err(e) => {
                 tracing::warn!("Failed to read image cache directory: {}", e);

@@ -16,6 +16,7 @@ pub mod https;
 pub mod message_bus;
 pub mod provisioning;
 pub mod tenant_binding;
+pub mod image_cleanup;
 
 pub use activation::ActivationService;
 pub use activation::ActivationStatus;
@@ -25,3 +26,4 @@ pub use https::HttpsService;
 pub use message_bus::MessageBusService;
 pub use provisioning::ProvisioningService;
 pub use tenant_binding::{Subscription, TenantBinding};
+pub use image_cleanup::ImageCleanupService;

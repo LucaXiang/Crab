@@ -183,8 +183,12 @@ pub enum ErrorCode {
     PrinterNotAvailable = 9201,
     /// Print operation failed
     PrintFailed = 9202,
+    /// Label printing not implemented
+    LabelPrintingNotImplemented = 9203,
     /// Client disconnected
     ClientDisconnected = 9301,
+    /// Subscription blocked (canceled or unpaid)
+    SubscriptionBlocked = 3006,
 }
 
 impl ErrorCode {
@@ -292,7 +296,9 @@ impl ErrorCode {
             ErrorCode::BridgeConnectionFailed => "Bridge connection failed",
             ErrorCode::PrinterNotAvailable => "Printer is not available",
             ErrorCode::PrintFailed => "Print operation failed",
+            ErrorCode::LabelPrintingNotImplemented => "Label printing is not implemented",
             ErrorCode::ClientDisconnected => "Client disconnected",
+            ErrorCode::SubscriptionBlocked => "Subscription is blocked",
         }
     }
 }
@@ -410,7 +416,9 @@ impl TryFrom<u16> for ErrorCode {
             9103 => Ok(ErrorCode::BridgeConnectionFailed),
             9201 => Ok(ErrorCode::PrinterNotAvailable),
             9202 => Ok(ErrorCode::PrintFailed),
+            9203 => Ok(ErrorCode::LabelPrintingNotImplemented),
             9301 => Ok(ErrorCode::ClientDisconnected),
+            3006 => Ok(ErrorCode::SubscriptionBlocked),
 
             _ => Err(InvalidErrorCode(value)),
         }

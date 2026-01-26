@@ -655,3 +655,72 @@ export interface KitchenOrderListResponse {
   items: KitchenOrder[];
   total: number | null;
 }
+
+// ============ Store Info ============
+
+/**
+ * Store information (singleton per tenant)
+ * Used for receipts, labels, and business info display
+ */
+export interface StoreInfo {
+  id: string | null;
+  name: string;
+  address: string;
+  /** Tax identification number (NIF) */
+  nif: string;
+  logo_url: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface StoreInfoUpdate {
+  name?: string;
+  address?: string;
+  nif?: string;
+  logo_url?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+}
+
+// ============ Label Template (API DTOs) ============
+
+// Re-export LabelTemplate from print types for convenience
+export type { LabelTemplate, LabelField } from '../print/labelTemplate';
+
+export interface LabelTemplateCreate {
+  name: string;
+  description?: string;
+  width: number;
+  height: number;
+  padding?: number;
+  fields?: import('../print/labelTemplate').LabelField[];
+  is_default?: boolean;
+  is_active?: boolean;
+  width_mm?: number;
+  height_mm?: number;
+  padding_mm_x?: number;
+  padding_mm_y?: number;
+  render_dpi?: number;
+  test_data?: string;
+}
+
+export interface LabelTemplateUpdate {
+  name?: string;
+  description?: string;
+  width?: number;
+  height?: number;
+  padding?: number;
+  fields?: import('../print/labelTemplate').LabelField[];
+  is_default?: boolean;
+  is_active?: boolean;
+  width_mm?: number;
+  height_mm?: number;
+  padding_mm_x?: number;
+  padding_mm_y?: number;
+  render_dpi?: number;
+  test_data?: string;
+}

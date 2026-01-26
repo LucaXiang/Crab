@@ -169,7 +169,7 @@ impl CertService {
         }
 
         // 注意: 证书链验证已在 self_check() 中完成
-        // load_tls_config() 在 wait_for_activation() 之后调用
+        // load_tls_config() 在 check_activation() 之后调用
         // 此时 self_check() 已验证: 证书链 + 硬件绑定
         // 这里只需加载证书即可，无需重复验证
 

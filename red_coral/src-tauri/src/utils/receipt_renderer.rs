@@ -1,4 +1,4 @@
-use crate::api::printers::ReceiptData;
+use crate::api::ReceiptData;
 use crate::utils::escpos_text::{get_gbk_width, pad_to_gbk_width, EscPosTextBuilder};
 
 pub struct ReceiptRenderer<'a> {

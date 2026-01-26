@@ -1,23 +1,83 @@
-import React from 'react';
-import { useStoreInfo } from '@/core/stores/settings';
+import React, { useEffect, useState } from 'react';
+import { useStoreInfo, useStoreInfoStore } from '@/core/stores/settings';
 import { useI18n } from '@/hooks/useI18n';
-import { Save, Store, Building2, MapPin, Phone, Mail, Globe, CreditCard, ImageIcon } from 'lucide-react';
+import { Save, Store, Building2, MapPin, Phone, Mail, Globe, CreditCard, ImageIcon, Loader2 } from 'lucide-react';
 import { useDirtyForm } from '@/shared/hooks/useDirtyForm';
+import { toast } from '@/presentation/components/Toast';
 
 export const StoreSettings: React.FC = () => {
-  const { info, setInfo } = useStoreInfo();
+  const info = useStoreInfo();
+  const { fetchStoreInfo, updateStoreInfo, isLoading, isLoaded } = useStoreInfoStore();
   const { t } = useI18n();
-  const { values: formData, handleChange, isDirty, reset } = useDirtyForm(info);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch store info on mount
+  useEffect(() => {
+    fetchStoreInfo();
+  }, []);
+
+  // Map API snake_case to form camelCase for consistency
+  const formInfo = {
+    name: info.name,
+    address: info.address,
+    nif: info.nif,
+    logoUrl: info.logo_url || '',
+    phone: info.phone || '',
+    email: info.email || '',
+    website: info.website || '',
+  };
+
+  const { values: formData, handleChange, isDirty, reset } = useDirtyForm(formInfo);
+
+  // Re-sync form when data is loaded
+  useEffect(() => {
+    if (isLoaded) {
+      reset({
+        name: info.name,
+        address: info.address,
+        nif: info.nif,
+        logoUrl: info.logo_url || '',
+        phone: info.phone || '',
+        email: info.email || '',
+        website: info.website || '',
+      });
+    }
+  }, [isLoaded, info]);
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     handleChange(name as keyof typeof formData, value);
   };
 
-  const handleSave = () => {
-    setInfo(formData);
-    reset(formData);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // Map form camelCase back to API snake_case
+      await updateStoreInfo({
+        name: formData.name,
+        address: formData.address,
+        nif: formData.nif,
+        logo_url: formData.logoUrl || null,
+        phone: formData.phone || null,
+        email: formData.email || null,
+        website: formData.website || null,
+      });
+      reset(formData);
+      toast.success(t('common.message.save_success'));
+    } catch {
+      toast.error(t('common.message.error'));
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading && !isLoaded) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -39,15 +99,19 @@ export const StoreSettings: React.FC = () => {
           </div>
           <button
             onClick={handleSave}
-            disabled={!isDirty}
+            disabled={!isDirty || isSaving}
             className={`flex items-center px-6 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
-              isDirty
+              isDirty && !isSaving
                 ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             }`}
           >
-            <Save className="w-4 h-4 mr-2" />
-            {t('common.action.save')}
+            {isSaving ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            {isSaving ? t('common.message.saving') : t('common.action.save')}
           </button>
         </div>
       </div>

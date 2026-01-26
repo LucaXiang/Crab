@@ -33,6 +33,7 @@
 
 import { useCallback } from 'react';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
+import { t } from '@/infrastructure/i18n';
 
 /**
  * Command lock error thrown when trying to execute during sync
@@ -74,9 +75,9 @@ export function useCommandLock() {
    * Get human-readable status message for UI
    */
   const statusMessage = (() => {
-    if (isSyncing) return '系统同步中...';
-    if (isDisconnected) return '连接已断开';
-    if (!isInitialized) return '初始化中...';
+    if (isSyncing) return t('system.syncing');
+    if (isDisconnected) return t('system.disconnected');
+    if (!isInitialized) return t('system.initializing');
     return null;
   })();
 
@@ -93,10 +94,10 @@ export function useCommandLock() {
       if (currentState !== 'connected' || !currentInit) {
         const message =
           currentState === 'syncing'
-            ? '系统同步中，请稍候...'
+            ? t('system.syncing_wait')
             : currentState === 'disconnected'
-              ? '连接已断开，请等待重连...'
-              : '系统初始化中...';
+              ? t('system.disconnected_reconnecting')
+              : t('system.initializing_wait');
 
         throw new CommandLockError(message, currentState);
       }
@@ -116,10 +117,10 @@ export function useCommandLock() {
     if (currentState !== 'connected' || !currentInit) {
       const message =
         currentState === 'syncing'
-          ? '系统同步中，请稍候...'
+          ? t('system.syncing_wait')
           : currentState === 'disconnected'
-            ? '连接已断开，请等待重连...'
-            : '系统初始化中...';
+            ? t('system.disconnected_reconnecting')
+            : t('system.initializing_wait');
 
       throw new CommandLockError(message, currentState);
     }
@@ -154,10 +155,10 @@ export function checkCommandLock(): { canExecute: boolean; error: string | null 
 
   const error =
     connectionState === 'syncing'
-      ? '系统同步中，请稍候...'
+      ? t('system.syncing_wait')
       : connectionState === 'disconnected'
-        ? '连接已断开，请等待重连...'
-        : '系统初始化中...';
+        ? t('system.disconnected_reconnecting')
+        : t('system.initializing_wait');
 
   return { canExecute: false, error };
 }

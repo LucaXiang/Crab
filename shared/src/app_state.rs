@@ -72,21 +72,27 @@ pub enum ActivationRequiredReason {
 }
 
 impl ActivationRequiredReason {
-    /// 获取恢复建议的 code (前端负责 i18n)
-    pub fn recovery_hint_code(&self) -> &'static str {
+    /// 获取恢复建议 (完整文本)
+    pub fn recovery_hint(&self) -> &'static str {
         match self {
-            Self::FirstTimeSetup => "hint.first_time_setup",
-            Self::CertificateExpired { .. } => "hint.certificate_expired",
-            Self::CertificateExpiringSoon { .. } => "hint.certificate_expiring_soon",
-            Self::CertificateInvalid { .. } => "hint.certificate_invalid",
-            Self::SignatureInvalid { .. } => "hint.signature_invalid",
-            Self::DeviceMismatch { .. } => "hint.device_mismatch",
-            Self::ClockTampering { .. } => "hint.clock_tampering",
-            Self::BindingInvalid { .. } => "hint.binding_invalid",
-            Self::TokenExpired { .. } => "hint.token_expired",
-            Self::NetworkError { can_continue_offline: true, .. } => "hint.network_error_offline_ok",
-            Self::NetworkError { can_continue_offline: false, .. } => "hint.network_error",
-            Self::Revoked { .. } => "hint.revoked",
+            Self::FirstTimeSetup => "输入管理员提供的凭据完成激活",
+            Self::CertificateExpired { .. } => "请重新激活设备以更新证书",
+            Self::CertificateExpiringSoon { .. } => "建议尽快重新激活以更新证书",
+            Self::CertificateInvalid { .. } => "证书文件损坏，请重新激活",
+            Self::SignatureInvalid { .. } => "安全验证失败，请重新激活",
+            Self::DeviceMismatch { .. } => "如果更换了设备，请联系管理员重新激活",
+            Self::ClockTampering { .. } => "请检查系统时间设置是否正确",
+            Self::BindingInvalid { .. } => "设备绑定无效，请重新激活",
+            Self::TokenExpired { .. } => "凭据已过期，请重新激活",
+            Self::NetworkError {
+                can_continue_offline: true,
+                ..
+            } => "可以离线继续使用，联网后将自动同步",
+            Self::NetworkError {
+                can_continue_offline: false,
+                ..
+            } => "请检查网络连接后重试",
+            Self::Revoked { .. } => "请联系管理员了解详情",
         }
     }
 
@@ -95,8 +101,35 @@ impl ActivationRequiredReason {
         matches!(
             self,
             Self::CertificateExpiringSoon { .. }
-                | Self::NetworkError { can_continue_offline: true, .. }
+                | Self::NetworkError {
+                    can_continue_offline: true,
+                    ..
+                }
         )
+    }
+
+    /// 获取恢复建议代码 (用于前端 i18n)
+    pub fn recovery_hint_code(&self) -> &'static str {
+        match self {
+            Self::FirstTimeSetup => "first_time_setup",
+            Self::CertificateExpired { .. } => "certificate_expired",
+            Self::CertificateExpiringSoon { .. } => "certificate_expiring_soon",
+            Self::CertificateInvalid { .. } => "certificate_invalid",
+            Self::SignatureInvalid { .. } => "signature_invalid",
+            Self::DeviceMismatch { .. } => "device_mismatch",
+            Self::ClockTampering { .. } => "clock_tampering",
+            Self::BindingInvalid { .. } => "binding_invalid",
+            Self::TokenExpired { .. } => "token_expired",
+            Self::NetworkError {
+                can_continue_offline: true,
+                ..
+            } => "network_error_offline_ok",
+            Self::NetworkError {
+                can_continue_offline: false,
+                ..
+            } => "network_error",
+            Self::Revoked { .. } => "revoked",
+        }
     }
 }
 

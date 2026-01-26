@@ -5,9 +5,11 @@
 //! - SessionCache: 员工会话缓存（支持离线登录）
 //! - ClientBridge: 统一的客户端桥接层
 //! - ApiResponse: 统一的 API 响应格式
+//! - TenantPaths: 租户目录路径管理
 
 pub mod bridge;
 pub mod image_cache;
+pub mod paths;
 pub mod response;
 pub mod session_cache;
 pub mod tenant_manager;
@@ -24,4 +26,5 @@ pub use response::{
     RolePermissionListData, TableListData, TagListData, TenantListData, ZoneListData,
 };
 pub use session_cache::{EmployeeSession, LoginMode, SessionCache, SessionCacheError};
+pub use paths::TenantPaths;
 pub use tenant_manager::{TenantError, TenantInfo, TenantManager};

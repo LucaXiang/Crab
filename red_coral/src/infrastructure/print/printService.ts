@@ -1,12 +1,23 @@
 /**
  * Print Service
  *
- * NOTE: 打印功能现在由服务端 (edge-server) 处理。
- * 前端不再需要直接调用打印命令。
- * 保留此文件仅用于类型导出和向后兼容。
+ * 本地打印功能通过 Tauri 命令调用：
+ * - listPrinters: 获取本地驱动打印机列表
+ * - openCashDrawer: 打开钱箱
+ *
+ * 收据/厨房票据打印由服务端处理。
  */
 
+import { invoke } from '@tauri-apps/api/core';
 import type { ReceiptPrintConfig, KitchenTicketPrintConfig, LabelPrintConfig } from '@/core/domain/types/print';
+import { t } from '@/infrastructure/i18n';
+
+/** API 响应格式 */
+interface ApiResponse<T> {
+  code: number;
+  message: string;
+  data: T;
+}
 
 export interface PrintService {
   printReceipt(config: ReceiptPrintConfig): Promise<void>;
@@ -21,8 +32,43 @@ export interface PrintService {
 
 // 打印功能已移至服务端，这些函数现在是空操作
 const notImplemented = async () => {
-  console.warn('[PrintService] 打印功能已由服务端处理，前端调用无效');
+  console.warn('[PrintService] 此打印功能由服务端处理，请使用对应的 API');
 };
+
+/**
+ * 获取本地驱动打印机列表
+ */
+async function listPrintersImpl(): Promise<string[]> {
+  try {
+    const response = await invoke<ApiResponse<string[]>>('list_printers');
+    if (response.code === 0) {
+      return response.data;
+    }
+    console.warn('[PrintService] 获取打印机列表失败:', response.message);
+    return [];
+  } catch (error) {
+    console.error('[PrintService] 获取打印机列表错误:', error);
+    return [];
+  }
+}
+
+/**
+ * 打开钱箱
+ * @param printerName 打印机名称，不传则使用默认打印机
+ */
+async function openCashDrawerImpl(printerName?: string): Promise<void> {
+  try {
+    const response = await invoke<ApiResponse<null>>('open_cash_drawer', {
+      printer_name: printerName ?? null,
+    });
+    if (response.code !== 0) {
+      throw new Error(response.message);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(t('common.message.cash_drawer_failed', { message }));
+  }
+}
 
 export const printService: PrintService = {
   printReceipt: notImplemented,
@@ -31,8 +77,8 @@ export const printService: PrintService = {
   printMultipleKitchenTickets: notImplemented,
   printLabel: notImplemented,
   printMultipleLabels: notImplemented,
-  openCashDrawer: notImplemented,
-  listPrinters: async () => [],
+  openCashDrawer: openCashDrawerImpl,
+  listPrinters: listPrintersImpl,
 };
 
 // Export individual functions
