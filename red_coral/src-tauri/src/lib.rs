@@ -17,9 +17,11 @@ pub use crab_client;
 pub use edge_server;
 pub use shared;
 
+pub mod api;
 pub mod commands;
 pub mod core;
 pub mod events;
+pub mod utils;
 
 use core::ClientBridge;
 
@@ -227,6 +229,13 @@ pub async fn run() {
             commands::init_genesis,
             commands::update_last_order,
             commands::update_sync_state,
+            commands::get_store_info,
+            commands::update_store_info,
+            commands::list_label_templates,
+            commands::get_label_template,
+            commands::create_label_template,
+            commands::update_label_template,
+            commands::delete_label_template,
             commands::list_employees,
             commands::list_all_employees,
             commands::get_employee,
@@ -259,6 +268,13 @@ pub async fn run() {
             commands::save_image,
             // Sync commands
             commands::get_sync_status,
+            // Printer commands
+            commands::list_printers,
+            commands::open_cash_drawer,
+            commands::print_receipt,
+            commands::print_label,
+            // Health commands
+            commands::get_health_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
