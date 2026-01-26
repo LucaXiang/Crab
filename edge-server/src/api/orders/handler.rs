@@ -1,14 +1,15 @@
 //! Order API Handlers
 
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Path, Query, State},
 };
 use serde::{Deserialize, Serialize};
 
+use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{Order, OrderAddItem, OrderAddPayment, OrderDetail, OrderEvent, OrderEventType, OrderSummary};
-use crate::db::repository::OrderRepository;
+use crate::db::repository::{OrderRepository, ShiftRepository};
 use crate::utils::{AppError, AppResult};
 
 const RESOURCE: &str = "order";
@@ -113,14 +114,29 @@ pub async fn remove_item(
 /// Add payment to order
 pub async fn add_payment(
     State(state): State<ServerState>,
+    Extension(user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(payload): Json<OrderAddPayment>,
 ) -> AppResult<Json<Order>> {
     let repo = OrderRepository::new(state.db.clone());
+
+    // Check if this is a cash payment before adding
+    let is_cash = payload.method.to_lowercase() == "cash";
+    let amount = payload.amount;
+
     let order = repo
         .add_payment(&id, payload)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
+
+    // Update shift expected_cash for cash payments
+    if is_cash {
+        let shift_repo = ShiftRepository::new(state.db.clone());
+        if let Err(e) = shift_repo.add_cash_payment(&user.id, amount).await {
+            // Log but don't fail the payment - shift tracking is secondary
+            tracing::warn!("Failed to update shift expected_cash: {}", e);
+        }
+    }
 
     state
         .broadcast_sync(RESOURCE, "payment_added", &id, Some(&order))
