@@ -83,11 +83,15 @@ impl DailyReportRepository {
                 LET $total_discount = math::sum($completed.discount_amount) OR 0;
                 LET $total_surcharge = math::sum($completed.surcharge_amount) OR 0;
 
-                -- Payment breakdowns (from order_payment via has_payment edge)
+                -- Payment breakdowns via graph edge traversal
+                LET $completed_ids = (SELECT VALUE id FROM $completed);
                 LET $payments = (
-                    SELECT method, amount FROM order_payment
-                    WHERE <-has_payment<-order IN $completed
-                    AND cancelled = false
+                    SELECT
+                        out.method AS method,
+                        out.amount AS amount
+                    FROM has_payment
+                    WHERE in IN $completed_ids
+                    AND out.cancelled = false
                 );
                 LET $payment_breakdown = (
                     SELECT
@@ -99,15 +103,15 @@ impl DailyReportRepository {
                 );
 
                 -- Tax breakdowns by rate (Spain IVA: 0%, 4%, 10%, 21%)
-                -- Group order items by tax_rate
+                -- Get order items via graph edge traversal
                 LET $order_items = (
                     SELECT
-                        tax_rate,
-                        (quantity * unit_price) AS gross_amount,
-                        ((quantity * unit_price) * tax_rate / (100 + tax_rate)) AS tax_amount,
-                        order_id
-                    FROM order_item
-                    WHERE order_id IN (SELECT id FROM $completed)
+                        out.tax_rate AS tax_rate,
+                        (out.quantity * out.unit_price) AS gross_amount,
+                        ((out.quantity * out.unit_price) * out.tax_rate / (100 + out.tax_rate)) AS tax_amount,
+                        in AS order_id
+                    FROM has_item
+                    WHERE in IN $completed_ids
                 );
 
                 LET $tax_breakdown = (
@@ -116,7 +120,7 @@ impl DailyReportRepository {
                         math::sum(gross_amount) AS gross_amount,
                         math::sum(tax_amount) AS tax_amount,
                         (math::sum(gross_amount) - math::sum(tax_amount)) AS net_amount,
-                        count(DISTINCT order_id) AS order_count
+                        array::len(array::distinct(array::group(order_id))) AS order_count
                     FROM $order_items
                     GROUP BY tax_rate
                     ORDER BY tax_rate DESC

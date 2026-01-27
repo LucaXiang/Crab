@@ -172,6 +172,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             tax: None,
+        tax_rate: None,
         };
         let item2 = CartItemSnapshot {
             id: "product:2".to_string(),
@@ -194,6 +195,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             tax: None,
+        tax_rate: None,
         };
         snapshot.items.push(item1);
         snapshot.items.push(item2);

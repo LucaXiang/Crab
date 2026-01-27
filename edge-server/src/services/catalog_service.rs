@@ -61,11 +61,12 @@ fn default_true() -> bool {
     true
 }
 
-/// Product metadata for price rule matching
+/// Product metadata for price rule matching and tax calculation
 #[derive(Debug, Clone, Default)]
 pub struct ProductMeta {
     pub category_id: String, // "category:xxx"
     pub tags: Vec<String>,   // ["tag:xxx", ...]
+    pub tax_rate: i32,       // Tax rate percentage (e.g., 21 for 21% IVA)
 }
 
 /// Kitchen print configuration (computed result with fallback chain applied)
@@ -918,6 +919,7 @@ impl CatalogService {
         cache.get(product_id).map(|p| ProductMeta {
             category_id: p.category.to_string(),
             tags: p.tags.iter().filter_map(|t| t.id.as_ref()).map(|t| t.to_string()).collect(),
+            tax_rate: p.tax_rate,
         })
     }
 
@@ -933,6 +935,7 @@ impl CatalogService {
                         ProductMeta {
                             category_id: p.category.to_string(),
                             tags: p.tags.iter().filter_map(|t| t.id.as_ref()).map(|t| t.to_string()).collect(),
+                            tax_rate: p.tax_rate,
                         },
                     )
                 })

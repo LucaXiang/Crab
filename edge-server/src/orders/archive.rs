@@ -314,11 +314,12 @@ impl OrderArchiveService {
                     discount_amount = $item{}_discount_amount,
                     surcharge_amount = $item{}_surcharge_amount,
                     tax = $item{}_tax,
+                    tax_rate = $item{}_tax_rate,
                     note = $item{}_note;
                 RELATE ($order[0].id)->has_item->({}[0].id);
                 "#,
                 var_name,
-                i, i, i, i, i, i, i, i, i, i, i, i, i,
+                i, i, i, i, i, i, i, i, i, i, i, i, i, i,
                 var_name
             ));
 
@@ -449,6 +450,7 @@ impl OrderArchiveService {
                 .bind((format!("item{}_discount_amount", i), total_discount))
                 .bind((format!("item{}_surcharge_amount", i), total_surcharge))
                 .bind((format!("item{}_tax", i), item.tax.unwrap_or(0.0)))
+                .bind((format!("item{}_tax_rate", i), item.tax_rate.unwrap_or(0)))
                 .bind((format!("item{}_note", i), item.note.clone()));
 
             // Bind option fields

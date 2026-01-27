@@ -143,6 +143,10 @@ DEFINE FIELD OVERWRITE tax ON order_item TYPE float
     DEFAULT 0
     PERMISSIONS FULL;
 
+DEFINE FIELD OVERWRITE tax_rate ON order_item TYPE int
+    DEFAULT 0
+    PERMISSIONS FULL;
+
 DEFINE FIELD OVERWRITE note ON order_item TYPE option<string>
     PERMISSIONS FULL;
 

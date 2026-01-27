@@ -622,6 +622,8 @@ export interface CartItemSnapshot {
   line_total?: number | null;
   /** Tax amount for this item */
   tax?: number | null;
+  /** Tax rate percentage (e.g., 21 for 21% IVA) */
+  tax_rate?: number | null;
 
   note?: string | null;
   authorizer_id?: string | null;

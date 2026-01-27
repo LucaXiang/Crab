@@ -89,6 +89,9 @@ pub struct CartItemSnapshot {
     /// Tax amount for this item
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tax: Option<f64>,
+    /// Tax rate for this item (e.g., 21 for 21% IVA)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tax_rate: Option<i32>,
 
     /// Item note
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -375,6 +378,7 @@ mod tests {
             unit_price: None,
             line_total: None,
             tax: None,
+            tax_rate: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
