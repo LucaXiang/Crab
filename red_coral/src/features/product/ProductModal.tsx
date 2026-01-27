@@ -62,6 +62,7 @@ export const ProductModal: React.FC = React.memo(() => {
   }, [isProductModal, modal.action, categories.length, categoryStore.isLoaded]);
 
   // Load full product data when editing
+  // NOTE: modal.open is needed as dependency to reload data when reopening the same product
   useEffect(() => {
     if (isProductModal && modal.action === 'EDIT' && modal.data?.id) {
       const loadData = async () => {
@@ -74,7 +75,7 @@ export const ProductModal: React.FC = React.memo(() => {
       };
       loadData();
     }
-  }, [isProductModal, modal.action, modal.data?.id]);
+  }, [isProductModal, modal.open, modal.action, modal.data?.id]);
 
   if (!isProductModal) return null;
 
