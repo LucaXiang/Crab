@@ -9,9 +9,11 @@ pub mod renderer;
 pub mod service;
 pub mod storage;
 pub mod types;
+pub mod worker;
 
 pub use executor::{PrintExecutor, PrintExecutorError, PrintExecutorResult};
 pub use renderer::KitchenTicketRenderer;
 pub use service::{KitchenPrintService, PrintServiceError, PrintServiceResult};
 pub use storage::{PrintStorage, PrintStorageError, PrintStorageResult, PrintStorageStats};
 pub use types::*;
+pub use worker::KitchenPrintWorker;

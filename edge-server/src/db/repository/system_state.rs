@@ -27,22 +27,9 @@ impl SystemStateRepository {
             return Ok(state);
         }
 
-        // Create new singleton using internal struct without serde_helpers
-        // (to avoid RecordId being serialized as string)
-        #[derive(serde::Serialize)]
-        struct InternalSystemState {
-            genesis_hash: Option<String>,
-            last_order: Option<RecordId>,
-            last_order_hash: Option<String>,
-            synced_up_to: Option<RecordId>,
-            synced_up_to_hash: Option<String>,
-            last_sync_time: Option<String>,
-            order_count: i32,
-            created_at: Option<String>,
-            updated_at: Option<String>,
-        }
-
-        let state = InternalSystemState {
+        // Create new singleton (直接使用 SystemState，无需 workaround)
+        let state = SystemState {
+            id: None,
             genesis_hash: None,
             last_order: None,
             last_order_hash: None,
