@@ -19,23 +19,23 @@ impl EmployeeRepository {
         }
     }
 
-    /// Find all active employees (excluding system users)
+    /// Find all active employees
     pub async fn find_all(&self) -> RepoResult<Vec<Employee>> {
         let employees: Vec<Employee> = self
             .base
             .db()
-            .query("SELECT * FROM employee WHERE is_active = true AND is_system = false ORDER BY username")
+            .query("SELECT * FROM employee WHERE is_active = true ORDER BY username")
             .await?
             .take(0)?;
         Ok(employees)
     }
 
-    /// Find all employees including inactive (excluding system users)
+    /// Find all employees including inactive
     pub async fn find_all_with_inactive(&self) -> RepoResult<Vec<Employee>> {
         let employees: Vec<Employee> = self
             .base
             .db()
-            .query("SELECT * FROM employee WHERE is_system = false ORDER BY username")
+            .query("SELECT * FROM employee ORDER BY username")
             .await?
             .take(0)?;
         Ok(employees)
@@ -92,7 +92,6 @@ impl EmployeeRepository {
         #[derive(serde::Serialize)]
         struct InternalEmployee {
             username: String,
-            #[serde(rename = "employee_name")]
             display_name: String,
             hash_pass: String,
             role: RecordId,
@@ -123,11 +122,13 @@ impl EmployeeRepository {
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Employee {} not found", id)))?;
 
-        // Prevent modifying system users
+        // System users can only change password
         if existing.is_system {
-            return Err(RepoError::Validation(
-                "Cannot modify system user".to_string(),
-            ));
+            if data.username.is_some() || data.role.is_some() || data.is_active.is_some() || data.display_name.is_some() {
+                return Err(RepoError::Validation(
+                    "System user can only change password".to_string(),
+                ));
+            }
         }
 
         // Check duplicate username if changing
@@ -146,7 +147,7 @@ impl EmployeeRepository {
         struct UpdateDoc {
             #[serde(skip_serializing_if = "Option::is_none")]
             username: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none", rename = "employee_name")]
+            #[serde(skip_serializing_if = "Option::is_none")]
             display_name: Option<String>,
             #[serde(skip_serializing_if = "Option::is_none")]
             hash_pass: Option<String>,
