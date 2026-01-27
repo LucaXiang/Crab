@@ -454,12 +454,14 @@ export interface Employee {
 export interface EmployeeCreate {
   username: string;
   password: string;
+  display_name?: string;
   role: string;
 }
 
 export interface EmployeeUpdate {
   username?: string;
   password?: string;
+  display_name?: string;
   role?: string;
   is_active?: boolean;
 }
@@ -479,24 +481,27 @@ export type AttributeTemplateUpdate = AttributeUpdate;
 // ============ Role ============
 
 export interface Role {
-  id: string;
+  id?: string;
   name: string;
   display_name: string;
   description: string | null;
+  permissions: string[];
   is_system: boolean;
   is_active: boolean;
 }
 
 export interface RoleCreate {
   name: string;
-  display_name: string;
+  display_name?: string;
   description?: string;
+  permissions?: string[];
 }
 
 export interface RoleUpdate {
   name?: string;
   display_name?: string;
   description?: string;
+  permissions?: string[];
   is_active?: boolean;
 }
 

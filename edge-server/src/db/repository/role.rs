@@ -56,7 +56,7 @@ impl RoleRepository {
         let mut result = self
             .base
             .db()
-            .query("SELECT * FROM role WHERE name = $name OR role_name = $name LIMIT 1")
+            .query("SELECT * FROM role WHERE name = $name LIMIT 1")
             .bind(("name", name_owned))
             .await?;
         let roles: Vec<Role> = result.take(0)?;

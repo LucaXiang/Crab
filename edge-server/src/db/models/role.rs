@@ -14,7 +14,6 @@ pub struct Role {
     #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<RoleId>,
     /// Unique name of the role (e.g., "admin", "cashier")
-    #[serde(alias = "role_name")]
     pub name: String,
     /// Display name for UI (e.g., "管理员", "收银员")
     #[serde(default)]

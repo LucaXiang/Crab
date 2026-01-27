@@ -14,8 +14,7 @@ pub struct Employee {
     #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<EmployeeId>,
     pub username: String,
-    /// Display name - alias from DB field "employee_name"
-    #[serde(alias = "employee_name")]
+    /// Display name (e.g., "张三")
     pub display_name: String,
     #[serde(skip_serializing)]
     pub hash_pass: String,
