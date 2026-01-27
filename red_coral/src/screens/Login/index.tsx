@@ -120,8 +120,12 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleCloseApp = async () => {
-    const appWindow = getCurrentWindow();
-    await appWindow.close();
+    try {
+      const appWindow = getCurrentWindow();
+      await appWindow.close();
+    } catch (error) {
+      console.error('Failed to close window:', error);
+    }
   };
 
   const isDisconnected = modeInfo?.mode === 'Disconnected';
@@ -129,7 +133,14 @@ export const LoginScreen: React.FC = () => {
   // Show loading while checking tenants
   if (isCheckingTenants) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 relative">
+        <button
+          onClick={handleCloseApp}
+          className="absolute top-6 right-6 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-20"
+          title={t('common.dialog.close_app')}
+        >
+          <Power size={24} />
+        </button>
         <div className="w-8 h-8 border-4 border-[#FF5E5E]/30 border-t-[#FF5E5E] rounded-full animate-spin" />
       </div>
     );
