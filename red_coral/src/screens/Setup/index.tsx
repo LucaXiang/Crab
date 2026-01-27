@@ -11,7 +11,7 @@ type ModeChoice = 'server' | 'client' | null;
 export const SetupScreen: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const { activateTenant, startServerMode, isLoading, error } = useBridgeStore();
+  const { activateTenant, startServerMode, startClientMode, isLoading, error } = useBridgeStore();
 
   const [step, setStep] = useState<SetupStep>('mode');
   const [modeChoice, setModeChoice] = useState<ModeChoice>(null);
@@ -47,8 +47,9 @@ export const SetupScreen: React.FC = () => {
       // Start the appropriate mode
       if (modeChoice === 'server') {
         await startServerMode();
+      } else if (modeChoice === 'client') {
+        await startClientMode(edgeUrl, messageAddr);
       }
-      // Client mode requires connecting after activation
 
       setStep('complete');
     } catch (err: unknown) {
