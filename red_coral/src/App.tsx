@@ -32,7 +32,6 @@ const InitialRoute: React.FC = () => {
     fetchTenants,
     fetchAppState,
     fetchCurrentSession,
-    startServerMode,
   } = useBridgeStore();
   const [isChecking, setIsChecking] = useState(true);
 
@@ -46,18 +45,9 @@ const InitialRoute: React.FC = () => {
       const state = await fetchAppState();
       console.log('[InitialRoute] initial appState:', state);
 
-      // 3. 如果状态表明需要自动启动 Server 模式
-      // (Uninitialized 状态且有租户 = 有证书但未启动)
-      if (state?.type === 'Uninitialized' && useBridgeStore.getState().tenants.length > 0) {
-        console.log('[InitialRoute] Auto-starting Server mode...');
-        try {
-          await startServerMode();
-          const newState = await fetchAppState(); // 刷新状态
-          console.log('[InitialRoute] appState after startServerMode:', newState);
-        } catch (err) {
-          console.error('Failed to auto-start Server mode:', err);
-        }
-      }
+      // 3. 如果状态是 Uninitialized 且有租户，说明后端已启动但模式未选择
+      // 不再自动启动 Server 模式，让用户通过 Setup 页面选择
+      // 后端的 restore_last_session 会根据 config.current_mode 自动恢复
 
       // 4. 尝试恢复缓存的员工会话 (从后端获取)
       const currentAppState = useBridgeStore.getState().appState;
@@ -72,7 +62,7 @@ const InitialRoute: React.FC = () => {
       setIsChecking(false);
     };
     init();
-  }, [fetchTenants, fetchAppState, fetchCurrentSession, startServerMode]);
+  }, [fetchTenants, fetchAppState, fetchCurrentSession]);
 
   if (isChecking) {
     return (
