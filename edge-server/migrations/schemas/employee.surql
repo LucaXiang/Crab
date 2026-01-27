@@ -14,7 +14,8 @@ DEFINE FIELD OVERWRITE hash_pass ON employee TYPE string
     ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE employee_name ON employee TYPE option<string>
+DEFINE FIELD OVERWRITE display_name ON employee TYPE string
+    DEFAULT ""
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE role ON employee TYPE record<role>

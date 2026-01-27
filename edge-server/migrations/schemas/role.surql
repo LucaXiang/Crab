@@ -6,8 +6,15 @@ DEFINE TABLE OVERWRITE role TYPE NORMAL SCHEMAFULL
         FOR select, create, update, delete
             WHERE $auth.role = role:admin OR $auth.id = employee:admin;
 
-DEFINE FIELD OVERWRITE role_name ON role TYPE string
+DEFINE FIELD OVERWRITE name ON role TYPE string
     ASSERT string::len($value) > 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE display_name ON role TYPE string
+    DEFAULT ""
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE description ON role TYPE option<string>
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE permissions ON role TYPE array<string>
@@ -19,4 +26,4 @@ DEFINE FIELD OVERWRITE is_system ON role TYPE bool DEFAULT false
 DEFINE FIELD OVERWRITE is_active ON role TYPE bool DEFAULT true
     PERMISSIONS FULL;
 
-DEFINE INDEX OVERWRITE role_name_unique ON role FIELDS role_name UNIQUE;
+DEFINE INDEX OVERWRITE role_name_unique ON role FIELDS name UNIQUE;
