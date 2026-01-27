@@ -18,7 +18,7 @@ pub use common::CrabClient;
 pub use http::{HttpClient, NetworkHttpClient};
 #[cfg(feature = "in-process")]
 pub use http_oneshot::OneshotHttpClient;
-pub use message::{InMemoryMessageClient, NetworkMessageClient};
+pub use message::{ConnectionState, HeartbeatStatus, InMemoryMessageClient, NetworkMessageClient, ReconnectEvent};
 
 // Re-export message config from parent module
 pub use crate::message::MessageClientConfig;

@@ -348,10 +348,15 @@ impl MessageProcessor for RequestCommandProcessor {
         // 处理具体的请求动作
         match payload.action.as_str() {
             "ping" => {
-                tracing::info!("Client ping received");
+                tracing::trace!("Client ping received");
+                // 返回 epoch 以便客户端检测服务器重启
+                let pong_payload = serde_json::json!({
+                    "epoch": &self.state.epoch,
+                    "server_time": chrono::Utc::now().to_rfc3339()
+                });
                 Ok(ProcessResult::Success {
                     message: "Pong".to_string(),
-                    payload: None,
+                    payload: Some(pong_payload),
                 })
             }
             "echo" => Ok(ProcessResult::Success {

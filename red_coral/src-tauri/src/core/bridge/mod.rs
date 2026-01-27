@@ -1022,6 +1022,7 @@ impl ClientBridge {
         // 启动消息广播订阅 (转发给前端)
         if let Some(handle) = &self.app_handle {
             if let Some(mc) = connected_client.message_client() {
+                // 消息监听
                 let mut rx = mc.subscribe();
                 let handle_clone = handle.clone();
 
@@ -1059,6 +1060,76 @@ impl ClientBridge {
                 });
 
                 tracing::info!("Client message listener started");
+
+                // 重连事件监听 (心跳失败或网络断开时触发)
+                let mut reconnect_rx = mc.subscribe_reconnect();
+                let handle_reconnect = handle.clone();
+
+                tokio::spawn(async move {
+                    loop {
+                        match reconnect_rx.recv().await {
+                            Ok(event) => {
+                                use crab_client::ReconnectEvent;
+                                match event {
+                                    ReconnectEvent::Disconnected => {
+                                        tracing::warn!("Client disconnected, waiting for reconnection...");
+                                        if let Err(e) = handle_reconnect.emit("connection-state-changed", false) {
+                                            tracing::warn!("Failed to emit connection state: {}", e);
+                                        }
+                                    }
+                                    ReconnectEvent::Reconnected => {
+                                        tracing::info!("Client reconnected successfully");
+                                        if let Err(e) = handle_reconnect.emit("connection-state-changed", true) {
+                                            tracing::warn!("Failed to emit connection state: {}", e);
+                                        }
+                                    }
+                                    ReconnectEvent::ReconnectFailed { attempts } => {
+                                        tracing::error!("Client reconnection failed after {} attempts", attempts);
+                                        // 仍然发送断开状态，让前端知道连接失败
+                                        if let Err(e) = handle_reconnect.emit("connection-state-changed", false) {
+                                            tracing::warn!("Failed to emit connection state: {}", e);
+                                        }
+                                    }
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                tracing::warn!("Reconnect event listener lagged {} events", n);
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                tracing::debug!("Reconnect event channel closed");
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                tracing::info!("Client reconnection listener started");
+
+                // 心跳状态监听 (每次心跳成功/失败都会触发)
+                let mut heartbeat_rx = mc.subscribe_heartbeat();
+                let handle_heartbeat = handle.clone();
+
+                tokio::spawn(async move {
+                    loop {
+                        match heartbeat_rx.recv().await {
+                            Ok(status) => {
+                                // 转发心跳状态给前端
+                                if let Err(e) = handle_heartbeat.emit("heartbeat-status", &status) {
+                                    tracing::warn!("Failed to emit heartbeat status: {}", e);
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                tracing::warn!("Heartbeat listener lagged {} events", n);
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                tracing::debug!("Heartbeat channel closed");
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                tracing::info!("Client heartbeat listener started");
             }
         }
 

@@ -78,8 +78,8 @@ pub use cert::{CertError, CertManager, Credential, CredentialStorage};
 #[cfg(feature = "in-process")]
 pub use client::OneshotHttpClient;
 pub use client::{
-    CrabClient, HttpClient, InMemoryMessageClient, MessageClientConfig, NetworkHttpClient,
-    NetworkMessageClient,
+    ConnectionState, CrabClient, HeartbeatStatus, HttpClient, InMemoryMessageClient,
+    MessageClientConfig, NetworkHttpClient, NetworkMessageClient, ReconnectEvent,
 };
 
 // Re-export type markers
