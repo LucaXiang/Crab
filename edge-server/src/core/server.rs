@@ -1,6 +1,18 @@
 //! Server Implementation
 //!
 //! HTTP 服务器启动和管理
+//!
+//! # 启动流程
+//!
+//! ```text
+//! 1. ServerState::initialize()      - 初始化服务和数据库
+//! 2. start_background_tasks()       - 启动无需 TLS 的后台任务
+//! 3. wait_for_activation()          - 等待设备激活
+//! 4. load_tls_config()              - 加载 mTLS 证书
+//! 5. start_tls_tasks()              - 启动需要 TLS 的任务
+//! 6. https.start_server()           - 启动 HTTPS 服务
+//! 7. shutdown()                     - Graceful shutdown
+//! ```
 
 use crate::core::{Config, Result, ServerState};
 use axum_server::tls_rustls::RustlsConfig;
@@ -28,65 +40,37 @@ impl Server {
     }
 
     pub async fn run(&self) -> Result<()> {
-        // Create application state if not provided
+        // ═══════════════════════════════════════════════════════════════════
+        // Phase 1: Initialize
+        // ═══════════════════════════════════════════════════════════════════
         let state = match &self.state {
             Some(s) => s.clone(),
             None => ServerState::initialize(&self.config).await,
         };
 
-        // Start background tasks
-        state.start_background_tasks().await;
+        // ═══════════════════════════════════════════════════════════════════
+        // Phase 2: Start background tasks (no TLS required)
+        // ═══════════════════════════════════════════════════════════════════
+        let mut background_tasks = state.start_background_tasks().await;
 
-        // Wait for activation and load TLS config
-        // This loop handles:
-        // 1. Waiting for initial activation
-        // 2. Retrying if TLS config loading fails after activation
-        #[allow(clippy::never_loop)]
-        let tls_config = loop {
-            // Wait for activation (blocks until activated and self-check passes)
-            state.wait_for_activation().await;
-
-            // Load TLS Config
-            // If this fails after self-check passed, something is seriously wrong
-            // (e.g., key file corrupted after self-check but before load)
-            match state.load_tls_config() {
-                Ok(Some(cfg)) => break cfg,
-                Ok(None) => {
-                    // Certificates don't exist - enter unbound state and retry
-                    tracing::error!("❌ TLS certificates not found after activation!");
-                    state.enter_unbound_state().await;
-                    continue;
-                }
-                Err(e) => {
-                    // Failed to load/parse certificates - enter unbound state and retry
-                    tracing::error!(
-                        "❌ Failed to load TLS config: {}. Entering unbound state.",
-                        e
-                    );
-                    state.enter_unbound_state().await;
-                    continue;
-                }
-            }
-        };
-
+        // ═══════════════════════════════════════════════════════════════════
+        // Phase 3: Wait for activation and load TLS
+        // ═══════════════════════════════════════════════════════════════════
+        let tls_config = self.wait_for_tls(&state).await;
         let rustls_config = RustlsConfig::from_config(tls_config.clone());
 
-        // Start Message Bus TCP Server (mTLS)
-        let message_bus_service = state.message_bus.clone();
-        let tcp_tls_config = tls_config.clone();
-        tokio::spawn(async move {
-            if let Err(e) = message_bus_service.start_tcp_server(tcp_tls_config).await {
-                tracing::error!("Message Bus TCP server failed: {}", e);
-            }
-        });
-
+        // ═══════════════════════════════════════════════════════════════════
+        // Phase 4: Start TLS-dependent tasks
+        // ═══════════════════════════════════════════════════════════════════
+        state.start_tls_tasks(&mut background_tasks, tls_config);
         state.print_activated_banner_content().await;
 
+        // ═══════════════════════════════════════════════════════════════════
+        // Phase 5: Start HTTPS server (blocks until shutdown)
+        // ═══════════════════════════════════════════════════════════════════
         let addr = std::net::SocketAddr::from(([0, 0, 0, 0], self.config.http_port));
         tracing::info!("🦀 Crab Edge Server starting on {}", addr);
 
-        // Start HTTPS service
-        // Use the existing https service instance from state
         let shutdown = async {
             let _ = tokio::signal::ctrl_c().await;
             tracing::info!("Shutting down...");
@@ -98,6 +82,33 @@ impl Server {
             .await
             .map_err(|e| crate::core::ServerError::Internal(e.into()))?;
 
+        // ═══════════════════════════════════════════════════════════════════
+        // Phase 6: Graceful shutdown
+        // ═══════════════════════════════════════════════════════════════════
+        background_tasks.shutdown().await;
+
         Ok(())
+    }
+
+    /// Wait for activation and load TLS config
+    ///
+    /// Blocks until device is activated and TLS certificates are loaded.
+    /// Retries on failure by re-entering unbound state.
+    async fn wait_for_tls(&self, state: &ServerState) -> std::sync::Arc<rustls::ServerConfig> {
+        loop {
+            state.wait_for_activation().await;
+
+            match state.load_tls_config() {
+                Ok(Some(cfg)) => return cfg,
+                Ok(None) => {
+                    tracing::error!("❌ TLS certificates not found after activation!");
+                    state.enter_unbound_state().await;
+                }
+                Err(e) => {
+                    tracing::error!("❌ Failed to load TLS config: {}. Entering unbound state.", e);
+                    state.enter_unbound_state().await;
+                }
+            }
+        }
     }
 }

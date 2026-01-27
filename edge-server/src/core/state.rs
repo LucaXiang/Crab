@@ -4,8 +4,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
+use tokio::sync::mpsc;
 
 use crate::auth::JwtService;
+use crate::core::tasks::{BackgroundTasks, TaskKind};
 use crate::core::Config;
 
 use crate::db::DbService;
@@ -17,7 +19,7 @@ use crate::services::{
     ActivationService, CatalogService, CertService, HttpsService, MessageBusService,
     ProvisioningService,
 };
-use shared::order::OrderEventType;
+
 
 /// 资源版本管理器
 ///
@@ -211,18 +213,7 @@ impl ServerState {
         orders_manager.set_catalog_service(catalog_service.clone());
         orders_manager.set_archive_service(db.clone());
 
-        // Start ArchiveWorker if archive service is configured
-        if let Some(archive_service) = orders_manager.archive_service() {
-            let worker = ArchiveWorker::new(
-                orders_manager.storage().clone(),
-                archive_service.clone(),
-                db.clone(),
-            );
-            let event_rx = orders_manager.subscribe();
-            tokio::spawn(async move {
-                worker.run(event_rx).await;
-            });
-        }
+        // Note: ArchiveWorker is started in start_background_tasks()
 
         let orders_manager = Arc::new(orders_manager);
 
@@ -265,13 +256,21 @@ impl ServerState {
     /// 必须在 `Server::run()` 之前调用
     ///
     /// 启动的任务：
-    /// - CatalogService 预热 (加载所有产品和分类到内存)
-    /// - 价格规则缓存预热 (为活跃订单加载规则)
-    /// - 消息总线处理器 (MessageHandler)
-    /// - 订单事件转发器 (Order Event Forwarder)
-    /// - 厨房打印事件监听器 (Kitchen Print Event Listener)
-    /// - 打印记录清理任务
-    pub async fn start_background_tasks(&self) {
+    /// - **Warmup**: CatalogService 预热, 价格规则缓存预热
+    /// - **Worker**: ArchiveWorker, MessageHandler
+    /// - **Listener**: 订单事件转发器, 厨房打印事件监听器
+    /// - **Periodic**: 打印记录清理任务
+    ///
+    /// 返回 `BackgroundTasks` 用于 graceful shutdown
+    pub async fn start_background_tasks(&self) -> BackgroundTasks {
+        use crate::core::EventRouter;
+
+        let mut tasks = BackgroundTasks::new();
+
+        // ═══════════════════════════════════════════════════════════════════
+        // Warmup Tasks (同步执行，启动时运行一次)
+        // ═══════════════════════════════════════════════════════════════════
+
         // Warmup: Load all products and categories into CatalogService cache
         if let Err(e) = self.catalog_service.warmup().await {
             tracing::error!("Failed to warmup CatalogService: {:?}", e);
@@ -280,17 +279,68 @@ impl ServerState {
         // Warmup: Load price rules for all active orders
         self.warmup_active_order_rules().await;
 
-        // Start MessageBus background tasks
-        self.message_bus.start_background_tasks(self.clone());
+        // ═══════════════════════════════════════════════════════════════════
+        // Event Router (事件路由，解耦 OrdersManager 和各 Worker)
+        // ═══════════════════════════════════════════════════════════════════
 
-        // Start order event forwarder (OrderEvent -> MessageBus)
-        self.start_order_event_forwarder();
+        // archive_buffer 较大（关键业务），其他 buffer 适中
+        let (router, channels) = EventRouter::new(512, 256);
+        let source_rx = self.orders_manager.subscribe();
 
-        // Start kitchen print event listener (ItemsAdded -> Print)
-        self.start_kitchen_print_event_listener();
+        tasks.spawn("event_router", TaskKind::Worker, async move {
+            router.run(source_rx).await;
+        });
 
-        // Start print record cleanup task (cleanup records older than 3 days)
-        self.start_print_record_cleanup_task();
+        // ═══════════════════════════════════════════════════════════════════
+        // Worker Tasks (长期后台工作者)
+        // ═══════════════════════════════════════════════════════════════════
+
+        // ArchiveWorker: 归档已完成订单到 SurrealDB
+        self.register_archive_worker(&mut tasks, channels.archive_rx);
+
+        // MessageHandler: 处理来自客户端的消息
+        self.register_message_handler(&mut tasks);
+
+        // ═══════════════════════════════════════════════════════════════════
+        // Listener Tasks (事件监听器)
+        // ═══════════════════════════════════════════════════════════════════
+
+        // OrderSyncForwarder: 订单事件 -> MessageBus
+        self.register_order_sync_forwarder(&mut tasks, channels.sync_rx);
+
+        // KitchenPrintWorker: ItemsAdded 事件 -> 厨房打印
+        self.register_kitchen_print_worker(&mut tasks, channels.print_rx);
+
+        // ═══════════════════════════════════════════════════════════════════
+        // Periodic Tasks (定时任务)
+        // ═══════════════════════════════════════════════════════════════════
+
+        // PrintRecordCleanup: 清理过期打印记录
+        self.register_print_record_cleanup(&mut tasks);
+
+        // 打印任务摘要
+        tasks.log_summary();
+
+        tasks
+    }
+
+    /// 启动需要 TLS 的后台任务（激活后调用）
+    ///
+    /// 这些任务需要 mTLS 配置，必须在设备激活后启动。
+    pub fn start_tls_tasks(
+        &self,
+        tasks: &mut BackgroundTasks,
+        tls_config: Arc<rustls::ServerConfig>,
+    ) {
+        // MessageBus TCP Server (mTLS)
+        let message_bus_service = self.message_bus.clone();
+        tasks.spawn("message_bus_tcp_server", TaskKind::Worker, async move {
+            if let Err(e) = message_bus_service.start_tcp_server(tls_config).await {
+                tracing::error!("Message Bus TCP server failed: {}", e);
+            }
+        });
+
+        tracing::info!("🔐 TLS tasks started (MessageBus TCP Server)");
     }
 
     /// 预热活跃订单的价格规则缓存
@@ -377,123 +427,136 @@ impl ServerState {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // Task Registration Methods
+    // ═══════════════════════════════════════════════════════════════════════
 
-    /// 启动厨房打印事件监听器
+    /// 注册 ArchiveWorker
     ///
-    /// 订阅 OrdersManager 的事件流，处理 ItemsAdded 事件：
-    /// - 检查打印是否启用
-    /// - 创建 KitchenOrder 和 LabelPrintRecord
-    fn start_kitchen_print_event_listener(&self) {
-        use crate::db::repository::PrintDestinationRepository;
-        use crate::printing::PrintExecutor;
-        use std::collections::HashMap;
+    /// 归档已完成的订单到 SurrealDB
+    /// 接收来自 EventRouter 的 mpsc 通道（已过滤为终端事件）
+    fn register_archive_worker(
+        &self,
+        tasks: &mut BackgroundTasks,
+        event_rx: mpsc::Receiver<std::sync::Arc<shared::order::OrderEvent>>,
+    ) {
+        if let Some(archive_service) = self.orders_manager.archive_service() {
+            let worker = ArchiveWorker::new(
+                self.orders_manager.storage().clone(),
+                archive_service.clone(),
+                self.db.clone(),
+            );
 
-        let mut event_rx = self.orders_manager.subscribe();
-        let kitchen_print_service = self.kitchen_print_service.clone();
+            tasks.spawn("archive_worker", TaskKind::Worker, async move {
+                worker.run(event_rx).await;
+            });
+        }
+    }
+
+    /// 注册 MessageHandler
+    ///
+    /// 处理来自客户端的消息
+    fn register_message_handler(&self, tasks: &mut BackgroundTasks) {
+        let handler_receiver = self.message_bus.bus().subscribe_to_clients();
+        let handler_shutdown = self.message_bus.bus().shutdown_token().clone();
+        let server_tx = self.message_bus.bus().sender().clone();
+
+        let handler = crate::message::MessageHandler::with_default_processors(
+            handler_receiver,
+            handler_shutdown,
+            self.clone().into(),
+        )
+        .with_broadcast_tx(server_tx);
+
+        tasks.spawn("message_handler", TaskKind::Worker, async move {
+            handler.run().await;
+        });
+    }
+
+    /// 注册订单同步转发器
+    ///
+    /// 接收来自 EventRouter 的 mpsc 通道（所有事件），转发到 MessageBus
+    fn register_order_sync_forwarder(
+        &self,
+        tasks: &mut BackgroundTasks,
+        mut event_rx: mpsc::Receiver<std::sync::Arc<shared::order::OrderEvent>>,
+    ) {
+        let message_bus = self.message_bus.bus().clone();
         let orders_manager = self.orders_manager.clone();
-        let catalog_service = self.catalog_service.clone();
-        let db = self.db.clone();
 
-        tokio::spawn(async move {
-            tracing::info!("🖨️ Kitchen print event listener started");
-            let executor = PrintExecutor::new();
+        tasks.spawn("order_sync_forwarder", TaskKind::Listener, async move {
+            tracing::info!("📦 Order sync forwarder started");
 
-            loop {
-                match event_rx.recv().await {
-                    Ok(event) => {
-                        // Only process ItemsAdded events
-                        if event.event_type != OrderEventType::ItemsAdded {
-                            continue;
-                        }
+            while let Some(event) = event_rx.recv().await {
+                let order_id = event.order_id.clone();
+                let sequence = event.sequence;
+                let action = event.event_type.to_string();
 
-                        // Get table name from order snapshot
-                        let table_name = orders_manager
-                            .get_snapshot(&event.order_id)
-                            .ok()
-                            .flatten()
-                            .and_then(|s| s.table_name);
-
-                        // Process the event (create KitchenOrder record)
-                        match kitchen_print_service.process_items_added(
-                            &event,
-                            table_name,
-                            &catalog_service,
-                        ) {
-                            Ok(Some(kitchen_order_id)) => {
-                                tracing::info!(
-                                    order_id = %event.order_id,
-                                    kitchen_order_id = %kitchen_order_id,
-                                    "🖨️ Created kitchen order"
-                                );
-
-                                // Execute actual printing
-                                if let Ok(Some(order)) = kitchen_print_service.get_kitchen_order(&kitchen_order_id) {
-                                    // Load print destinations
-                                    let repo = PrintDestinationRepository::new(db.clone());
-                                    match repo.find_all().await {
-                                        Ok(destinations) => {
-                                            let dest_map: HashMap<String, _> = destinations
-                                                .into_iter()
-                                                .filter_map(|d| {
-                                                    d.id.as_ref()
-                                                        .map(|id| (id.to_string(), d.clone()))
-                                                })
-                                                .collect();
-
-                                            if let Err(e) = executor.print_kitchen_order(&order, &dest_map).await {
-                                                tracing::error!(
-                                                    kitchen_order_id = %kitchen_order_id,
-                                                    error = %e,
-                                                    "Failed to execute print job"
-                                                );
-                                            }
-                                        }
-                                        Err(e) => {
-                                            tracing::error!(
-                                                error = ?e,
-                                                "Failed to load print destinations"
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                            Ok(None) => {
-                                // Printing not enabled or no items to print
-                            }
-                            Err(e) => {
-                                tracing::error!(
-                                    order_id = %event.order_id,
-                                    "Failed to process ItemsAdded for printing: {:?}",
-                                    e
-                                );
-                            }
+                // 获取快照，打包 event + snapshot 一起推送
+                match orders_manager.get_snapshot(&order_id) {
+                    Ok(Some(snapshot)) => {
+                        let payload = SyncPayload {
+                            resource: "order_sync".to_string(),
+                            version: sequence,
+                            action,
+                            id: order_id,
+                            data: serde_json::json!({
+                                "event": event,
+                                "snapshot": snapshot
+                            }).into(),
+                        };
+                        if let Err(e) = message_bus.publish(BusMessage::sync(&payload)).await {
+                            tracing::warn!("Failed to forward order sync: {}", e);
                         }
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!("Kitchen print listener lagged, skipped {} events", n);
+                    Ok(None) => {
+                        tracing::warn!("Order {} not found after event", order_id);
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                        tracing::info!("Order event channel closed, kitchen print listener stopping");
-                        break;
+                    Err(e) => {
+                        tracing::error!("Failed to get snapshot for {}: {}", order_id, e);
                     }
                 }
             }
+
+            tracing::info!("Sync channel closed, order sync forwarder stopping");
+        });
+    }
+
+    /// 注册厨房打印工作者
+    ///
+    /// 接收来自 EventRouter 的 mpsc 通道（仅 ItemsAdded 事件）
+    fn register_kitchen_print_worker(
+        &self,
+        tasks: &mut BackgroundTasks,
+        event_rx: mpsc::Receiver<std::sync::Arc<shared::order::OrderEvent>>,
+    ) {
+        use crate::printing::KitchenPrintWorker;
+
+        let worker = KitchenPrintWorker::new(
+            self.orders_manager.clone(),
+            self.kitchen_print_service.clone(),
+            self.catalog_service.clone(),
+            self.db.clone(),
+        );
+
+        tasks.spawn("kitchen_print_worker", TaskKind::Listener, async move {
+            worker.run(event_rx).await;
         });
     }
 
 
-    /// 启动打印记录清理任务
+    /// 注册打印记录清理任务
     ///
     /// - 启动时立即执行一次清理
     /// - 之后每小时执行一次
     /// - 清理 3 天以前的记录 (kitchen_order, label_record)
-    fn start_print_record_cleanup_task(&self) {
+    fn register_print_record_cleanup(&self, tasks: &mut BackgroundTasks) {
         const CLEANUP_INTERVAL_SECS: u64 = 3600; // 1 hour
         const MAX_AGE_SECS: i64 = 3 * 24 * 3600; // 3 days
 
         let print_service = self.kitchen_print_service.clone();
 
-        tokio::spawn(async move {
+        tasks.spawn("print_record_cleanup", TaskKind::Periodic, async move {
             tracing::info!("🧹 Print record cleanup task started (interval: 1h, max_age: 3d)");
 
             // Cleanup immediately on startup
@@ -530,60 +593,9 @@ impl ServerState {
         });
     }
 
-    /// 启动订单同步转发器
-    ///
-    /// 订阅 OrdersManager 的事件流，转发到 MessageBus：
-    /// - order_sync: 包含 event (时间线) + snapshot (状态)
-    fn start_order_event_forwarder(&self) {
-        let mut event_rx = self.orders_manager.subscribe();
-        let message_bus = self.message_bus.bus().clone();
-        let orders_manager = self.orders_manager.clone();
-
-        tokio::spawn(async move {
-            tracing::info!("📦 Order sync forwarder started");
-            loop {
-                match event_rx.recv().await {
-                    Ok(event) => {
-                        let order_id = event.order_id.clone();
-                        let sequence = event.sequence;
-                        let action = event.event_type.to_string();
-
-                        // 获取快照，打包 event + snapshot 一起推送
-                        match orders_manager.get_snapshot(&order_id) {
-                            Ok(Some(snapshot)) => {
-                                let payload = SyncPayload {
-                                    resource: "order_sync".to_string(),
-                                    version: sequence,
-                                    action,
-                                    id: order_id,
-                                    data: serde_json::json!({
-                                        "event": event,
-                                        "snapshot": snapshot
-                                    }).into(),
-                                };
-                                if let Err(e) = message_bus.publish(BusMessage::sync(&payload)).await {
-                                    tracing::warn!("Failed to forward order sync: {}", e);
-                                }
-                            }
-                            Ok(None) => {
-                                tracing::warn!("Order {} not found after event", order_id);
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to get snapshot for {}: {}", order_id, e);
-                            }
-                        }
-                    }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!("Order forwarder lagged, skipped {} events", n);
-                    }
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                        tracing::info!("Order event channel closed, forwarder stopping");
-                        break;
-                    }
-                }
-            }
-        });
-    }
+    // ═══════════════════════════════════════════════════════════════════════
+    // Getter Methods
+    // ═══════════════════════════════════════════════════════════════════════
 
     /// 获取数据库实例
     pub fn get_db(&self) -> Surreal<Db> {
