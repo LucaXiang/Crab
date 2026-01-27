@@ -224,7 +224,7 @@ impl NetworkMessageClient {
     async fn establish_tls_connection(
         params: &ConnectionParams,
     ) -> Result<TlsStream<TcpStream>, crate::MessageError> {
-        // 安装 aws-lc-rs CryptoProvider (FIPS 140-3)
+        // 安装 aws-lc-rs CryptoProvider
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
         // 解析 CA 证书链

@@ -37,7 +37,7 @@ axum.workspace = true
 # UUID
 uuid.workspace = true
 
-# TLS (aws-lc-rs backend with FIPS)
+# TLS (aws-lc-rs backend)
 aws-lc-rs.workspace = true
 tokio-rustls.workspace = true
 rustls.workspace = true

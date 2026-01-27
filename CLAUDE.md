@@ -110,7 +110,7 @@ db.delete(id).await?;
 
 ## 安全
 
-- mTLS 双向认证 (TLS 1.3 + aws-lc-rs FIPS)
+- mTLS 双向认证 (TLS 1.3 + aws-lc-rs)
 - 三层 CA 层级: Root CA → Tenant CA → Entity Cert
 - 硬件绑定: 证书包含 device_id 防克隆
 
