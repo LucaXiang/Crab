@@ -220,14 +220,18 @@
       "surcharge": "附加费",
       "unit_price": "单价",
       "base_price": "基础价",
+      "final_price": "最终价格",
       "custom": "自定义",
       "subtotal": "小计",
       "enter_discount": "输入折扣金额",
       "edit_item": "编辑项目",
+      "edit_final_price": "点击编辑最终价格",
       "input": {
         "quantity": "输入数量",
         "price": "输入价格",
-        "discount": "输入折扣百分比"
+        "discount": "输入折扣百分比",
+        "final_price": "输入最终价格",
+        "base_price": "输入基础价格"
       }
     },
     "product": {
