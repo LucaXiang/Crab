@@ -640,11 +640,23 @@ function recalculateTotals(snapshot: OrderSnapshot): OrderSnapshot {
 
   let subtotal = Currency.toDecimal(0);
   let discount = Currency.toDecimal(0);
+  let totalTax = Currency.toDecimal(0);
 
   for (const item of activeItems) {
     // item.price 是服务器计算后的最终单价（已含规则折扣/附加费）
     const itemTotal = Currency.mul(item.price, item.quantity);
     subtotal = Currency.add(subtotal, itemTotal);
+
+    // 计算商品税额 (西班牙 IVA 含税价格模型)
+    // tax = gross_amount * tax_rate / (100 + tax_rate)
+    const taxRate = item.tax_rate ?? 0;
+    if (taxRate > 0) {
+      const itemTax = Currency.div(
+        Currency.mul(itemTotal, taxRate),
+        Currency.add(100, taxRate)
+      );
+      totalTax = Currency.add(totalTax, itemTax);
+    }
 
     // 累计手动折扣（用于显示）
     if (item.manual_discount_percent && item.manual_discount_percent > 0) {
@@ -665,8 +677,8 @@ function recalculateTotals(snapshot: OrderSnapshot): OrderSnapshot {
     }
   }
 
-  // Total = subtotal (item.price 已经是折扣后的价格)
-  const total = Currency.floor2(subtotal).toNumber();
+  // Total = subtotal (西班牙 IVA: 税额已包含在价格中)
+  const total = Currency.round2(subtotal).toNumber();
 
   // Calculate paid amount from non-cancelled payments
   const paidAmount = snapshot.payments
@@ -675,9 +687,10 @@ function recalculateTotals(snapshot: OrderSnapshot): OrderSnapshot {
 
   return {
     ...snapshot,
-    subtotal: Currency.floor2(subtotal).toNumber(),
-    discount: Currency.floor2(discount).toNumber(),
+    subtotal: Currency.round2(subtotal).toNumber(),
+    discount: Currency.round2(discount).toNumber(),
+    tax: Currency.round2(totalTax).toNumber(),
     total,
-    paid_amount: Currency.floor2(paidAmount).toNumber(),
+    paid_amount: Currency.round2(paidAmount).toNumber(),
   };
 }

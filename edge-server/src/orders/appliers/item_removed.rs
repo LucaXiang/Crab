@@ -430,17 +430,20 @@ mod tests {
     #[test]
     fn test_recalculate_totals_with_tax_discount() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot
-            .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 100.0, 1));
-        snapshot.tax = 10.0;
+        // Create item with 21% IVA tax rate (Spanish standard rate)
+        let mut item = create_test_item("item-1", "product:p1", "Product A", 121.0, 1);
+        item.tax_rate = Some(21); // 21% IVA
+        snapshot.items.push(item);
         snapshot.order_manual_discount_fixed = Some(5.0); // Use structured field
 
         recalculate_totals(&mut snapshot);
 
-        assert_eq!(snapshot.subtotal, 100.0);
-        // total = subtotal + tax - discount = 100 + 10 - 5 = 105
-        assert_eq!(snapshot.total, 105.0);
+        assert_eq!(snapshot.subtotal, 121.0);
+        // Spanish IVA: price is tax-inclusive
+        // Tax = 121 * 21 / (100 + 21) = 121 * 21 / 121 = 21.0
+        assert_eq!(snapshot.tax, 21.0);
+        // total = subtotal - discount = 121 - 5 = 116 (tax already included)
+        assert_eq!(snapshot.total, 116.0);
         assert_eq!(snapshot.discount, 5.0); // Legacy field should be updated
     }
 }

@@ -1,9 +1,9 @@
 import Decimal from 'decimal.js';
 
 // Configure Decimal to handle adequate precision
-// User request: "Take two decimal places, no rounding" (Truncation/Floor)
-// We set default rounding to FLOOR to ensure if we do explicit rounding it floors.
-Decimal.set({ precision: 20, rounding: Decimal.ROUND_FLOOR });
+// Unified rounding strategy: ROUND_HALF_UP (四舍五入)
+// Matches backend rust_decimal::RoundingStrategy::MidpointAwayFromZero
+Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
 
 export const Currency = {
   /**
@@ -42,11 +42,12 @@ export const Currency = {
   },
 
   /**
-   * Floor to 2 decimal places (truncation)
-   * e.g. 1.239 -> 1.23
+   * Round to 2 decimal places using ROUND_HALF_UP (四舍五入)
+   * e.g. 1.235 -> 1.24, 1.234 -> 1.23
+   * @deprecated Use round2() for clarity. Kept for backward compatibility.
    */
   floor2(n: number | string | Decimal): Decimal {
-    return new Decimal(n).toDecimalPlaces(2, Decimal.ROUND_FLOOR);
+    return new Decimal(n).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
   },
 
   /**

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { X, ShoppingBag } from 'lucide-react';
-import { formatCurrency } from '@/utils/currency/formatCurrency';
+import { formatCurrency, Currency } from '@/utils/currency';
 import { CartItem as CartItemType, Product, ItemOption, AttributeTemplate, AttributeOption, EmbeddedSpec, ProductAttribute } from '@/core/domain/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useCategories, useCategoryStore } from '@/features/category';
@@ -402,7 +402,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     setTempItems(prev => prev.filter(item => item.instance_id !== instanceId));
   }, []);
 
-  const totalAmount = tempItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const totalAmount = tempItems.reduce((sum, item) =>
+    Currency.add(sum, Currency.mul(item.price, item.quantity)).toNumber(), 0);
 
   const handleConfirm = () => {
     if (tempItems.length > 0) {

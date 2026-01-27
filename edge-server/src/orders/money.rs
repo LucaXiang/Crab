@@ -85,6 +85,7 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     let mut subtotal = Decimal::ZERO;
     let mut item_discount_total = Decimal::ZERO;
     let mut item_surcharge_total = Decimal::ZERO;
+    let mut total_tax = Decimal::ZERO;
 
     for item in &mut snapshot.items {
         let quantity = Decimal::from(item.quantity);
@@ -122,6 +123,17 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         let item_total = unit_price * quantity;
         item.line_total = Some(to_f64(item_total));
 
+        // Calculate item tax (Spain IVA: prices are tax-inclusive)
+        // Formula: tax = gross_amount * tax_rate / (100 + tax_rate)
+        let tax_rate = Decimal::from(item.tax_rate.unwrap_or(0));
+        let item_tax = if tax_rate > Decimal::ZERO {
+            item_total * tax_rate / (Decimal::ONE_HUNDRED + tax_rate)
+        } else {
+            Decimal::ZERO
+        };
+        item.tax = Some(to_f64(item_tax));
+        total_tax += item_tax;
+
         // Accumulate subtotal
         subtotal += item_total;
     }
@@ -138,9 +150,8 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     let total_discount = item_discount_total + order_discount;
     let total_surcharge = item_surcharge_total + order_surcharge;
 
-    // Final total
-    let tax = to_decimal(snapshot.tax);
-    let total = subtotal + tax - order_discount + order_surcharge;
+    // Final total (Spanish IVA: tax is already included in subtotal)
+    let total = subtotal - order_discount + order_surcharge;
     let paid = to_decimal(snapshot.paid_amount);
     let remaining = (total - paid).max(Decimal::ZERO);
 
@@ -149,6 +160,7 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     snapshot.subtotal = to_f64(subtotal);
     snapshot.total_discount = to_f64(total_discount);
     snapshot.total_surcharge = to_f64(total_surcharge);
+    snapshot.tax = to_f64(total_tax);
     snapshot.discount = to_f64(order_discount); // Legacy field
     snapshot.total = to_f64(total);
     snapshot.remaining_amount = to_f64(remaining);

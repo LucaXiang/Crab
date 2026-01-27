@@ -42,7 +42,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
   // Calculate payment state from order (server state)
   const totalPaid = order.paid_amount;
-  const remaining = Math.max(0, order.total - totalPaid);
+  const remaining = Math.max(0, Currency.sub(order.total, totalPaid).toNumber());
   const isPaidInFull = remaining <= 0.01;
 
   // Get active (non-cancelled) payments

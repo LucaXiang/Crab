@@ -5,6 +5,7 @@ import { createTauriClient } from '@/infrastructure/api';
 
 const api = createTauriClient();
 import { Table, Zone, HeldOrder, Permission } from '@/core/domain/types';
+import { Currency } from '@/utils/currency';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
 import { ZoneSidebar } from '../ZoneSidebar';
@@ -146,14 +147,14 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
 
     const splitTotal = useMemo(() => {
         if (!sourceOrder) return 0;
-        let total = 0;
+        let total = Currency.toDecimal(0);
         (Object.entries(splitItems) as [string, number][]).forEach(([id, qty]) => {
             const item = sourceOrder.items.find(i => i.id === id);
             if (item) {
-                total += item.price * qty;
+                total = Currency.add(total, Currency.mul(item.price, qty));
             }
         });
-        return total;
+        return Currency.round2(total).toNumber();
     }, [splitItems, sourceOrder]);
 
     // Filter tables based on mode

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { CartItem, ItemOption } from '@/core/domain/types';
 import { ProductWithPrice } from '@/features/product';
+import { Currency } from '@/utils/currency';
 
 /**
  * Compare two selectedOptions arrays for equality
@@ -201,14 +202,34 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
   calculateTotal: () => {
     const { cart } = get();
-    // Simple sum for draft cart - use line_total if available (server data), otherwise price * quantity
+    // Calculate total considering manual discounts (same logic as CartItem.tsx)
     const total = cart.reduce((sum, item) => {
       if (item._removed) return sum;
-      const lineTotal = item.line_total ?? item.price * item.quantity;
-      return sum + lineTotal;
+      
+      // Use server-computed line_total if available
+      if (item.line_total !== undefined && item.line_total !== null) {
+        return Currency.add(sum, item.line_total).toNumber();
+      }
+      
+      // Fallback to local calculation
+      const discountPercent = item.manual_discount_percent || 0;
+      const optionsModifier = (item.selected_options ?? []).reduce((acc, opt) => acc + (opt.price_modifier ?? 0), 0);
+      const basePrice = item.original_price ?? item.price;
+      const baseUnitPrice = basePrice + optionsModifier;
+      
+      let finalUnitPrice: number;
+      if (discountPercent > 0) {
+        const discountFactor = Currency.sub(1, Currency.div(discountPercent, 100));
+        finalUnitPrice = Currency.floor2(Currency.mul(baseUnitPrice, discountFactor)).toNumber();
+      } else {
+        finalUnitPrice = baseUnitPrice;
+      }
+      
+      const lineTotal = Currency.floor2(Currency.mul(finalUnitPrice, item.quantity)).toNumber();
+      return Currency.add(sum, lineTotal).toNumber();
     }, 0);
     const count = cart.reduce((sum, item) => sum + item.quantity, 0);
-    set({ totalAmount: total, itemCount: count });
+    set({ totalAmount: Currency.round2(total).toNumber(), itemCount: count });
   }
 }));
 
