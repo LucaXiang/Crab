@@ -78,10 +78,39 @@ pub enum ManagerError {
     Internal(String),
 }
 
+/// 将存储错误转换为错误码（前端负责本地化）
+fn classify_storage_error(e: &StorageError) -> CommandErrorCode {
+    let err_str = e.to_string().to_lowercase();
+
+    // 磁盘空间不足
+    if err_str.contains("no space") || err_str.contains("disk full") || err_str.contains("enospc")
+    {
+        return CommandErrorCode::StorageFull;
+    }
+
+    // 内存不足
+    if err_str.contains("out of memory") || err_str.contains("cannot allocate") {
+        return CommandErrorCode::OutOfMemory;
+    }
+
+    // 数据损坏
+    if err_str.contains("corrupt") || err_str.contains("invalid database") {
+        return CommandErrorCode::StorageCorrupted;
+    }
+
+    // 默认：系统繁忙
+    CommandErrorCode::SystemBusy
+}
+
 impl From<ManagerError> for CommandError {
     fn from(err: ManagerError) -> Self {
         let (code, message) = match err {
-            ManagerError::Storage(e) => (CommandErrorCode::InternalError, e.to_string()),
+            ManagerError::Storage(e) => {
+                let code = classify_storage_error(&e);
+                let message = e.to_string(); // 保留技术细节用于日志/调试
+                tracing::error!(error = %e, error_code = ?code, "Storage error occurred");
+                (code, message)
+            }
             ManagerError::OrderNotFound(id) => (
                 CommandErrorCode::OrderNotFound,
                 format!("Order not found: {}", id),

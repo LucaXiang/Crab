@@ -1,7 +1,10 @@
 //! Archive Worker - Processes pending archive queue
+//! Archive Worker - 订单归档处理
 //!
-//! Listens for terminal events and processes archive queue with retry logic.
-//! Decoupled from OrderManager for better separation of concerns.
+//! 监听终端事件通道，处理订单归档。
+//! 通过 EventRouter 解耦，不直接依赖 OrdersManager。
+//!
+//! Note: redb operations are synchronous for stability.
 
 use super::archive::OrderArchiveService;
 use super::money::{to_decimal, to_f64};
@@ -13,9 +16,12 @@ use std::sync::Arc;
 use std::time::Duration;
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
-use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 
-/// Terminal event types that trigger archiving
+/// Arc-wrapped OrderEvent (from EventRouter)
+type ArcOrderEvent = Arc<OrderEvent>;
+
+/// Terminal event types (用于 shift cash 判断)
 const TERMINAL_EVENT_TYPES: &[OrderEventType] = &[
     OrderEventType::OrderCompleted,
     OrderEventType::OrderVoided,
@@ -24,14 +30,16 @@ const TERMINAL_EVENT_TYPES: &[OrderEventType] = &[
 ];
 
 /// Archive worker configuration
-const MAX_RETRY_COUNT: u32 = 10;
+const MAX_RETRY_COUNT: u32 = 3;
 const RETRY_BASE_DELAY_SECS: u64 = 5;
-const RETRY_MAX_DELAY_SECS: u64 = 3600; // 1 hour
+const RETRY_MAX_DELAY_SECS: u64 = 60; // 1 minute max
 const QUEUE_SCAN_INTERVAL_SECS: u64 = 60;
 /// 并发归档数量
 const ARCHIVE_CONCURRENCY: usize = 50;
 
 /// Worker for processing archive queue (支持并发归档)
+///
+/// 通过 EventRouter 解耦，接收 mpsc 通道（已过滤为终端事件）
 pub struct ArchiveWorker {
     storage: OrderStorage,
     archive_service: OrderArchiveService,
@@ -50,7 +58,9 @@ impl ArchiveWorker {
     }
 
     /// Run the archive worker (并发处理归档)
-    pub async fn run(self, mut event_rx: broadcast::Receiver<OrderEvent>) {
+    ///
+    /// 接收来自 EventRouter 的 mpsc 通道（已过滤为终端事件）
+    pub async fn run(self, mut event_rx: mpsc::Receiver<ArcOrderEvent>) {
         tracing::info!("ArchiveWorker started with concurrency={}", ARCHIVE_CONCURRENCY);
 
         let worker = Arc::new(self);
@@ -63,10 +73,10 @@ impl ArchiveWorker {
 
         loop {
             tokio::select! {
-                // Handle new terminal events
-                result = event_rx.recv() => {
-                    match result {
-                        Ok(event) if TERMINAL_EVENT_TYPES.contains(&event.event_type) => {
+                // Handle new terminal events (EventRouter 已过滤)
+                event_opt = event_rx.recv() => {
+                    match event_opt {
+                        Some(event) => {
                             tracing::debug!(order_id = %event.order_id, event_type = ?event.event_type, "Received terminal event");
                             // 并发处理归档
                             let w = worker.clone();
@@ -75,13 +85,8 @@ impl ArchiveWorker {
                                 w.process_order_concurrent(&order_id).await;
                             });
                         }
-                        Ok(_) => {} // Ignore non-terminal events
-                        Err(broadcast::error::RecvError::Lagged(n)) => {
-                            tracing::warn!(skipped = n, "Event receiver lagged, processing queue");
-                            worker.process_pending_queue().await;
-                        }
-                        Err(broadcast::error::RecvError::Closed) => {
-                            tracing::info!("Event channel closed, shutting down ArchiveWorker");
+                        None => {
+                            tracing::info!("Archive channel closed, shutting down ArchiveWorker");
                             break;
                         }
                     }
@@ -102,16 +107,11 @@ impl ArchiveWorker {
 
     /// Process all pending archives
     async fn process_pending_queue(&self) {
-        // Get pending archives (blocking I/O -> spawn_blocking)
-        let storage = self.storage.clone();
-        let pending = match tokio::task::spawn_blocking(move || storage.get_pending_archives()).await {
-            Ok(Ok(p)) => p,
-            Ok(Err(e)) => {
-                tracing::error!(error = %e, "Failed to get pending archives");
-                return;
-            }
+        // Get pending archives (synchronous redb operation)
+        let pending = match self.storage.get_pending_archives() {
+            Ok(p) => p,
             Err(e) => {
-                tracing::error!(error = %e, "spawn_blocking panicked");
+                tracing::error!(error = %e, "Failed to get pending archives");
                 return;
             }
         };
@@ -123,25 +123,24 @@ impl ArchiveWorker {
         tracing::info!(count = pending.len(), "Processing pending archive queue");
 
         for entry in pending {
-            if self.should_retry(&entry).await {
+            if self.should_retry(&entry) {
                 self.process_order(&entry.order_id).await;
             }
         }
     }
 
     /// Check if entry should be retried based on backoff
-    async fn should_retry(&self, entry: &PendingArchive) -> bool {
+    fn should_retry(&self, entry: &PendingArchive) -> bool {
         if entry.retry_count >= MAX_RETRY_COUNT {
             tracing::error!(
                 order_id = %entry.order_id,
                 retry_count = entry.retry_count,
                 last_error = ?entry.last_error,
-                "Max retry count exceeded, removing from queue"
+                "Max retry count exceeded, moving to dead letter queue"
             );
-            // Remove from queue - order data remains in redb for manual recovery
-            let storage = self.storage.clone();
-            let order_id = entry.order_id.clone();
-            let _ = tokio::task::spawn_blocking(move || storage.remove_from_pending(&order_id)).await;
+            // Move to dead letter queue for manual recovery
+            let error = entry.last_error.as_deref().unwrap_or("Unknown error");
+            let _ = self.storage.move_to_dead_letter(&entry.order_id, error);
             return false;
         }
 
@@ -156,62 +155,60 @@ impl ArchiveWorker {
 
     /// Process a single order archive
     ///
-    /// Uses spawn_blocking for redb operations to avoid blocking tokio runtime.
+    /// redb operations are synchronous for stability.
     async fn process_order(&self, order_id: &str) {
-        let order_id_owned = order_id.to_string();
-        let storage = self.storage.clone();
-
-        // 1. Load snapshot and events from redb (blocking I/O -> spawn_blocking)
-        let load_result = tokio::task::spawn_blocking(move || {
-            let snapshot = storage.get_snapshot(&order_id_owned)?;
-            let events = storage.get_events_for_order(&order_id_owned)?;
-            Ok::<_, super::storage::StorageError>((snapshot, events, order_id_owned))
-        })
-        .await;
-
-        let (snapshot, events, order_id_owned) = match load_result {
-            Ok(Ok((Some(s), e, oid))) => (s, e, oid),
-            Ok(Ok((None, _, oid))) => {
-                tracing::warn!(order_id = %oid, "Snapshot not found, removing from queue");
-                let storage = self.storage.clone();
-                let _ = tokio::task::spawn_blocking(move || storage.remove_from_pending(&oid)).await;
-                return;
-            }
-            Ok(Err(e)) => {
-                tracing::error!(order_id = %order_id, error = %e, "Failed to load data from redb");
-                return;
-            }
-            Err(e) => {
-                tracing::error!(order_id = %order_id, error = %e, "spawn_blocking panicked");
-                return;
-            }
+        // 1. Load snapshot and events from redb (synchronous)
+        let (snapshot, events) = match self.load_order_data(order_id) {
+            Some(data) => data,
+            None => return,
         };
 
         // 2. Archive to SurrealDB (async)
         match self.archive_service.archive_order(&snapshot, events.clone()).await {
             Ok(()) => {
-                tracing::info!(order_id = %order_id_owned, "Order archived successfully");
+                tracing::info!(order_id = %order_id, "Order archived successfully");
 
                 // 3. Update shift expected_cash for cash payments
                 self.update_shift_cash(&snapshot, &events).await;
 
-                // 4. Cleanup redb (blocking I/O -> spawn_blocking)
-                let storage = self.storage.clone();
-                let oid = order_id_owned.clone();
-                if let Err(e) = tokio::task::spawn_blocking(move || storage.complete_archive(&oid)).await {
-                    tracing::error!(order_id = %order_id_owned, error = %e, "Failed to complete archive cleanup");
+                // 4. Cleanup redb (synchronous)
+                if let Err(e) = self.storage.complete_archive(order_id) {
+                    tracing::error!(order_id = %order_id, error = %e, "Failed to complete archive cleanup");
                 }
             }
             Err(e) => {
-                tracing::error!(order_id = %order_id_owned, error = %e, "Archive failed");
-                let storage = self.storage.clone();
-                let oid = order_id_owned.clone();
-                let err_msg = e.to_string();
-                if let Err(e2) = tokio::task::spawn_blocking(move || storage.mark_archive_failed(&oid, &err_msg)).await {
-                    tracing::error!(order_id = %order_id_owned, error = %e2, "Failed to mark archive failed");
+                tracing::error!(order_id = %order_id, error = %e, "Archive failed");
+                if let Err(e2) = self.storage.mark_archive_failed(order_id, &e.to_string()) {
+                    tracing::error!(order_id = %order_id, error = %e2, "Failed to mark archive failed");
                 }
             }
         }
+    }
+
+    /// Load order data from redb (synchronous helper)
+    fn load_order_data(&self, order_id: &str) -> Option<(OrderSnapshot, Vec<OrderEvent>)> {
+        let snapshot = match self.storage.get_snapshot(order_id) {
+            Ok(Some(s)) => s,
+            Ok(None) => {
+                tracing::warn!(order_id = %order_id, "Snapshot not found, removing from queue");
+                let _ = self.storage.remove_from_pending(order_id);
+                return None;
+            }
+            Err(e) => {
+                tracing::error!(order_id = %order_id, error = %e, "Failed to load snapshot from redb");
+                return None;
+            }
+        };
+
+        let events = match self.storage.get_events_for_order(order_id) {
+            Ok(e) => e,
+            Err(e) => {
+                tracing::error!(order_id = %order_id, error = %e, "Failed to load events from redb");
+                return None;
+            }
+        };
+
+        Some((snapshot, events))
     }
 
     /// Update shift expected_cash for cash payments in the order
@@ -306,14 +303,14 @@ mod tests {
 
     #[test]
     fn test_backoff_calculation() {
-        // Test exponential backoff formula
+        // Test exponential backoff formula (max 3 retries, max 60s delay)
         let base = RETRY_BASE_DELAY_SECS;
         let max = RETRY_MAX_DELAY_SECS;
 
         assert_eq!((base * 2u64.pow(0)).min(max), 5); // retry 0: 5s
         assert_eq!((base * 2u64.pow(1)).min(max), 10); // retry 1: 10s
         assert_eq!((base * 2u64.pow(2)).min(max), 20); // retry 2: 20s
-        assert_eq!((base * 2u64.pow(3)).min(max), 40); // retry 3: 40s
-        assert_eq!((base * 2u64.pow(10)).min(max), 3600); // retry 10: capped at 1h
+        assert_eq!((base * 2u64.pow(3)).min(max), 40); // retry 3: 40s (but max is 3, so won't happen)
+        assert_eq!((base * 2u64.pow(4)).min(max), 60); // capped at 60s
     }
 }

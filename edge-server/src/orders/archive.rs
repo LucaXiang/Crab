@@ -373,13 +373,13 @@ impl OrderArchiveService {
             ));
         }
 
-        // Update system_state
+        // Update system_state (use UPSERT to ensure record exists)
         query.push_str(
             r#"
-            UPDATE system_state SET
-                last_order_id = <string>$order[0].id,
-                last_order_hash = $order_hash
-            WHERE id = system_state:global;
+            UPSERT system_state:main SET
+                last_order = $order[0].id,
+                last_order_hash = $order_hash,
+                updated_at = time::now();
             COMMIT TRANSACTION;
             RETURN { success: true, order_id: <string>$order[0].id };
             "#,

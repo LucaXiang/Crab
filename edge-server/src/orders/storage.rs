@@ -50,6 +50,9 @@ const SEQUENCE_TABLE: TableDefinition<&str, u64> = TableDefinition::new("sequenc
 /// Table for pending archive queue: key = order_id, value = JSON-serialized PendingArchive
 const PENDING_ARCHIVE_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("pending_archive");
 
+/// Table for dead letter queue: key = order_id, value = JSON-serialized DeadLetterEntry
+const DEAD_LETTER_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("dead_letter");
+
 const SEQUENCE_KEY: &str = "seq";
 const ORDER_COUNT_KEY: &str = "order_count";
 
@@ -60,6 +63,16 @@ pub struct PendingArchive {
     pub created_at: i64,
     pub retry_count: u32,
     pub last_error: Option<String>,
+}
+
+/// Dead letter queue entry (permanently failed archives)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DeadLetterEntry {
+    pub order_id: String,
+    pub created_at: i64,
+    pub failed_at: i64,
+    pub retry_count: u32,
+    pub last_error: String,
 }
 
 /// Storage errors
@@ -122,6 +135,7 @@ impl OrderStorage {
             let _ = write_txn.open_table(ACTIVE_ORDERS_TABLE)?;
             let _ = write_txn.open_table(PROCESSED_COMMANDS_TABLE)?;
             let _ = write_txn.open_table(PENDING_ARCHIVE_TABLE)?;
+            let _ = write_txn.open_table(DEAD_LETTER_TABLE)?;
 
             // Initialize sequence counter if not exists
             let mut seq_table = write_txn.open_table(SEQUENCE_TABLE)?;
@@ -147,6 +161,7 @@ impl OrderStorage {
             let _ = write_txn.open_table(ACTIVE_ORDERS_TABLE)?;
             let _ = write_txn.open_table(PROCESSED_COMMANDS_TABLE)?;
             let _ = write_txn.open_table(PENDING_ARCHIVE_TABLE)?;
+            let _ = write_txn.open_table(DEAD_LETTER_TABLE)?;
             let mut seq_table = write_txn.open_table(SEQUENCE_TABLE)?;
             seq_table.insert(SEQUENCE_KEY, 0u64)?;
         }
@@ -669,6 +684,66 @@ impl OrderStorage {
         Ok(())
     }
 
+    /// Move order from pending queue to dead letter queue
+    pub fn move_to_dead_letter(&self, order_id: &str, error: &str) -> StorageResult<()> {
+        let txn = self.begin_write()?;
+        {
+            let mut pending_table = txn.open_table(PENDING_ARCHIVE_TABLE)?;
+            let mut dead_letter_table = txn.open_table(DEAD_LETTER_TABLE)?;
+
+            // Get pending entry
+            let pending_opt = if let Some(value) = pending_table.get(order_id)? {
+                let pending: PendingArchive = serde_json::from_slice(value.value())?;
+                Some(pending)
+            } else {
+                None
+            };
+
+            if let Some(pending) = pending_opt {
+                // Create dead letter entry
+                let dead_letter = DeadLetterEntry {
+                    order_id: order_id.to_string(),
+                    created_at: pending.created_at,
+                    failed_at: chrono::Utc::now().timestamp_millis(),
+                    retry_count: pending.retry_count,
+                    last_error: error.to_string(),
+                };
+                let value = serde_json::to_vec(&dead_letter)?;
+                dead_letter_table.insert(order_id, value.as_slice())?;
+
+                // Remove from pending
+                pending_table.remove(order_id)?;
+            }
+        }
+        txn.commit()?;
+        Ok(())
+    }
+
+    /// Get all dead letter entries
+    pub fn get_dead_letters(&self) -> StorageResult<Vec<DeadLetterEntry>> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(DEAD_LETTER_TABLE)?;
+
+        let mut entries = Vec::new();
+        for result in table.iter()? {
+            let (_key, value) = result?;
+            let entry: DeadLetterEntry = serde_json::from_slice(value.value())?;
+            entries.push(entry);
+        }
+        Ok(entries)
+    }
+
+    /// Remove from dead letter queue (after manual recovery)
+    pub fn remove_from_dead_letter(&self, order_id: &str) -> StorageResult<()> {
+        let txn = self.begin_write()?;
+        {
+            let mut table = txn.open_table(DEAD_LETTER_TABLE)?;
+            table.remove(order_id)?;
+        }
+        txn.commit()?;
+        Ok(())
+    }
+
     // ========== Statistics ==========
 
     /// Get storage statistics
@@ -767,6 +842,10 @@ mod tests {
             updated_at: chrono::Utc::now().timestamp_millis(),
             last_sequence: 0,
             state_checksum: String::new(),
+            void_type: None,
+            loss_reason: None,
+            loss_amount: None,
+            void_note: None,
         };
         snapshot.update_checksum();
         snapshot
@@ -930,6 +1009,48 @@ mod tests {
 
         let pending = storage.get_pending_archives().unwrap();
         assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn test_dead_letter_queue() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let order_id = "order-dlq-1";
+
+        // Initially empty
+        let dead_letters = storage.get_dead_letters().unwrap();
+        assert!(dead_letters.is_empty());
+
+        // Queue for archive first
+        let txn = storage.begin_write().unwrap();
+        storage.queue_for_archive(&txn, order_id).unwrap();
+        txn.commit().unwrap();
+
+        // Mark as failed a few times
+        storage.mark_archive_failed(order_id, "error 1").unwrap();
+        storage.mark_archive_failed(order_id, "error 2").unwrap();
+        storage.mark_archive_failed(order_id, "final error").unwrap();
+
+        // Move to dead letter queue
+        storage
+            .move_to_dead_letter(order_id, "final error")
+            .unwrap();
+
+        // Pending should be empty
+        let pending = storage.get_pending_archives().unwrap();
+        assert!(pending.is_empty());
+
+        // Dead letter should have the entry
+        let dead_letters = storage.get_dead_letters().unwrap();
+        assert_eq!(dead_letters.len(), 1);
+        assert_eq!(dead_letters[0].order_id, order_id);
+        assert_eq!(dead_letters[0].retry_count, 3);
+        assert_eq!(dead_letters[0].last_error, "final error");
+
+        // Remove from dead letter (manual recovery)
+        storage.remove_from_dead_letter(order_id).unwrap();
+
+        let dead_letters = storage.get_dead_letters().unwrap();
+        assert!(dead_letters.is_empty());
     }
 
     #[test]
