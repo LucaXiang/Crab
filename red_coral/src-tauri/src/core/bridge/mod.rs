@@ -1008,6 +1008,7 @@ impl ClientBridge {
         // CrabClient 使用 cert_path + client_name 构建 CertManager
         // 我们传 certs_dir 作为 cert_path，空字符串作为 client_name
         // 这样 CertManager 会在 {tenant}/certs/ 查找证书
+        // 握手时 CrabClient 会自动从证书中读取正确的 name
         let client = CrabClient::remote()
             .auth_server(&auth_url)
             .edge_server(edge_url)

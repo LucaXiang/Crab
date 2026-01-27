@@ -243,17 +243,9 @@ async fn perform_handshake(
                 client_name
             );
 
-            send_handshake_error(
-                transport,
-                &msg,
-                &format!(
-                    "Identity verification failed: Certificate subject='{}' does not match Handshake client_name='{}'.",
-                    peer_id, client_name
-                ),
-            )
-            .await;
+            send_handshake_error(transport, &msg, "Handshake failed").await;
 
-            return Err(AppError::invalid("Identity verification failed"));
+            return Err(AppError::invalid("Handshake failed"));
         } else {
             tracing::debug!("✅ Client {} identity verified via mTLS: {}", addr, peer_id);
         }

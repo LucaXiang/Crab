@@ -92,6 +92,14 @@ impl CrabClient<Remote, Disconnected> {
             .save_certificates(&cert_pem, &key_pem, &ca_cert_pem)
             .map_err(|e| ClientError::Certificate(e.to_string()))?;
 
+        // Extract client name from certificate (for handshake verification)
+        let cert_metadata = crab_cert::CertMetadata::from_pem(&cert_pem)
+            .map_err(|e| ClientError::Certificate(format!("Failed to parse certificate: {}", e)))?;
+        let handshake_name = cert_metadata
+            .client_name
+            .or(cert_metadata.common_name)
+            .unwrap_or_default();
+
         // 4. Connect to message server
         tracing::info!("Connecting to message server: {}", message_addr);
         let message_client = crate::client::message::NetworkMessageClient::connect_mtls(
@@ -99,7 +107,7 @@ impl CrabClient<Remote, Disconnected> {
             ca_cert_pem.as_bytes(),
             cert_pem.as_bytes(),
             key_pem.as_bytes(),
-            cert_manager.client_name(),
+            &handshake_name,
         )
         .await
         .map_err(|e| ClientError::Connection(e.to_string()))?;
@@ -181,6 +189,14 @@ impl CrabClient<Remote, Disconnected> {
             .load_local_certificates()
             .map_err(|e| ClientError::Certificate(e.to_string()))?;
 
+        // Extract client name from certificate (for handshake verification)
+        let cert_metadata = crab_cert::CertMetadata::from_pem(&cert_pem)
+            .map_err(|e| ClientError::Certificate(format!("Failed to parse certificate: {}", e)))?;
+        let handshake_name = cert_metadata
+            .client_name
+            .or(cert_metadata.common_name)
+            .unwrap_or_default();
+
         // 3. Connect to message server
         tracing::info!("Reconnecting to message server: {}", message_addr);
         let message_client = crate::client::message::NetworkMessageClient::connect_mtls(
@@ -188,7 +204,7 @@ impl CrabClient<Remote, Disconnected> {
             ca_cert_pem.as_bytes(),
             cert_pem.as_bytes(),
             key_pem.as_bytes(),
-            cert_manager.client_name(),
+            &handshake_name,
         )
         .await
         .map_err(|e| ClientError::Connection(e.to_string()))?;
