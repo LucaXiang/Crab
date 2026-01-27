@@ -66,7 +66,7 @@ pub async fn create(
     tracing::info!(
         user_id = %current_user.id,
         username = %current_user.username,
-        role_name = %payload.role_name,
+        role_name = %payload.name,
         "Creating role"
     );
 

@@ -108,7 +108,7 @@ pub async fn login(
             &employee.username,
             &employee.display_name,
             &employee.role.to_string(),
-            &role.role_name,
+            &role.name,
             &role.permissions,
             employee.is_system,
         )
@@ -120,7 +120,7 @@ pub async fn login(
     tracing::info!(
         user_id = %user_id,
         username = %employee.username,
-        role = %role.role_name,
+        role = %role.name,
         "User logged in successfully"
     );
 
@@ -131,7 +131,7 @@ pub async fn login(
             username: employee.username.clone(),
             display_name: employee.display_name.clone(),
             role_id: employee.role.to_string(),
-            role_name: role.role_name,
+            role_name: role.name,
             permissions: role.permissions,
             is_system: employee.is_system,
         },

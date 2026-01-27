@@ -24,7 +24,7 @@ impl RoleRepository {
         let roles: Vec<Role> = self
             .base
             .db()
-            .query("SELECT * FROM role WHERE is_active = true ORDER BY role_name")
+            .query("SELECT * FROM role WHERE is_active = true ORDER BY name")
             .await?
             .take(0)?;
         Ok(roles)
@@ -35,7 +35,7 @@ impl RoleRepository {
         let roles: Vec<Role> = self
             .base
             .db()
-            .query("SELECT * FROM role ORDER BY role_name")
+            .query("SELECT * FROM role ORDER BY name")
             .await?
             .take(0)?;
         Ok(roles)
@@ -51,12 +51,12 @@ impl RoleRepository {
     }
 
     /// Find role by name
-    pub async fn find_by_name(&self, role_name: &str) -> RepoResult<Option<Role>> {
-        let name_owned = role_name.to_string();
+    pub async fn find_by_name(&self, name: &str) -> RepoResult<Option<Role>> {
+        let name_owned = name.to_string();
         let mut result = self
             .base
             .db()
-            .query("SELECT * FROM role WHERE role_name = $name LIMIT 1")
+            .query("SELECT * FROM role WHERE name = $name OR role_name = $name LIMIT 1")
             .bind(("name", name_owned))
             .await?;
         let roles: Vec<Role> = result.take(0)?;
@@ -66,14 +66,18 @@ impl RoleRepository {
     /// Create a new role
     pub async fn create(&self, data: RoleCreate) -> RepoResult<Role> {
         // Check duplicate name
-        if self.find_by_name(&data.role_name).await?.is_some() {
+        if self.find_by_name(&data.name).await?.is_some() {
             return Err(RepoError::Duplicate(format!(
                 "Role '{}' already exists",
-                data.role_name
+                data.name
             )));
         }
 
-        let role = Role::new(data.role_name, data.permissions);
+        let mut role = Role::new(data.name, data.permissions);
+        if let Some(display_name) = data.display_name {
+            role.display_name = display_name;
+        }
+        role.description = data.description;
         let created: Option<Role> = self.base.db().create(TABLE).content(role).await?;
         created.ok_or_else(|| RepoError::Database("Failed to create role".to_string()))
     }
@@ -96,8 +100,8 @@ impl RoleRepository {
         }
 
         // Check duplicate name if changing
-        if let Some(ref new_name) = data.role_name
-            && new_name != &existing.role_name
+        if let Some(ref new_name) = data.name
+            && new_name != &existing.name
             && self.find_by_name(new_name).await?.is_some()
         {
             return Err(RepoError::Duplicate(format!(

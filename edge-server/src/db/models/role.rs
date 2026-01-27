@@ -13,8 +13,14 @@ pub struct Role {
     /// Optional role ID
     #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<RoleId>,
-    /// Name of the role
-    pub role_name: String,
+    /// Unique name of the role (e.g., "admin", "cashier")
+    #[serde(alias = "role_name")]
+    pub name: String,
+    /// Display name for UI (e.g., "管理员", "收银员")
+    #[serde(default)]
+    pub display_name: String,
+    /// Description of the role
+    pub description: Option<String>,
     /// List of permissions
     #[serde(default)]
     pub permissions: Vec<String>,
@@ -35,10 +41,12 @@ fn default_true() -> bool {
 
 impl Role {
     /// Create a new role
-    pub fn new(role_name: String, permissions: Vec<String>) -> Self {
+    pub fn new(name: String, permissions: Vec<String>) -> Self {
         Self {
             id: None,
-            role_name,
+            name: name.clone(),
+            display_name: name,
+            description: None,
             permissions,
             is_system: false,
             is_active: true,
@@ -49,7 +57,10 @@ impl Role {
 /// Create role request
 #[derive(Debug, Deserialize)]
 pub struct RoleCreate {
-    pub role_name: String,
+    pub name: String,
+    #[serde(default)]
+    pub display_name: Option<String>,
+    pub description: Option<String>,
     #[serde(default)]
     pub permissions: Vec<String>,
 }
@@ -58,7 +69,11 @@ pub struct RoleCreate {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RoleUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub role_name: Option<String>,
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permissions: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
