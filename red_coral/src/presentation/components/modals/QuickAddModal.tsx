@@ -128,11 +128,12 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       return products
         .filter((p) => {
           if (!p.is_active) return false;
-          const productTags = p.tags || [];
+          // Extract tag IDs from Tag[] objects
+          const productTagIds = (p.tags || []).map((t) => t.id);
           if (category.match_mode === 'all') {
-            return tagIds.every((tagId) => productTags.includes(tagId));
+            return tagIds.every((tagId) => productTagIds.includes(tagId));
           } else {
-            return tagIds.some((tagId) => productTags.includes(tagId));
+            return tagIds.some((tagId) => productTagIds.includes(tagId));
           }
         })
         .map(mapProductWithSpec);
@@ -146,10 +147,15 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
 
   // Handle product add from ProductGrid (same logic as POSScreen)
   const handleAddProduct = useCallback(async (product: Product, _startRect?: DOMRect, skipQuickAdd: boolean = false) => {
+    // Get full product data from store (ProductFull includes attributes)
+    const productFull = useProductStore.getState().getById(String(product.id));
+    if (!productFull) {
+      console.error('Product not found in store:', product.id);
+      return;
+    }
+
     try {
-      // Fetch full product data with attributes
-      const productFull = await api.getProductFull(String(product.id));
-      const attrBindings = productFull?.attributes || [];
+      const attrBindings = productFull.attributes || [];
 
       // Build set of product attribute IDs for deduplication
       const productAttrIds = new Set(attrBindings.map(b => String(b.attribute.id)));

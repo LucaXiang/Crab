@@ -35,6 +35,7 @@ interface ItemConfiguratorModalProps {
   discount: number;
   onQuantityChange: (val: number) => void;
   onDiscountChange: (val: number, authorizer?: { id: string; username: string }) => void;
+  onBasePriceChange?: (val: number) => void;
 
   // Actions
   onConfirm: () => void;
@@ -69,6 +70,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
   onDelete,
   showDelete = false,
   readOnlyAttributes = false,
+  onBasePriceChange,
 }) => {
   const { t } = useI18n();
 
@@ -226,6 +228,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
               optionsModifier={optionsModifier}
               onQuantityChange={onQuantityChange}
               onDiscountChange={onDiscountChange}
+              onBasePriceChange={onBasePriceChange}
               onConfirm={onConfirm}
               onCancel={onClose}
               onDelete={onDelete}

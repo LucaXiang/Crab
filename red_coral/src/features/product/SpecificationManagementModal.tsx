@@ -9,7 +9,7 @@ import { getErrorMessage } from '@/utils/error';
 import { SpecificationFormModal } from './SpecificationFormModal';
 import { canDeleteSpec, setDefaultSpec } from './spec-utils';
 import { useProductStore } from './store';
-import type { EmbeddedSpec, ProductFull, Product } from '@/core/domain/types';
+import type { EmbeddedSpec } from '@/core/domain/types';
 
 const api = createTauriClient();
 
@@ -28,8 +28,9 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
 }) => {
   const { t } = useI18n();
 
+  // Get specs directly from store (no API call needed)
+  const product = useProductStore((state) => state.items.find((p) => p.id === productId));
   const [specs, setSpecs] = useState<EmbeddedSpec[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   // Form modal state
@@ -45,27 +46,12 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
     onConfirm: () => {},
   });
 
-  // Load product specs
+  // Sync specs from store when modal opens or product changes
   useEffect(() => {
-    if (isOpen) {
-      loadSpecs();
+    if (isOpen && product) {
+      setSpecs(product.specs || []);
     }
-  }, [isOpen, productId]);
-
-  const loadSpecs = async () => {
-    setIsLoading(true);
-    try {
-      const productFull = await api.getProductFull(productId);
-      if (productFull) {
-        setSpecs(productFull.specs || []);
-      }
-    } catch (error) {
-      console.error('Failed to load specs:', error);
-      toast.error(t('settings.specification.message.load_failed'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [isOpen, product]);
 
   const saveSpecs = async (newSpecs: EmbeddedSpec[]) => {
     setIsSaving(true);
@@ -73,9 +59,13 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
       const updated = await api.updateProduct(productId, { specs: newSpecs });
       setSpecs(newSpecs);
 
-      // Update ProductStore cache
+      // Optimistic update - sync mechanism will also update via broadcast
+      // This ensures immediate UI update without waiting for sync
       if (updated) {
-        useProductStore.getState().optimisticUpdate(productId, () => updated as Product);
+        useProductStore.getState().optimisticUpdate(productId, (prev) => ({
+          ...prev,
+          specs: updated.specs,
+        }));
       }
 
       return true;
@@ -197,11 +187,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
 
         {/* Content */}
         <div className="p-4 max-h-[60vh] overflow-y-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-8 h-8 border-4 border-gray-200 border-t-orange-500 rounded-full animate-spin" />
-            </div>
-          ) : specs.length === 0 ? (
+          {specs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <List className="text-gray-300" size={32} />

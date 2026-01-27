@@ -6,6 +6,7 @@ export interface ItemActionPanelProps {
   optionsModifier: number;
   onQuantityChange: (val: number) => void;
   onDiscountChange: (val: number, authorizer?: { id: string; username: string }) => void;
+  onBasePriceChange?: (val: number) => void;
   onConfirm: () => void;
   onCancel?: () => void;
   onDelete?: (authorizer?: { id: string; username: string }) => void;
@@ -13,4 +14,4 @@ export interface ItemActionPanelProps {
   showDelete?: boolean;
 }
 
-export type EditMode = 'STANDARD' | 'QTY' | 'DISC' | 'PRICE';
+export type EditMode = 'STANDARD' | 'QTY' | 'DISC' | 'PRICE' | 'BASE_PRICE';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Minus, Plus, Percent, X, Trash2, Check } from 'lucide-react';
+import { Minus, Plus, X, Trash2, Check, Edit2 } from 'lucide-react';
 import { Numpad } from '../Numpad';
 import { Currency } from '@/utils/currency';
 import { formatCurrency } from '@/utils/currency';
@@ -19,6 +19,7 @@ const useItemActionLogic = (props: ItemActionPanelProps) => {
     quantity,
     onQuantityChange,
     onDiscountChange,
+    onBasePriceChange,
   } = props;
 
   const [editMode, setEditMode] = useState<EditMode>('STANDARD');
@@ -38,7 +39,8 @@ const useItemActionLogic = (props: ItemActionPanelProps) => {
 
   // --- Numpad Handlers ---
 
-  const openNumpad = (mode: 'QTY' | 'DISC' | 'PRICE', authorizer?: { id: string; username: string }) => {
+  const openNumpad = (mode: EditMode, authorizer?: { id: string; username: string }) => {
+    if (mode === 'STANDARD') return;
     setEditMode(mode);
     setIsTyping(false);
     if (authorizer) {
@@ -51,6 +53,7 @@ const useItemActionLogic = (props: ItemActionPanelProps) => {
     if (mode === 'QTY') initialValue = quantity.toString();
     else if (mode === 'DISC') initialValue = discount.toString();
     else if (mode === 'PRICE') initialValue = unitPriceFinal.toFixed(2);
+    else if (mode === 'BASE_PRICE') initialValue = basePrice.toFixed(2);
 
     setInputBuffer(initialValue);
   };
@@ -66,8 +69,12 @@ const useItemActionLogic = (props: ItemActionPanelProps) => {
       let val = parseFloat(inputBuffer);
       if (!isNaN(val)) {
         if (val > 100) val = 100;
-        // NOTE: For live preview, we don't pass authorizer yet because it's not final confirmation
-        onDiscountChange(val); 
+        onDiscountChange(val);
+      }
+    } else if (editMode === 'BASE_PRICE' && onBasePriceChange) {
+      const val = parseFloat(inputBuffer);
+      if (!isNaN(val) && val >= 0) {
+        onBasePriceChange(val);
       }
     }
     // PRICE mode is handled on confirm to avoid circular dependency issues during typing
@@ -83,9 +90,6 @@ const useItemActionLogic = (props: ItemActionPanelProps) => {
           let newDiscount = 100 * (1 - targetPrice / baseVal);
           // Clamp discount
           newDiscount = Math.max(0, Math.min(100, newDiscount));
-          // For price override, if it implies a discount, we might want to pass authorizer if we had one for 'PRICE' mode?
-          // Currently PRICE mode isn't protected explicitly here, but maybe it should be if it results in discount?
-          // The request specifically asked for Discount protection.
           onDiscountChange(parseFloat(newDiscount.toFixed(2)), authorizedUser || undefined);
         }
       }
@@ -108,7 +112,9 @@ const useItemActionLogic = (props: ItemActionPanelProps) => {
         return char === '.' ? '0.' : char;
       }
       if (char === '.' && prev.includes('.')) return prev;
-      if (prev.replace('.', '').length >= 4) return prev;
+      // Allow more digits for price
+      const maxDigits = (editMode === 'PRICE' || editMode === 'BASE_PRICE') ? 6 : 4;
+      if (prev.replace('.', '').length >= maxDigits) return prev;
       return prev + char;
     });
   };
@@ -128,6 +134,7 @@ const useItemActionLogic = (props: ItemActionPanelProps) => {
     inputBuffer,
     setInputBuffer,
     isTyping,
+    unitPriceBeforeDiscount,
     unitPriceFinal,
     finalTotal,
     openNumpad,
@@ -147,6 +154,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
     basePrice,
     optionsModifier,
     onDiscountChange,
+    onBasePriceChange,
     onConfirm,
     onCancel,
     onDelete,
@@ -160,6 +168,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
     inputBuffer,
     setInputBuffer,
     isTyping,
+    unitPriceBeforeDiscount,
     unitPriceFinal,
     handleNumInput,
     handleClearInput,
@@ -172,7 +181,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
   const { user: currentUser } = useAuthStore();
   const { hasPermission } = usePermission();
 
-  const DISCOUNTS = [10, 20, 50, 100];
+  const QUICK_DISCOUNTS = [5, 10, 20, 50];
 
   const handleProtectedDelete = (authorizer?: { id: string; username: string }) => {
      if (onDelete) {
@@ -184,171 +193,186 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
       onDiscountChange(val, authorizer || (currentUser ? { id: currentUser.id, username: currentUser.username } : undefined));
   };
 
+  const getEditModeTitle = () => {
+    switch (editMode) {
+      case 'QTY': return t('common.label.quantity');
+      case 'DISC': return t('checkout.cart.discount');
+      case 'PRICE': return t('pos.cart.final_price');
+      case 'BASE_PRICE': return t('pos.cart.base_price');
+      default: return '';
+    }
+  };
+
+  const getEditModeHint = () => {
+    switch (editMode) {
+      case 'QTY': return t('pos.cart.input.quantity');
+      case 'DISC': return t('pos.cart.input.discount');
+      case 'PRICE': return t('pos.cart.input.final_price');
+      case 'BASE_PRICE': return t('pos.cart.input.base_price');
+      default: return '';
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-white">
       {editMode === 'STANDARD' ? (
         <>
-          <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
-            
-            {/* 1. Compact Price Breakdown */}
-            <div className="bg-gray-50/80 border border-gray-100 rounded-2xl p-4 space-y-2">
-              <div className="flex justify-between items-center text-sm">
-                 <div className="flex items-center gap-2">
-                    <span className="text-gray-500">{t('pos.cart.unit_price')}</span>
-                    {discount > 0 && (
-                        <span className="text-xs font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
-                            -{discount}%
-                        </span>
-                    )}
-                 </div>
-                 <div className="flex flex-col items-end">
-                    {/* Original Price (if discounted) */}
-                    {discount > 0 && (
-                        <span className="text-xs text-gray-400 line-through decoration-gray-300">
-                            {formatCurrency(Currency.add(basePrice, optionsModifier).toNumber())}
-                        </span>
-                    )}
-                    {/* Final Unit Price */}
-                    <span className="text-xl font-bold text-gray-900 font-mono leading-none">
-                        {formatCurrency(unitPriceFinal.toNumber())}
-                    </span>
-                 </div>
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+
+            {/* Price Section */}
+            <div className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+              {/* 原价 (可编辑) */}
+              <div
+                className="flex items-center justify-between p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-100/50 transition-colors group"
+                onClick={() => onBasePriceChange && openNumpad('BASE_PRICE')}
+              >
+                <span className="text-sm text-gray-600">{t('pos.cart.base_price')}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-semibold text-gray-900 font-mono">
+                    {formatCurrency(basePrice)}
+                  </span>
+                  {onBasePriceChange && (
+                    <Edit2 size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </div>
               </div>
-              
-              {/* Collapsed Details - Only show if relevant */}
-              {(optionsModifier !== 0) && (
-                  <div className="pt-2 border-t border-gray-200/50 flex justify-between text-xs text-gray-400">
-                    <span>{t('pos.cart.base_price')}: {formatCurrency(basePrice)}</span>
-                    <span className={optionsModifier > 0 ? 'text-orange-500' : 'text-green-600'}>
-                        {t('pos.product.options')}: {optionsModifier > 0 ? '+' : ''}{formatCurrency(optionsModifier)}
-                    </span>
-                  </div>
+
+              {/* 属性加价 (如果有) */}
+              {optionsModifier !== 0 && (
+                <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-orange-50/50">
+                  <span className="text-sm text-gray-600">{t('pos.product.options')}</span>
+                  <span className={`text-lg font-semibold font-mono ${optionsModifier > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                    {optionsModifier > 0 ? '+' : ''}{formatCurrency(optionsModifier)}
+                  </span>
+                </div>
               )}
-            </div>
 
-            {/* 2. Controls Group */}
-            <div className="space-y-5">
-                {/* Quantity */}
-                <div className="space-y-2">
-                    <div className="flex justify-between items-end px-1">
-                        <label className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                            {t('common.label.quantity')}
-                        </label>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button
-                        onClick={() => incrementQty(-1)}
-                        className="w-14 h-14 bg-white border border-gray-200 shadow-sm rounded-xl flex items-center justify-center text-gray-600 active:scale-95 hover:border-gray-300 transition-all"
-                        >
-                        <Minus size={24} />
-                        </button>
-                        <button
-                        onClick={() => openNumpad('QTY')}
-                        className="flex-1 h-14 bg-gray-50 rounded-xl border border-transparent hover:bg-white hover:border-blue-200 hover:shadow-sm transition-all flex flex-col items-center justify-center group cursor-pointer"
-                        >
-                        <span className="text-2xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors">
-                            {quantity}
-                        </span>
-                        </button>
-                        <button
-                        onClick={() => incrementQty(1)}
-                        className="w-14 h-14 bg-white border border-gray-200 shadow-sm rounded-xl flex items-center justify-center text-gray-600 active:scale-95 hover:border-gray-300 transition-all"
-                        >
-                        <Plus size={24} />
-                        </button>
-                    </div>
+              {/* 折扣 (可编辑) */}
+              <div className="p-4 border-b border-gray-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">{t('checkout.cart.discount')}</span>
+                  <EscalatableGate
+                    permission={Permission.APPLY_DISCOUNT}
+                    mode="intercept"
+                    description={t('pos.cart.enter_discount')}
+                    onAuthorized={(user) => openNumpad('DISC', { id: user.id, username: user.username })}
+                  >
+                    <button
+                      onClick={() => {
+                        if (hasPermission(Permission.APPLY_DISCOUNT)) {
+                          openNumpad('DISC');
+                        }
+                      }}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                        discount > 0
+                          ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}
+                    >
+                      <span className="text-lg font-mono">{discount}%</span>
+                      <Edit2 size={14} />
+                    </button>
+                  </EscalatableGate>
                 </div>
 
-                {/* Discount */}
-                <div className="space-y-2">
-                    <div className="flex justify-between items-end px-1">
-                        <label className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                            {t('checkout.cart.discount')}
-                        </label>
-                    </div>
-                    
-                    {/* Discount Controls */}
-                    <div className="bg-white rounded-2xl border border-gray-200 p-2 shadow-sm space-y-2">
-                        <div className="flex items-center gap-2">
-                            <EscalatableGate
-                                permission={Permission.APPLY_DISCOUNT}
-                                mode="intercept"
-                                description={t('pos.cart.enter_discount')}
-                                onAuthorized={(user) => openNumpad('DISC', { id: user.id, username: user.username })}
-                            >
-                                <button
-                                    onClick={() => {
-                                        if (hasPermission(Permission.APPLY_DISCOUNT)) {
-                                            openNumpad('DISC');
-                                        }
-                                    }}
-                                    className={`
-                                        flex-1 h-10 rounded-lg border flex items-center justify-center gap-2 font-bold transition-all text-sm
-                                        ${discount > 0 
-                                            ? 'bg-red-50 border-red-200 text-red-600' 
-                                            : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100'}
-                                    `}
-                                >
-                                    {discount > 0 ? (
-                                        <>
-                                            <span className="text-lg">{discount}%</span>
-                                            <span className="text-[0.625rem] uppercase opacity-75">{t('common.discount.off')}</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Percent size={16} />
-                                            <span>{t('pos.cart.custom')}</span>
-                                        </>
-                                    )}
-                                </button>
-                            </EscalatableGate>
-                            {discount > 0 && (
-                                <button 
-                                    onClick={() => onDiscountChange(0)}
-                                    className="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
-                                >
-                                    <X size={18} />
-                                </button>
-                            )}
-                        </div>
-                        
-                        {/* Quick Presets - Tighter Grid */}
-                        <div className="grid grid-cols-4 gap-2">
-                            {DISCOUNTS.map(d => (
-                                <EscalatableGate
-                                    key={d}
-                                    permission={Permission.APPLY_DISCOUNT}
-                                    mode="intercept"
-                                    description={`${t('checkout.cart.discount')} ${d}%`}
-                                    onAuthorized={(user) => handleProtectedDiscount(d === discount ? 0 : d, { id: user.id, username: user.username })}
-                                >
-                                    <button
-                                        onClick={() => {
-                                            if (hasPermission(Permission.APPLY_DISCOUNT)) {
-                                                handleProtectedDiscount(d === discount ? 0 : d);
-                                            }
-                                        }}
-                                        className={`
-                                            h-9 rounded-lg text-xs font-bold border transition-all
-                                            ${discount === d 
-                                                ? 'bg-gray-900 text-white border-gray-900' 
-                                                : 'bg-white text-gray-600 border-gray-100 hover:border-gray-300'}
-                                        `}
-                                    >
-                                        {d === 100 ? t('common.discount.free') : `${d}%`}
-                                    </button>
-                                </EscalatableGate>
-                            ))}
-                        </div>
-                    </div>
+                {/* 快速折扣按钮 */}
+                <div className="flex gap-2">
+                  {QUICK_DISCOUNTS.map(d => (
+                    <EscalatableGate
+                      key={d}
+                      permission={Permission.APPLY_DISCOUNT}
+                      mode="intercept"
+                      description={`${t('checkout.cart.discount')} ${d}%`}
+                      onAuthorized={(user) => handleProtectedDiscount(d === discount ? 0 : d, { id: user.id, username: user.username })}
+                    >
+                      <button
+                        onClick={() => {
+                          if (hasPermission(Permission.APPLY_DISCOUNT)) {
+                            handleProtectedDiscount(d === discount ? 0 : d);
+                          }
+                        }}
+                        className={`flex-1 h-10 rounded-lg text-sm font-bold transition-all ${
+                          discount === d
+                            ? 'bg-gray-900 text-white'
+                            : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-400'
+                        }`}
+                      >
+                        {d}%
+                      </button>
+                    </EscalatableGate>
+                  ))}
+                  {discount > 0 && (
+                    <button
+                      onClick={() => onDiscountChange(0)}
+                      className="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
                 </div>
+              </div>
+
+              {/* 最终价格 (可编辑) */}
+              <EscalatableGate
+                permission={Permission.APPLY_DISCOUNT}
+                mode="intercept"
+                description={t('pos.cart.edit_final_price')}
+                onAuthorized={(user) => openNumpad('PRICE', { id: user.id, username: user.username })}
+              >
+                <div
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-blue-50/50 transition-colors group"
+                  onClick={() => {
+                    if (hasPermission(Permission.APPLY_DISCOUNT)) {
+                      openNumpad('PRICE');
+                    }
+                  }}
+                >
+                  <span className="text-sm font-semibold text-gray-900">{t('pos.cart.final_price')}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold text-blue-600 font-mono">
+                      {formatCurrency(unitPriceFinal.toNumber())}
+                    </span>
+                    <Edit2 size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              </EscalatableGate>
             </div>
+
+            {/* Quantity Section */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider px-1">
+                {t('common.label.quantity')}
+              </label>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => incrementQty(-1)}
+                  className="w-14 h-14 bg-white border border-gray-200 shadow-sm rounded-xl flex items-center justify-center text-gray-600 active:scale-95 hover:border-gray-300 transition-all"
+                >
+                  <Minus size={24} />
+                </button>
+                <button
+                  onClick={() => openNumpad('QTY')}
+                  className="flex-1 h-14 bg-gray-50 rounded-xl border border-transparent hover:bg-white hover:border-blue-200 hover:shadow-sm transition-all flex items-center justify-center group cursor-pointer"
+                >
+                  <span className="text-3xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors">
+                    {quantity}
+                  </span>
+                </button>
+                <button
+                  onClick={() => incrementQty(1)}
+                  className="w-14 h-14 bg-white border border-gray-200 shadow-sm rounded-xl flex items-center justify-center text-gray-600 active:scale-95 hover:border-gray-300 transition-all"
+                >
+                  <Plus size={24} />
+                </button>
+              </div>
+            </div>
+
           </div>
 
-          {/* Bottom Actions - Compact Footer */}
+          {/* Bottom Actions */}
           <div className="p-5 bg-white border-t border-gray-100 space-y-3 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
              <div className="flex gap-3 h-14">
-                {/* Cancel Button - Always visible for better UX */}
+                {/* Cancel Button */}
                 {onCancel && (
                     <button
                         onClick={onCancel}
@@ -359,7 +383,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                     </button>
                 )}
 
-                {/* Delete Button (Only if visible) */}
+                {/* Delete Button */}
                 {showDelete && onDelete && (
                     <EscalatableGate
                         permission={Permission.VOID_ORDER}
@@ -399,18 +423,18 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
         </>
       ) : (
         <div className="flex flex-col h-full animate-in slide-in-from-right duration-200 bg-gray-50">
-          {/* Numpad Header - Enhanced */}
+          {/* Numpad Header */}
           <div className="flex items-center justify-between p-6 bg-white shadow-sm z-10">
             <div>
                 <span className="block font-bold text-gray-900 text-lg">
-                    {editMode === 'QTY' ? (t('common.label.quantity')) : editMode === 'PRICE' ? (t('pos.cart.unit_price')) : (t('checkout.cart.discount'))}
+                    {getEditModeTitle()}
                 </span>
                 <span className="text-xs text-gray-500">
-                     {editMode === 'QTY' ? (t('pos.cart.input.quantity')) : editMode === 'PRICE' ? (t('pos.cart.input.price')) : (t('pos.cart.input.discount'))}
+                     {getEditModeHint()}
                 </span>
             </div>
-            <button 
-                onClick={() => setEditMode('STANDARD')} 
+            <button
+                onClick={() => setEditMode('STANDARD')}
                 className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
                 title={t('common.action.close')}
             >
@@ -422,7 +446,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
           <div className="flex-1 flex flex-col p-4">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 mb-4 flex items-center justify-end h-24 shrink-0">
                 <span className="text-5xl font-bold text-gray-900 tracking-tight font-mono">
-                {editMode === 'PRICE' && !isTyping ? '€' : ''}
+                {(editMode === 'PRICE' || editMode === 'BASE_PRICE') && '€'}
                 {inputBuffer}
                 {editMode === 'DISC' && <span className="text-gray-400 text-3xl ml-2">%</span>}
                 </span>
@@ -431,12 +455,12 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
             {/* Numpad Container */}
             <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-0">
                 <Numpad
-                onNumber={handleNumInput}
-                onDelete={() => setInputBuffer(prev => prev.slice(0, -1))}
-                onClear={handleClearInput}
-                onEnter={handleConfirmInput}
-                showDecimal={editMode === 'DISC' || editMode === 'PRICE'}
-                className="h-full"
+                  onNumber={handleNumInput}
+                  onDelete={() => setInputBuffer(prev => prev.slice(0, -1))}
+                  onClear={handleClearInput}
+                  onEnter={handleConfirmInput}
+                  showDecimal={editMode === 'DISC' || editMode === 'PRICE' || editMode === 'BASE_PRICE'}
+                  className="h-full"
                 />
             </div>
           </div>

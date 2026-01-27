@@ -45,6 +45,8 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
   const [quantity, setQuantity] = useState(1);
   const [discount, setDiscount] = useState(0);
   const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; username: string } | undefined>();
+  // Local override for base price (null = use spec/default price)
+  const [localBasePrice, setLocalBasePrice] = useState<number | null>(null);
 
   // Initialize selections with default options and specification
   useEffect(() => {
@@ -52,6 +54,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
       setQuantity(1);
       setDiscount(0);
       setDiscountAuthorizer(undefined);
+      setLocalBasePrice(null); // Reset price override when opening
 
       // Initialize specification selection (use index as ID since EmbeddedSpec has no id)
       if (hasMultiSpec && specifications && specifications.length > 0) {
@@ -148,6 +151,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
     });
 
     // Get selected specification details (use index as ID)
+    // Use currentPrice (which may be user-overridden) instead of spec.price
     let selectedSpec: { id: string; name: string; external_id?: number | null; receipt_name?: string | null; price?: number; is_multi_spec?: boolean } | undefined;
     if (hasMultiSpec && selectedSpecId !== null && specifications) {
       const specIdx = parseInt(selectedSpecId, 10);
@@ -157,7 +161,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
           id: String(specIdx),
           name: spec.is_default && !spec.name ? t('settings.product.specification.label.default') : spec.name,
           external_id: spec.external_id,
-          price: spec.price,
+          price: currentPrice, // Use possibly user-modified price
           is_multi_spec: hasMultiSpec,
         };
       }
@@ -169,7 +173,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
         id: String(specIdx),
         name: defaultSpec.name,
         external_id: defaultSpec.external_id,
-        price: defaultSpec.price,
+        price: currentPrice, // Use possibly user-modified price
         is_multi_spec: hasMultiSpec,
       };
     }
@@ -177,10 +181,17 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
     onConfirm(result, quantity, discount, discountAuthorizer, selectedSpec);
   };
 
-  // Calculate current price (specification price or base price)
-  const currentPrice = hasMultiSpec && selectedSpecId !== null && specifications
+  // Handle specification selection (reset price override when changing spec)
+  const handleSpecificationSelect = (specId: string) => {
+    setSelectedSpecId(specId);
+    setLocalBasePrice(null); // Reset price override when changing spec
+  };
+
+  // Calculate current price (local override > specification price > base price)
+  const specPrice = hasMultiSpec && selectedSpecId !== null && specifications
     ? specifications[parseInt(selectedSpecId, 10)]?.price ?? basePrice
     : basePrice;
+  const currentPrice = localBasePrice !== null ? localBasePrice : specPrice;
 
   return (
     <ItemConfiguratorModal
@@ -201,13 +212,14 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
         setDiscount(val);
         setDiscountAuthorizer(auth);
       }}
+      onBasePriceChange={setLocalBasePrice}
       onConfirm={handleConfirm}
       confirmLabel={t('common.action.confirm')}
       // Specification selection
       specifications={specifications}
       hasMultiSpec={hasMultiSpec}
       selectedSpecId={selectedSpecId}
-      onSpecificationSelect={setSelectedSpecId}
+      onSpecificationSelect={handleSpecificationSelect}
     />
   );
 });

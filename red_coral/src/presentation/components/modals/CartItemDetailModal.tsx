@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CartItem, AttributeTemplate, AttributeOption, ProductAttribute, ItemOption, EmbeddedSpec } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
+import { useProductStore } from '@/features/product';
 import { toast } from '../Toast';
 
 const api = createTauriClient();
@@ -38,8 +39,13 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     const load = async () => {
         setIsLoadingAttributes(true);
         try {
-            // ProductFull contains specs, attributes (with full Attribute data), and tags
-            const productFull = await api.getProductFull(String(item.id));
+            // Get full product data from store (ProductFull includes attributes)
+            const productFull = useProductStore.getState().getById(String(item.id));
+            if (!productFull) {
+              console.error('Product not found in store:', item.id);
+              setIsLoadingAttributes(false);
+              return;
+            }
 
             if (!mounted) return;
 

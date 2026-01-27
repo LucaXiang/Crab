@@ -2,6 +2,11 @@ import { create } from 'zustand';
 
 /**
  * Sync payload for version-based incremental sync
+ *
+ * 版本同步策略:
+ * - lastVersion = 0: 初始状态，接受任何版本的同步消息
+ * - lastVersion > 0: 正常同步，检查版本连续性
+ * - 检测到版本间隙: 触发全量刷新
  */
 export interface SyncPayload<T = unknown> {
   id: string;
@@ -40,7 +45,7 @@ export interface CrudResourceStore<T extends { id: string }, TCreate, TUpdate>
   update: (id: string, data: TUpdate) => Promise<T>;
   remove: (id: string) => Promise<void>;
   // 乐观更新辅助
-  optimisticUpdate: (id: string, updater: (item: T) => T) => void;
+  optimisticUpdate: (id: string, updater: (item: T) => T, version?: number) => void;
   optimisticRemove: (id: string) => void;
   optimisticAdd: (item: T) => void;
 }
@@ -96,13 +101,14 @@ export function createResourceStore<T extends { id: string }>(
       const state = get();
       const { id, version, action, data } = payload;
 
-      // Skip if duplicate
-      if (version <= state.lastVersion) {
+      // Skip if duplicate (but allow if lastVersion is 0, meaning never synced)
+      if (state.lastVersion > 0 && version <= state.lastVersion) {
         return;
       }
 
       // Gap detected: need full refresh
-      if (version > state.lastVersion + 1) {
+      // Only trigger fetchAll if we have a previous version to compare against
+      if (state.lastVersion > 0 && version > state.lastVersion + 1) {
         if (state.isLoaded) {
           get().fetchAll(true);
         }
@@ -202,13 +208,14 @@ export function createCrudResourceStore<
       const state = get();
       const { id, version, action, data } = payload;
 
-      // Skip if duplicate
-      if (version <= state.lastVersion) {
+      // Skip if duplicate (but allow if lastVersion is 0, meaning never synced)
+      if (state.lastVersion > 0 && version <= state.lastVersion) {
         return;
       }
 
       // Gap detected: need full refresh
-      if (version > state.lastVersion + 1) {
+      // Only trigger fetchAll if we have a previous version to compare against
+      if (state.lastVersion > 0 && version > state.lastVersion + 1) {
         if (state.isLoaded) {
           get().fetchAll(true);
         }
@@ -284,11 +291,13 @@ export function createCrudResourceStore<
     },
 
     // 乐观更新辅助方法
-    optimisticUpdate: (id, updater) => {
+    // version 参数可选，传入时会同时更新 lastVersion，避免后续 sync 触发不必要的 fetchAll
+    optimisticUpdate: (id, updater, version) => {
       set((state) => ({
         items: state.items.map((item) =>
           item.id === id ? updater(item) : item
         ),
+        ...(version !== undefined && { lastVersion: version }),
       }));
     },
 

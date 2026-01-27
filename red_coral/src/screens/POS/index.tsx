@@ -144,14 +144,15 @@ export const POSScreen: React.FC = () => {
       return products
         .filter((p) => {
           if (!p.is_active) return false;
-          const productTags = p.tags || [];
+          // Extract tag IDs from Tag[] objects
+          const productTagIds = (p.tags || []).map((t) => t.id);
 
           if (category.match_mode === 'all') {
             // Product must have ALL tags
-            return tagIds.every((tagId) => productTags.includes(tagId));
+            return tagIds.every((tagId) => productTagIds.includes(tagId));
           } else {
             // Product must have ANY tag (default: 'any')
-            return tagIds.some((tagId) => productTags.includes(tagId));
+            return tagIds.some((tagId) => productTagIds.includes(tagId));
           }
         })
         .map(mapProductWithSpec);
@@ -293,16 +294,21 @@ export const POSScreen: React.FC = () => {
   // Handlers
   const addToCart = useCallback(
     async (product: Product, startRect?: DOMRect, skipQuickAdd: boolean = false) => {
+      // Get full product data from store (ProductFull includes attributes)
+      const productFull = useProductStore.getState().getById(String(product.id));
+      if (!productFull) {
+        toast.error('Product not found');
+        return;
+      }
+
       // Check if product has attributes or specifications
       try {
-        // Use getProductFull to get complete product data including full attribute details
-        const productFull = await api.getProductFull(String(product.id));
-        const attrBindings = productFull?.attributes || [];
+        const attrBindings = productFull.attributes || [];
 
         // Build set of product attribute IDs for deduplication
         const productAttrIds = new Set(attrBindings.map(b => String(b.attribute.id)));
 
-        // Fetch category attributes (inherited)
+        // Fetch category attributes (inherited) - still need API call for now
         let categoryAttributes: AttributeTemplate[] = [];
         if (productFull.category) {
           try {
@@ -348,9 +354,9 @@ export const POSScreen: React.FC = () => {
         }));
         const allBindings = [...productBindings, ...categoryBindings];
 
-        // Specs are now embedded in Product (EmbeddedSpec[])
-        const hasMultiSpec = product.specs.length > 1;
-        const specifications: EmbeddedSpec[] = product.specs || [];
+        // Specs are now embedded in ProductFull (EmbeddedSpec[])
+        const hasMultiSpec = productFull.specs.length > 1;
+        const specifications: EmbeddedSpec[] = productFull.specs || [];
 
         // Get base price from default spec or first spec
         const defaultSpec = specifications.find((s) => s.is_default) || specifications[0];

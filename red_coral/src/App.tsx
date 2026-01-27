@@ -8,6 +8,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 
 // Components
 import { ToastContainer } from '@/presentation/components/Toast';
+import { ServerMessageToastContainer } from '@/presentation/components/ServerMessageToast';
 import { ProtectedRoute } from '@/presentation/components/ProtectedRoute';
 import { PermissionEscalationProvider } from '@/presentation/components/auth/PermissionEscalationProvider';
 import { NotificationProvider } from '@/presentation/components/notifications';
@@ -261,8 +262,9 @@ const App: React.FC = () => {
   return (
     <BrowserRouter>
       <NotificationProvider>
-        {/* Global Toast Container */}
+        {/* Global Toast Containers */}
         <ToastContainer />
+        <ServerMessageToastContainer />
         <PermissionEscalationProvider />
 
         <Routes>

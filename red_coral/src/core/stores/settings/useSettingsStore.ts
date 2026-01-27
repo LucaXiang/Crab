@@ -248,7 +248,7 @@ export const useSettingsStore = create<SettingsStore>()(
             is_kitchen_print_enabled: productData?.is_kitchen_print_enabled ?? -1,  // 默认继承分类
             is_label_print_enabled: productData?.is_label_print_enabled ?? -1,  // 默认继承分类
             is_active: productData?.is_active ?? true,  // Default to active for new products
-            tags: productData?.tags || [],
+            tags: (productData?.tags || []).map((t) => t.id).filter(Boolean) as string[],
             specs: productData?.specs || [],
             has_multi_spec: (productData?.specs?.length ?? 0) > 1,
           };
