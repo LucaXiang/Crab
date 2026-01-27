@@ -215,6 +215,10 @@ interface BridgeStore {
   startClientMode: (edgeUrl: string, messageAddr: string) => Promise<void>;
   stopMode: () => Promise<void>;
 
+  // Config Actions
+  updateServerConfig: (httpPort: number, messagePort: number) => Promise<void>;
+  updateClientConfig: (edgeUrl: string, messageAddr: string, authUrl: string) => Promise<void>;
+
   // Tenant Actions
   fetchTenants: () => Promise<void>;
   activateTenant: (authUrl: string, username: string, password: string) => Promise<string>;
@@ -322,6 +326,31 @@ export const useBridgeStore = create<BridgeStore>()(
           });
         } catch (error: unknown) {
           set({ error: error instanceof Error ? error.message : 'Operation failed' });
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      // Config Actions
+      updateServerConfig: async (httpPort: number, messagePort: number) => {
+        try {
+          set({ isLoading: true, error: null });
+          await invokeApi('update_server_config', { http_port: httpPort, message_port: messagePort });
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Failed to update server config' });
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      updateClientConfig: async (edgeUrl: string, messageAddr: string, authUrl: string) => {
+        try {
+          set({ isLoading: true, error: null });
+          await invokeApi('update_client_config', { edge_url: edgeUrl, message_addr: messageAddr, auth_url: authUrl });
+        } catch (error: unknown) {
+          set({ error: error instanceof Error ? error.message : 'Failed to update client config' });
+          throw error;
         } finally {
           set({ isLoading: false });
         }

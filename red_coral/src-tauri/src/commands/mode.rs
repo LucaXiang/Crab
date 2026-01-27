@@ -162,6 +162,44 @@ pub async fn reconnect(
     Ok(ApiResponse::success(()))
 }
 
+/// 更新 Server 模式配置
+#[tauri::command(rename_all = "snake_case")]
+pub async fn update_server_config(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    http_port: u16,
+    message_port: u16,
+) -> Result<ApiResponse<()>, String> {
+    let bridge = bridge.read().await;
+    match bridge.update_server_config(http_port, message_port).await {
+        Ok(_) => Ok(ApiResponse::success(())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::ConfigError,
+            e.to_string(),
+        )),
+    }
+}
+
+/// 更新 Client 模式配置
+#[tauri::command(rename_all = "snake_case")]
+pub async fn update_client_config(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    edge_url: String,
+    message_addr: String,
+    auth_url: String,
+) -> Result<ApiResponse<()>, String> {
+    let bridge = bridge.read().await;
+    match bridge
+        .update_client_config(&edge_url, &message_addr, &auth_url)
+        .await
+    {
+        Ok(_) => Ok(ApiResponse::success(())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::ConfigError,
+            e.to_string(),
+        )),
+    }
+}
+
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_app_config(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,

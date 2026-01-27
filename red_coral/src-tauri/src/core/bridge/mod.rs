@@ -128,27 +128,16 @@ impl ClientBridge {
         Ok(())
     }
 
-    /// 激活设备并自动切换租户，保存配置
+    /// 激活设备并保存证书
     ///
-    /// 如果当前在 Server mode，会重启服务器以使用新租户配置
+    /// 仅保存证书到磁盘，不启动任何模式。
+    /// 用户需要在激活后手动选择并启动模式。
     pub async fn handle_activation(
         &self,
         auth_url: &str,
         username: &str,
         password: &str,
     ) -> Result<String, BridgeError> {
-        // 检查是否在 Server 模式
-        let was_server_mode = {
-            let mode = self.mode.read().await;
-            matches!(*mode, ClientMode::Server { .. })
-        };
-
-        // 如果在 Server 模式，先停止服务器
-        if was_server_mode {
-            tracing::info!("Stopping server before activation...");
-            self.stop().await?;
-        }
-
         // 1. 调用 TenantManager 激活（保存证书和 credential 到磁盘）
         let tenant_id = {
             let mut tm = self.tenant_manager.write().await;
@@ -165,13 +154,7 @@ impl ClientBridge {
             config.save(&self.config_path)?;
         }
 
-        // 3. 如果之前在 Server 模式，重启服务器（使用新租户的 work_dir）
-        if was_server_mode {
-            tracing::info!("Restarting server with new tenant...");
-            self.start_server_mode().await?;
-        }
-
-        tracing::info!(tenant_id = %tenant_id, "Device activated and config saved");
+        tracing::info!(tenant_id = %tenant_id, "Device activated and config saved (mode not started)");
         Ok(tenant_id)
     }
 
@@ -1191,6 +1174,46 @@ impl ClientBridge {
     /// 获取客户端模式配置
     pub async fn get_client_config(&self) -> Option<ClientModeConfig> {
         self.config.read().await.client_config.clone()
+    }
+
+    /// 更新 Server 模式配置 (端口配置)
+    ///
+    /// 仅更新配置并保存，不启动模式
+    pub async fn update_server_config(
+        &self,
+        http_port: u16,
+        message_port: u16,
+    ) -> Result<(), BridgeError> {
+        {
+            let mut config = self.config.write().await;
+            config.server_config.http_port = http_port;
+            config.server_config.message_port = message_port;
+            config.save(&self.config_path)?;
+        }
+        tracing::info!(http_port = %http_port, message_port = %message_port, "Server config updated");
+        Ok(())
+    }
+
+    /// 更新 Client 模式配置 (连接地址)
+    ///
+    /// 仅更新配置并保存，不启动模式
+    pub async fn update_client_config(
+        &self,
+        edge_url: &str,
+        message_addr: &str,
+        auth_url: &str,
+    ) -> Result<(), BridgeError> {
+        {
+            let mut config = self.config.write().await;
+            config.client_config = Some(ClientModeConfig {
+                edge_url: edge_url.to_string(),
+                message_addr: message_addr.to_string(),
+                auth_url: auth_url.to_string(),
+            });
+            config.save(&self.config_path)?;
+        }
+        tracing::info!(edge_url = %edge_url, message_addr = %message_addr, auth_url = %auth_url, "Client config updated");
+        Ok(())
     }
 
     /// 获取 Client 模式的 mTLS HTTP client 和相关信息

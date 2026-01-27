@@ -1,36 +1,44 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Server, Wifi, AlertCircle, ChevronRight, Shield, Power } from 'lucide-react';
+import { Server, Wifi, AlertCircle, ChevronRight, Shield, Power, Settings } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useBridgeStore } from '@/core/stores/bridge';
-import { useI18n } from '@/hooks/useI18n';
 
-type SetupStep = 'mode' | 'activate' | 'complete';
+type SetupStep = 'activate' | 'mode' | 'configure' | 'complete';
 type ModeChoice = 'server' | 'client' | null;
 
-export const SetupScreen: React.FC = () => {
-  const { t } = useI18n();
-  const navigate = useNavigate();
-  const { activateTenant, startServerMode, startClientMode, isLoading, error } = useBridgeStore();
+// Default ports for Server mode
+const DEFAULT_HTTP_PORT = 9625;
+const DEFAULT_MESSAGE_PORT = 9626;
 
-  const [step, setStep] = useState<SetupStep>('mode');
+export const SetupScreen: React.FC = () => {
+  const navigate = useNavigate();
+  const {
+    activateTenant,
+    startServerMode,
+    startClientMode,
+    updateServerConfig,
+    updateClientConfig,
+    isLoading,
+    error,
+  } = useBridgeStore();
+
+  const [step, setStep] = useState<SetupStep>('activate');
   const [modeChoice, setModeChoice] = useState<ModeChoice>(null);
 
   // Activation form state
-  // AUTH_SERVER is hardcoded for now (development: 127.0.0.1:3001)
   const authUrl = 'http://127.0.0.1:3001';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [activationError, setActivationError] = useState('');
 
+  // Server mode config
+  const [httpPort, setHttpPort] = useState(DEFAULT_HTTP_PORT);
+  const [messagePort, setMessagePort] = useState(DEFAULT_MESSAGE_PORT);
+
   // Client mode config
   const [edgeUrl, setEdgeUrl] = useState('https://edge.example.com');
   const [messageAddr, setMessageAddr] = useState('edge.example.com:9626');
-
-  const handleModeSelect = (mode: ModeChoice) => {
-    setModeChoice(mode);
-    setStep('activate');
-  };
 
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,17 +51,35 @@ export const SetupScreen: React.FC = () => {
 
     try {
       await activateTenant(authUrl, username, password);
-
-      // Start the appropriate mode
-      if (modeChoice === 'server') {
-        await startServerMode();
-      } else if (modeChoice === 'client') {
-        await startClientMode(edgeUrl, messageAddr);
-      }
-
-      setStep('complete');
+      // After activation, go to mode selection (don't start any mode)
+      setStep('mode');
     } catch (err: unknown) {
       setActivationError(err instanceof Error ? err.message : 'Activation failed');
+    }
+  };
+
+  const handleModeSelect = (mode: ModeChoice) => {
+    setModeChoice(mode);
+    setStep('configure');
+  };
+
+  const handleConfigure = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActivationError('');
+
+    try {
+      if (modeChoice === 'server') {
+        // Save server config and start server mode
+        await updateServerConfig(httpPort, messagePort);
+        await startServerMode();
+      } else if (modeChoice === 'client') {
+        // Save client config and start client mode
+        await updateClientConfig(edgeUrl, messageAddr, authUrl);
+        await startClientMode(edgeUrl, messageAddr);
+      }
+      setStep('complete');
+    } catch (err: unknown) {
+      setActivationError(err instanceof Error ? err.message : 'Failed to start mode');
     }
   };
 
@@ -66,15 +92,78 @@ export const SetupScreen: React.FC = () => {
     await appWindow.close();
   };
 
+  const stepLabels = ['Activate', 'Mode', 'Configure', 'Complete'];
+  const stepKeys: SetupStep[] = ['activate', 'mode', 'configure', 'complete'];
+
+  const renderActivateStep = () => (
+    <div className="max-w-md mx-auto space-y-8">
+      <div className="text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-[#FF5E5E]/10 rounded-2xl mb-4">
+          <Shield className="text-[#FF5E5E]" size={32} />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Activate Device</h1>
+        <p className="text-gray-500">Enter your tenant credentials to activate this device</p>
+      </div>
+
+      <form onSubmit={handleActivate} className="space-y-6">
+        {/* Username */}
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">Tenant Username</label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter your tenant username"
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5E5E]/20 focus:border-[#FF5E5E]"
+            disabled={isLoading}
+          />
+        </div>
+
+        {/* Password */}
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5E5E]/20 focus:border-[#FF5E5E]"
+            disabled={isLoading}
+          />
+        </div>
+
+        {/* Error Message */}
+        {(activationError || error) && (
+          <div className="flex items-center gap-3 text-red-600 bg-red-50 p-4 rounded-xl border border-red-100">
+            <AlertCircle size={20} className="shrink-0" />
+            <span className="text-sm font-medium">{activationError || error}</span>
+          </div>
+        )}
+
+        {/* Submit Button */}
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full py-3 bg-[#FF5E5E] text-white font-bold rounded-xl hover:bg-[#E54545] active:scale-[0.98] transition-all shadow-lg shadow-[#FF5E5E]/25 flex items-center justify-center gap-2 disabled:opacity-70"
+        >
+          {isLoading ? (
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <>
+              <span>Activate Device</span>
+              <ChevronRight size={20} />
+            </>
+          )}
+        </button>
+      </form>
+    </div>
+  );
+
   const renderModeStep = () => (
     <div className="space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Welcome to RedCoral POS
-        </h1>
-        <p className="text-gray-500">
-          Choose how you want to run the application
-        </p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Choose Operation Mode</h1>
+        <p className="text-gray-500">Select how you want to run the application</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -124,31 +213,80 @@ export const SetupScreen: React.FC = () => {
           </div>
         </button>
       </div>
+
+      {/* Back Button */}
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={() => setStep('activate')}
+          className="px-6 py-3 text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+        >
+          Back to Activation
+        </button>
+      </div>
     </div>
   );
 
-  const renderActivateStep = () => (
+  const renderConfigureStep = () => (
     <div className="max-w-md mx-auto space-y-8">
       <div className="text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-[#FF5E5E]/10 rounded-2xl mb-4">
-          <Shield className="text-[#FF5E5E]" size={32} />
+        <div
+          className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 ${
+            modeChoice === 'server' ? 'bg-[#FF5E5E]/10' : 'bg-blue-500/10'
+          }`}
+        >
+          <Settings className={modeChoice === 'server' ? 'text-[#FF5E5E]' : 'text-blue-500'} size={32} />
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Activate Device
+          Configure {modeChoice === 'server' ? 'Server' : 'Client'} Mode
         </h1>
         <p className="text-gray-500">
-          Enter your tenant credentials to activate this device
+          {modeChoice === 'server'
+            ? 'Set the ports for the local server'
+            : 'Enter the connection details for the remote server'}
         </p>
       </div>
 
-      <form onSubmit={handleActivate} className="space-y-6">
-        {/* Client Mode: Edge Server Config */}
-        {modeChoice === 'client' && (
+      <form onSubmit={handleConfigure} className="space-y-6">
+        {modeChoice === 'server' ? (
           <>
+            {/* HTTP Port */}
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">
-                Edge Server URL
-              </label>
+              <label className="text-sm font-medium text-gray-700">HTTP Port</label>
+              <input
+                type="number"
+                value={httpPort}
+                onChange={(e) => setHttpPort(parseInt(e.target.value) || DEFAULT_HTTP_PORT)}
+                placeholder="9625"
+                min={1024}
+                max={65535}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5E5E]/20 focus:border-[#FF5E5E]"
+                disabled={isLoading}
+              />
+              <p className="text-xs text-gray-400">Port for HTTP API (default: 9625)</p>
+            </div>
+
+            {/* Message Port */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Message Bus Port</label>
+              <input
+                type="number"
+                value={messagePort}
+                onChange={(e) => setMessagePort(parseInt(e.target.value) || DEFAULT_MESSAGE_PORT)}
+                placeholder="9626"
+                min={1024}
+                max={65535}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5E5E]/20 focus:border-[#FF5E5E]"
+                disabled={isLoading}
+              />
+              <p className="text-xs text-gray-400">Port for real-time messaging (default: 9626)</p>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Edge Server URL */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Edge Server URL</label>
               <input
                 type="url"
                 value={edgeUrl}
@@ -157,11 +295,12 @@ export const SetupScreen: React.FC = () => {
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 disabled={isLoading}
               />
+              <p className="text-xs text-gray-400">HTTPS URL of the Edge Server</p>
             </div>
+
+            {/* Message Server Address */}
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">
-                Message Server Address
-              </label>
+              <label className="text-sm font-medium text-gray-700">Message Server Address</label>
               <input
                 type="text"
                 value={messageAddr}
@@ -170,39 +309,10 @@ export const SetupScreen: React.FC = () => {
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 disabled={isLoading}
               />
+              <p className="text-xs text-gray-400">Host:Port for real-time messaging</p>
             </div>
           </>
         )}
-
-        {/* Username */}
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">
-            Tenant Username
-          </label>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Enter your tenant username"
-            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5E5E]/20 focus:border-[#FF5E5E]"
-            disabled={isLoading}
-          />
-        </div>
-
-        {/* Password */}
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">
-            Password
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
-            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5E5E]/20 focus:border-[#FF5E5E]"
-            disabled={isLoading}
-          />
-        </div>
 
         {/* Error Message */}
         {(activationError || error) && (
@@ -225,13 +335,17 @@ export const SetupScreen: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="flex-1 py-3 bg-[#FF5E5E] text-white font-bold rounded-xl hover:bg-[#E54545] active:scale-[0.98] transition-all shadow-lg shadow-[#FF5E5E]/25 flex items-center justify-center gap-2 disabled:opacity-70"
+            className={`flex-1 py-3 text-white font-bold rounded-xl active:scale-[0.98] transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-70 ${
+              modeChoice === 'server'
+                ? 'bg-[#FF5E5E] hover:bg-[#E54545] shadow-[#FF5E5E]/25'
+                : 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/25'
+            }`}
           >
             {isLoading ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                <span>Activate Device</span>
+                <span>Start {modeChoice === 'server' ? 'Server' : 'Client'} Mode</span>
                 <ChevronRight size={20} />
               </>
             )}
@@ -250,11 +364,11 @@ export const SetupScreen: React.FC = () => {
       </div>
 
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Device Activated!
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Setup Complete!</h1>
         <p className="text-gray-500">
-          Your device has been successfully activated. You can now log in with your employee credentials.
+          Your device is activated and running in{' '}
+          <span className="font-medium">{modeChoice === 'server' ? 'Server' : 'Client'}</span> mode. You can
+          now log in with your employee credentials.
         </p>
       </div>
 
@@ -282,25 +396,32 @@ export const SetupScreen: React.FC = () => {
       <div className="w-full max-w-4xl">
         {/* Progress Indicator */}
         <div className="flex items-center justify-center gap-2 mb-12">
-          {['mode', 'activate', 'complete'].map((s, i) => (
+          {stepKeys.map((s, i) => (
             <React.Fragment key={s}>
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                  step === s
-                    ? 'bg-[#FF5E5E] text-white'
-                    : i < ['mode', 'activate', 'complete'].indexOf(step)
-                    ? 'bg-green-500 text-white'
-                    : 'bg-gray-200 text-gray-500'
-                }`}
-              >
-                {i + 1}
-              </div>
-              {i < 2 && (
+              <div className="flex flex-col items-center">
                 <div
-                  className={`w-16 h-1 rounded ${
-                    i < ['mode', 'activate', 'complete'].indexOf(step)
-                      ? 'bg-green-500'
-                      : 'bg-gray-200'
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                    step === s
+                      ? 'bg-[#FF5E5E] text-white'
+                      : stepKeys.indexOf(step) > i
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-200 text-gray-500'
+                  }`}
+                >
+                  {stepKeys.indexOf(step) > i ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    i + 1
+                  )}
+                </div>
+                <span className="text-xs text-gray-500 mt-1">{stepLabels[i]}</span>
+              </div>
+              {i < stepKeys.length - 1 && (
+                <div
+                  className={`w-12 h-1 rounded mb-5 ${
+                    stepKeys.indexOf(step) > i ? 'bg-green-500' : 'bg-gray-200'
                   }`}
                 />
               )}
@@ -309,8 +430,9 @@ export const SetupScreen: React.FC = () => {
         </div>
 
         {/* Step Content */}
-        {step === 'mode' && renderModeStep()}
         {step === 'activate' && renderActivateStep()}
+        {step === 'mode' && renderModeStep()}
+        {step === 'configure' && renderConfigureStep()}
         {step === 'complete' && renderCompleteStep()}
       </div>
     </div>
