@@ -176,23 +176,18 @@ export class TauriApiClient {
 
   // ============ Products ============
 
-  async listProducts(): Promise<Product[]> {
-    const data = await invokeAndUnwrap<ProductListData>('list_products');
+  async listProducts(): Promise<ProductFull[]> {
+    const data = await invokeAndUnwrap<{ products: ProductFull[] }>('list_products');
     return data.products;
   }
 
-  async getProductFull(id: string): Promise<ProductFull> {
-    const data = await invokeAndUnwrap<{ product: ProductFull }>('get_product_full', { id });
-    return data.product;
-  }
-
-  async createProduct(data: ProductCreate): Promise<Product> {
-    const result = await invokeAndUnwrap<{ product: Product }>('create_product', { data });
+  async createProduct(data: ProductCreate): Promise<ProductFull> {
+    const result = await invokeAndUnwrap<{ product: ProductFull }>('create_product', { data });
     return result.product;
   }
 
-  async updateProduct(id: string, data: ProductUpdate): Promise<Product> {
-    const result = await invokeAndUnwrap<{ product: Product }>('update_product', { id, data });
+  async updateProduct(id: string, data: ProductUpdate): Promise<ProductFull> {
+    const result = await invokeAndUnwrap<{ product: ProductFull }>('update_product', { id, data });
     return result.product;
   }
 

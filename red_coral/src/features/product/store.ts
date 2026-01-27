@@ -1,11 +1,11 @@
 import { createCrudResourceStore } from '@/core/stores/factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
-import type { Product, ProductCreate, ProductUpdate } from '@/core/domain/types/api';
+import type { ProductFull, ProductCreate, ProductUpdate } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
-// Product with guaranteed id
-type ProductEntity = Product & { id: string };
+// ProductFull with guaranteed id (contains specs, attributes, tags)
+type ProductEntity = ProductFull & { id: string };
 
 export const useProductStore = createCrudResourceStore<ProductEntity, ProductCreate, ProductUpdate>(
   'product',

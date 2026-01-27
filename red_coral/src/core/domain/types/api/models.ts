@@ -122,29 +122,10 @@ export interface EmbeddedSpec {
   external_id: number | null;
 }
 
-export interface Product {
-  id: string | null;
-  name: string;
-  image: string;
-  category: string;
-  sort_order: number;
-  tax_rate: number;
-  receipt_name: string | null;
-  kitchen_print_name: string | null;
-  /** 厨房打印目的地 */
-  kitchen_print_destinations: string[];
-  /** 标签打印目的地 */
-  label_print_destinations: string[];
-  /** 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用) */
-  is_kitchen_print_enabled: PrintState;
-  /** 标签打印启用状态 (-1=继承, 0=禁用, 1=启用) */
-  is_label_print_enabled: PrintState;
-  is_active: boolean;
-  /** Tag references (String IDs) */
-  tags: string[];
-  /** 嵌入式规格数组 */
-  specs: EmbeddedSpec[];
-}
+// NOTE: Product is now an alias for ProductFull
+// Backend always returns full product data including attributes and tags
+// This simplifies type handling across the frontend
+export type Product = ProductFull;
 
 export interface ProductCreate {
   name: string;

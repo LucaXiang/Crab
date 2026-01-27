@@ -221,10 +221,10 @@ export async function deleteProduct(id: string): Promise<{ success: boolean }> {
 }
 
 /**
- * Load full product data for editing
+ * Load full product data for editing (from store)
  */
-export async function loadProductFullData(productId: string) {
-  const productFull = await api.getProductFull(productId);
+export function loadProductFullData(productId: string) {
+  const productFull = useProductStore.getState().getById(productId);
   if (!productFull) {
     throw new Error('Failed to load product full data');
   }

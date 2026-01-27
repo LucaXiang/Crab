@@ -56,36 +56,23 @@ async fn check_duplicate_external_ids(
 // Product Handlers
 // =============================================================================
 
-/// GET /api/products - 获取所有商品
-pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<shared::models::Product>>> {
+/// GET /api/products - 获取所有商品 (完整数据，含属性和标签)
+pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<ProductFull>>> {
     let products = state.catalog_service.list_products();
-    Ok(Json(products.into_iter().map(Into::into).collect()))
+    Ok(Json(products))
 }
 
-/// GET /api/products/by-category/:category_id - 按分类获取商品
+/// GET /api/products/by-category/:category_id - 按分类获取商品 (完整数据)
 pub async fn list_by_category(
     State(state): State<ServerState>,
     Path(category_id): Path<String>,
-) -> AppResult<Json<Vec<shared::models::Product>>> {
+) -> AppResult<Json<Vec<ProductFull>>> {
     let products = state.catalog_service.get_products_by_category(&category_id);
-    Ok(Json(products.into_iter().map(Into::into).collect()))
+    Ok(Json(products))
 }
 
-/// GET /api/products/:id - 获取单个商品
+/// GET /api/products/:id - 获取单个商品 (完整数据)
 pub async fn get_by_id(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-) -> AppResult<Json<shared::models::Product>> {
-    let product = state
-        .catalog_service
-        .get_product(&id)
-        .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
-    Ok(Json(product.into()))
-}
-
-/// GET /api/products/:id/full - 获取商品完整信息 (含规格、属性、标签)
-/// Note: Now same as get_by_id since CatalogService always returns ProductFull
-pub async fn get_full(
     State(state): State<ServerState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<ProductFull>> {
@@ -96,11 +83,24 @@ pub async fn get_full(
     Ok(Json(product))
 }
 
+/// GET /api/products/:id/full - 获取商品完整信息 (含规格、属性、标签)
+/// Note: Now same as get_by_id since CatalogService always returns ProductFull
+pub async fn get_full(
+    State(state): State<ServerState>,
+    Path(id): Path<String>,
+) -> AppResult<Json<shared::models::ProductFull>> {
+    let product = state
+        .catalog_service
+        .get_product(&id)
+        .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
+    Ok(Json(product.into()))
+}
+
 /// POST /api/products - 创建商品
 pub async fn create(
     State(state): State<ServerState>,
     Json(payload): Json<ProductCreate>,
-) -> AppResult<Json<shared::models::Product>> {
+) -> AppResult<Json<shared::models::ProductFull>> {
     // 检查 external_id 是否已存在
     let external_ids: Vec<i64> = payload.specs.iter().filter_map(|s| s.external_id).collect();
     if !external_ids.is_empty()
@@ -116,9 +116,9 @@ pub async fn create(
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    // 广播同步通知
+    // 广播同步通知 (发送完整 ProductFull 数据)
     let id = product.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
-    let product_for_api: shared::models::Product = product.into();
+    let product_for_api: shared::models::ProductFull = product.into();
     state
         .broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&product_for_api))
         .await;
@@ -131,7 +131,7 @@ pub async fn update(
     State(state): State<ServerState>,
     Path(id): Path<String>,
     Json(payload): Json<ProductUpdate>,
-) -> AppResult<Json<shared::models::Product>> {
+) -> AppResult<Json<shared::models::ProductFull>> {
     tracing::debug!(
         "Product update - id: {}, tax_rate: {:?}, is_kitchen_print_enabled: {:?}",
         id,
@@ -163,8 +163,8 @@ pub async fn update(
         product.is_label_print_enabled
     );
 
-    // 广播同步通知
-    let product_for_api: shared::models::Product = product.into();
+    // 广播同步通知 (发送完整 ProductFull 数据)
+    let product_for_api: shared::models::ProductFull = product.into();
     state
         .broadcast_sync(RESOURCE_PRODUCT, "updated", &id, Some(&product_for_api))
         .await;
@@ -227,38 +227,40 @@ pub async fn list_product_attributes(
 pub async fn add_product_tag(
     State(state): State<ServerState>,
     Path((product_id, tag_id)): Path<(String, String)>,
-) -> AppResult<Json<ProductFull>> {
+) -> AppResult<Json<shared::models::ProductFull>> {
     let product = state
         .catalog_service
         .add_product_tag(&product_id, &tag_id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    // 广播同步通知
+    // 广播同步通知 (发送完整 ProductFull 数据)
+    let product_for_api: shared::models::ProductFull = product.into();
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&product))
+        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&product_for_api))
         .await;
 
-    Ok(Json(product))
+    Ok(Json(product_for_api))
 }
 
 /// DELETE /api/products/:id/tags/:tag_id - 从商品移除标签
 pub async fn remove_product_tag(
     State(state): State<ServerState>,
     Path((product_id, tag_id)): Path<(String, String)>,
-) -> AppResult<Json<ProductFull>> {
+) -> AppResult<Json<shared::models::ProductFull>> {
     let product = state
         .catalog_service
         .remove_product_tag(&product_id, &tag_id)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
-    // 广播同步通知
+    // 广播同步通知 (发送完整 ProductFull 数据)
+    let product_for_api: shared::models::ProductFull = product.into();
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&product))
+        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&product_for_api))
         .await;
 
-    Ok(Json(product))
+    Ok(Json(product_for_api))
 }
 
 // =============================================================================

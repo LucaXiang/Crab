@@ -225,11 +225,10 @@ pub struct ProductFull {
     pub tags: Vec<Tag>,
 }
 
-/// Convert internal ProductFull to shared::models::Product for API responses
-/// (tags converted to string IDs)
-impl From<ProductFull> for shared::models::Product {
+/// Convert internal ProductFull to shared::models::ProductFull for API responses
+impl From<ProductFull> for shared::models::ProductFull {
     fn from(p: ProductFull) -> Self {
-        shared::models::Product {
+        shared::models::ProductFull {
             id: p.id.map(|id| id.to_string()),
             name: p.name,
             image: p.image,
@@ -243,7 +242,6 @@ impl From<ProductFull> for shared::models::Product {
             is_kitchen_print_enabled: p.is_kitchen_print_enabled,
             is_label_print_enabled: p.is_label_print_enabled,
             is_active: p.is_active,
-            tags: p.tags.into_iter().filter_map(|t| t.id.map(|id| id.to_string())).collect(),
             specs: p.specs.into_iter().map(|s| shared::models::EmbeddedSpec {
                 name: s.name,
                 price: s.price,
@@ -253,6 +251,41 @@ impl From<ProductFull> for shared::models::Product {
                 external_id: s.external_id,
                 receipt_name: s.receipt_name,
                 is_root: s.is_root,
+            }).collect(),
+            attributes: p.attributes.into_iter().map(|b| shared::models::AttributeBindingFull {
+                id: b.id.map(|id| id.to_string()),
+                attribute: shared::models::Attribute {
+                    id: b.attribute.id.map(|id| id.to_string()),
+                    name: b.attribute.name,
+                    is_multi_select: b.attribute.is_multi_select,
+                    max_selections: b.attribute.max_selections,
+                    default_option_idx: b.attribute.default_option_idx,
+                    display_order: b.attribute.display_order,
+                    is_active: b.attribute.is_active,
+                    show_on_receipt: b.attribute.show_on_receipt,
+                    receipt_name: b.attribute.receipt_name,
+                    show_on_kitchen_print: b.attribute.show_on_kitchen_print,
+                    kitchen_print_name: b.attribute.kitchen_print_name,
+                    options: b.attribute.options.into_iter().map(|o| shared::models::AttributeOption {
+                        name: o.name,
+                        price_modifier: o.price_modifier,
+                        display_order: o.display_order,
+                        is_active: o.is_active,
+                        receipt_name: o.receipt_name,
+                        kitchen_print_name: o.kitchen_print_name,
+                    }).collect(),
+                },
+                is_required: b.is_required,
+                display_order: b.display_order,
+                default_option_idx: b.default_option_idx,
+            }).collect(),
+            tags: p.tags.into_iter().map(|t| shared::models::Tag {
+                id: t.id.map(|id| id.to_string()),
+                name: t.name,
+                color: t.color,
+                display_order: t.display_order,
+                is_active: t.is_active,
+                is_system: t.is_system,
             }).collect(),
         }
     }
