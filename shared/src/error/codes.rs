@@ -189,6 +189,16 @@ pub enum ErrorCode {
     ClientDisconnected = 9301,
     /// Subscription blocked (canceled or unpaid)
     SubscriptionBlocked = 3006,
+
+    // ==================== 94xx: Storage ====================
+    /// Storage full (disk space insufficient)
+    StorageFull = 9401,
+    /// Out of memory
+    OutOfMemory = 9402,
+    /// Storage corrupted (data file damaged)
+    StorageCorrupted = 9403,
+    /// System busy (IO error, retry later)
+    SystemBusy = 9404,
 }
 
 impl ErrorCode {
@@ -299,6 +309,12 @@ impl ErrorCode {
             ErrorCode::LabelPrintingNotImplemented => "Label printing is not implemented",
             ErrorCode::ClientDisconnected => "Client disconnected",
             ErrorCode::SubscriptionBlocked => "Subscription is blocked",
+
+            // Storage
+            ErrorCode::StorageFull => "Storage full (disk space insufficient)",
+            ErrorCode::OutOfMemory => "Out of memory",
+            ErrorCode::StorageCorrupted => "Storage corrupted (data file damaged)",
+            ErrorCode::SystemBusy => "System busy, please retry later",
         }
     }
 }
@@ -420,6 +436,12 @@ impl TryFrom<u16> for ErrorCode {
             9301 => Ok(ErrorCode::ClientDisconnected),
             3006 => Ok(ErrorCode::SubscriptionBlocked),
 
+            // Storage
+            9401 => Ok(ErrorCode::StorageFull),
+            9402 => Ok(ErrorCode::OutOfMemory),
+            9403 => Ok(ErrorCode::StorageCorrupted),
+            9404 => Ok(ErrorCode::SystemBusy),
+
             _ => Err(InvalidErrorCode(value)),
         }
     }
@@ -525,6 +547,12 @@ mod tests {
         assert_eq!(ErrorCode::BridgeConnectionFailed.code(), 9103);
         assert_eq!(ErrorCode::PrinterNotAvailable.code(), 9201);
         assert_eq!(ErrorCode::PrintFailed.code(), 9202);
+
+        // Storage
+        assert_eq!(ErrorCode::StorageFull.code(), 9401);
+        assert_eq!(ErrorCode::OutOfMemory.code(), 9402);
+        assert_eq!(ErrorCode::StorageCorrupted.code(), 9403);
+        assert_eq!(ErrorCode::SystemBusy.code(), 9404);
     }
 
     #[test]
@@ -541,6 +569,11 @@ mod tests {
         assert_eq!(ErrorCode::try_from(1001), Ok(ErrorCode::NotAuthenticated));
         assert_eq!(ErrorCode::try_from(4001), Ok(ErrorCode::OrderNotFound));
         assert_eq!(ErrorCode::try_from(9001), Ok(ErrorCode::InternalError));
+        // Storage
+        assert_eq!(ErrorCode::try_from(9401), Ok(ErrorCode::StorageFull));
+        assert_eq!(ErrorCode::try_from(9402), Ok(ErrorCode::OutOfMemory));
+        assert_eq!(ErrorCode::try_from(9403), Ok(ErrorCode::StorageCorrupted));
+        assert_eq!(ErrorCode::try_from(9404), Ok(ErrorCode::SystemBusy));
     }
 
     #[test]

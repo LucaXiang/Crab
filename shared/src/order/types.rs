@@ -312,6 +312,11 @@ pub enum CommandErrorCode {
     DuplicateCommand,
     InternalError,
     TableOccupied,
+    // Storage errors (maps to ErrorCode 94xx)
+    StorageFull,
+    OutOfMemory,
+    StorageCorrupted,
+    SystemBusy,
 }
 
 /// Sync request for reconnection
