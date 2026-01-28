@@ -81,13 +81,17 @@ export const TimelineItem: React.FC<TimelineItemProps> = ({ data, showNoteTags =
             >
                 {Icon && <Icon size={12} strokeWidth={2.5} />}
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-bold text-gray-800">{title}</div>
-                {tags && tags.map((tag, i) => (
-                    <span key={i} className="px-1.5 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                        {tag}
-                    </span>
-                ))}
+                {tags && tags.length > 0 && (
+                    <div className="flex items-center gap-1">
+                        {tags.map((tag, i) => (
+                            <span key={i} className="px-1.5 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                {tag}
+                            </span>
+                        ))}
+                    </div>
+                )}
             </div>
             <div className="text-xs text-gray-400 font-mono">
                 {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
