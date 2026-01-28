@@ -235,11 +235,6 @@ const PaymentAddedRenderer: EventRenderer<PaymentAddedPayload> = {
 
     const details: string[] = [];
 
-    // Show payment ID (short form)
-    if (payload.payment_id) {
-      details.push(`ID: #${payload.payment_id.slice(-6)}`);
-    }
-
     // Show tendered/change for cash payments
     if (payload.tendered !== undefined && payload.tendered !== null) {
       details.push(`${t('checkout.amount.tendered')}: ${formatCurrency(payload.tendered)}`);
@@ -258,6 +253,7 @@ const PaymentAddedRenderer: EventRenderer<PaymentAddedPayload> = {
       icon: Coins,
       colorClass: 'bg-green-500',
       timestamp: event.timestamp,
+      tags: payload.payment_id ? [`#${payload.payment_id.slice(-6)}`] : [],
     };
   }
 };
@@ -270,11 +266,6 @@ const PaymentCancelledRenderer: EventRenderer<PaymentCancelledPayload> = {
 
     // Build details array
     const details: string[] = [];
-
-    // Show payment ID (short form)
-    if (payload.payment_id) {
-      details.push(`ID: #${payload.payment_id.slice(-6)}`);
-    }
 
     // Show cancelled amount
     if (payload.amount != null) {
@@ -298,6 +289,7 @@ const PaymentCancelledRenderer: EventRenderer<PaymentCancelledPayload> = {
       icon: Ban,
       colorClass: 'bg-red-400',
       timestamp: event.timestamp,
+      tags: payload.payment_id ? [`#${payload.payment_id.slice(-6)}`] : [],
     };
   }
 };
