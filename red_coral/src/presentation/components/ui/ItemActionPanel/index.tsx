@@ -370,7 +370,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
           </div>
 
           {/* Bottom Actions */}
-          <div className="p-5 bg-white border-t border-gray-100 space-y-3 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+          <div className="p-5 bg-white border-t border-gray-100 space-y-3 z-10 shadow-up">
              <div className="flex gap-3 h-14">
                 {/* Cancel Button */}
                 {onCancel && (

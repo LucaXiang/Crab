@@ -129,7 +129,7 @@ mod tests {
                 zone_name: None,
                 guest_count: 2,
                 is_retail: false,
-                receipt_number: None,
+                receipt_number: "RCP-001".to_string(),
             },
         };
 
@@ -155,7 +155,7 @@ mod tests {
             total: 0.0,
             paid_amount: 0.0,
             remaining_amount: 0.0,
-            receipt_number: None,
+            receipt_number: "RCP-001".to_string(),
             is_pre_payment: false,
             order_rule_discount_amount: None,
             order_rule_surcharge_amount: None,

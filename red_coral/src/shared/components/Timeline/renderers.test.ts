@@ -43,6 +43,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
           zone_name: 'Main',
           guest_count: 2,
           is_retail: false,
+          receipt_number: 'RCP-TEST',
         }),
         createMockEvent('ITEMS_ADDED', {
           type: 'ITEMS_ADDED',
@@ -104,6 +105,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
         zone_name: 'Main',
         guest_count: 2,
         is_retail: false,
+        receipt_number: 'RCP-TEST',
       });
 
       const result = renderEvent(event, mockT);
@@ -176,6 +178,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
         zone_name: 'Main',
         guest_count: 2,
         is_retail: false,
+        receipt_number: 'RCP-TEST',
       }, { timestamp });
 
       const result = renderEvent(event, mockT);
@@ -186,7 +189,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
   describe('Color Classes', () => {
     it('should assign unique color classes to different event types', () => {
       const events: OrderEvent[] = [
-        createMockEvent('TABLE_OPENED', { type: 'TABLE_OPENED', table_id: 'T1', table_name: 'T1', zone_id: 'Z1', zone_name: 'Z', guest_count: 2, is_retail: false }),
+        createMockEvent('TABLE_OPENED', { type: 'TABLE_OPENED', table_id: 'T1', table_name: 'T1', zone_id: 'Z1', zone_name: 'Z', guest_count: 2, is_retail: false, receipt_number: 'RCP-TEST' }),
         createMockEvent('ITEMS_ADDED', { type: 'ITEMS_ADDED', items: [] }),
         createMockEvent('PAYMENT_ADDED', { type: 'PAYMENT_ADDED', payment_id: 'p1', method: 'cash', amount: 100, tendered: null, change: null, note: null }),
         createMockEvent('ORDER_COMPLETED', { type: 'ORDER_COMPLETED', final_total: 100, receipt_number: 'R1', payment_summary: [] }),
@@ -222,6 +225,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
         zone_name: 'Main',
         guest_count: 2,
         is_retail: false,
+        receipt_number: 'RCP-TEST',
       });
 
       renderEvent(event, trackingT);
@@ -243,6 +247,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
         zone_name: 'Main',
         guest_count: 2,
         is_retail: false,
+        receipt_number: 'RCP-TEST',
       });
 
       // Multiple lookups should work
@@ -259,6 +264,7 @@ describe('Timeline Renderers - Architecture Tests', () => {
         zone_name: 'Main',
         guest_count: 2,
         is_retail: false,
+        receipt_number: 'RCP-TEST',
       });
 
       // Simulate concurrent calls

@@ -34,10 +34,11 @@ export const CategoryModal: React.FC = React.memo(() => {
   // Load category attributes when editing
   // NOTE: modal.open is needed as dependency to reload data when reopening the same category
   useEffect(() => {
-    if (isCategory && modal.action === 'EDIT' && modal.data?.id) {
+    const categoryId = modal.data?.id;
+    if (isCategory && modal.action === 'EDIT' && categoryId) {
       const loadAttributes = async () => {
         try {
-          const { attributeIds, defaultOptions } = await loadCategoryAttributes(String(modal.data.id));
+          const { attributeIds, defaultOptions } = await loadCategoryAttributes(String(categoryId));
           setAsyncFormData({
             selected_attribute_ids: attributeIds,
             attribute_default_options: defaultOptions
@@ -81,6 +82,7 @@ export const CategoryModal: React.FC = React.memo(() => {
   };
 
   const handleDelete = async () => {
+    if (!data?.id) return;
     try {
       await deleteCategory(String(data.id));
       toast.success(t('settings.category.category_deleted'));
@@ -117,7 +119,7 @@ export const CategoryModal: React.FC = React.memo(() => {
         });
         refreshData();
         toast.success(t('settings.category.create_category_success'));
-      } else if (action === 'EDIT') {
+      } else if (action === 'EDIT' && data?.id) {
         await updateCategory(String(data.id), {
           name: formData.name,
           print_destinations: formData.print_destinations,

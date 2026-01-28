@@ -64,10 +64,11 @@ export const ProductModal: React.FC = React.memo(() => {
   // Load full product data when editing
   // NOTE: modal.open is needed as dependency to reload data when reopening the same product
   useEffect(() => {
-    if (isProductModal && modal.action === 'EDIT' && modal.data?.id) {
+    const productId = modal.data?.id;
+    if (isProductModal && modal.action === 'EDIT' && productId) {
       const loadData = async () => {
         try {
-          const fullData = await loadProductFullData(String(modal.data.id));
+          const fullData = await loadProductFullData(String(productId));
           setAsyncFormData(fullData);
         } catch {
           // Silently fail - form will show empty values
@@ -108,6 +109,7 @@ export const ProductModal: React.FC = React.memo(() => {
   };
 
   const handleDelete = async () => {
+    if (!data?.id) return;
     try {
       await deleteProduct(String(data.id));
       toast.success(t('settings.product.product_deleted'));
@@ -159,7 +161,7 @@ export const ProductModal: React.FC = React.memo(() => {
       if (action === 'CREATE') {
         await createProduct(formData, categories);
         toast.success(t('settings.product.message.created'));
-      } else {
+      } else if (data?.id) {
         await updateProduct(String(data.id), formData);
         toast.success(t('settings.product.message.updated'));
       }

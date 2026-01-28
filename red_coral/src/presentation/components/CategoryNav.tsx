@@ -89,9 +89,9 @@ export const CategoryNav = React.memo<CategoryNavProps>(
           key={catName}
           onClick={() => onSelect(catName)}
           className={`
-            px-6 py-2.5 text-lg transition-all duration-200 cursor-pointer rounded-md whitespace-nowrap border h-[2.875rem] flex items-center gap-1.5
+            px-6 py-2.5 text-lg transition-all duration-200 cursor-pointer rounded-xl whitespace-nowrap border h-[2.875rem] flex items-center gap-1.5
             ${isActive
-              ? 'bg-white text-[#FF5E5E] border-white font-bold shadow-sm'
+              ? 'bg-white text-primary-500 border-white font-bold shadow-sm'
               : isVirtual
                 ? 'bg-white/15 text-white border-white/30 hover:bg-white/25'
                 : 'bg-white/10 text-white border-transparent hover:bg-white/20'
@@ -108,7 +108,7 @@ export const CategoryNav = React.memo<CategoryNavProps>(
     const hasVirtualCats = virtualCats.length > 0;
 
     return (
-      <div className="w-full bg-[#FF5E5E] shadow-md relative z-20 h-[8.375rem] flex border-t border-white/10">
+      <div className="w-full bg-primary-500 shadow-md relative z-20 h-[8.375rem] flex border-t border-white/10">
         <div
           ref={scrollRef}
           onScroll={checkScroll}
@@ -137,14 +137,14 @@ export const CategoryNav = React.memo<CategoryNavProps>(
         </div>
 
         {showControls && (
-          <div className="w-12 flex flex-col items-center justify-between py-4 border-l border-white/10 bg-[#FF5E5E] shrink-0 shadow-[-4px_0_10px_rgba(0,0,0,0.1)] z-30 animate-in slide-in-from-right duration-200">
+          <div className="w-14 flex flex-col items-center justify-between py-3 border-l border-white/10 bg-primary-500 shrink-0 shadow-left z-30 animate-in slide-in-from-right duration-200">
             <button
               onClick={() => scroll('up')}
               disabled={!canScrollUp}
               className={`
-                p-1.5 rounded-full transition-all
+                p-2.5 min-w-[2.75rem] min-h-[2.75rem] flex items-center justify-center rounded-full transition-all
                 ${canScrollUp
-                  ? 'text-white hover:bg-white/20 active:scale-95 bg-white/5 opacity-100'
+                  ? 'text-white hover:bg-white/20 active:scale-95 active:bg-white/30 bg-white/5 opacity-100'
                   : 'opacity-0 pointer-events-none'
                 }
               `}
@@ -156,9 +156,9 @@ export const CategoryNav = React.memo<CategoryNavProps>(
               onClick={() => scroll('down')}
               disabled={!canScrollDown}
               className={`
-                p-1.5 rounded-full transition-all
+                p-2.5 min-w-[2.75rem] min-h-[2.75rem] flex items-center justify-center rounded-full transition-all
                 ${canScrollDown
-                  ? 'text-white hover:bg-white/20 active:scale-95 bg-white/5 opacity-100'
+                  ? 'text-white hover:bg-white/20 active:scale-95 active:bg-white/30 bg-white/5 opacity-100'
                   : 'opacity-0 pointer-events-none'
                 }
               `}

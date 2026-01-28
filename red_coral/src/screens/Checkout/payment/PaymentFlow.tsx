@@ -158,14 +158,15 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         };
 
         // Complete order via backend (fire & forget)
-        await completeOrder(order.order_id, order.receipt_number!, [payment]);
+        // receipt_number is server-generated at OpenTable
+        await completeOrder(order.order_id, [payment]);
         const is_retail = order.is_retail;
 
         setShowCashModal(false);
         setSuccessModal({
           isOpen: true,
           type: 'CASH',
-          change: payment.change,
+          change: payment.change ?? undefined,
           onClose: handleComplete,
           onPrint: is_retail ? async () => {
             await printOrderReceipt(order);
@@ -202,7 +203,8 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
       };
 
       // Complete order via backend (fire & forget)
-      await completeOrder(order.order_id, order.receipt_number!, [payment]);
+      // receipt_number is server-generated at OpenTable
+      await completeOrder(order.order_id, [payment]);
       const is_retail = order.is_retail;
 
       setSuccessModal({
@@ -234,9 +236,9 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         return;
       }
 
+      // receipt_number is immutable (set at OpenTable), no need to pass
       await updateOrderInfo(order.order_id, {
         is_pre_payment: true,
-        receipt_number: order.receipt_number,
       });
 
       // Print with current order (WebSocket will update if needed)
@@ -474,7 +476,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                   </div>
 
                   {/* Items Grid */}
-                  <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mt-3">
+                  <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-3">
                     {items.map((item) => {
                       const currentSplitQty = splitItems[item.instance_id] || 0;
                       const paidQty = (order.paid_item_quantities && order.paid_item_quantities[item.instance_id]) || 0;
@@ -520,19 +522,19 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                             <button
                               onClick={() => setSplitItems(prev => ({ ...prev, [item.instance_id]: Math.max(0, (prev[item.instance_id] || 0) - 1) }))}
                               disabled={currentSplitQty <= 0}
-                              className="w-7 h-7 flex items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+                              className="w-11 h-11 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 active:bg-gray-300 disabled:opacity-30 transition-colors"
                             >
-                              <Minus size={14} />
+                              <Minus size={18} />
                             </button>
-                            <span className={`text-sm font-bold ${currentSplitQty > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+                            <span className={`text-base font-bold ${currentSplitQty > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
                               {currentSplitQty}
                             </span>
                             <button
                               onClick={() => setSplitItems(prev => ({ ...prev, [item.instance_id]: Math.min(maxQty, (prev[item.instance_id] || 0) + 1) }))}
                               disabled={currentSplitQty >= maxQty || maxQty === 0}
-                              className="w-7 h-7 flex items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+                              className="w-11 h-11 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 active:bg-gray-300 disabled:opacity-30 transition-colors"
                             >
-                              <Plus size={14} />
+                              <Plus size={18} />
                             </button>
                           </div>
                         </div>
@@ -544,7 +546,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
             </div>
           </div>
 
-          <div className="p-6 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+          <div className="p-6 bg-white border-t border-gray-200 shadow-up">
             <div className="max-w-3xl mx-auto space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-gray-500 font-medium text-lg">{t('checkout.split.total')}</span>
@@ -825,7 +827,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           </div>
 
           {/* Footer Summary */}
-          <div className="p-6 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+          <div className="p-6 bg-white border-t border-gray-200 shadow-up">
             <div className="max-w-3xl mx-auto flex justify-between items-center">
               <span className="text-gray-500 font-medium text-lg">{t('checkout.payment.total_paid')}</span>
               <span className="text-3xl font-bold text-blue-600">{formatCurrency(totalPaid)}</span>

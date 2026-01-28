@@ -226,10 +226,10 @@ export const handleTableSelect = async (
 /**
  * Complete an order with payments
  * Fire & forget - UI updates via WebSocket event
+ * Note: receipt_number is server-generated at OpenTable, no need to pass
  */
 export const completeOrder = async (
   orderId: string,
-  receiptNumber: string,
   newPayments: PaymentRecord[],
 ): Promise<void> => {
   // Add payments
@@ -248,11 +248,10 @@ export const completeOrder = async (
     ensureSuccess(paymentResponse, 'Add payment');
   }
 
-  // Complete order
+  // Complete order (server uses snapshot's receipt_number)
   const completeCommand = createCommand({
     type: 'COMPLETE_ORDER',
     order_id: orderId,
-    receipt_number: receiptNumber,
   });
   const completeResponse = await sendCommand(completeCommand);
   ensureSuccess(completeResponse, 'Complete order');
@@ -354,13 +353,13 @@ export const splitOrder = async (
 };
 
 /**
- * Update order info (receipt number, guest count, etc.)
+ * Update order info (guest count, table name, etc.)
  * Fire & forget - UI updates via WebSocket event
+ * Note: receipt_number is immutable (set at OpenTable)
  */
 export const updateOrderInfo = async (
   orderId: string,
   info: {
-    receipt_number?: string;
     guest_count?: number;
     table_name?: string;
     is_pre_payment?: boolean;
@@ -369,7 +368,6 @@ export const updateOrderInfo = async (
   const command = createCommand({
     type: 'UPDATE_ORDER_INFO',
     order_id: orderId,
-    receipt_number: info.receipt_number ?? null,
     guest_count: info.guest_count ?? null,
     table_name: info.table_name ?? null,
     is_pre_payment: info.is_pre_payment ?? null,

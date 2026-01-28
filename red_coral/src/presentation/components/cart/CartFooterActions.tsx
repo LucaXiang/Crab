@@ -29,7 +29,7 @@ export const CartFooterActions = React.memo<CartFooterActionsProps>(({
         <>
           <button
             onClick={onManageTable}
-            className="flex-1 hover:bg-gray-50 transition-colors flex flex-col items-center justify-center gap-1 pt-1"
+            className="flex-1 hover:bg-gray-50 active:bg-gray-100 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 pt-1"
           >
             <List size={20} className="text-gray-500" />
             <span className="text-sm">{t('pos.sidebar.get_order')} ({heldOrdersCount})</span>
@@ -37,7 +37,7 @@ export const CartFooterActions = React.memo<CartFooterActionsProps>(({
           <button
             onClick={onRestoreDraft}
             disabled={draftOrdersCount === 0}
-            className={`flex-1 hover:bg-gray-50 transition-colors flex flex-col items-center justify-center gap-1 pt-1 ${
+            className={`flex-1 hover:bg-gray-50 active:bg-gray-100 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 pt-1 ${
               draftOrdersCount === 0 ? 'opacity-40 cursor-not-allowed' : 'text-blue-600'
             }`}
           >
@@ -49,21 +49,21 @@ export const CartFooterActions = React.memo<CartFooterActionsProps>(({
         <>
           <button
             onClick={onManageTable}
-            className="flex-1 hover:bg-gray-50 transition-colors flex flex-col items-center justify-center gap-1 pt-1 text-orange-600"
+            className="flex-1 hover:bg-gray-50 active:bg-orange-100 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 pt-1 text-orange-600"
           >
             <PauseCircle size={20} />
             <span className="text-sm">{t('pos.sidebar.hold')}</span>
           </button>
           <button
             onClick={onSaveDraft}
-            className="flex-1 hover:bg-gray-50 transition-colors flex flex-col items-center justify-center gap-1 pt-1 text-blue-600"
+            className="flex-1 hover:bg-gray-50 active:bg-blue-100 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 pt-1 text-blue-600"
           >
             <Save size={20} />
             <span className="text-sm">{t('pos.sidebar.save')}</span>
           </button>
           <button
             onClick={onClear}
-            className="flex-1 hover:bg-red-50 transition-colors flex flex-col items-center justify-center gap-1 pt-1 text-red-500"
+            className="flex-1 hover:bg-red-50 active:bg-red-100 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 pt-1 text-red-500"
           >
             <Trash2 size={20} />
             <span className="text-sm">{t('pos.sidebar.clear')}</span>

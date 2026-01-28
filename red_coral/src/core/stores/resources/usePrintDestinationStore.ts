@@ -88,7 +88,10 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
       await api.updatePrintDestination(id, data);
       await get().fetchAll(true);
       const updated = get().items.find((p) => p.id === id);
-      return updated!;
+      if (!updated) {
+        throw new Error(`PrintDestination ${id} not found after update`);
+      }
+      return updated;
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to update print destination';
       set({ error: errorMsg, isLoading: false });

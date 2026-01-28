@@ -51,7 +51,7 @@ const PaymentSuccessModalComponent: React.FC<PaymentSuccessModalProps> = ({
     >
       <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl transform transition-all animate-in zoom-in-95 duration-200 flex flex-col items-center text-center" onClick={(e) => e.stopPropagation()}>
         <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${
-          type === 'CASH' ? 'bg-green-100 text-green-500' : 'bg-red-100 text-[#FF5E5E]'
+          type === 'CASH' ? 'bg-green-100 text-green-500' : 'bg-primary-100 text-primary-500'
         }`}>
           {type === 'CASH' ? <Coins size={40} /> : <Check size={40} strokeWidth={3} />}
         </div>

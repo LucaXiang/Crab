@@ -61,6 +61,9 @@ const Toast: React.FC<ToastProps> = ({ item, onRemove }) => {
 // Toast Container & Hook
 let toastListeners: Set<(toasts: ToastItem[]) => void> = new Set();
 let toasts: ToastItem[] = [];
+let toastCounter = 0;
+
+const generateToastId = () => `toast-${Date.now()}-${++toastCounter}`;
 
 const notifyListeners = () => {
   toastListeners.forEach(listener => listener([...toasts]));
@@ -68,17 +71,17 @@ const notifyListeners = () => {
 
 export const toast = {
   success: (message: string) => {
-    const id = `toast-${Date.now()}`;
+    const id = generateToastId();
     toasts = [...toasts, { id, message, type: 'success' }];
     notifyListeners();
   },
   error: (message: string) => {
-    const id = `toast-${Date.now()}`;
+    const id = generateToastId();
     toasts = [...toasts, { id, message, type: 'error' }];
     notifyListeners();
   },
   warning: (message: string) => {
-    const id = `toast-${Date.now()}`;
+    const id = generateToastId();
     toasts = [...toasts, { id, message, type: 'warning' }];
     notifyListeners();
   }

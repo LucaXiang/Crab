@@ -66,8 +66,8 @@ export const TenantSelectScreen: React.FC = () => {
       <div className="w-full max-w-2xl space-y-8">
         {/* Header */}
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-[#FF5E5E]/10 rounded-2xl mb-4">
-            <Building2 className="text-[#FF5E5E]" size={32} />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-500/10 rounded-2xl mb-4">
+            <Building2 className="text-primary-500" size={32} />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Select Tenant
@@ -98,7 +98,7 @@ export const TenantSelectScreen: React.FC = () => {
                 key={tenant.tenant_id}
                 className={`group relative p-6 rounded-2xl border-2 bg-white transition-all ${
                   selectedTenant === tenant.tenant_id
-                    ? 'border-[#FF5E5E] ring-4 ring-[#FF5E5E]/10'
+                    ? 'border-primary-500 ring-4 ring-primary-500/10'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
@@ -141,7 +141,7 @@ export const TenantSelectScreen: React.FC = () => {
                     <button
                       onClick={() => handleSelectTenant(tenant.tenant_id)}
                       disabled={isLoading}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#FF5E5E] text-white rounded-lg hover:bg-[#E54545] transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
                     >
                       <span>Select</span>
                       <ChevronRight size={16} />
@@ -175,7 +175,7 @@ export const TenantSelectScreen: React.FC = () => {
         {/* Add Tenant Button */}
         <button
           onClick={handleAddTenant}
-          className="w-full p-6 rounded-2xl border-2 border-dashed border-gray-300 hover:border-[#FF5E5E] hover:bg-red-50 transition-all flex items-center justify-center gap-3 text-gray-500 hover:text-[#FF5E5E]"
+          className="w-full p-6 rounded-2xl border-2 border-dashed border-gray-300 hover:border-primary-500 hover:bg-primary-50 transition-all flex items-center justify-center gap-3 text-gray-500 hover:text-primary-500"
         >
           <Plus size={24} />
           <span className="font-medium">Add New Tenant</span>

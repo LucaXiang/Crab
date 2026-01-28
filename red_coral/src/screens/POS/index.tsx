@@ -652,7 +652,7 @@ export const POSScreen: React.FC = () => {
 				{/* Right Column */}
 				<div className="flex-1 flex flex-col min-w-0 bg-gray-100 relative z-10">
           {/* Category Nav */}
-          <div className="shrink-0 bg-[#FF5E5E]">
+          <div className="shrink-0 bg-primary-500">
             <CategoryNav
               selected={selectedCategory}
               onSelect={setSelectedCategory}

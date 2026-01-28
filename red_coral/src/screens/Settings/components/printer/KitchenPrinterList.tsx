@@ -83,7 +83,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
     const printerType = activePrinter?.printer_type === 'network' ? 'network' : 'driver';
 
     setEditingItem({
-      id: item.id!,
+      id: item.id,
       name: item.name,
       description: item.description,
       printerType,
@@ -142,8 +142,8 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
                   <Edit2 size={14} />
                 </button>
                 <button
-                  onClick={() => remove(dest.id!)}
-                  className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600 transition-colors"
+                  onClick={() => remove(dest.id)}
+                  className="p-1.5 hover:bg-primary-50 rounded-lg text-gray-400 hover:text-primary-600 transition-colors"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -163,8 +163,8 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
                 </div>
 
                 <div className="bg-gray-50 rounded-lg px-3 py-2 flex items-center gap-2 text-xs border border-gray-100">
-                  <Printer size={12} className={printerDisplay ? "text-gray-500" : "text-red-400"} />
-                  <span className={`font-medium ${printerDisplay ? "text-gray-700" : "text-red-500"}`}>
+                  <Printer size={12} className={printerDisplay ? "text-gray-500" : "text-primary-400"} />
+                  <span className={`font-medium ${printerDisplay ? "text-gray-700" : "text-primary-500"}`}>
                     {printerDisplay || (t('settings.printer.message.no_printer'))}
                   </span>
                 </div>

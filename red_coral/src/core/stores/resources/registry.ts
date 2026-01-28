@@ -21,13 +21,12 @@ import { useLabelTemplateStore } from '../printer/useLabelTemplateStore';
 // Store interface for registry
 // Note: Uses SyncPayload<any> to be compatible with all typed stores (contravariance)
 // lastVersion and checkVersion are optional for legacy stores not yet updated
-// applySync payload is optional to support legacy stores that don't use version-based sync
 interface RegistryStore {
   getState: () => {
     isLoaded: boolean;
     lastVersion?: number;
     fetchAll: (force?: boolean) => Promise<void>;
-    applySync: (payload?: SyncPayload<any>) => void;
+    applySync: (payload: SyncPayload<any>) => void;
     checkVersion?: (serverVersion: number) => boolean;
     clear: () => void;
   };

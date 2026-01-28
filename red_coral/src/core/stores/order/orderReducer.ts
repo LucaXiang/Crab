@@ -559,9 +559,9 @@ function applyOrderInfoUpdated(
   snapshot: OrderSnapshot,
   payload: OrderInfoUpdatedPayload
 ): OrderSnapshot {
+  // Note: receipt_number is immutable (set at OpenTable)
   return {
     ...snapshot,
-    receipt_number: payload.receipt_number ?? snapshot.receipt_number,
     guest_count: payload.guest_count ?? snapshot.guest_count,
     table_name: payload.table_name ?? snapshot.table_name,
     is_pre_payment: payload.is_pre_payment ?? snapshot.is_pre_payment,

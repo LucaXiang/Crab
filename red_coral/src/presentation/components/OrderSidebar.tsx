@@ -1,6 +1,6 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, lazy, Suspense, useMemo } from 'react';
 import { HeldOrder, CartItem } from '@/core/domain/types';
-import { Clock, List, Settings, ShoppingBag } from 'lucide-react';
+import { Clock, List, Settings, ShoppingBag, Percent } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { OrderItemsSummary } from '@/screens/Checkout/OrderItemsSummary';
 import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDetailModal';
@@ -51,11 +51,11 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
 
     // Send command to backend - state will be updated via event (Server Authority)
     await orderOps.modifyItem(order.order_id, instanceId, {
-      price: updates.price,
-      quantity: updates.quantity,
-      manual_discount_percent: updates.manual_discount_percent,
-      surcharge: updates.surcharge,
-      note: updates.note,
+      price: updates.price ?? undefined,
+      quantity: updates.quantity ?? undefined,
+      manual_discount_percent: updates.manual_discount_percent ?? undefined,
+      surcharge: updates.surcharge ?? undefined,
+      note: updates.note ?? undefined,
     });
 
     setEditingItem(null);
@@ -88,6 +88,11 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   const displayTotalSurcharge = order.total_surcharge;
   const displayFinalTotal = order.total;
   const displayRemainingAmount = order.remaining_amount;
+
+  // Order-level applied rules (filter out skipped ones)
+  const orderActiveRules = useMemo(() => {
+    return (order.order_applied_rules ?? []).filter(r => !r.skipped);
+  }, [order.order_applied_rules]);
 
   // Use backend-provided unpaidQuantity for each item
   const unpaidItems = React.useMemo(() => {
@@ -128,7 +133,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowQuickAdd(true)}
-              className="px-4 py-2.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 transition-colors flex items-center gap-1.5"
+              className="px-4 py-2.5 bg-primary-50 hover:bg-primary-100 rounded-lg text-primary-500 transition-colors flex items-center gap-1.5"
               title={t('pos.quick_add.title')}
             >
               <ShoppingBag size={20} />
@@ -153,7 +158,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           onClick={() => setActiveTab('ITEMS')}
           className={`flex-1 py-4 text-base font-bold flex justify-center items-center gap-2 transition-colors border-b-2 ${
             activeTab === 'ITEMS'
-              ? 'text-[#FF5E5E] border-[#FF5E5E] bg-red-50'
+              ? 'text-primary-500 border-primary-500 bg-primary-50'
               : 'text-gray-500 border-transparent hover:bg-gray-50'
           }`}
         >
@@ -222,6 +227,29 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
             <span className="text-sm font-medium text-purple-500">
 	              +{formatCurrency(displayTotalSurcharge)}
 	            </span>
+          </div>
+        )}
+
+        {/* 3.5 Order-level Applied Rules (if any) */}
+        {orderActiveRules.length > 0 && (
+          <div className="pt-1 space-y-1">
+            {orderActiveRules.map((rule) => (
+              <div
+                key={rule.rule_id}
+                className={`flex justify-between items-center text-xs ${
+                  rule.rule_type === 'DISCOUNT' ? 'text-green-600' : 'text-amber-600'
+                }`}
+              >
+                <span className="flex items-center gap-1">
+                  <Percent size={10} />
+                  {rule.receipt_name || rule.display_name}
+                </span>
+                <span className="font-medium">
+                  {rule.rule_type === 'DISCOUNT' ? '-' : '+'}
+                  {formatCurrency(Math.abs(rule.calculated_amount))}
+                </span>
+              </div>
+            ))}
           </div>
         )}
 

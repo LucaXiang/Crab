@@ -56,7 +56,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({ isVisible, onBack,
       <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
         {detailLoading ? (
           <div className="h-full flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
           </div>
         ) : (
           <HistoryDetail order={selectedOrder || undefined} onReprint={handleReprint} />

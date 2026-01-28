@@ -103,7 +103,7 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
     try {
       const fullSpec: EmbeddedSpec = {
         name: formData.name.trim(),
-        receipt_name: formData.receiptName.trim() || null,
+        receipt_name: formData.receiptName.trim() || undefined,
         price: (isRootSpec && isEditing && spec) ? spec.price : formData.price,
         display_order: spec?.display_order ?? 0,
         is_default: formData.isDefault,

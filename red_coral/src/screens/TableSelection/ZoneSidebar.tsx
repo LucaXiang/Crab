@@ -25,7 +25,7 @@ export const ZoneSidebar: React.FC<ZoneSidebarProps> = React.memo(
                 w-full p-2.5 rounded-lg flex items-center gap-2 transition-all text-left
                 ${
                   activeZoneId === 'ALL'
-                    ? 'bg-[#FF5E5E] text-white shadow-md font-bold'
+                    ? 'bg-primary-500 text-white shadow-md font-bold'
                     : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 }
               `}
@@ -45,7 +45,7 @@ export const ZoneSidebar: React.FC<ZoneSidebarProps> = React.memo(
                     w-full p-2.5 rounded-lg flex items-center justify-between gap-2 transition-all text-left
                     ${
                       activeZoneId === zone.id
-                        ? 'bg-[#FF5E5E] text-white shadow-md font-bold'
+                        ? 'bg-primary-500 text-white shadow-md font-bold'
                         : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                     }
                   `}

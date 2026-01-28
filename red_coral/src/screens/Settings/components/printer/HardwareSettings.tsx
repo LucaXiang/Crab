@@ -230,7 +230,7 @@ export const HardwareSettings: React.FC<HardwareSettingsProps> = ({ printers, lo
                   </div>
 
                   {labelPrinter && !loading && !printers.includes(labelPrinter) && (
-                    <div className="mt-2 text-xs text-red-600 flex items-center gap-1.5 bg-red-50 p-2 rounded-lg border border-red-100 animate-pulse">
+                    <div className="mt-2 text-xs text-primary-600 flex items-center gap-1.5 bg-primary-50 p-2 rounded-lg border border-primary-100 animate-pulse">
                       <AlertCircle size={14} />
                       {t('settings.printer.message.printer_unavailable')}
                     </div>

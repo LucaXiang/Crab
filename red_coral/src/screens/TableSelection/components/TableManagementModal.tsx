@@ -1,14 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, ArrowLeftRight, Users, Check, ArrowLeft, LayoutGrid, Split, Minus, Plus, CreditCard, Banknote } from 'lucide-react';
+import { X, ArrowLeftRight, Users, Check, ArrowLeft, LayoutGrid, Split, Minus, Plus, CreditCard, Banknote, Percent } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 
 const api = createTauriClient();
-import { Table, Zone, HeldOrder, Permission } from '@/core/domain/types';
+import { Table, Zone, HeldOrder, Permission, AppliedRule } from '@/core/domain/types';
 import { Currency } from '@/utils/currency';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
+import { toggleRuleSkip } from '@/core/stores/order/useOrderOperations';
 import { ZoneSidebar } from '../ZoneSidebar';
+import { formatCurrency } from '@/utils/currency';
 import { TableCard } from '../TableCard';
 import { toast } from '@/presentation/components/Toast';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
@@ -21,7 +23,7 @@ interface TableManagementModalProps {
     onSuccess: (navigateToTableId?: string) => void;
 }
 
-type ManagementMode = 'MENU' | 'MERGE' | 'MOVE' | 'SPLIT';
+type ManagementMode = 'MENU' | 'MERGE' | 'MOVE' | 'SPLIT' | 'PRICE_RULES';
 
 export const TableManagementModal: React.FC<TableManagementModalProps> = ({
     sourceTable,
@@ -63,7 +65,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
     }, [zones, heldOrders, sourceTable.id, activeZoneId]);
 
     // Get source order from active store or fallback to prop
-    const sourceOrderSnapshot = useActiveOrdersStore(state => state.getOrderByTable(sourceTable.id as string));
+    const sourceOrderSnapshot = useActiveOrdersStore(state => state.getOrderByTable(sourceTable.id ));
     const sourceOrder = sourceOrderSnapshot ? sourceOrderSnapshot : heldOrders.find(o => o.table_id === sourceTable.id);
 
     const hasPayments = useMemo(() => {
@@ -76,13 +78,13 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
     const handleMerge = async () => {
         if (!selectedTargetTable || !sourceOrder) return;
         const store = useActiveOrdersStore.getState();
-        const targetSnapshot = store.getOrder(selectedTargetTable.id as string);
+        const targetSnapshot = store.getOrder(selectedTargetTable.id );
         if (!targetSnapshot) return;
 
         try {
             // Fire & forget - UI updates via WebSocket
             await orderOps.mergeOrders(sourceOrder.order_id, targetSnapshot.order_id);
-            onSuccess(selectedTargetTable.id as string);
+            onSuccess(selectedTargetTable.id );
         } catch (err) {
             console.error('Merge failed:', err);
             toast.error(t('checkout.error.merge_failed'));
@@ -97,11 +99,11 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             // Fire & forget - UI updates via WebSocket
             await orderOps.moveOrder(
                 sourceOrder.order_id,
-                selectedTargetTable.id as string,
+                selectedTargetTable.id ,
                 selectedTargetTable.name,
                 targetZone?.name
             );
-            onSuccess(selectedTargetTable.id as string);
+            onSuccess(selectedTargetTable.id );
         } catch (err) {
             console.error('Move failed:', err);
             toast.error(t('checkout.error.move_failed'));
@@ -229,7 +231,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                     </div>
                 </div>
 
-                <div className="p-4 bg-white border-t border-gray-100 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] space-y-3">
+                <div className="p-4 bg-white border-t border-gray-100 shadow-up space-y-3">
                     <div className="flex justify-between items-center mb-2">
                         <span className="text-gray-500 font-medium">{t('checkout.split.total')}</span>
                         <span className="text-2xl font-bold text-gray-900">${splitTotal.toFixed(2)}</span>
@@ -314,6 +316,20 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                     </div>
                 </button>
             </EscalatableGate>
+
+            {/* Price Rules Button */}
+            <button
+                onClick={() => setMode('PRICE_RULES')}
+                className="flex flex-col items-center justify-center text-center p-4 h-32 rounded-lg border transition-all duration-200 gap-2 bg-teal-50/50 hover:bg-teal-50 border-teal-100 hover:border-teal-200 hover:shadow-md active:scale-[0.99]"
+            >
+                <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm bg-teal-100 text-teal-600">
+                    <Percent size={24} />
+                </div>
+                <div>
+                    <div className="font-bold text-gray-800 text-base mb-0.5">{t('table.action.price_rules')}</div>
+                    <div className="text-xs text-gray-500 font-medium">{t('table.description.price_rules')}</div>
+                </div>
+            </button>
         </div>
     );
 
@@ -372,7 +388,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                         </div>
                     )}
                 </div>
-                <div className="p-4 bg-white border-t border-gray-100 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                <div className="p-4 bg-white border-t border-gray-100 shadow-up">
                     <button
                         onClick={mode === 'MERGE' ? handleMerge : handleMove}
                         disabled={!selectedTargetTable}
@@ -384,6 +400,134 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             </div>
         </div>
     );
+
+    // Collect all applied rules from order (items + order-level)
+    const allAppliedRules = useMemo(() => {
+        if (!sourceOrder) return [];
+        
+        const rulesMap = new Map<string, { rule: AppliedRule; sources: string[] }>();
+        
+        // Add item-level rules
+        sourceOrder.items.forEach(item => {
+            (item.applied_rules ?? []).forEach(rule => {
+                const existing = rulesMap.get(rule.rule_id);
+                if (existing) {
+                    if (!existing.sources.includes(item.name)) {
+                        existing.sources.push(item.name);
+                    }
+                } else {
+                    rulesMap.set(rule.rule_id, { rule, sources: [item.name] });
+                }
+            });
+        });
+        
+        // Add order-level rules
+        (sourceOrder.order_applied_rules ?? []).forEach(rule => {
+            const existing = rulesMap.get(rule.rule_id);
+            if (existing) {
+                if (!existing.sources.includes(t('table.price_rules.order_level'))) {
+                    existing.sources.push(t('table.price_rules.order_level'));
+                }
+            } else {
+                rulesMap.set(rule.rule_id, { rule, sources: [t('table.price_rules.order_level')] });
+            }
+        });
+        
+        return Array.from(rulesMap.values());
+    }, [sourceOrder, t]);
+
+    const handleToggleRule = async (ruleId: string, currentSkipped: boolean) => {
+        if (!sourceOrder) return;
+        try {
+            await toggleRuleSkip(sourceOrder.order_id, ruleId, !currentSkipped);
+            toast.success(currentSkipped ? t('table.price_rules.rule_enabled') : t('table.price_rules.rule_disabled'));
+        } catch (err) {
+            console.error('Toggle rule failed:', err);
+            toast.error(t('table.price_rules.toggle_failed'));
+        }
+    };
+
+    const renderPriceRules = () => {
+        if (!sourceOrder) return null;
+
+        return (
+            <div className="flex flex-col h-full bg-gray-50/50">
+                <div className="p-3 bg-white border-b border-gray-100 flex justify-between items-center shadow-sm z-10">
+                    <h3 className="font-bold text-gray-800 text-base flex items-center gap-2">
+                        <Percent size={18} className="text-teal-600" />
+                        {t('table.action.price_rules')}
+                    </h3>
+                    <button onClick={() => setMode('MENU')} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all">
+                        <ArrowLeft size={14} /> {t('common.action.back')}
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    {allAppliedRules.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
+                            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                                <Percent size={24} className="opacity-50" />
+                            </div>
+                            <p className="text-sm font-medium">{t('table.price_rules.no_rules')}</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {allAppliedRules.map(({ rule, sources }) => (
+                                <div
+                                    key={rule.rule_id}
+                                    className={`bg-white p-4 rounded-lg border shadow-sm transition-all ${
+                                        rule.skipped ? 'border-gray-200 opacity-60' : 'border-gray-200'
+                                    }`}
+                                >
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                                    rule.rule_type === 'DISCOUNT'
+                                                        ? 'bg-green-100 text-green-700'
+                                                        : 'bg-amber-100 text-amber-700'
+                                                }`}>
+                                                    {rule.rule_type === 'DISCOUNT' ? t('settings.price_rule.type.discount') : t('settings.price_rule.type.surcharge')}
+                                                </span>
+                                                {rule.skipped && (
+                                                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
+                                                        {t('table.price_rules.skipped')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="font-bold text-gray-800">{rule.display_name}</div>
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                {rule.adjustment_type === 'PERCENTAGE'
+                                                    ? `${rule.adjustment_value}%`
+                                                    : formatCurrency(rule.adjustment_value)}
+                                                {' · '}
+                                                {t('table.price_rules.applied_to')}: {sources.join(', ')}
+                                            </div>
+                                            <div className={`text-sm font-bold mt-2 ${
+                                                rule.rule_type === 'DISCOUNT' ? 'text-green-600' : 'text-amber-600'
+                                            }`}>
+                                                {rule.rule_type === 'DISCOUNT' ? '-' : '+'}
+                                                {formatCurrency(Math.abs(rule.calculated_amount))}
+                                            </div>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={!rule.skipped}
+                                                onChange={() => handleToggleRule(rule.rule_id, rule.skipped)}
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500 shadow-sm"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     return (
 	    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-60 flex items-center justify-center p-6 font-sans">
@@ -400,7 +544,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                 </div>
 
                 <div className="flex-1 overflow-hidden flex flex-col bg-white">
-                    {mode === 'MENU' ? renderMenu() : mode === 'SPLIT' ? renderSplit() : renderTableSelector()}
+                    {mode === 'MENU' ? renderMenu() : mode === 'SPLIT' ? renderSplit() : mode === 'PRICE_RULES' ? renderPriceRules() : renderTableSelector()}
                 </div>
             </div>
         </div>

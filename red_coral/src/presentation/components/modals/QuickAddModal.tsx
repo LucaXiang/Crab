@@ -96,7 +96,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     return {
       ...p,
       price: defaultSpec?.price ?? 0,
-      external_id: defaultSpec?.external_id,
+      external_id: defaultSpec?.external_id ?? undefined,
     };
   };
 
@@ -450,10 +450,10 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
         {/* Left Side: Cart Sidebar (Matches POS Sidebar style) */}
         <div className="w-[27.5rem] shrink-0 flex flex-col bg-white z-30">
           {/* Header */}
-          <div className="h-16 flex items-center justify-between px-6 bg-[#FF5E5E] text-white shrink-0 relative z-20">
+          <div className="h-16 flex items-center justify-between px-6 bg-primary-500 text-white shrink-0 relative z-20">
             <div className="flex items-center gap-3">
               <h3 className="font-bold text-xl">{t('pos.quick_add.title')}</h3>
-              <span className="bg-white text-[#FF5E5E] px-2.5 py-0.5 rounded-full text-sm font-bold">
+              <span className="bg-white text-primary-500 px-2.5 py-0.5 rounded-full text-sm font-bold">
                 {tempItems.reduce((acc, item) => acc + item.quantity, 0)}
               </span>
             </div>
@@ -486,7 +486,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
             </div>
   
             {/* Footer (Matches CartCheckoutBar style) */}
-            <div className="bg-[#FF5E5E] text-white flex h-16 relative z-30 shadow-inner shrink-0">
+            <div className="bg-primary-500 text-white flex h-16 relative z-30 shadow-inner shrink-0">
               <div 
                 className="w-28 flex items-center justify-center text-lg font-medium border-r border-white/20 bg-black/5 cursor-pointer hover:bg-black/10 transition-colors"
                 onClick={onClose}
@@ -509,7 +509,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
         {/* Right Side: Category Nav + Products */}
         <div className="flex-1 flex flex-col min-w-0 bg-gray-100">
           {/* Category Nav */}
-          <div className="shrink-0 bg-[#FF5E5E] shadow-sm z-20">
+          <div className="shrink-0 bg-primary-500 shadow-sm z-20">
             <CategoryNav
               selected={selectedCategory}
               onSelect={setSelectedCategory}

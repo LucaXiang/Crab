@@ -21,7 +21,7 @@ export const GuestCountInput: React.FC<GuestCountInputProps> = ({
 
   return (
     <div className="flex flex-col items-center p-0 w-full max-w-sm">
-      <div className="text-6xl font-bold text-[#FF5E5E] mb-2 font-mono">
+      <div className="text-6xl font-bold text-primary-500 mb-2 font-mono">
         {guestInput || <span className="text-gray-200">0</span>}
       </div>
 

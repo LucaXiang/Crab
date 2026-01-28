@@ -136,7 +136,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                           <span className="text-xs text-red-500">*</span>
                         </h3>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {specifications
                           .map((spec, specIdx) => ({ spec, specIdx }))
                           .filter(({ spec }) => spec.is_active)
@@ -148,10 +148,10 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                                 type="button"
                                 onClick={() => onSpecificationSelect?.(String(specIdx))}
                                 className={`
-                                  relative p-3 rounded-xl border-2 transition-all text-left flex flex-col items-start min-h-[4.375rem] justify-center
+                                  relative p-4 rounded-xl border-2 transition-all text-left flex flex-col items-start min-h-[5rem] justify-center active:scale-[0.97]
                                   ${isSelected
                                     ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200'
-                                    : 'border-gray-200 hover:border-orange-300 bg-white hover:bg-orange-50/30'
+                                    : 'border-gray-200 hover:border-orange-300 active:border-orange-400 bg-white hover:bg-orange-50/30 active:bg-orange-50'
                                   }
                                 `}
                               >

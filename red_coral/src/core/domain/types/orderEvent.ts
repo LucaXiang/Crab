@@ -100,7 +100,8 @@ export interface TableOpenedPayload {
   zone_name: string | null;
   guest_count: number;
   is_retail: boolean;
-  receipt_number?: string | null;
+  /** Server-generated receipt number (always present) */
+  receipt_number: string;
 }
 
 export interface OrderCompletedPayload {
@@ -251,9 +252,9 @@ export interface TableReassignedPayload {
   items: CartItemSnapshot[];
 }
 
+/** Order info updated (receipt_number is immutable - set at OpenTable) */
 export interface OrderInfoUpdatedPayload {
   type: 'ORDER_INFO_UPDATED';
-  receipt_number?: string | null;
   guest_count?: number | null;
   table_name?: string | null;
   is_pre_payment?: boolean | null;
@@ -323,7 +324,7 @@ export interface OpenTableCommand {
 export interface CompleteOrderCommand {
   type: 'COMPLETE_ORDER';
   order_id: string;
-  receipt_number: string;
+  // receipt_number removed - server uses snapshot's receipt_number
 }
 
 export interface VoidOrderCommand {
@@ -420,10 +421,10 @@ export interface MergeOrdersCommand {
   target_order_id: string;
 }
 
+/** Update order info (receipt_number is immutable - set at OpenTable) */
 export interface UpdateOrderInfoCommand {
   type: 'UPDATE_ORDER_INFO';
   order_id: string;
-  receipt_number?: string | null;
   guest_count?: number | null;
   table_name?: string | null;
   is_pre_payment?: boolean | null;
@@ -561,8 +562,24 @@ export interface OrderSnapshot {
   remaining_amount: number;
   /** Quantities paid per item (for split bill) */
   paid_item_quantities?: Record<string, number>;
-  receipt_number: string | null;
+  /** Server-generated receipt number (always present from OpenTable) */
+  receipt_number: string;
   is_pre_payment?: boolean;
+
+  // === Order-level Rule Adjustments ===
+  /** Order-level rule discount amount */
+  order_rule_discount_amount?: number | null;
+  /** Order-level rule surcharge amount */
+  order_rule_surcharge_amount?: number | null;
+  /** Order-level applied rules */
+  order_applied_rules?: AppliedRule[] | null;
+
+  // === Order-level Manual Adjustments ===
+  /** Order-level manual discount percentage */
+  order_manual_discount_percent?: number | null;
+  /** Order-level manual discount fixed amount */
+  order_manual_discount_fixed?: number | null;
+
   start_time: number;
   end_time: number | null;
   created_at: number;

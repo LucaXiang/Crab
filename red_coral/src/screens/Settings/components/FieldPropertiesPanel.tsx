@@ -318,7 +318,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                        </button>
                        <button
                          onClick={handleClearImage}
-                         className="p-2 bg-white rounded-lg text-red-600 hover:bg-red-50"
+                         className="p-2 bg-white rounded-lg text-primary-600 hover:bg-primary-50"
                        >
                          <Trash2 size={18} />
                        </button>

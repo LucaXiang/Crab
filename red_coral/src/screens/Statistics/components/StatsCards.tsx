@@ -135,7 +135,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {Math.round(overview.avg_dining_time)} min
+          {Math.round(overview.avg_dining_time ?? 0)} min
         </div>
         <div className="text-sm text-gray-500">{t("statistics.metric.avg_dining_time")}</div>
       </div>

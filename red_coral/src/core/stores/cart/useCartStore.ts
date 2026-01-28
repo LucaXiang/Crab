@@ -8,8 +8,8 @@ import { Currency } from '@/utils/currency';
  * Compare two selectedOptions arrays for equality
  */
 function areOptionsEqual(
-  options1: ItemOption[] | undefined,
-  options2: ItemOption[] | undefined
+  options1: ItemOption[] | null | undefined,
+  options2: ItemOption[] | null | undefined
 ): boolean {
   // Normalize empty arrays to undefined for comparison
   const o1 = options1 && options1.length > 0 ? options1 : undefined;
@@ -41,8 +41,8 @@ function areOptionsEqual(
  * Compare two specifications for equality
  */
 function areSpecificationsEqual(
-  spec1: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number } | undefined,
-  spec2: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number } | undefined
+  spec1: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number } | null | undefined,
+  spec2: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number } | null | undefined
 ): boolean {
   if (!spec1 && !spec2) return true;
   if (!spec1 || !spec2) return false;

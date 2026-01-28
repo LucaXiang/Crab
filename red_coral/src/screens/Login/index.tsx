@@ -141,7 +141,7 @@ export const LoginScreen: React.FC = () => {
         >
           <Power size={24} />
         </button>
-        <div className="w-8 h-8 border-4 border-[#FF5E5E]/30 border-t-[#FF5E5E] rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
       </div>
     );
   }
@@ -149,7 +149,7 @@ export const LoginScreen: React.FC = () => {
   return (
     <div className="min-h-screen w-full flex font-sans overflow-hidden bg-gray-50">
       {/* Left Side - Brand & Aesthetic */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-[#FF5E5E] overflow-hidden items-center justify-center p-12 text-white">
+      <div className="hidden lg:flex lg:w-1/2 relative bg-primary-500 overflow-hidden items-center justify-center p-12 text-white">
         {/* Abstract Background Patterns */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
           <div className="absolute top-[-10%] left-[-10%] w-[37.5rem] h-[37.5rem] rounded-full bg-white/5 blur-[6.25rem]" />
@@ -208,7 +208,7 @@ export const LoginScreen: React.FC = () => {
           
           {/* Mobile Header (only visible on small screens) */}
           <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-[#FF5E5E] rounded-2xl shadow-lg mb-4 text-white">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-500 rounded-2xl shadow-lg mb-4 text-white">
               <span className="text-3xl">🐚</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-900">{t('app.brand.full_name')}</h1>
@@ -220,7 +220,7 @@ export const LoginScreen: React.FC = () => {
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className={`p-2.5 rounded-xl ${
-                  modeInfo?.tenant_id ? 'bg-orange-50 text-[#FF5E5E]' : 'bg-gray-50 text-gray-400'
+                  modeInfo?.tenant_id ? 'bg-orange-50 text-primary-500' : 'bg-gray-50 text-gray-400'
                 }`}>
                   {modeInfo?.tenant_id ? <Building2 size={24} /> : <WifiOff size={24} />}
                 </div>
@@ -236,7 +236,7 @@ export const LoginScreen: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate('/setup', { replace: true })}
-                className="px-3 py-1.5 text-xs font-medium text-[#FF5E5E] bg-[#FF5E5E]/10 hover:bg-[#FF5E5E]/20 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-xs font-medium text-primary-500 bg-primary-500/10 hover:bg-primary-500/20 rounded-lg transition-colors"
               >
                 {isDisconnected ? 'Setup' : 'Switch'}
               </button>
@@ -297,7 +297,7 @@ export const LoginScreen: React.FC = () => {
               <label
                 htmlFor="username"
                 className={`text-sm font-medium transition-colors ${
-                  focusedField === 'username' ? 'text-[#FF5E5E]' : 'text-gray-700'
+                  focusedField === 'username' ? 'text-primary-500' : 'text-gray-700'
                 }`}
               >
                 {t('auth.login.username')}
@@ -305,7 +305,7 @@ export const LoginScreen: React.FC = () => {
               <div className={`
                 relative flex items-center transition-all duration-200 border rounded-xl bg-white
                 ${focusedField === 'username'
-                  ? 'border-[#FF5E5E] ring-4 ring-[#FF5E5E]/10 shadow-sm'
+                  ? 'border-primary-500 ring-4 ring-primary-500/10 shadow-sm'
                   : 'border-gray-200 hover:border-gray-300'}
               `}>
                 <div className="pl-4 text-gray-400">
@@ -331,20 +331,20 @@ export const LoginScreen: React.FC = () => {
                 <label
                   htmlFor="password"
                   className={`text-sm font-medium transition-colors ${
-                    focusedField === 'password' ? 'text-[#FF5E5E]' : 'text-gray-700'
+                    focusedField === 'password' ? 'text-primary-500' : 'text-gray-700'
                   }`}
                 >
                   {t('auth.login.password')}
                 </label>
                 {/* Optional: Forgot Password Link */}
-                {/* <button type="button" className="text-sm text-[#FF5E5E] hover:underline">
+                {/* <button type="button" className="text-sm text-primary-500 hover:underline">
                   Forgot password?
                 </button> */}
               </div>
               <div className={`
                 relative flex items-center transition-all duration-200 border rounded-xl bg-white
                 ${focusedField === 'password'
-                  ? 'border-[#FF5E5E] ring-4 ring-[#FF5E5E]/10 shadow-sm'
+                  ? 'border-primary-500 ring-4 ring-primary-500/10 shadow-sm'
                   : 'border-gray-200 hover:border-gray-300'}
               `}>
                 <div className="pl-4 text-gray-400">
@@ -376,7 +376,7 @@ export const LoginScreen: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="group w-full py-4 bg-[#FF5E5E] text-white font-bold rounded-xl hover:bg-[#E54545] active:scale-[0.98] transition-all shadow-lg shadow-[#FF5E5E]/25 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100"
+              className="group w-full py-4 bg-primary-500 text-white font-bold rounded-xl hover:bg-primary-600 active:scale-[0.98] transition-all shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               {isLoading ? (
                 <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />

@@ -49,7 +49,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
             <ArrowLeft size={24} />
           </button>
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 flex-1">
-            <Clock className="text-[#FF5E5E]" size={24} />
+            <Clock className="text-primary-500" size={24} />
             <span>{t('history.sidebar.title')}</span>
           </h2>
         </div>
@@ -60,7 +60,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
             placeholder={t('history.sidebar.search')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-gray-100 pl-9 pr-4 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-100 transition-all"
+            className="w-full bg-gray-100 pl-9 pr-4 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-100 transition-all"
           />
         </div>
       </div>
@@ -68,7 +68,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
       <div className="flex-1 overflow-y-auto relative">
         {loading && (
           <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
           </div>
         )}
         {filteredOrders.length === 0 ? (
@@ -86,11 +86,11 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                 <button
                   key={order.order_id}
                   onClick={() => onSelect(order.order_id)}
-                  className={`w-full p-4 text-left transition-colors flex justify-between items-center group ${isSelected ? 'bg-red-50' : 'hover:bg-gray-50'}`}
+                  className={`w-full p-4 text-left transition-colors flex justify-between items-center group ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
                 >
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`font-bold ${isSelected ? 'text-red-600' : 'text-gray-800'}`}>
+                      <span className={`font-bold ${isSelected ? 'text-primary-600' : 'text-gray-800'}`}>
                         {order.receipt_number || order.table_name}
                       </span>
                       {isVoid && (
@@ -122,7 +122,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                   </div>
                     <div className="text-right">
 	                    <div className={`font-bold ${isVoid || isMoved || isMerged ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{formatCurrency(order.total)}</div>
-                    <ChevronRight size={16} className={`ml-auto mt-1 transition-opacity ${isSelected ? 'text-red-400 opacity-100' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`} />
+                    <ChevronRight size={16} className={`ml-auto mt-1 transition-opacity ${isSelected ? 'text-primary-400 opacity-100' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`} />
                   </div>
                 </button>
               );

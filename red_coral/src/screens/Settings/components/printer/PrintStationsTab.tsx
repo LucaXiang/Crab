@@ -130,7 +130,7 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
     const printerType = activePrinter?.printer_type === 'network' ? 'network' : 'driver';
 
     setEditingItem({
-      id: item.id!,
+      id: item.id,
       name: item.name,
       description: item.description,
       printerType,
@@ -210,8 +210,8 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
                     <Edit2 size={16} />
                   </button>
                   <button
-                    onClick={() => remove(dest.id!)}
-                    className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600 transition-colors"
+                    onClick={() => remove(dest.id)}
+                    className="p-2 hover:bg-primary-50 rounded-lg text-gray-400 hover:text-primary-600 transition-colors"
                   >
                     <Trash2 size={16} />
                   </button>

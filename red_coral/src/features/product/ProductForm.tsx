@@ -120,7 +120,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             is_default: true,
             is_active: true,
             external_id: formData.externalId ?? null,
-            receipt_name: null,
+            receipt_name: undefined,
             is_root: true,
           }]);
         } else {
@@ -237,7 +237,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       is_default: true,
                       is_active: true,
                       external_id: newExternalId,
-                      receipt_name: null,
+                      receipt_name: undefined,
                       is_root: true,
                     }]);
                   } else {
@@ -591,7 +591,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       value={spec.receipt_name || ''}
                       onChange={(e) => {
                         const newSpecs = [...formData.specs!];
-                        newSpecs[index] = { ...newSpecs[index], receipt_name: e.target.value || null };
+                        newSpecs[index] = { ...newSpecs[index], receipt_name: e.target.value || undefined };
                         onFieldChange('specs', newSpecs);
                       }}
                       placeholder={t('settings.specification.form.receipt_name_placeholder')}

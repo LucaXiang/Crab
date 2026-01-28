@@ -26,7 +26,7 @@ const ProductGridInner: React.FC<ProductGridProps> = ({
       <div className={`grid gap-3 ${className || 'grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]'}`}>
         {isLoading ? (
 	          <div className="col-span-full flex flex-col items-center justify-center h-64 text-gray-400">
-	            <div className="animate-spin w-8 h-8 border-2 border-coral-500 border-t-transparent rounded-full mb-2" />
+	            <div className="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full mb-2" />
 	            <p>{t('app.status.loading')}</p>
 	          </div>
 	        ) : products.length === 0 ? (

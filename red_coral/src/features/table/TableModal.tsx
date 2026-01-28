@@ -53,6 +53,7 @@ export const TableModal: React.FC = React.memo(() => {
   };
 
   const handleDelete = async () => {
+    if (!data?.id) return;
     try {
       await deleteTable(String(data.id));
       toast.success(t('settings.table.table_deleted'));
@@ -76,7 +77,7 @@ export const TableModal: React.FC = React.memo(() => {
       const tablePayload = {
         name: formData.name.trim(),
         zone: formData.zone,
-        capacity: Math.max(1, formData.capacity),
+        capacity: Math.max(1, formData.capacity ?? 1),
         is_active: formData.is_active ?? true,
       };
 
@@ -87,7 +88,7 @@ export const TableModal: React.FC = React.memo(() => {
           capacity: Number(tablePayload.capacity),
         });
         toast.success(t('settings.table.message.created'));
-      } else {
+      } else if (data?.id) {
         await updateTable(String(data.id), {
           name: tablePayload.name,
           zone: String(tablePayload.zone),

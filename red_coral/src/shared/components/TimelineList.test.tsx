@@ -52,6 +52,7 @@ describe('TimelineList Integration Tests', () => {
           zone_name: 'Main',
           guest_count: 2,
           is_retail: false,
+          receipt_number: 'RCP-TEST',
         }),
       ];
 
@@ -72,6 +73,7 @@ describe('TimelineList Integration Tests', () => {
           zone_name: 'Main',
           guest_count: 2,
           is_retail: false,
+          receipt_number: 'RCP-TEST',
         }, { event_id: 'evt-1', timestamp: Date.now() - 2000, sequence: 1 }),
         createMockEvent('PAYMENT_ADDED', {
           type: 'PAYMENT_ADDED',
@@ -176,6 +178,7 @@ describe('TimelineList Integration Tests', () => {
           zone_name: 'Main',
           guest_count: 2,
           is_retail: false,
+          receipt_number: 'RCP-TEST',
         }, { event_id: 'evt-1', sequence: 1 }),
         createMockEvent('ITEMS_ADDED', {
           type: 'ITEMS_ADDED',

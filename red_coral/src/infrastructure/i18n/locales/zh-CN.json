@@ -370,10 +370,21 @@
     "action": {
       "manage": "管理",
       "merge": "合并",
-      "move": "转移"
+      "move": "转移",
+      "price_rules": "价格规则"
     },
     "description": {
-      "move": "将订单转移到其他桌台"
+      "move": "将订单转移到其他桌台",
+      "price_rules": "查看和管理应用的规则"
+    },
+    "price_rules": {
+      "order_level": "订单级别",
+      "applied_to": "应用于",
+      "no_rules": "当前订单没有应用价格规则",
+      "skipped": "已跳过",
+      "rule_enabled": "规则已启用",
+      "rule_disabled": "规则已跳过",
+      "toggle_failed": "切换规则状态失败"
     },
     "auth_required": {
       "merge": "合并桌台需要主管审批",
@@ -508,12 +519,21 @@
       "guests": "客人",
       "receipt": "小票",
       "table": "桌台",
+      "zone": "区域",
       "price": "价格",
       "quantity": "数量",
       "discount": "折扣",
       "surcharge": "附加费",
-      "total": "总计"
+      "total": "总计",
+      "subtotal": "小计",
+      "pre_payment": "预付款",
+      "reason": "原因",
+      "loss_amount": "损失金额",
+      "authorizer": "授权人",
+      "affected_quantity": "影响数量",
+      "items": "商品"
     },
+    "retail_mode": "零售模式",
     "rule_toggled": "价格规则切换",
     "rule_skipped": "已跳过",
     "rule_applied": "已应用"

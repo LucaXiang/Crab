@@ -153,7 +153,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
         </div>
         <div className="text-right">
           <div className="text-sm text-gray-500 uppercase font-bold tracking-wider mb-1">{t('history.info.total_amount')}</div>
-          <div className={`text-3xl font-bold ${isVoid || isMerged || isMoved ? 'text-gray-400 line-through' : 'text-[#FF5E5E]'}`}>
+          <div className={`text-3xl font-bold ${isVoid || isMerged || isMoved ? 'text-gray-400 line-through' : 'text-primary-500'}`}>
             {formatCurrency(order.total)}
           </div>
         </div>
@@ -203,7 +203,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
               )}
               <div className="flex justify-between items-end pt-3 mt-1 border-t border-gray-200">
                 <span className="text-gray-800 font-bold">{t('checkout.amount.total')}</span>
-                <span className="text-xl font-bold text-[#FF5E5E]">{formatCurrency(order.total)}</span>
+                <span className="text-xl font-bold text-primary-500">{formatCurrency(order.total)}</span>
               </div>
             </div>
           </div>

@@ -140,9 +140,9 @@ export const SystemSettings: React.FC = () => {
           </div>
 
           {/* Clear Cache Section */}
-          <div className="flex items-center justify-between p-6 bg-red-50 rounded-xl border border-red-100 transition-all hover:border-red-200 hover:shadow-sm">
+          <div className="flex items-center justify-between p-6 bg-primary-50 rounded-xl border border-primary-100 transition-all hover:border-primary-200 hover:shadow-sm">
             <div className="flex gap-5">
-              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-red-100 text-red-600 shrink-0">
+              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-primary-100 text-primary-600 shrink-0">
                 <Trash2 size={24} />
               </div>
               <div>
@@ -157,7 +157,7 @@ export const SystemSettings: React.FC = () => {
 
             <button
               onClick={() => setShowClearCacheDialog(true)}
-              className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg font-medium hover:bg-red-50 transition-colors shadow-sm"
+              className="px-4 py-2 bg-white border border-primary-200 text-primary-600 rounded-lg font-medium hover:bg-primary-50 transition-colors shadow-sm"
             >
               {t('common.action.clear')}
             </button>

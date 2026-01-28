@@ -87,7 +87,7 @@ const PrinterCard: React.FC<PrinterCardProps> = ({
         )}
 
         {value && !loading && !printers.includes(value) && (
-          <div className="text-xs text-red-600 flex items-center gap-1.5 bg-red-50 p-2 rounded-lg border border-red-100">
+          <div className="text-xs text-primary-600 flex items-center gap-1.5 bg-primary-50 p-2 rounded-lg border border-primary-100">
             <AlertCircle size={14} />
             {t('settings.printer.message.printer_unavailable')}
           </div>

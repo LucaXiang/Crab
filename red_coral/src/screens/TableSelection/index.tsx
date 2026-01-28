@@ -233,7 +233,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
         <div className="bg-gray-100 w-full max-w-2xl h-[34.375rem] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-200">
           <div className="bg-white h-12 border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-10 gap-4">
             <h1 className="text-base font-bold text-gray-800 flex items-center gap-2 shrink-0">
-              <LayoutGrid className="text-[#FF5E5E]" size={18} />
+              <LayoutGrid className="text-primary-500" size={18} />
               <span>
                 {mode === 'HOLD' ? t('table.selection.title') : t('table.selection.retrieve')}
               </span>
@@ -268,7 +268,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
                 <div className="relative flex-1 overflow-y-auto p-3 custom-scrollbar">
                   {loading && zoneTables.length > 0 && (
                     <div className="absolute inset-0 bg-gray-50/60 z-10 flex items-center justify-center backdrop-blur-[1px]">
-                      <div className="w-8 h-8 border-4 border-gray-200 border-t-red-500 rounded-full animate-spin" />
+                      <div className="w-8 h-8 border-4 border-gray-200 border-t-primary-500 rounded-full animate-spin" />
                     </div>
                   )}
 

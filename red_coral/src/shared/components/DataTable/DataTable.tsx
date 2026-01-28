@@ -31,6 +31,8 @@ interface DataTableProps<T> {
   // External selection mode control
   isSelectionMode?: boolean;
   onSelectionModeChange?: (mode: boolean) => void;
+  // Min height for the table container
+  minHeight?: string;
 }
 
 const THEMES = {
@@ -120,6 +122,7 @@ export function DataTable<T>({
   onPageChange,
   isSelectionMode: propIsSelectionMode,
   onSelectionModeChange,
+  minHeight,
 }: DataTableProps<T>) {
   const { t } = useI18n();
   const theme = THEMES[themeColor] || THEMES.blue;
@@ -287,7 +290,7 @@ export function DataTable<T>({
 
   if (loading && (!data || data.length === 0)) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden" style={{ minHeight }}>
         <div className="animate-pulse">
           <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 p-4">
             <div className="flex gap-4">
@@ -312,7 +315,7 @@ export function DataTable<T>({
 
   if (!loading && data.length === 0 && !isServerSide) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden" style={{ minHeight }}>
         <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
           <div className="flex">
             {columns.map((col) => (
@@ -347,7 +350,7 @@ export function DataTable<T>({
   const someSelected = selectedKeys.size > 0 && selectedKeys.size < currentData.length;
 
   return (
-    <div className="relative bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+    <div className="relative bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm" style={{ minHeight }}>
       {/* Loading Overlay */}
       {loading && data.length > 0 && (
         <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-[1px]">

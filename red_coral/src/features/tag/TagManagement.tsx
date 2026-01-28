@@ -72,7 +72,7 @@ export const TagManagement: React.FC = React.memo(() => {
     try {
       // Update display_order for both tags
       const updates = newTags.map((tag, idx) => ({
-        id: tag.id!,
+        id: tag.id,
         display_order: idx
       }));
 

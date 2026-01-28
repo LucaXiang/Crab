@@ -98,8 +98,8 @@ export const SetupScreen: React.FC = () => {
   const renderActivateStep = () => (
     <div className="max-w-md mx-auto space-y-8">
       <div className="text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-[#FF5E5E]/10 rounded-2xl mb-4">
-          <Shield className="text-[#FF5E5E]" size={32} />
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-500/10 rounded-2xl mb-4">
+          <Shield className="text-primary-500" size={32} />
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Activate Device</h1>
         <p className="text-gray-500">Enter your tenant credentials to activate this device</p>
@@ -114,7 +114,7 @@ export const SetupScreen: React.FC = () => {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Enter your tenant username"
-            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5E5E]/20 focus:border-[#FF5E5E]"
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
             disabled={isLoading}
           />
         </div>
@@ -127,7 +127,7 @@ export const SetupScreen: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter your password"
-            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5E5E]/20 focus:border-[#FF5E5E]"
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
             disabled={isLoading}
           />
         </div>
@@ -144,7 +144,7 @@ export const SetupScreen: React.FC = () => {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full py-3 bg-[#FF5E5E] text-white font-bold rounded-xl hover:bg-[#E54545] active:scale-[0.98] transition-all shadow-lg shadow-[#FF5E5E]/25 flex items-center justify-center gap-2 disabled:opacity-70"
+          className="w-full py-3 bg-primary-500 text-white font-bold rounded-xl hover:bg-primary-600 active:scale-[0.98] transition-all shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2 disabled:opacity-70"
         >
           {isLoading ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -170,11 +170,11 @@ export const SetupScreen: React.FC = () => {
         {/* Server Mode */}
         <button
           onClick={() => handleModeSelect('server')}
-          className="group p-8 rounded-2xl border-2 border-gray-200 hover:border-[#FF5E5E] bg-white hover:bg-red-50 transition-all text-left"
+          className="group p-8 rounded-2xl border-2 border-gray-200 hover:border-primary-500 bg-white hover:bg-primary-50 transition-all text-left"
         >
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-xl bg-[#FF5E5E]/10 flex items-center justify-center group-hover:bg-[#FF5E5E]/20">
-              <Server className="text-[#FF5E5E]" size={28} />
+            <div className="w-14 h-14 rounded-xl bg-primary-500/10 flex items-center justify-center group-hover:bg-primary-500/20">
+              <Server className="text-primary-500" size={28} />
             </div>
             <div>
               <h3 className="text-xl font-semibold text-gray-900">Server Mode</h3>
@@ -184,7 +184,7 @@ export const SetupScreen: React.FC = () => {
           <p className="text-gray-600 text-sm mb-4">
             Best for standalone POS terminals. Data is stored locally and synced when online.
           </p>
-          <div className="flex items-center text-[#FF5E5E] text-sm font-medium">
+          <div className="flex items-center text-primary-500 text-sm font-medium">
             <span>Select this mode</span>
             <ChevronRight size={16} className="ml-1 group-hover:translate-x-1 transition-transform" />
           </div>
@@ -232,10 +232,10 @@ export const SetupScreen: React.FC = () => {
       <div className="text-center">
         <div
           className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 ${
-            modeChoice === 'server' ? 'bg-[#FF5E5E]/10' : 'bg-blue-500/10'
+            modeChoice === 'server' ? 'bg-primary-500/10' : 'bg-blue-500/10'
           }`}
         >
-          <Settings className={modeChoice === 'server' ? 'text-[#FF5E5E]' : 'text-blue-500'} size={32} />
+          <Settings className={modeChoice === 'server' ? 'text-primary-500' : 'text-blue-500'} size={32} />
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
           Configure {modeChoice === 'server' ? 'Server' : 'Client'} Mode
@@ -260,7 +260,7 @@ export const SetupScreen: React.FC = () => {
                 placeholder="9625"
                 min={1024}
                 max={65535}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5E5E]/20 focus:border-[#FF5E5E]"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                 disabled={isLoading}
               />
               <p className="text-xs text-gray-400">Port for HTTP API (default: 9625)</p>
@@ -276,7 +276,7 @@ export const SetupScreen: React.FC = () => {
                 placeholder="9626"
                 min={1024}
                 max={65535}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5E5E]/20 focus:border-[#FF5E5E]"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                 disabled={isLoading}
               />
               <p className="text-xs text-gray-400">Port for real-time messaging (default: 9626)</p>
@@ -337,7 +337,7 @@ export const SetupScreen: React.FC = () => {
             disabled={isLoading}
             className={`flex-1 py-3 text-white font-bold rounded-xl active:scale-[0.98] transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-70 ${
               modeChoice === 'server'
-                ? 'bg-[#FF5E5E] hover:bg-[#E54545] shadow-[#FF5E5E]/25'
+                ? 'bg-primary-500 hover:bg-primary-600 shadow-primary-500/25'
                 : 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/25'
             }`}
           >
@@ -374,7 +374,7 @@ export const SetupScreen: React.FC = () => {
 
       <button
         onClick={handleComplete}
-        className="w-full py-4 bg-[#FF5E5E] text-white font-bold rounded-xl hover:bg-[#E54545] active:scale-[0.98] transition-all shadow-lg shadow-[#FF5E5E]/25 flex items-center justify-center gap-2"
+        className="w-full py-4 bg-primary-500 text-white font-bold rounded-xl hover:bg-primary-600 active:scale-[0.98] transition-all shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2"
       >
         <span>Continue to Login</span>
         <ChevronRight size={20} />
@@ -402,7 +402,7 @@ export const SetupScreen: React.FC = () => {
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
                     step === s
-                      ? 'bg-[#FF5E5E] text-white'
+                      ? 'bg-primary-500 text-white'
                       : stepKeys.indexOf(step) > i
                         ? 'bg-green-500 text-white'
                         : 'bg-gray-200 text-gray-500'

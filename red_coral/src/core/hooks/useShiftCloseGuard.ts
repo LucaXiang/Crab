@@ -58,7 +58,7 @@ export function useShiftCloseGuard() {
       if (shouldClose) {
         // 用户选择强制关闭
         try {
-          await client.forceCloseShift(openShift.id!, {
+          await client.forceCloseShift(openShift.id, {
             note: '应用退出时自动强制关闭',
           });
           await message('班次已强制关闭', { title: '提示', kind: 'info' });

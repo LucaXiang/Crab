@@ -211,7 +211,7 @@ export const LabelTemplateManager: React.FC = () => {
                       e.stopPropagation();
                       handleDeleteTemplate(template.id);
                     }}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                     title={t('common.action.delete')}
                   >
                     <Trash2 size={16} />

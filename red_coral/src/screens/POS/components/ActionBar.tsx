@@ -24,14 +24,14 @@ export const ActionBar: React.FC<ActionBarProps> = ({
   const { t } = useI18n();
 
   return (
-    <div className="h-16 bg-[#FF5E5E] flex items-center justify-between shrink-0 px-3 text-white shadow-md z-20">
+    <div className="h-16 bg-primary-500 flex items-center justify-between shrink-0 px-3 text-white shadow-md z-20">
       <div className="flex items-center gap-2">
         <button
           onClick={() => onSetScreen('POS')}
           onMouseDown={(e) => e.preventDefault()}
           className={`p-3 rounded-xl transition-all flex items-center gap-3 ${
             screen === 'POS'
-              ? 'bg-white text-[#FF5E5E] font-bold shadow-sm'
+              ? 'bg-white text-primary-500 font-bold shadow-sm'
               : 'text-white/80 hover:bg-white/10'
           }`}
         >
@@ -51,7 +51,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           onMouseDown={(e) => e.preventDefault()}
           className={`p-3 rounded-xl transition-all flex items-center gap-3 ${
             screen === 'HISTORY'
-              ? 'bg-white text-[#FF5E5E] font-bold shadow-sm'
+              ? 'bg-white text-primary-500 font-bold shadow-sm'
               : 'text-white/80 hover:bg-white/10'
           }`}
         >

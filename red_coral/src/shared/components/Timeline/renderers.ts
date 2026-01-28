@@ -70,10 +70,28 @@ interface EventRenderer<T> {
 
 const TableOpenedRenderer: EventRenderer<TableOpenedPayload> = {
   render(event, payload, t) {
+    const details: string[] = [];
+
+    // Show table and zone info
+    if (payload.table_name) {
+      details.push(`${t('timeline.labels.table')}: ${payload.table_name}`);
+    }
+    if (payload.zone_name) {
+      details.push(`${t('timeline.labels.zone')}: ${payload.zone_name}`);
+    }
+    // Show receipt number (server-generated)
+    if (payload.receipt_number) {
+      details.push(`${t('timeline.labels.receipt')}: ${payload.receipt_number}`);
+    }
+    // Show retail mode
+    if (payload.is_retail) {
+      details.push(t('timeline.retail_mode'));
+    }
+
     return {
       title: t('timeline.table_order'),
       summary: payload.guest_count != null ? t('timeline.guests_count', { n: payload.guest_count }) : '',
-      details: [],
+      details,
       icon: Utensils,
       colorClass: 'bg-blue-500',
       timestamp: event.timestamp,
@@ -110,6 +128,16 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
     const previousValues = payload.previous_values || {};
     const details: string[] = [];
 
+    // Show operation description
+    if (payload.operation) {
+      details.push(payload.operation);
+    }
+
+    // Show affected quantity
+    if (payload.affected_quantity != null && payload.affected_quantity > 0) {
+      details.push(`${t('timeline.labels.affected_quantity')}: ${payload.affected_quantity}`);
+    }
+
     const formatChange = (
       key: keyof typeof changes,
       labelKey: string,
@@ -120,7 +148,7 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
         const oldVal = previousValues[key];
         if (oldVal !== newVal) {
           details.push(
-            `${t(labelKey)}: ${typeof oldVal === 'number' ? formatter(oldVal) : '0'} -> ${formatter(newVal)}`
+            `${t(labelKey)}: ${typeof oldVal === 'number' ? formatter(oldVal) : '0'} → ${formatter(newVal)}`
           );
         }
       }
@@ -130,6 +158,11 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
     formatChange('quantity', 'timeline.labels.quantity');
     formatChange('manual_discount_percent', 'timeline.labels.discount', v => `${v}%`);
     formatChange('surcharge', 'timeline.labels.surcharge', v => formatCurrency(v || 0));
+
+    // Show authorizer
+    if (payload.authorizer_name) {
+      details.push(`${t('timeline.labels.authorizer')}: ${payload.authorizer_name}`);
+    }
 
     const source = payload.source;
     return {
@@ -155,7 +188,12 @@ const ItemRemovedRenderer: EventRenderer<ItemRemovedPayload> = {
 
     // Show reason if available
     if (payload.reason) {
-      details.push(payload.reason);
+      details.push(`${t('timeline.labels.reason')}: ${payload.reason}`);
+    }
+
+    // Show authorizer
+    if (payload.authorizer_name) {
+      details.push(`${t('timeline.labels.authorizer')}: ${payload.authorizer_name}`);
     }
 
     return {
@@ -245,7 +283,12 @@ const PaymentCancelledRenderer: EventRenderer<PaymentCancelledPayload> = {
 
     // Show reason if available
     if (payload.reason) {
-      details.push(payload.reason);
+      details.push(`${t('timeline.labels.reason')}: ${payload.reason}`);
+    }
+
+    // Show authorizer
+    if (payload.authorizer_name) {
+      details.push(`${t('timeline.labels.authorizer')}: ${payload.authorizer_name}`);
     }
 
     return {
@@ -290,12 +333,28 @@ const OrderSplitRenderer: EventRenderer<OrderSplitPayload> = {
 
 const OrderCompletedRenderer: EventRenderer<OrderCompletedPayload> = {
   render(event, payload, t) {
+    const details: string[] = [];
+
+    // Show final total
+    if (payload.final_total != null) {
+      details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.final_total)}`);
+    }
+
+    // Show payment summary
+    if (payload.payment_summary && payload.payment_summary.length > 0) {
+      payload.payment_summary.forEach((item) => {
+        const methodKey = `checkout.method.${item.method?.toLowerCase() || 'other'}`;
+        const methodDisplay = t(methodKey);
+        details.push(`${methodDisplay}: ${formatCurrency(item.amount)}`);
+      });
+    }
+
     return {
       title: t('timeline.order_completed'),
       summary: payload.receipt_number
         ? t('timeline.receipt_no', { n: payload.receipt_number })
-        : formatCurrency(payload.final_total),
-      details: [],
+        : '',
+      details,
       icon: CheckCircle,
       colorClass: 'bg-green-600',
       timestamp: event.timestamp,
@@ -311,13 +370,25 @@ const OrderVoidedRenderer: EventRenderer<OrderVoidedPayload> = {
       : t('checkout.void.type.cancelled');
     const details: string[] = [];
 
+    // Show loss reason
     if (payload.loss_reason) {
       const reasonKey = `checkout.void.loss_reason.${payload.loss_reason.toLowerCase()}`;
-      details.push(t(reasonKey));
+      details.push(`${t('timeline.labels.reason')}: ${t(reasonKey)}`);
     }
 
+    // Show loss amount (for tax reporting)
+    if (payload.loss_amount != null) {
+      details.push(`${t('timeline.labels.loss_amount')}: ${formatCurrency(payload.loss_amount)}`);
+    }
+
+    // Show note
     if (payload.note) {
       details.push(payload.note);
+    }
+
+    // Show authorizer
+    if (payload.authorizer_name) {
+      details.push(`${t('timeline.labels.authorizer')}: ${payload.authorizer_name}`);
     }
 
     return {
@@ -345,10 +416,18 @@ const OrderRestoredRenderer: EventRenderer<OrderRestoredPayload> = {
 
 const OrderMergedRenderer: EventRenderer<OrderMergedPayload> = {
   render(event, payload, t) {
+    const details: string[] = [];
+
+    // Show merged items
+    if (payload.items && payload.items.length > 0) {
+      const itemCount = payload.items.reduce((sum, item) => sum + item.quantity, 0);
+      details.push(`${t('timeline.labels.items')}: ${itemCount}`);
+    }
+
     return {
       title: t('timeline.order_merged'),
       summary: payload.source_table_name ? `${t('timeline.from')} ${payload.source_table_name}` : '',
-      details: [],
+      details,
       icon: ArrowLeft,
       colorClass: 'bg-purple-500',
       timestamp: event.timestamp,
@@ -358,12 +437,20 @@ const OrderMergedRenderer: EventRenderer<OrderMergedPayload> = {
 
 const OrderMovedRenderer: EventRenderer<OrderMovedPayload> = {
   render(event, payload, t) {
+    const details: string[] = [];
+
+    // Show moved items count
+    if (payload.items && payload.items.length > 0) {
+      const itemCount = payload.items.reduce((sum, item) => sum + item.quantity, 0);
+      details.push(`${t('timeline.labels.items')}: ${itemCount}`);
+    }
+
     return {
       title: t('timeline.table_moved'),
       summary: (payload.source_table_name && payload.target_table_name)
         ? `${payload.source_table_name} → ${payload.target_table_name}`
         : '',
-      details: [],
+      details,
       icon: ArrowRight,
       colorClass: 'bg-indigo-500',
       timestamp: event.timestamp,
@@ -373,10 +460,17 @@ const OrderMovedRenderer: EventRenderer<OrderMovedPayload> = {
 
 const OrderMovedOutRenderer: EventRenderer<OrderMovedOutPayload> = {
   render(event, payload, t) {
+    const details: string[] = [];
+
+    // Show reason if available
+    if (payload.reason) {
+      details.push(`${t('timeline.labels.reason')}: ${payload.reason}`);
+    }
+
     return {
       title: t('timeline.moved_out'),
       summary: payload.target_table_name ? `${t('timeline.to')} ${payload.target_table_name}` : '',
-      details: [],
+      details,
       icon: ArrowRight,
       colorClass: 'bg-indigo-600',
       timestamp: event.timestamp,
@@ -386,10 +480,17 @@ const OrderMovedOutRenderer: EventRenderer<OrderMovedOutPayload> = {
 
 const OrderMergedOutRenderer: EventRenderer<OrderMergedOutPayload> = {
   render(event, payload, t) {
+    const details: string[] = [];
+
+    // Show reason if available
+    if (payload.reason) {
+      details.push(`${t('timeline.labels.reason')}: ${payload.reason}`);
+    }
+
     return {
       title: t('timeline.merged_out'),
       summary: payload.target_table_name ? `${t('timeline.to')} ${payload.target_table_name}` : '',
-      details: [],
+      details,
       icon: ArrowRight,
       colorClass: 'bg-purple-600',
       timestamp: event.timestamp,
@@ -399,12 +500,25 @@ const OrderMergedOutRenderer: EventRenderer<OrderMergedOutPayload> = {
 
 const TableReassignedRenderer: EventRenderer<TableReassignedPayload> = {
   render(event, payload, t) {
+    const details: string[] = [];
+
+    // Show target zone if available
+    if (payload.target_zone_name) {
+      details.push(`${t('timeline.labels.zone')}: ${payload.target_zone_name}`);
+    }
+
+    // Show items count
+    if (payload.items && payload.items.length > 0) {
+      const itemCount = payload.items.reduce((sum, item) => sum + item.quantity, 0);
+      details.push(`${t('timeline.labels.items')}: ${itemCount}`);
+    }
+
     return {
       title: t('timeline.table_reassigned'),
       summary: (payload.source_table_name && payload.target_table_name)
         ? `${payload.source_table_name} → ${payload.target_table_name}`
         : '',
-      details: [],
+      details,
       icon: ArrowRight,
       colorClass: 'bg-blue-600',
       timestamp: event.timestamp,
@@ -414,10 +528,18 @@ const TableReassignedRenderer: EventRenderer<TableReassignedPayload> = {
 
 const OrderInfoUpdatedRenderer: EventRenderer<OrderInfoUpdatedPayload> = {
   render(event, payload, t) {
+    // Note: receipt_number is immutable (set at OpenTable), not updatable
     const details: string[] = [];
-    if (payload.receipt_number) details.push(`${t('timeline.labels.receipt')}: ${payload.receipt_number}`);
-    if (payload.guest_count) details.push(`${t('timeline.labels.guests')}: ${payload.guest_count}`);
-    if (payload.table_name) details.push(`${t('timeline.labels.table')}: ${payload.table_name}`);
+    // Use != null to check for both null and undefined, allowing 0 values
+    if (payload.guest_count != null) {
+      details.push(`${t('timeline.labels.guests')}: ${payload.guest_count}`);
+    }
+    if (payload.table_name != null) {
+      details.push(`${t('timeline.labels.table')}: ${payload.table_name}`);
+    }
+    if (payload.is_pre_payment != null) {
+      details.push(`${t('timeline.labels.pre_payment')}: ${payload.is_pre_payment ? t('common.yes') : t('common.no')}`);
+    }
 
     return {
       title: t('timeline.order_info_updated'),
@@ -435,12 +557,26 @@ const RuleSkipToggledRenderer: EventRenderer<RuleSkipToggledPayload> = {
       ? t('timeline.rule_skipped')
       : t('timeline.rule_applied');
 
+    const details: string[] = [];
+
+    // Show recalculated amounts
+    if (payload.subtotal != null) {
+      details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
+    }
+    if (payload.discount != null && payload.discount !== 0) {
+      details.push(`${t('timeline.labels.discount')}: -${formatCurrency(payload.discount)}`);
+    }
+    if (payload.surcharge != null && payload.surcharge !== 0) {
+      details.push(`${t('timeline.labels.surcharge')}: +${formatCurrency(payload.surcharge)}`);
+    }
+    if (payload.total != null) {
+      details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`);
+    }
+
     return {
       title: t('timeline.rule_toggled'),
       summary: `${actionLabel}: ${payload.rule_id}`,
-      details: [
-        `${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`,
-      ],
+      details,
       icon: Tag,
       colorClass: payload.skipped ? 'bg-orange-400' : 'bg-green-400',
       timestamp: event.timestamp,

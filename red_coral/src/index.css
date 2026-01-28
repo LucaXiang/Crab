@@ -11,6 +11,23 @@
 @theme {
   /* Roboto for Latin, system fonts for CJK fallback */
   --font-sans: "Roboto", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  /* Primary color palette */
+  --color-primary-50: #fff1f1;
+  --color-primary-100: #ffe4e4;
+  --color-primary-200: #ffcccc;
+  --color-primary-300: #ffa8a8;
+  --color-primary-400: #ff7a7a;
+  --color-primary-500: #FF5E5E;
+  --color-primary-600: #e63946;
+  --color-primary-700: #c92a36;
+  --color-primary-800: #a82530;
+  --color-primary-900: #8c222b;
+
+  /* Custom shadows for bottom bars (upward shadow) */
+  --shadow-up: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
+  --shadow-up-lg: 0 -5px 15px rgba(0, 0, 0, 0.05);
+  --shadow-left: -4px 0 10px rgba(0, 0, 0, 0.1);
 }
 
 :root {
@@ -42,14 +59,6 @@ body {
   /* Prevent rubber-banding/overscroll effects */
   overscroll-behavior: none;
   touch-action: pan-x pan-y;
-}
-
-/* Fix border flicker during React re-renders */
-/* Set default border color to prevent black flash */
-*,
-*::before,
-*::after {
-  border-color: theme('colors.gray.200');
 }
 
 /* Custom scrollbar for webkit */

@@ -63,7 +63,7 @@ export const TableFilters: React.FC<TableFiltersProps> = React.memo(
           type="ALL"
           label={t('table.filter.all')}
           icon={LayoutGrid}
-          colorClass="bg-[#FF5E5E] text-white border-[#FF5E5E]"
+          colorClass="bg-primary-500 text-white border-primary-500"
           count={stats.ALL}
           isActive={activeFilter === 'ALL'}
           onClick={() => onFilterChange('ALL')}

@@ -125,13 +125,13 @@ export function useOrderCommands() {
 
   /**
    * Complete an order (checkout)
+   * Note: receipt_number is server-generated at OpenTable, no need to pass
    */
   const completeOrder = useCallback(
-    async (orderId: string, receiptNumber: string): Promise<CommandResponse> => {
+    async (orderId: string): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'COMPLETE_ORDER',
         order_id: orderId,
-        receipt_number: receiptNumber,
       });
 
       return sendCommand(command);
@@ -375,13 +375,13 @@ export function useOrderCommands() {
   // ==================== Order Settings ====================
 
   /**
-   * Update order info (receipt number, guest count, etc.)
+   * Update order info (guest count, table name, etc.)
+   * Note: receipt_number is immutable (set at OpenTable)
    */
   const updateOrderInfo = useCallback(
     async (
       orderId: string,
       info: {
-        receipt_number?: string;
         guest_count?: number;
         table_name?: string;
         is_pre_payment?: boolean;
@@ -390,7 +390,6 @@ export function useOrderCommands() {
       const command = createCommand({
         type: 'UPDATE_ORDER_INFO',
         order_id: orderId,
-        receipt_number: info.receipt_number ?? null,
         guest_count: info.guest_count ?? null,
         table_name: info.table_name ?? null,
         is_pre_payment: info.is_pre_payment ?? null,
