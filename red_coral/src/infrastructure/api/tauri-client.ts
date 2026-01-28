@@ -8,6 +8,8 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { useAuthStore } from '@/core/stores/auth/useAuthStore';
+import { useBridgeStore } from '@/core/stores/bridge';
 import type {
   ApiResponse,
   LoginResponseData,
@@ -77,19 +79,41 @@ export class ApiError extends Error {
   }
 }
 
+// Auth error codes that indicate the session is invalid
+const AUTH_ERROR_CODES = [1001, 1003, 1005]; // NotAuthenticated, TokenExpired, SessionExpired
+let isHandlingAuthError = false;
+
+function handleAuthError(code: number) {
+  if (!AUTH_ERROR_CODES.includes(code)) return;
+  if (isHandlingAuthError) return;
+  isHandlingAuthError = true;
+  try {
+    console.warn(`[invokeApi] Auth error ${code}, clearing auth state`);
+    useAuthStore.getState().logout();
+    useBridgeStore.setState({ currentSession: null });
+  } finally {
+    isHandlingAuthError = false;
+  }
+}
+
 /**
  * 调用 Tauri command 并自动解包 ApiResponse
  * 返回 data 字段，错误时抛出 ApiError
+ * 认证错误（1001/1003/1005）会自动清除前端认证状态
  */
 export async function invokeApi<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {
     const response = await invoke<ApiResponse<T>>(command, args);
     if (response.code && response.code > 0) {
+      handleAuthError(response.code);
       throw new ApiError(response.code, response.message, response.details ?? undefined);
     }
     return response.data as T;
   } catch (error) {
-    if (error instanceof ApiError) throw error;
+    if (error instanceof ApiError) {
+      handleAuthError(error.code);
+      throw error;
+    }
     const message = error instanceof Error ? error.message : String(error);
     throw new ApiError(9001, message); // 9001 = InternalError
   }

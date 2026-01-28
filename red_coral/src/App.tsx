@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
+import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useSyncListener, useConnectionRecovery, useOrderEventListener, useSyncConnection, useShiftCloseGuard } from '@/core/hooks';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -50,10 +51,31 @@ const InitialRoute: React.FC = () => {
       // 后端的 restore_last_session 会根据 config.current_mode 自动恢复
 
       // 4. 尝试恢复缓存的员工会话 (从后端获取)
+      // 并同步 auth store（以后端为唯一认证状态来源）
       const currentAppState = useBridgeStore.getState().appState;
       if (currentAppState?.type === 'ServerAuthenticated' || currentAppState?.type === 'ClientAuthenticated') {
         console.log('[InitialRoute] Restoring session from backend...');
-        await fetchCurrentSession();
+        const session = await fetchCurrentSession();
+        if (session) {
+          // 后端有有效 session，同步到 auth store
+          const user = {
+            id: session.user_info.id,
+            username: session.user_info.username,
+            display_name: session.user_info.display_name,
+            role_id: session.user_info.role_id,
+            role_name: session.user_info.role_name,
+            permissions: session.user_info.permissions,
+            is_system: session.user_info.is_system,
+            is_active: true,
+          };
+          useAuthStore.getState().setUser(user);
+        } else {
+          // 后端无 session，清除前端 auth 状态
+          useAuthStore.getState().logout();
+        }
+      } else {
+        // 后端未认证，确保前端 auth 状态也清除
+        useAuthStore.getState().logout();
       }
 
       const finalState = useBridgeStore.getState().appState;

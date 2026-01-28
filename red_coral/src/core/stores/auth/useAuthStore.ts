@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { createTauriClient, type LoginRequest } from '@/infrastructure/api';
 import type { User } from '@/core/domain/types';
 
@@ -34,7 +33,6 @@ interface AuthStore {
 }
 
 export const useAuthStore = create<AuthStore>()(
-  persist(
     (set, get) => ({
       // Initial State
       user: null,
@@ -238,16 +236,7 @@ export const useAuthStore = create<AuthStore>()(
       deleteUser: async (userId: string) => {
         await api.deleteEmployee(userId);
       },
-    }),
-    {
-      name: 'auth-storage',
-      partialize: (state) => ({
-        user: state.user,
-        permissions: state.permissions,
-        isAuthenticated: state.isAuthenticated,
-      }),
-    }
-  )
+    })
 );
 
 // ==================== Selectors ====================
