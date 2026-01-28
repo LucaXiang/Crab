@@ -30,6 +30,7 @@ export const ProductModal: React.FC = React.memo(() => {
   const setLastSelectedCategory = useSettingsStore((s) => s.setLastSelectedCategory);
 
   const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [inheritedAttributeIds, setInheritedAttributeIds] = useState<string[]>([]);
   const defaultCategorySet = useRef(false);
@@ -72,8 +73,8 @@ export const ProductModal: React.FC = React.memo(() => {
         try {
           const fullData = await loadProductFullData(String(productId));
           setAsyncFormData(fullData);
-        } catch {
-          // Silently fail - form will show empty values
+        } catch (e) {
+          setLoadErrorMessage(getErrorMessage(e));
         }
       };
       loadData();
@@ -185,8 +186,8 @@ export const ProductModal: React.FC = React.memo(() => {
       if (!file || Array.isArray(file)) return;
       const hash = await invoke<string>('save_image', { source_path: file });
       setFormField('image', hash);
-    } catch {
-      toast.error(t('common.label.none'));
+    } catch (e) {
+      toast.error(getErrorMessage(e));
     }
   };
 
@@ -286,6 +287,24 @@ export const ProductModal: React.FC = React.memo(() => {
           )}
         </div>
       </div>
+
+      {/* Load Error Dialog */}
+      {loadErrorMessage && (
+        <div className="fixed inset-0 z-90 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">{t('common.message.load_failed')}</h3>
+              <p className="text-sm text-gray-600 mb-6">{loadErrorMessage}</p>
+              <button
+                onClick={() => { setLoadErrorMessage(null); closeModal(); }}
+                className="w-full py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-colors"
+              >
+                {t('common.action.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Unsaved Changes Dialog */}
       {unsavedDialogOpen && (

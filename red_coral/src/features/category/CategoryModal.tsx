@@ -28,6 +28,7 @@ export const CategoryModal: React.FC = React.memo(() => {
   const refreshData = useSettingsStore((s) => s.refreshData);
 
   const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Only render if modal is for CATEGORY entity
@@ -45,8 +46,8 @@ export const CategoryModal: React.FC = React.memo(() => {
             selected_attribute_ids: attributeIds,
             attribute_default_options: defaultOptions
           });
-        } catch {
-          // Silently fail - attributes will be empty
+        } catch (e) {
+          setLoadErrorMessage(getErrorMessage(e));
         }
       };
       loadAttributes();
@@ -232,6 +233,24 @@ export const CategoryModal: React.FC = React.memo(() => {
           )}
         </div>
       </div>
+
+      {/* Load Error Dialog */}
+      {loadErrorMessage && (
+        <div className="fixed inset-0 z-90 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">{t('common.message.load_failed')}</h3>
+              <p className="text-sm text-gray-600 mb-6">{loadErrorMessage}</p>
+              <button
+                onClick={() => { setLoadErrorMessage(null); closeModal(); }}
+                className="w-full py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-colors"
+              >
+                {t('common.action.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Unsaved Changes Dialog */}
       {unsavedDialogOpen && (

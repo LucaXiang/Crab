@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { LayoutGrid, X } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
+import { toast } from '@/presentation/components/Toast';
+import { getErrorMessage } from '@/utils/error';
 
 const api = createTauriClient();
 import { HeldOrder, Table, Zone } from '@/core/domain/types';
@@ -77,7 +79,9 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
             const tables = await api.listTables();
             setZoneTables(tables);
           }
-        } catch {}
+        } catch (e) {
+          toast.error(getErrorMessage(e));
+        }
       };
       init();
     }, [dataVersion]);
@@ -90,7 +94,8 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
         try {
           const tables = await api.listTables();
           setZoneTables(tables);
-        } catch {
+        } catch (e) {
+          toast.error(getErrorMessage(e));
         } finally {
           setLoading(false);
         }

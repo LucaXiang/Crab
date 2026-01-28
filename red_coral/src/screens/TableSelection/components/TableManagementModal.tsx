@@ -13,6 +13,7 @@ import { ZoneSidebar } from '../ZoneSidebar';
 import { formatCurrency } from '@/utils/currency';
 import { TableCard } from '../TableCard';
 import { toast } from '@/presentation/components/Toast';
+import { getErrorMessage } from '@/utils/error';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 
 interface TableManagementModalProps {
@@ -49,7 +50,9 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             try {
                 const tables = await api.listTables();
                 setZoneTables(tables);
-            } catch { }
+            } catch (e) {
+                toast.error(getErrorMessage(e));
+            }
         };
         loadTables();
     }, [activeZoneId]);

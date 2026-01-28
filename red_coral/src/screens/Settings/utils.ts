@@ -15,7 +15,7 @@ export async function syncAttributeBindings(
     try {
       await unbindFn(binding.id);  // Pass binding ID
     } catch (error) {
-      console.error('Failed to unbind attribute:', binding.attributeId, error);
+      throw error;
     }
   }
 
@@ -77,7 +77,7 @@ export async function syncAttributeBindings(
                 }
                 await bindFn(attributeId, newDefaultOptionIds, i);
              } catch (retryError) {
-                console.error('Failed to force update attribute:', attributeId, retryError);
+                throw retryError;
              }
         } else {
              console.error('Failed to bind attribute:', attributeId, error);

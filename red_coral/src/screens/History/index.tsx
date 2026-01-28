@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from '@/presentation/components/Toast';
+import { getErrorMessage } from '@/utils/error';
 import { useHistoryOrderList } from '@/hooks/useHistoryOrderList';
 import { useHistoryOrderDetail } from '@/hooks/useHistoryOrderDetail';
 import { HistorySidebar } from './HistorySidebar';
@@ -35,7 +37,9 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({ isVisible, onBack,
     try {
       const { reprintReceipt } = await import('@/infrastructure/print/printService');
       await reprintReceipt(selectedOrder.order_id);
-    } catch {}
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
   };
 
   return (
