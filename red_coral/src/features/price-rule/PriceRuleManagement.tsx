@@ -17,7 +17,7 @@ const api = createTauriClient();
 export const PriceRuleManagement: React.FC = React.memo(() => {
   const { t } = useI18n();
   const { hasPermission } = usePermission();
-  const canManage = hasPermission(Permission.MANAGE_SETTINGS);
+  const canManage = hasPermission(Permission.SETTINGS_MANAGE);
 
   const priceRuleStore = usePriceRuleStore();
   const rules = priceRuleStore.items;
@@ -202,7 +202,7 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
         addButtonText={t('settings.price_rule.add_rule')}
         onAdd={handleAdd}
         themeColor="teal"
-        permission={Permission.MANAGE_SETTINGS}
+        permission={Permission.SETTINGS_MANAGE}
       />
 
       <FilterBar

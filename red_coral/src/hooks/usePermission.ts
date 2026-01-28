@@ -14,7 +14,7 @@ import { useHasPermission, useHasRole } from '@/core/stores/auth/useAuthStore';
  *
  * @example
  * const { hasPermission, hasRole } = usePermission();
- * if (hasPermission(Permission.VOID_ORDER)) {
+ * if (hasPermission(Permission.ORDERS_VOID)) {
  *   // Show void order button
  * }
  */
@@ -33,7 +33,7 @@ export const usePermission = () => {
  */
 export const useCanManageUsers = () => {
   const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.MANAGE_USERS);
+  return hasPermission(PermissionValues.USERS_MANAGE);
 };
 
 /**
@@ -42,7 +42,7 @@ export const useCanManageUsers = () => {
  */
 export const useCanManageProducts = () => {
   const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.CREATE_PRODUCT);
+  return hasPermission(PermissionValues.PRODUCTS_WRITE);
 };
 
 /**
@@ -51,7 +51,7 @@ export const useCanManageProducts = () => {
  */
 export const useCanUpdateProduct = () => {
   const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.UPDATE_PRODUCT);
+  return hasPermission(PermissionValues.PRODUCTS_WRITE);
 };
 
 /**
@@ -60,7 +60,7 @@ export const useCanUpdateProduct = () => {
  */
 export const useCanDeleteProduct = () => {
   const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.DELETE_PRODUCT);
+  return hasPermission(PermissionValues.PRODUCTS_DELETE);
 };
 
 /**
@@ -69,7 +69,7 @@ export const useCanDeleteProduct = () => {
  */
 export const useCanManageCategories = () => {
   const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.MANAGE_CATEGORIES);
+  return hasPermission(PermissionValues.CATEGORIES_MANAGE);
 };
 
 /**
@@ -78,7 +78,7 @@ export const useCanManageCategories = () => {
  */
 export const useCanManageZones = () => {
   const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.MANAGE_ZONES);
+  return hasPermission(PermissionValues.ZONES_MANAGE);
 };
 
 /**
@@ -87,5 +87,5 @@ export const useCanManageZones = () => {
  */
 export const useCanManageTables = () => {
   const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.MANAGE_TABLES);
+  return hasPermission(PermissionValues.TABLES_MANAGE);
 };

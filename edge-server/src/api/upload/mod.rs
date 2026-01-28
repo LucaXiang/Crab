@@ -4,9 +4,10 @@
 
 mod handler;
 
-use axum::{Router, body::Bytes, extract::{Path, State}, response::IntoResponse, routing::post};
+use axum::{Router, middleware, body::Bytes, extract::{Path, State}, response::IntoResponse, routing::post};
 use http::header;
 
+use crate::auth::require_permission;
 use crate::core::ServerState;
 
 /// Upload file response
@@ -71,11 +72,15 @@ async fn serve_uploaded_file(
 /// Build upload router
 pub fn router() -> Router<ServerState> {
     Router::new()
-        // Upload image API - authentication required
+        // Upload image API - requires products:write permission
         .route("/api/image/upload", post(handler::upload))
-        // Serve uploaded images - public access
-        .route(
-            "/api/image/{filename}",
-            axum::routing::get(serve_uploaded_file),
+        .layer(middleware::from_fn(require_permission("products:write")))
+        // Serve uploaded images - any authenticated user can read
+        .merge(
+            Router::new()
+                .route(
+                    "/api/image/{filename}",
+                    axum::routing::get(serve_uploaded_file),
+                )
         )
 }

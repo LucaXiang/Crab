@@ -23,7 +23,7 @@ export const TagManagement: React.FC = React.memo(() => {
 
   // Permission check
   const { hasPermission } = usePermission();
-  const canManageTags = hasPermission(Permission.MANAGE_CATEGORIES); // Using same permission as categories
+  const canManageTags = hasPermission(Permission.CATEGORIES_MANAGE); // Using same permission as categories
 
   // Use resources store for data
   const tagStore = useTagStore();
@@ -176,7 +176,7 @@ export const TagManagement: React.FC = React.memo(() => {
         addButtonText={t('settings.tag.add_tag')}
         onAdd={() => openModal('TAG', 'CREATE')}
         themeColor="indigo"
-        permission={Permission.MANAGE_CATEGORIES}
+        permission={Permission.CATEGORIES_MANAGE}
       />
 
       <FilterBar

@@ -106,10 +106,19 @@ pub async fn require_auth(
 /// - `"products:*"` 匹配所有 products 相关操作
 /// - `"all"` 匹配所有权限
 ///
+/// # 用法
+///
+/// ```ignore
+/// use axum::middleware;
+/// Router::new()
+///     .route("/api/products", get(handler::list))
+///     .layer(middleware::from_fn(require_permission("products:read")));
+/// ```
+///
 /// # 错误
 ///
 /// 无权限返回 403 Forbidden
-pub async fn require_permission(
+pub fn require_permission(
     permission: &'static str,
 ) -> impl Fn(
     Request,

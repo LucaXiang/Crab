@@ -5,12 +5,34 @@ use axum::extract::{Extension, Path, Query, State};
 use axum::response::IntoResponse;
 use serde::Deserialize;
 
-use crate::auth::permissions::ALL_PERMISSIONS;
+use crate::auth::permissions::{is_valid_permission, ALL_PERMISSIONS};
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{Role, RoleCreate, RoleUpdate};
 use crate::db::repository::RoleRepository;
 use crate::utils::{AppError, AppResult};
+
+/// 权限天花板校验：操作者只能分配自己拥有的权限
+fn validate_permission_ceiling(
+    current_user: &CurrentUser,
+    permissions: &[String],
+) -> AppResult<()> {
+    for perm in permissions {
+        if !is_valid_permission(perm) {
+            return Err(AppError::invalid_request(format!(
+                "Invalid permission: {}",
+                perm
+            )));
+        }
+        if !current_user.has_permission(perm) {
+            return Err(AppError::forbidden(format!(
+                "Cannot grant permission '{}': you do not have it yourself",
+                perm
+            )));
+        }
+    }
+    Ok(())
+}
 
 /// Query filter for role listing
 #[derive(Debug, Deserialize)]
@@ -71,6 +93,9 @@ pub async fn create(
         "Creating role"
     );
 
+    // 权限天花板校验
+    validate_permission_ceiling(&current_user, &payload.permissions)?;
+
     let repo = RoleRepository::new(state.get_db());
     let role = repo
         .create(payload)
@@ -93,6 +118,11 @@ pub async fn update(
         role_id = %id,
         "Updating role"
     );
+
+    // 权限天花板校验（仅当 payload 包含 permissions 时）
+    if let Some(ref permissions) = payload.permissions {
+        validate_permission_ceiling(&current_user, permissions)?;
+    }
 
     let repo = RoleRepository::new(state.get_db());
     let role = repo
@@ -163,6 +193,9 @@ pub async fn update_role_permissions(
         permissions = ?permissions,
         "Updating role permissions"
     );
+
+    // 权限天花板校验
+    validate_permission_ceiling(&current_user, &permissions)?;
 
     let repo = RoleRepository::new(state.get_db());
     let update = RoleUpdate {

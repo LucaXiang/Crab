@@ -128,7 +128,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
    */
   const handleVoidConfirm = useCallback((options: VoidOrderOptions) => {
     // If user cannot void orders, require supervisor auth
-    if (!hasPermission(Permission.VOID_ORDER)) {
+    if (!hasPermission(Permission.ORDERS_VOID)) {
       setPendingVoidOptions(options);
       setIsVoidModalOpen(false); // Close void modal first
       setIsSupervisorModalOpen(true);
@@ -175,7 +175,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
           setPendingVoidOptions(null);
         }}
         onSuccess={handleSupervisorSuccess}
-        requiredPermission={Permission.VOID_ORDER}
+        requiredPermission={Permission.ORDERS_VOID}
         actionDescription={t('checkout.void.auth_required')}
       />
 

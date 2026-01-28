@@ -2,8 +2,9 @@
 
 mod handler;
 
-use axum::{Router, routing::get};
+use axum::{Router, middleware, routing::get};
 
+use crate::auth::require_permission;
 use crate::core::ServerState;
 
 pub fn router() -> Router<ServerState> {
@@ -13,4 +14,5 @@ pub fn router() -> Router<ServerState> {
 fn routes() -> Router<ServerState> {
     Router::new()
         .route("/status", get(handler::get_sync_status))
+        .layer(middleware::from_fn(require_permission("system:read")))
 }

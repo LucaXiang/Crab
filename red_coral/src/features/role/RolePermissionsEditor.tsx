@@ -7,34 +7,59 @@ import { Shield, Save, RefreshCw, Check, Plus, Trash2, Info } from 'lucide-react
 import { Role, RoleListData, RolePermissionListData } from '@/core/domain/types';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 
-// Map permissions to readable labels
+// Map permissions to readable labels (resource:action format)
 const usePermissionLabels = () => {
   const { t } = useI18n();
   return {
-    manage_users: t('settings.permissions.manage_users'),
-    create_product: t('settings.permissions.create_product'),
-    update_product: t('settings.permissions.update_product'),
-    delete_product: t('settings.permissions.delete_product'),
-    manage_categories: t('settings.permissions.manage_categories'),
-    manage_zones: t('settings.permissions.manage_zones'),
-    manage_tables: t('settings.permissions.manage_tables'),
-    void_order: t('settings.permissions.void_order'),
-    restore_order: t('settings.permissions.restore_order'),
-    modify_price: t('settings.permissions.modify_price'),
-    apply_discount: t('settings.permissions.apply_discount'),
-    view_statistics: t('settings.permissions.view_statistics'),
-    manage_printers: t('settings.permissions.manage_printers'),
-    manage_attributes: t('settings.permissions.manage_attributes'),
-    refund_order: t('settings.permissions.refund_order'),
-    split_bill: t('settings.permissions.split_bill'),
-    merge_bill: t('settings.permissions.merge_bill'),
-    transfer_table: t('settings.permissions.transfer_table'),
-    open_cash_drawer: t('settings.permissions.open_cash_drawer'),
-    reprint_receipt: t('settings.permissions.reprint_receipt'),
-    free_of_charge: t('settings.permissions.free_of_charge'),
-    view_reports: t('settings.permissions.view_reports'),
-    adjust_stock: t('settings.permissions.adjust_stock'),
-    system_settings: t('settings.permissions.system_settings'),
+    // Product permissions
+    'products:read': t('settings.permissions.products_read'),
+    'products:write': t('settings.permissions.create_product'),
+    'products:delete': t('settings.permissions.delete_product'),
+    'products:manage': t('settings.permissions.manage_products'),
+    // Category permissions
+    'categories:read': t('settings.permissions.categories_read'),
+    'categories:manage': t('settings.permissions.manage_categories'),
+    // Attribute permissions
+    'attributes:read': t('settings.permissions.attributes_read'),
+    'attributes:manage': t('settings.permissions.manage_attributes'),
+    // Order permissions
+    'orders:read': t('settings.permissions.orders_read'),
+    'orders:write': t('settings.permissions.orders_write'),
+    'orders:void': t('settings.permissions.void_order'),
+    'orders:restore': t('settings.permissions.restore_order'),
+    'orders:discount': t('settings.permissions.apply_discount'),
+    'orders:refund': t('settings.permissions.refund_order'),
+    'orders:cancel_item': t('settings.permissions.cancel_item'),
+    // User management
+    'users:read': t('settings.permissions.users_read'),
+    'users:manage': t('settings.permissions.manage_users'),
+    // Role management
+    'roles:read': t('settings.permissions.roles_read'),
+    'roles:write': t('settings.permissions.roles_write'),
+    // Zone & Table permissions
+    'zones:read': t('settings.permissions.zones_read'),
+    'zones:manage': t('settings.permissions.manage_zones'),
+    'tables:read': t('settings.permissions.tables_read'),
+    'tables:manage': t('settings.permissions.manage_tables'),
+    'tables:merge_bill': t('settings.permissions.merge_bill'),
+    'tables:transfer': t('settings.permissions.transfer_table'),
+    // Pricing permissions
+    'pricing:read': t('settings.permissions.pricing_read'),
+    'pricing:write': t('settings.permissions.modify_price'),
+    // Statistics
+    'statistics:read': t('settings.permissions.view_statistics'),
+    // Printer permissions
+    'printers:read': t('settings.permissions.printers_read'),
+    'printers:manage': t('settings.permissions.manage_printers'),
+    // Receipt permissions
+    'receipts:print': t('settings.permissions.print_receipts'),
+    'receipts:reprint': t('settings.permissions.reprint_receipt'),
+    // Settings & System
+    'settings:manage': t('settings.permissions.manage_settings'),
+    'system:read': t('settings.permissions.system_read'),
+    'system:write': t('settings.permissions.system_settings'),
+    // POS operations
+    'pos:cash_drawer': t('settings.permissions.open_cash_drawer'),
   };
 };
 
@@ -57,24 +82,24 @@ export const RolePermissionsEditor: React.FC = () => {
 
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
-  // Group permissions
+  // Group permissions (resource:action format)
   const getPermissionGroups = () => {
     const groups = {
       menu: {
         title: t('settings.permissions.group.menu'),
-        perms: ['create_product', 'update_product', 'delete_product', 'manage_categories', 'manage_attributes']
+        perms: ['products:read', 'products:write', 'products:delete', 'products:manage', 'categories:read', 'categories:manage', 'attributes:read', 'attributes:manage']
       },
       pos: {
         title: t('settings.permissions.group.pos'),
-        perms: ['void_order', 'restore_order', 'modify_price', 'apply_discount', 'refund_order', 'split_bill', 'merge_bill', 'transfer_table', 'open_cash_drawer', 'reprint_receipt', 'free_of_charge']
+        perms: ['orders:read', 'orders:write', 'orders:void', 'orders:restore', 'orders:discount', 'orders:refund', 'orders:cancel_item', 'tables:merge_bill', 'tables:transfer', 'pos:cash_drawer', 'receipts:print', 'receipts:reprint', 'pricing:read', 'pricing:write']
       },
       store: {
         title: t('settings.permissions.group.store'),
-        perms: ['manage_zones', 'manage_tables', 'manage_printers', 'adjust_stock']
+        perms: ['zones:read', 'zones:manage', 'tables:read', 'tables:manage', 'printers:read', 'printers:manage']
       },
       system: {
         title: t('settings.permissions.group.system'),
-        perms: ['manage_users', 'view_statistics', 'view_reports', 'system_settings']
+        perms: ['users:read', 'users:manage', 'roles:read', 'roles:write', 'statistics:read', 'settings:manage', 'system:read', 'system:write']
       }
     };
 

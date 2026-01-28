@@ -6,9 +6,11 @@ mod handler;
 
 use axum::{
     Router,
+    middleware,
     routing::get,
 };
 
+use crate::auth::require_permission;
 use crate::core::ServerState;
 
 /// Order router
@@ -22,4 +24,5 @@ fn routes() -> Router<ServerState> {
         .route("/history", get(handler::fetch_order_list))
         // Order detail (archived)
         .route("/{id}", get(handler::get_by_id))
+        .layer(middleware::from_fn(require_permission("orders:read")))
 }

@@ -252,14 +252,14 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">{t('checkout.cart.discount')}</span>
                   <EscalatableGate
-                    permission={Permission.APPLY_DISCOUNT}
+                    permission={Permission.ORDERS_DISCOUNT}
                     mode="intercept"
                     description={t('pos.cart.enter_discount')}
                     onAuthorized={(user) => openNumpad('DISC', { id: user.id, username: user.username })}
                   >
                     <button
                       onClick={() => {
-                        if (hasPermission(Permission.APPLY_DISCOUNT)) {
+                        if (hasPermission(Permission.ORDERS_DISCOUNT)) {
                           openNumpad('DISC');
                         }
                       }}
@@ -280,14 +280,14 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                   {QUICK_DISCOUNTS.map(d => (
                     <EscalatableGate
                       key={d}
-                      permission={Permission.APPLY_DISCOUNT}
+                      permission={Permission.ORDERS_DISCOUNT}
                       mode="intercept"
                       description={`${t('checkout.cart.discount')} ${d}%`}
                       onAuthorized={(user) => handleProtectedDiscount(d === discount ? 0 : d, { id: user.id, username: user.username })}
                     >
                       <button
                         onClick={() => {
-                          if (hasPermission(Permission.APPLY_DISCOUNT)) {
+                          if (hasPermission(Permission.ORDERS_DISCOUNT)) {
                             handleProtectedDiscount(d === discount ? 0 : d);
                           }
                         }}
@@ -314,7 +314,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
 
               {/* 最终价格 (可编辑) */}
               <EscalatableGate
-                permission={Permission.APPLY_DISCOUNT}
+                permission={Permission.ORDERS_DISCOUNT}
                 mode="intercept"
                 description={t('pos.cart.edit_final_price')}
                 onAuthorized={(user) => openNumpad('PRICE', { id: user.id, username: user.username })}
@@ -322,7 +322,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                 <div
                   className="flex items-center justify-between p-4 cursor-pointer hover:bg-blue-50/50 transition-colors group"
                   onClick={() => {
-                    if (hasPermission(Permission.APPLY_DISCOUNT)) {
+                    if (hasPermission(Permission.ORDERS_DISCOUNT)) {
                       openNumpad('PRICE');
                     }
                   }}
@@ -386,14 +386,14 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                 {/* Delete Button */}
                 {showDelete && onDelete && (
                     <EscalatableGate
-                        permission={Permission.VOID_ORDER}
+                        permission={Permission.ORDERS_VOID}
                         mode="intercept"
                         description={t('common.action.delete')}
                         onAuthorized={(user) => handleProtectedDelete({ id: user.id, username: user.username })}
                     >
                         <button
                             onClick={() => {
-                                if (hasPermission(Permission.VOID_ORDER)) {
+                                if (hasPermission(Permission.ORDERS_VOID)) {
                                     handleProtectedDelete();
                                 }
                             }}

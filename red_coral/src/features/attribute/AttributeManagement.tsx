@@ -184,7 +184,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
         addButtonText={t('settings.attribute.add_attribute')}
         onAdd={handleAddAttribute}
         themeColor="teal"
-        permission={Permission.MANAGE_ATTRIBUTES}
+        permission={Permission.ATTRIBUTES_MANAGE}
       />
 
       <FilterBar
@@ -269,7 +269,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
 
                         {/* Action Buttons */}
                         <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>
+                          <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
                             <button
                               onClick={(e) => handleAddOption(attrId, e)}
                               className="p-2 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors"
@@ -278,7 +278,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                               <Plus size={16} />
                             </button>
                           </ProtectedGate>
-                          <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>
+                          <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
                             <button
                               onClick={(e) => handleEditAttribute(attr, e)}
                               className="p-2 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
@@ -286,7 +286,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                               <Edit size={16} />
                             </button>
                           </ProtectedGate>
-                          <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>
+                          <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
                             <button
                               onClick={(e) => handleDeleteAttribute(attr, e)}
                               className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -355,7 +355,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                 </div>
                                 </div>
                                 <div className="flex items-center gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity shrink-0">
-                                  <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>
+                                  <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
                                     <button
                                       onClick={(e) => handleEditOption(option, e)}
                                       className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
@@ -363,7 +363,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                       <Edit size={14} />
                                     </button>
                                   </ProtectedGate>
-                                  <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>
+                                  <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
                                     <button
                                       onClick={(e) => handleDeleteOption(option, e)}
                                       className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"

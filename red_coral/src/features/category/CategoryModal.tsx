@@ -11,6 +11,8 @@ import { getErrorMessage } from '@/utils/error';
 import { CategoryForm } from './CategoryForm';
 import { createCategory, updateCategory, deleteCategory, loadCategoryAttributes } from './mutations';
 import { DeleteConfirmation } from '@/shared/components/DeleteConfirmation';
+import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
+import { Permission } from '@/core/domain/types';
 
 /**
  * CategoryModal - Modal for creating, editing, and deleting categories
@@ -211,12 +213,14 @@ export const CategoryModal: React.FC = React.memo(() => {
             {t('common.action.cancel')}
           </button>
           {action === 'DELETE' ? (
-            <button
-              onClick={handleDelete}
-              className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
-            >
-              {t('common.action.delete')}
-            </button>
+            <ProtectedGate permission={Permission.CATEGORIES_MANAGE}>
+              <button
+                onClick={handleDelete}
+                className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
+              >
+                {t('common.action.delete')}
+              </button>
+            </ProtectedGate>
           ) : (
             <button
               onClick={handleSave}

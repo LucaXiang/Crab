@@ -64,7 +64,7 @@ export const DraftListModal = React.memo<DraftListModalProps>(({
                     {formatCurrency(draft.total)}
                   </span>
                   <EscalatableGate
-                    permission={PermissionValues.RESTORE_ORDER}
+                    permission={PermissionValues.ORDERS_RESTORE}
                     mode="intercept"
                     description={t('draft.action.restore')}
                     onAuthorized={() => draft.order_id && onRestore(draft.order_id)}

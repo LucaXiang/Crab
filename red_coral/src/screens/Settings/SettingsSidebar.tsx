@@ -83,14 +83,14 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
 
       <div className="flex-1 overflow-y-auto py-4 px-2 custom-scrollbar">
         {/* 店铺信息 & 桌台管理 */}
-        <ProtectedGate permission={Permission.SYSTEM_SETTINGS}>
+        <ProtectedGate permission={Permission.SYSTEM_WRITE}>
           <CategoryItem
             category="STORE"
             icon={Store}
             label={t('settings.store.title')}
           />
         </ProtectedGate>
-        <ProtectedGate permission={Permission.MANAGE_TABLES}>
+        <ProtectedGate permission={Permission.TABLES_MANAGE}>
           <CategoryItem
             category="TABLES"
             icon={LayoutGrid}
@@ -101,35 +101,35 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
         <Divider />
 
         {/* 商品管理相关 */}
-        <ProtectedGate permission={Permission.CREATE_PRODUCT}>
+        <ProtectedGate permission={Permission.PRODUCTS_WRITE}>
           <CategoryItem
             category="PRODUCTS"
             icon={Utensils}
             label={t('settings.product.title')}
           />
         </ProtectedGate>
-        <ProtectedGate permission={Permission.MANAGE_CATEGORIES}>
+        <ProtectedGate permission={Permission.CATEGORIES_MANAGE}>
           <CategoryItem
             category="CATEGORIES"
             icon={Tag}
             label={t('settings.category.title')}
           />
         </ProtectedGate>
-        <ProtectedGate permission={Permission.MANAGE_ATTRIBUTES}>
+        <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
           <CategoryItem
             category="ATTRIBUTES"
             icon={Sliders}
             label={t('settings.attribute.title')}
           />
         </ProtectedGate>
-        <ProtectedGate permission={Permission.MANAGE_CATEGORIES}>
+        <ProtectedGate permission={Permission.CATEGORIES_MANAGE}>
           <CategoryItem
             category="TAGS"
             icon={Tags}
             label={t('settings.tag.title')}
           />
         </ProtectedGate>
-        <ProtectedGate permission={Permission.SYSTEM_SETTINGS}>
+        <ProtectedGate permission={Permission.SYSTEM_WRITE}>
           <CategoryItem
             category="PRICE_RULES"
             icon={Percent}
@@ -140,14 +140,14 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
         <Divider />
 
         {/* 员工管理 & 数据转移 */}
-        <ProtectedGate permission={Permission.MANAGE_USERS}>
+        <ProtectedGate permission={Permission.USERS_MANAGE}>
           <CategoryItem
             category="USERS"
             icon={Users}
             label={t('settings.user.title')}
           />
         </ProtectedGate>
-        <ProtectedGate permission={Permission.SYSTEM_SETTINGS}>
+        <ProtectedGate permission={Permission.SYSTEM_WRITE}>
           <CategoryItem
             category="DATA_TRANSFER"
             icon={Database}
@@ -158,20 +158,22 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
         <Divider />
 
         {/* 班次管理 */}
-        <CategoryItem
-          category="SHIFTS"
-          icon={Clock}
-          label={t('settings.shift.title')}
-        />
+        <ProtectedGate permission={Permission.SYSTEM_WRITE}>
+          <CategoryItem
+            category="SHIFTS"
+            icon={Clock}
+            label={t('settings.shift.title')}
+          />
+        </ProtectedGate>
 
         <Divider />
 
         {/* 系统设置 */}
         <CategoryItem category="LANG" icon={Languages} label={t('settings.language.title')} />
-        <ProtectedGate permission={Permission.MANAGE_PRINTERS}>
+        <ProtectedGate permission={Permission.PRINTERS_MANAGE}>
           <CategoryItem category="PRINTER" icon={Printer} label={t('settings.printer.title')} />
         </ProtectedGate>
-        <ProtectedGate permission={Permission.SYSTEM_SETTINGS}>
+        <ProtectedGate permission={Permission.SYSTEM_WRITE}>
           <CategoryItem
             category="SYSTEM"
             icon={Monitor}

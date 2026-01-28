@@ -241,7 +241,7 @@ export const UserManagement: React.FC = React.memo(() => {
         width: '160px',
         align: 'right',
         render: (user) => (
-          <ProtectedGate permission={Permission.MANAGE_USERS}>
+          <ProtectedGate permission={Permission.USERS_MANAGE}>
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={(e) => {
@@ -319,7 +319,7 @@ export const UserManagement: React.FC = React.memo(() => {
               </p>
             </div>
           </div>
-          <ProtectedGate permission={Permission.MANAGE_USERS}>
+          <ProtectedGate permission={Permission.USERS_MANAGE}>
             <button
               onClick={handleAddUser}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-blue-600/20 hover:bg-blue-700 hover:shadow-blue-600/30 transition-all"

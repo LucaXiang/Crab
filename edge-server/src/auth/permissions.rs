@@ -8,22 +8,51 @@ pub const ALL_PERMISSIONS: &[&str] = &[
     "products:read",
     "products:write",
     "products:delete",
+    "products:manage",
     // Category permissions
     "categories:read",
-    "categories:write",
+    "categories:manage",
+    // Attribute permissions
+    "attributes:read",
+    "attributes:manage",
     // Order permissions
     "orders:read",
     "orders:write",
-    "orders:cancel",
+    "orders:void",
+    "orders:restore",
+    "orders:discount",
+    "orders:refund",
+    "orders:cancel_item",
     // User management permissions
     "users:read",
-    "users:write",
+    "users:manage",
     // Role management permissions
     "roles:read",
     "roles:write",
-    // System permissions
+    // Zone & Table permissions
+    "zones:read",
+    "zones:manage",
+    "tables:read",
+    "tables:manage",
+    "tables:merge_bill",
+    "tables:transfer",
+    // Pricing permissions
+    "pricing:read",
+    "pricing:write",
+    // Statistics permissions
+    "statistics:read",
+    // Printer permissions
+    "printers:read",
+    "printers:manage",
+    // Receipt permissions
+    "receipts:print",
+    "receipts:reprint",
+    // Settings & System permissions
+    "settings:manage",
     "system:read",
     "system:write",
+    // POS operations
+    "pos:cash_drawer",
     // Admin permission (grants all access)
     "all",
 ];
@@ -31,14 +60,51 @@ pub const ALL_PERMISSIONS: &[&str] = &[
 /// Default role permissions
 pub const DEFAULT_ADMIN_PERMISSIONS: &[&str] = &["all"];
 
-pub const DEFAULT_USER_PERMISSIONS: &[&str] = &["products:read", "categories:read"];
+pub const DEFAULT_USER_PERMISSIONS: &[&str] = &[
+    "products:read",
+    "categories:read",
+    "attributes:read",
+    "orders:read",
+    "orders:write",
+    "zones:read",
+    "tables:read",
+    "pricing:read",
+    "statistics:read",
+    "printers:read",
+    "receipts:print",
+];
 
 pub const DEFAULT_MANAGER_PERMISSIONS: &[&str] = &[
     "products:read",
     "products:write",
+    "products:manage",
     "categories:read",
-    "categories:write",
+    "categories:manage",
+    "attributes:read",
+    "attributes:manage",
+    "orders:read",
+    "orders:write",
+    "orders:void",
+    "orders:restore",
+    "orders:discount",
+    "orders:refund",
+    "orders:cancel_item",
     "users:read",
+    "zones:read",
+    "zones:manage",
+    "tables:read",
+    "tables:manage",
+    "tables:merge_bill",
+    "tables:transfer",
+    "pricing:read",
+    "pricing:write",
+    "statistics:read",
+    "printers:read",
+    "printers:manage",
+    "receipts:print",
+    "receipts:reprint",
+    "settings:manage",
+    "pos:cash_drawer",
 ];
 
 /// Get permissions for a role name

@@ -839,7 +839,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                 )}
                 {onVoid && !order.is_retail && (
                   <EscalatableGate
-                    permission={Permission.VOID_ORDER}
+                    permission={Permission.ORDERS_VOID}
                     mode="intercept"
                     description={t('checkout.void.title')}
                     onAuthorized={() => {

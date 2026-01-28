@@ -137,31 +137,55 @@ export type CompletedOrder = HeldOrder;
 export type Permission = string;
 
 export const Permission = {
-  MANAGE_USERS: 'manage_users' as Permission,
-  VOID_ORDER: 'void_order' as Permission,
-  RESTORE_ORDER: 'restore_order' as Permission,
-  MANAGE_PRODUCTS: 'manage_products' as Permission,
-  CREATE_PRODUCT: 'create_product' as Permission,
-  UPDATE_PRODUCT: 'update_product' as Permission,
-  DELETE_PRODUCT: 'delete_product' as Permission,
-  MANAGE_CATEGORIES: 'manage_categories' as Permission,
-  MANAGE_ZONES: 'manage_zones' as Permission,
-  MANAGE_TABLES: 'manage_tables' as Permission,
-  MODIFY_PRICE: 'modify_price' as Permission,
-  APPLY_DISCOUNT: 'apply_discount' as Permission,
-  VIEW_STATISTICS: 'view_statistics' as Permission,
-  MANAGE_PRINTERS: 'manage_printers' as Permission,
-  MANAGE_ATTRIBUTES: 'manage_attributes' as Permission,
-  MANAGE_SETTINGS: 'manage_settings' as Permission,
-  SYSTEM_SETTINGS: 'system_settings' as Permission,
-  PRINT_RECEIPTS: 'print_receipts' as Permission,
-  REPRINT_RECEIPT: 'reprint_receipt' as Permission,
-  REFUND: 'refund' as Permission,
-  DISCOUNT: 'discount' as Permission,
-  CANCEL_ITEM: 'cancel_item' as Permission,
-  OPEN_CASH_DRAWER: 'open_cash_drawer' as Permission,
-  MERGE_BILL: 'merge_bill' as Permission,
-  TRANSFER_TABLE: 'transfer_table' as Permission,
+  // User management
+  USERS_READ: 'users:read' as Permission,
+  USERS_MANAGE: 'users:manage' as Permission,
+  // Product permissions
+  PRODUCTS_READ: 'products:read' as Permission,
+  PRODUCTS_WRITE: 'products:write' as Permission,
+  PRODUCTS_DELETE: 'products:delete' as Permission,
+  PRODUCTS_MANAGE: 'products:manage' as Permission,
+  // Category permissions
+  CATEGORIES_READ: 'categories:read' as Permission,
+  CATEGORIES_MANAGE: 'categories:manage' as Permission,
+  // Attribute permissions
+  ATTRIBUTES_READ: 'attributes:read' as Permission,
+  ATTRIBUTES_MANAGE: 'attributes:manage' as Permission,
+  // Order permissions
+  ORDERS_READ: 'orders:read' as Permission,
+  ORDERS_WRITE: 'orders:write' as Permission,
+  ORDERS_VOID: 'orders:void' as Permission,
+  ORDERS_RESTORE: 'orders:restore' as Permission,
+  ORDERS_DISCOUNT: 'orders:discount' as Permission,
+  ORDERS_REFUND: 'orders:refund' as Permission,
+  ORDERS_CANCEL_ITEM: 'orders:cancel_item' as Permission,
+  // Zone & Table permissions
+  ZONES_READ: 'zones:read' as Permission,
+  ZONES_MANAGE: 'zones:manage' as Permission,
+  TABLES_READ: 'tables:read' as Permission,
+  TABLES_MANAGE: 'tables:manage' as Permission,
+  TABLES_MERGE_BILL: 'tables:merge_bill' as Permission,
+  TABLES_TRANSFER: 'tables:transfer' as Permission,
+  // Pricing permissions
+  PRICING_READ: 'pricing:read' as Permission,
+  PRICING_WRITE: 'pricing:write' as Permission,
+  // Statistics
+  STATISTICS_READ: 'statistics:read' as Permission,
+  // Printer permissions
+  PRINTERS_READ: 'printers:read' as Permission,
+  PRINTERS_MANAGE: 'printers:manage' as Permission,
+  // Receipt permissions
+  RECEIPTS_PRINT: 'receipts:print' as Permission,
+  RECEIPTS_REPRINT: 'receipts:reprint' as Permission,
+  // Settings & System
+  SETTINGS_MANAGE: 'settings:manage' as Permission,
+  SYSTEM_READ: 'system:read' as Permission,
+  SYSTEM_WRITE: 'system:write' as Permission,
+  // Role management
+  ROLES_READ: 'roles:read' as Permission,
+  ROLES_WRITE: 'roles:write' as Permission,
+  // POS operations
+  POS_CASH_DRAWER: 'pos:cash_drawer' as Permission,
 } as const;
 
 // Statistics types
