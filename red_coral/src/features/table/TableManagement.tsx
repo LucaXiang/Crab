@@ -8,7 +8,7 @@ import { createTauriClient } from '@/infrastructure/api';
 import { getErrorMessage } from '@/utils/error';
 import { displayThingId } from '@/utils/formatting';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { toast } from '@/presentation/components/Toast';
@@ -65,7 +65,7 @@ const ZoneList: React.FC = React.memo(() => {
           const results = await Promise.all(
             items.map(async (item) => {
               try {
-                await api.deleteZone(item.id);
+                await getApi().deleteZone(item.id);
                 return { success: true, id: item.id };
               } catch (e: unknown) {
                 return { success: false, id: item.id, error: e };
@@ -255,7 +255,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
-          await Promise.all(items.map((item) => api.deleteTable(item.id)));
+          await Promise.all(items.map((item) => getApi().deleteTable(item.id)));
           toast.success(t('settings.batchDelete.tablesSuccess', { count: items.length }) || '批量删除成功');
           await tableStore.fetchAll();
           setPagination(1, tableStore.items.length);

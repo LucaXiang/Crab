@@ -12,7 +12,7 @@ import { usePermission } from '@/hooks/usePermission';
 import { ManagementHeader } from '@/screens/Settings/components';
 import { PriceRuleWizard } from './PriceRuleWizard';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 export const PriceRuleManagement: React.FC = React.memo(() => {
   const { t } = useI18n();
@@ -55,7 +55,7 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
   const handleDelete = async () => {
     if (!deleteConfirm?.id) return;
     try {
-      await api.deletePriceRule(deleteConfirm.id);
+      await getApi().deletePriceRule(deleteConfirm.id);
       await priceRuleStore.fetchAll(true);
       toast.success(t('settings.price_rule.message.deleted'));
     } catch (e) {

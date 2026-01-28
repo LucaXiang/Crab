@@ -16,7 +16,7 @@ import { toast } from '@/presentation/components/Toast';
 import { formatCurrency } from '@/utils/currency';
 import type { DailyReport } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 // Extracted components
 import { ManagementHeader, FilterBar } from '@/screens/Settings/components';
@@ -40,7 +40,7 @@ export const DailyReportManagement: React.FC = React.memo(() => {
   const loadReports = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.listDailyReports({ limit: 100 });
+      const data = await getApi().listDailyReports({ limit: 100 });
       setReports(data);
     } catch (err) {
       console.error('Failed to load daily reports:', err);

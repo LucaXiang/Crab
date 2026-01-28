@@ -2,18 +2,18 @@ import { createCrudResourceStore } from '@/core/stores/factory/createResourceSto
 import { createTauriClient } from '@/infrastructure/api';
 import type { ProductFull, ProductCreate, ProductUpdate } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 // ProductFull with guaranteed id (contains specs, attributes, tags)
 type ProductEntity = ProductFull & { id: string };
 
 export const useProductStore = createCrudResourceStore<ProductEntity, ProductCreate, ProductUpdate>(
   'product',
-  () => api.listProducts() as Promise<ProductEntity[]>,
+  () => getApi().listProducts() as Promise<ProductEntity[]>,
   {
-    create: (data) => api.createProduct(data) as Promise<ProductEntity>,
-    update: (id, data) => api.updateProduct(id, data) as Promise<ProductEntity>,
-    remove: (id) => api.deleteProduct(id),
+    create: (data) => getApi().createProduct(data) as Promise<ProductEntity>,
+    update: (id, data) => getApi().updateProduct(id, data) as Promise<ProductEntity>,
+    remove: (id) => getApi().deleteProduct(id),
   }
 );
 

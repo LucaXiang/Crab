@@ -11,7 +11,7 @@ import { canDeleteSpec, setDefaultSpec } from './spec-utils';
 import { useProductStore } from './store';
 import type { EmbeddedSpec } from '@/core/domain/types';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 interface SpecificationManagementModalProps {
   isOpen: boolean;
@@ -56,7 +56,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
   const saveSpecs = async (newSpecs: EmbeddedSpec[]) => {
     setIsSaving(true);
     try {
-      const updated = await api.updateProduct(productId, { specs: newSpecs });
+      const updated = await getApi().updateProduct(productId, { specs: newSpecs });
       setSpecs(newSpecs);
 
       // Optimistic update - sync mechanism will also update via broadcast

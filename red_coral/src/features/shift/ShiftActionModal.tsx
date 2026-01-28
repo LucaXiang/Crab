@@ -20,7 +20,7 @@ import { Currency, formatCurrency } from '@/utils/currency';
 import { Numpad } from '@/presentation/components/ui/Numpad';
 import type { Shift } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 interface ShiftActionModalProps {
   open: boolean;

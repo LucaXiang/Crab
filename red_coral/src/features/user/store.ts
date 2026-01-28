@@ -5,12 +5,12 @@ import type { Employee } from '@/core/domain/types/api';
 // Employee.id is optional, but createResourceStore requires { id: string }
 type EmployeeEntity = Employee & { id: string };
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 export const useEmployeeStore = createResourceStore<EmployeeEntity>(
   'employee',
   async () => {
-    const employees = await api.listEmployees();
+    const employees = await getApi().listEmployees();
     return employees as EmployeeEntity[];
   }
 );

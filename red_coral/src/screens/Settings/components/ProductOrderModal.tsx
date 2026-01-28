@@ -6,7 +6,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 import { toast } from '@/presentation/components/Toast';
 import { Product } from '@/core/domain/types';
 import DefaultImage from '@/assets/reshot.svg';
@@ -144,7 +144,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const allProducts = await api.listProducts();
+      const allProducts = await getApi().listProducts();
       // Filter by category locally
       const filteredProducts = allProducts.filter(p => p.category === category);
       setProducts(filteredProducts);
@@ -186,7 +186,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
         id: product.id,
         sort_order: index,
       }));
-      await api.batchUpdateProductSortOrder(updates);
+      await getApi().batchUpdateProductSortOrder(updates);
       refreshData();
       toast.success(t('common.message.save_success'));
       onClose();

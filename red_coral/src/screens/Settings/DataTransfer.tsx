@@ -6,7 +6,7 @@ import { toast } from '@/presentation/components/Toast';
 import { createTauriClient, invokeApi } from '@/infrastructure/api';
 import { getErrorMessage } from '@/utils/error';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 import { useProductStore, useCategoryStore, useZoneStore, useTableStore } from '@/core/stores/resources';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 

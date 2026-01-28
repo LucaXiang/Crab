@@ -2,11 +2,11 @@ import { createResourceStore } from '@/core/stores/factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
 import type { Tag } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 export const useTagStore = createResourceStore<Tag & { id: string }>(
   'tag',
-  () => api.listTags() as Promise<(Tag & { id: string })[]>
+  () => getApi().listTags() as Promise<(Tag & { id: string })[]>
 );
 
 // Convenience hooks

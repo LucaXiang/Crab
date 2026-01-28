@@ -5,7 +5,7 @@ import { useSettingsModal, useDataVersion } from '@/core/stores/settings/useSett
 import { useTagStore } from './store';
 import { createTauriClient } from '@/infrastructure/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
 import { Permission, Tag } from '@/core/domain/types';
@@ -78,7 +78,7 @@ export const TagManagement: React.FC = React.memo(() => {
 
       // Update each tag's display_order
       for (const update of updates) {
-        await api.updateTag(update.id, { display_order: update.display_order });
+        await getApi().updateTag(update.id, { display_order: update.display_order });
       }
 
       // Refresh tags from store

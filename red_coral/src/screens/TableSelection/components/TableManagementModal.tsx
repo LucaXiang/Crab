@@ -3,7 +3,7 @@ import { X, ArrowLeftRight, Users, Check, ArrowLeft, LayoutGrid, Split, Minus, P
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 import { Table, Zone, HeldOrder, Permission, AppliedRule } from '@/core/domain/types';
 import { Currency } from '@/utils/currency';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
@@ -48,7 +48,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         const loadTables = async () => {
             if (!activeZoneId) return;
             try {
-                const tables = await api.listTables();
+                const tables = await getApi().listTables();
                 setZoneTables(tables);
             } catch (e) {
                 toast.error(getErrorMessage(e));

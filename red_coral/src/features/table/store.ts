@@ -2,11 +2,11 @@ import { createResourceStore } from '@/core/stores/factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
 import type { Table } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 export const useTableStore = createResourceStore<Table & { id: string }>(
   'table',
-  () => api.listTables() as Promise<(Table & { id: string })[]>
+  () => getApi().listTables() as Promise<(Table & { id: string })[]>
 );
 
 // Convenience hooks

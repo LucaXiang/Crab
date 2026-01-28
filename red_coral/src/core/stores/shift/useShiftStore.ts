@@ -11,7 +11,7 @@ import { create } from 'zustand';
 import { createTauriClient } from '@/infrastructure/api';
 import type { Shift, ShiftCreate, ShiftClose, ShiftForceClose } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 interface ShiftStore {
   // State
@@ -44,7 +44,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
   fetchCurrentShift: async (operatorId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const shift = await api.getCurrentShift(operatorId);
+      const shift = await getApi().getCurrentShift(operatorId);
       set({ currentShift: shift, isLoading: false });
 
       // 如果没有班次，标记需要开班
@@ -69,7 +69,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
   openShift: async (data: ShiftCreate) => {
     set({ isLoading: true, error: null });
     try {
-      const shift = await api.openShift(data);
+      const shift = await getApi().openShift(data);
       set({ currentShift: shift, isLoading: false, needsOpenShift: false });
       return shift;
     } catch (error) {
@@ -88,7 +88,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
   closeShift: async (shiftId: string, data: ShiftClose) => {
     set({ isLoading: true, error: null });
     try {
-      const shift = await api.closeShift(shiftId, data);
+      const shift = await getApi().closeShift(shiftId, data);
       set({ currentShift: null, isLoading: false });
       return shift;
     } catch (error) {
@@ -107,7 +107,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
   forceCloseShift: async (shiftId: string, data: ShiftForceClose) => {
     set({ isLoading: true, error: null });
     try {
-      const shift = await api.forceCloseShift(shiftId, data);
+      const shift = await getApi().forceCloseShift(shiftId, data);
       set({ currentShift: null, isLoading: false });
       return shift;
     } catch (error) {

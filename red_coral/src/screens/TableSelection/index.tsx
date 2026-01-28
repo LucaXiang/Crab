@@ -5,7 +5,7 @@ import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
 import { getErrorMessage } from '@/utils/error';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 import { HeldOrder, Table, Zone } from '@/core/domain/types';
 import { TableFilter, TableSelectionScreenProps } from './types';
 import { TableCard } from './TableCard';
@@ -71,12 +71,12 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
     useEffect(() => {
       const init = async () => {
         try {
-          const zs = await api.listZones();
+          const zs = await getApi().listZones();
           setZones(zs);
           setActiveZoneId((prev) => prev || 'ALL');
           // If initializing to ALL, fetch all tables
           if (!activeZoneId) {
-            const tables = await api.listTables();
+            const tables = await getApi().listTables();
             setZoneTables(tables);
           }
         } catch (e) {
@@ -92,7 +92,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
         if (!activeZoneId) return;
         setLoading(true);
         try {
-          const tables = await api.listTables();
+          const tables = await getApi().listTables();
           setZoneTables(tables);
         } catch (e) {
           toast.error(getErrorMessage(e));

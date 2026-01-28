@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createTauriClient } from '@/infrastructure/api';
 import type { PrintDestination, PrintDestinationCreate, PrintDestinationUpdate } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 type PrintDestinationEntity = PrintDestination & { id: string };
 
@@ -46,7 +46,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
 
     set({ isLoading: true, error: null });
     try {
-      const destinations = await api.listPrintDestinations() as PrintDestinationEntity[];
+      const destinations = await getApi().listPrintDestinations() as PrintDestinationEntity[];
       const safeDestinations = destinations ?? [];
       safeDestinations.sort((a, b) => a.name.localeCompare(b.name));
       set({ items: safeDestinations, isLoading: false, isLoaded: true });
@@ -71,7 +71,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
   create: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      const newDestination = await api.createPrintDestination(data) as PrintDestinationEntity;
+      const newDestination = await getApi().createPrintDestination(data) as PrintDestinationEntity;
       await get().fetchAll(true);
       return newDestination || get().items[get().items.length - 1];
     } catch (e: unknown) {
@@ -85,7 +85,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
   update: async (id, data) => {
     set({ isLoading: true, error: null });
     try {
-      await api.updatePrintDestination(id, data);
+      await getApi().updatePrintDestination(id, data);
       await get().fetchAll(true);
       const updated = get().items.find((p) => p.id === id);
       if (!updated) {
@@ -103,7 +103,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
   remove: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      await api.deletePrintDestination(id);
+      await getApi().deletePrintDestination(id);
       set((state) => ({
         items: state.items.filter((item) => item.id !== id),
         isLoading: false,

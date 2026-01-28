@@ -5,7 +5,7 @@ import { createTauriClient } from '@/infrastructure/api';
 import { useProductStore } from '@/features/product';
 import { toast } from '../Toast';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 import { ItemConfiguratorModal } from './ItemConfiguratorModal';
 
 interface CartItemDetailModalProps {
@@ -72,7 +72,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
             let categoryAttributes: Attribute[] = [];
             if (productFull.category) {
                 try {
-                    categoryAttributes = await api.listCategoryAttributes(productFull.category);
+                    categoryAttributes = await getApi().listCategoryAttributes(productFull.category);
                     // Filter out duplicates (product-level binding takes precedence)
                     categoryAttributes = categoryAttributes.filter(
                         attr => !productAttrIds.has(String(attr.id))

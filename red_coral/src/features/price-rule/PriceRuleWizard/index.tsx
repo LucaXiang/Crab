@@ -14,7 +14,7 @@ import { Step5Naming } from './Step5Naming';
 import { Step6Advanced } from './Step6Advanced';
 import { WizardProgress } from './WizardProgress';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 export interface WizardState {
   // Step 1
@@ -202,10 +202,10 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({
       const payload = buildPayload();
 
       if (isEditing && editingRule?.id) {
-        await api.updatePriceRule(editingRule.id, payload);
+        await getApi().updatePriceRule(editingRule.id, payload);
         toast.success(t('settings.price_rule.message.updated'));
       } else {
-        await api.createPriceRule(payload);
+        await getApi().createPriceRule(payload);
         toast.success(t('settings.price_rule.message.created'));
       }
       onSuccess();

@@ -1,7 +1,7 @@
 import { createTauriClient } from '@/infrastructure/api';
 import { useZoneStore } from './store';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 export interface CreateZoneInput {
   name: string;
@@ -18,7 +18,7 @@ export interface UpdateZoneInput {
  * Create a new zone
  */
 export async function createZone(input: CreateZoneInput): Promise<void> {
-  await api.createZone({
+  await getApi().createZone({
     name: input.name,
     description: input.description,
   });
@@ -30,7 +30,7 @@ export async function createZone(input: CreateZoneInput): Promise<void> {
  * Update an existing zone
  */
 export async function updateZone(id: string, input: UpdateZoneInput): Promise<void> {
-  await api.updateZone(String(id), {
+  await getApi().updateZone(String(id), {
     name: input.name,
     description: input.description,
     is_active: input.is_active,
@@ -43,7 +43,7 @@ export async function updateZone(id: string, input: UpdateZoneInput): Promise<vo
  * Delete a zone
  */
 export async function deleteZone(id: string): Promise<void> {
-  await api.deleteZone(String(id));
+  await getApi().deleteZone(String(id));
   // Refresh zones from server
   await useZoneStore.getState().fetchAll(true);
 }

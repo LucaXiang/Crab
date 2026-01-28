@@ -3,7 +3,7 @@ import { useProductStore } from './store';
 import type { Product, Category, EmbeddedSpec, PrintState } from '@/core/domain/types';
 import { syncAttributeBindings } from '@/screens/Settings/utils';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 export interface ProductFormData {
   id?: string;
@@ -62,7 +62,7 @@ export async function createProduct(
     }],
   };
 
-  const created = await api.createProduct(productPayload);
+  const created = await getApi().createProduct(productPayload);
   const productId = created?.id || '';
 
   // Optimistic update: add to ProductStore
@@ -81,7 +81,7 @@ export async function createProduct(
     const defaultOptionIdx = defaultOptionIds.length > 0 ? parseInt(defaultOptionIds[0], 10) : undefined;
 
     try {
-      await api.bindProductAttribute({
+      await getApi().bindProductAttribute({
         product_id: productId,
         attribute_id: attributeId,
         is_required: false,
@@ -106,7 +106,7 @@ export async function createProduct(
         external_id: spec.external_id ?? null,
       }));
 
-      await api.updateProduct(productId, {
+      await getApi().updateProduct(productId, {
         specs: embeddedSpecs,
       });
     } catch (error) {
@@ -166,7 +166,7 @@ export async function updateProduct(
     specs: updatedSpecs,
   };
 
-  const updated = await api.updateProduct(id, updatePayload);
+  const updated = await getApi().updateProduct(id, updatePayload);
 
   // Update ProductStore cache with API response data
   if (updated?.id) {
@@ -179,7 +179,7 @@ export async function updateProduct(
   // Get existing bindings
   let existingBindings: { attributeId: string; id: string }[] = [];
   try {
-    const productAttrs = await api.fetchProductAttributes(id);
+    const productAttrs = await getApi().fetchProductAttributes(id);
     // API returns relation records with 'to' pointing to attribute
     existingBindings = (productAttrs ?? []).map((pa) => ({
       attributeId: (pa as unknown as { to: string }).to,
@@ -194,10 +194,10 @@ export async function updateProduct(
     selectedAttributeIds,
     formData.attribute_default_options || {},
     existingBindings,
-    async (attrId) => api.unbindProductAttribute(String(attrId)),
+    async (attrId) => getApi().unbindProductAttribute(String(attrId)),
     async (attrId, defaultOptionIds, index) => {
       const defaultOptionIdx = defaultOptionIds.length > 0 ? parseInt(defaultOptionIds[0], 10) : undefined;
-      await api.bindProductAttribute({
+      await getApi().bindProductAttribute({
         product_id: id,
         attribute_id: attrId,
         is_required: false,
@@ -214,7 +214,7 @@ export async function updateProduct(
  * Delete a product
  */
 export async function deleteProduct(id: string): Promise<{ success: boolean }> {
-  await api.deleteProduct(id);
+  await getApi().deleteProduct(id);
   // Optimistic update: remove from ProductStore
   useProductStore.getState().optimisticRemove(id);
   return { success: true };

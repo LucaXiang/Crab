@@ -2,12 +2,12 @@ import { createResourceStore } from '@/core/stores/factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
 import type { Role } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 export const useRoleStore = createResourceStore<Role & { id: string }>(
   'role',
   async () => {
-    const data = await api.listRoles();
+    const data = await getApi().listRoles();
     return data.roles as (Role & { id: string })[];
   }
 );

@@ -17,7 +17,7 @@ import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { formatCurrency } from '@/utils/currency';
 import type { Shift, ShiftStatus } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 // Extracted components
 import { ManagementHeader, FilterBar } from '@/screens/Settings/components';
@@ -45,8 +45,8 @@ export const ShiftManagement: React.FC = React.memo(() => {
     setLoading(true);
     try {
       const [allShifts, current] = await Promise.all([
-        api.listShifts({ limit: 50 }),
-        user ? api.getCurrentShift(user.id) : Promise.resolve(null),
+        getApi().listShifts({ limit: 50 }),
+        user ? getApi().getCurrentShift(user.id) : Promise.resolve(null),
       ]);
       setShifts(allShifts);
       setCurrentShift(current);

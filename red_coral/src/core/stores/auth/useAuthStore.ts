@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import { createTauriClient, type LoginRequest } from '@/infrastructure/api';
 import type { User } from '@/core/domain/types';
 
-// API Client (use TauriApiClient directly for full CRUD support)
-const api = createTauriClient();
+// Lazy getter to break circular dependency:
+// tauri-client.ts imports useAuthStore → useAuthStore imports createTauriClient
+// createTauriClient() is already a singleton, so repeated calls are free.
+const getApi = () => createTauriClient();
 
 interface AuthStore {
   // State
@@ -53,7 +55,7 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
 
         try {
-          const { token, user: userData } = await api.login({ username, password });
+          const { token, user: userData } = await getApi().login({ username, password });
 
           // UserInfo from backend already has all fields we need
           const user: User = {
@@ -124,7 +126,7 @@ export const useAuthStore = create<AuthStore>()(
        */
       refreshToken: async () => {
         try {
-          await api.refreshToken();
+          await getApi().refreshToken();
         } catch {
           get().logout();
         }
@@ -179,7 +181,7 @@ export const useAuthStore = create<AuthStore>()(
       // ==================== User Management ====================
 
       fetchUsers: async () => {
-        const employees = await api.listEmployees();
+        const employees = await getApi().listEmployees();
         // Convert Employee -> User for display
         // Note: role_name is extracted from role_id (e.g., "role:admin" -> "admin")
         return employees.map((e) => ({
@@ -195,7 +197,7 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       createUser: async (data: { username: string; password: string; displayName?: string; role: string }) => {
-        const result = await api.createEmployee({
+        const result = await getApi().createEmployee({
           username: data.username,
           password: data.password,
           role: data.role,
@@ -213,7 +215,7 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       updateUser: async (userId: string, data: { displayName?: string; role?: string; isActive?: boolean }) => {
-        const result = await api.updateEmployee(userId, {
+        const result = await getApi().updateEmployee(userId, {
           role: data.role,
           is_active: data.isActive,
         });
@@ -230,11 +232,11 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       resetPassword: async (userId: string, newPassword: string) => {
-        await api.updateEmployee(userId, { password: newPassword });
+        await getApi().updateEmployee(userId, { password: newPassword });
       },
 
       deleteUser: async (userId: string) => {
-        await api.deleteEmployee(userId);
+        await getApi().deleteEmployee(userId);
       },
     })
 );

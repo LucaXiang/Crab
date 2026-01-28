@@ -2,11 +2,11 @@ import { createResourceStore } from '@/core/stores/factory/createResourceStore';
 import { createTauriClient } from '@/infrastructure/api';
 import type { PriceRule } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 export const usePriceRuleStore = createResourceStore<PriceRule & { id: string }>(
   'price_rule',
-  () => api.listPriceRules() as Promise<(PriceRule & { id: string })[]>
+  () => getApi().listPriceRules() as Promise<(PriceRule & { id: string })[]>
 );
 
 // Convenience hooks

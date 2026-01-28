@@ -13,7 +13,7 @@ import { useProductStore } from './store';
 import { useCategoryStore } from '@/core/stores/resources';
 import { createTauriClient } from '@/infrastructure/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -120,7 +120,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
         try {
           const ids = items.map((item) => item.id).filter((id): id is string => id != null);
-          await api.bulkDeleteProducts(ids);
+          await getApi().bulkDeleteProducts(ids);
           // Optimistic update: remove from ProductStore
           items.forEach((item) => {
             useProductStore.getState().optimisticRemove(item.id);

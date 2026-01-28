@@ -8,7 +8,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { toast } from '@/presentation/components/Toast';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 interface GenerateReportModalProps {
   open: boolean;
@@ -41,7 +41,7 @@ export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
 
     setLoading(true);
     try {
-      await api.generateDailyReport({
+      await getApi().generateDailyReport({
         business_date: businessDate,
         note: note || undefined,
       });

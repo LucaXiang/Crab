@@ -11,7 +11,7 @@ import { create } from 'zustand';
 import { createTauriClient } from '@/infrastructure/api';
 import type { StoreInfo, StoreInfoUpdate } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 interface SyncPayload {
   id: string;
@@ -64,7 +64,7 @@ export const useStoreInfoStore = create<StoreInfoState>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const info = await api.getStoreInfo();
+      const info = await getApi().getStoreInfo();
       set({ info, isLoading: false, isLoaded: true });
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to fetch store info';
@@ -79,7 +79,7 @@ export const useStoreInfoStore = create<StoreInfoState>((set, get) => ({
   updateStoreInfo: async (data: StoreInfoUpdate) => {
     set({ isLoading: true, error: null });
     try {
-      const updated = await api.updateStoreInfo(data);
+      const updated = await getApi().updateStoreInfo(data);
       set({ info: updated, isLoading: false, isLoaded: true });
       return updated;
     } catch (e: unknown) {

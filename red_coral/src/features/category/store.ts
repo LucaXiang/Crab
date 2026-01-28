@@ -2,18 +2,18 @@ import { createCrudResourceStore } from '@/core/stores/factory/createResourceSto
 import { createTauriClient } from '@/infrastructure/api';
 import type { Category, CategoryCreate, CategoryUpdate } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 // Category with guaranteed id
 type CategoryEntity = Category & { id: string };
 
 export const useCategoryStore = createCrudResourceStore<CategoryEntity, CategoryCreate, CategoryUpdate>(
   'category',
-  () => api.listCategories() as Promise<CategoryEntity[]>,
+  () => getApi().listCategories() as Promise<CategoryEntity[]>,
   {
-    create: (data) => api.createCategory(data) as Promise<CategoryEntity>,
-    update: (id, data) => api.updateCategory(id, data) as Promise<CategoryEntity>,
-    remove: (id) => api.deleteCategory(id),
+    create: (data) => getApi().createCategory(data) as Promise<CategoryEntity>,
+    update: (id, data) => getApi().updateCategory(id, data) as Promise<CategoryEntity>,
+    remove: (id) => getApi().deleteCategory(id),
   }
 );
 

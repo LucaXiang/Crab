@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { createTauriClient } from '@/infrastructure/api';
 import type { Attribute, AttributeOption } from '@/core/domain/types/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 // Extended option type with index for UI purposes
 interface AttributeOptionWithIndex extends AttributeOption {
@@ -114,7 +114,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const attributes = await api.listAttributes() as AttributeEntity[];
+      const attributes = await getApi().listAttributes() as AttributeEntity[];
       set({ items: attributes ?? [], isLoading: false, isLoaded: true });
     } catch (e: unknown) {
       const errorMsg = (e instanceof Error ? e.message : '') || 'Failed to fetch attributes';
@@ -145,7 +145,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       // Options are embedded in Attribute, fetch the attribute to get its options
-      const template = await api.getAttribute(attributeId);
+      const template = await getApi().getAttribute(attributeId);
       const opts = (template.options || []) as AttributeOption[];
       const optionsWithIndex: AttributeOptionWithIndex[] = opts.map((opt, index) => ({
         ...opt,
@@ -167,7 +167,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   // CRUD operations
   createAttribute: async (params) => {
     try {
-      await api.createAttribute(params);
+      await getApi().createAttribute(params);
       await get().fetchAll(true);
     } catch (e: unknown) {
       console.error('[Store] createAttribute failed:', e);
@@ -177,7 +177,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   updateAttribute: async (params) => {
     try {
       const { id, ...data } = params;
-      await api.updateAttribute(id, data);
+      await getApi().updateAttribute(id, data);
       await get().fetchAll(true);
     } catch (e: unknown) {
       console.error('[Store] updateAttribute failed:', e);
@@ -186,7 +186,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   },
   deleteAttribute: async (id) => {
     try {
-      await api.deleteAttribute(id);
+      await getApi().deleteAttribute(id);
       await get().fetchAll(true);
     } catch (e: unknown) {
       console.error('[Store] deleteAttribute failed:', e);
@@ -196,7 +196,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   createOption: async (params) => {
     try {
       const { attributeId, ...data } = params;
-      const template = await api.addAttributeOption(attributeId, data);
+      const template = await getApi().addAttributeOption(attributeId, data);
       // Update local options cache
       const opts = (template.options || []).map((opt, index) => ({
         ...opt,
@@ -217,7 +217,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   updateOption: async (params) => {
     try {
       const { attributeId, index, ...data } = params;
-      const template = await api.updateAttributeOption(attributeId, index, data);
+      const template = await getApi().updateAttributeOption(attributeId, index, data);
       // Update local options cache
       const opts = (template.options || []).map((opt, idx) => ({
         ...opt,
@@ -237,7 +237,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   },
   deleteOption: async (attributeId, index) => {
     try {
-      const template = await api.deleteAttributeOption(attributeId, index);
+      const template = await getApi().deleteAttributeOption(attributeId, index);
       // Update local options cache
       const opts = (template.options || []).map((opt, idx) => ({
         ...opt,
@@ -269,7 +269,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       });
 
       // Single API call to update all options
-      await api.updateAttribute(attributeId, { options: reorderedOptions });
+      await getApi().updateAttribute(attributeId, { options: reorderedOptions });
 
       // Update local state directly (no extra API calls)
       set((state) => {
@@ -292,7 +292,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   bindProductAttribute: async (params) => {
     try {
       // Note: default_option_idx is now on the Attribute itself, not on the binding
-      await api.bindProductAttribute({
+      await getApi().bindProductAttribute({
         product_id: params.product_id,
         attribute_id: params.attribute_id,
         is_required: params.is_required,
@@ -305,7 +305,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   },
   unbindProductAttribute: async (bindingId) => {
     try {
-      await api.unbindProductAttribute(bindingId);
+      await getApi().unbindProductAttribute(bindingId);
     } catch (e: unknown) {
       console.error('[Store] unbindProductAttribute failed:', e);
       throw e;

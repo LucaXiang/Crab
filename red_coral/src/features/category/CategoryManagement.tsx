@@ -5,7 +5,7 @@ import { useSettingsModal, useDataVersion } from '@/core/stores/settings/useSett
 import { useCategoryStore } from './store';
 import { createTauriClient } from '@/infrastructure/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { toast } from '@/presentation/components/Toast';
 import { Permission, Category } from '@/core/domain/types';
@@ -73,7 +73,7 @@ const CategoryList: React.FC<CategoryListProps> = React.memo(({
         id: cat.id,
         sort_order: idx
       }));
-      await api.batchUpdateCategorySortOrder(updates);
+      await getApi().batchUpdateCategorySortOrder(updates);
 
       // Refresh categories from store
       await categoryStore.fetchAll();

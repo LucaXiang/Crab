@@ -66,7 +66,7 @@ import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 // Services
 import { createTauriClient } from '@/infrastructure/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 
 // Hooks
@@ -235,7 +235,7 @@ export const POSScreen: React.FC = () => {
     let mounted = true;
     const check = async () => {
       try {
-        const ok = await api.isAvailable();
+        const ok = await getApi().isAvailable();
         if (mounted) setIsDbOnline(ok);
       } catch {
         if (mounted) setIsDbOnline(false);
@@ -312,7 +312,7 @@ export const POSScreen: React.FC = () => {
         let categoryAttributes: Attribute[] = [];
         if (productFull.category) {
           try {
-            categoryAttributes = await api.listCategoryAttributes(productFull.category);
+            categoryAttributes = await getApi().listCategoryAttributes(productFull.category);
             // Filter out duplicates (product-level binding takes precedence)
             categoryAttributes = categoryAttributes.filter(
               attr => !productAttrIds.has(String(attr.id))

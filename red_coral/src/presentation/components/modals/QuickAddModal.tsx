@@ -13,7 +13,7 @@ import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDe
 import { ProductOptionsModal } from '@/presentation/components/modals/ProductOptionsModal';
 import { createTauriClient } from '@/infrastructure/api';
 
-const api = createTauriClient();
+const getApi = () => createTauriClient();
 
 interface QuickAddModalProps {
   onClose: () => void;
@@ -164,7 +164,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       let categoryAttributes: Attribute[] = [];
       if (productFull.category) {
         try {
-          categoryAttributes = await api.listCategoryAttributes(productFull.category);
+          categoryAttributes = await getApi().listCategoryAttributes(productFull.category);
           categoryAttributes = categoryAttributes.filter(
             attr => !productAttrIds.has(String(attr.id))
           );
