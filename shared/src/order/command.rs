@@ -39,11 +39,8 @@ pub enum OrderCommandPayload {
         is_retail: bool,
     },
 
-    /// Complete an order
-    CompleteOrder {
-        order_id: String,
-        receipt_number: String,
-    },
+    /// Complete an order (receipt_number from snapshot)
+    CompleteOrder { order_id: String },
 
     /// Void an order
     VoidOrder {
@@ -144,8 +141,6 @@ pub enum OrderCommandPayload {
         order_id: String,
         target_table_id: String,
         target_table_name: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        target_zone_name: Option<String>,
     },
 
     /// Merge two orders
@@ -155,11 +150,9 @@ pub enum OrderCommandPayload {
     },
 
     // ========== Other Operations ==========
-    /// Update order info
+    /// Update order info (receipt_number is immutable - set at OpenTable)
     UpdateOrderInfo {
         order_id: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        receipt_number: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         guest_count: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]

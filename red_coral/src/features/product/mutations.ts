@@ -58,7 +58,7 @@ export async function createProduct(
       is_active: true,
       is_root: true,
       external_id: externalId ?? null,
-      receipt_name: null,
+      receipt_name: undefined,
     }],
   };
 
@@ -146,7 +146,7 @@ export async function updateProduct(
         is_active: true,
         is_root: true,
         external_id: externalId ?? null,
-        receipt_name: null,
+        receipt_name: undefined,
       }];
 
   const updatePayload = {
@@ -169,8 +169,8 @@ export async function updateProduct(
   const updated = await api.updateProduct(id, updatePayload);
 
   // Update ProductStore cache with API response data
-  if (updated) {
-    useProductStore.getState().optimisticUpdate(id, () => updated as Product);
+  if (updated?.id) {
+    useProductStore.getState().optimisticUpdate(id, () => updated as Product & { id: string });
   }
 
   // Handle attribute bindings

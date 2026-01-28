@@ -218,7 +218,7 @@ impl CommandHandler for OpenTableAction {
         snapshot.zone_name = self.zone_name.clone();
         snapshot.guest_count = self.guest_count;
         snapshot.is_retail = self.is_retail;
-        snapshot.receipt_number = Some(self.receipt_number.clone());
+        snapshot.receipt_number = self.receipt_number.clone();
         snapshot.status = OrderStatus::Active;
         snapshot.start_time = metadata.timestamp;
         snapshot.created_at = metadata.timestamp;
@@ -247,7 +247,7 @@ impl CommandHandler for OpenTableAction {
                 zone_name: self.zone_name.clone(),
                 guest_count: self.guest_count,
                 is_retail: self.is_retail,
-                receipt_number: Some(self.receipt_number.clone()),
+                receipt_number: self.receipt_number.clone(),
             },
         );
 

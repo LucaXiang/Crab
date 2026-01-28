@@ -188,7 +188,7 @@ impl OrderArchiveService {
         events: &[OrderEvent],
     ) -> ArchiveResult<()> {
         // 0. Check idempotency - skip if already archived
-        let receipt = snapshot.receipt_number.clone().unwrap_or_default();
+        let receipt = snapshot.receipt_number.clone();
         let exists: Option<bool> = self
             .db
             .query("SELECT count() > 0 AS exists FROM order WHERE receipt_number = $receipt GROUP ALL")
@@ -546,13 +546,7 @@ impl OrderArchiveService {
         let mut hasher = Sha256::new();
         hasher.update(prev_hash.as_bytes());
         hasher.update(snapshot.order_id.as_bytes());
-        hasher.update(
-            snapshot
-                .receipt_number
-                .as_deref()
-                .unwrap_or("")
-                .as_bytes(),
-        );
+        hasher.update(snapshot.receipt_number.as_bytes());
         hasher.update(format!("{:?}", snapshot.status).as_bytes());
         hasher.update(last_event_hash.as_bytes());
         format!("{:x}", hasher.finalize())
@@ -594,7 +588,7 @@ impl OrderArchiveService {
 
         Ok(SurrealOrder {
             id: None,
-            receipt_number: snapshot.receipt_number.clone().unwrap_or_default(),
+            receipt_number: snapshot.receipt_number.clone(),
             zone_name: snapshot.zone_name.clone(),
             table_name: snapshot.table_name.clone(),
             status,
@@ -657,7 +651,7 @@ mod tests {
             paid_amount: 100.0,
             remaining_amount: 0.0,
             paid_item_quantities: std::collections::HashMap::new(),
-            receipt_number: Some("R001".to_string()),
+            receipt_number: "R001".to_string(),
             is_pre_payment: false,
             order_rule_discount_amount: None,
             order_rule_surcharge_amount: None,
@@ -691,7 +685,7 @@ mod tests {
                 zone_name: None,
                 guest_count: 2,
                 is_retail: false,
-                receipt_number: None,
+                receipt_number: "RCP-TEST".to_string(),
             },
         }
     }
@@ -741,7 +735,7 @@ mod tests {
             zone_name: None,
             guest_count: 2,
             is_retail: false,
-            receipt_number: None,
+            receipt_number: "RCP-TEST".to_string(),
         };
 
         let hash1 = compute_event_hash_standalone(&event1);
@@ -759,7 +753,7 @@ mod tests {
         let mut hasher = Sha256::new();
         hasher.update(prev_hash.as_bytes());
         hasher.update(snapshot.order_id.as_bytes());
-        hasher.update(snapshot.receipt_number.as_deref().unwrap_or("").as_bytes());
+        hasher.update(snapshot.receipt_number.as_bytes());
         hasher.update(format!("{:?}", snapshot.status).as_bytes());
         hasher.update(last_event_hash.as_bytes());
         format!("{:x}", hasher.finalize())

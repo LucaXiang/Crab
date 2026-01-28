@@ -64,7 +64,7 @@ mod tests {
                 zone_name: Some("Zone 1".to_string()),
                 guest_count: 4,
                 is_retail: false,
-                receipt_number: None,
+                receipt_number: "RCP-TEST-001".to_string(),
             },
         );
 

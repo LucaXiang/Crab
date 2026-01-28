@@ -9,10 +9,10 @@ use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, Ord
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// UpdateOrderInfo action
+/// Note: receipt_number is immutable (set at OpenTable), not updatable here
 #[derive(Debug, Clone)]
 pub struct UpdateOrderInfoAction {
     pub order_id: String,
-    pub receipt_number: Option<String>,
     pub guest_count: Option<i32>,
     pub table_name: Option<String>,
     pub is_pre_payment: Option<bool>,
@@ -43,8 +43,7 @@ impl CommandHandler for UpdateOrderInfoAction {
         }
 
         // 3. Validate that at least one field is being updated
-        if self.receipt_number.is_none()
-            && self.guest_count.is_none()
+        if self.guest_count.is_none()
             && self.table_name.is_none()
             && self.is_pre_payment.is_none()
         {
@@ -75,7 +74,6 @@ impl CommandHandler for UpdateOrderInfoAction {
             Some(metadata.timestamp),
             OrderEventType::OrderInfoUpdated,
             EventPayload::OrderInfoUpdated {
-                receipt_number: self.receipt_number.clone(),
                 guest_count: self.guest_count,
                 table_name: self.table_name.clone(),
                 is_pre_payment: self.is_pre_payment,
@@ -123,8 +121,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-            receipt_number: None,
-            guest_count: Some(4),
+                        guest_count: Some(4),
             table_name: None,
             is_pre_payment: None,
         };
@@ -138,13 +135,11 @@ mod tests {
         assert_eq!(event.event_type, OrderEventType::OrderInfoUpdated);
 
         if let EventPayload::OrderInfoUpdated {
-            receipt_number,
             guest_count,
             table_name,
             is_pre_payment,
         } = &event.payload
         {
-            assert_eq!(*receipt_number, None);
             assert_eq!(*guest_count, Some(4));
             assert_eq!(*table_name, None);
             assert_eq!(*is_pre_payment, None);
@@ -166,7 +161,6 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-            receipt_number: Some("R-001".to_string()),
             guest_count: Some(6),
             table_name: Some("VIP Room".to_string()),
             is_pre_payment: Some(true),
@@ -177,13 +171,11 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderInfoUpdated {
-            receipt_number,
             guest_count,
             table_name,
             is_pre_payment,
         } = &events[0].payload
         {
-            assert_eq!(receipt_number.as_deref(), Some("R-001"));
             assert_eq!(*guest_count, Some(6));
             assert_eq!(table_name.as_deref(), Some("VIP Room"));
             assert_eq!(*is_pre_payment, Some(true));
@@ -205,8 +197,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-            receipt_number: None,
-            guest_count: None,
+                        guest_count: None,
             table_name: None,
             is_pre_payment: None,
         };
@@ -230,8 +221,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-            receipt_number: None,
-            guest_count: Some(0),
+                        guest_count: Some(0),
             table_name: None,
             is_pre_payment: None,
         };
@@ -255,8 +245,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-            receipt_number: None,
-            guest_count: Some(-1),
+                        guest_count: Some(-1),
             table_name: None,
             is_pre_payment: None,
         };
@@ -281,8 +270,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-            receipt_number: None,
-            guest_count: Some(4),
+                        guest_count: Some(4),
             table_name: None,
             is_pre_payment: None,
         };
@@ -307,8 +295,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-            receipt_number: None,
-            guest_count: Some(4),
+                        guest_count: Some(4),
             table_name: None,
             is_pre_payment: None,
         };
@@ -329,8 +316,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "nonexistent".to_string(),
-            receipt_number: None,
-            guest_count: Some(4),
+                        guest_count: Some(4),
             table_name: None,
             is_pre_payment: None,
         };
@@ -342,7 +328,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_order_info_receipt_number_only() {
+    async fn test_update_order_info_table_name_only() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -354,9 +340,8 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-            receipt_number: Some("R-12345".to_string()),
             guest_count: None,
-            table_name: None,
+            table_name: Some("New Table".to_string()),
             is_pre_payment: None,
         };
 
@@ -365,15 +350,13 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderInfoUpdated {
-            receipt_number,
             guest_count,
             table_name,
             is_pre_payment,
         } = &events[0].payload
         {
-            assert_eq!(receipt_number.as_deref(), Some("R-12345"));
             assert_eq!(*guest_count, None);
-            assert_eq!(*table_name, None);
+            assert_eq!(table_name.as_deref(), Some("New Table"));
             assert_eq!(*is_pre_payment, None);
         } else {
             panic!("Expected OrderInfoUpdated payload");
@@ -393,8 +376,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-            receipt_number: None,
-            guest_count: None,
+                        guest_count: None,
             table_name: None,
             is_pre_payment: Some(true),
         };
@@ -423,8 +405,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-            receipt_number: None,
-            guest_count: Some(3),
+                        guest_count: Some(3),
             table_name: None,
             is_pre_payment: None,
         };
@@ -448,8 +429,7 @@ mod tests {
 
         let action = UpdateOrderInfoAction {
             order_id: "order-1".to_string(),
-            receipt_number: None,
-            guest_count: Some(5),
+                        guest_count: Some(5),
             table_name: None,
             is_pre_payment: None,
         };

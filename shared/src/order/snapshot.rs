@@ -93,9 +93,8 @@ pub struct OrderSnapshot {
     /// Quantities paid per item (for split bill)
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
     pub paid_item_quantities: std::collections::HashMap<String, i32>,
-    /// Receipt number
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub receipt_number: Option<String>,
+    /// Receipt number (server-generated at OpenTable)
+    pub receipt_number: String,
     /// Whether this is a pre-payment order
     #[serde(default)]
     pub is_pre_payment: bool,
@@ -167,7 +166,7 @@ impl OrderSnapshot {
             paid_amount: 0.0,
             remaining_amount: 0.0,
             paid_item_quantities: std::collections::HashMap::new(),
-            receipt_number: None,
+            receipt_number: String::new(),
             is_pre_payment: false,
             order_rule_discount_amount: None,
             order_rule_surcharge_amount: None,

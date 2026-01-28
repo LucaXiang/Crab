@@ -2,10 +2,11 @@
 
 use axum::{
     Json,
-    extract::{Path, Query, State},
+    extract::{Extension, Path, Query, State},
 };
 use serde::Deserialize;
 
+use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{DailyReport, DailyReportGenerate};
 use crate::db::repository::DailyReportRepository;
@@ -76,11 +77,17 @@ pub async fn get_by_date(
 /// POST /api/daily-reports/generate - 生成日结报告
 pub async fn generate(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<DailyReportGenerate>,
 ) -> AppResult<Json<DailyReport>> {
-    // TODO: Extract operator info from JWT auth context
-    let operator_id = None;
-    let operator_name = None;
+    tracing::info!(
+        user_id = %current_user.id,
+        username = %current_user.username,
+        "Generating daily report"
+    );
+
+    let operator_id = Some(current_user.id);
+    let operator_name = Some(current_user.display_name);
 
     let repo = DailyReportRepository::new(state.db.clone());
     let report = repo

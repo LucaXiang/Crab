@@ -113,8 +113,8 @@ pub enum EventPayload {
         zone_name: Option<String>,
         guest_count: i32,
         is_retail: bool,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        receipt_number: Option<String>,
+        /// Server-generated receipt number (always present)
+        receipt_number: String,
     },
 
     OrderCompleted {
@@ -261,9 +261,8 @@ pub enum EventPayload {
     },
 
     // ========== Other ==========
+    /// Order info updated (receipt_number is immutable - set at OpenTable)
     OrderInfoUpdated {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        receipt_number: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         guest_count: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]

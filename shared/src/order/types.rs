@@ -192,10 +192,12 @@ pub struct ItemChanges {
 pub struct SplitItem {
     #[serde(default)]
     pub instance_id: String,
+    /// Item name (for display/audit)
     #[serde(default)]
     pub name: String,
     #[serde(default)]
     pub quantity: i32,
+    /// Unit price (for display/audit, not used in calculation)
     #[serde(default)]
     pub unit_price: f64,
 }

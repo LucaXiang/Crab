@@ -802,7 +802,7 @@ mod tests {
                 zone_name: None,
                 guest_count: 2,
                 is_retail: false,
-                receipt_number: None,
+                receipt_number: "RCP-TEST".to_string(),
             },
         }
     }
@@ -829,7 +829,7 @@ mod tests {
             paid_amount: 0.0,
             remaining_amount: 0.0,
             paid_item_quantities: std::collections::HashMap::new(),
-            receipt_number: None,
+            receipt_number: String::new(),
             is_pre_payment: false,
             order_rule_discount_amount: None,
             order_rule_surcharge_amount: None,

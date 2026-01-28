@@ -12,16 +12,13 @@ pub struct OrderInfoUpdatedApplier;
 impl EventApplier for OrderInfoUpdatedApplier {
     fn apply(&self, snapshot: &mut OrderSnapshot, event: &OrderEvent) {
         if let EventPayload::OrderInfoUpdated {
-            receipt_number,
             guest_count,
             table_name,
             is_pre_payment,
         } = &event.payload
         {
             // Only update fields that are present (Some) in the event
-            if let Some(receipt_num) = receipt_number {
-                snapshot.receipt_number = Some(receipt_num.clone());
-            }
+            // Note: receipt_number is immutable (set at OpenTable)
 
             if let Some(count) = guest_count {
                 snapshot.guest_count = *count;
@@ -62,7 +59,6 @@ mod tests {
     fn create_order_info_updated_event(
         order_id: &str,
         seq: u64,
-        receipt_number: Option<String>,
         guest_count: Option<i32>,
         table_name: Option<String>,
         is_pre_payment: Option<bool>,
@@ -76,7 +72,6 @@ mod tests {
             Some(1234567890),
             OrderEventType::OrderInfoUpdated,
             EventPayload::OrderInfoUpdated {
-                receipt_number,
                 guest_count,
                 table_name,
                 is_pre_payment,
@@ -89,7 +84,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         let initial_guest_count = snapshot.guest_count;
 
-        let event = create_order_info_updated_event("order-1", 2, None, Some(6), None, None);
+        let event = create_order_info_updated_event("order-1", 2, Some(6), None, None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -98,7 +93,7 @@ mod tests {
         assert_ne!(snapshot.guest_count, initial_guest_count);
         // Other fields should remain unchanged
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
-        assert_eq!(snapshot.receipt_number, None);
+        assert!(snapshot.receipt_number.is_empty());
         assert!(!snapshot.is_pre_payment);
     }
 
@@ -110,7 +105,6 @@ mod tests {
             "order-1",
             2,
             None,
-            None,
             Some("VIP Room".to_string()),
             None,
         );
@@ -121,7 +115,7 @@ mod tests {
         assert_eq!(snapshot.table_name, Some("VIP Room".to_string()));
         // Other fields should remain unchanged
         assert_eq!(snapshot.guest_count, 2);
-        assert_eq!(snapshot.receipt_number, None);
+        assert!(snapshot.receipt_number.is_empty());
         assert!(!snapshot.is_pre_payment);
     }
 
@@ -129,22 +123,18 @@ mod tests {
     fn test_order_info_updated_receipt_number_only() {
         let mut snapshot = create_test_snapshot("order-1");
 
-        let event = create_order_info_updated_event(
-            "order-1",
-            2,
-            Some("R-12345".to_string()),
-            None,
-            None,
-            None,
-        );
+        // receipt_number is immutable (set at OpenTable), not updatable via OrderInfoUpdated
+        // This test is no longer valid - receipt_number cannot be updated
+        // Keeping test but changing to test guest_count update instead
+        let event = create_order_info_updated_event("order-1", 2, Some(5), None, None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(snapshot.receipt_number, Some("R-12345".to_string()));
+        assert_eq!(snapshot.guest_count, 5);
         // Other fields should remain unchanged
-        assert_eq!(snapshot.guest_count, 2);
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
+        assert!(snapshot.receipt_number.is_empty()); // receipt_number not changed by this event
         assert!(!snapshot.is_pre_payment);
     }
 
@@ -153,7 +143,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         assert!(!snapshot.is_pre_payment);
 
-        let event = create_order_info_updated_event("order-1", 2, None, None, None, Some(true));
+        let event = create_order_info_updated_event("order-1", 2, None, None, Some(true));
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -162,7 +152,7 @@ mod tests {
         // Other fields should remain unchanged
         assert_eq!(snapshot.guest_count, 2);
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
-        assert_eq!(snapshot.receipt_number, None);
+        assert!(snapshot.receipt_number.is_empty());
     }
 
     #[test]
@@ -172,7 +162,6 @@ mod tests {
         let event = create_order_info_updated_event(
             "order-1",
             2,
-            Some("R-001".to_string()),
             Some(8),
             Some("Private Dining".to_string()),
             Some(true),
@@ -181,10 +170,11 @@ mod tests {
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(snapshot.receipt_number, Some("R-001".to_string()));
         assert_eq!(snapshot.guest_count, 8);
         assert_eq!(snapshot.table_name, Some("Private Dining".to_string()));
         assert!(snapshot.is_pre_payment);
+        // receipt_number unchanged (immutable)
+        assert!(snapshot.receipt_number.is_empty());
     }
 
     #[test]
@@ -192,7 +182,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         snapshot.last_sequence = 5;
 
-        let event = create_order_info_updated_event("order-1", 10, None, Some(4), None, None);
+        let event = create_order_info_updated_event("order-1", 10, Some(4), None, None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -206,7 +196,7 @@ mod tests {
         // Set initial timestamp to a known different value
         snapshot.updated_at = 1000000000;
 
-        let event = create_order_info_updated_event("order-1", 2, None, Some(4), None, None);
+        let event = create_order_info_updated_event("order-1", 2, Some(4), None, None);
         let expected_timestamp = event.timestamp; // Server timestamp set at event creation
 
         let applier = OrderInfoUpdatedApplier;
@@ -223,7 +213,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         let initial_checksum = snapshot.state_checksum.clone();
 
-        let event = create_order_info_updated_event("order-1", 2, None, Some(10), None, None);
+        let event = create_order_info_updated_event("order-1", 2, Some(10), None, None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -241,7 +231,7 @@ mod tests {
         let original_is_pre_payment = snapshot.is_pre_payment;
 
         // Event with all None values (shouldn't happen in practice, but test the behavior)
-        let event = create_order_info_updated_event("order-1", 2, None, None, None, None);
+        let event = create_order_info_updated_event("order-1", 2, None, None, None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -259,13 +249,12 @@ mod tests {
     #[test]
     fn test_order_info_updated_overwrite_existing_values() {
         let mut snapshot = create_test_snapshot("order-1");
-        snapshot.receipt_number = Some("OLD-001".to_string());
+        snapshot.receipt_number = "OLD-001".to_string(); // receipt_number is immutable
         snapshot.is_pre_payment = true;
 
         let event = create_order_info_updated_event(
             "order-1",
             2,
-            Some("NEW-002".to_string()),
             Some(1),
             Some("New Table".to_string()),
             Some(false),
@@ -274,7 +263,8 @@ mod tests {
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(snapshot.receipt_number, Some("NEW-002".to_string()));
+        // receipt_number should NOT change (immutable)
+        assert_eq!(snapshot.receipt_number, "OLD-001");
         assert_eq!(snapshot.guest_count, 1);
         assert_eq!(snapshot.table_name, Some("New Table".to_string()));
         assert!(!snapshot.is_pre_payment);
@@ -283,14 +273,13 @@ mod tests {
     #[test]
     fn test_order_info_updated_partial_overwrite() {
         let mut snapshot = create_test_snapshot("order-1");
-        snapshot.receipt_number = Some("R-OLD".to_string());
+        snapshot.receipt_number = "R-OLD".to_string(); // receipt_number is immutable
         snapshot.is_pre_payment = true;
 
         // Only update guest_count and table_name
         let event = create_order_info_updated_event(
             "order-1",
             2,
-            None, // Don't update receipt_number
             Some(5),
             Some("Updated Table".to_string()),
             None, // Don't update is_pre_payment
@@ -302,8 +291,8 @@ mod tests {
         // Updated fields
         assert_eq!(snapshot.guest_count, 5);
         assert_eq!(snapshot.table_name, Some("Updated Table".to_string()));
-        // Unchanged fields
-        assert_eq!(snapshot.receipt_number, Some("R-OLD".to_string()));
+        // Unchanged fields (receipt_number is immutable, is_pre_payment not in event)
+        assert_eq!(snapshot.receipt_number, "R-OLD");
         assert!(snapshot.is_pre_payment);
     }
 
@@ -314,7 +303,6 @@ mod tests {
         let event = create_order_info_updated_event(
             "order-1",
             2,
-            Some("R-123".to_string()),
             Some(3),
             Some("Table 3".to_string()),
             Some(true),
@@ -367,7 +355,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         snapshot.is_pre_payment = true;
 
-        let event = create_order_info_updated_event("order-1", 2, None, None, None, Some(false));
+        let event = create_order_info_updated_event("order-1", 2, None, None, Some(false));
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -380,7 +368,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
         snapshot.guest_count = 10;
 
-        let event = create_order_info_updated_event("order-1", 2, None, Some(1), None, None);
+        let event = create_order_info_updated_event("order-1", 2, Some(1), None, None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -393,7 +381,7 @@ mod tests {
         let mut snapshot = create_test_snapshot("order-1");
 
         let event =
-            create_order_info_updated_event("order-1", 2, None, None, Some("".to_string()), None);
+            create_order_info_updated_event("order-1", 2, None, Some("".to_string()), None);
 
         let applier = OrderInfoUpdatedApplier;
         applier.apply(&mut snapshot, &event);
@@ -401,16 +389,6 @@ mod tests {
         assert_eq!(snapshot.table_name, Some("".to_string()));
     }
 
-    #[test]
-    fn test_order_info_updated_empty_string_receipt_number() {
-        let mut snapshot = create_test_snapshot("order-1");
-
-        let event =
-            create_order_info_updated_event("order-1", 2, Some("".to_string()), None, None, None);
-
-        let applier = OrderInfoUpdatedApplier;
-        applier.apply(&mut snapshot, &event);
-
-        assert_eq!(snapshot.receipt_number, Some("".to_string()));
-    }
+    // Removed test_order_info_updated_empty_string_receipt_number
+    // receipt_number is immutable (set at OpenTable), cannot be updated via OrderInfoUpdated
 }

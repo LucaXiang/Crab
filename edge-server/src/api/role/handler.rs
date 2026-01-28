@@ -5,6 +5,7 @@ use axum::extract::{Extension, Path, Query, State};
 use axum::response::IntoResponse;
 use serde::Deserialize;
 
+use crate::auth::permissions::ALL_PERMISSIONS;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{Role, RoleCreate, RoleUpdate};
@@ -122,4 +123,60 @@ pub async fn delete(
         .map_err(|e| AppError::database(e.to_string()))?;
 
     Ok(Json(result))
+}
+
+/// GET /api/permissions - Get all available permissions
+pub async fn get_all_permissions() -> AppResult<impl IntoResponse> {
+    let permissions: Vec<String> = ALL_PERMISSIONS
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    Ok(Json(permissions))
+}
+
+/// GET /api/roles/{id}/permissions - Get role permissions
+pub async fn get_role_permissions(
+    State(state): State<ServerState>,
+    Path(id): Path<String>,
+) -> AppResult<Json<Vec<String>>> {
+    let repo = RoleRepository::new(state.get_db());
+    let role = repo
+        .find_by_id(&id)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?
+        .ok_or_else(|| AppError::not_found(format!("Role {} not found", id)))?;
+
+    Ok(Json(role.permissions))
+}
+
+/// PUT /api/roles/{id}/permissions - Update role permissions
+pub async fn update_role_permissions(
+    State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
+    Path(id): Path<String>,
+    Json(permissions): Json<Vec<String>>,
+) -> AppResult<Json<Role>> {
+    tracing::info!(
+        user_id = %current_user.id,
+        username = %current_user.username,
+        role_id = %id,
+        permissions = ?permissions,
+        "Updating role permissions"
+    );
+
+    let repo = RoleRepository::new(state.get_db());
+    let update = RoleUpdate {
+        name: None,
+        display_name: None,
+        description: None,
+        permissions: Some(permissions),
+        is_active: None,
+    };
+
+    let role = repo
+        .update(&id, update)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+
+    Ok(Json(role))
 }

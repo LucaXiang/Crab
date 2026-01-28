@@ -18,7 +18,7 @@ export type PrintState = -1 | 0 | 1;
 // ============ Tag ============
 
 export interface Tag {
-  id: string | null;
+  id: string;
   name: string;
   color: string;
   display_order: number;
@@ -43,7 +43,7 @@ export interface TagUpdate {
 // ============ Category ============
 
 export interface Category {
-  id: string | null;
+  id: string;
   name: string;
   sort_order: number;
   /** Kitchen print destination IDs */
@@ -173,7 +173,7 @@ export interface ProductUpdate {
 /** Attribute binding with full attribute data */
 export interface AttributeBindingFull {
   /** Relation ID (has_attribute edge) */
-  id: string | null;
+  id: string;
   /** Full attribute object */
   attribute: Attribute;
   is_required: boolean;
@@ -184,7 +184,7 @@ export interface AttributeBindingFull {
 
 /** Full product with all related data */
 export interface ProductFull {
-  id: string | null;
+  id: string;
   name: string;
   image: string;
   category: string;
@@ -222,7 +222,7 @@ export interface AttributeOption {
 }
 
 export interface Attribute {
-  id: string | null;
+  id: string;
   name: string;
   is_multi_select: boolean;
   max_selections: number | null;
@@ -239,7 +239,7 @@ export interface Attribute {
 export interface AttributeCreate {
   name: string;
   is_multi_select?: boolean;
-  max_selections?: number;
+  max_selections?: number | null;
   default_option_idx?: number;
   display_order?: number;
   show_on_receipt?: boolean;
@@ -252,7 +252,7 @@ export interface AttributeCreate {
 export interface AttributeUpdate {
   name?: string;
   is_multi_select?: boolean;
-  max_selections?: number;
+  max_selections?: number | null;
   default_option_idx?: number;
   display_order?: number;
   is_active?: boolean;
@@ -264,7 +264,7 @@ export interface AttributeUpdate {
 }
 
 export interface AttributeBinding {
-  id: string | null;
+  id: string;
   /** Product or Category ID */
   from: string;
   /** Attribute ID */
@@ -294,7 +294,7 @@ export interface EmbeddedPrinter {
 // ============ Print Destination ============
 
 export interface PrintDestination {
-  id?: string;
+  id: string;
   name: string;
   description?: string;
   printers: EmbeddedPrinter[];
@@ -318,7 +318,7 @@ export interface PrintDestinationUpdate {
 // ============ Zone ============
 
 export interface Zone {
-  id: string | null;
+  id: string;
   name: string;
   description: string | null;
   is_active: boolean;
@@ -338,7 +338,7 @@ export interface ZoneUpdate {
 // ============ Dining Table ============
 
 export interface DiningTable {
-  id: string | null;
+  id: string;
   name: string;
   zone: string;
   capacity: number;
@@ -365,7 +365,7 @@ export type ProductScope = 'GLOBAL' | 'CATEGORY' | 'TAG' | 'PRODUCT';
 export type AdjustmentType = 'PERCENTAGE' | 'FIXED_AMOUNT';
 
 export interface PriceRule {
-  id: string | null;
+  id: string;
   name: string;
   display_name: string;
   receipt_name: string;
@@ -442,7 +442,7 @@ export interface PriceRuleUpdate {
 // ============ Employee ============
 
 export interface Employee {
-  id?: string;
+  id: string;
   username: string;
   display_name: string;
   role: string;
@@ -481,7 +481,7 @@ export type AttributeTemplateUpdate = AttributeUpdate;
 // ============ Role ============
 
 export interface Role {
-  id?: string;
+  id: string;
   name: string;
   display_name: string;
   description: string | null;
@@ -654,7 +654,7 @@ export interface KitchenOrderListResponse {
  * Used for receipts, labels, and business info display
  */
 export interface StoreInfo {
-  id: string | null;
+  id: string;
   name: string;
   address: string;
   /** Tax identification number (NIF) */
@@ -734,7 +734,7 @@ export type ShiftStatus = 'OPEN' | 'CLOSED';
  * Used for cash tracking and shift management
  */
 export interface Shift {
-  id: string | null;
+  id: string;
   /** Operator employee ID (RecordId format: "employee:xxx") */
   operator_id: string;
   /** Operator display name */
@@ -824,7 +824,7 @@ export interface PaymentMethodBreakdown {
  * Contains aggregated sales data for a business date
  */
 export interface DailyReport {
-  id: string | null;
+  id: string;
   /** Business date (YYYY-MM-DD format) */
   business_date: string;
   /** Total number of orders */

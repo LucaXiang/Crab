@@ -243,13 +243,4 @@ impl DailyReportRepository {
 
         Ok(true)
     }
-
-    /// Calculate unpaid amount from active orders (not archived yet)
-    /// This queries the order storage, not the archived orders
-    pub async fn get_current_unpaid_amount(&self) -> RepoResult<f64> {
-        // Query from active orders (OrderSnapshot in memory/redb)
-        // For now, we return 0 as this requires OrdersManager integration
-        // TODO: Integrate with OrdersManager to get real unpaid amount
-        Ok(0.0)
-    }
 }

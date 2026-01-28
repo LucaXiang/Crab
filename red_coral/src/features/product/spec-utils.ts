@@ -50,7 +50,7 @@ export function setDefaultSpec(
 export function createEmptySpec(): Partial<EmbeddedSpec> {
   return {
     name: '',
-    receipt_name: null,
+    receipt_name: undefined,
     price: 0,
     display_order: 0,
     is_default: false,

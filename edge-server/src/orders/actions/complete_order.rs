@@ -14,7 +14,6 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, Payme
 #[derive(Debug, Clone)]
 pub struct CompleteOrderAction {
     pub order_id: String,
-    pub receipt_number: String,
 }
 
 #[async_trait]
@@ -78,7 +77,7 @@ impl CommandHandler for CompleteOrderAction {
         // 6. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 7. Create event
+        // 7. Create event (receipt_number from snapshot, set at OpenTable)
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -88,7 +87,7 @@ impl CommandHandler for CompleteOrderAction {
             Some(metadata.timestamp),
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
-                receipt_number: self.receipt_number.clone(),
+                receipt_number: snapshot.receipt_number.clone(),
                 final_total: snapshot.total,
                 payment_summary,
             },
@@ -129,14 +128,20 @@ mod tests {
         }
     }
 
+    /// Helper: create an active order snapshot with receipt_number set
+    fn create_active_snapshot(order_id: &str, receipt_number: &str) -> OrderSnapshot {
+        let mut snapshot = OrderSnapshot::new(order_id.to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.receipt_number = receipt_number.to_string();
+        snapshot
+    }
+
     #[tokio::test]
     async fn test_complete_order_success() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        // Create an active order with sufficient payment
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.status = OrderStatus::Active;
+        let mut snapshot = create_active_snapshot("order-1", "RCP-001");
         snapshot.total = 100.0;
         snapshot.payments.push(create_payment_record("CASH", 100.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -146,7 +151,6 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
-            receipt_number: "RCP-001".to_string(),
         };
 
         let metadata = create_test_metadata();
@@ -178,12 +182,11 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.status = OrderStatus::Active;
+        let mut snapshot = create_active_snapshot("order-1", "RCP-002");
         snapshot.total = 100.0;
         snapshot.payments.push(create_payment_record("CASH", 50.0));
         snapshot.payments.push(create_payment_record("CARD", 30.0));
-        snapshot.payments.push(create_payment_record("CASH", 20.0)); // Same method
+        snapshot.payments.push(create_payment_record("CASH", 20.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -191,7 +194,6 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
-            receipt_number: "RCP-002".to_string(),
         };
 
         let metadata = create_test_metadata();
@@ -201,9 +203,7 @@ mod tests {
             payment_summary, ..
         } = &events[0].payload
         {
-            // Should have 2 items (CASH and CARD merged)
             assert_eq!(payment_summary.len(), 2);
-
             let cash_total: f64 = payment_summary
                 .iter()
                 .filter(|p| p.method == "CASH")
@@ -214,8 +214,7 @@ mod tests {
                 .filter(|p| p.method == "CARD")
                 .map(|p| p.amount)
                 .sum();
-
-            assert_eq!(cash_total, 70.0); // 50 + 20
+            assert_eq!(cash_total, 70.0);
             assert_eq!(card_total, 30.0);
         } else {
             panic!("Expected OrderCompleted payload");
@@ -227,11 +226,9 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.status = OrderStatus::Active;
+        let mut snapshot = create_active_snapshot("order-1", "RCP-003");
         snapshot.total = 100.0;
         snapshot.payments.push(create_payment_record("CASH", 100.0));
-        // Add a cancelled payment
         let mut cancelled_payment = create_payment_record("CARD", 50.0);
         cancelled_payment.cancelled = true;
         snapshot.payments.push(cancelled_payment);
@@ -242,7 +239,6 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
-            receipt_number: "RCP-003".to_string(),
         };
 
         let metadata = create_test_metadata();
@@ -252,7 +248,6 @@ mod tests {
             payment_summary, ..
         } = &events[0].payload
         {
-            // Should only have CASH (cancelled CARD excluded)
             assert_eq!(payment_summary.len(), 1);
             assert_eq!(payment_summary[0].method, "CASH");
             assert_eq!(payment_summary[0].amount, 100.0);
@@ -266,10 +261,9 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.status = OrderStatus::Active;
+        let mut snapshot = create_active_snapshot("order-1", "RCP-004");
         snapshot.total = 100.0;
-        snapshot.payments.push(create_payment_record("CASH", 50.0)); // Only 50 paid
+        snapshot.payments.push(create_payment_record("CASH", 50.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -277,7 +271,6 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
-            receipt_number: "RCP-004".to_string(),
         };
 
         let metadata = create_test_metadata();
@@ -294,13 +287,9 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.status = OrderStatus::Active;
+        let mut snapshot = create_active_snapshot("order-1", "RCP-005");
         snapshot.total = 100.0;
-        // Pay 99.995 (within 0.01 tolerance)
-        snapshot
-            .payments
-            .push(create_payment_record("CASH", 99.995));
+        snapshot.payments.push(create_payment_record("CASH", 99.995));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -308,13 +297,10 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
-            receipt_number: "RCP-005".to_string(),
         };
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-
-        // Should succeed due to rounding tolerance
         assert!(result.is_ok());
     }
 
@@ -325,6 +311,7 @@ mod tests {
 
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Completed;
+        snapshot.receipt_number = "RCP-006".to_string();
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -332,12 +319,10 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
-            receipt_number: "RCP-006".to_string(),
         };
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
@@ -348,6 +333,7 @@ mod tests {
 
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Void;
+        snapshot.receipt_number = "RCP-007".to_string();
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -355,12 +341,10 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
-            receipt_number: "RCP-007".to_string(),
         };
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
@@ -374,12 +358,10 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "nonexistent".to_string(),
-            receipt_number: "RCP-008".to_string(),
         };
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
     }
 
@@ -388,10 +370,9 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.status = OrderStatus::Active;
+        let mut snapshot = create_active_snapshot("order-1", "RCP-009");
         snapshot.total = 100.0;
-        snapshot.payments.push(create_payment_record("CASH", 150.0)); // Overpaid
+        snapshot.payments.push(create_payment_record("CASH", 150.0));
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -399,13 +380,11 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
-            receipt_number: "RCP-009".to_string(),
         };
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
-        // Overpayment should be allowed
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderCompleted {
             final_total,
@@ -425,9 +404,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.status = OrderStatus::Active;
-        snapshot.total = 0.0; // Zero total (e.g., all items free)
+        let mut snapshot = create_active_snapshot("order-1", "RCP-010");
+        snapshot.total = 0.0;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -435,13 +413,11 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
-            receipt_number: "RCP-010".to_string(),
         };
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
-        // Should succeed with no payments needed
         assert_eq!(events.len(), 1);
         if let EventPayload::OrderCompleted {
             payment_summary, ..

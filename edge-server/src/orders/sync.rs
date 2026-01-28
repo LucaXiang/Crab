@@ -366,7 +366,7 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                receipt_number: None,
+                receipt_number: "RCP-TEST".to_string(),
             },
         };
 
@@ -392,7 +392,7 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                receipt_number: None,
+                receipt_number: "RCP-TEST".to_string(),
             },
         };
 

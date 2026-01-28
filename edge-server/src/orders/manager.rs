@@ -745,13 +745,12 @@ mod tests {
         assert_eq!(snapshot.payments.len(), 1);
         assert_eq!(snapshot.payments[0].change, Some(10.0));
 
-        // Complete order
+        // Complete order (receipt_number comes from snapshot)
         let complete_cmd = OrderCommand::new(
             "op-1".to_string(),
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
-                receipt_number: "R001".to_string(),
             },
         );
         let complete_response = manager.execute_command(complete_cmd);
@@ -759,7 +758,7 @@ mod tests {
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
         assert_eq!(snapshot.status, OrderStatus::Completed);
-        assert_eq!(snapshot.receipt_number, Some("R001".to_string()));
+        assert!(!snapshot.receipt_number.is_empty()); // Server-generated at OpenTable
     }
 
     #[test]

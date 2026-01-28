@@ -273,18 +273,18 @@ mod tests {
     }
 
     #[test]
-    fn test_order_voided_clears_receipt_number() {
+    fn test_order_voided_preserves_receipt_number() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot.receipt_number = None; // Orders being voided typically don't have receipt numbers
+        snapshot.receipt_number = "RCP-001".to_string();
 
         let event = create_order_voided_event("order-1", 1, None, None, None);
 
         let applier = OrderVoidedApplier;
         applier.apply(&mut snapshot, &event);
 
-        // Receipt number should remain None for voided orders
-        assert!(snapshot.receipt_number.is_none());
+        // Receipt number should be preserved for voided orders
+        assert_eq!(snapshot.receipt_number, "RCP-001");
         assert_eq!(snapshot.status, OrderStatus::Void);
     }
 

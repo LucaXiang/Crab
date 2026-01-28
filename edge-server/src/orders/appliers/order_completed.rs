@@ -19,8 +19,8 @@ impl EventApplier for OrderCompletedApplier {
             // Set status to Completed
             snapshot.status = OrderStatus::Completed;
 
-            // Set receipt number
-            snapshot.receipt_number = Some(receipt_number.clone());
+            // Set receipt number (overwrite with event value for audit trail)
+            snapshot.receipt_number = receipt_number.clone();
 
             // Set end time
             snapshot.end_time = Some(event.timestamp);
@@ -81,14 +81,14 @@ mod tests {
     fn test_order_completed_sets_receipt_number() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
-        assert!(snapshot.receipt_number.is_none());
+        assert!(snapshot.receipt_number.is_empty());
 
         let event = create_order_completed_event("order-1", 1, "RCP-12345", 100.0, vec![]);
 
         let applier = OrderCompletedApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(snapshot.receipt_number, Some("RCP-12345".to_string()));
+        assert_eq!(snapshot.receipt_number, "RCP-12345");
     }
 
     #[test]
@@ -177,7 +177,7 @@ mod tests {
 
         // Applier should still work - payment_summary is in event, not snapshot
         assert_eq!(snapshot.status, OrderStatus::Completed);
-        assert_eq!(snapshot.receipt_number, Some("RCP-001".to_string()));
+        assert_eq!(snapshot.receipt_number, "RCP-001");
     }
 
     #[test]
@@ -204,7 +204,7 @@ mod tests {
 
         // But status and receipt should be updated
         assert_eq!(snapshot.status, OrderStatus::Completed);
-        assert_eq!(snapshot.receipt_number, Some("RCP-001".to_string()));
+        assert_eq!(snapshot.receipt_number, "RCP-001");
     }
 
     #[test]
@@ -225,7 +225,7 @@ mod tests {
 
         // State should be the same
         assert_eq!(snapshot.status, OrderStatus::Completed);
-        assert_eq!(snapshot.receipt_number, Some("RCP-001".to_string()));
+        assert_eq!(snapshot.receipt_number, "RCP-001");
         // Checksum should be recalculated but the same (since state is same)
         assert_eq!(checksum_after_first, checksum_after_second);
     }
@@ -245,7 +245,7 @@ mod tests {
         applier.apply(&mut snapshot1, &event1);
         applier.apply(&mut snapshot2, &event2);
 
-        assert_eq!(snapshot1.receipt_number, Some("RCP-001".to_string()));
-        assert_eq!(snapshot2.receipt_number, Some("RCP-002".to_string()));
+        assert_eq!(snapshot1.receipt_number, "RCP-001".to_string());
+        assert_eq!(snapshot2.receipt_number, "RCP-002".to_string());
     }
 }

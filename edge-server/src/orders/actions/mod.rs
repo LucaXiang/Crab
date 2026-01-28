@@ -155,13 +155,11 @@ impl From<&OrderCommand> for CommandAction {
                 authorizer_id: authorizer_id.clone(),
                 authorizer_name: authorizer_name.clone(),
             }),
-            OrderCommandPayload::CompleteOrder {
-                order_id,
-                receipt_number,
-            } => CommandAction::CompleteOrder(CompleteOrderAction {
-                order_id: order_id.clone(),
-                receipt_number: receipt_number.clone(),
-            }),
+            OrderCommandPayload::CompleteOrder { order_id } => {
+                CommandAction::CompleteOrder(CompleteOrderAction {
+                    order_id: order_id.clone(),
+                })
+            }
             OrderCommandPayload::VoidOrder {
                 order_id,
                 void_type,
@@ -189,13 +187,11 @@ impl From<&OrderCommand> for CommandAction {
             }),
             OrderCommandPayload::UpdateOrderInfo {
                 order_id,
-                receipt_number,
                 guest_count,
                 table_name,
                 is_pre_payment,
             } => CommandAction::UpdateOrderInfo(UpdateOrderInfoAction {
                 order_id: order_id.clone(),
-                receipt_number: receipt_number.clone(),
                 guest_count: *guest_count,
                 table_name: table_name.clone(),
                 is_pre_payment: *is_pre_payment,
@@ -204,13 +200,12 @@ impl From<&OrderCommand> for CommandAction {
                 order_id,
                 target_table_id,
                 target_table_name,
-                target_zone_name,
             } => CommandAction::MoveOrder(MoveOrderAction {
                 order_id: order_id.clone(),
                 target_table_id: target_table_id.clone(),
                 target_table_name: target_table_name.clone(),
-                target_zone_id: None, // Not in OrderCommandPayload
-                target_zone_name: target_zone_name.clone(),
+                target_zone_id: None,
+                target_zone_name: None,
             }),
             OrderCommandPayload::MergeOrders {
                 source_order_id,

@@ -266,7 +266,7 @@ mod tests {
     fn test_order_restored_receipt_number_preserved() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Void;
-        snapshot.receipt_number = Some("RC-001".to_string());
+        snapshot.receipt_number = "RC-001".to_string();
 
         let event = create_order_restored_event("order-1", 1);
 
@@ -274,7 +274,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Receipt number should be preserved (if it was assigned before voiding)
-        assert_eq!(snapshot.receipt_number, Some("RC-001".to_string()));
+        assert_eq!(snapshot.receipt_number, "RC-001");
         assert_eq!(snapshot.status, OrderStatus::Active);
     }
 }
