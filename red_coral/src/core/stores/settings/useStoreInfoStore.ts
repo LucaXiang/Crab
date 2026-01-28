@@ -13,6 +13,13 @@ import type { StoreInfo, StoreInfoUpdate } from '@/core/domain/types/api';
 
 const api = createTauriClient();
 
+interface SyncPayload {
+  id: string;
+  version: number;
+  action: 'created' | 'updated' | 'deleted';
+  data: unknown | null;
+}
+
 interface StoreInfoState {
   // State
   info: StoreInfo;
@@ -22,8 +29,10 @@ interface StoreInfoState {
 
   // Actions
   fetchStoreInfo: (force?: boolean) => Promise<void>;
+  fetchAll: (force?: boolean) => Promise<void>;  // Alias for registry compatibility
   updateStoreInfo: (data: StoreInfoUpdate) => Promise<StoreInfo>;
   clear: () => void;
+  applySync: (payload?: SyncPayload) => void;
 }
 
 const defaultStoreInfo: StoreInfo = {
@@ -64,6 +73,9 @@ export const useStoreInfoStore = create<StoreInfoState>((set, get) => ({
     }
   },
 
+  // Alias for registry compatibility
+  fetchAll: async (force = false) => get().fetchStoreInfo(force),
+
   updateStoreInfo: async (data: StoreInfoUpdate) => {
     set({ isLoading: true, error: null });
     try {
@@ -79,6 +91,16 @@ export const useStoreInfoStore = create<StoreInfoState>((set, get) => ({
   },
 
   clear: () => set({ info: defaultStoreInfo, isLoaded: false, error: null }),
+
+  /**
+   * Apply sync from server broadcast
+   * store_info is a singleton, so we just refetch on any sync signal
+   */
+  applySync: (payload?: SyncPayload) => {
+    console.log('[Store] store_info: received sync signal', payload?.action);
+    // Refetch to get latest data
+    get().fetchStoreInfo(true);
+  },
 }));
 
 // Convenience hooks

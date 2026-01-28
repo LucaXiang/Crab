@@ -15,6 +15,8 @@ import { useEmployeeStore } from '@/features/user';
 import { useRoleStore } from '@/features/role';
 import { usePriceRuleStore } from '@/features/price-rule';
 import { usePrintDestinationStore } from './usePrintDestinationStore';
+import { useStoreInfoStore } from '../settings/useStoreInfoStore';
+import { useLabelTemplateStore } from '../printer/useLabelTemplateStore';
 
 // Store interface for registry
 // Note: Uses SyncPayload<any> to be compatible with all typed stores (contravariance)
@@ -53,6 +55,8 @@ export const storeRegistry: Record<string, RegistryStore> = {
   role: useRoleStore,                    // 后端无 sync (只读 API)
   price_rule: usePriceRuleStore,
   print_destination: usePrintDestinationStore,
+  store_info: useStoreInfoStore,        // 店铺信息
+  label_template: useLabelTemplateStore, // 标签模板
 };
 
 /**
