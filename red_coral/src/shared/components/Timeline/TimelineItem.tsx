@@ -96,7 +96,7 @@ export const TimelineItem: React.FC<TimelineItemProps> = ({ data, showNoteTags =
             <div className="text-xs text-gray-400 font-mono">
                 {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
             </div>
-            <div className="text-sm font-medium text-gray-700 mt-0.5 leading-relaxed">{summary}</div>
+            {summary && <div className="text-sm font-medium text-gray-700 mt-0.5 pb-0.5">{summary}</div>}
             
             {details && details.length > 0 && (
                 <div className="mt-1 bg-gray-50 p-2 rounded text-xs text-gray-600 space-y-0.5">
