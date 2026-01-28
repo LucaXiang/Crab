@@ -102,7 +102,7 @@ export const useAuthStore = create<AuthStore>()(
         if (!user) {
           set({ user, permissions: [], isAuthenticated: false });
         } else {
-          set({ user, isAuthenticated: true });
+          set({ user, permissions: user.permissions ?? [], isAuthenticated: true });
         }
       },
 
