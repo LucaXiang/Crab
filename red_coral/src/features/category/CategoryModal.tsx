@@ -32,6 +32,7 @@ export const CategoryModal: React.FC = React.memo(() => {
   const isCategory = modal.open && modal.entity === 'CATEGORY';
 
   // Load category attributes when editing
+  // NOTE: modal.open is needed as dependency to reload data when reopening the same category
   useEffect(() => {
     if (isCategory && modal.action === 'EDIT' && modal.data?.id) {
       const loadAttributes = async () => {
@@ -47,7 +48,7 @@ export const CategoryModal: React.FC = React.memo(() => {
       };
       loadAttributes();
     }
-  }, [isCategory, modal.action, modal.data?.id, setAsyncFormData]);
+  }, [isCategory, modal.open, modal.action, modal.data?.id, setAsyncFormData]);
 
   if (!isCategory) return null;
 
