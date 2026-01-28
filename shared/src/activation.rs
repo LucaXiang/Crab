@@ -135,7 +135,7 @@ impl SignedBinding {
     /// 检测时钟篡改
     pub fn check_clock_tampering(&self) -> Result<(), String> {
         if self.last_verified_at.is_empty() {
-            return Ok(()); // 兼容旧格式
+            return Ok(()); // 未设置时跳过检查
         }
 
         let last_verified = chrono::DateTime::parse_from_rfc3339(&self.last_verified_at)

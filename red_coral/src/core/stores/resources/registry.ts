@@ -19,8 +19,6 @@ import { useStoreInfoStore } from '../settings/useStoreInfoStore';
 import { useLabelTemplateStore } from '../printer/useLabelTemplateStore';
 
 // Store interface for registry
-// Note: Uses SyncPayload<any> to be compatible with all typed stores (contravariance)
-// lastVersion and checkVersion are optional for legacy stores not yet updated
 interface RegistryStore {
   getState: () => {
     isLoaded: boolean;

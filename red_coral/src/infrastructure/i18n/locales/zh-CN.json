@@ -277,6 +277,20 @@
       "pay_card": "刷卡支付",
       "desc": "拆分订单分别支付"
     },
+    "amount_split": {
+      "title": "金额分单",
+      "desc": "指定金额支付",
+      "aa_divide": "AA 平分",
+      "people": "人",
+      "custom_amount": "自定义金额",
+      "enter_amount": "输入金额",
+      "full_amount": "全部",
+      "split_amount": "分单金额",
+      "invalid_amount": "请输入有效金额",
+      "exceeds_remaining": "金额超出剩余应付",
+      "failed": "金额分单失败",
+      "item_split_disabled": "已使用金额分单，无法菜品分单"
+    },
     "order_type": {
       "dine_in": "堂食",
       "takeout": "外卖"

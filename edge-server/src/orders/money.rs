@@ -10,6 +10,9 @@ use shared::order::{CartItemSnapshot, OrderSnapshot};
 /// Rounding strategy for monetary values (2 decimal places, half-up)
 const DECIMAL_PLACES: u32 = 2;
 
+/// Tolerance for monetary comparisons (0.01)
+pub const MONEY_TOLERANCE: Decimal = Decimal::from_parts(1, 0, 0, false, 2);
+
 /// Convert f64 to Decimal for calculation
 #[inline]
 pub fn to_decimal(value: f64) -> Decimal {
@@ -161,7 +164,7 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     snapshot.total_discount = to_f64(total_discount);
     snapshot.total_surcharge = to_f64(total_surcharge);
     snapshot.tax = to_f64(total_tax);
-    snapshot.discount = to_f64(order_discount); // Legacy field
+    snapshot.discount = to_f64(order_discount);
     snapshot.total = to_f64(total);
     snapshot.remaining_amount = to_f64(remaining);
 
@@ -188,15 +191,13 @@ pub fn sum_payments(payments: &[shared::order::PaymentRecord]) -> f64 {
 pub fn is_payment_sufficient(paid: f64, required: f64) -> bool {
     let paid_dec = to_decimal(paid);
     let required_dec = to_decimal(required);
-    let tolerance = Decimal::new(1, 2); // 0.01
-
-    paid_dec >= required_dec - tolerance
+    paid_dec >= required_dec - MONEY_TOLERANCE
 }
 
 /// Compare two monetary values for equality (within 0.01 tolerance)
 pub fn money_eq(a: f64, b: f64) -> bool {
     let diff = (to_decimal(a) - to_decimal(b)).abs();
-    diff < Decimal::new(1, 2) // 0.01
+    diff < MONEY_TOLERANCE
 }
 
 #[cfg(test)]

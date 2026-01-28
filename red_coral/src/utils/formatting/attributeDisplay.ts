@@ -6,8 +6,6 @@ export interface GroupedAttribute {
   totalPrice: number;
 }
 
-// Re-export for backward compatibility
-export type { ItemOption };
 
 export const groupOptionsByAttribute = (options: ItemOption[]): GroupedAttribute[] => {
   const groups: GroupedAttribute[] = [];

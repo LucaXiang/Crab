@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 import { Lock, X } from 'lucide-react';
-import { AttributeTemplate } from '@/core/domain/types';
+import { Attribute } from '@/core/domain/types';
 import { useAttributeStore } from '@/features/attribute';
 
 export interface AttributeDisplayTagProps {
-  attribute: AttributeTemplate;
+  attribute: Attribute;
   defaultOptionIds?: (string | number)[];
   onRemove?: (attrId: string | number) => void;
   isInherited?: boolean;
@@ -27,8 +27,6 @@ export const AttributeDisplayTag: React.FC<AttributeDisplayTagProps> = ({
   const defaultOptions = useMemo(() => {
     if (defaultOptionIds.length === 0 || !attribute.id) return [];
 
-    // attribute.id is string, getOptionsByAttributeId expects number (legacy API)
-    // For now, try parsing as number or use the attribute's embedded options
     const allOptions = attribute.options || [];
     return defaultOptionIds
       .map((idx) => {

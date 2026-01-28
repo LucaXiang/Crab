@@ -664,6 +664,7 @@ mod tests {
             updated_at: 1704070800000,
             last_sequence: 5,
             state_checksum: String::new(),
+            has_amount_split: false,
         }
     }
 

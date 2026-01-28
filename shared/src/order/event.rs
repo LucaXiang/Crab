@@ -215,6 +215,7 @@ pub enum EventPayload {
 
     // ========== Split ==========
     OrderSplit {
+        payment_id: String,
         split_amount: f64,
         payment_method: String,
         items: Vec<SplitItem>,

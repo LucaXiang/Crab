@@ -17,6 +17,7 @@ pub mod sync;
 pub mod system;
 pub mod tenant;
 pub mod shift;
+pub mod statistics;
 
 pub use api::*;
 pub use auth::*;
@@ -33,3 +34,4 @@ pub use sync::*;
 pub use system::*;
 pub use tenant::*;
 pub use shift::*;
+pub use statistics::*;

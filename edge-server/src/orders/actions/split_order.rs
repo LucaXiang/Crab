@@ -9,7 +9,7 @@
 
 use async_trait::async_trait;
 
-use crate::orders::money::{calculate_unit_price, to_f64};
+use crate::orders::money::{calculate_unit_price, to_decimal, to_f64, MONEY_TOLERANCE};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use rust_decimal::Decimal;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, SplitItem};
@@ -49,7 +49,14 @@ impl CommandHandler for SplitOrderAction {
             }
         }
 
-        // 3. Validate items exist in order and have sufficient quantity
+        // 3. Mutual exclusion: block item-based split when amount split is active
+        if snapshot.has_amount_split && !self.items.is_empty() {
+            return Err(OrderError::InvalidOperation(
+                "Item-based split is disabled while amount-based split payments exist".to_string(),
+            ));
+        }
+
+        // 4. Validate items exist in order and have sufficient quantity
         // Also calculate split amount from items if not provided
         let mut calculated_amount = Decimal::ZERO;
         for split_item in &self.items {
@@ -76,7 +83,7 @@ impl CommandHandler for SplitOrderAction {
             calculated_amount += unit_price * Decimal::from(split_item.quantity);
         }
 
-        // 4. Determine final split amount
+        // 5. Determine final split amount
         let final_split_amount = if let Some(amount) = self.split_amount {
             // Amount-based split: use provided amount
             if amount <= 0.0 {
@@ -95,20 +102,23 @@ impl CommandHandler for SplitOrderAction {
             return Err(OrderError::InvalidAmount);
         };
 
-        // 5. Validate: cannot overpay (split_amount <= remaining unpaid)
-        let remaining_unpaid = snapshot.total - snapshot.paid_amount;
-        if final_split_amount > remaining_unpaid + 0.01 {
-            // Allow small tolerance for rounding
+        // 6. Validate: cannot overpay (split_amount <= remaining unpaid + tolerance)
+        let remaining_unpaid = to_decimal(snapshot.total) - to_decimal(snapshot.paid_amount);
+        if to_decimal(final_split_amount) > remaining_unpaid + MONEY_TOLERANCE {
             return Err(OrderError::InvalidOperation(format!(
                 "Split amount ({:.2}) exceeds remaining unpaid ({:.2})",
-                final_split_amount, remaining_unpaid
+                final_split_amount,
+                to_f64(remaining_unpaid)
             )));
         }
 
-        // 6. Allocate sequence number
+        // 7. Generate payment_id (UUID)
+        let payment_id = uuid::Uuid::new_v4().to_string();
+
+        // 8. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 7. Create event
+        // 9. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -118,6 +128,7 @@ impl CommandHandler for SplitOrderAction {
             Some(metadata.timestamp),
             OrderEventType::OrderSplit,
             EventPayload::OrderSplit {
+                payment_id,
                 split_amount: final_split_amount,
                 payment_method: self.payment_method.clone(),
                 items: self.items.clone(),
@@ -236,11 +247,15 @@ mod tests {
         assert_eq!(event.event_type, OrderEventType::OrderSplit);
 
         if let EventPayload::OrderSplit {
+            payment_id,
             split_amount,
             payment_method,
             items,
         } = &event.payload
         {
+            // payment_id should be a valid UUID
+            assert!(!payment_id.is_empty());
+            assert!(uuid::Uuid::parse_str(payment_id).is_ok());
             assert_eq!(*split_amount, 20.0);
             assert_eq!(payment_method, "CASH");
             assert_eq!(items.len(), 1);

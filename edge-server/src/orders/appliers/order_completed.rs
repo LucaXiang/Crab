@@ -25,6 +25,13 @@ impl EventApplier for OrderCompletedApplier {
             // Set end time
             snapshot.end_time = Some(event.timestamp);
 
+            // Safety net: mark all items as fully paid on completion
+            for item in &snapshot.items {
+                snapshot
+                    .paid_item_quantities
+                    .insert(item.instance_id.clone(), item.quantity as i32);
+            }
+
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
             snapshot.updated_at = event.timestamp;

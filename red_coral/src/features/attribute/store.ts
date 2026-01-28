@@ -114,7 +114,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const attributes = await api.listAttributeTemplates() as AttributeEntity[];
+      const attributes = await api.listAttributes() as AttributeEntity[];
       set({ items: attributes ?? [], isLoading: false, isLoaded: true });
     } catch (e: unknown) {
       const errorMsg = (e instanceof Error ? e.message : '') || 'Failed to fetch attributes';
@@ -145,7 +145,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       // Options are embedded in Attribute, fetch the attribute to get its options
-      const template = await api.getAttributeTemplate(attributeId);
+      const template = await api.getAttribute(attributeId);
       const opts = (template.options || []) as AttributeOption[];
       const optionsWithIndex: AttributeOptionWithIndex[] = opts.map((opt, index) => ({
         ...opt,

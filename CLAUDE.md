@@ -100,7 +100,7 @@ db.delete(id).await?;
 - ❌ 任何 ID 适配层/转换层
 
 **RELATE 边关系**:
-- `attribute_binding`: product/category → attribute
+- `has_attribute`: product/category → attribute
 - `has_event`: order → order_event
 
 **删除规则**:
@@ -140,7 +140,7 @@ TypeScript (前端) ↔ Rust (后端) 类型必须完全匹配：
 | **Order 不可删除** | 订单使用状态管理（VOID），禁止物理删除 |
 | **OrderEvent 不可删除** | 事件溯源，只追加不删除 |
 | **RELATE 边清理** | 删除实体时必须清理关联的图边 |
-| **ID 格式** | 全栈统一 `"table:id"` 格式，使用 `serde_thing` 自动转换 |
+| **ID 格式** | 全栈统一 `"table:id"` 格式，直接使用 `RecordId` 序列化 |
 
 ### 安全约束
 

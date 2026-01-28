@@ -3,7 +3,8 @@ use crate::core::{Config, ServerState};
 use axum::{Router, middleware};
 use axum_server::tls_rustls::RustlsConfig;
 use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use parking_lot::RwLock;
 use tower::Service;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
@@ -55,6 +56,8 @@ pub fn build_app() -> Router<ServerState> {
         // Operations (班次与日结)
         .merge(crate::api::shifts::router())
         .merge(crate::api::daily_reports::router())
+        // Analytics (数据统计)
+        .merge(crate::api::statistics::router())
         // Sync API
         .merge(crate::api::sync::router())
 }
@@ -88,16 +91,16 @@ impl HttpsService {
             // HTTP 请求日志中间件
             .layer(middleware::from_fn(log_request));
 
-        let mut router = self.router.write().expect("Failed to lock router");
+        let mut router = self.router.write();
         *router = Some(app);
     }
 
     pub fn router(&self) -> Option<Router> {
-        self.router.read().expect("Failed to lock router").clone()
+        self.router.read().clone()
     }
 
     pub async fn oneshot(&self, request: http::Request<axum::body::Body>) -> OneshotResult {
-        let router_opt = self.router.read().expect("Failed to lock router").clone();
+        let router_opt = self.router.read().clone();
 
         match router_opt {
             Some(router) => {

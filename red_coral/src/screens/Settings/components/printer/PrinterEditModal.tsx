@@ -27,8 +27,6 @@ interface PrinterEditModalProps {
     driverName?: string;
     ip?: string;
     port?: number;
-    // Legacy field for backward compatibility
-    printerName?: string;
   } | null;
   onSave: (data: PrinterFormData) => Promise<void>;
   systemPrinters: string[];
@@ -68,7 +66,7 @@ export const PrinterEditModal: React.FC<PrinterEditModalProps> = ({
         name: initialData?.name || '',
         description: initialData?.description || '',
         printerType,
-        driverName: initialData?.driverName || initialData?.printerName || '',
+        driverName: initialData?.driverName || '',
         ip: initialData?.ip || '',
         port: initialData?.port || DEFAULT_PORT,
       });

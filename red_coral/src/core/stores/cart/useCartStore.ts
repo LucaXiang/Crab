@@ -220,12 +220,12 @@ export const useCartStore = create<CartStore>((set, get) => ({
       let finalUnitPrice: number;
       if (discountPercent > 0) {
         const discountFactor = Currency.sub(1, Currency.div(discountPercent, 100));
-        finalUnitPrice = Currency.floor2(Currency.mul(baseUnitPrice, discountFactor)).toNumber();
+        finalUnitPrice = Currency.round2(Currency.mul(baseUnitPrice, discountFactor)).toNumber();
       } else {
         finalUnitPrice = baseUnitPrice;
       }
       
-      const lineTotal = Currency.floor2(Currency.mul(finalUnitPrice, item.quantity)).toNumber();
+      const lineTotal = Currency.round2(Currency.mul(finalUnitPrice, item.quantity)).toNumber();
       return Currency.add(sum, lineTotal).toNumber();
     }, 0);
     const count = cart.reduce((sum, item) => sum + item.quantity, 0);

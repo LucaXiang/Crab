@@ -15,7 +15,6 @@ use std::path::PathBuf;
 use std::{fs, io::Cursor};
 
 use crate::audit_log;
-use crate::utils::AppResponse;
 use crate::{AppError, CurrentUser, ServerState};
 
 /// Maximum file size (5MB)
@@ -115,7 +114,7 @@ pub async fn upload(
     State(state): State<ServerState>,
     Extension(_current_user): Extension<CurrentUser>,
     mut multipart: Multipart,
-) -> Result<Json<AppResponse<UploadResponse>>, AppError> {
+) -> Result<Json<UploadResponse>, AppError> {
     // Images dir: {tenant}/server/images/
     let work_dir = state.work_dir().clone();
     let images_dir = work_dir.join("images");
@@ -192,7 +191,7 @@ pub async fn upload(
             url: format!("/api/image/{}.jpg", hash),
         };
 
-        return Ok(crate::ok!(response));
+        return Ok(Json(response));
     }
 
     // Save compressed image with hash as filename
@@ -223,5 +222,5 @@ pub async fn upload(
         url: format!("/api/image/{}.jpg", hash),
     };
 
-    Ok(crate::ok!(response))
+    Ok(Json(response))
 }

@@ -84,6 +84,7 @@ enum_dispatch.workspace = true
 include_dir.workspace = true
 symlink.workspace = true
 dashmap.workspace = true
+parking_lot.workspace = true
 
 [dev-dependencies]
 # Testing

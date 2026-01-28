@@ -31,7 +31,7 @@ export const CartItem = React.memo<CartItemProps>(({
     if (discountPercent > 0) {
       // Calculate discounted price: (base + options) * (1 - discount%)
       const discountFactor = Currency.sub(1, Currency.div(discountPercent, 100));
-      finalUnitPrice = Currency.floor2(
+      finalUnitPrice = Currency.round2(
         Currency.mul(baseUnitPrice, discountFactor)
       ).toNumber();
     } else {
@@ -40,7 +40,7 @@ export const CartItem = React.memo<CartItemProps>(({
   }
 
   // Use server-computed line_total, fallback to local calculation
-  const finalLineTotal = item.line_total ?? Currency.floor2(Currency.mul(finalUnitPrice, item.quantity)).toNumber();
+  const finalLineTotal = item.line_total ?? Currency.round2(Currency.mul(finalUnitPrice, item.quantity)).toNumber();
 
   const handleQuantityChange = (e: React.MouseEvent, delta: number) => {
     e.stopPropagation();

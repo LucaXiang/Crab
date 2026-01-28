@@ -59,7 +59,7 @@ pub enum OrderCommandPayload {
         note: Option<String>,
     },
 
-    /// Restore a voided order (reserved, not implemented)
+    /// Restore a voided order
     RestoreOrder { order_id: String },
 
     // ========== Item Operations ==========
@@ -100,7 +100,7 @@ pub enum OrderCommandPayload {
         authorizer_name: Option<String>,
     },
 
-    /// Restore a removed item (reserved, not implemented)
+    /// Restore a removed item
     RestoreItem {
         order_id: String,
         instance_id: String,

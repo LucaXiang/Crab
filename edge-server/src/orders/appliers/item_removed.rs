@@ -444,6 +444,6 @@ mod tests {
         assert_eq!(snapshot.tax, 21.0);
         // total = subtotal - discount = 121 - 5 = 116 (tax already included)
         assert_eq!(snapshot.total, 116.0);
-        assert_eq!(snapshot.discount, 5.0); // Legacy field should be updated
+        assert_eq!(snapshot.discount, 5.0);
     }
 }

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { X, ShoppingBag } from 'lucide-react';
 import { formatCurrency, Currency } from '@/utils/currency';
-import { CartItem as CartItemType, Product, ItemOption, AttributeTemplate, AttributeOption, EmbeddedSpec, ProductAttribute } from '@/core/domain/types';
+import { CartItem as CartItemType, Product, ItemOption, Attribute, AttributeOption, EmbeddedSpec, ProductAttribute } from '@/core/domain/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useCategories, useCategoryStore } from '@/features/category';
 import { useProducts, useProductStore, useProductsLoading, ProductWithPrice } from '@/features/product';
@@ -74,7 +74,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
   const [selectedProductForOptions, setSelectedProductForOptions] = useState<{
     product: Product;
     basePrice: number;
-    attributes: AttributeTemplate[];
+    attributes: Attribute[];
     options: Map<string, AttributeOption[]>;
     bindings: ProductAttribute[];
     specifications?: EmbeddedSpec[];
@@ -161,7 +161,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       const productAttrIds = new Set(attrBindings.map(b => String(b.attribute.id)));
 
       // Fetch category attributes (inherited)
-      let categoryAttributes: AttributeTemplate[] = [];
+      let categoryAttributes: Attribute[] = [];
       if (productFull.category) {
         try {
           categoryAttributes = await api.listCategoryAttributes(productFull.category);
@@ -174,8 +174,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       }
 
       // Extract attributes from product bindings
-      const productAttributeList: AttributeTemplate[] = attrBindings.map(binding => binding.attribute);
-      const attributeList: AttributeTemplate[] = [...productAttributeList, ...categoryAttributes];
+      const productAttributeList: Attribute[] = attrBindings.map(binding => binding.attribute);
+      const attributeList: Attribute[] = [...productAttributeList, ...categoryAttributes];
 
       // Build options map
       const optionsMap = new Map<string, AttributeOption[]>();

@@ -111,7 +111,7 @@ impl MessageHandler {
         if let Some(processor) = self.processors.get(&event_type) {
             self.process_message(msg, processor.clone()).await?;
         } else {
-            self.handle_legacy(msg).await?;
+            self.handle_unregistered(msg).await?;
         }
 
         Ok(())
@@ -191,8 +191,8 @@ impl MessageHandler {
         }
     }
 
-    /// 未注册消息类型的遗留处理逻辑
-    async fn handle_legacy(&self, msg: &BusMessage) -> Result<(), Box<dyn std::error::Error>> {
+    /// 处理未注册消息类型
+    async fn handle_unregistered(&self, msg: &BusMessage) -> Result<(), Box<dyn std::error::Error>> {
         tracing::warn!(
             event_type = ?msg.event_type,
             "No processor registered for event type"

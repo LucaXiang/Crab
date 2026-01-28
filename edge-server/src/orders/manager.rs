@@ -37,7 +37,8 @@ use shared::order::{
 };
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use parking_lot::RwLock;
 use thiserror::Error;
 use tokio::sync::broadcast;
 
@@ -253,19 +254,19 @@ impl OrdersManager {
 
     /// Cache rules for an order
     pub fn cache_rules(&self, order_id: &str, rules: Vec<PriceRule>) {
-        let mut cache = self.rule_cache.write().unwrap();
+        let mut cache = self.rule_cache.write();
         cache.insert(order_id.to_string(), rules);
     }
 
     /// Get cached rules for an order
     pub fn get_cached_rules(&self, order_id: &str) -> Option<Vec<PriceRule>> {
-        let cache = self.rule_cache.read().unwrap();
+        let cache = self.rule_cache.read();
         cache.get(order_id).cloned()
     }
 
     /// Remove cached rules for an order
     pub fn remove_cached_rules(&self, order_id: &str) {
-        let mut cache = self.rule_cache.write().unwrap();
+        let mut cache = self.rule_cache.write();
         cache.remove(order_id);
     }
 
@@ -513,7 +514,7 @@ impl OrdersManager {
     /// Get a snapshot by order ID
     pub fn get_snapshot(&self, order_id: &str) -> ManagerResult<Option<OrderSnapshot>> {
         let mut snapshot = self.storage.get_snapshot(order_id)?;
-        // Ensure line_total is populated for backward compatibility with old data
+        // 确保 line_total 已计算
         if let Some(ref mut order) = snapshot {
             let needs_recalc = order.items.iter().any(|item| item.line_total.is_none());
             if needs_recalc {
@@ -528,7 +529,7 @@ impl OrdersManager {
     /// Ensures all items have `line_total` computed for consistency with order totals.
     pub fn get_active_orders(&self) -> ManagerResult<Vec<OrderSnapshot>> {
         let mut orders = self.storage.get_active_orders()?;
-        // Ensure line_total is populated for backward compatibility with old data
+        // 确保 line_total 已计算
         for order in &mut orders {
             let needs_recalc = order.items.iter().any(|item| item.line_total.is_none());
             if needs_recalc {

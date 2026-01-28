@@ -24,7 +24,7 @@ import {
 	}	from './components';
 
 // Types
-import { Product, ItemOption, AttributeTemplate, AttributeOption, EmbeddedSpec, ProductAttribute } from '@/core/domain/types';
+import { Product, ItemOption, Attribute, AttributeOption, EmbeddedSpec, ProductAttribute } from '@/core/domain/types';
 
 // i18n
 import { useI18n } from '@/hooks/useI18n';
@@ -40,7 +40,7 @@ import {
 import {
   useCart,
   useCartActions,
-} from '@/core/stores/cart';
+} from '@/core/stores/cart/useCartStore';
 import {
   useHeldOrders,
   useDraftOrders,
@@ -52,7 +52,7 @@ import {
   useScreen,
   useViewMode,
   useModalStates,
-  useSelectedPrinter,
+  useReceiptPrinter,
   useUIActions,
   useSelectedCategory,
   usePOSUIActions,
@@ -207,7 +207,7 @@ export const POSScreen: React.FC = () => {
     product: Product;
     basePrice: number;  // Computed from root spec
     startRect?: DOMRect;
-    attributes: AttributeTemplate[];
+    attributes: Attribute[];
     options: Map<string, AttributeOption[]>;
     bindings: ProductAttribute[];
     specifications?: EmbeddedSpec[];
@@ -220,7 +220,7 @@ export const POSScreen: React.FC = () => {
     setShowDraftModal,
     addAnimation,
   } = useUIActions();
-  const selectedPrinter = useSelectedPrinter();
+  const selectedPrinter = useReceiptPrinter();
 
   // DB Status
   const [isDbOnline, setIsDbOnline] = useState<boolean | null>(null);
@@ -309,7 +309,7 @@ export const POSScreen: React.FC = () => {
         const productAttrIds = new Set(attrBindings.map(b => String(b.attribute.id)));
 
         // Fetch category attributes (inherited) - still need API call for now
-        let categoryAttributes: AttributeTemplate[] = [];
+        let categoryAttributes: Attribute[] = [];
         if (productFull.category) {
           try {
             categoryAttributes = await api.listCategoryAttributes(productFull.category);
@@ -323,9 +323,9 @@ export const POSScreen: React.FC = () => {
         }
 
         // Extract attributes from product bindings
-        const productAttributeList: AttributeTemplate[] = attrBindings.map(binding => binding.attribute);
+        const productAttributeList: Attribute[] = attrBindings.map(binding => binding.attribute);
         // Merge: product attributes first, then category attributes (inherited)
-        const attributeList: AttributeTemplate[] = [...productAttributeList, ...categoryAttributes];
+        const attributeList: Attribute[] = [...productAttributeList, ...categoryAttributes];
 
         // Build options map from all attributes
         const optionsMap = new Map<string, AttributeOption[]>();

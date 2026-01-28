@@ -14,7 +14,7 @@ pub use shared::error::ErrorCode;
 
 /// 统一的 API 响应格式
 ///
-/// Compatible with unified error system while maintaining backward compatibility
+/// 使用 shared::error::ErrorCode 统一错误码
 #[derive(Debug, Clone, Serialize)]
 pub struct ApiResponse<T: Serialize> {
     /// 错误码 (null or 0 = success)

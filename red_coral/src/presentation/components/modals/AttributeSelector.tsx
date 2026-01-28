@@ -1,11 +1,11 @@
 import React from 'react';
 import { Check } from 'lucide-react';
-import { AttributeTemplate, AttributeOption } from '@/core/domain/types';
+import { Attribute, AttributeOption } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface AttributeSelectorProps {
-  attribute: AttributeTemplate;
+  attribute: Attribute;
   options: AttributeOption[];
   selectedOptionIds: string[];
   defaultOptionIds?: string[];

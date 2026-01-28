@@ -5,7 +5,6 @@ export {
   useLabelPrinter,
   useCashDrawerPrinter,
   useActiveLabelTemplateId,
-  useSelectedPrinter,
   usePrinterActions,
   useAutoOpenCashDrawerAfterReceipt,
 } from './usePrinterStore';

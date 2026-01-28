@@ -294,6 +294,9 @@ pub async fn run() {
             commands::get_daily_report_by_date,
             commands::generate_daily_report,
             commands::delete_daily_report,
+            // Statistics commands (数据统计)
+            commands::get_statistics,
+            commands::get_sales_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -31,7 +31,7 @@ const useItemActionLogic = (props: ItemActionPanelProps) => {
   // 1. Base + Options
   const unitPriceBeforeDiscount = Currency.add(basePrice, optionsModifier);
   // 2. Discount Amount (on the enhanced unit price)
-  const unitDiscountAmount = Currency.floor2(Currency.mul(unitPriceBeforeDiscount, discount / 100));
+  const unitDiscountAmount = Currency.round2(Currency.mul(unitPriceBeforeDiscount, discount / 100));
   // 3. Final Unit Price
   const unitPriceFinal = Currency.sub(unitPriceBeforeDiscount, unitDiscountAmount);
   // 4. Total Line Price

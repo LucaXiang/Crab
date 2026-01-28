@@ -169,7 +169,7 @@ impl<T> MessageBuilder<T> {
     }
 }
 
-/// 保持对旧BusMessage的完全兼容
+/// 消息总线消息体
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BusMessage {
     pub request_id: Uuid,

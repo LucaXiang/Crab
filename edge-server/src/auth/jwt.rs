@@ -140,7 +140,7 @@ pub fn generate_secure_printable_jwt_secret() -> String {
             return "CrabEdgeServerDevelopmentSecureKey2024!".to_string();
         }
         let idx = (byte[0] as usize) % allowed_chars.len();
-        key.push(allowed_chars.chars().nth(idx).unwrap());
+        key.push(allowed_chars.chars().nth(idx).expect("idx is bounded by modulo"));
     }
 
     key

@@ -51,7 +51,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
   useEffect(() => {
     if (open) {
       if (action === 'close' && shift?.expected_cash) {
-        setCashInput(Currency.floor2(shift.expected_cash).toString());
+        setCashInput(Currency.round2(shift.expected_cash).toString());
       } else {
         setCashInput('0');
       }
@@ -107,7 +107,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
     setLoading(true);
     try {
       if (action === 'open') {
-        const cashAmount = Currency.floor2(cashInput || '0').toNumber();
+        const cashAmount = Currency.round2(cashInput || '0').toNumber();
         if (cashAmount < 0) {
           toast.error(t('settings.shift.invalid_amount'));
           setLoading(false);
@@ -121,7 +121,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
         });
         toast.success(t('settings.shift.open_success'));
       } else if (action === 'close' && shift?.id) {
-        const actual = Currency.floor2(cashInput).toNumber();
+        const actual = Currency.round2(cashInput).toNumber();
         if (actual < 0) {
           toast.error(t('settings.shift.invalid_amount'));
           setLoading(false);
@@ -137,7 +137,7 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
         } else {
           toast.success(
             t('settings.shift.close_success_variance', {
-              variance: (variance.isPositive() ? '+' : '') + Currency.floor2(variance).toString(),
+              variance: (variance.isPositive() ? '+' : '') + Currency.round2(variance).toString(),
             })
           );
         }

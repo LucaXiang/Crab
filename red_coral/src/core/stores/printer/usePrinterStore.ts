@@ -86,8 +86,6 @@ export const useCashDrawerPrinter = () => usePrinterStore((state) => state.cashD
 export const useActiveLabelTemplateId = () => usePrinterStore((state) => state.activeLabelTemplateId);
 export const useAutoOpenCashDrawerAfterReceipt = () => usePrinterStore((state) => state.autoOpenCashDrawerAfterReceipt);
 
-// Alias for backward compatibility
-export const useSelectedPrinter = useReceiptPrinter;
 
 // Actions hook
 export const usePrinterActions = () => usePrinterStore(

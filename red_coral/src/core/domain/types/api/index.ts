@@ -12,7 +12,6 @@ import type {
   Table,
   PrintDestination,
   Attribute,
-  AttributeTemplate,
   AttributeOption,
   Role,
   RolePermission,
@@ -293,17 +292,17 @@ export interface UpdatePriceAdjustmentRequest {
 }
 
 // Attribute Template types
-// Note: AttributeTemplateData extends AttributeTemplate but makes options optional for API responses
-export interface AttributeTemplateData extends Omit<AttributeTemplate, 'options'> {
+// Note: AttributeData extends Attribute but makes options optional for API responses
+export interface AttributeData extends Omit<Attribute, 'options'> {
   options?: AttributeOption[];
 }
 
-export interface AttributeTemplateListData {
-  templates: AttributeTemplate[];
+export interface AttributeListData {
+  templates: Attribute[];
   total: number;
 }
 
-export interface CreateAttributeTemplateRequest {
+export interface CreateAttributeRequest {
   name: string;
   scope?: 'global' | 'inherited';
   excluded_categories?: string[];
@@ -318,7 +317,7 @@ export interface CreateAttributeTemplateRequest {
   kitchen_print_name?: string;
 }
 
-export interface UpdateAttributeTemplateRequest {
+export interface UpdateAttributeRequest {
   name?: string;
   scope?: 'global' | 'inherited';
   excluded_categories?: string[];
@@ -470,7 +469,7 @@ export interface UpdateTableRequest {
 
 // Category Attribute types
 export interface CategoryAttributeData extends CategoryAttribute {
-  attribute?: AttributeTemplate;
+  attribute?: Attribute;
   options?: AttributeOption[];
 }
 

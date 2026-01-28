@@ -14,7 +14,8 @@
 //! 7. shutdown()                     - Graceful shutdown
 //! ```
 
-use crate::core::{Config, Result, ServerState};
+use crate::core::{Config, ServerState};
+use crate::utils::AppError;
 use axum_server::tls_rustls::RustlsConfig;
 
 /// HTTP Server
@@ -39,7 +40,7 @@ impl Server {
         }
     }
 
-    pub async fn run(&self) -> Result<()> {
+    pub async fn run(&self) -> Result<(), AppError> {
         // ═══════════════════════════════════════════════════════════════════
         // Phase 1: Initialize
         // ═══════════════════════════════════════════════════════════════════
@@ -80,7 +81,7 @@ impl Server {
             .https
             .start_server(rustls_config, shutdown)
             .await
-            .map_err(|e| crate::core::ServerError::Internal(e.into()))?;
+            .map_err(|e| AppError::internal(format!("HTTPS server error: {e}")))?;
 
         // ═══════════════════════════════════════════════════════════════════
         // Phase 6: Graceful shutdown

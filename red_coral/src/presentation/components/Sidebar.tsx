@@ -10,7 +10,7 @@ import {
   useTotalAmount,
   useIsCartEmpty,
   useCartActions
-} from '@/core/stores/cart';
+} from '@/core/stores/cart/useCartStore';
 
 import {
   useHeldOrdersCount,

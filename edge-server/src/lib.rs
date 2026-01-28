@@ -41,36 +41,13 @@ pub use core::{Config, Server, ServerState};
 pub use message::{BusMessage, EventType};
 pub use orders::{OrderStorage, OrdersManager};
 pub use pricing::PriceRuleEngine;
-pub use utils::AppError as AppErrorType;
-pub use utils::{AppResponse, AppResult};
-
-// 为向后兼容性提供 AppError 别名
-pub use utils::AppError;
+pub use utils::{AppError, AppResult};
 
 // Re-export unified error types from shared
 pub use utils::{ApiResponse, ErrorCategory, ErrorCode};
 
 // Re-export logger functions
 pub use utils::logger::{cleanup_old_logs, init_logger, init_logger_with_file};
-
-// API response helper macro
-#[macro_export]
-macro_rules! ok {
-    ($data:expr) => {
-        axum::Json($crate::AppResponse {
-            success: true,
-            data: Some($data),
-            error: None,
-        })
-    };
-    () => {
-        axum::Json($crate::AppResponse {
-            success: true,
-            data: None,
-            error: None,
-        })
-    };
-}
 
 // Audit logging macro - 空操作 (1-3 客户端场景不需要审计)
 #[macro_export]

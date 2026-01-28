@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '../Toast';
-import { AttributeTemplate, AttributeOption, ItemOption, ProductAttribute, EmbeddedSpec } from '@/core/domain/types';
+import { Attribute, AttributeOption, ItemOption, ProductAttribute, EmbeddedSpec } from '@/core/domain/types';
 import { ItemConfiguratorModal } from './ItemConfiguratorModal';
 
 interface ProductOptionsModalProps {
@@ -9,7 +9,7 @@ interface ProductOptionsModalProps {
   onClose: () => void;
   productName: string;
   basePrice: number;
-  attributes: AttributeTemplate[];
+  attributes: Attribute[];
   allOptions: Map<string, AttributeOption[]>;
   bindings?: ProductAttribute[];
   specifications?: EmbeddedSpec[]; // Embedded specifications (use index as ID)

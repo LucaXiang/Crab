@@ -79,7 +79,7 @@ pub struct OrderSnapshot {
     /// Tax amount
     #[serde(default)]
     pub tax: f64,
-    /// Discount amount (legacy, use total_discount instead)
+    /// Total discount amount
     #[serde(default)]
     pub discount: f64,
     /// Total amount to pay
@@ -93,6 +93,10 @@ pub struct OrderSnapshot {
     /// Quantities paid per item (for split bill)
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
     pub paid_item_quantities: std::collections::HashMap<String, i32>,
+    /// Whether this order has amount-based split payments (金额分单)
+    /// If true, item-based split is disabled
+    #[serde(default)]
+    pub has_amount_split: bool,
     /// Receipt number (server-generated at OpenTable)
     pub receipt_number: String,
     /// Whether this is a pre-payment order
@@ -166,6 +170,7 @@ impl OrderSnapshot {
             paid_amount: 0.0,
             remaining_amount: 0.0,
             paid_item_quantities: std::collections::HashMap::new(),
+            has_amount_split: false,
             receipt_number: String::new(),
             is_pre_payment: false,
             order_rule_discount_amount: None,

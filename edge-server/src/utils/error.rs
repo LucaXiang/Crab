@@ -5,9 +5,6 @@
 
 pub use shared::error::{ApiResponse, AppError, AppResult, ErrorCategory, ErrorCode};
 
-// Legacy type alias for backward compatibility
-pub type AppResponse2<T> = ApiResponse<T>;
-
 /// Convenience functions for creating JSON responses
 pub mod response {
     use super::*;

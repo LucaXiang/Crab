@@ -2431,6 +2431,7 @@ dependencies = [
  "jsonwebtoken 10.2.0",
  "log",
  "mime_guess",
+ "parking_lot",
  "rand 0.8.5",
  "ratatui 0.29.0",
  "redb",

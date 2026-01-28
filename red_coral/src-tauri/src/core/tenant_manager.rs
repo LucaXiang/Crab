@@ -381,35 +381,10 @@ impl TenantManager {
         }
 
         // 解析响应
-        #[derive(serde::Deserialize)]
-        struct LoginResponse {
-            success: bool,
-            data: Option<LoginData>,
-            error: Option<String>,
-        }
-
-        #[derive(serde::Deserialize)]
-        struct LoginData {
-            token: String,
-            user: shared::client::UserInfo,
-        }
-
-        let login_resp: LoginResponse = response
-            .json::<LoginResponse>()
+        let data: shared::client::LoginResponse = response
+            .json()
             .await
             .map_err(|e: reqwest::Error| TenantError::Network(e.to_string()))?;
-
-        if !login_resp.success {
-            return Err(TenantError::AuthFailed(
-                login_resp
-                    .error
-                    .unwrap_or_else(|| "Unknown error".to_string()),
-            ));
-        }
-
-        let data = login_resp
-            .data
-            .ok_or_else(|| TenantError::AuthFailed("Missing login data".to_string()))?;
 
         // 创建会话
         let session = EmployeeSession {

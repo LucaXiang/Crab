@@ -45,5 +45,8 @@ pub mod zones;
 pub mod shifts;
 pub mod daily_reports;
 
+// Analytics (数据统计)
+pub mod statistics;
+
 // Re-export common types for handlers
-pub use crate::utils::{AppResponse, AppResult};
+pub use crate::utils::AppResult;

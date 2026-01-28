@@ -486,7 +486,7 @@ pub struct LabelTemplate {
 
 impl Default for LabelTemplate {
     fn default() -> Self {
-        // Default 40mm x 30mm template with legacy field layout
+        // Default 40mm x 30mm template
         Self {
             width_mm: 40.0,
             height_mm: 30.0,

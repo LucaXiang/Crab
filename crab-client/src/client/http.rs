@@ -6,14 +6,6 @@ use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
 use serde::de::DeserializeOwned;
 
-/// Internal response wrapper for Edge Server API (which uses success/data/error format)
-#[derive(serde::Deserialize)]
-struct EdgeResponse<T> {
-    pub success: bool,
-    pub data: Option<T>,
-    pub error: Option<String>,
-}
-
 /// 服务端返回的错误响应格式
 #[derive(serde::Deserialize)]
 struct ApiErrorResponse {
@@ -187,29 +179,15 @@ impl HttpClient for NetworkHttpClient {
             username: username.to_string(),
             password: password.to_string(),
         };
-        let resp: EdgeResponse<LoginResponse> = self.post("/api/auth/login", &req).await?;
-        if !resp.success {
-            return Err(ClientError::Auth(
-                resp.error.unwrap_or_else(|| "Unknown error".into()),
-            ));
-        }
-        resp.data
-            .ok_or_else(|| ClientError::InvalidResponse("Missing login data".into()))
+        self.post("/api/auth/login", &req).await
     }
 
     async fn me(&self) -> ClientResult<CurrentUserResponse> {
-        let resp: EdgeResponse<CurrentUserResponse> = self.get("/api/auth/me").await?;
-        if !resp.success {
-            return Err(ClientError::Auth(
-                resp.error.unwrap_or_else(|| "Unknown error".into()),
-            ));
-        }
-        resp.data
-            .ok_or_else(|| ClientError::InvalidResponse("Missing user data".into()))
+        self.get("/api/auth/me").await
     }
 
     async fn logout(&mut self) -> Result<(), ClientError> {
-        let _resp: EdgeResponse<()> = self.post_empty("/api/auth/logout").await?;
+        let _resp: () = self.post_empty("/api/auth/logout").await?;
         self.token = None;
         Ok(())
     }

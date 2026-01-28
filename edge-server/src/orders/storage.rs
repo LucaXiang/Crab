@@ -846,6 +846,7 @@ mod tests {
             loss_reason: None,
             loss_amount: None,
             void_note: None,
+            has_amount_split: false,
         };
         snapshot.update_checksum();
         snapshot

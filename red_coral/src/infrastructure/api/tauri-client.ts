@@ -34,7 +34,7 @@ import type {
   Attribute,
   AttributeCreate,
   AttributeUpdate,
-  AttributeTemplateListData,
+  AttributeListData,
   RoleListData,
   RolePermissionListData,
   ProductAttribute,
@@ -239,12 +239,12 @@ export class TauriApiClient {
 
   // ============ Attributes ============
 
-  async listAttributeTemplates(): Promise<Attribute[]> {
-    const data = await invokeAndUnwrap<AttributeTemplateListData>('list_attributes');
+  async listAttributes(): Promise<Attribute[]> {
+    const data = await invokeAndUnwrap<AttributeListData>('list_attributes');
     return data.templates;
   }
 
-  async getAttributeTemplate(id: string): Promise<Attribute> {
+  async getAttribute(id: string): Promise<Attribute> {
     const data = await invokeAndUnwrap<{ template: Attribute }>('get_attribute', { id });
     return data.template;
   }

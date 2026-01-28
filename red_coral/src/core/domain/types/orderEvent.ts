@@ -206,6 +206,7 @@ export interface PaymentCancelledPayload {
 
 export interface OrderSplitPayload {
   type: 'ORDER_SPLIT';
+  payment_id: string;
   split_amount: number;
   payment_method: string;
   items: SplitItem[];
@@ -552,7 +553,7 @@ export interface OrderSnapshot {
   /** Total surcharge amount (item-level + order-level) */
   total_surcharge: number;
   tax: number;
-  /** Legacy discount field (use total_discount instead) */
+  /** Total discount amount */
   discount: number;
   /** Total amount to pay */
   total: number;
@@ -562,6 +563,8 @@ export interface OrderSnapshot {
   remaining_amount: number;
   /** Quantities paid per item (for split bill) */
   paid_item_quantities?: Record<string, number>;
+  /** Whether this order has amount-based split payments (金额分单) */
+  has_amount_split?: boolean;
   /** Server-generated receipt number (always present from OpenTable) */
   receipt_number: string;
   is_pre_payment?: boolean;

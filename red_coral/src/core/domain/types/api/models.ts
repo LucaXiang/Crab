@@ -466,17 +466,12 @@ export interface EmployeeUpdate {
   is_active?: boolean;
 }
 
-// ============ Type Aliases for Backward Compatibility ============
+// ============ Table Short Names ============
 
-/** Alias for DiningTable */
 export type Table = DiningTable;
 export type TableCreate = DiningTableCreate;
 export type TableUpdate = DiningTableUpdate;
 
-/** Alias for Attribute (legacy name) */
-export type AttributeTemplate = Attribute;
-export type AttributeTemplateCreate = AttributeCreate;
-export type AttributeTemplateUpdate = AttributeUpdate;
 
 // ============ Role ============
 

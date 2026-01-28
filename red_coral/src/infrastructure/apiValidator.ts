@@ -8,6 +8,7 @@
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { z } from 'zod';
 import { logger } from '@/utils/logger';
+import type { StatisticsResponse, SalesReportResponse } from '@/core/domain/types';
 
 // Re-export base schemas from validators
 import {
@@ -105,25 +106,7 @@ const statisticsResponseSchema = z.object({
   top_products: z.array(topProductSchema),
 });
 
-export interface StatisticsResponse {
-  overview: {
-    today_revenue: number;
-    today_orders: number;
-    today_customers: number;
-    average_order_value: number;
-    cash_revenue: number;
-    card_revenue: number;
-    other_revenue: number;
-    voided_orders: number;
-    voided_amount: number;
-    total_discount: number;
-    avg_guest_spend: number;
-    avg_dining_time?: number;
-  };
-  revenue_trend: Array<{ time: string; value: number }>;
-  category_sales: Array<{ name: string; value: number; color: string }>;
-  top_products: Array<{ name: string; sales: number }>;
-}
+export type { StatisticsResponse };
 
 export async function getStatistics(
   timeRange: string,
@@ -157,13 +140,7 @@ const salesReportResponseSchema = z.object({
   totalPages: positiveIntSchema,
 });
 
-export interface SalesReportResponse {
-  items: Array<{ order_id: string; receipt_number: string | null; date: string; total: number; status: string }>;
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
+export type { SalesReportResponse };
 
 export async function getSalesReport(
   timeRange: string,

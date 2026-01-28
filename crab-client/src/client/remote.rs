@@ -12,14 +12,6 @@ use std::time::Duration;
 
 use super::common::CrabClient;
 
-/// AppResponse structure matching Edge Server's format
-#[derive(Debug, Clone, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AppResponse<T> {
-    success: bool,
-    data: Option<T>,
-    error: Option<String>,
-}
 
 // ============================================================================
 // Disconnected State
@@ -361,7 +353,7 @@ impl CrabClient<Remote, Connected> {
             }
         };
 
-        // Parse response using AppResponse format (matches Edge Server)
+        // Parse response
         let status = response.status();
         if !status.is_success() {
             let text = response
@@ -372,29 +364,12 @@ impl CrabClient<Remote, Connected> {
             return Err((ClientError::Auth(text), self));
         }
 
-        let resp: AppResponse<shared::client::LoginResponse> = match response.json().await {
+        let login_data: shared::client::LoginResponse = match response.json().await {
             Ok(r) => r,
             Err(e) => {
                 self.edge_http = Some(edge_http);
                 return Err((
                     ClientError::InvalidResponse(format!("Failed to parse login response: {}", e)),
-                    self,
-                ));
-            }
-        };
-
-        if !resp.success {
-            let error_msg = resp.error.unwrap_or_else(|| "Unknown error".to_string());
-            self.edge_http = Some(edge_http);
-            return Err((ClientError::Auth(error_msg), self));
-        }
-
-        let login_data = match resp.data {
-            Some(d) => d,
-            None => {
-                self.edge_http = Some(edge_http);
-                return Err((
-                    ClientError::InvalidResponse("Missing login data in response".into()),
                     self,
                 ));
             }

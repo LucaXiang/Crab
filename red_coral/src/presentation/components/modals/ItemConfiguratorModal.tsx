@@ -4,7 +4,7 @@ import { X, Check } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { AttributeSelector } from './AttributeSelector';
 import { ItemActionPanel } from '../ui/ItemActionPanel';
-import { AttributeTemplate, AttributeOption, ProductAttribute, EmbeddedSpec } from '@/core/domain/types';
+import { Attribute, AttributeOption, ProductAttribute, EmbeddedSpec } from '@/core/domain/types';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface ItemConfiguratorModalProps {
@@ -17,7 +17,7 @@ interface ItemConfiguratorModalProps {
 
   // Data & State
   isLoading?: boolean;
-  attributes: AttributeTemplate[];
+  attributes: Attribute[];
   allOptions: Map<string, AttributeOption[]>;
   bindings?: ProductAttribute[];
   selections: Map<string, string[]>;

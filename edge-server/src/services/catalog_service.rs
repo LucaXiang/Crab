@@ -15,7 +15,8 @@ use crate::db::repository::{ImageRefRepository, RepoError, RepoResult};
 use super::ImageCleanupService;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use parking_lot::RwLock;
 use surrealdb::engine::local::Db;
 use surrealdb::RecordId;
 use surrealdb::Surreal;
@@ -113,8 +114,8 @@ pub struct CatalogService {
 
 impl std::fmt::Debug for CatalogService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let products_count = self.products.read().map(|p| p.len()).unwrap_or(0);
-        let categories_count = self.categories.read().map(|c| c.len()).unwrap_or(0);
+        let products_count = self.products.read().len();
+        let categories_count = self.categories.read().len();
         f.debug_struct("CatalogService")
             .field("products_count", &products_count)
             .field("categories_count", &categories_count)
@@ -151,7 +152,7 @@ impl CatalogService {
             .take(0)?;
 
         {
-            let mut cache = self.categories.write().unwrap();
+            let mut cache = self.categories.write();
             cache.clear();
             for cat in &categories {
                 if let Some(id) = &cat.id {
@@ -212,7 +213,7 @@ impl CatalogService {
 
         // 4. Build ProductFull and store in cache
         {
-            let mut cache = self.products.write().unwrap();
+            let mut cache = self.products.write();
             cache.clear();
 
             for product in products {
@@ -252,7 +253,7 @@ impl CatalogService {
             }
         }
 
-        let products_count = self.products.read().unwrap().len();
+        let products_count = self.products.read().len();
         tracing::info!("📦 CatalogService: Loaded {} products", products_count);
 
         Ok(())
@@ -260,14 +261,14 @@ impl CatalogService {
 
     /// Set system default print destinations
     pub fn set_print_defaults(&self, kitchen: Option<String>, label: Option<String>) {
-        let mut defaults = self.print_defaults.write().unwrap();
+        let mut defaults = self.print_defaults.write();
         defaults.kitchen_destination = kitchen;
         defaults.label_destination = label;
     }
 
     /// Get system default print destinations
     pub fn get_print_defaults(&self) -> PrintDefaults {
-        self.print_defaults.read().unwrap().clone()
+        self.print_defaults.read().clone()
     }
 
     // =========================================================================
@@ -276,13 +277,13 @@ impl CatalogService {
 
     /// Get product by ID (from cache)
     pub fn get_product(&self, id: &str) -> Option<ProductFull> {
-        let cache = self.products.read().unwrap();
+        let cache = self.products.read();
         cache.get(id).cloned()
     }
 
     /// List all products (from cache)
     pub fn list_products(&self) -> Vec<ProductFull> {
-        let cache = self.products.read().unwrap();
+        let cache = self.products.read();
         let mut products: Vec<_> = cache.values().cloned().collect();
         products.sort_by_key(|p| p.sort_order);
         products
@@ -290,7 +291,7 @@ impl CatalogService {
 
     /// Get products by category ID (from cache)
     pub fn get_products_by_category(&self, category_id: &str) -> Vec<ProductFull> {
-        let cache = self.products.read().unwrap();
+        let cache = self.products.read();
         let mut products: Vec<_> = cache
             .values()
             .filter(|p| p.category.to_string() == category_id)
@@ -317,7 +318,7 @@ impl CatalogService {
 
         // Validate category is not virtual
         {
-            let categories = self.categories.read().unwrap();
+            let categories = self.categories.read();
             let cat_id = data.category.to_string();
             if let Some(cat) = categories.get(&cat_id)
                 && cat.is_virtual
@@ -383,7 +384,7 @@ impl CatalogService {
 
         // Update cache
         {
-            let mut cache = self.products.write().unwrap();
+            let mut cache = self.products.write();
             cache.insert(product_id, full.clone());
         }
 
@@ -419,7 +420,7 @@ impl CatalogService {
 
         // Validate category if changing
         if let Some(ref new_cat) = data.category {
-            let categories = self.categories.read().unwrap();
+            let categories = self.categories.read();
             let cat_id = new_cat.to_string();
             if let Some(cat) = categories.get(&cat_id)
                 && cat.is_virtual
@@ -477,7 +478,7 @@ impl CatalogService {
 
         // Update cache
         {
-            let mut cache = self.products.write().unwrap();
+            let mut cache = self.products.write();
             if full.is_active {
                 cache.insert(id.to_string(), full.clone());
             } else {
@@ -514,7 +515,7 @@ impl CatalogService {
 
         // Update cache
         {
-            let mut cache = self.products.write().unwrap();
+            let mut cache = self.products.write();
             cache.remove(id);
         }
 
@@ -550,7 +551,7 @@ impl CatalogService {
         // Refresh full product and update cache
         let full = self.fetch_product_full(product_id).await?;
         {
-            let mut cache = self.products.write().unwrap();
+            let mut cache = self.products.write();
             cache.insert(product_id.to_string(), full.clone());
         }
 
@@ -580,7 +581,7 @@ impl CatalogService {
         // Refresh full product and update cache
         let full = self.fetch_product_full(product_id).await?;
         {
-            let mut cache = self.products.write().unwrap();
+            let mut cache = self.products.write();
             cache.insert(product_id.to_string(), full.clone());
         }
 
@@ -676,13 +677,13 @@ impl CatalogService {
 
     /// Get category by ID (from cache)
     pub fn get_category(&self, id: &str) -> Option<Category> {
-        let cache = self.categories.read().unwrap();
+        let cache = self.categories.read();
         cache.get(id).cloned()
     }
 
     /// List all categories (from cache)
     pub fn list_categories(&self) -> Vec<Category> {
-        let cache = self.categories.read().unwrap();
+        let cache = self.categories.read();
         let mut categories: Vec<_> = cache.values().cloned().collect();
         categories.sort_by_key(|c| c.sort_order);
         categories
@@ -696,7 +697,7 @@ impl CatalogService {
     pub async fn create_category(&self, data: CategoryCreate) -> RepoResult<Category> {
         // Check duplicate name
         {
-            let categories = self.categories.read().unwrap();
+            let categories = self.categories.read();
             if categories.values().any(|c| c.name == data.name) {
                 return Err(RepoError::Duplicate(format!(
                     "Category '{}' already exists",
@@ -760,7 +761,7 @@ impl CatalogService {
         // Update cache
         let category_id = created.id.as_ref().map(|t| t.to_string()).unwrap_or_default();
         {
-            let mut cache = self.categories.write().unwrap();
+            let mut cache = self.categories.write();
             cache.insert(category_id, created.clone());
         }
 
@@ -781,7 +782,7 @@ impl CatalogService {
         if let Some(ref new_name) = data.name
             && new_name != &existing.name
         {
-            let categories = self.categories.read().unwrap();
+            let categories = self.categories.read();
             if categories.values().any(|c| &c.name == new_name) {
                 return Err(RepoError::Duplicate(format!(
                     "Category '{}' already exists",
@@ -858,7 +859,7 @@ impl CatalogService {
 
         // Update cache
         {
-            let mut cache = self.categories.write().unwrap();
+            let mut cache = self.categories.write();
             if updated.is_active {
                 cache.insert(id.to_string(), updated.clone());
             } else {
@@ -902,7 +903,7 @@ impl CatalogService {
 
         // Update cache
         {
-            let mut cache = self.categories.write().unwrap();
+            let mut cache = self.categories.write();
             cache.remove(id);
         }
 
@@ -915,7 +916,7 @@ impl CatalogService {
 
     /// Get product metadata for price rule matching
     pub fn get_product_meta(&self, product_id: &str) -> Option<ProductMeta> {
-        let cache = self.products.read().unwrap();
+        let cache = self.products.read();
         cache.get(product_id).map(|p| ProductMeta {
             category_id: p.category.to_string(),
             tags: p.tags.iter().filter_map(|t| t.id.as_ref()).map(|t| t.to_string()).collect(),
@@ -925,7 +926,7 @@ impl CatalogService {
 
     /// Get product metadata for multiple products
     pub fn get_product_meta_batch(&self, product_ids: &[String]) -> HashMap<String, ProductMeta> {
-        let cache = self.products.read().unwrap();
+        let cache = self.products.read();
         product_ids
             .iter()
             .filter_map(|id| {
@@ -948,10 +949,10 @@ impl CatalogService {
     /// Priority: product.is_kitchen_print_enabled > category.is_kitchen_print_enabled
     /// Destinations: product.destinations > category.destinations > global default
     pub fn get_kitchen_print_config(&self, product_id: &str) -> Option<KitchenPrintConfig> {
-        let products = self.products.read().unwrap();
+        let products = self.products.read();
         let product = products.get(product_id)?;
 
-        let categories = self.categories.read().unwrap();
+        let categories = self.categories.read();
         let category = categories.get(&product.category.to_string());
 
         // Determine if enabled (product > category)
@@ -981,11 +982,11 @@ impl CatalogService {
             if !cat.kitchen_print_destinations.is_empty() {
                 cat.kitchen_print_destinations.iter().map(|t| t.to_string()).collect()
             } else {
-                let defaults = self.print_defaults.read().unwrap();
+                let defaults = self.print_defaults.read();
                 defaults.kitchen_destination.iter().cloned().collect()
             }
         } else {
-            let defaults = self.print_defaults.read().unwrap();
+            let defaults = self.print_defaults.read();
             defaults.kitchen_destination.iter().cloned().collect()
         };
 
@@ -998,10 +999,10 @@ impl CatalogService {
 
     /// Get label print configuration for a product (with fallback chain)
     pub fn get_label_print_config(&self, product_id: &str) -> Option<LabelPrintConfig> {
-        let products = self.products.read().unwrap();
+        let products = self.products.read();
         let product = products.get(product_id)?;
 
-        let categories = self.categories.read().unwrap();
+        let categories = self.categories.read();
         let category = categories.get(&product.category.to_string());
 
         // Determine if enabled (product > category)
@@ -1030,11 +1031,11 @@ impl CatalogService {
             if !cat.label_print_destinations.is_empty() {
                 cat.label_print_destinations.iter().map(|t| t.to_string()).collect()
             } else {
-                let defaults = self.print_defaults.read().unwrap();
+                let defaults = self.print_defaults.read();
                 defaults.label_destination.iter().cloned().collect()
             }
         } else {
-            let defaults = self.print_defaults.read().unwrap();
+            let defaults = self.print_defaults.read();
             defaults.label_destination.iter().cloned().collect()
         };
 
@@ -1046,13 +1047,13 @@ impl CatalogService {
 
     /// Check if kitchen printing is enabled (system level)
     pub fn is_kitchen_print_enabled(&self) -> bool {
-        let defaults = self.print_defaults.read().unwrap();
+        let defaults = self.print_defaults.read();
         defaults.kitchen_destination.is_some()
     }
 
     /// Check if label printing is enabled (system level)
     pub fn is_label_print_enabled(&self) -> bool {
-        let defaults = self.print_defaults.read().unwrap();
+        let defaults = self.print_defaults.read();
         defaults.label_destination.is_some()
     }
 }

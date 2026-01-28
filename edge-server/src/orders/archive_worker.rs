@@ -101,7 +101,7 @@ impl ArchiveWorker {
 
     /// 带并发限制的订单处理
     async fn process_order_concurrent(&self, order_id: &str) {
-        let _permit = self.semaphore.acquire().await.unwrap();
+        let _permit = self.semaphore.acquire().await.expect("semaphore is never closed");
         self.process_order(order_id).await;
     }
 

@@ -41,16 +41,7 @@ export const Currency = {
     return new Decimal(a).div(b);
   },
 
-  /**
-   * Round to 2 decimal places using ROUND_HALF_UP (四舍五入)
-   * e.g. 1.235 -> 1.24, 1.234 -> 1.23
-   * @deprecated Use round2() for clarity. Kept for backward compatibility.
-   */
-  floor2(n: number | string | Decimal): Decimal {
-    return new Decimal(n).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-  },
-
-  /**
+/**
    * Standard rounding to 2 decimal places
    * Used for final totals if needed
    */

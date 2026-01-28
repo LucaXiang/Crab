@@ -10,7 +10,7 @@ use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{Employee, Role};
-use crate::{AppError, AppResponse};
+use crate::AppError;
 
 // Re-use shared DTOs for API consistency
 use shared::client::{LoginRequest, LoginResponse, UserInfo};
@@ -24,7 +24,7 @@ const AUTH_FIXED_DELAY_MS: u64 = 500;
 pub async fn login(
     State(state): State<ServerState>,
     Json(req): Json<LoginRequest>,
-) -> Result<Json<AppResponse<LoginResponse>>, AppError> {
+) -> Result<Json<LoginResponse>, AppError> {
     let db = state.get_db();
     let username = req.username.clone();
 
@@ -137,13 +137,13 @@ pub async fn login(
         },
     };
 
-    Ok(crate::ok!(response))
+    Ok(Json(response))
 }
 
 /// Get current user info
 pub async fn me(
     Extension(user): Extension<CurrentUser>,
-) -> Result<Json<AppResponse<UserInfo>>, AppError> {
+) -> Result<Json<UserInfo>, AppError> {
     let user_info = UserInfo {
         id: user.id,
         username: user.username,
@@ -154,13 +154,13 @@ pub async fn me(
         is_system: user.is_system,
     };
 
-    Ok(crate::ok!(user_info))
+    Ok(Json(user_info))
 }
 
 /// Logout handler
 pub async fn logout(
     Extension(user): Extension<CurrentUser>,
-) -> Result<Json<AppResponse<()>>, AppError> {
+) -> Result<Json<()>, AppError> {
     audit_log!(&user.id, "logout", &user.username);
 
     tracing::info!(
@@ -169,5 +169,5 @@ pub async fn logout(
         "User logged out"
     );
 
-    Ok(crate::ok!(()))
+    Ok(Json(()))
 }

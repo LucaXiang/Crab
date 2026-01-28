@@ -50,7 +50,4 @@ export type { OpenTableParams, PaymentInput, OrderCommandsHook } from './useOrde
 export { useOrderSync, setupOrderEventListeners } from './useOrderSync';
 export type { OrderSyncHook } from './useOrderSync';
 
-// Order Reducer - DEPRECATED under Server Authority Model
-// These functions are kept for debugging/reference only.
-// Client should NEVER compute snapshots locally - always use server-provided snapshots.
-// export { applyEvent, rebuildFromEvents, createEmptySnapshot } from './orderReducer';
+

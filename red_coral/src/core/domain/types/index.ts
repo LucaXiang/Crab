@@ -86,6 +86,8 @@ export type {
   OrderConnectionState,
   AppliedRule,
   OrderStatus,  // Event sourcing status: ACTIVE | COMPLETED | VOID | MOVED | MERGED
+  VoidType,
+  LossReason,
 } from './orderEvent';
 
 // ============================================================================
@@ -213,6 +215,14 @@ export interface StatisticsResponse {
   revenue_trend: RevenueTrendPoint[];
   category_sales: CategorySale[];
   top_products: TopProduct[];
+}
+
+export interface SalesReportResponse {
+  items: SalesReportItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 // App state types

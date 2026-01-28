@@ -52,6 +52,21 @@ impl EventApplier for PaymentCancelledApplier {
                 restore_split_items(snapshot, &items_to_restore);
             }
 
+            // Check if we need to clear has_amount_split flag
+            // Amount-based split payments have: split_items is Some but empty (Some([]))
+            if snapshot.has_amount_split {
+                let has_remaining_amount_splits = snapshot.payments.iter().any(|p| {
+                    !p.cancelled
+                        && p.split_items
+                            .as_ref()
+                            .map_or(false, |items| items.is_empty())
+                });
+
+                if !has_remaining_amount_splits {
+                    snapshot.has_amount_split = false;
+                }
+            }
+
             // Recalculate totals to update unpaid_quantity and financial fields
             money::recalculate_totals(snapshot);
 

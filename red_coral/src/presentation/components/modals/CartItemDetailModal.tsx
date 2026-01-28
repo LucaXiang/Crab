@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CartItem, AttributeTemplate, AttributeOption, ProductAttribute, ItemOption, EmbeddedSpec } from '@/core/domain/types';
+import { CartItem, Attribute, AttributeOption, ProductAttribute, ItemOption, EmbeddedSpec } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { createTauriClient } from '@/infrastructure/api';
 import { useProductStore } from '@/features/product';
@@ -28,7 +28,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
 
   // Attribute State
   const [isLoadingAttributes, setIsLoadingAttributes] = useState(false);
-  const [attributes, setAttributes] = useState<AttributeTemplate[]>([]);
+  const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [allOptions, setAllOptions] = useState<Map<string, AttributeOption[]>>(new Map());
   const [bindings, setBindings] = useState<ProductAttribute[]>([]);
   const [selections, setSelections] = useState<Map<string, string[]>>(new Map());
@@ -69,7 +69,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
             const productAttrIds = new Set(attrBindings.map(b => String(b.attribute.id)));
 
             // Fetch category attributes (inherited)
-            let categoryAttributes: AttributeTemplate[] = [];
+            let categoryAttributes: Attribute[] = [];
             if (productFull.category) {
                 try {
                     categoryAttributes = await api.listCategoryAttributes(productFull.category);
@@ -82,10 +82,10 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                 }
             }
 
-            // Extract Attribute objects directly (AttributeTemplate = Attribute)
-            const productAttributeList: AttributeTemplate[] = attrBindings.map(binding => binding.attribute);
+            // Extract Attribute objects directly (Attribute = Attribute)
+            const productAttributeList: Attribute[] = attrBindings.map(binding => binding.attribute);
             // Merge: product attributes first, then category attributes (inherited)
-            const attributeList: AttributeTemplate[] = [...productAttributeList, ...categoryAttributes];
+            const attributeList: Attribute[] = [...productAttributeList, ...categoryAttributes];
             setAttributes(attributeList);
 
             // Convert AttributeBindingFull[] to ProductAttribute[] (AttributeBinding relation)

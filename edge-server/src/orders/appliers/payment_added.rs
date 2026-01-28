@@ -2,7 +2,7 @@
 //!
 //! Applies the PaymentAdded event to add a payment to the snapshot.
 
-use crate::orders::money::{to_decimal, to_f64};
+use crate::orders::money::{self, to_decimal, to_f64, MONEY_TOLERANCE};
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot, PaymentRecord};
 
@@ -39,6 +39,23 @@ impl EventApplier for PaymentAddedApplier {
 
             // Update paid_amount using Decimal for precision
             snapshot.paid_amount = to_f64(to_decimal(snapshot.paid_amount) + to_decimal(*amount));
+
+            // When fully paid, mark all items as paid for reliable tracking
+            // 金额分单不跟踪商品数量，跳过填充 paid_item_quantities
+            if to_decimal(snapshot.paid_amount) >= to_decimal(snapshot.total) - MONEY_TOLERANCE {
+                if !snapshot.has_amount_split {
+                    let item_quantities: Vec<(String, i32)> = snapshot
+                        .items
+                        .iter()
+                        .map(|item| (item.instance_id.clone(), item.quantity as i32))
+                        .collect();
+                    for (instance_id, quantity) in item_quantities {
+                        snapshot.paid_item_quantities.insert(instance_id, quantity);
+                    }
+                }
+                // Recalculate to update unpaid_quantity per item
+                money::recalculate_totals(snapshot);
+            }
 
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;

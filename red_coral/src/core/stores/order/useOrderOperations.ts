@@ -313,18 +313,12 @@ export const partialSettle = async (
   }
 };
 
-/**
- * Ensure order exists in store (no-op with event sourcing - orders come from backend)
- * Kept for API compatibility
- */
-export const ensureActiveOrder = (): void => {
-  // With event sourcing architecture, orders are managed by the backend
-  // and synced via events. This function is a no-op for compatibility.
-};
 
 /**
- * Split order - process a split payment for specific items
- * Amount is calculated by server from items (server-authoritative)
+ * Split order - process a split payment
+ * Two modes:
+ * - Item-based split: items.length > 0, amount calculated from items
+ * - Amount-based split (金额分单): items = [], split_amount provided
  * Fire & forget - UI updates via WebSocket event
  */
 export const splitOrder = async (
@@ -332,6 +326,7 @@ export const splitOrder = async (
   splitData: {
     items: { instance_id: string; name: string; quantity: number; unit_price: number }[];
     paymentMethod: string;
+    split_amount?: number;  // For amount-based split (金额分单)
     tendered?: number;
     change?: number;
   }
@@ -339,6 +334,7 @@ export const splitOrder = async (
   const command = createCommand({
     type: 'SPLIT_ORDER',
     order_id: orderId,
+    split_amount: splitData.split_amount ?? null,
     payment_method: splitData.paymentMethod,
     items: splitData.items.map(item => ({
       instance_id: item.instance_id,

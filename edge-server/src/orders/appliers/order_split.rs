@@ -3,7 +3,7 @@
 //! Applies the OrderSplit event to track paid item quantities and update paid amount.
 //! This is used for split bill payments where specific items are paid for.
 
-use crate::orders::money::{self, to_decimal, to_f64};
+use crate::orders::money::{self, to_decimal, to_f64, MONEY_TOLERANCE};
 use crate::orders::traits::EventApplier;
 use shared::order::{CartItemSnapshot, EventPayload, OrderEvent, OrderSnapshot, PaymentRecord};
 
@@ -13,6 +13,7 @@ pub struct OrderSplitApplier;
 impl EventApplier for OrderSplitApplier {
     fn apply(&self, snapshot: &mut OrderSnapshot, event: &OrderEvent) {
         if let EventPayload::OrderSplit {
+            payment_id,
             split_amount,
             payment_method,
             items,
@@ -28,6 +29,11 @@ impl EventApplier for OrderSplitApplier {
 
             // Update paid amount using Decimal for precision
             snapshot.paid_amount = to_f64(to_decimal(snapshot.paid_amount) + to_decimal(*split_amount));
+
+            // Set has_amount_split flag if this is amount-based split (empty items)
+            if items.is_empty() {
+                snapshot.has_amount_split = true;
+            }
 
             // Create PaymentRecord for audit trail
             let item_names: Vec<&str> = items.iter().map(|i| i.name.as_str()).collect();
@@ -57,7 +63,7 @@ impl EventApplier for OrderSplitApplier {
                 .collect();
 
             let payment = PaymentRecord {
-                payment_id: format!("split-{}", event.event_id),
+                payment_id: payment_id.clone(),
                 method: payment_method.clone(),
                 amount: *split_amount,
                 tendered: None,
@@ -66,13 +72,24 @@ impl EventApplier for OrderSplitApplier {
                 timestamp: event.timestamp,
                 cancelled: false,
                 cancel_reason: None,
-                split_items: if split_items.is_empty() {
-                    None
-                } else {
-                    Some(split_items)
-                },
+                split_items: Some(split_items),
             };
             snapshot.payments.push(payment);
+
+            // When fully paid after item-based split, mark all items as paid
+            // 金额分单不跟踪商品数量，跳过填充 paid_item_quantities
+            if !items.is_empty()
+                && to_decimal(snapshot.paid_amount) >= to_decimal(snapshot.total) - MONEY_TOLERANCE
+            {
+                let item_quantities: Vec<(String, i32)> = snapshot
+                    .items
+                    .iter()
+                    .map(|item| (item.instance_id.clone(), item.quantity as i32))
+                    .collect();
+                for (instance_id, quantity) in item_quantities {
+                    snapshot.paid_item_quantities.insert(instance_id, quantity);
+                }
+            }
 
             // Recalculate totals to update unpaid_quantity for each item
             money::recalculate_totals(snapshot);
@@ -169,6 +186,7 @@ mod tests {
             Some(1234567890),
             OrderEventType::OrderSplit,
             EventPayload::OrderSplit {
+                payment_id: uuid::Uuid::new_v4().to_string(),
                 split_amount,
                 payment_method: payment_method.to_string(),
                 items,
@@ -253,7 +271,7 @@ mod tests {
         // PaymentRecord should be created
         assert_eq!(snapshot.payments.len(), 1);
         let payment = &snapshot.payments[0];
-        assert!(payment.payment_id.starts_with("split-"));
+        assert!(uuid::Uuid::parse_str(&payment.payment_id).is_ok());
         assert_eq!(payment.method, "CASH");
         assert_eq!(payment.amount, 20.0);
         assert_eq!(payment.note, Some("Split: Coffee".to_string()));
