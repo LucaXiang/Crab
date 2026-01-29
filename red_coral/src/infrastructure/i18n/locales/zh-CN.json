@@ -65,7 +65,9 @@
       "system": "系统",
       "status": "状态",
       "is_active": "启用状态",
-      "paidQuantity": "已付 {{qty}} 份"
+      "paidQuantity": "已付 {{qty}} 份",
+      "retail": "零售",
+      "loss_amount": "损失金额"
     },
     "message": {
       "loading": "加载中...",
@@ -275,7 +277,23 @@
       "failed": "分单失败",
       "pay_cash": "现金支付",
       "pay_card": "刷卡支付",
-      "desc": "拆分订单分别支付"
+      "desc": "拆分订单分别支付",
+      "available": "可选",
+      "new_order": "分单明细"
+    },
+    "aa_split": {
+      "title": "AA分账",
+      "desc": "按人数平均分摊",
+      "locked": "AA分账中，无法菜品分单",
+      "paid_shares": "已付",
+      "unpaid_shares": "未付",
+      "shares_unit": "份",
+      "split_into": "分成",
+      "total_shares": "总份数",
+      "pay_for": "支付",
+      "your_shares": "本次份数",
+      "calculation": "计算",
+      "amount_to_pay": "支付金额"
     },
     "amount_split": {
       "title": "金额分单",
@@ -353,7 +371,8 @@
       "confirm_cancel": "确定要取消此支付记录吗？",
       "confirm_cancel_split": "确定要取消此分账支付吗？取消后相关菜品将恢复到订单中。",
       "cancel_success": "支付记录已取消",
-      "cancel_failed": "取消支付失败"
+      "cancel_failed": "取消支付失败",
+      "remaining": "待付金额"
     },
     "items": {
       "paid": "已付项目",
@@ -435,6 +454,15 @@
       "moved": "已转移",
       "merged": "已合并"
     },
+    "void_type": {
+      "CANCELLED": "取消",
+      "LOSS_SETTLED": "损失结算"
+    },
+    "loss_reason": {
+      "CUSTOMER_FLED": "跑单",
+      "CUSTOMER_INSOLVENT": "无力支付",
+      "OTHER": "其他"
+    },
     "action": {
       "reprint": "重新打印"
     },
@@ -507,6 +535,12 @@
     "receipt_no": "小票号: {n}",
     "payment": "支付",
     "split_bill": "分单",
+    "item_split": "菜品分单",
+    "amount_split": "金额分单",
+    "aa_split_started": "AA分账",
+    "aa_split_paid": "AA付款",
+    "aa_split_cancelled": "AA分账已取消",
+    "aa_split_cancelled_summary": "原 {n}人分账",
     "item_modified": "项目修改",
     "item_removed": "删除项目",
     "order_completed": "订单完成",

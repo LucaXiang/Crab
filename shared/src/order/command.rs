@@ -126,13 +126,33 @@ pub enum OrderCommandPayload {
         authorizer_name: Option<String>,
     },
 
-    /// Split bill payment
-    SplitOrder {
+    /// Split by items (菜品分单)
+    SplitByItems {
         order_id: String,
-        /// Split amount (optional for item-based split, backend calculates from items)
-        split_amount: Option<f64>,
         payment_method: String,
         items: Vec<SplitItem>,
+    },
+
+    /// Split by amount (金额分单)
+    SplitByAmount {
+        order_id: String,
+        split_amount: f64,
+        payment_method: String,
+    },
+
+    /// Start AA split (锁定人数 + 支付第一份)
+    StartAaSplit {
+        order_id: String,
+        total_shares: i32,
+        shares: i32,
+        payment_method: String,
+    },
+
+    /// Pay AA split (后续 AA 支付)
+    PayAaSplit {
+        order_id: String,
+        shares: i32,
+        payment_method: String,
     },
 
     // ========== Table Operations ==========
@@ -198,7 +218,10 @@ impl OrderCommand {
             OrderCommandPayload::RestoreItem { order_id, .. } => Some(order_id),
             OrderCommandPayload::AddPayment { order_id, .. } => Some(order_id),
             OrderCommandPayload::CancelPayment { order_id, .. } => Some(order_id),
-            OrderCommandPayload::SplitOrder { order_id, .. } => Some(order_id),
+            OrderCommandPayload::SplitByItems { order_id, .. } => Some(order_id),
+            OrderCommandPayload::SplitByAmount { order_id, .. } => Some(order_id),
+            OrderCommandPayload::StartAaSplit { order_id, .. } => Some(order_id),
+            OrderCommandPayload::PayAaSplit { order_id, .. } => Some(order_id),
             OrderCommandPayload::MoveOrder { order_id, .. } => Some(order_id),
             OrderCommandPayload::MergeOrders {
                 source_order_id, ..

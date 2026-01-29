@@ -33,7 +33,10 @@ pub use order_info_updated::OrderInfoUpdatedApplier;
 pub use order_moved::OrderMovedApplier;
 pub use order_moved_out::OrderMovedOutApplier;
 pub use order_restored::OrderRestoredApplier;
-pub use order_split::OrderSplitApplier;
+pub use order_split::{
+    AaSplitCancelledApplier, AaSplitPaidApplier, AaSplitStartedApplier, AmountSplitApplier,
+    ItemSplitApplier,
+};
 pub use order_voided::OrderVoidedApplier;
 pub use orders_merged::{OrderMergedApplier, OrderMergedOutApplier};
 pub use payment_added::PaymentAddedApplier;
@@ -59,7 +62,11 @@ pub enum EventAction {
     OrderVoided(OrderVoidedApplier),
     OrderMerged(OrderMergedApplier),
     OrderMergedOut(OrderMergedOutApplier),
-    OrderSplit(OrderSplitApplier),
+    ItemSplit(ItemSplitApplier),
+    AmountSplit(AmountSplitApplier),
+    AaSplitStarted(AaSplitStartedApplier),
+    AaSplitPaid(AaSplitPaidApplier),
+    AaSplitCancelled(AaSplitCancelledApplier),
     RuleSkipToggled(RuleSkipToggledApplier),
     TableReassigned(TableReassignedApplier),
 }
@@ -83,7 +90,11 @@ impl EventApplier for EventAction {
             EventAction::OrderVoided(applier) => applier.apply(snapshot, event),
             EventAction::OrderMerged(applier) => applier.apply(snapshot, event),
             EventAction::OrderMergedOut(applier) => applier.apply(snapshot, event),
-            EventAction::OrderSplit(applier) => applier.apply(snapshot, event),
+            EventAction::ItemSplit(applier) => applier.apply(snapshot, event),
+            EventAction::AmountSplit(applier) => applier.apply(snapshot, event),
+            EventAction::AaSplitStarted(applier) => applier.apply(snapshot, event),
+            EventAction::AaSplitPaid(applier) => applier.apply(snapshot, event),
+            EventAction::AaSplitCancelled(applier) => applier.apply(snapshot, event),
             EventAction::RuleSkipToggled(applier) => applier.apply(snapshot, event),
             EventAction::TableReassigned(applier) => applier.apply(snapshot, event),
         }
@@ -121,7 +132,15 @@ impl From<&OrderEvent> for EventAction {
             EventPayload::OrderMovedOut { .. } => {
                 EventAction::OrderMovedOut(OrderMovedOutApplier)
             }
-            EventPayload::OrderSplit { .. } => EventAction::OrderSplit(OrderSplitApplier),
+            EventPayload::ItemSplit { .. } => EventAction::ItemSplit(ItemSplitApplier),
+            EventPayload::AmountSplit { .. } => EventAction::AmountSplit(AmountSplitApplier),
+            EventPayload::AaSplitStarted { .. } => {
+                EventAction::AaSplitStarted(AaSplitStartedApplier)
+            }
+            EventPayload::AaSplitPaid { .. } => EventAction::AaSplitPaid(AaSplitPaidApplier),
+            EventPayload::AaSplitCancelled { .. } => {
+                EventAction::AaSplitCancelled(AaSplitCancelledApplier)
+            }
             EventPayload::RuleSkipToggled { .. } => {
                 EventAction::RuleSkipToggled(RuleSkipToggledApplier)
             }

@@ -190,6 +190,8 @@ mod tests {
             cancelled: false,
             cancel_reason: None,
             split_items: None,
+            aa_shares: None,
+            split_type: None,
         });
 
         let event = create_order_restored_event("order-1", 2);

@@ -305,21 +305,84 @@ export function useOrderCommands() {
   );
 
   /**
-   * Split order payment
+   * Split by items (菜品分单)
    */
-  const splitOrder = useCallback(
+  const splitByItems = useCallback(
     async (
       orderId: string,
-      splitAmount: number,
       paymentMethod: string,
       items: SplitItem[]
     ): Promise<CommandResponse> => {
       const command = createCommand({
-        type: 'SPLIT_ORDER',
+        type: 'SPLIT_BY_ITEMS',
+        order_id: orderId,
+        payment_method: paymentMethod,
+        items,
+      });
+
+      return sendCommand(command);
+    },
+    []
+  );
+
+  /**
+   * Split by amount (金额分单)
+   */
+  const splitByAmount = useCallback(
+    async (
+      orderId: string,
+      splitAmount: number,
+      paymentMethod: string,
+    ): Promise<CommandResponse> => {
+      const command = createCommand({
+        type: 'SPLIT_BY_AMOUNT',
         order_id: orderId,
         split_amount: splitAmount,
         payment_method: paymentMethod,
-        items,
+      });
+
+      return sendCommand(command);
+    },
+    []
+  );
+
+  /**
+   * Start AA split (锁定人数 + 支付第一份)
+   */
+  const startAaSplit = useCallback(
+    async (
+      orderId: string,
+      totalShares: number,
+      shares: number,
+      paymentMethod: string,
+    ): Promise<CommandResponse> => {
+      const command = createCommand({
+        type: 'START_AA_SPLIT',
+        order_id: orderId,
+        total_shares: totalShares,
+        shares,
+        payment_method: paymentMethod,
+      });
+
+      return sendCommand(command);
+    },
+    []
+  );
+
+  /**
+   * Pay AA split (后续 AA 支付)
+   */
+  const payAaSplit = useCallback(
+    async (
+      orderId: string,
+      shares: number,
+      paymentMethod: string,
+    ): Promise<CommandResponse> => {
+      const command = createCommand({
+        type: 'PAY_AA_SPLIT',
+        order_id: orderId,
+        shares,
+        payment_method: paymentMethod,
       });
 
       return sendCommand(command);
@@ -416,7 +479,10 @@ export function useOrderCommands() {
     // Payment Operations
     addPayment,
     cancelPayment,
-    splitOrder,
+    splitByItems,
+    splitByAmount,
+    startAaSplit,
+    payAaSplit,
 
     // Table Operations
     moveOrder,

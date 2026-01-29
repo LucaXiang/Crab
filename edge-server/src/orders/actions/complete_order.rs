@@ -125,6 +125,8 @@ mod tests {
             cancelled: false,
             cancel_reason: None,
             split_items: None,
+            aa_shares: None,
+            split_type: None,
         }
     }
 

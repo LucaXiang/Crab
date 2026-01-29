@@ -240,8 +240,25 @@ impl OrderArchiveService {
             .unwrap_or((None, None));
 
         // 4. Convert snapshot to order struct for building query
+        tracing::info!(
+            order_id = %snapshot.order_id,
+            status = ?snapshot.status,
+            void_type = ?snapshot.void_type,
+            loss_reason = ?snapshot.loss_reason,
+            loss_amount = ?snapshot.loss_amount,
+            "Archive: snapshot void metadata before conversion"
+        );
+
         let surreal_order =
             self.convert_snapshot_to_order(snapshot, prev_hash, order_hash.clone(), operator_id, operator_name)?;
+
+        tracing::info!(
+            order_id = %snapshot.order_id,
+            void_type = ?surreal_order.void_type,
+            loss_reason = ?surreal_order.loss_reason,
+            loss_amount = ?surreal_order.loss_amount,
+            "Archive: converted SurrealOrder void metadata"
+        );
 
         tracing::info!(
             order_id = %snapshot.order_id,
@@ -290,6 +307,10 @@ impl OrderArchiveService {
                 end_time = <datetime>$end_time,
                 operator_id = $operator_id,
                 operator_name = $operator_name,
+                void_type = $void_type,
+                loss_reason = $loss_reason,
+                loss_amount = $loss_amount,
+                void_note = $void_note,
                 prev_hash = $prev_hash,
                 curr_hash = $curr_hash,
                 created_at = time::now();
@@ -415,6 +436,10 @@ impl OrderArchiveService {
             .bind(("end_time", order.end_time.clone()))
             .bind(("operator_id", order.operator_id.clone()))
             .bind(("operator_name", order.operator_name.clone()))
+            .bind(("void_type", order.void_type.clone()))
+            .bind(("loss_reason", order.loss_reason.clone()))
+            .bind(("loss_amount", order.loss_amount))
+            .bind(("void_note", order.void_note.clone()))
             .bind(("prev_hash", order.prev_hash.clone()))
             .bind(("curr_hash", order.curr_hash.clone()))
             .bind(("order_hash", order_hash.to_string()));
@@ -609,6 +634,18 @@ impl OrderArchiveService {
                     .map(|dt| dt.to_rfc3339())
                     .unwrap_or_default()
             }),
+            void_type: snapshot.void_type.as_ref().map(|v| {
+                serde_json::to_value(v).ok()
+                    .and_then(|val| val.as_str().map(String::from))
+                    .unwrap_or_default()
+            }),
+            loss_reason: snapshot.loss_reason.as_ref().map(|r| {
+                serde_json::to_value(r).ok()
+                    .and_then(|val| val.as_str().map(String::from))
+                    .unwrap_or_default()
+            }),
+            loss_amount: snapshot.loss_amount,
+            void_note: snapshot.void_note.clone(),
             operator_id,
             operator_name,
             prev_hash,
@@ -665,6 +702,8 @@ mod tests {
             last_sequence: 5,
             state_checksum: String::new(),
             has_amount_split: false,
+            aa_total_shares: None,
+            aa_paid_shares: 0,
         }
     }
 

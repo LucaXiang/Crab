@@ -28,7 +28,11 @@ export type OrderEventType =
   | 'ITEM_RESTORED'
   | 'PAYMENT_ADDED'
   | 'PAYMENT_CANCELLED'
-  | 'ORDER_SPLIT'
+  | 'ITEM_SPLIT'
+  | 'AMOUNT_SPLIT'
+  | 'AA_SPLIT_STARTED'
+  | 'AA_SPLIT_PAID'
+  | 'AA_SPLIT_CANCELLED'
   | 'ORDER_MOVED'
   | 'ORDER_MOVED_OUT'
   | 'ORDER_MERGED'
@@ -83,7 +87,11 @@ export type EventPayload =
   | ItemRestoredPayload
   | PaymentAddedPayload
   | PaymentCancelledPayload
-  | OrderSplitPayload
+  | ItemSplitPayload
+  | AmountSplitPayload
+  | AaSplitStartedPayload
+  | AaSplitPaidPayload
+  | AaSplitCancelledPayload
   | OrderMovedPayload
   | OrderMovedOutPayload
   | OrderMergedPayload
@@ -204,12 +212,46 @@ export interface PaymentCancelledPayload {
   authorizer_name?: string | null;
 }
 
-export interface OrderSplitPayload {
-  type: 'ORDER_SPLIT';
+/** 菜品分单 */
+export interface ItemSplitPayload {
+  type: 'ITEM_SPLIT';
   payment_id: string;
   split_amount: number;
   payment_method: string;
   items: SplitItem[];
+}
+
+/** 金额分单 */
+export interface AmountSplitPayload {
+  type: 'AMOUNT_SPLIT';
+  payment_id: string;
+  split_amount: number;
+  payment_method: string;
+}
+
+/** AA 开始（锁人数，记录每份金额） */
+export interface AaSplitStartedPayload {
+  type: 'AA_SPLIT_STARTED';
+  total_shares: number;
+  per_share_amount: number;
+  order_total: number;
+}
+
+/** AA 支付（进度） */
+export interface AaSplitPaidPayload {
+  type: 'AA_SPLIT_PAID';
+  payment_id: string;
+  shares: number;
+  amount: number;
+  payment_method: string;
+  progress_paid: number;
+  progress_total: number;
+}
+
+/** AA 取消 */
+export interface AaSplitCancelledPayload {
+  type: 'AA_SPLIT_CANCELLED';
+  total_shares: number;
 }
 
 export interface OrderMovedPayload {
@@ -306,7 +348,10 @@ export type OrderCommandPayload =
   | RestoreItemCommand
   | AddPaymentCommand
   | CancelPaymentCommand
-  | SplitOrderCommand
+  | SplitByItemsCommand
+  | SplitByAmountCommand
+  | StartAaSplitCommand
+  | PayAaSplitCommand
   | MoveOrderCommand
   | MergeOrdersCommand
   | UpdateOrderInfoCommand
@@ -399,13 +444,37 @@ export interface CancelPaymentCommand {
   authorizer_name?: string | null;
 }
 
-export interface SplitOrderCommand {
-  type: 'SPLIT_ORDER';
+/** 菜品分单 */
+export interface SplitByItemsCommand {
+  type: 'SPLIT_BY_ITEMS';
   order_id: string;
-  /** Optional - if omitted, server calculates from items (server-authoritative) */
-  split_amount?: number | null;
   payment_method: string;
   items: SplitItem[];
+}
+
+/** 金额分单 */
+export interface SplitByAmountCommand {
+  type: 'SPLIT_BY_AMOUNT';
+  order_id: string;
+  split_amount: number;
+  payment_method: string;
+}
+
+/** AA 开始（锁定人数 + 支付第一份） */
+export interface StartAaSplitCommand {
+  type: 'START_AA_SPLIT';
+  order_id: string;
+  total_shares: number;
+  shares: number;
+  payment_method: string;
+}
+
+/** AA 后续支付 */
+export interface PayAaSplitCommand {
+  type: 'PAY_AA_SPLIT';
+  order_id: string;
+  shares: number;
+  payment_method: string;
 }
 
 export interface MoveOrderCommand {
@@ -565,6 +634,10 @@ export interface OrderSnapshot {
   paid_item_quantities?: Record<string, number>;
   /** Whether this order has amount-based split payments (金额分单) */
   has_amount_split?: boolean;
+  /** AA split: total shares (locked after first AA payment) */
+  aa_total_shares?: number | null;
+  /** AA split: number of shares already paid */
+  aa_paid_shares?: number;
   /** Server-generated receipt number (always present from OpenTable) */
   receipt_number: string;
   is_pre_payment?: boolean;
@@ -734,6 +807,9 @@ export interface PaymentSummaryItem {
   amount: number;
 }
 
+/** Split type for categorizing split payments */
+export type SplitType = 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'AA_SPLIT';
+
 export interface PaymentRecord {
   payment_id: string;
   method: string;
@@ -746,6 +822,10 @@ export interface PaymentRecord {
   cancel_reason?: string | null;
   /** Split payment items snapshot (for restoration on cancel) */
   split_items?: CartItemSnapshot[] | null;
+  /** AA split: number of shares this payment covers (for rollback on cancel) */
+  aa_shares?: number | null;
+  /** Split type: which split mode produced this payment */
+  split_type?: SplitType | null;
 }
 
 // ============================================================================

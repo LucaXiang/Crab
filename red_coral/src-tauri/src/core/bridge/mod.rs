@@ -1786,7 +1786,18 @@ impl ClientBridge {
                             shared::order::OrderCommandPayload::CancelPayment { .. } => {
                                 "order.cancel_payment"
                             }
-                            shared::order::OrderCommandPayload::SplitOrder { .. } => "order.split",
+                            shared::order::OrderCommandPayload::SplitByItems { .. } => {
+                                "order.split_by_items"
+                            }
+                            shared::order::OrderCommandPayload::SplitByAmount { .. } => {
+                                "order.split_by_amount"
+                            }
+                            shared::order::OrderCommandPayload::StartAaSplit { .. } => {
+                                "order.start_aa_split"
+                            }
+                            shared::order::OrderCommandPayload::PayAaSplit { .. } => {
+                                "order.pay_aa_split"
+                            }
                             shared::order::OrderCommandPayload::MoveOrder { .. } => "order.move",
                             shared::order::OrderCommandPayload::MergeOrders { .. } => "order.merge",
                             shared::order::OrderCommandPayload::UpdateOrderInfo { .. } => {

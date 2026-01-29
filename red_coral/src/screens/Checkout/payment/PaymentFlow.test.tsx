@@ -39,7 +39,10 @@ vi.mock('@/core/stores/order/useOrderOperations', () => ({
   completeOrder: vi.fn(),
   voidOrder: vi.fn(),
   partialSettle: vi.fn(),
-  splitOrder: vi.fn(),
+  splitByItems: vi.fn(),
+  splitByAmount: vi.fn(),
+  startAaSplit: vi.fn(),
+  payAaSplit: vi.fn(),
 }));
 
 vi.mock('@/presentation/components/auth/EscalatableGate', () => ({

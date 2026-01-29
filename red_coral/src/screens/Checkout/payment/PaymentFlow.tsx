@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { HeldOrder, PaymentRecord } from '@/core/domain/types';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag, Receipt, ImageOff } from 'lucide-react';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag, Receipt, ImageOff, Users, Calculator, PieChart, X, Lock as LockIcon, Check, Clock } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
@@ -11,7 +11,7 @@ import { Currency } from '@/utils/currency';
 
 // Services & Operations
 import { openCashDrawer, printOrderReceipt } from '@/core/services/order/paymentService';
-import { completeOrder, splitOrder, updateOrderInfo } from '@/core/stores/order/useOrderOperations';
+import { completeOrder, splitByItems, splitByAmount, startAaSplit, payAaSplit, updateOrderInfo } from '@/core/stores/order/useOrderOperations';
 import { useOrderCommands } from '@/core/stores/order/useOrderCommands';
 
 // Components
@@ -20,6 +20,7 @@ import { PaymentSuccessModal } from './PaymentSuccessModal';
 import { OrderSidebar } from '@/presentation/components/OrderSidebar';
 import { ConfirmDialog } from '@/shared/components';
 import { SplitItemRow } from '../components';
+import { Numpad } from '@/presentation/components/ui/Numpad';
 import { useProductStore } from '@/features/product';
 import { useCategoryStore } from '@/features/category';
 import { useImageUrls } from '@/core/hooks';
@@ -47,7 +48,9 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
   // Get active (non-cancelled) payments
   const activePayments = useMemo(() => {
-    return (order.payments || []).filter(p => !p.cancelled);
+    return [...(order.payments || [])]
+      .filter(p => !p.cancelled)
+      .sort((a, b) => b.timestamp - a.timestamp); // Sort by time desc
   }, [order.payments]);
 
   // Local State
@@ -73,6 +76,132 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   // Amount Split State (金额分单)
   const [amountSplitValue, setAmountSplitValue] = useState<string>('');
   const [isProcessingAmountSplit, setIsProcessingAmountSplit] = useState(false);
+  
+  // AA / Custom Split Logic
+  // Server-authoritative: once AA is locked, aa_total_shares comes from server
+  const isAALocked = !!(order.aa_total_shares && order.aa_total_shares > 0);
+  const aaRemainingShares = isAALocked ? (order.aa_total_shares! - (order.aa_paid_shares ?? 0)) : 0;
+  const [splitMode, setSplitMode] = useState<'CUSTOM' | 'AA'>('CUSTOM');
+  const [activeInput, setActiveInput] = useState<'CUSTOM' | 'AA_TOTAL' | 'AA_PAY'>('CUSTOM');
+  const [aaTotalStr, setAATotalStr] = useState<string>(String(order.guest_count || 2));
+  const [aaPayStr, setAAPayStr] = useState<string>('1');
+
+  // Auto-enter AA mode when server has AA locked
+  React.useEffect(() => {
+    if (isAALocked) {
+      setSplitMode('AA');
+      setAATotalStr(order.aa_total_shares!.toString());
+      // Clamp aaPayStr to remaining shares
+      const pay = parseInt(aaPayStr) || 1;
+      const maxPay = aaRemainingShares;
+      if (pay > maxPay && maxPay > 0) {
+        setAAPayStr(maxPay.toString());
+      }
+    }
+  }, [isAALocked, order.aa_total_shares, aaRemainingShares]);
+
+  // Sync amountSplitValue with AA state
+  React.useEffect(() => {
+    if (splitMode === 'AA') {
+      const total = isAALocked ? order.aa_total_shares! : (parseInt(aaTotalStr) || 1);
+      const remainingSharesForCalc = isAALocked ? aaRemainingShares : total;
+      let pay = parseInt(aaPayStr) || 0;
+
+      // Ensure pay doesn't exceed remaining shares
+      if (pay > remainingSharesForCalc) {
+        pay = remainingSharesForCalc;
+        setAAPayStr(remainingSharesForCalc.toString());
+      }
+
+      // Calculate: (remaining / remaining_shares) * pay_shares
+      const amount = remainingSharesForCalc > 0
+        ? Currency.mul(Currency.div(remaining, remainingSharesForCalc), pay).toDecimalPlaces(2).toNumber()
+        : 0;
+      setAmountSplitValue(amount.toFixed(2));
+    }
+  }, [splitMode, aaTotalStr, aaPayStr, remaining, isAALocked, aaRemainingShares, order.aa_total_shares]);
+
+  // Numpad Handler
+  const handleNumpadInput = useCallback((value: string) => {
+    if (value === 'C') {
+      if (activeInput === 'CUSTOM') setAmountSplitValue('');
+      else if (activeInput === 'AA_TOTAL') setAATotalStr('');
+      else if (activeInput === 'AA_PAY') setAAPayStr('');
+      return;
+    }
+
+    if (value === 'backspace') {
+      if (activeInput === 'CUSTOM') setAmountSplitValue(prev => prev.slice(0, -1));
+      else if (activeInput === 'AA_TOTAL') setAATotalStr(prev => prev.slice(0, -1));
+      else if (activeInput === 'AA_PAY') setAAPayStr(prev => prev.slice(0, -1));
+      return;
+    }
+
+    // Handle numeric input
+    if (activeInput === 'CUSTOM') {
+      // Allow decimals for amount
+      if (value === '.' && amountSplitValue.includes('.')) return;
+      setAmountSplitValue(prev => {
+        const next = prev + value;
+        // Basic validation: max 2 decimals
+        if (next.includes('.') && next.split('.')[1].length > 2) return prev;
+        return next;
+      });
+    } else {
+      // Integer only for counts
+      if (value === '.') return;
+      
+      if (activeInput === 'AA_TOTAL') {
+        setAATotalStr(prev => {
+          const next = prev + value;
+          if (parseInt(next) > 999) return prev; // Sanity limit
+          return next;
+        });
+      } else if (activeInput === 'AA_PAY') {
+        setAAPayStr(prev => {
+          const next = prev + value;
+          const total = parseInt(aaTotalStr) || 1;
+          const maxPay = isAALocked ? aaRemainingShares : total;
+
+          // Prevent entering more shares than allowed
+          if (parseInt(next) > maxPay) return prev;
+
+          if (parseInt(next) > 999) return prev;
+          return next;
+        });
+      }
+    }
+  }, [activeInput, amountSplitValue, aaTotalStr, aaPayStr, isAALocked, aaRemainingShares]);
+
+  // Handle Input Focus
+  const handleFocus = (field: 'CUSTOM' | 'AA_TOTAL' | 'AA_PAY') => {
+    // When AA is locked, prevent switching to CUSTOM mode
+    if (field === 'CUSTOM' && isAALocked) return;
+    setActiveInput(field);
+    if (field === 'CUSTOM') {
+      setSplitMode('CUSTOM');
+      // Do not reset amountSplitValue, allow user to edit current value (whether from AA or manual)
+    } else {
+      setSplitMode('AA');
+    }
+  };
+
+  const incrementAA = (field: 'TOTAL' | 'PAY', delta: number) => {
+    setSplitMode('AA');
+    if (field === 'TOTAL') {
+      setActiveInput('AA_TOTAL');
+      const current = parseInt(aaTotalStr) || 0;
+      const next = Math.max(1, current + delta);
+      setAATotalStr(next.toString());
+    } else {
+      setActiveInput('AA_PAY');
+      const current = parseInt(aaPayStr) || 0;
+      const total = parseInt(aaTotalStr) || 1;
+      const maxPay = isAALocked ? aaRemainingShares : total;
+      const next = Math.max(1, Math.min(maxPay, current + delta));
+      setAAPayStr(next.toString());
+    }
+  };
 
   // Retail order cancel confirmation
   const [showRetailCancelConfirm, setShowRetailCancelConfirm] = useState(false);
@@ -292,17 +421,16 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
         // Server calculates amount from items (server-authoritative)
         // Fire & forget - UI updates via WebSocket
-        await splitOrder(order.order_id, {
-          items: itemsToSplit.map((i) => ({
+        await splitByItems(
+          order.order_id,
+          itemsToSplit.map((i) => ({
             instance_id: i.instance_id,
             name: i.name,
             quantity: i.quantity,
             unit_price: i.unit_price,
           })),
-          paymentMethod: method,
-          tendered: cashDetails?.tendered,
-          change: cashDetails ? cashDetails.tendered - total : undefined,
-        });
+          method,
+        );
 
         // Show success modal for cash payments
         if (method === 'CASH' && cashDetails?.tendered !== undefined) {
@@ -339,14 +467,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     [handleSplitPayment]
   );
 
-  /**
-   * AA 平分计算
-   */
-  const handleAADivide = useCallback((peopleCount: number) => {
-    if (peopleCount <= 0 || remaining <= 0) return;
-    const perPerson = remaining / peopleCount;
-    setAmountSplitValue(perPerson.toFixed(2));
-  }, [remaining]);
+
 
   /**
    * 金额分单支付处理
@@ -373,12 +494,21 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           await openCashDrawer();
         }
 
-        // Amount-based split: items = [], split_amount provided
-        await splitOrder(order.order_id, {
-          items: [],
-          paymentMethod: method,
-          split_amount: amount,
-        });
+        if (splitMode === 'AA') {
+          // AA split: server calculates amount from shares
+          const payShares = parseInt(aaPayStr) || 1;
+          if (isAALocked) {
+            // Subsequent AA payment
+            await payAaSplit(order.order_id, payShares, method);
+          } else {
+            // First AA payment — lock headcount + pay
+            const totalShares = parseInt(aaTotalStr) || 2;
+            await startAaSplit(order.order_id, totalShares, payShares, method);
+          }
+        } else {
+          // Amount-based split
+          await splitByAmount(order.order_id, amount, method);
+        }
 
         // Show success modal for cash payments
         if (method === 'CASH' && cashDetails?.tendered !== undefined) {
@@ -401,7 +531,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         setIsProcessingAmountSplit(false);
       }
     },
-    [order, isProcessingAmountSplit, amountSplitValue, remaining, t]
+    [order, isProcessingAmountSplit, amountSplitValue, remaining, t, splitMode, aaPayStr, aaTotalStr, isAALocked]
   );
 
   const handleConfirmAmountSplitCash = useCallback(
@@ -514,9 +644,23 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     return result;
   }, [order.items, order.paid_item_quantities, productInfoMap, categories, t]);
 
+  // Filter logic for Split Mode UI
+  const [selectedCategory, setSelectedCategory] = useState<string | 'ALL'>('ALL');
+
+  const allCategories = useMemo(() => {
+    const cats = new Set<string>();
+    itemsByCategory.forEach(g => cats.add(g.categoryName));
+    return Array.from(cats);
+  }, [itemsByCategory]);
+
+  const filteredItemsByCategory = useMemo(() => {
+    if (selectedCategory === 'ALL') return itemsByCategory;
+    return itemsByCategory.filter(g => g.categoryName === selectedCategory);
+  }, [itemsByCategory, selectedCategory]);
+
   const renderSplitMode = () => {
     return (
-      <div className="h-full flex">
+      <div className="h-full flex bg-gray-50/50 backdrop-blur-xl">
         {successModal && (
           <PaymentSuccessModal
             isOpen={successModal.isOpen}
@@ -533,129 +677,240 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           remaining={remaining}
           onManage={onManageTable}
         />
-        <div className="flex-1 flex flex-col bg-gray-50">
-          <div className="p-6 bg-white border-b border-gray-200 shadow-sm flex justify-between items-center">
-            <h3 className="font-bold text-gray-800 text-xl flex items-center gap-2">
-              <Split size={24} className="text-purple-600" />
+        
+        <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+           {/* Background Decor */}
+           <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-purple-100/50 rounded-full mix-blend-multiply filter blur-[100px] opacity-50 pointer-events-none"></div>
+           <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-blue-100/50 rounded-full mix-blend-multiply filter blur-[100px] opacity-50 pointer-events-none"></div>
+
+          {/* Header */}
+          <div className="p-6 bg-white/80 backdrop-blur-md border-b border-gray-200/50 shadow-sm flex justify-between items-center z-10 shrink-0">
+            <h3 className="font-bold text-gray-800 text-2xl flex items-center gap-3">
+              <div className="p-2 bg-purple-600 rounded-xl text-white shadow-lg shadow-purple-500/30">
+                <Split size={24} />
+              </div>
               {t('checkout.split.title')}
             </h3>
-            <button onClick={() => { setMode('SELECT'); setSplitItems({}); }} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium flex items-center gap-2 transition-all">
+            <button onClick={() => { setMode('SELECT'); setSplitItems({}); }} className="px-5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 rounded-xl font-medium flex items-center gap-2 transition-all shadow-sm">
               <ArrowLeft size={20} /> {t('common.action.back')}
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-            <div className="space-y-6">
-              {itemsByCategory.map(({ categoryId, categoryName, items }) => (
-                <div key={categoryId || 'uncategorized'}>
-                  {/* Category Header */}
-                  <div className="sticky top-0 bg-gray-50 py-2 z-10">
-                    <h4 className="text-lg font-bold text-gray-700 border-b-2 border-purple-200 pb-2">
-                      {categoryName}
-                      <span className="ml-2 text-sm font-normal text-gray-400">({items.length})</span>
-                    </h4>
+          <div className="flex-1 flex overflow-hidden z-10">
+              {/* Left Side: Item Selection */}
+              <div className="flex-1 flex flex-col border-r border-gray-200/60 bg-white/50 backdrop-blur-sm min-w-0">
+                  {/* Category Filter */}
+                  <div className="p-4 overflow-x-auto whitespace-nowrap custom-scrollbar border-b border-gray-100">
+                      <div className="flex gap-3">
+                          <button
+                            onClick={() => setSelectedCategory('ALL')}
+                            className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all ${
+                                selectedCategory === 'ALL' 
+                                ? 'bg-gray-900 text-white shadow-lg shadow-gray-900/20' 
+                                : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                              {t('common.label.all')}
+                          </button>
+                          {allCategories.map(cat => (
+                              <button
+                                key={cat}
+                                onClick={() => setSelectedCategory(cat)}
+                                className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all ${
+                                    selectedCategory === cat 
+                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' 
+                                    : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                                }`}
+                              >
+                                  {cat}
+                              </button>
+                          ))}
+                      </div>
                   </div>
 
                   {/* Items Grid */}
-                  <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-3">
-                    {items.map((item) => {
-                      const currentSplitQty = splitItems[item.instance_id] || 0;
-                      const paidQty = (order.paid_item_quantities && order.paid_item_quantities[item.instance_id]) || 0;
-                      const maxQty = item.quantity - paidQty;
-                      const unitPrice = item.unit_price ?? item.price;
-                      const imageRef = productInfoMap.get(item.instance_id)?.image;
-                      const imageSrc = imageRef ? (imageUrls.get(imageRef) || DefaultImage) : DefaultImage;
+                  <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                      {filteredItemsByCategory.map(({ categoryId, categoryName, items }) => (
+                          <div key={categoryId || 'uncategorized'} className="mb-8 last:mb-0">
+                              <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 ml-1">{categoryName}</h4>
+                              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                                  {items.map((item) => {
+                                      const currentSplitQty = splitItems[item.instance_id] || 0;
+                                      const paidQty = (order.paid_item_quantities && order.paid_item_quantities[item.instance_id]) || 0;
+                                      const maxQty = item.quantity - paidQty;
+                                      const unitPrice = item.unit_price ?? item.price;
+                                      const imageRef = productInfoMap.get(item.instance_id)?.image;
+                                      const imageSrc = imageRef ? (imageUrls.get(imageRef) || DefaultImage) : DefaultImage;
+                                      const isSelected = currentSplitQty > 0;
+                                      const isFullySelected = currentSplitQty === maxQty;
 
-                      return (
-                        <div
-                          key={item.instance_id}
-                          className="bg-white rounded-lg border border-gray-200 overflow-hidden"
-                        >
-                          {/* Image */}
-                          <div className="aspect-[4/3] bg-gray-100">
-                            {imageRef ? (
-                              <img
-                                src={imageSrc}
-                                alt={item.name}
-                                className="w-full h-full object-cover"
-                                onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-300">
-                                <ImageOff size={32} />
+                                      return (
+                                          <div
+                                            key={item.instance_id}
+                                            onClick={() => {
+                                                if (currentSplitQty < maxQty) {
+                                                    setSplitItems(prev => ({ ...prev, [item.instance_id]: (prev[item.instance_id] || 0) + 1 }));
+                                                }
+                                            }}
+                                            className={`
+                                                relative group cursor-pointer rounded-2xl border transition-all duration-200 overflow-hidden
+                                                ${isSelected 
+                                                    ? 'border-purple-500 ring-2 ring-purple-500/20 bg-purple-50/50' 
+                                                    : 'border-gray-200 bg-white hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/10'
+                                                }
+                                            `}
+                                          >
+                                              {/* Selection Badge */}
+                                              {isSelected && (
+                                                  <div className="absolute top-3 right-3 z-10 bg-purple-600 text-white w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm shadow-lg animate-in zoom-in duration-200">
+                                                      {currentSplitQty}
+                                                  </div>
+                                              )}
+
+                                              <div className="p-4 flex gap-4 items-center">
+                                                  <div className="w-16 h-16 rounded-xl bg-gray-100 shrink-0 overflow-hidden relative">
+                                                      {imageRef ? (
+                                                        <img src={imageSrc} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
+                                                      ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageOff size={20} /></div>
+                                                      )}
+                                                      {isFullySelected && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><div className="text-white text-xs font-bold">ALL</div></div>}
+                                                  </div>
+                                                  <div className="flex-1 min-w-0">
+                                                      <div className="font-bold text-gray-800 truncate" title={item.name}>{item.name}</div>
+                                                      <div className="text-sm text-gray-500 mt-0.5">{formatCurrency(unitPrice)}</div>
+                                                      <div className="text-xs font-medium text-gray-400 mt-2">
+                                                          {t('checkout.split.available')}: <span className="text-gray-700">{maxQty}</span>
+                                                      </div>
+                                                  </div>
+                                              </div>
+                                              
+                                              {/* Hover Overlay Controls */}
+                                              <div className="absolute inset-0 bg-white/90 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                                                  <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSplitItems(prev => ({ ...prev, [item.instance_id]: Math.max(0, (prev[item.instance_id] || 0) - 1) }));
+                                                    }}
+                                                    disabled={currentSplitQty <= 0}
+                                                    className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center disabled:opacity-30 text-gray-600 transition-colors"
+                                                  >
+                                                      <Minus size={20} />
+                                                  </button>
+                                                  <div className="font-bold text-lg w-6 text-center">{currentSplitQty}</div>
+                                                  <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSplitItems(prev => ({ ...prev, [item.instance_id]: Math.min(maxQty, (prev[item.instance_id] || 0) + 1) }));
+                                                    }}
+                                                    disabled={currentSplitQty >= maxQty}
+                                                    className="w-10 h-10 rounded-full bg-purple-100 hover:bg-purple-200 flex items-center justify-center disabled:opacity-30 text-purple-700 transition-colors"
+                                                  >
+                                                      <Plus size={20} />
+                                                  </button>
+                                              </div>
+                                          </div>
+                                      );
+                                  })}
                               </div>
-                            )}
                           </div>
-
-                          {/* Info */}
-                          <div className="p-2">
-                            <div className="text-sm font-medium text-gray-800 truncate" title={item.name}>
-                              {item.name}
-                            </div>
-                            <div className="flex items-center justify-between text-xs mt-0.5">
-                              <span className="text-gray-600">{formatCurrency(unitPrice)}</span>
-                              <span className="text-gray-400">剩{maxQty}</span>
-                            </div>
-                          </div>
-
-                          {/* Quantity Controls */}
-                          <div className="flex items-center justify-between px-2 pb-2">
-                            <button
-                              onClick={() => setSplitItems(prev => ({ ...prev, [item.instance_id]: Math.max(0, (prev[item.instance_id] || 0) - 1) }))}
-                              disabled={currentSplitQty <= 0}
-                              className="w-11 h-11 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 active:bg-gray-300 disabled:opacity-30 transition-colors"
-                            >
-                              <Minus size={18} />
-                            </button>
-                            <span className={`text-base font-bold ${currentSplitQty > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
-                              {currentSplitQty}
-                            </span>
-                            <button
-                              onClick={() => setSplitItems(prev => ({ ...prev, [item.instance_id]: Math.min(maxQty, (prev[item.instance_id] || 0) + 1) }))}
-                              disabled={currentSplitQty >= maxQty || maxQty === 0}
-                              className="w-11 h-11 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 active:bg-gray-300 disabled:opacity-30 transition-colors"
-                            >
-                              <Plus size={18} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                      ))}
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="p-6 bg-white border-t border-gray-200 shadow-up">
-            <div className="max-w-3xl mx-auto space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 font-medium text-lg">{t('checkout.split.total')}</span>
-                <span className="text-3xl font-bold text-gray-900">{formatCurrency(splitTotal)}</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => {
-                    setPaymentContext('SPLIT');
-                    setShowCashModal(true);
-                  }}
-                  disabled={splitTotal <= 0 || isProcessingSplit}
-                  className="flex items-center justify-center gap-3 py-4 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
-                >
-                  <Banknote size={24} />
-                  {t('checkout.split.pay_cash')}
-                </button>
-                <button
-                  onClick={() => handleSplitPayment('CARD')}
-                  disabled={splitTotal <= 0 || isProcessingSplit}
-                  className="flex items-center justify-center gap-3 py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
-                >
-                  <CreditCard size={24} />
-                  {t('checkout.split.pay_card')}
-                </button>
+              {/* Right Side: Summary & Pay */}
+              <div className="w-[400px] flex flex-col bg-white border-l border-gray-200 shadow-xl z-20">
+                  <div className="p-6 bg-gray-50 border-b border-gray-200">
+                      <h4 className="font-bold text-gray-800 text-lg">{t('checkout.split.new_order')}</h4>
+                      <div className="text-sm text-gray-500 mt-1">{Object.values(splitItems).reduce((a, b) => a + b, 0)} {t('checkout.split.available')}</div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                      {Object.keys(splitItems).length === 0 ? (
+                          <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
+                              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                                  <ShoppingBag size={32} className="opacity-50" />
+                              </div>
+                              <p className="text-sm font-medium">{t('checkout.split.desc')}</p>
+                          </div>
+                      ) : (
+                          <div className="space-y-3">
+                              {Object.entries(splitItems).map(([instanceId, qty]) => {
+                                  if (qty <= 0) return null;
+                                  const item = order.items.find(i => i.instance_id === instanceId);
+                                  if (!item) return null;
+                                  const unitPrice = item.unit_price ?? item.price;
+                                  
+                                  return (
+                                      <div key={instanceId} className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm animate-in slide-in-from-right-4 duration-300">
+                                          <div className="w-10 h-10 rounded-lg bg-gray-100 shrink-0 overflow-hidden">
+                                              {productInfoMap.get(instanceId)?.image ? (
+                                                  <img src={imageUrls.get(productInfoMap.get(instanceId)!.image!) || DefaultImage} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
+                                              ) : (
+                                                  <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageOff size={14} /></div>
+                                              )}
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                              <div className="text-sm font-bold text-gray-800 truncate">{item.name}</div>
+                                              <div className="text-xs text-gray-500">{formatCurrency(unitPrice)}</div>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                              <button 
+                                                onClick={() => setSplitItems(prev => ({ ...prev, [instanceId]: Math.max(0, qty - 1) }))}
+                                                className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                                              >
+                                                  <Minus size={14} />
+                                              </button>
+                                              <span className="text-sm font-bold w-4 text-center">{qty}</span>
+                                              <button 
+                                                onClick={() => {
+                                                    const paidQty = (order.paid_item_quantities && order.paid_item_quantities[instanceId]) || 0;
+                                                    const maxQty = item.quantity - paidQty;
+                                                    if (qty < maxQty) {
+                                                        setSplitItems(prev => ({ ...prev, [instanceId]: qty + 1 }));
+                                                    }
+                                                }}
+                                                className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                                              >
+                                                  <Plus size={14} />
+                                              </button>
+                                          </div>
+                                      </div>
+                                  );
+                              })}
+                          </div>
+                      )}
+                  </div>
+
+                  <div className="p-6 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+                      <div className="flex justify-between items-end mb-6">
+                          <span className="text-gray-500 font-medium">{t('checkout.split.total')}</span>
+                          <span className="text-3xl font-bold text-gray-900 tabular-nums">{formatCurrency(splitTotal)}</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                          <button
+                              onClick={() => {
+                                  setPaymentContext('SPLIT');
+                                  setShowCashModal(true);
+                              }}
+                              disabled={splitTotal <= 0 || isProcessingSplit}
+                              className="py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-500/30 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                              <Banknote size={20} />
+                              {t('checkout.split.pay_cash')}
+                          </button>
+                          <button
+                              onClick={() => handleSplitPayment('CARD')}
+                              disabled={splitTotal <= 0 || isProcessingSplit}
+                              className="py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-lg shadow-lg shadow-blue-600/30 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                              <CreditCard size={20} />
+                              {t('checkout.split.pay_card')}
+                          </button>
+                      </div>
+                  </div>
               </div>
-            </div>
           </div>
         </div>
       </div>
@@ -665,8 +920,26 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   const renderAmountSplitMode = () => {
     const parsedAmount = parseFloat(amountSplitValue) || 0;
 
+    // Calculate Share Stats - use server AA state when locked
+    const totalShares = isAALocked ? order.aa_total_shares! : (parseInt(aaTotalStr) || 1);
+    const paidSharesExact = isAALocked ? (order.aa_paid_shares ?? 0) : (() => {
+      const sharePrice = order.total / totalShares;
+      const paidAmount = order.total - remaining;
+      return Math.abs(sharePrice) < 0.01 ? 0 : paidAmount / sharePrice;
+    })();
+    const remainingSharesExact = isAALocked ? (totalShares - paidSharesExact) : (() => {
+      const sharePrice = order.total / totalShares;
+      return Math.abs(sharePrice) < 0.01 ? 0 : remaining / sharePrice;
+    })();
+
+    // Helper to format shares (e.g. 1, 1.5, 0.3)
+    const formatShareCount = (val: number) => {
+        const rounded = Math.round(val * 100) / 100;
+        return rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
+    };
+
     return (
-      <div className="h-full flex">
+      <div className="h-full flex bg-gray-50/50 backdrop-blur-xl">
         {successModal && (
           <PaymentSuccessModal
             isOpen={successModal.isOpen}
@@ -683,95 +956,243 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           remaining={remaining}
           onManage={onManageTable}
         />
-        <div className="flex-1 flex flex-col bg-gray-50">
-          <div className="p-6 bg-white border-b border-gray-200 shadow-sm flex justify-between items-center">
-            <h3 className="font-bold text-gray-800 text-xl flex items-center gap-2">
-              <Banknote size={24} className="text-amber-600" />
-              {t('checkout.amount_split.title')}
+        
+        <div className="flex-1 flex flex-col relative overflow-hidden">
+           {/* Background Decor */}
+           <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+           <div className="absolute bottom-[-10%] left-[20%] w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+
+          {/* Header */}
+          <div className="p-6 bg-white/80 backdrop-blur-md border-b border-gray-200/50 shadow-sm flex justify-between items-center z-10 shrink-0">
+            <h3 className="font-bold text-gray-800 text-2xl flex items-center gap-3">
+              <div className="p-2 bg-orange-500 rounded-xl text-white shadow-lg shadow-orange-500/30">
+                <Banknote size={24} />
+              </div>
+              {isAALocked ? t('checkout.aa_split.title') : t('checkout.amount_split.title')}
             </h3>
-            <button onClick={() => { setMode('SELECT'); setAmountSplitValue(''); }} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium flex items-center gap-2 transition-all">
+            <button onClick={() => { 
+                setMode('SELECT'); 
+                setAmountSplitValue(''); 
+                setSplitMode('CUSTOM');
+                setActiveInput('CUSTOM');
+              }} 
+              className="px-5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 rounded-xl font-medium flex items-center gap-2 transition-all shadow-sm"
+            >
               <ArrowLeft size={20} /> {t('common.action.back')}
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-            <div className="max-w-2xl mx-auto space-y-6">
-              {/* Remaining Amount Display */}
-              <div className="bg-blue-50 p-6 rounded-xl border-2 border-blue-200">
-                <div className="text-sm text-blue-600 font-medium mb-2">{t('checkout.amount.remaining')}</div>
-                <div className="text-4xl font-bold text-blue-700">{formatCurrency(remaining)}</div>
-              </div>
+          <div className="flex-1 flex overflow-hidden z-10 p-6 gap-6">
+            {/* Left Column: Split Configuration */}
+            <div className="flex-1 flex flex-col gap-6">
+                
+                {/* Info Card */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col gap-4">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                        <div>
+                            <div className="text-gray-500 font-medium mb-1">{t('checkout.split.total')}</div>
+                            <div className="text-3xl font-bold text-gray-900">{formatCurrency(order.total)}</div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-gray-500 font-medium mb-1">{t('checkout.payment.remaining')}</div>
+                            <div className="text-3xl font-bold text-orange-600">{formatCurrency(remaining)}</div>
+                        </div>
+                    </div>
+                    
+                    {/* Share Stats - only show when in AA mode or AA is locked */}
+                    {(splitMode === 'AA' || isAALocked) && (
+                    <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2 text-gray-600 bg-green-50 px-3 py-2 rounded-lg border border-green-100">
+                             <div className="p-1 bg-green-200 text-green-700 rounded-full"><Check size={12} strokeWidth={3} /></div>
+                             <span>{t('checkout.aa_split.paid_shares')}: <b className="text-green-700">{formatShareCount(paidSharesExact)}</b> {t('checkout.aa_split.shares_unit')}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-600 bg-orange-50 px-3 py-2 rounded-lg border border-orange-100">
+                             <div className="p-1 bg-orange-200 text-orange-700 rounded-full"><Clock size={12} strokeWidth={3} /></div>
+                             <span>{t('checkout.aa_split.unpaid_shares')}: <b className="text-orange-700">{formatShareCount(remainingSharesExact)}</b> {t('checkout.aa_split.shares_unit')}</span>
+                        </div>
+                    </div>
+                    )}
+                </div>
 
-              {/* AA Split Quick Actions */}
-              <div>
-                <h4 className="text-lg font-bold text-gray-700 mb-3">{t('checkout.amount_split.aa_divide')}</h4>
-                <div className="grid grid-cols-5 gap-3">
-                  {[2, 3, 4, 5, 6].map(count => (
-                    <button
-                      key={count}
-                      onClick={() => handleAADivide(count)}
-                      className="bg-white border-2 border-gray-200 hover:border-purple-400 hover:bg-purple-50 rounded-lg p-4 transition-all"
+                {/* Split Controls */}
+                <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col gap-6">
+                    
+                    {/* Split Into (Total Shares) - locked after first AA payment */}
+                    <div
+                        onClick={() => !isAALocked && handleFocus('AA_TOTAL')}
+                        className={`
+                            relative p-6 rounded-2xl border-2 transition-all flex items-center justify-between
+                            ${isAALocked
+                                ? 'border-purple-300 bg-purple-50/50 cursor-not-allowed opacity-90'
+                                : activeInput === 'AA_TOTAL'
+                                    ? 'border-purple-500 bg-purple-50 ring-4 ring-purple-100 cursor-pointer'
+                                    : 'border-gray-200 hover:border-purple-200 hover:bg-gray-50 opacity-80 cursor-pointer'
+                            }
+                        `}
                     >
-                      <div className="text-sm text-gray-500 mb-1">{count}{t('checkout.amount_split.people')}</div>
-                      <div className="text-lg font-bold text-gray-800">{formatCurrency(remaining / count)}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+                        <div className="flex items-center gap-4">
+                            <div className={`p-3 rounded-xl ${isAALocked ? 'bg-purple-200 text-purple-700' : activeInput === 'AA_TOTAL' ? 'bg-purple-200 text-purple-700' : 'bg-gray-100 text-gray-500'}`}>
+                                {isAALocked ? <LockIcon size={24} /> : <Users size={24} />}
+                            </div>
+                            <div>
+                                <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">{t('checkout.aa_split.split_into')}</div>
+                                <div className="text-sm text-gray-400">{isAALocked ? t('checkout.aa_split.locked') : t('checkout.aa_split.total_shares')}</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            {!isAALocked && activeInput === 'AA_TOTAL' && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); incrementAA('TOTAL', -1); }}
+                                    className="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600 shadow-sm"
+                                >
+                                    <Minus size={20} />
+                                </button>
+                            )}
+                            <div className={`text-4xl font-bold tabular-nums w-20 text-center ${isAALocked ? 'text-purple-700' : activeInput === 'AA_TOTAL' ? 'text-gray-800' : 'text-gray-500'}`}>
+                                {isAALocked ? order.aa_total_shares : (aaTotalStr || <span className="text-gray-300">1</span>)}
+                            </div>
+                            {!isAALocked && activeInput === 'AA_TOTAL' && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); incrementAA('TOTAL', 1); }}
+                                    className="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600 shadow-sm"
+                                >
+                                    <Plus size={20} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
 
-              {/* Manual Amount Input */}
-              <div>
-                <h4 className="text-lg font-bold text-gray-700 mb-3">{t('checkout.amount_split.custom_amount')}</h4>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={amountSplitValue}
-                    onChange={(e) => setAmountSplitValue(e.target.value)}
-                    placeholder={t('checkout.amount_split.enter_amount')}
-                    className="w-full px-6 py-4 text-2xl font-bold border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
-                    step="0.01"
-                    min="0"
-                    max={remaining}
-                  />
-                  <button
-                    onClick={() => setAmountSplitValue(remaining.toFixed(2))}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-md text-sm font-medium transition-colors"
-                  >
-                    {t('checkout.amount_split.full_amount')}
-                  </button>
+                    {/* Pay For (Shares) */}
+                    <div 
+                        onClick={() => handleFocus('AA_PAY')}
+                        className={`
+                            relative p-6 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between
+                            ${activeInput === 'AA_PAY' 
+                                ? 'border-orange-500 bg-orange-50 ring-4 ring-orange-100' 
+                                : 'border-gray-200 hover:border-orange-200 hover:bg-gray-50 opacity-80'
+                            }
+                        `}
+                    >
+                        <div className="flex items-center gap-4">
+                             <div className={`p-3 rounded-xl ${activeInput === 'AA_PAY' ? 'bg-orange-200 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+                                <PieChart size={24} />
+                            </div>
+                            <div>
+                                <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">{t('checkout.aa_split.pay_for')}</div>
+                                <div className="text-sm text-gray-400">{t('checkout.aa_split.your_shares')}</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            {activeInput === 'AA_PAY' && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); incrementAA('PAY', -1); }}
+                                    className="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600 shadow-sm"
+                                >
+                                    <Minus size={20} />
+                                </button>
+                            )}
+                            <div className={`text-4xl font-bold tabular-nums w-20 text-center ${activeInput === 'AA_PAY' ? 'text-gray-800' : 'text-gray-500'}`}>
+                                {aaPayStr || <span className="text-gray-300">0</span>}
+                            </div>
+                            {activeInput === 'AA_PAY' && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); incrementAA('PAY', 1); }}
+                                    className="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600 shadow-sm"
+                                >
+                                    <Plus size={20} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Result Summary */}
+                    <div className="mt-auto p-6 bg-gray-50 rounded-xl border border-gray-200 flex flex-col gap-2">
+                        <div className="flex justify-between items-center text-gray-500">
+                            <span>{t('checkout.aa_split.calculation')}</span>
+                            <span className="text-sm">
+                                {splitMode === 'AA'
+                                    ? `(${formatCurrency(remaining)} / ${isAALocked ? aaRemainingShares : (parseInt(aaTotalStr)||1)}) × ${parseInt(aaPayStr)||1}`
+                                    : t('checkout.amount_split.custom_amount')
+                                }
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-end">
+                            <span className="text-lg font-bold text-gray-700">{t('checkout.aa_split.amount_to_pay')}</span>
+                            <span className="text-4xl font-bold text-purple-600 tabular-nums">
+                                {formatCurrency(parsedAmount)}
+                            </span>
+                        </div>
+                    </div>
+
                 </div>
-              </div>
             </div>
-          </div>
 
-          <div className="p-6 bg-white border-t border-gray-200 shadow-up">
-            <div className="max-w-3xl mx-auto space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 font-medium text-lg">{t('checkout.amount_split.split_amount')}</span>
-                <span className="text-3xl font-bold text-gray-900">{formatCurrency(parsedAmount)}</span>
-              </div>
+            {/* Right Column: Numpad & Actions */}
+            <div className="w-[380px] flex flex-col gap-6">
+                
+                {/* Custom Amount Display (Clickable) - disabled when AA locked */}
+                <div
+                    onClick={() => handleFocus('CUSTOM')}
+                    className={`
+                        p-6 bg-white rounded-2xl shadow-sm border-2 transition-all flex flex-col items-end justify-center min-h-[120px]
+                        ${isAALocked
+                            ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                            : activeInput === 'CUSTOM'
+                                ? 'border-blue-500 bg-blue-50 ring-4 ring-blue-100 cursor-pointer'
+                                : 'border-gray-200 hover:border-blue-200 hover:bg-gray-50 cursor-pointer'
+                        }
+                    `}
+                >
+                    <div className="text-sm font-bold text-gray-400 uppercase mb-2">
+                        {isAALocked ? t('checkout.aa_split.title') : t('checkout.amount_split.custom_amount')}
+                    </div>
+                    <div className="text-5xl font-bold text-gray-800 tabular-nums break-all text-right w-full">
+                        {activeInput === 'CUSTOM' && !isAALocked
+                            ? (amountSplitValue || <span className="text-gray-300">0.00</span>)
+                            : <span className="text-gray-400">{amountSplitValue || '0.00'}</span>
+                        }
+                    </div>
+                </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => {
-                    setPaymentContext('AMOUNT_SPLIT');
-                    setShowCashModal(true);
-                  }}
-                  disabled={parsedAmount <= 0 || isProcessingAmountSplit}
-                  className="flex items-center justify-center gap-3 py-4 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
-                >
-                  <Banknote size={24} />
-                  {t('checkout.split.pay_cash')}
-                </button>
-                <button
-                  onClick={() => handleAmountSplitPayment('CARD')}
-                  disabled={parsedAmount <= 0 || isProcessingAmountSplit}
-                  className="flex items-center justify-center gap-3 py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
-                >
-                  <CreditCard size={24} />
-                  {t('checkout.split.pay_card')}
-                </button>
-              </div>
+                {/* Numpad */}
+                <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                    <Numpad
+                        onNumber={handleNumpadInput}
+                        onDelete={() => handleNumpadInput('backspace')}
+                        onClear={() => handleNumpadInput('C')}
+                        onEnter={() => {
+                            if (parsedAmount > 0) {
+                                setPaymentContext('AMOUNT_SPLIT');
+                                setShowCashModal(true);
+                            }
+                        }}
+                        showEnter={false} // We have dedicated buttons below
+                        className="h-full"
+                    />
+                </div>
+
+                {/* Payment Buttons */}
+                <div className="grid grid-cols-2 gap-4">
+                    <button
+                        onClick={() => {
+                            setPaymentContext('AMOUNT_SPLIT');
+                            setShowCashModal(true);
+                        }}
+                        disabled={parsedAmount <= 0 || isProcessingAmountSplit}
+                        className="py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-500/30 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                        <Banknote size={20} />
+                        {t('checkout.split.pay_cash')}
+                    </button>
+                    <button
+                        onClick={() => handleAmountSplitPayment('CARD')}
+                        disabled={parsedAmount <= 0 || isProcessingAmountSplit}
+                        className="py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-lg shadow-lg shadow-blue-600/30 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                        <CreditCard size={20} />
+                        {t('checkout.split.pay_card')}
+                    </button>
+                </div>
             </div>
           </div>
         </div>
@@ -864,15 +1285,15 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
             <div className="grid grid-cols-3 gap-4">
               <div className="p-4 bg-gray-50 rounded-xl">
                 <div className="text-xs text-gray-500 uppercase font-bold">{t('checkout.amount.total')}</div>
-                <div className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(order.total)}</div>
+                <div className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">{formatCurrency(order.total)}</div>
               </div>
               <div className="p-4 bg-blue-50 rounded-xl">
                 <div className="text-xs text-gray-600 uppercase font-bold">{t('checkout.amount.paid')}</div>
-                <div className="text-2xl font-bold text-blue-600 mt-1">{formatCurrency(totalPaid)}</div>
+                <div className="text-2xl font-bold text-blue-600 mt-1 tabular-nums">{formatCurrency(totalPaid)}</div>
               </div>
               <div className={`p-4 rounded-xl ${isPaidInFull ? 'bg-green-50' : 'bg-red-50'}`}>
                 <div className="text-xs text-gray-600 uppercase font-bold">{t('checkout.amount.remaining')}</div>
-                <div className={`text-2xl font-bold mt-1 ${isPaidInFull ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(remaining)}</div>
+                <div className={`text-2xl font-bold mt-1 tabular-nums ${isPaidInFull ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(remaining)}</div>
               </div>
             </div>
 
@@ -881,45 +1302,42 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           <div className="flex-1 p-8 overflow-y-auto space-y-6">
             {/* Payment Method Buttons */}
             <div className="grid grid-cols-3 gap-6">
-              <button onClick={handleFullCashPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+              <button onClick={handleFullCashPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-green-500 hover:bg-green-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
                 <Coins size={48} />
                 <div className="text-2xl font-bold">{t('checkout.method.cash')}</div>
                 <div className="text-sm opacity-90">{t('checkout.method.cash_desc')}</div>
               </button>
-              <button onClick={handleFullCardPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+              <button onClick={handleFullCardPayment} disabled={isPaidInFull || isProcessing} className="h-40 bg-blue-500 hover:bg-blue-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
                 <CreditCard size={48} />
                 <div className="text-2xl font-bold">{t('checkout.method.card')}</div>
                 <div className="text-sm opacity-90">{t('checkout.method.card_desc')}</div>
               </button>
-              <button onClick={() => setMode('ITEM_SPLIT')} disabled={isPaidInFull || isProcessing || order.has_amount_split} className="h-40 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+              <button onClick={() => setMode('ITEM_SPLIT')} disabled={isPaidInFull || isProcessing || order.has_amount_split || isAALocked} className="h-40 bg-purple-500 hover:bg-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
                 <Split size={48} />
                 <div className="text-2xl font-bold">{t('checkout.split.title')}</div>
-                <div className="text-sm opacity-90">{order.has_amount_split ? t('checkout.amount_split.item_split_disabled') : t('checkout.split.desc')}</div>
+                <div className="text-sm opacity-90">{isAALocked ? t('checkout.aa_split.locked') : order.has_amount_split ? t('checkout.amount_split.item_split_disabled') : t('checkout.split.desc')}</div>
               </button>
             </div>
 
-            {/* Amount Split Button */}
+            {/* Amount Split & Payment Records Buttons */}
             <div className="grid grid-cols-3 gap-6">
-              <button onClick={() => setMode('AMOUNT_SPLIT')} disabled={isPaidInFull || isProcessing} className="h-40 bg-gradient-to-br from-amber-500 to-orange-500 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+              <button onClick={() => setMode('AMOUNT_SPLIT')} disabled={isPaidInFull || isProcessing} className="h-40 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
                 <Banknote size={48} />
-                <div className="text-2xl font-bold">{t('checkout.amount_split.title')}</div>
-                <div className="text-sm opacity-90">{t('checkout.amount_split.desc')}</div>
+                <div className="text-2xl font-bold">{isAALocked ? t('checkout.aa_split.title') : t('checkout.amount_split.title')}</div>
+                <div className="text-sm opacity-90">{isAALocked ? t('checkout.aa_split.desc') : t('checkout.amount_split.desc')}</div>
               </button>
-            </div>
 
-            {/* Payment Records Entry Card */}
-            {activePayments.length > 0 && (
-              <div className="grid grid-cols-3 gap-6">
+              {activePayments.length > 0 && (
                 <button
                   onClick={() => setMode('PAYMENT_RECORDS')}
-                  className="h-40 bg-gradient-to-br from-amber-500 to-orange-500 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-4"
+                  className="h-40 bg-teal-500 hover:bg-teal-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-4"
                 >
                   <Receipt size={48} />
                   <div className="text-2xl font-bold">{t('checkout.payment.records')}</div>
                   <div className="text-sm opacity-90">{activePayments.length} {t('checkout.payment.record_count')} · {formatCurrency(totalPaid)}</div>
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -939,7 +1357,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           {/* Header */}
           <div className="p-6 bg-white border-b border-gray-200 shadow-sm flex justify-between items-center">
             <h3 className="font-bold text-gray-800 text-xl flex items-center gap-2">
-              <Receipt size={24} className="text-amber-600" />
+              <Receipt size={24} className="text-teal-600" />
               {t('checkout.payment.records')}
             </h3>
             <button

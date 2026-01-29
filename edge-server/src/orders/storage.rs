@@ -847,6 +847,8 @@ mod tests {
             loss_amount: None,
             void_note: None,
             has_amount_split: false,
+            aa_total_shares: None,
+            aa_paid_shares: 0,
         };
         snapshot.update_checksum();
         snapshot

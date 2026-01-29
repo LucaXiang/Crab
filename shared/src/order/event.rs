@@ -56,7 +56,11 @@ pub enum OrderEventType {
     PaymentCancelled,
 
     // Split
-    OrderSplit,
+    ItemSplit,
+    AmountSplit,
+    AaSplitStarted,
+    AaSplitPaid,
+    AaSplitCancelled,
 
     // Table operations
     OrderMoved,
@@ -85,7 +89,11 @@ impl std::fmt::Display for OrderEventType {
             OrderEventType::ItemRestored => write!(f, "ITEM_RESTORED"),
             OrderEventType::PaymentAdded => write!(f, "PAYMENT_ADDED"),
             OrderEventType::PaymentCancelled => write!(f, "PAYMENT_CANCELLED"),
-            OrderEventType::OrderSplit => write!(f, "ORDER_SPLIT"),
+            OrderEventType::ItemSplit => write!(f, "ITEM_SPLIT"),
+            OrderEventType::AmountSplit => write!(f, "AMOUNT_SPLIT"),
+            OrderEventType::AaSplitStarted => write!(f, "AA_SPLIT_STARTED"),
+            OrderEventType::AaSplitPaid => write!(f, "AA_SPLIT_PAID"),
+            OrderEventType::AaSplitCancelled => write!(f, "AA_SPLIT_CANCELLED"),
             OrderEventType::OrderMoved => write!(f, "ORDER_MOVED"),
             OrderEventType::OrderMovedOut => write!(f, "ORDER_MOVED_OUT"),
             OrderEventType::OrderMerged => write!(f, "ORDER_MERGED"),
@@ -214,11 +222,41 @@ pub enum EventPayload {
     },
 
     // ========== Split ==========
-    OrderSplit {
+    /// 菜品分单
+    ItemSplit {
         payment_id: String,
         split_amount: f64,
         payment_method: String,
         items: Vec<SplitItem>,
+    },
+
+    /// 金额分单
+    AmountSplit {
+        payment_id: String,
+        split_amount: f64,
+        payment_method: String,
+    },
+
+    /// AA 开始（锁人数，记录每份金额）
+    AaSplitStarted {
+        total_shares: i32,
+        per_share_amount: f64,
+        order_total: f64,
+    },
+
+    /// AA 支付（进度）
+    AaSplitPaid {
+        payment_id: String,
+        shares: i32,
+        amount: f64,
+        payment_method: String,
+        progress_paid: i32,
+        progress_total: i32,
+    },
+
+    /// AA 取消（所有 AA 支付被取消，解锁 AA 模式）
+    AaSplitCancelled {
+        total_shares: i32,
     },
 
     // ========== Table Operations ==========

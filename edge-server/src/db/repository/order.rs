@@ -46,6 +46,10 @@ impl OrderRepository {
                     time::millis(start_time) AS start_time,
                     time::millis(end_time) AS end_time,
                     operator_name,
+                    void_type,
+                    loss_reason,
+                    loss_amount,
+                    void_note,
                     (
                         SELECT
                             <string>id AS id,

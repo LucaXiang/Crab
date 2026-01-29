@@ -45,6 +45,19 @@ pub struct Order {
     pub operator_name: Option<String>,
     #[serde(default, with = "serde_helpers::option_record_id")]
     pub related_order_id: Option<RecordId>,
+    // === Void Metadata (only when status == Void) ===
+    /// 作废类型: "CANCELLED" | "LOSS_SETTLED"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub void_type: Option<String>,
+    /// 损失原因: "CUSTOMER_FLED" | "CUSTOMER_INSOLVENT" | "OTHER"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loss_reason: Option<String>,
+    /// 损失金额（未收回部分）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loss_amount: Option<f64>,
+    /// 作废备注
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub void_note: Option<String>,
     pub prev_hash: String,
     pub curr_hash: String,
     pub created_at: Option<String>,
@@ -84,6 +97,13 @@ pub struct OrderSummary {
     #[serde(default)]
     pub start_time: i64,
     pub end_time: Option<i64>,
+    // === Void Metadata ===
+    #[serde(default)]
+    pub void_type: Option<String>,
+    #[serde(default)]
+    pub loss_reason: Option<String>,
+    #[serde(default)]
+    pub loss_amount: Option<f64>,
 }
 
 /// Order item option for detail view
@@ -196,6 +216,15 @@ pub struct OrderDetail {
     pub start_time: i64,
     pub end_time: Option<i64>,
     pub operator_name: Option<String>,
+    // === Void Metadata ===
+    #[serde(default)]
+    pub void_type: Option<String>,
+    #[serde(default)]
+    pub loss_reason: Option<String>,
+    #[serde(default)]
+    pub loss_amount: Option<f64>,
+    #[serde(default)]
+    pub void_note: Option<String>,
     #[serde(default)]
     pub items: Vec<OrderItemDetail>,
     #[serde(default)]

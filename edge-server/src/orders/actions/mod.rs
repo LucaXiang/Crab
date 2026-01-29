@@ -35,7 +35,7 @@ pub use open_table::OpenTableAction;
 pub use remove_item::RemoveItemAction;
 pub use restore_item::RestoreItemAction;
 pub use restore_order::RestoreOrderAction;
-pub use split_order::SplitOrderAction;
+pub use split_order::{PayAaSplitAction, SplitByAmountAction, SplitByItemsAction, StartAaSplitAction};
 pub use toggle_rule_skip::ToggleRuleSkipAction;
 pub use update_order_info::UpdateOrderInfoAction;
 pub use void_order::VoidOrderAction;
@@ -55,7 +55,10 @@ pub enum CommandAction {
     RestoreOrder(RestoreOrderAction),
     MoveOrder(MoveOrderAction),
     MergeOrders(MergeOrdersAction),
-    SplitOrder(SplitOrderAction),
+    SplitByItems(SplitByItemsAction),
+    SplitByAmount(SplitByAmountAction),
+    StartAaSplit(StartAaSplitAction),
+    PayAaSplit(PayAaSplitAction),
     ToggleRuleSkip(ToggleRuleSkipAction),
 }
 
@@ -81,7 +84,10 @@ impl CommandHandler for CommandAction {
             CommandAction::RestoreOrder(action) => action.execute(ctx, metadata).await,
             CommandAction::MoveOrder(action) => action.execute(ctx, metadata).await,
             CommandAction::MergeOrders(action) => action.execute(ctx, metadata).await,
-            CommandAction::SplitOrder(action) => action.execute(ctx, metadata).await,
+            CommandAction::SplitByItems(action) => action.execute(ctx, metadata).await,
+            CommandAction::SplitByAmount(action) => action.execute(ctx, metadata).await,
+            CommandAction::StartAaSplit(action) => action.execute(ctx, metadata).await,
+            CommandAction::PayAaSplit(action) => action.execute(ctx, metadata).await,
             CommandAction::ToggleRuleSkip(action) => action.execute(ctx, metadata).await,
         }
     }
@@ -214,16 +220,43 @@ impl From<&OrderCommand> for CommandAction {
                 source_order_id: source_order_id.clone(),
                 target_order_id: target_order_id.clone(),
             }),
-            OrderCommandPayload::SplitOrder {
+            OrderCommandPayload::SplitByItems {
+                order_id,
+                payment_method,
+                items,
+            } => CommandAction::SplitByItems(SplitByItemsAction {
+                order_id: order_id.clone(),
+                payment_method: payment_method.clone(),
+                items: items.clone(),
+            }),
+            OrderCommandPayload::SplitByAmount {
                 order_id,
                 split_amount,
                 payment_method,
-                items,
-            } => CommandAction::SplitOrder(SplitOrderAction {
+            } => CommandAction::SplitByAmount(SplitByAmountAction {
                 order_id: order_id.clone(),
                 split_amount: *split_amount,
                 payment_method: payment_method.clone(),
-                items: items.clone(),
+            }),
+            OrderCommandPayload::StartAaSplit {
+                order_id,
+                total_shares,
+                shares,
+                payment_method,
+            } => CommandAction::StartAaSplit(StartAaSplitAction {
+                order_id: order_id.clone(),
+                total_shares: *total_shares,
+                shares: *shares,
+                payment_method: payment_method.clone(),
+            }),
+            OrderCommandPayload::PayAaSplit {
+                order_id,
+                shares,
+                payment_method,
+            } => CommandAction::PayAaSplit(PayAaSplitAction {
+                order_id: order_id.clone(),
+                shares: *shares,
+                payment_method: payment_method.clone(),
             }),
             OrderCommandPayload::ToggleRuleSkip {
                 order_id,

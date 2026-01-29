@@ -208,6 +208,8 @@ mod tests {
             cancelled: false,
             cancel_reason: None,
             split_items: None,
+            aa_shares: None,
+            split_type: None,
         });
 
         let event = create_item_restored_event("order-1", 2, "item-1", "Test Product");

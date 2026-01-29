@@ -315,28 +315,19 @@ export const partialSettle = async (
 
 
 /**
- * Split order - process a split payment
- * Two modes:
- * - Item-based split: items.length > 0, amount calculated from items
- * - Amount-based split (金额分单): items = [], split_amount provided
+ * Split by items (菜品分单)
  * Fire & forget - UI updates via WebSocket event
  */
-export const splitOrder = async (
+export const splitByItems = async (
   orderId: string,
-  splitData: {
-    items: { instance_id: string; name: string; quantity: number; unit_price: number }[];
-    paymentMethod: string;
-    split_amount?: number;  // For amount-based split (金额分单)
-    tendered?: number;
-    change?: number;
-  }
+  items: { instance_id: string; name: string; quantity: number; unit_price: number }[],
+  paymentMethod: string,
 ): Promise<void> => {
   const command = createCommand({
-    type: 'SPLIT_ORDER',
+    type: 'SPLIT_BY_ITEMS',
     order_id: orderId,
-    split_amount: splitData.split_amount ?? null,
-    payment_method: splitData.paymentMethod,
-    items: splitData.items.map(item => ({
+    payment_method: paymentMethod,
+    items: items.map(item => ({
       instance_id: item.instance_id,
       name: item.name,
       quantity: item.quantity,
@@ -345,7 +336,69 @@ export const splitOrder = async (
   });
 
   const response = await sendCommand(command);
-  ensureSuccess(response, 'Split order');
+  ensureSuccess(response, 'Split by items');
+};
+
+/**
+ * Split by amount (金额分单)
+ * Fire & forget - UI updates via WebSocket event
+ */
+export const splitByAmount = async (
+  orderId: string,
+  splitAmount: number,
+  paymentMethod: string,
+): Promise<void> => {
+  const command = createCommand({
+    type: 'SPLIT_BY_AMOUNT',
+    order_id: orderId,
+    split_amount: splitAmount,
+    payment_method: paymentMethod,
+  });
+
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Split by amount');
+};
+
+/**
+ * Start AA split (锁定人数 + 支付第一份)
+ * Fire & forget - UI updates via WebSocket event
+ */
+export const startAaSplit = async (
+  orderId: string,
+  totalShares: number,
+  shares: number,
+  paymentMethod: string,
+): Promise<void> => {
+  const command = createCommand({
+    type: 'START_AA_SPLIT',
+    order_id: orderId,
+    total_shares: totalShares,
+    shares,
+    payment_method: paymentMethod,
+  });
+
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Start AA split');
+};
+
+/**
+ * Pay AA split (后续 AA 支付)
+ * Fire & forget - UI updates via WebSocket event
+ */
+export const payAaSplit = async (
+  orderId: string,
+  shares: number,
+  paymentMethod: string,
+): Promise<void> => {
+  const command = createCommand({
+    type: 'PAY_AA_SPLIT',
+    order_id: orderId,
+    shares,
+    payment_method: paymentMethod,
+  });
+
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Pay AA split');
 };
 
 /**

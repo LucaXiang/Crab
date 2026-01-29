@@ -97,6 +97,13 @@ pub struct OrderSnapshot {
     /// If true, item-based split is disabled
     #[serde(default)]
     pub has_amount_split: bool,
+    /// AA split: total number of shares (锁定的人数)
+    /// Set on first AA payment, locked afterwards
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aa_total_shares: Option<i32>,
+    /// AA split: number of shares already paid
+    #[serde(default)]
+    pub aa_paid_shares: i32,
     /// Receipt number (server-generated at OpenTable)
     pub receipt_number: String,
     /// Whether this is a pre-payment order
@@ -171,6 +178,8 @@ impl OrderSnapshot {
             remaining_amount: 0.0,
             paid_item_quantities: std::collections::HashMap::new(),
             has_amount_split: false,
+            aa_total_shares: None,
+            aa_paid_shares: 0,
             receipt_number: String::new(),
             is_pre_payment: false,
             order_rule_discount_amount: None,
@@ -288,5 +297,79 @@ mod tests {
         assert_eq!(snapshot.order_rule_discount_amount, Some(10.0));
         assert_eq!(snapshot.order_rule_surcharge_amount, Some(5.0));
         assert_eq!(snapshot.order_manual_discount_percent, Some(5.0));
+    }
+
+    #[test]
+    fn test_void_type_serde_roundtrip() {
+        use super::super::types::VoidType;
+
+        // 1. Create an Active snapshot (void_type = None)
+        let snapshot = OrderSnapshot::new("test-void".to_string());
+        let json = serde_json::to_string(&snapshot).unwrap();
+
+        // void_type should NOT be in the JSON (skip_serializing_if)
+        assert!(
+            !json.contains("void_type"),
+            "Active snapshot should not contain void_type in JSON"
+        );
+
+        // 2. Deserialize back - should work even without void_type key
+        let restored: Result<OrderSnapshot, _> = serde_json::from_str(&json);
+        assert!(
+            restored.is_ok(),
+            "Deserialization should succeed even without void_type key: {:?}",
+            restored.err()
+        );
+        let restored = restored.unwrap();
+        assert_eq!(restored.void_type, None);
+
+        // 3. Create a Void snapshot with void_type set
+        let mut void_snapshot = OrderSnapshot::new("test-void-2".to_string());
+        void_snapshot.status = OrderStatus::Void;
+        void_snapshot.void_type = Some(VoidType::LossSettled);
+
+        let json2 = serde_json::to_string(&void_snapshot).unwrap();
+        assert!(
+            json2.contains("LOSS_SETTLED"),
+            "Void snapshot JSON should contain LOSS_SETTLED, got: {}",
+            json2
+        );
+
+        // 4. Deserialize back
+        let restored2: OrderSnapshot = serde_json::from_str(&json2).unwrap();
+        assert_eq!(restored2.void_type, Some(VoidType::LossSettled));
+    }
+
+    #[test]
+    fn test_void_type_to_string_conversion() {
+        use super::super::types::{LossReason, VoidType};
+
+        // Test the exact conversion used in convert_snapshot_to_order
+        let void_type = VoidType::LossSettled;
+        let result: Option<String> = Some(&void_type).map(|v| {
+            serde_json::to_value(v)
+                .ok()
+                .and_then(|val| val.as_str().map(String::from))
+                .unwrap_or_default()
+        });
+        assert_eq!(result, Some("LOSS_SETTLED".to_string()));
+
+        let void_type2 = VoidType::Cancelled;
+        let result2: Option<String> = Some(&void_type2).map(|v| {
+            serde_json::to_value(v)
+                .ok()
+                .and_then(|val| val.as_str().map(String::from))
+                .unwrap_or_default()
+        });
+        assert_eq!(result2, Some("CANCELLED".to_string()));
+
+        let loss_reason = LossReason::CustomerFled;
+        let result3: Option<String> = Some(&loss_reason).map(|r| {
+            serde_json::to_value(r)
+                .ok()
+                .and_then(|val| val.as_str().map(String::from))
+                .unwrap_or_default()
+        });
+        assert_eq!(result3, Some("CUSTOMER_FLED".to_string()));
     }
 }

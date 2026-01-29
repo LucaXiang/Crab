@@ -20,14 +20,14 @@ impl EventApplier for PaymentCancelledApplier {
         } = &event.payload
         {
             // Find the payment and mark it as cancelled
-            // We need to find and clone split_items before mutating payment
-            let (amount, split_items) = {
+            // We need to find and clone split_items/aa_shares before mutating payment
+            let (amount, split_items, cancelled_aa_shares) = {
                 if let Some(payment) = snapshot
                     .payments
                     .iter()
                     .find(|p| p.payment_id == *payment_id && !p.cancelled)
                 {
-                    (payment.amount, payment.split_items.clone())
+                    (payment.amount, payment.split_items.clone(), payment.aa_shares)
                 } else {
                     return; // Payment not found or already cancelled
                 }
@@ -53,17 +53,24 @@ impl EventApplier for PaymentCancelledApplier {
             }
 
             // Check if we need to clear has_amount_split flag
-            // Amount-based split payments have: split_items is Some but empty (Some([]))
             if snapshot.has_amount_split {
                 let has_remaining_amount_splits = snapshot.payments.iter().any(|p| {
                     !p.cancelled
-                        && p.split_items
-                            .as_ref()
-                            .map_or(false, |items| items.is_empty())
+                        && p.split_type
+                            == Some(shared::order::SplitType::AmountSplit)
                 });
 
                 if !has_remaining_amount_splits {
                     snapshot.has_amount_split = false;
+                }
+            }
+
+            // Rollback AA state if this was an AA payment
+            if let Some(shares) = cancelled_aa_shares {
+                snapshot.aa_paid_shares = (snapshot.aa_paid_shares - shares).max(0);
+                // If no AA shares remain, unlock the AA mode entirely
+                if snapshot.aa_paid_shares == 0 {
+                    snapshot.aa_total_shares = None;
                 }
             }
 
@@ -168,6 +175,8 @@ mod tests {
             cancelled: false,
             cancel_reason: None,
             split_items: None,
+            aa_shares: None,
+            split_type: None,
         }
     }
 
@@ -724,5 +733,133 @@ mod tests {
         assert_eq!(snapshot.items.len(), 1);
         assert_eq!(snapshot.items[0].quantity, 5);
         assert_eq!(snapshot.items[0].unpaid_quantity, 5);
+    }
+
+    // ========== Amount split cancel: has_amount_split flag ==========
+
+    #[test]
+    fn test_cancel_one_of_two_amount_splits_keeps_flag() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.total = 100.0;
+        snapshot.paid_amount = 40.0;
+        snapshot.has_amount_split = true;
+
+        // Two amount split payments
+        let mut pay1 = create_payment_record("amt-1", "CASH", 20.0);
+        pay1.split_type = Some(shared::order::SplitType::AmountSplit);
+        let mut pay2 = create_payment_record("amt-2", "CARD", 20.0);
+        pay2.split_type = Some(shared::order::SplitType::AmountSplit);
+        snapshot.payments.push(pay1);
+        snapshot.payments.push(pay2);
+
+        // Cancel amt-1
+        let event = create_payment_cancelled_event(
+            "order-1", 1, "amt-1", "CASH", 20.0, None, None, None,
+        );
+
+        let applier = PaymentCancelledApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // amt-2 is still active → has_amount_split stays true
+        assert!(snapshot.has_amount_split, "has_amount_split should stay true when other amount splits remain");
+        assert_eq!(snapshot.paid_amount, 20.0);
+        assert!(snapshot.payments[0].cancelled);
+        assert!(!snapshot.payments[1].cancelled);
+    }
+
+    #[test]
+    fn test_cancel_all_amount_splits_clears_flag() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.total = 100.0;
+        snapshot.paid_amount = 20.0;
+        snapshot.has_amount_split = true;
+
+        // One active amount split, one already cancelled
+        let mut pay1 = create_payment_record("amt-1", "CASH", 20.0);
+        pay1.split_type = Some(shared::order::SplitType::AmountSplit);
+        let mut pay2 = create_payment_record("amt-2", "CARD", 20.0);
+        pay2.split_type = Some(shared::order::SplitType::AmountSplit);
+        pay2.cancelled = true;
+        snapshot.payments.push(pay1);
+        snapshot.payments.push(pay2);
+
+        // Cancel the last active one
+        let event = create_payment_cancelled_event(
+            "order-1", 1, "amt-1", "CASH", 20.0, None, None, None,
+        );
+
+        let applier = PaymentCancelledApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // No active amount splits remain → flag cleared
+        assert!(!snapshot.has_amount_split, "has_amount_split should be false when no amount splits remain");
+        assert_eq!(snapshot.paid_amount, 0.0);
+    }
+
+    // ========== AA cancel: aa_total_shares / aa_paid_shares rollback ==========
+
+    #[test]
+    fn test_cancel_one_of_two_aa_payments_keeps_aa_active() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.total = 90.0;
+        snapshot.paid_amount = 60.0;
+        snapshot.aa_total_shares = Some(3);
+        snapshot.aa_paid_shares = 2;
+
+        // Two AA payments (1 share each)
+        let mut pay1 = create_payment_record("aa-1", "CASH", 30.0);
+        pay1.split_type = Some(shared::order::SplitType::AaSplit);
+        pay1.aa_shares = Some(1);
+        let mut pay2 = create_payment_record("aa-2", "CARD", 30.0);
+        pay2.split_type = Some(shared::order::SplitType::AaSplit);
+        pay2.aa_shares = Some(1);
+        snapshot.payments.push(pay1);
+        snapshot.payments.push(pay2);
+
+        // Cancel aa-2
+        let event = create_payment_cancelled_event(
+            "order-1", 1, "aa-2", "CARD", 30.0, None, None, None,
+        );
+
+        let applier = PaymentCancelledApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // aa-1 still active → AA mode stays locked
+        assert_eq!(snapshot.aa_total_shares, Some(3), "AA should remain locked");
+        assert_eq!(snapshot.aa_paid_shares, 1, "Paid shares should be reduced by 1");
+        assert_eq!(snapshot.paid_amount, 30.0);
+    }
+
+    #[test]
+    fn test_cancel_all_aa_payments_unlocks_aa() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.total = 90.0;
+        snapshot.paid_amount = 30.0;
+        snapshot.aa_total_shares = Some(3);
+        snapshot.aa_paid_shares = 1;
+
+        // One active, one already cancelled
+        let mut pay1 = create_payment_record("aa-1", "CASH", 30.0);
+        pay1.split_type = Some(shared::order::SplitType::AaSplit);
+        pay1.aa_shares = Some(1);
+        let mut pay2 = create_payment_record("aa-2", "CARD", 30.0);
+        pay2.split_type = Some(shared::order::SplitType::AaSplit);
+        pay2.aa_shares = Some(1);
+        pay2.cancelled = true;
+        snapshot.payments.push(pay1);
+        snapshot.payments.push(pay2);
+
+        // Cancel the last active one
+        let event = create_payment_cancelled_event(
+            "order-1", 1, "aa-1", "CASH", 30.0, None, None, None,
+        );
+
+        let applier = PaymentCancelledApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // No active AA shares → AA unlocked
+        assert_eq!(snapshot.aa_total_shares, None, "AA should be unlocked when all shares cancelled");
+        assert_eq!(snapshot.aa_paid_shares, 0);
+        assert_eq!(snapshot.paid_amount, 0.0);
     }
 }

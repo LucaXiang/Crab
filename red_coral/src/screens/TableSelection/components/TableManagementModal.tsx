@@ -135,10 +135,11 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
 
         try {
             // Fire & forget - UI updates via WebSocket
-            await orderOps.splitOrder(sourceOrder.order_id, {
-                items: itemsToSplit,
-                paymentMethod: method
-            });
+            await orderOps.splitByItems(
+                sourceOrder.order_id,
+                itemsToSplit,
+                method,
+            );
 
             onClose();
             toast.success(t('checkout.split.success'));

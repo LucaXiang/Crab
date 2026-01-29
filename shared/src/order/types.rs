@@ -213,6 +213,15 @@ pub struct PaymentInput {
     pub note: Option<String>,
 }
 
+/// Split type for categorizing split payments
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum SplitType {
+    ItemSplit,
+    AmountSplit,
+    AaSplit,
+}
+
 /// Payment record in snapshot
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PaymentRecord {
@@ -233,6 +242,12 @@ pub struct PaymentRecord {
     /// Split payment items snapshot (for restoration on cancel)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub split_items: Option<Vec<CartItemSnapshot>>,
+    /// AA split: number of shares this payment covers (for rollback on cancel)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aa_shares: Option<i32>,
+    /// Split type: which split mode produced this payment
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub split_type: Option<SplitType>,
 }
 
 /// Payment summary for completed order

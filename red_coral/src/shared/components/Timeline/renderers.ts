@@ -21,7 +21,11 @@ import type {
   OrderCompletedPayload,
   OrderVoidedPayload,
   OrderRestoredPayload,
-  OrderSplitPayload,
+  ItemSplitPayload,
+  AmountSplitPayload,
+  AaSplitStartedPayload,
+  AaSplitPaidPayload,
+  AaSplitCancelledPayload,
   OrderMergedPayload,
   OrderMovedPayload,
   OrderMovedOutPayload,
@@ -33,7 +37,7 @@ import type {
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 import {
   Utensils, ShoppingBag, Coins, CheckCircle,
-  Edit3, Trash2, Ban, Tag, ArrowRight, ArrowLeft, Split
+  Edit3, Trash2, Ban, Tag, ArrowRight, ArrowLeft, Split, Users, XCircle
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -294,7 +298,16 @@ const PaymentCancelledRenderer: EventRenderer<PaymentCancelledPayload> = {
   }
 };
 
-const OrderSplitRenderer: EventRenderer<OrderSplitPayload> = {
+// ---- Split Renderers ----
+
+function formatPaymentMethod(method: string, t: TranslateFn): string {
+  const lower = method.toLowerCase();
+  if (lower === 'cash') return t('checkout.method.cash');
+  if (lower === 'card') return t('checkout.method.card');
+  return method;
+}
+
+const ItemSplitRenderer: EventRenderer<ItemSplitPayload> = {
   render(event, payload, t) {
     const items = payload.items || [];
     const details = items.map(item => {
@@ -302,22 +315,90 @@ const OrderSplitRenderer: EventRenderer<OrderSplitPayload> = {
       return `${item.name} ${instanceId} x${item.quantity}`;
     });
 
-    let methodDisplay = payload.payment_method || '';
-    const methodLower = methodDisplay.toLowerCase();
-    if (methodLower === 'cash') {
-      methodDisplay = t('checkout.method.cash');
-    } else if (methodLower === 'card') {
-      methodDisplay = t('checkout.method.card');
-    }
+    const methodDisplay = formatPaymentMethod(payload.payment_method || '', t);
 
     return {
-      title: t('timeline.split_bill'),
+      title: t('timeline.item_split'),
       summary: payload.split_amount != null
         ? `${formatCurrency(payload.split_amount)} (${methodDisplay})`
         : '',
       details,
       icon: Split,
       colorClass: 'bg-teal-500',
+      timestamp: event.timestamp,
+      tags: payload.payment_id ? [`#${payload.payment_id.slice(-6)}`] : [],
+    };
+  }
+};
+
+const AmountSplitRenderer: EventRenderer<AmountSplitPayload> = {
+  render(event, payload, t) {
+    const methodDisplay = formatPaymentMethod(payload.payment_method || '', t);
+
+    return {
+      title: t('timeline.amount_split'),
+      summary: payload.split_amount != null
+        ? `${formatCurrency(payload.split_amount)} (${methodDisplay})`
+        : '',
+      details: [],
+      icon: Split,
+      colorClass: 'bg-teal-500',
+      timestamp: event.timestamp,
+      tags: payload.payment_id ? [`#${payload.payment_id.slice(-6)}`] : [],
+    };
+  }
+};
+
+const AaSplitStartedRenderer: EventRenderer<AaSplitStartedPayload> = {
+  render(event, payload, t) {
+    const summary = (payload.order_total != null && payload.total_shares != null && payload.per_share_amount != null)
+      ? `${formatCurrency(payload.order_total)} / ${payload.total_shares}${t('checkout.aa_split.shares_unit')} = ${formatCurrency(payload.per_share_amount)}/${t('checkout.aa_split.shares_unit')}`
+      : '';
+
+    return {
+      title: t('timeline.aa_split_started'),
+      summary,
+      details: [],
+      icon: Users,
+      colorClass: 'bg-cyan-500',
+      timestamp: event.timestamp,
+    };
+  }
+};
+
+const AaSplitPaidRenderer: EventRenderer<AaSplitPaidPayload> = {
+  render(event, payload, t) {
+    const methodDisplay = formatPaymentMethod(payload.payment_method || '', t);
+    const progress = (payload.progress_paid != null && payload.progress_total != null)
+      ? ` ${payload.progress_paid}/${payload.progress_total}`
+      : '';
+
+    return {
+      title: t('timeline.aa_split_paid'),
+      summary: payload.amount != null
+        ? `${formatCurrency(payload.amount)} (${methodDisplay})${progress}`
+        : '',
+      details: [],
+      icon: Users,
+      colorClass: 'bg-cyan-600',
+      timestamp: event.timestamp,
+      tags: payload.payment_id ? [`#${payload.payment_id.slice(-6)}`] : [],
+    };
+  }
+};
+
+const AaSplitCancelledRenderer: EventRenderer<AaSplitCancelledPayload> = {
+  render(event, payload, t) {
+    const summary = payload.total_shares != null
+      ? t('timeline.aa_split_cancelled_summary', { n: payload.total_shares })
+      : '';
+
+    return {
+      title: t('timeline.aa_split_cancelled'),
+      summary,
+      details: [],
+      icon: XCircle,
+      colorClass: 'bg-red-400',
       timestamp: event.timestamp,
     };
   }
@@ -594,7 +675,11 @@ export const EVENT_RENDERERS: Record<OrderEventType, EventRenderer<any>> = {
   ITEM_RESTORED: ItemRestoredRenderer,
   PAYMENT_ADDED: PaymentAddedRenderer,
   PAYMENT_CANCELLED: PaymentCancelledRenderer,
-  ORDER_SPLIT: OrderSplitRenderer,
+  ITEM_SPLIT: ItemSplitRenderer,
+  AMOUNT_SPLIT: AmountSplitRenderer,
+  AA_SPLIT_STARTED: AaSplitStartedRenderer,
+  AA_SPLIT_PAID: AaSplitPaidRenderer,
+  AA_SPLIT_CANCELLED: AaSplitCancelledRenderer,
   ORDER_COMPLETED: OrderCompletedRenderer,
   ORDER_VOIDED: OrderVoidedRenderer,
   ORDER_RESTORED: OrderRestoredRenderer,

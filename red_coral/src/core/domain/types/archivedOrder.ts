@@ -20,6 +20,10 @@ export interface ArchivedOrderSummary {
   guest_count: number;
   start_time: number; // milliseconds
   end_time: number | null; // milliseconds
+  // === Void Metadata ===
+  void_type: ArchivedVoidType | null;
+  loss_reason: ArchivedLossReason | null;
+  loss_amount: number | null;
 }
 
 /** Response from fetch_order_list */
@@ -84,6 +88,12 @@ export interface ArchivedEvent {
   payload: unknown | null;
 }
 
+/** Void type for archived orders */
+export type ArchivedVoidType = 'CANCELLED' | 'LOSS_SETTLED';
+
+/** Loss reason for archived void orders */
+export type ArchivedLossReason = 'CUSTOMER_FLED' | 'CUSTOMER_INSOLVENT' | 'OTHER';
+
 /** Full order detail (matches backend OrderDetail) */
 export interface ArchivedOrderDetail {
   order_id: string;
@@ -100,6 +110,10 @@ export interface ArchivedOrderDetail {
   start_time: number; // milliseconds
   end_time: number | null; // milliseconds
   operator_name: string | null;
+  // === Void Metadata ===
+  void_type: ArchivedVoidType | null;
+  loss_reason: ArchivedLossReason | null;
+  loss_amount: number | null;
   items: ArchivedOrderItem[];
   payments: ArchivedPayment[];
   timeline: ArchivedEvent[];
