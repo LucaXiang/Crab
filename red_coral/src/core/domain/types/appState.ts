@@ -31,7 +31,7 @@ export type ActivationRequiredReason =
 // =============================================================================
 
 export type SubscriptionStatus = 'inactive' | 'active' | 'past_due' | 'expired' | 'canceled' | 'unpaid';
-export type PlanType = 'free' | 'pro' | 'enterprise';
+export type PlanType = 'basic' | 'pro' | 'enterprise';
 
 export interface SubscriptionBlockedInfo {
   status: SubscriptionStatus;

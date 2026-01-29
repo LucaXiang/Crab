@@ -1,6 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Ban, AlertTriangle, CreditCard, ExternalLink, Power, Building2 } from 'lucide-react';
+import { Ban, AlertTriangle, CreditCard, ExternalLink, Power } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAppState } from '@/core/stores/bridge';
 import { t } from '@/infrastructure/i18n';
@@ -46,7 +45,6 @@ function getTheme(status: SubscriptionStatus) {
 }
 
 export const SubscriptionBlockedScreen: React.FC = () => {
-  const navigate = useNavigate();
   const appState = useAppState();
 
   if (appState?.type !== 'ServerSubscriptionBlocked') {
@@ -60,10 +58,6 @@ export const SubscriptionBlockedScreen: React.FC = () => {
   const handleCloseApp = async () => {
     const appWindow = getCurrentWindow();
     await appWindow.close();
-  };
-
-  const handleSwitchTenant = () => {
-    navigate('/tenant-select', { replace: true });
   };
 
   return (
@@ -142,13 +136,6 @@ export const SubscriptionBlockedScreen: React.FC = () => {
               {t('subscriptionBlocked.button_contact_support')}
             </a>
           )}
-          <button
-            onClick={handleSwitchTenant}
-            className="w-full py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all flex items-center justify-center gap-2"
-          >
-            <Building2 size={20} />
-            {t('subscriptionBlocked.button_switch_tenant')}
-          </button>
         </div>
       </div>
     </div>

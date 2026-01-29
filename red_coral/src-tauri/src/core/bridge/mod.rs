@@ -533,7 +533,7 @@ impl ClientBridge {
                             SubscriptionStatus::Unpaid => shared::activation::SubscriptionStatus::Unpaid,
                         };
                         let plan = match sub.plan {
-                            edge_server::services::tenant_binding::PlanType::Free => shared::activation::PlanType::Free,
+                            edge_server::services::tenant_binding::PlanType::Basic => shared::activation::PlanType::Basic,
                             edge_server::services::tenant_binding::PlanType::Pro => shared::activation::PlanType::Pro,
                             edge_server::services::tenant_binding::PlanType::Enterprise => shared::activation::PlanType::Enterprise,
                         };

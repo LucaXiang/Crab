@@ -19,7 +19,7 @@ import { ShiftGuard } from '@/presentation/components/shift';
 import { LoginScreen } from '@/screens/Login';
 import { POSScreen } from '@/screens/POS';
 import { SetupScreen } from '@/screens/Setup';
-import { TenantSelectScreen } from '@/screens/TenantSelect';
+
 import { OrderDebug } from '@/screens/Debug';
 import { ActivationRequiredScreen, SubscriptionBlockedScreen } from '@/screens/Status';
 
@@ -29,7 +29,6 @@ import { ActivationRequiredScreen, SubscriptionBlockedScreen } from '@/screens/S
 const InitialRoute: React.FC = () => {
   const {
     appState,
-    tenants,
     fetchTenants,
     fetchAppState,
     fetchCurrentSession,
@@ -92,11 +91,6 @@ const InitialRoute: React.FC = () => {
         <div className="w-8 h-8 border-4 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
       </div>
     );
-  }
-
-  // 多租户但未选择 - 显示租户选择页面
-  if (tenants.length > 1 && appState?.type === 'ServerNoTenant') {
-    return <Navigate to="/tenant-select" replace />;
   }
 
   // 使用 AppStateHelpers 确定路由
@@ -282,7 +276,6 @@ const App: React.FC = () => {
         <Routes>
         {/* Setup Routes */}
         <Route path="/setup" element={<SetupScreen />} />
-        <Route path="/tenant-select" element={<TenantSelectScreen />} />
 
         {/* Status Routes */}
         <Route path="/status/activation-required" element={<ActivationRequiredScreen />} />

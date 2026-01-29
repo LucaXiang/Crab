@@ -123,10 +123,6 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
-  const handleSwitchTenant = () => {
-    navigate('/tenant-select', { replace: true });
-  };
-
   const handleCloseApp = async () => {
     try {
       const appWindow = getCurrentWindow();

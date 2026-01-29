@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Server, Wifi, AlertCircle, ChevronRight, Shield, Power, Settings, Building2 } from 'lucide-react';
+import { Server, Wifi, AlertCircle, ChevronRight, Shield, Power, Settings } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
 
@@ -20,17 +20,9 @@ export const SetupScreen: React.FC = () => {
     updateServerConfig,
     updateClientConfig,
     fetchAppState,
-    tenants,
-    fetchTenants,
     isLoading,
     error,
   } = useBridgeStore();
-
-  React.useEffect(() => {
-    fetchTenants();
-  }, [fetchTenants]);
-
-  const hasTenants = tenants.length > 0;
 
   const [step, setStep] = useState<SetupStep>('activate');
   const [modeChoice, setModeChoice] = useState<ModeChoice>(null);
@@ -182,19 +174,6 @@ export const SetupScreen: React.FC = () => {
           )}
         </button>
       </form>
-
-      {hasTenants && (
-        <div className="text-center mt-6">
-          <button
-            type="button"
-            onClick={() => navigate('/tenant-select', { replace: true })}
-            className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-primary-500 transition-colors"
-          >
-            <Building2 size={16} />
-            <span>切换租户? 点击选择</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 

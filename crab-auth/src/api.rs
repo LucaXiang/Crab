@@ -374,8 +374,8 @@ async fn activate(
         "api_access".to_string(),
     ];
     let (sub_status, sub_plan, sub_features) = match tenant_id.as_str() {
-        "tenant-inactive" => (SubscriptionStatus::Inactive, PlanType::Free, vec![]),
-        "tenant-expired" | "expired_tenant" => (SubscriptionStatus::Expired, PlanType::Free, vec![]),
+        "tenant-inactive" => (SubscriptionStatus::Inactive, PlanType::Basic, vec![]),
+        "tenant-expired" | "expired_tenant" => (SubscriptionStatus::Expired, PlanType::Basic, vec![]),
         "tenant-canceled" => (SubscriptionStatus::Canceled, PlanType::Pro, vec![]),
         "tenant-unpaid" => (SubscriptionStatus::Unpaid, PlanType::Pro, vec![]),
         "tenant-pastdue" => (SubscriptionStatus::PastDue, PlanType::Pro, pro_features.clone()),
@@ -482,8 +482,8 @@ async fn get_subscription_status(
         "api_access".to_string(),
     ];
     let (status, plan, features) = match tenant_id.as_str() {
-        "tenant-inactive" => (SubscriptionStatus::Inactive, PlanType::Free, vec![]),
-        "tenant-expired" | "expired_tenant" => (SubscriptionStatus::Expired, PlanType::Free, vec![]),
+        "tenant-inactive" => (SubscriptionStatus::Inactive, PlanType::Basic, vec![]),
+        "tenant-expired" | "expired_tenant" => (SubscriptionStatus::Expired, PlanType::Basic, vec![]),
         "tenant-canceled" => (SubscriptionStatus::Canceled, PlanType::Pro, vec![]),
         "tenant-unpaid" => (SubscriptionStatus::Unpaid, PlanType::Pro, vec![]),
         "tenant-pastdue" => (SubscriptionStatus::PastDue, PlanType::Pro, pro_features.clone()),

@@ -321,9 +321,19 @@ impl SubscriptionStatus {
 impl PlanType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            PlanType::Free => "free",
+            PlanType::Basic => "basic",
             PlanType::Pro => "pro",
             PlanType::Enterprise => "enterprise",
+        }
+    }
+
+    /// 返回该计划允许的最大门店数量
+    /// 0 表示无限制
+    pub fn max_stores(&self) -> usize {
+        match self {
+            PlanType::Basic => 1,
+            PlanType::Pro => 3,
+            PlanType::Enterprise => 0, // 无限
         }
     }
 }
@@ -350,7 +360,7 @@ pub enum SubscriptionStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanType {
-    Free,
+    Basic,
     Pro,
     Enterprise,
 }

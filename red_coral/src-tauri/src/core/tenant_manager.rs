@@ -317,7 +317,7 @@ impl TenantManager {
                     shared::activation::SubscriptionStatus::Unpaid => edge_server::services::tenant_binding::SubscriptionStatus::Unpaid,
                 },
                 plan: match sub_info.plan {
-                    shared::activation::PlanType::Free => edge_server::services::tenant_binding::PlanType::Free,
+                    shared::activation::PlanType::Basic => edge_server::services::tenant_binding::PlanType::Basic,
                     shared::activation::PlanType::Pro => edge_server::services::tenant_binding::PlanType::Pro,
                     shared::activation::PlanType::Enterprise => edge_server::services::tenant_binding::PlanType::Enterprise,
                 },

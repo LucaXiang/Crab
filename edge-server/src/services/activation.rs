@@ -512,7 +512,7 @@ impl ActivationService {
         };
 
         let plan = match sub_info.plan {
-            shared::activation::PlanType::Free => PlanType::Free,
+            shared::activation::PlanType::Basic => PlanType::Basic,
             shared::activation::PlanType::Pro => PlanType::Pro,
             shared::activation::PlanType::Enterprise => PlanType::Enterprise,
         };

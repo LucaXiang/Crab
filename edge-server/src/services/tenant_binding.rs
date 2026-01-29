@@ -89,9 +89,21 @@ impl SubscriptionStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanType {
-    Free,
+    Basic,
     Pro,
     Enterprise,
+}
+
+impl PlanType {
+    /// 返回该计划允许的最大门店数量
+    /// 0 表示无限制
+    pub fn max_stores(&self) -> usize {
+        match self {
+            PlanType::Basic => 1,
+            PlanType::Pro => 3,
+            PlanType::Enterprise => 0, // 无限
+        }
+    }
 }
 
 fn default_now_millis() -> i64 {
@@ -144,7 +156,7 @@ impl Subscription {
 
     fn plan_str(&self) -> &'static str {
         match self.plan {
-            PlanType::Free => "free",
+            PlanType::Basic => "basic",
             PlanType::Pro => "pro",
             PlanType::Enterprise => "enterprise",
         }
@@ -203,7 +215,7 @@ impl Default for Subscription {
             id: None,
             tenant_id: "default".to_string(),
             status: SubscriptionStatus::Inactive,
-            plan: PlanType::Free,
+            plan: PlanType::Basic,
             starts_at: now,
             expires_at: None,
             features: vec![],
