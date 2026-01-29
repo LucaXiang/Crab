@@ -65,13 +65,9 @@ impl EventApplier for PaymentCancelledApplier {
                 }
             }
 
-            // Rollback AA state if this was an AA payment
+            // Rollback AA paid shares counter (unlock is handled by AaSplitCancelledApplier)
             if let Some(shares) = cancelled_aa_shares {
                 snapshot.aa_paid_shares = (snapshot.aa_paid_shares - shares).max(0);
-                // If no AA shares remain, unlock the AA mode entirely
-                if snapshot.aa_paid_shares == 0 {
-                    snapshot.aa_total_shares = None;
-                }
             }
 
             // Recalculate totals to update unpaid_quantity and financial fields
@@ -831,7 +827,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cancel_all_aa_payments_unlocks_aa() {
+    fn test_cancel_all_aa_payments_zeroes_shares_but_does_not_unlock() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.total = 90.0;
         snapshot.paid_amount = 30.0;
@@ -857,8 +853,8 @@ mod tests {
         let applier = PaymentCancelledApplier;
         applier.apply(&mut snapshot, &event);
 
-        // No active AA shares → AA unlocked
-        assert_eq!(snapshot.aa_total_shares, None, "AA should be unlocked when all shares cancelled");
+        // Shares zeroed, but unlock is deferred to AaSplitCancelledApplier
+        assert_eq!(snapshot.aa_total_shares, Some(3), "PaymentCancelledApplier must NOT unlock AA; that is AaSplitCancelledApplier's job");
         assert_eq!(snapshot.aa_paid_shares, 0);
         assert_eq!(snapshot.paid_amount, 0.0);
     }
