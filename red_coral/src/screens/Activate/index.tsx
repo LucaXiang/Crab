@@ -5,7 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useBridgeStore } from '@/core/stores/bridge';
 
 // 订阅被阻止的状态
-const BLOCKED_STATUSES = ['Inactive', 'Expired', 'Canceled', 'Unpaid'];
+const BLOCKED_STATUSES = ['inactive', 'expired', 'canceled', 'unpaid'];
 
 export const ActivateScreen: React.FC = () => {
   const navigate = useNavigate();

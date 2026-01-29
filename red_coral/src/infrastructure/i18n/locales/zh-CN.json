@@ -1753,7 +1753,7 @@
       "Unpaid": "订阅欠费"
     },
     "planType": {
-      "free": "免费版",
+      "basic": "基础版",
       "pro": "专业版",
       "enterprise": "企业版"
     }

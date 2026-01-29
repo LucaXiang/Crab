@@ -252,7 +252,7 @@ pub struct SubscriptionInfo {
     /// 签名有效期 (Unix millis，超过此时间需要刷新)
     pub signature_valid_until: i64,
     /// Tenant CA 签名 (base64)
-    /// 签名内容: "{tenant_id}|{plan}|{status}|{features}|{signature_valid_until}"
+    /// 签名内容: "{tenant_id}|{plan}|{status}|{features}|{max_stores}|{signature_valid_until}"
     pub signature: String,
 }
 
@@ -261,11 +261,12 @@ impl SubscriptionInfo {
     pub fn signable_data(&self) -> String {
         let features_str = self.features.join(",");
         format!(
-            "{}|{}|{}|{}|{}",
+            "{}|{}|{}|{}|{}|{}",
             self.tenant_id,
             self.plan.as_str(),
             self.status.as_str(),
             features_str,
+            self.max_stores,
             self.signature_valid_until
         )
     }
