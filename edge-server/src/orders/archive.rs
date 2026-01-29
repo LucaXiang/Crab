@@ -75,16 +75,7 @@ pub struct DailyChainVerification {
     pub invalid_orders: Vec<OrderVerification>,
 }
 
-/// 全链验证结果（周扫描）
-#[derive(Debug, Serialize)]
-pub struct FullChainVerification {
-    pub total_orders: usize,
-    pub verified_orders: usize,
-    pub chain_intact: bool,
-    pub chain_resets: Vec<ChainReset>,
-    pub chain_breaks: Vec<ChainBreak>,
-    pub invalid_orders: Vec<OrderVerification>,
-}
+
 
 /// 断联事故导致的链重置
 #[derive(Debug, Serialize)]
@@ -802,7 +793,7 @@ impl OrderArchiveService {
                     prev_hash,
                     curr_hash
                 FROM order
-                WHERE created_at >= <datetime>$start AND created_at <= <datetime>$end
+                WHERE created_at >= <datetime>$start AND created_at < <datetime>$end
                 ORDER BY created_at
                 "#,
             )
@@ -904,82 +895,7 @@ impl OrderArchiveService {
         })
     }
 
-    /// 全链验证：从第一个 genesis 扫描到最后一个订单
-    /// 适合每周执行一次
-    pub async fn verify_full_chain(&self) -> ArchiveResult<FullChainVerification> {
-        // 查询所有订单，按 created_at 排序
-        let mut result = self
-            .db
-            .query(
-                r#"
-                SELECT
-                    <string>id AS order_id,
-                    receipt_number,
-                    prev_hash,
-                    curr_hash
-                FROM order
-                ORDER BY created_at
-                "#,
-            )
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        let orders: Vec<VerifyOrderRow> = result
-            .take(0)
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        let total_orders = orders.len();
-
-        let mut chain_intact = true;
-        let mut chain_resets: Vec<ChainReset> = Vec::new();
-        let mut chain_breaks: Vec<ChainBreak> = Vec::new();
-        let mut invalid_orders = Vec::new();
-        let mut verified_orders = 0usize;
-
-        // 第一个订单的 expected prev_hash 就是它自身存储的值（不猜）
-        let mut expected_prev = orders
-            .first()
-            .map(|o| o.prev_hash.clone())
-            .unwrap_or_else(|| "genesis".to_string());
-
-        for order in &orders {
-            verified_orders += 1;
-
-            if order.prev_hash != expected_prev {
-                chain_intact = false;
-                if order.prev_hash == "genesis" {
-                    chain_resets.push(ChainReset {
-                        receipt_number: order.receipt_number.clone(),
-                        prev_chain_hash: expected_prev.clone(),
-                    });
-                } else {
-                    chain_breaks.push(ChainBreak {
-                        receipt_number: order.receipt_number.clone(),
-                        expected_prev_hash: expected_prev.clone(),
-                        actual_prev_hash: order.prev_hash.clone(),
-                    });
-                }
-            }
-
-            // 验证订单内部事件链
-            let order_verification = self.verify_order(&order.receipt_number).await?;
-            if !order_verification.events_chain_valid {
-                chain_intact = false;
-                invalid_orders.push(order_verification);
-            }
-
-            expected_prev = order.curr_hash.clone();
-        }
-
-        Ok(FullChainVerification {
-            total_orders,
-            verified_orders,
-            chain_intact,
-            chain_resets,
-            chain_breaks,
-            invalid_orders,
-        })
-    }
 
     fn convert_snapshot_to_order(
         &self,

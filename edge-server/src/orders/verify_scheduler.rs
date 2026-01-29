@@ -1,7 +1,6 @@
 //! 归档验证调度器
 //!
 //! 启动时补扫未验证的营业日，运行期间按 `business_day_cutoff` 每日触发。
-//! 每 7 天自动执行一次全链验证。
 //!
 //! 验证结果持久化到 SurrealDB `archive_verification` 表。
 
@@ -23,9 +22,9 @@ const TABLE: &str = "archive_verification";
 /// 验证记录（存入 SurrealDB）
 #[derive(Debug, Serialize, Deserialize)]
 struct VerificationRecord {
-    /// "daily" | "full"
+    /// "daily"
     verification_type: String,
-    /// 营业日标签，daily 用 "2026-01-29"，full 为 None
+    /// 营业日标签 "2026-01-29"
     date: Option<String>,
     total_orders: usize,
     verified_orders: usize,
@@ -41,12 +40,6 @@ struct VerificationRecord {
 #[derive(Debug, Deserialize)]
 struct LastDateRow {
     date: Option<String>,
-}
-
-/// 用于查询最近全链验证时间
-#[derive(Debug, Deserialize)]
-struct LastFullRow {
-    created_at: String,
 }
 
 // ============================================================================
@@ -98,13 +91,7 @@ impl VerifyScheduler {
     async fn catch_up(&self) -> Result<(), String> {
         let (cutoff_str, cutoff_time) = self.get_cutoff().await;
         let yesterday = Self::yesterday_business_date(cutoff_time);
-
-        // 补扫每日验证
         self.catch_up_daily(&cutoff_str, yesterday).await?;
-
-        // 补扫全链验证（>7 天未执行）
-        self.catch_up_full().await?;
-
         Ok(())
     }
 
@@ -150,6 +137,12 @@ impl VerifyScheduler {
 
         let mut date = start_date;
         while date <= yesterday {
+            // Fix #2: 响应 shutdown 信号
+            if self.shutdown.is_cancelled() {
+                tracing::info!("Verify scheduler catch-up interrupted by shutdown");
+                return Ok(());
+            }
+
             let date_str = date.format("%Y-%m-%d").to_string();
             let next = date + chrono::Duration::days(1);
             let start = format!("{}T{}:00Z", date, cutoff);
@@ -173,53 +166,13 @@ impl VerifyScheduler {
                     }
                 }
                 Err(e) => {
+                    // Fix #4: 失败也写入记录，推进 last_daily_date 进度
                     tracing::error!("Failed to verify daily chain for {}: {}", date_str, e);
+                    self.save_error_daily(&date_str, &e.to_string()).await;
                 }
             }
 
             date = next;
-        }
-
-        Ok(())
-    }
-
-    /// 补扫全链验证（>7 天未执行）
-    async fn catch_up_full(&self) -> Result<(), String> {
-        let needs_full = match self.last_full_scan_date().await? {
-            Some(last) => {
-                let parsed = NaiveDate::parse_from_str(&last, "%Y-%m-%d")
-                    .map_err(|e| format!("Invalid full scan date: {}", e))?;
-                let days_since = (Local::now().date_naive() - parsed).num_days();
-                days_since >= 7
-            }
-            None => true, // 从未执行过
-        };
-
-        if !needs_full {
-            tracing::debug!("Full chain scan up to date (< 7 days)");
-            return Ok(());
-        }
-
-        tracing::info!("🔍 Running full chain verification (startup catch-up)");
-        match self.archive_service.verify_full_chain().await {
-            Ok(result) => {
-                let intact = result.chain_intact;
-                let total = result.total_orders;
-                self.save_full_result(&result).await;
-                if !intact {
-                    tracing::warn!(
-                        "⚠️ Full chain verification found issues (resets: {}, breaks: {}, invalid: {})",
-                        result.chain_resets.len(),
-                        result.chain_breaks.len(),
-                        result.invalid_orders.len()
-                    );
-                } else {
-                    tracing::info!("✅ Full chain verification: {} orders OK", total);
-                }
-            }
-            Err(e) => {
-                tracing::error!("Failed to run full chain verification: {}", e);
-            }
         }
 
         Ok(())
@@ -274,26 +227,7 @@ impl VerifyScheduler {
                 }
                 Err(e) => {
                     tracing::error!("Daily verification failed for {}: {}", date_str, e);
-                }
-            }
-
-            // 检查是否需要全链扫描
-            if let Ok(true) = self.needs_full_scan().await {
-                tracing::info!("🔍 Running weekly full chain verification");
-                match self.archive_service.verify_full_chain().await {
-                    Ok(result) => {
-                        let intact = result.chain_intact;
-                        let total = result.total_orders;
-                        self.save_full_result(&result).await;
-                        if !intact {
-                            tracing::warn!("⚠️ Full chain verification: issues found");
-                        } else {
-                            tracing::info!("✅ Full chain verification: {} orders OK", total);
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("Full chain verification failed: {}", e);
-                    }
+                    self.save_error_daily(&date_str, &e.to_string()).await;
                 }
             }
         }
@@ -327,45 +261,37 @@ impl VerifyScheduler {
             details,
         };
 
-        if let Err(e) = self.save_record(record).await {
+        if let Err(e) = self.save_record(date, record).await {
             tracing::error!("Failed to save daily verification record: {}", e);
         }
     }
 
-    /// 保存全链验证结果
-    async fn save_full_result(
-        &self,
-        result: &crate::orders::archive::FullChainVerification,
-    ) {
-        let details = if !result.chain_intact {
-            serde_json::to_value(result).ok()
-        } else {
-            None
-        };
-
+    /// Fix #4: 验证失败时也写入记录（chain_intact = false, 0 订单），推进进度
+    async fn save_error_daily(&self, date: &str, error: &str) {
         let record = VerificationRecord {
-            verification_type: "full".to_string(),
-            date: None,
-            total_orders: result.total_orders,
-            verified_orders: result.verified_orders,
-            chain_intact: result.chain_intact,
-            chain_resets_count: result.chain_resets.len(),
-            chain_breaks_count: result.chain_breaks.len(),
-            invalid_orders_count: result.invalid_orders.len(),
-            details,
+            verification_type: "daily".to_string(),
+            date: Some(date.to_string()),
+            total_orders: 0,
+            verified_orders: 0,
+            chain_intact: false,
+            chain_resets_count: 0,
+            chain_breaks_count: 0,
+            invalid_orders_count: 0,
+            details: Some(serde_json::json!({ "error": error })),
         };
 
-        if let Err(e) = self.save_record(record).await {
-            tracing::error!("Failed to save full verification record: {}", e);
+        if let Err(e) = self.save_record(date, record).await {
+            tracing::error!("Failed to save error verification record: {}", e);
         }
     }
 
-    /// 写入 SurrealDB
-    async fn save_record(&self, record: VerificationRecord) -> Result<(), String> {
-        let id = uuid::Uuid::new_v4().to_string();
+    /// Fix #3: 使用 upsert 写入 SurrealDB，按 (type, date) 去重
+    async fn save_record(&self, date: &str, record: VerificationRecord) -> Result<(), String> {
+        // 用 verification_type + date 作为确定性 ID，天然去重
+        let id = format!("daily_{}", date.replace('-', ""));
         let _: Option<VerificationRecord> = self
             .db
-            .create((TABLE, &id))
+            .upsert((TABLE, &id))
             .content(record)
             .await
             .map_err(|e| e.to_string())?;
@@ -396,26 +322,6 @@ impl VerifyScheduler {
         Ok(rows.into_iter().next().and_then(|r| r.date))
     }
 
-    /// 查询最近一次 full 验证的日期（从 created_at 提取日期部分）
-    async fn last_full_scan_date(&self) -> Result<Option<String>, String> {
-        let mut result = self
-            .db
-            .query(
-                r#"
-                SELECT string::slice(<string>created_at, 0, 10) AS created_at
-                FROM archive_verification
-                WHERE verification_type = "full"
-                ORDER BY created_at DESC
-                LIMIT 1
-                "#,
-            )
-            .await
-            .map_err(|e| e.to_string())?;
-
-        let rows: Vec<LastFullRow> = result.take(0).map_err(|e| e.to_string())?;
-        Ok(rows.into_iter().next().map(|r| r.created_at))
-    }
-
     /// 查询最早的归档订单日期
     async fn earliest_order_date(&self) -> Result<Option<NaiveDate>, String> {
         #[derive(Debug, Deserialize)]
@@ -440,18 +346,6 @@ impl VerifyScheduler {
         }
     }
 
-    /// 是否需要全链扫描（>= 7 天未执行）
-    async fn needs_full_scan(&self) -> Result<bool, String> {
-        match self.last_full_scan_date().await? {
-            Some(last) => {
-                let parsed = NaiveDate::parse_from_str(&last, "%Y-%m-%d")
-                    .map_err(|e| format!("Invalid date: {}", e))?;
-                Ok((Local::now().date_naive() - parsed).num_days() >= 7)
-            }
-            None => Ok(true),
-        }
-    }
-
     // ========================================================================
     // Time Helpers
     // ========================================================================
@@ -466,8 +360,18 @@ impl VerifyScheduler {
             .flatten()
             .map(|s| s.business_day_cutoff)
             .unwrap_or_else(|| "00:00".to_string());
-        let cutoff_time = NaiveTime::parse_from_str(&cutoff_str, "%H:%M")
-            .unwrap_or(NaiveTime::MIN);
+        // Fix #6: 解析失败增加 warn 日志
+        let cutoff_time = match NaiveTime::parse_from_str(&cutoff_str, "%H:%M") {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to parse business_day_cutoff '{}': {}, falling back to 00:00",
+                    cutoff_str,
+                    e
+                );
+                NaiveTime::MIN
+            }
+        };
         (cutoff_str, cutoff_time)
     }
 

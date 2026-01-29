@@ -7,7 +7,7 @@ use axum::{
 
 use crate::core::ServerState;
 use crate::db::repository::StoreInfoRepository;
-use crate::orders::archive::{DailyChainVerification, FullChainVerification, OrderVerification};
+use crate::orders::archive::{DailyChainVerification, OrderVerification};
 use crate::utils::{AppError, AppResult};
 
 /// GET /api/archive/verify/order/:receipt_number
@@ -66,21 +66,4 @@ pub async fn verify_daily_chain(
     Ok(Json(verification))
 }
 
-/// GET /api/archive/verify/full
-/// 全链验证：从第一个 genesis 扫描到最后一个订单
-/// 适合每周执行一次
-pub async fn verify_full_chain(
-    State(state): State<ServerState>,
-) -> AppResult<Json<FullChainVerification>> {
-    let archive_service = state
-        .orders_manager
-        .archive_service()
-        .ok_or_else(|| AppError::internal("Archive service not available"))?;
 
-    let verification = archive_service
-        .verify_full_chain()
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
-
-    Ok(Json(verification))
-}

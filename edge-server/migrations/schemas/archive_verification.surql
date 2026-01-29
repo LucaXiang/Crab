@@ -56,3 +56,5 @@ DEFINE INDEX OVERWRITE av_type_idx ON archive_verification FIELDS verification_t
 DEFINE INDEX OVERWRITE av_date_idx ON archive_verification FIELDS date;
 DEFINE INDEX OVERWRITE av_created_idx ON archive_verification FIELDS created_at;
 DEFINE INDEX OVERWRITE av_intact_idx ON archive_verification FIELDS chain_intact;
+-- Fix #3: 去重约束（同类型+同日期只保留一条）
+DEFINE INDEX OVERWRITE av_type_date_unique ON archive_verification FIELDS verification_type, date UNIQUE;
