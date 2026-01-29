@@ -366,22 +366,30 @@ async fn activate(
         }
     };
 
-    // 8. Build subscription info (mock for now)
-    // Subscription signature valid for 7 days
+    // 8. Build subscription info (mock: 根据 tenant_id 返回不同状态)
     let signature_valid_until = shared::util::now_millis() + 7 * 24 * 60 * 60 * 1000;
+    let pro_features = vec![
+        "audit_log".to_string(),
+        "advanced_reporting".to_string(),
+        "api_access".to_string(),
+    ];
+    let (sub_status, sub_plan, sub_features) = match tenant_id.as_str() {
+        "tenant-inactive" => (SubscriptionStatus::Inactive, PlanType::Free, vec![]),
+        "tenant-expired" | "expired_tenant" => (SubscriptionStatus::Expired, PlanType::Free, vec![]),
+        "tenant-canceled" => (SubscriptionStatus::Canceled, PlanType::Pro, vec![]),
+        "tenant-unpaid" => (SubscriptionStatus::Unpaid, PlanType::Pro, vec![]),
+        "tenant-pastdue" => (SubscriptionStatus::PastDue, PlanType::Pro, pro_features.clone()),
+        _ => (SubscriptionStatus::Active, PlanType::Pro, pro_features),
+    };
 
     let subscription = SubscriptionInfo {
         tenant_id: tenant_id.clone(),
         id: None,
-        status: SubscriptionStatus::Active,
-        plan: PlanType::Pro,
+        status: sub_status,
+        plan: sub_plan,
         starts_at: shared::util::now_millis(),
         expires_at: Some(shared::util::now_millis() + 365 * 24 * 60 * 60 * 1000),
-        features: vec![
-            "audit_log".to_string(),
-            "advanced_reporting".to_string(),
-            "api_access".to_string(),
-        ],
+        features: sub_features,
         signature_valid_until,
         signature: String::new(), // Will be signed below
     };

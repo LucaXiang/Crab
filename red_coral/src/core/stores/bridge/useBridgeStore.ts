@@ -153,6 +153,7 @@ export interface TenantInfo {
   tenant_name: string | null;
   has_certificates: boolean;
   last_used: number | null;
+  subscription_status: string | null;
 }
 
 // UserInfo matching shared::client::UserInfo from Rust
@@ -185,6 +186,11 @@ export interface LoginResponse {
 interface AuthData {
   session: EmployeeSession | null;
   mode: LoginMode;
+}
+
+export interface ActivationResult {
+  tenant_id: string;
+  subscription_status: string | null;
 }
 
 export interface AppConfigResponse {
@@ -221,7 +227,7 @@ interface BridgeStore {
 
   // Tenant Actions
   fetchTenants: () => Promise<void>;
-  activateTenant: (authUrl: string, username: string, password: string) => Promise<string>;
+  activateTenant: (authUrl: string, username: string, password: string) => Promise<ActivationResult>;
   switchTenant: (tenantId: string) => Promise<void>;
   removeTenant: (tenantId: string) => Promise<void>;
   getCurrentTenant: () => Promise<string | null>;
@@ -370,14 +376,14 @@ export const useBridgeStore = create<BridgeStore>()(
       activateTenant: async (authUrl, username, password) => {
         try {
           set({ isLoading: true, error: null });
-          const msg = await invokeApi<string>('activate_tenant', {
+          const result = await invokeApi<ActivationResult>('activate_tenant', {
             auth_url: authUrl,
             username,
             password,
           });
           await get().fetchTenants();
           await get().fetchAppState();
-          return msg;
+          return result;
         } catch (error: unknown) {
           set({ error: error instanceof Error ? error.message : 'Operation failed' });
           throw error;
@@ -401,7 +407,7 @@ export const useBridgeStore = create<BridgeStore>()(
 
       removeTenant: async (tenantId) => {
         try {
-          await invokeApi('remove_tenant', { tenantId });
+          await invokeApi('remove_tenant', { tenant_id: tenantId });
           await get().fetchTenants();
         } catch (error: unknown) {
           set({ error: error instanceof Error ? error.message : 'Operation failed' });

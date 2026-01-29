@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock;
 
-use crate::core::response::{ApiResponse, ErrorCode, TenantListData};
+use crate::core::response::{ActivationResultData, ApiResponse, ErrorCode, TenantListData};
 use crate::core::ClientBridge;
 use crate::core::DeleteData;
 
@@ -29,16 +29,17 @@ pub async fn activate_tenant(
     auth_url: String,
     username: String,
     password: String,
-) -> Result<ApiResponse<String>, String> {
+) -> Result<ApiResponse<ActivationResultData>, String> {
     let bridge = bridge.read().await;
 
-    // 使用 ClientBridge 的 handle_activation 方法
-    // 它会自动调用 TenantManager 激活，并更新配置 (current_tenant)
     match bridge
         .handle_activation(&auth_url, &username, &password)
         .await
     {
-        Ok(msg) => Ok(ApiResponse::success(msg)),
+        Ok((tenant_id, subscription_status)) => Ok(ApiResponse::success(ActivationResultData {
+            tenant_id,
+            subscription_status,
+        })),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::ActivationFailed,
             e.to_string(),

@@ -1,5 +1,7 @@
 import React from 'react';
-import { Ban, AlertTriangle, CreditCard, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Ban, AlertTriangle, CreditCard, ExternalLink, Power, Building2 } from 'lucide-react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAppState } from '@/core/stores/bridge';
 import { t } from '@/infrastructure/i18n';
 import type { SubscriptionStatus } from '@/core/domain/types/appState';
@@ -44,6 +46,7 @@ function getTheme(status: SubscriptionStatus) {
 }
 
 export const SubscriptionBlockedScreen: React.FC = () => {
+  const navigate = useNavigate();
   const appState = useAppState();
 
   if (appState?.type !== 'ServerSubscriptionBlocked') {
@@ -54,8 +57,26 @@ export const SubscriptionBlockedScreen: React.FC = () => {
   const theme = getTheme(info.status);
   const statusLabel = t(`subscription.status.${statusKey(info.status)}`);
 
+  const handleCloseApp = async () => {
+    const appWindow = getCurrentWindow();
+    await appWindow.close();
+  };
+
+  const handleSwitchTenant = () => {
+    navigate('/tenant-select', { replace: true });
+  };
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-8 bg-gray-50">
+      {/* 关闭按钮 */}
+      <button
+        onClick={handleCloseApp}
+        className="absolute top-6 right-6 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-20"
+        title={t('common.dialog.close_app')}
+      >
+        <Power size={24} />
+      </button>
+
       <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
         {/* 图标 + 标题 */}
         <div className="text-center mb-6">
@@ -121,6 +142,13 @@ export const SubscriptionBlockedScreen: React.FC = () => {
               {t('subscriptionBlocked.button_contact_support')}
             </a>
           )}
+          <button
+            onClick={handleSwitchTenant}
+            className="w-full py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all flex items-center justify-center gap-2"
+          >
+            <Building2 size={20} />
+            {t('subscriptionBlocked.button_switch_tenant')}
+          </button>
         </div>
       </div>
     </div>

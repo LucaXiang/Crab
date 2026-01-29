@@ -750,6 +750,16 @@ impl ServerState {
             .await
     }
 
+    /// 检查订阅是否被阻止
+    pub async fn is_subscription_blocked(&self) -> bool {
+        self.activation.is_subscription_blocked().await
+    }
+
+    /// 从 auth-server 同步订阅状态
+    pub async fn sync_subscription(&self) {
+        self.activation.sync_subscription().await;
+    }
+
     /// 创建预配服务 (用于边缘激活)
     pub fn provisioning_service(&self, auth_url: String) -> ProvisioningService {
         ProvisioningService::new(self.clone(), auth_url)

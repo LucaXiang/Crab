@@ -85,6 +85,17 @@ impl ActivationService {
         &self.auth_server_url
     }
 
+    /// 检查订阅是否被阻止
+    ///
+    /// 读取缓存的凭证，检查订阅状态是否为 Inactive/Expired/Canceled/Unpaid
+    pub async fn is_subscription_blocked(&self) -> bool {
+        let cache = self.credential_cache.read().await;
+        cache
+            .as_ref()
+            .and_then(|c| c.subscription.as_ref())
+            .is_some_and(|sub| sub.status.is_blocked())
+    }
+
     /// 检查激活状态并执行自检
     ///
     /// # 行为

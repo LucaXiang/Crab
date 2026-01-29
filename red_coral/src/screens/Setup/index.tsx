@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Server, Wifi, AlertCircle, ChevronRight, Shield, Power, Settings } from 'lucide-react';
+import { Server, Wifi, AlertCircle, ChevronRight, Shield, Power, Settings, Building2 } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useBridgeStore } from '@/core/stores/bridge';
+import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
 
 type SetupStep = 'activate' | 'mode' | 'configure' | 'complete';
 type ModeChoice = 'server' | 'client' | null;
@@ -19,9 +19,18 @@ export const SetupScreen: React.FC = () => {
     startClientMode,
     updateServerConfig,
     updateClientConfig,
+    fetchAppState,
+    tenants,
+    fetchTenants,
     isLoading,
     error,
   } = useBridgeStore();
+
+  React.useEffect(() => {
+    fetchTenants();
+  }, [fetchTenants]);
+
+  const hasTenants = tenants.length > 0;
 
   const [step, setStep] = useState<SetupStep>('activate');
   const [modeChoice, setModeChoice] = useState<ModeChoice>(null);
@@ -40,6 +49,9 @@ export const SetupScreen: React.FC = () => {
   const [edgeUrl, setEdgeUrl] = useState('https://edge.example.com');
   const [messageAddr, setMessageAddr] = useState('edge.example.com:9626');
 
+  // 订阅被阻止的状态
+  const BLOCKED_STATUSES = ['Inactive', 'Expired', 'Canceled', 'Unpaid'];
+
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
     setActivationError('');
@@ -50,8 +62,15 @@ export const SetupScreen: React.FC = () => {
     }
 
     try {
-      await activateTenant(authUrl, username, password);
-      // After activation, go to mode selection (don't start any mode)
+      const result = await activateTenant(authUrl, username, password);
+
+      // 激活成功后立即检查订阅状态，blocked 直接跳转
+      if (result.subscription_status && BLOCKED_STATUSES.includes(result.subscription_status)) {
+        navigate('/status/subscription-blocked', { replace: true });
+        return;
+      }
+
+      // 订阅正常，继续 mode 选择
       setStep('mode');
     } catch (err: unknown) {
       setActivationError(err instanceof Error ? err.message : 'Activation failed');
@@ -83,8 +102,11 @@ export const SetupScreen: React.FC = () => {
     }
   };
 
-  const handleComplete = () => {
-    navigate('/login', { replace: true });
+  const handleComplete = async () => {
+    await fetchAppState();
+    const appState = useBridgeStore.getState().appState;
+    const route = AppStateHelpers.getRouteForState(appState);
+    navigate(route, { replace: true });
   };
 
   const handleCloseApp = async () => {
@@ -160,6 +182,19 @@ export const SetupScreen: React.FC = () => {
           )}
         </button>
       </form>
+
+      {hasTenants && (
+        <div className="text-center mt-6">
+          <button
+            type="button"
+            onClick={() => navigate('/tenant-select', { replace: true })}
+            className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-primary-500 transition-colors"
+          >
+            <Building2 size={16} />
+            <span>切换租户? 点击选择</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 

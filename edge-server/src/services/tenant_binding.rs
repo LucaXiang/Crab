@@ -70,6 +70,21 @@ pub enum SubscriptionStatus {
     Unpaid,
 }
 
+impl SubscriptionStatus {
+    /// 订阅是否被阻止（不允许使用系统）
+    ///
+    /// PastDue 仍允许使用（Stripe 正在重试扣费）
+    pub fn is_blocked(&self) -> bool {
+        matches!(
+            self,
+            SubscriptionStatus::Inactive
+                | SubscriptionStatus::Expired
+                | SubscriptionStatus::Canceled
+                | SubscriptionStatus::Unpaid
+        )
+    }
+}
+
 /// 订阅计划类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

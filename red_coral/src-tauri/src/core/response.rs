@@ -294,6 +294,14 @@ pub struct OrderEventListData {
 
 // ============ Tenants ============
 
+/// 激活结果
+#[derive(Debug, Clone, Serialize)]
+pub struct ActivationResultData {
+    pub tenant_id: String,
+    /// 订阅状态 (来自 auth server)，null 表示无订阅信息
+    pub subscription_status: Option<String>,
+}
+
 /// Tenants 列表
 #[derive(Debug, Clone, Serialize)]
 pub struct TenantListData {

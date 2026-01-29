@@ -1732,7 +1732,8 @@
       "PastDue": "逾期待付",
       "Expired": "已过期",
       "Canceled": "已取消",
-      "Unpaid": "未付款"
+      "Unpaid": "未付款",
+      "Unknown": "未知"
     }
   },
   "subscriptionBlocked": {
@@ -1742,6 +1743,7 @@
     "grace_period_ends": "宽限期截止",
     "button_renew": "续费 / 升级套餐",
     "button_contact_support": "联系客服",
+    "button_switch_tenant": "切换租户",
     "message": {
       "Inactive": "订阅未激活，请先完成付费",
       "Expired": "合同已到期，请续约",

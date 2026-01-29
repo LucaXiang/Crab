@@ -23,7 +23,7 @@ pub use response::{
     CategoryListData, DeleteData, EmployeeListData, OrderEventListData, OrderSnapshotListData,
     PriceRuleListData, PrintDestinationData, PrintDestinationListData, ProductAttributeListData,
     ProductData, ProductFullData, ProductListData, Role, RoleListData, RolePermission,
-    RolePermissionListData, TableListData, TagListData, TenantListData, ZoneListData,
+    ActivationResultData, RolePermissionListData, TableListData, TagListData, TenantListData, ZoneListData,
 };
 pub use session_cache::{EmployeeSession, LoginMode, SessionCache, SessionCacheError};
 pub use paths::TenantPaths;

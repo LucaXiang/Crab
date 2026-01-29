@@ -7,8 +7,8 @@
 //! ```text
 //! 1. ServerState::initialize()      - 初始化服务和数据库
 //! 2. start_background_tasks()       - 启动无需 TLS 的后台任务
-//! 3. wait_for_activation()          - 等待设备激活
-//! 4. load_tls_config()              - 加载 mTLS 证书
+//! 3. wait_for_activation()          - 等待设备激活 + 加载 mTLS 证书
+//! 4. subscription_check()           - 订阅阻止检查 (blocked → 60s 重试循环)
 //! 5. start_tls_tasks()              - 启动需要 TLS 的任务
 //! 6. https.start_server()           - 启动 HTTPS 服务
 //! 7. shutdown()                     - Graceful shutdown
@@ -61,13 +61,30 @@ impl Server {
         let rustls_config = RustlsConfig::from_config(tls_config.clone());
 
         // ═══════════════════════════════════════════════════════════════════
-        // Phase 4: Start TLS-dependent tasks
+        // Phase 4: Subscription check — wait & retry if subscription invalid
+        // ═══════════════════════════════════════════════════════════════════
+        while state.is_subscription_blocked().await {
+            tracing::warn!(
+                "⛔ Subscription is blocked. Waiting 60s before re-checking..."
+            );
+            state.print_activated_banner_content().await;
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+
+            // Re-sync subscription from auth-server
+            state.sync_subscription().await;
+            tracing::info!("🔄 Re-checked subscription status");
+        }
+        tracing::info!("✅ Subscription OK, proceeding to start services");
+
+        // ═══════════════════════════════════════════════════════════════════
+        // Phase 5: Start TLS-dependent tasks
         // ═══════════════════════════════════════════════════════════════════
         state.start_tls_tasks(&mut background_tasks, tls_config);
         state.print_activated_banner_content().await;
 
         // ═══════════════════════════════════════════════════════════════════
-        // Phase 5: Start HTTPS server (blocks until shutdown)
+        // Phase 6: Start HTTPS server (blocks until shutdown)
         // ═══════════════════════════════════════════════════════════════════
         let addr = std::net::SocketAddr::from(([0, 0, 0, 0], self.config.http_port));
         tracing::info!("🦀 Crab Edge Server starting on {}", addr);
@@ -84,7 +101,7 @@ impl Server {
             .map_err(|e| AppError::internal(format!("HTTPS server error: {e}")))?;
 
         // ═══════════════════════════════════════════════════════════════════
-        // Phase 6: Graceful shutdown
+        // Phase 7: Graceful shutdown
         // ═══════════════════════════════════════════════════════════════════
         background_tasks.shutdown().await;
 

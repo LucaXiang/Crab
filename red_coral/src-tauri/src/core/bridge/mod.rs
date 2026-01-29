@@ -129,13 +129,13 @@ impl ClientBridge {
     /// 激活设备并保存证书
     ///
     /// 仅保存证书到磁盘，不启动任何模式。
-    /// 用户需要在激活后手动选择并启动模式。
+    /// 返回 (tenant_id, subscription_status)，前端据此决定下一步。
     pub async fn handle_activation(
         &self,
         auth_url: &str,
         username: &str,
         password: &str,
-    ) -> Result<String, BridgeError> {
+    ) -> Result<(String, Option<String>), BridgeError> {
         // 1. 调用 TenantManager 激活（保存证书和 credential 到磁盘）
         let tenant_id = {
             let mut tm = self.tenant_manager.write().await;
@@ -152,8 +152,14 @@ impl ClientBridge {
             config.save(&self.config_path)?;
         }
 
-        tracing::info!(tenant_id = %tenant_id, "Device activated and config saved (mode not started)");
-        Ok(tenant_id)
+        // 3. 读取订阅状态（从刚保存的 credential）
+        let subscription_status = {
+            let tm = self.tenant_manager.read().await;
+            tm.get_subscription_status(&tenant_id)
+        };
+
+        tracing::info!(tenant_id = %tenant_id, ?subscription_status, "Device activated and config saved (mode not started)");
+        Ok((tenant_id, subscription_status))
     }
 
     // ============ 模式管理 ============
@@ -531,7 +537,11 @@ impl ClientBridge {
                             edge_server::services::tenant_binding::PlanType::Pro => shared::activation::PlanType::Pro,
                             edge_server::services::tenant_binding::PlanType::Enterprise => shared::activation::PlanType::Enterprise,
                         };
-                        let expired_at = sub.expires_at;
+                        // Inactive/Unpaid 未激活状态不应有过期时间
+                        let expired_at = match sub.status {
+                            SubscriptionStatus::Inactive | SubscriptionStatus::Unpaid => None,
+                            _ => sub.expires_at,
+                        };
                         let info = SubscriptionBlockedInfo {
                             status,
                             plan,

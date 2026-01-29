@@ -39,9 +39,9 @@ export const LoginScreen: React.FC = () => {
   // Tenant check state
   const [isCheckingTenants, setIsCheckingTenants] = useState(true);
 
-  // Check if we should be here - redirect to setup if no tenants
+  // Check if we should be here - redirect if no tenants or subscription blocked
   useEffect(() => {
-    const checkTenants = async () => {
+    const checkAccess = async () => {
       const isFirst = await checkFirstRun();
       await fetchTenants();
       const currentTenants = useBridgeStore.getState().tenants;
@@ -51,9 +51,18 @@ export const LoginScreen: React.FC = () => {
         navigate('/setup', { replace: true });
         return;
       }
+
+      // 检查订阅状态 — 被阻止时不应停留在登录页
+      await useBridgeStore.getState().fetchAppState();
+      const currentState = useBridgeStore.getState().appState;
+      if (AppStateHelpers.isSubscriptionBlocked(currentState)) {
+        navigate(AppStateHelpers.getRouteForState(currentState), { replace: true });
+        return;
+      }
+
       setIsCheckingTenants(false);
     };
-    checkTenants();
+    checkAccess();
   }, [checkFirstRun, fetchTenants, navigate]);
 
   // Fetch mode info on mount

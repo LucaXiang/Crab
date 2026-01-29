@@ -2,7 +2,35 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Plus, Trash2, ChevronRight, Power, AlertCircle } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useBridgeStore, type TenantInfo } from '@/core/stores/bridge';
+import { useBridgeStore, AppStateHelpers, type TenantInfo } from '@/core/stores/bridge';
+import { t } from '@/infrastructure/i18n';
+
+/** 订阅状态标签 */
+function TenantStatusBadge({ status }: { status: string | null }) {
+  if (!status) {
+    return (
+      <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">
+        {t('subscription.status.Unknown')}
+      </span>
+    );
+  }
+
+  const config: Record<string, { bg: string; text: string; key: string }> = {
+    active:   { bg: 'bg-green-100',  text: 'text-green-700',  key: 'Active' },
+    inactive: { bg: 'bg-red-100',    text: 'text-red-700',    key: 'Inactive' },
+    past_due: { bg: 'bg-yellow-100', text: 'text-yellow-700', key: 'PastDue' },
+    expired:  { bg: 'bg-red-100',    text: 'text-red-700',    key: 'Expired' },
+    canceled: { bg: 'bg-gray-100',   text: 'text-gray-600',   key: 'Canceled' },
+    unpaid:   { bg: 'bg-red-100',    text: 'text-red-700',    key: 'Unpaid' },
+  };
+
+  const c = config[status] ?? { bg: 'bg-gray-100', text: 'text-gray-500', key: 'Unknown' };
+  return (
+    <span className={`px-2 py-0.5 ${c.bg} ${c.text} rounded text-xs`}>
+      {t(`subscription.status.${c.key}`)}
+    </span>
+  );
+}
 
 export const TenantSelectScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -27,7 +55,11 @@ export const TenantSelectScreen: React.FC = () => {
     setActionError('');
     try {
       await switchTenant(tenantId);
-      navigate('/login', { replace: true });
+      // 让 AppState 驱动路由（订阅阻止 → blocked 页面，正常 → login）
+      await useBridgeStore.getState().fetchAppState();
+      const appState = useBridgeStore.getState().appState;
+      const route = AppStateHelpers.getRouteForState(appState);
+      navigate(route, { replace: true });
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : 'Failed to switch tenant');
     }
@@ -116,9 +148,7 @@ export const TenantSelectScreen: React.FC = () => {
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <span className="truncate">{tenant.tenant_id}</span>
                       {tenant.has_certificates && (
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">
-                          Activated
-                        </span>
+                        <TenantStatusBadge status={tenant.subscription_status} />
                       )}
                     </div>
                   </div>
