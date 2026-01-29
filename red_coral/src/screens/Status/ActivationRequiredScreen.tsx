@@ -57,7 +57,7 @@ export const ActivationRequiredScreen: React.FC = () => {
   };
 
   const handleReactivate = () => {
-    navigate('/setup', { replace: true });
+    navigate('/activate', { replace: true });
   };
 
   return (

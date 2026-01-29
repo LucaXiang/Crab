@@ -157,6 +157,7 @@ pub async fn run() {
             commands::switch_tenant,
             commands::remove_tenant,
             commands::get_current_tenant,
+            commands::check_subscription,
             // Auth commands (ClientBridge-based - unified)
             commands::login_employee,
             commands::logout_employee,

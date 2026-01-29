@@ -545,6 +545,7 @@ impl ClientBridge {
                         let info = SubscriptionBlockedInfo {
                             status,
                             plan,
+                            max_stores: sub.max_stores,
                             expired_at,
                             grace_period_days: None,
                             grace_period_ends_at: None,
@@ -609,6 +610,31 @@ impl ClientBridge {
     pub async fn get_current_session(&self) -> Option<super::session_cache::EmployeeSession> {
         let tenant_manager = self.tenant_manager.read().await;
         tenant_manager.current_session().cloned()
+    }
+
+    /// 重新检查订阅状态
+    ///
+    /// 在 Server 模式下，调用 edge-server 的 sync_subscription 从 auth-server 拉取最新订阅，
+    /// 然后返回最新的 AppState。
+    pub async fn check_subscription(&self) -> Result<AppState, BridgeError> {
+        let mode_guard = self.mode.read().await;
+
+        match &*mode_guard {
+            ClientMode::Server { server_state, .. } => {
+                // 从 auth-server 同步最新订阅状态
+                server_state.sync_subscription().await;
+                tracing::info!("Subscription re-checked from auth-server");
+            }
+            _ => {
+                tracing::warn!("check_subscription called in non-Server mode, skipping sync");
+            }
+        }
+
+        // 释放 mode_guard 以避免死锁（get_app_state 也需要读锁）
+        drop(mode_guard);
+
+        // 返回最新的 AppState
+        Ok(self.get_app_state().await)
     }
 
     /// 获取健康检查组件 (订阅、网络、数据库)

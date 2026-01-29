@@ -76,7 +76,7 @@ export const TenantSelectScreen: React.FC = () => {
   };
 
   const handleAddTenant = () => {
-    navigate('/setup', { replace: true });
+    navigate('/activate', { replace: true });
   };
 
   const handleCloseApp = async () => {

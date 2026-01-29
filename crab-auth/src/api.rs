@@ -390,6 +390,7 @@ async fn activate(
         starts_at: shared::util::now_millis(),
         expires_at: Some(shared::util::now_millis() + 365 * 24 * 60 * 60 * 1000),
         features: sub_features,
+        max_stores: sub_plan.max_stores() as u32,
         signature_valid_until,
         signature: String::new(), // Will be signed below
     };
@@ -502,6 +503,7 @@ async fn get_subscription_status(
         starts_at: shared::util::now_millis(),
         expires_at: Some(shared::util::now_millis() + 365 * 24 * 60 * 60 * 1000),
         features,
+        max_stores: plan.max_stores() as u32,
         signature_valid_until,
         signature: String::new(),
     };

@@ -246,6 +246,9 @@ pub struct SubscriptionInfo {
     /// 启用的功能
     #[serde(default)]
     pub features: Vec<String>,
+    /// Plan 允许的最大门店数，0 = 无限
+    #[serde(default)]
+    pub max_stores: u32,
     /// 签名有效期 (Unix millis，超过此时间需要刷新)
     pub signature_valid_until: i64,
     /// Tenant CA 签名 (base64)

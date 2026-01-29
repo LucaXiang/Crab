@@ -5,7 +5,7 @@ use tauri::State;
 use tokio::sync::RwLock;
 
 use crate::core::response::{ActivationResultData, ApiResponse, ErrorCode, TenantListData};
-use crate::core::ClientBridge;
+use crate::core::{AppState, ClientBridge};
 use crate::core::DeleteData;
 
 /// 获取已激活的租户列表
@@ -94,4 +94,22 @@ pub async fn get_current_tenant(
     Ok(ApiResponse::success(
         tenant_manager.current_tenant_id().map(|s| s.to_string()),
     ))
+}
+
+/// 重新检查订阅状态
+///
+/// 从 auth-server 同步最新订阅信息，返回更新后的 AppState。
+/// 用于 SubscriptionBlockedScreen 的"重新检查"按钮。
+#[tauri::command(rename_all = "snake_case")]
+pub async fn check_subscription(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+) -> Result<ApiResponse<AppState>, String> {
+    let bridge = bridge.read().await;
+    match bridge.check_subscription().await {
+        Ok(state) => Ok(ApiResponse::success(state)),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::InternalError,
+            e.to_string(),
+        )),
+    }
 }

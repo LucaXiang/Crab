@@ -142,6 +142,9 @@ impl ActivationRequiredReason {
 pub struct SubscriptionBlockedInfo {
     pub status: SubscriptionStatus,
     pub plan: PlanType,
+    /// Plan 允许的最大门店数，0 = 无限
+    #[serde(default)]
+    pub max_stores: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expired_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]

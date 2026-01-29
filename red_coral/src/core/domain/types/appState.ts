@@ -36,6 +36,8 @@ export type PlanType = 'basic' | 'pro' | 'enterprise';
 export interface SubscriptionBlockedInfo {
   status: SubscriptionStatus;
   plan: PlanType;
+  /** Plan 允许的最大门店数，0 = 无限 */
+  max_stores: number;
   expired_at?: number;
   grace_period_days?: number;
   grace_period_ends_at?: number;

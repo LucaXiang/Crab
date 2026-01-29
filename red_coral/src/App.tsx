@@ -19,6 +19,7 @@ import { ShiftGuard } from '@/presentation/components/shift';
 import { LoginScreen } from '@/screens/Login';
 import { POSScreen } from '@/screens/POS';
 import { SetupScreen } from '@/screens/Setup';
+import { ActivateScreen } from '@/screens/Activate';
 
 import { OrderDebug } from '@/screens/Debug';
 import { ActivationRequiredScreen, SubscriptionBlockedScreen } from '@/screens/Status';
@@ -274,7 +275,8 @@ const App: React.FC = () => {
         <PermissionEscalationProvider />
 
         <Routes>
-        {/* Setup Routes */}
+        {/* Activate & Setup Routes */}
+        <Route path="/activate" element={<ActivateScreen />} />
         <Route path="/setup" element={<SetupScreen />} />
 
         {/* Status Routes */}

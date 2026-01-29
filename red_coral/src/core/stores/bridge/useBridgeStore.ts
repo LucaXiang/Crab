@@ -84,18 +84,18 @@ export const AppStateHelpers = {
 
   /** 获取推荐路由 */
   getRouteForState: (state: AppState | null): string => {
-    if (!state) return '/setup';
+    if (!state) return '/activate';
 
     switch (state.type) {
-      // 首次设置
+      // 需要激活（首次设置 / 无租户）
       case 'ServerNoTenant':
-        return '/setup';
+        return '/activate';
 
       // 需要激活
       case 'ServerNeedActivation':
-        // FirstTimeSetup 直接进入设置页面，其他问题显示具体原因
+        // FirstTimeSetup 直接进入激活页面，其他问题显示具体原因
         if (state.data.reason.code === 'FirstTimeSetup') {
-          return '/setup';
+          return '/activate';
         }
         return '/status/activation-required';
 
@@ -111,8 +111,11 @@ export const AppStateHelpers = {
       case 'ServerSubscriptionBlocked':
         return '/status/subscription-blocked';
 
-      // 未初始化
+      // 未初始化 - 需要激活
       case 'Uninitialized':
+        return '/activate';
+
+      // 需要模式选择/配置
       case 'ClientDisconnected':
       case 'ClientNeedSetup':
       case 'ClientConnecting':
@@ -129,7 +132,7 @@ export const AppStateHelpers = {
         return '/pos';
 
       default:
-        return '/setup';
+        return '/activate';
     }
   },
 

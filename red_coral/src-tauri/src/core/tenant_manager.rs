@@ -324,6 +324,7 @@ impl TenantManager {
                 starts_at: sub_info.starts_at,
                 expires_at: sub_info.expires_at,
                 features: sub_info.features.clone(),
+                max_stores: sub_info.max_stores,
                 last_checked_at: now,
                 signature_valid_until: Some(sub_info.signature_valid_until),
                 signature: Some(sub_info.signature.clone()),

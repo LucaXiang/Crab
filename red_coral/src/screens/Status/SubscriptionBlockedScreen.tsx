@@ -1,9 +1,11 @@
-import React from 'react';
-import { Ban, AlertTriangle, CreditCard, ExternalLink, Power } from 'lucide-react';
+import React, { useState } from 'react';
+import { Ban, AlertTriangle, CreditCard, ExternalLink, Power, RefreshCw } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useAppState } from '@/core/stores/bridge';
+import { useAppState, useBridgeStore } from '@/core/stores/bridge';
+import { invokeApi } from '@/infrastructure/api/tauri-client';
 import { t } from '@/infrastructure/i18n';
 import type { SubscriptionStatus } from '@/core/domain/types/appState';
+import type { AppState } from '@/core/stores/bridge/useBridgeStore';
 
 /**
  * 订阅阻止状态的权限说明
@@ -46,6 +48,8 @@ function getTheme(status: SubscriptionStatus) {
 
 export const SubscriptionBlockedScreen: React.FC = () => {
   const appState = useAppState();
+  const [isChecking, setIsChecking] = useState(false);
+  const [checkMessage, setCheckMessage] = useState<string | null>(null);
 
   if (appState?.type !== 'ServerSubscriptionBlocked') {
     return null;
@@ -58,6 +62,28 @@ export const SubscriptionBlockedScreen: React.FC = () => {
   const handleCloseApp = async () => {
     const appWindow = getCurrentWindow();
     await appWindow.close();
+  };
+
+  const handleCheckSubscription = async () => {
+    setIsChecking(true);
+    setCheckMessage(null);
+    try {
+      const newState = await invokeApi<AppState>('check_subscription');
+      // 更新全局 appState
+      useBridgeStore.setState({ appState: newState });
+
+      if (newState.type !== 'ServerSubscriptionBlocked') {
+        // 订阅恢复正常，appState 已更新，路由守卫会自动导航
+        // 无需手动跳转
+      } else {
+        // 仍然被阻止
+        setCheckMessage(t('subscriptionBlocked.still_blocked'));
+      }
+    } catch {
+      setCheckMessage(t('subscriptionBlocked.still_blocked'));
+    } finally {
+      setIsChecking(false);
+    }
   };
 
   return (
@@ -114,6 +140,23 @@ export const SubscriptionBlockedScreen: React.FC = () => {
 
         {/* 操作按钮 */}
         <div className="space-y-3">
+          {/* 重新检查订阅状态 */}
+          <button
+            onClick={handleCheckSubscription}
+            disabled={isChecking}
+            className="w-full py-3 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={20} className={isChecking ? 'animate-spin' : ''} />
+            {isChecking
+              ? t('subscriptionBlocked.rechecking')
+              : t('subscriptionBlocked.button_recheck')}
+          </button>
+
+          {/* 检查结果提示 */}
+          {checkMessage && (
+            <p className="text-sm text-center text-orange-600">{checkMessage}</p>
+          )}
+
           {info.renewal_url && (
             <a
               href={info.renewal_url}

@@ -1743,6 +1743,9 @@
     "grace_period_ends": "宽限期截止",
     "button_renew": "续费 / 升级套餐",
     "button_contact_support": "联系客服",
+    "button_recheck": "重新检查订阅状态",
+    "rechecking": "正在检查...",
+    "still_blocked": "订阅仍然无效，请续费后再试",
     "message": {
       "Inactive": "订阅未激活，请先完成付费",
       "Expired": "合同已到期，请续约",

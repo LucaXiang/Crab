@@ -125,6 +125,9 @@ pub struct Subscription {
     pub expires_at: Option<i64>,
     #[serde(default)]
     pub features: Vec<String>,
+    /// Plan 允许的最大门店数，0 = 无限
+    #[serde(default)]
+    pub max_stores: u32,
     #[serde(default = "default_now_millis")]
     pub last_checked_at: i64,
     /// 签名有效期 (Unix millis，超过此时间需要从 Auth Server 刷新)
@@ -219,6 +222,7 @@ impl Default for Subscription {
             starts_at: now,
             expires_at: None,
             features: vec![],
+            max_stores: PlanType::Basic.max_stores() as u32,
             last_checked_at: now,
             signature_valid_until: None,
             signature: None,

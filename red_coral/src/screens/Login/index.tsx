@@ -46,9 +46,9 @@ export const LoginScreen: React.FC = () => {
       await fetchTenants();
       const currentTenants = useBridgeStore.getState().tenants;
 
-      // If no tenants, redirect to setup
+      // If no tenants, redirect to activate
       if (isFirst || currentTenants.length === 0) {
-        navigate('/setup', { replace: true });
+        navigate('/activate', { replace: true });
         return;
       }
 
