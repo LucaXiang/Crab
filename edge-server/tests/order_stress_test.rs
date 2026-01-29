@@ -98,6 +98,7 @@ fn execute_phase(
                     zone_name: None,
                     guest_count: rng.gen_range(1..=4),
                     is_retail: true,
+                    service_type: None,
                 },
             );
             let resp = manager.execute_command(open_cmd);
@@ -164,7 +165,6 @@ fn execute_phase(
                 op_name,
                 OrderCommandPayload::CompleteOrder {
                     order_id: order_id.clone(),
-                    receipt_number: format!("R{:06}", ctx.idx),
                 },
             );
             let resp = manager.execute_command(complete_cmd);

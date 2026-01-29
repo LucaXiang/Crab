@@ -2,7 +2,7 @@
 
 use super::types::{
     CartItemSnapshot, ItemChanges, ItemModificationResult, LossReason, PaymentSummaryItem,
-    SplitItem, VoidType,
+    ServiceType, SplitItem, VoidType,
 };
 use serde::{Deserialize, Serialize};
 
@@ -121,6 +121,12 @@ pub enum EventPayload {
         zone_name: Option<String>,
         guest_count: i32,
         is_retail: bool,
+        /// 服务类型（堂食/外卖，零售订单使用）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        service_type: Option<ServiceType>,
+        /// 叫号（服务器生成，零售订单使用）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        queue_number: Option<u32>,
         /// Server-generated receipt number (always present)
         receipt_number: String,
     },

@@ -1,6 +1,8 @@
 //! Order commands - requests from clients to modify orders
 
-use super::types::{CartItemInput, ItemChanges, LossReason, PaymentInput, SplitItem, VoidType};
+use super::types::{
+    CartItemInput, ItemChanges, LossReason, PaymentInput, ServiceType, SplitItem, VoidType,
+};
 use serde::{Deserialize, Serialize};
 
 /// Order command wrapper
@@ -37,6 +39,9 @@ pub enum OrderCommandPayload {
         guest_count: i32,
         #[serde(default)]
         is_retail: bool,
+        /// 服务类型（堂食/外卖，零售订单使用）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        service_type: Option<ServiceType>,
     },
 
     /// Complete an order (receipt_number from snapshot)

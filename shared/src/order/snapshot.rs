@@ -4,7 +4,7 @@
 //! Clients can compare their locally computed checksum with the server's
 //! to detect if the reducer logic has diverged.
 
-use super::types::{CartItemSnapshot, LossReason, PaymentRecord, VoidType};
+use super::types::{CartItemSnapshot, LossReason, PaymentRecord, ServiceType, VoidType};
 use super::AppliedRule;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
@@ -43,6 +43,12 @@ pub struct OrderSnapshot {
     /// Whether this is a retail order
     #[serde(default)]
     pub is_retail: bool,
+    /// Service type (dine-in or takeout, for retail orders)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_type: Option<ServiceType>,
+    /// Queue number (server-generated, for retail orders)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub queue_number: Option<u32>,
     /// Order status
     pub status: OrderStatus,
 
@@ -160,6 +166,8 @@ impl OrderSnapshot {
             zone_name: None,
             guest_count: 1,
             is_retail: false,
+            service_type: None,
+            queue_number: None,
             status: OrderStatus::Active,
             void_type: None,
             loss_reason: None,

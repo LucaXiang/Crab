@@ -129,6 +129,8 @@ mod tests {
                 zone_name: None,
                 guest_count: 2,
                 is_retail: false,
+                service_type: None,
+                queue_number: None,
                 receipt_number: "RCP-001".to_string(),
             },
         };
@@ -142,6 +144,8 @@ mod tests {
             zone_name: None,
             guest_count: 2,
             is_retail: false,
+            service_type: None,
+            queue_number: None,
             status: OrderStatus::Active,
             items: vec![],
             payments: vec![],

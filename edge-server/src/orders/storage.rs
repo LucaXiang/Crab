@@ -55,6 +55,8 @@ const DEAD_LETTER_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("de
 
 const SEQUENCE_KEY: &str = "seq";
 const ORDER_COUNT_KEY: &str = "order_count";
+const QUEUE_NUMBER_KEY: &str = "queue_number";
+const QUEUE_DATE_KEY: &str = "queue_date";
 
 /// Pending archive queue entry
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -246,6 +248,45 @@ impl OrderStorage {
             .get(ORDER_COUNT_KEY)?
             .map(|g| g.value())
             .unwrap_or(0))
+    }
+
+    /// Get next queue number for retail orders (叫号)
+    ///
+    /// Queue number resets daily with a random start between 0-999.
+    /// Wraps around after 999 back to 0.
+    pub fn next_queue_number(&self) -> StorageResult<u32> {
+        use chrono::Local;
+        use rand::Rng;
+
+        let today = Local::now().format("%Y%m%d").to_string();
+        let today_u64: u64 = today.parse().unwrap_or(0);
+
+        let txn = self.db.begin_write()?;
+        let mut table = txn.open_table(SEQUENCE_TABLE)?;
+
+        // Check if date changed → reset with random start
+        let stored_date = table.get(QUEUE_DATE_KEY)?.map(|g| g.value()).unwrap_or(0);
+
+        let queue_num = if stored_date != today_u64 {
+            // New day: random start 0-999
+            let start: u64 = rand::thread_rng().gen_range(0..1000);
+            table.insert(QUEUE_DATE_KEY, today_u64)?;
+            table.insert(QUEUE_NUMBER_KEY, start)?;
+            start
+        } else {
+            // Same day: increment, wrap at 1000
+            let current = table
+                .get(QUEUE_NUMBER_KEY)?
+                .map(|g| g.value())
+                .unwrap_or(0);
+            let next = (current + 1) % 1000;
+            table.insert(QUEUE_NUMBER_KEY, next)?;
+            next
+        };
+
+        drop(table);
+        txn.commit()?;
+        Ok(queue_num as u32)
     }
 
     // ========== Command Idempotency ==========
@@ -802,6 +843,8 @@ mod tests {
                 zone_name: None,
                 guest_count: 2,
                 is_retail: false,
+                service_type: None,
+                queue_number: None,
                 receipt_number: "RCP-TEST".to_string(),
             },
         }
@@ -816,6 +859,8 @@ mod tests {
             zone_name: None,
             guest_count: 2,
             is_retail: false,
+            service_type: None,
+            queue_number: None,
             status: OrderStatus::Active,
             items: vec![],
             payments: vec![],

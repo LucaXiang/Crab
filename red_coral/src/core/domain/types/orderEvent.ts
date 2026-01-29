@@ -11,6 +11,12 @@
  */
 
 // ============================================================================
+// Service Type (零售订单的服务类型)
+// ============================================================================
+
+export type ServiceType = 'DINE_IN' | 'TAKEOUT';
+
+// ============================================================================
 // Event Types
 // ============================================================================
 
@@ -108,6 +114,10 @@ export interface TableOpenedPayload {
   zone_name: string | null;
   guest_count: number;
   is_retail: boolean;
+  /** 服务类型（堂食/外卖，零售订单使用） */
+  service_type?: ServiceType | null;
+  /** 叫号（服务器生成，零售订单使用） */
+  queue_number?: number | null;
   /** Server-generated receipt number (always present) */
   receipt_number: string;
 }
@@ -365,6 +375,8 @@ export interface OpenTableCommand {
   zone_name?: string | null;
   guest_count?: number;
   is_retail: boolean;
+  /** 服务类型（堂食/外卖，零售订单使用） */
+  service_type?: ServiceType | null;
 }
 
 export interface CompleteOrderCommand {
@@ -597,6 +609,10 @@ export interface OrderSnapshot {
   zone_name: string | null;
   guest_count: number;
   is_retail: boolean;
+  /** 服务类型（堂食/外卖，零售订单使用） */
+  service_type?: ServiceType | null;
+  /** 叫号（服务器生成，零售订单使用） */
+  queue_number?: number | null;
   status: OrderStatus;
 
   // === Void Information (only when status === 'VOID') ===

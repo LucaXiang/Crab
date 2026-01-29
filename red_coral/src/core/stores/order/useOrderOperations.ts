@@ -19,6 +19,7 @@ import type {
   OrderCommand,
   CommandResponse,
   CartItemInput,
+  ServiceType,
 } from '@/core/domain/types/orderEvent';
 
 async function sendCommand(command: OrderCommand): Promise<CommandResponse> {
@@ -150,7 +151,8 @@ const handleCreateNewOrder = async (
  * Returns the new order_id directly (needed for navigation)
  */
 export const createRetailOrder = async (
-  cart: CartItem[]
+  cart: CartItem[],
+  serviceType?: ServiceType,
 ): Promise<string> => {
   if (cart.length === 0) {
     throw new Error('Cannot create retail order with empty cart');
@@ -165,6 +167,7 @@ export const createRetailOrder = async (
     zone_name: null,
     guest_count: 1,
     is_retail: true,
+    service_type: serviceType ?? null,
   });
 
   const openResponse = await sendCommand(openCommand);

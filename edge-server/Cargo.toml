@@ -85,11 +85,11 @@ include_dir.workspace = true
 symlink.workspace = true
 dashmap.workspace = true
 parking_lot.workspace = true
+rand.workspace = true
 
 [dev-dependencies]
 # Testing
 tempfile.workspace = true
-rand.workspace = true
 crab-client = { workspace = true, features = ["in-process"] }
 
 # TUI

@@ -183,8 +183,7 @@ const ZoneList: React.FC = React.memo(() => {
 interface TableItem {
   id: string;
   name: string;
-  zoneId?: string;
-  zone_id?: string;
+  zone?: string;
   capacity?: number;
   seats?: number;
 }
@@ -298,7 +297,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
         width: '140px',
         render: (item) => (
           <span className="inline-flex items-center px-2.5 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium">
-            {zonesMap.get(item.zoneId || item.zone_id || '') || item.zoneId || item.zone_id}
+            {zonesMap.get(item.zone || '') || item.zone}
           </span>
         ),
       },

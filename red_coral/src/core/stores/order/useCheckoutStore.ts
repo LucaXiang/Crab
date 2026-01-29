@@ -273,7 +273,7 @@ export function useCheckoutActions() {
 }
 
 // Retail service type state
-export type RetailServiceType = 'dineIn' | 'takeout' | 'delivery';
+export type RetailServiceType = 'dineIn' | 'takeout';
 
 // Create a simple store for retail service type
 let _retailServiceType: RetailServiceType = 'dineIn';
@@ -288,4 +288,12 @@ export function setRetailServiceType(type: RetailServiceType): void {
 
 export function useRetailServiceType(): RetailServiceType {
   return _retailServiceType;
+}
+
+/** Map frontend RetailServiceType to backend ServiceType */
+export function toBackendServiceType(type: RetailServiceType): import('@/core/domain/types/orderEvent').ServiceType {
+  switch (type) {
+    case 'dineIn': return 'DINE_IN';
+    case 'takeout': return 'TAKEOUT';
+  }
 }

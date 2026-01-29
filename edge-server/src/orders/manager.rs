@@ -361,13 +361,28 @@ impl OrdersManager {
                 )));
             }
 
-        // 3. Pre-generate receipt_number for OpenTable (BEFORE transaction to avoid deadlock)
+        // 3. Pre-generate receipt_number and queue_number for OpenTable (BEFORE transaction to avoid deadlock)
         // redb doesn't allow nested write transactions
         let pre_generated_receipt = match &cmd.payload {
             shared::order::OrderCommandPayload::OpenTable { .. } => {
                 let receipt = self.next_receipt_number();
                 tracing::info!(receipt_number = %receipt, "Pre-generated receipt number");
                 Some(receipt)
+            }
+            _ => None,
+        };
+        let pre_generated_queue = match &cmd.payload {
+            shared::order::OrderCommandPayload::OpenTable { is_retail: true, .. } => {
+                match self.storage.next_queue_number() {
+                    Ok(qn) => {
+                        tracing::info!(queue_number = qn, "Pre-generated queue number");
+                        Some(qn)
+                    }
+                    Err(e) => {
+                        tracing::error!(error = %e, "Failed to generate queue number");
+                        None
+                    }
+                }
             }
             _ => None,
         };
@@ -406,6 +421,7 @@ impl OrdersManager {
                 zone_name,
                 guest_count,
                 is_retail,
+                service_type,
             } => {
                 tracing::info!(table_id = ?table_id, table_name = ?table_name, "Processing OpenTable command");
                 // Use pre-generated receipt_number (generated before transaction)
@@ -417,6 +433,8 @@ impl OrdersManager {
                     zone_name: zone_name.clone(),
                     guest_count: *guest_count,
                     is_retail: *is_retail,
+                    service_type: *service_type,
+                    queue_number: pre_generated_queue,
                     receipt_number,
                 })
             }
@@ -608,6 +626,7 @@ mod tests {
                 zone_name: None,
                 guest_count: 2,
                 is_retail: false,
+                service_type: None,
             },
         )
     }

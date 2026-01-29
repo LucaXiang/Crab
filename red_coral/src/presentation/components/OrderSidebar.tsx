@@ -114,7 +114,12 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           <div>
             <h1 className="text-xl font-bold text-gray-800 leading-tight">
               {order.is_retail ? (
-                t('checkout.retail_order')
+                <>
+                  {t('checkout.retail_order')}
+                  {order.queue_number != null && (
+                    <span className="ml-2 text-blue-600">#{String(order.queue_number).padStart(3, '0')}</span>
+                  )}
+                </>
               ) : (
                 <>
                   {t('checkout.table_order')} {order.zone_name}-{order.table_name}
