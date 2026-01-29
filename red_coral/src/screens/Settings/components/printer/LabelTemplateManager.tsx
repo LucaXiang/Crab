@@ -16,7 +16,7 @@ export const LabelTemplateManager: React.FC = () => {
   const { t } = useI18n();
   const templates = useLabelTemplates();
   const isLoading = useLabelTemplatesLoading();
-  const { fetchTemplates, createTemplate, updateTemplate, deleteTemplate, duplicateTemplate, ensureDefaultTemplate } =
+  const { createTemplate, updateTemplate, deleteTemplate, duplicateTemplate, ensureDefaultTemplate } =
     useLabelTemplateStore();
   const isLoaded = useLabelTemplateStore((state) => state.isLoaded);
 

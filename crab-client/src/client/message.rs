@@ -1081,16 +1081,6 @@ impl InMemoryMessageClient {
         self.server_tx.subscribe()
     }
 
-    /// 创建内存消息客户端 (别名方法)
-    ///
-    /// 等同于 `new()`，保持向后兼容
-    #[allow(dead_code)]
-    pub fn with_channels(
-        client_tx: broadcast::Sender<BusMessage>,
-        server_tx: broadcast::Sender<BusMessage>,
-    ) -> Self {
-        Self::new(client_tx, server_tx)
-    }
 }
 
 #[cfg(test)]

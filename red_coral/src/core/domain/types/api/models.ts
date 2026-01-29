@@ -522,7 +522,6 @@ export interface RolePermissionListData {
  */
 /**
  * User for auth store - aligned with shared::client::UserInfo
- * Note: created_at/updated_at are frontend-only fields for compatibility
  */
 export interface User {
   id: string;
@@ -533,7 +532,7 @@ export interface User {
   permissions: string[];
   is_system: boolean;
   is_active: boolean;
-  // Frontend-only fields (not from backend)
+  // 可选字段（后端可能不返回）
   created_at?: string;
   updated_at?: string;
 }

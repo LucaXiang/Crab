@@ -8,13 +8,13 @@ import { createTauriClient } from '@/infrastructure/api';
 
 export const StoreSettings: React.FC = () => {
   const info = useStoreInfo();
-  const { fetchStoreInfo, updateStoreInfo, isLoading, isLoaded } = useStoreInfoStore();
+  const { fetchAll, updateStoreInfo, isLoading, isLoaded } = useStoreInfoStore();
   const { t } = useI18n();
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch store info on mount
   useEffect(() => {
-    fetchStoreInfo();
+    fetchAll();
   }, []);
 
   // Map API snake_case to form camelCase for consistency

@@ -129,13 +129,6 @@ export function t(key: string, params?: Record<string, string | number>): string
 }
 
 /**
- * Translate function (alias for t)
- */
-export function translate(key: string, params?: Record<string, string | number>): string {
-  return t(key, params);
-}
-
-/**
  * Get translation function for a specific locale
  */
 export function getTranslator(locale: Locale): (key: string) => string {
@@ -159,13 +152,12 @@ export function getAllTranslations(): Record<string, string> {
   return { ...flattenedTranslations[currentLocale] };
 }
 
-// i18n object for compatibility
+// i18n 单例对象
 export const i18n = {
   getLocale: () => currentLocale,
   setLocale,
   subscribe: subscribeLocale,
   t,
-  translate,
   getAllTranslations,
 };
 

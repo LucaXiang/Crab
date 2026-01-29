@@ -28,8 +28,7 @@ interface StoreInfoState {
   error: string | null;
 
   // Actions
-  fetchStoreInfo: (force?: boolean) => Promise<void>;
-  fetchAll: (force?: boolean) => Promise<void>;  // Alias for registry compatibility
+  fetchAll: (force?: boolean) => Promise<void>;
   updateStoreInfo: (data: StoreInfoUpdate) => Promise<StoreInfo>;
   clear: () => void;
   applySync: (payload?: SyncPayload) => void;
@@ -57,7 +56,7 @@ export const useStoreInfoStore = create<StoreInfoState>((set, get) => ({
   error: null,
 
   // Actions
-  fetchStoreInfo: async (force = false) => {
+  fetchAll: async (force = false) => {
     const state = get();
     if (state.isLoading) return;
     if (state.isLoaded && !force) return;
@@ -72,9 +71,6 @@ export const useStoreInfoStore = create<StoreInfoState>((set, get) => ({
       console.error('[Store] store_info: fetch failed -', errorMsg);
     }
   },
-
-  // Alias for registry compatibility
-  fetchAll: async (force = false) => get().fetchStoreInfo(force),
 
   updateStoreInfo: async (data: StoreInfoUpdate) => {
     set({ isLoading: true, error: null });
@@ -99,7 +95,7 @@ export const useStoreInfoStore = create<StoreInfoState>((set, get) => ({
   applySync: (payload?: SyncPayload) => {
     console.log('[Store] store_info: received sync signal', payload?.action);
     // Refetch to get latest data
-    get().fetchStoreInfo(true);
+    get().fetchAll(true);
   },
 }));
 
@@ -107,6 +103,6 @@ export const useStoreInfoStore = create<StoreInfoState>((set, get) => ({
 export const useStoreInfo = () => useStoreInfoStore((state) => state.info);
 export const useStoreInfoLoading = () => useStoreInfoStore((state) => state.isLoading);
 export const useStoreInfoActions = () => ({
-  fetch: useStoreInfoStore.getState().fetchStoreInfo,
+  fetch: useStoreInfoStore.getState().fetchAll,
   update: useStoreInfoStore.getState().updateStoreInfo,
 });

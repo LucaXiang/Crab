@@ -252,7 +252,7 @@ impl LocalClientBuilder {
 
         // Create in-memory message client with bidirectional channels
         let memory_message =
-            super::message::InMemoryMessageClient::with_channels(client_tx, server_tx);
+            super::message::InMemoryMessageClient::new(client_tx, server_tx);
 
         Ok(CrabClient {
             marker: StateMarker::new(),

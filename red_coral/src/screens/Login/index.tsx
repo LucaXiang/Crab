@@ -15,7 +15,7 @@ export const LoginScreen: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Auth store for compatibility with ProtectedRoute
+  // 同步登录状态到 AuthStore
   const setAuthUser = useAuthStore((state) => state.setUser);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
@@ -93,8 +93,7 @@ export const LoginScreen: React.FC = () => {
 
         const userInfo = response.session.user_info;
 
-        // Update auth store for ProtectedRoute compatibility
-        // UserInfo from backend now has all required fields
+        // 同步登录状态到 AuthStore
         setAuthUser({
           id: userInfo.id,
           username: userInfo.username,

@@ -11,9 +11,7 @@ import React from 'react';
 import type { OrderEvent } from '@/core/domain/types/orderEvent';
 import { useI18n } from '@/hooks/useI18n';
 import { renderEvent } from './Timeline/renderers';
-import { TimelineItem, NoteTag } from './Timeline/TimelineItem';
-
-export { NoteTag }; // Re-export for compatibility
+import { TimelineItem } from './Timeline/TimelineItem';
 
 interface TimelineListProps {
   events: OrderEvent[];  // ✅ 使用后端类型

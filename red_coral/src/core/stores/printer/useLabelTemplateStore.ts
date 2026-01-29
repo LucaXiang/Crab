@@ -91,8 +91,7 @@ interface LabelTemplateStore {
   error: string | null;
 
   // Actions
-  fetchTemplates: (force?: boolean) => Promise<void>;
-  fetchAll: (force?: boolean) => Promise<void>;  // Alias for registry compatibility
+  fetchAll: (force?: boolean) => Promise<void>;
   createTemplate: (template: Partial<LabelTemplate>) => Promise<LabelTemplate>;
   updateTemplate: (id: string, template: Partial<LabelTemplate>) => Promise<LabelTemplate>;
   deleteTemplate: (id: string) => Promise<void>;
@@ -113,7 +112,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
   error: null,
 
   // Actions
-  fetchTemplates: async (force = false) => {
+  fetchAll: async (force = false) => {
     const state = get();
     if (state.isLoading) return;
     if (state.isLoaded && !force) return;
@@ -129,9 +128,6 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
       console.error('[Store] label_template: fetch failed -', errorMsg);
     }
   },
-
-  // Alias for registry compatibility
-  fetchAll: async (force = false) => get().fetchTemplates(force),
 
   createTemplate: async (templateData) => {
     set({ isLoading: true, error: null });
@@ -210,7 +206,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
 
     if (!payload) {
       // No payload, refetch all
-      state.fetchTemplates(true);
+      state.fetchAll(true);
       return;
     }
 
@@ -233,7 +229,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
           });
         } else {
           // No data provided, refetch
-          state.fetchTemplates(true);
+          state.fetchAll(true);
         }
         break;
       case 'deleted':
@@ -243,7 +239,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
   },
 
   ensureDefaultTemplate: async () => {
-    await get().fetchTemplates();
+    await get().fetchAll();
     const { templates } = get();
 
     if (templates.length === 0) {
@@ -265,7 +261,7 @@ export const useLabelTemplateById = (id: string) =>
 
 // Action hooks
 export const useLabelTemplateActions = () => ({
-  fetch: useLabelTemplateStore.getState().fetchTemplates,
+  fetch: useLabelTemplateStore.getState().fetchAll,
   create: useLabelTemplateStore.getState().createTemplate,
   update: useLabelTemplateStore.getState().updateTemplate,
   delete: useLabelTemplateStore.getState().deleteTemplate,
