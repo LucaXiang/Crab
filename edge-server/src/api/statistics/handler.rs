@@ -312,8 +312,8 @@ pub async fn get_statistics(
                 avg_dining_time: $avg_dining_time
             }
         "#)
-        .bind(("start", start_dt.clone()))
-        .bind(("end", end_dt.clone()))
+        .bind(("start", start_dt))
+        .bind(("end", end_dt))
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
@@ -365,8 +365,8 @@ pub async fn get_statistics(
 
     let mut trend_result = state.db
         .query(trend_query)
-        .bind(("start", start_dt.clone()))
-        .bind(("end", end_dt.clone()))
+        .bind(("start", start_dt))
+        .bind(("end", end_dt))
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
@@ -392,8 +392,8 @@ pub async fn get_statistics(
             ORDER BY value DESC
             LIMIT 10
         "#)
-        .bind(("start", start_dt.clone()))
-        .bind(("end", end_dt.clone()))
+        .bind(("start", start_dt))
+        .bind(("end", end_dt))
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
@@ -437,8 +437,8 @@ pub async fn get_statistics(
             ORDER BY sales DESC
             LIMIT 10
         "#)
-        .bind(("start", start_dt.clone()))
-        .bind(("end", end_dt.clone()))
+        .bind(("start", start_dt))
+        .bind(("end", end_dt))
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
@@ -487,8 +487,8 @@ pub async fn get_sales_report(
             AND end_time < $end
             GROUP ALL
         "#)
-        .bind(("start", start_dt.clone()))
-        .bind(("end", end_dt.clone()))
+        .bind(("start", start_dt))
+        .bind(("end", end_dt))
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
