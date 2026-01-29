@@ -5,9 +5,10 @@
 use serde::{Deserialize, Serialize};
 
 /// Label field type
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum LabelFieldType {
+    #[default]
     Text,
     Barcode,
     Qrcode,
@@ -16,12 +17,6 @@ pub enum LabelFieldType {
     Datetime,
     Price,
     Counter,
-}
-
-impl Default for LabelFieldType {
-    fn default() -> Self {
-        Self::Text
-    }
 }
 
 /// Label field alignment

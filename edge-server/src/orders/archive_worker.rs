@@ -217,17 +217,16 @@ impl ArchiveWorker {
 
         // Skip cash tracking for CANCELLED void orders (no money changed hands)
         // LOSS_SETTLED void orders should still count cash (it was actually received)
-        if snapshot.status == OrderStatus::Void {
-            if let Some(ref void_type) = snapshot.void_type {
-                if *void_type == VoidType::Cancelled {
-                    tracing::info!(
-                        order_id = %snapshot.order_id,
-                        void_type = ?void_type,
-                        "Skipping cash tracking for CANCELLED void order"
-                    );
-                    return;
-                }
-            }
+        if snapshot.status == OrderStatus::Void
+            && let Some(ref void_type) = snapshot.void_type
+            && *void_type == VoidType::Cancelled
+        {
+            tracing::info!(
+                order_id = %snapshot.order_id,
+                void_type = ?void_type,
+                "Skipping cash tracking for CANCELLED void order"
+            );
+            return;
         }
 
         // Debug: log all payment methods for troubleshooting

@@ -3,18 +3,13 @@
 use serde::{Deserialize, Serialize};
 
 /// Shift status
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ShiftStatus {
     #[serde(rename = "OPEN")]
+    #[default]
     Open,
     #[serde(rename = "CLOSED")]
     Closed,
-}
-
-impl Default for ShiftStatus {
-    fn default() -> Self {
-        Self::Open
-    }
 }
 
 /// Shift record - represents an operator's work shift

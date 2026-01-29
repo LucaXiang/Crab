@@ -535,10 +535,7 @@ impl NetworkMessageClient {
 
     /// 快速 TCP 探测 - 检测网络是否可达
     async fn quick_tcp_probe(addr: &str) -> bool {
-        match tokio::time::timeout(Duration::from_millis(500), TcpStream::connect(addr)).await {
-            Ok(Ok(_)) => true,
-            _ => false,
-        }
+        matches!(tokio::time::timeout(Duration::from_millis(500), TcpStream::connect(addr)).await, Ok(Ok(_)))
     }
 
     /// 后台读取任务循环

@@ -107,10 +107,10 @@ impl EventRouter {
         let event = Arc::new(event);
 
         // 1. 归档通道优先：阻塞发送保证不丢失（关键业务）
-        if TERMINAL_EVENTS.contains(&event.event_type) {
-            if self.archive_tx.send(Arc::clone(&event)).await.is_err() {
-                tracing::error!("Archive channel closed - critical data may be lost!");
-            }
+        if TERMINAL_EVENTS.contains(&event.event_type)
+            && self.archive_tx.send(Arc::clone(&event)).await.is_err()
+        {
+            tracing::error!("Archive channel closed - critical data may be lost!");
         }
 
         // 2. 同步通道：best-effort，满则丢弃

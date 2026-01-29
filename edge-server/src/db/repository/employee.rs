@@ -123,12 +123,12 @@ impl EmployeeRepository {
             .ok_or_else(|| RepoError::NotFound(format!("Employee {} not found", id)))?;
 
         // System users can only change password
-        if existing.is_system {
-            if data.username.is_some() || data.role.is_some() || data.is_active.is_some() || data.display_name.is_some() {
-                return Err(RepoError::Validation(
-                    "System user can only change password".to_string(),
-                ));
-            }
+        if existing.is_system
+            && (data.username.is_some() || data.role.is_some() || data.is_active.is_some() || data.display_name.is_some())
+        {
+            return Err(RepoError::Validation(
+                "System user can only change password".to_string(),
+            ));
         }
 
         // Check duplicate username if changing

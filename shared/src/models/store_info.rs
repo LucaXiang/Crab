@@ -3,12 +3,15 @@
 use serde::{Deserialize, Serialize};
 
 /// Store information entity (singleton per tenant)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct StoreInfo {
     pub id: Option<String>,
+    #[serde(default)]
     pub name: String,
+    #[serde(default)]
     pub address: String,
     /// Tax identification number (NIF)
+    #[serde(default)]
     pub nif: String,
     pub logo_url: Option<String>,
     pub phone: Option<String>,
@@ -16,23 +19,6 @@ pub struct StoreInfo {
     pub website: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
-}
-
-impl Default for StoreInfo {
-    fn default() -> Self {
-        Self {
-            id: None,
-            name: String::new(),
-            address: String::new(),
-            nif: String::new(),
-            logo_url: None,
-            phone: None,
-            email: None,
-            website: None,
-            created_at: None,
-            updated_at: None,
-        }
-    }
 }
 
 /// Update store info payload

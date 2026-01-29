@@ -29,7 +29,7 @@ impl EventApplier for OrderCompletedApplier {
             for item in &snapshot.items {
                 snapshot
                     .paid_item_quantities
-                    .insert(item.instance_id.clone(), item.quantity as i32);
+                    .insert(item.instance_id.clone(), item.quantity);
             }
 
             // Update sequence and timestamp

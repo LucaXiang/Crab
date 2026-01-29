@@ -49,7 +49,7 @@ impl EventApplier for PaymentAddedApplier {
                     let item_quantities: Vec<(String, i32)> = snapshot
                         .items
                         .iter()
-                        .map(|item| (item.instance_id.clone(), item.quantity as i32))
+                        .map(|item| (item.instance_id.clone(), item.quantity))
                         .collect();
                     for (instance_id, quantity) in item_quantities {
                         snapshot.paid_item_quantities.insert(instance_id, quantity);

@@ -97,21 +97,21 @@ impl CommandHandler for CancelPaymentAction {
         let mut events = vec![event];
 
         // 6. If AA zero-out, produce extra AaSplitCancelled event
-        if is_aa_zero_out {
-            if let Some(total_shares) = aa_total_for_cancel {
-                let seq2 = ctx.next_sequence();
-                let cancel_event = OrderEvent::new(
-                    seq2,
-                    self.order_id.clone(),
-                    metadata.operator_id.clone(),
-                    metadata.operator_name.clone(),
-                    metadata.command_id.clone(),
-                    Some(metadata.timestamp),
-                    OrderEventType::AaSplitCancelled,
-                    EventPayload::AaSplitCancelled { total_shares },
-                );
-                events.push(cancel_event);
-            }
+        if is_aa_zero_out
+            && let Some(total_shares) = aa_total_for_cancel
+        {
+            let seq2 = ctx.next_sequence();
+            let cancel_event = OrderEvent::new(
+                seq2,
+                self.order_id.clone(),
+                metadata.operator_id.clone(),
+                metadata.operator_name.clone(),
+                metadata.command_id.clone(),
+                Some(metadata.timestamp),
+                OrderEventType::AaSplitCancelled,
+                EventPayload::AaSplitCancelled { total_shares },
+            );
+            events.push(cancel_event);
         }
 
         Ok(events)

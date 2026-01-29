@@ -7,17 +7,12 @@ use surrealdb::RecordId;
 pub type ShiftId = RecordId;
 
 /// Shift status
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ShiftStatus {
+    #[default]
     Open,
     Closed,
-}
-
-impl Default for ShiftStatus {
-    fn default() -> Self {
-        Self::Open
-    }
 }
 
 /// Shift entity (班次)
