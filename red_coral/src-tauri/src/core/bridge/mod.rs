@@ -1902,7 +1902,7 @@ impl ClientBridge {
             }
 
             // Get current timestamp for time-based rule validation
-            let current_time = chrono::Utc::now().timestamp_millis();
+            let current_time = shared::util::now_millis();
 
             // Apply price rules to items
             let processed_items = server_state

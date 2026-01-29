@@ -203,7 +203,7 @@ impl OrderCommand {
     pub fn new(operator_id: String, operator_name: String, payload: OrderCommandPayload) -> Self {
         Self {
             command_id: uuid::Uuid::new_v4().to_string(),
-            timestamp: chrono::Utc::now().timestamp_millis(),
+            timestamp: crate::util::now_millis(),
             operator_id,
             operator_name,
             payload,

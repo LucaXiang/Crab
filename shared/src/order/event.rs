@@ -356,7 +356,7 @@ impl OrderEvent {
             sequence,
             order_id,
             // Server timestamp is ALWAYS set by server - this is authoritative
-            timestamp: chrono::Utc::now().timestamp_millis(),
+            timestamp: crate::util::now_millis(),
             // Client timestamp preserved for audit (may differ due to clock skew)
             client_timestamp,
             operator_id,

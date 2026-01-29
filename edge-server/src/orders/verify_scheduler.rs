@@ -34,6 +34,8 @@ struct VerificationRecord {
     invalid_orders_count: usize,
     /// 有异常时存储完整 JSON，无异常时 None
     details: Option<serde_json::Value>,
+    /// 创建时间 (Unix millis)
+    created_at: i64,
 }
 
 /// 用于查询最近验证日期
@@ -259,6 +261,7 @@ impl VerifyScheduler {
             chain_breaks_count: result.chain_breaks.len(),
             invalid_orders_count: result.invalid_orders.len(),
             details,
+            created_at: shared::util::now_millis(),
         };
 
         if let Err(e) = self.save_record(date, record).await {
@@ -278,6 +281,7 @@ impl VerifyScheduler {
             chain_breaks_count: 0,
             invalid_orders_count: 0,
             details: Some(serde_json::json!({ "error": error })),
+            created_at: shared::util::now_millis(),
         };
 
         if let Err(e) = self.save_record(date, record).await {

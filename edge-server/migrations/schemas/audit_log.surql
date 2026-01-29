@@ -50,6 +50,7 @@ DEFINE FIELD OVERWRITE error ON audit_log TYPE option<string>
 
 -- 时间戳（自动生成，只读）
 DEFINE FIELD OVERWRITE created_at ON audit_log TYPE int READONLY
+    DEFAULT 0
     PERMISSIONS FULL;
 
 -- 索引

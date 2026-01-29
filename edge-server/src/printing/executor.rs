@@ -247,7 +247,7 @@ mod tests {
             id: "evt-1".to_string(),
             order_id: "order-1".to_string(),
             table_name: Some("100桌".to_string()),
-            created_at: 1705912335,
+            created_at: 1705912335000, // 2024-01-22 14:32:15 UTC (millis)
             items: vec![KitchenOrderItem {
                 context: PrintItemContext {
                     category_id: "category:c1".to_string(),

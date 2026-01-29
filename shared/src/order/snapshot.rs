@@ -157,7 +157,7 @@ pub struct OrderSnapshot {
 impl OrderSnapshot {
     /// Create a new empty order
     pub fn new(order_id: String) -> Self {
-        let now = chrono::Utc::now().timestamp_millis();
+        let now = crate::util::now_millis();
         let mut snapshot = Self {
             order_id,
             table_id: None,

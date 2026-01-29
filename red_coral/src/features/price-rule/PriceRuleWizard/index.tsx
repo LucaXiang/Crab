@@ -16,6 +16,13 @@ import { WizardProgress } from './WizardProgress';
 
 const getApi = () => createTauriClient();
 
+/** 将 Unix millis 转为 datetime-local input 所需的本地时间字符串 "YYYY-MM-DDTHH:mm" */
+function toLocalDatetimeString(millis: number): string {
+  const d = new Date(millis);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export interface WizardState {
   // Step 1
   rule_type: 'DISCOUNT' | 'SURCHARGE';
@@ -68,8 +75,8 @@ const getInitialState = (rule?: PriceRule | null): WizardState => {
       active_days: rule.active_days || [1, 2, 3, 4, 5],
       active_start_time: rule.active_start_time || '09:00',
       active_end_time: rule.active_end_time || '18:00',
-      valid_from: rule.valid_from ? new Date(rule.valid_from).toISOString().slice(0, 16) : '',
-      valid_until: rule.valid_until ? new Date(rule.valid_until).toISOString().slice(0, 16) : '',
+      valid_from: rule.valid_from ? toLocalDatetimeString(rule.valid_from) : '',
+      valid_until: rule.valid_until ? toLocalDatetimeString(rule.valid_until) : '',
       name: rule.name,
       display_name: rule.display_name,
       receipt_name: rule.receipt_name,
