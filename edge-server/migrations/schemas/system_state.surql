@@ -24,7 +24,7 @@ DEFINE FIELD OVERWRITE synced_up_to ON system_state TYPE option<record<order>>
 DEFINE FIELD OVERWRITE synced_up_to_hash ON system_state TYPE option<string>
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE last_sync_time ON system_state TYPE option<datetime>
+DEFINE FIELD OVERWRITE last_sync_time ON system_state TYPE option<int>
     PERMISSIONS FULL;
 
 -- 统计
@@ -32,10 +32,8 @@ DEFINE FIELD OVERWRITE order_count ON system_state TYPE int
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE created_at ON system_state TYPE datetime
-    DEFAULT time::now()
+DEFINE FIELD OVERWRITE created_at ON system_state TYPE int
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE updated_at ON system_state TYPE datetime
-    DEFAULT time::now()
+DEFINE FIELD OVERWRITE updated_at ON system_state TYPE int
     PERMISSIONS FULL;

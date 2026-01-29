@@ -90,7 +90,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: "2024-01-01T00:00:00Z".to_string(),
+            created_at: 1704067200000, // 2024-01-01T00:00:00Z in millis
         };
 
         let applied = AppliedRule::from_rule(&rule, 5.0);

@@ -347,8 +347,8 @@ impl PrintStorage {
 
     /// Clean up old records (older than max_age_secs)
     pub fn cleanup_old_records(&self, max_age_secs: i64) -> PrintStorageResult<usize> {
-        let now = chrono::Utc::now().timestamp();
-        let cutoff = now - max_age_secs;
+        let now = shared::util::now_millis();
+        let cutoff = now - max_age_secs * 1000;
 
         let txn = self.db.begin_write()?;
         let mut deleted = 0;
@@ -430,7 +430,7 @@ mod tests {
             id: "ko-1".to_string(),
             order_id: "order-1".to_string(),
             table_name: Some("Table 1".to_string()),
-            created_at: chrono::Utc::now().timestamp(),
+            created_at: shared::util::now_millis(),
             items: vec![],
             print_count: 0,
         };

@@ -14,6 +14,7 @@ pub mod order;
 pub mod request;
 pub mod response;
 pub mod types;
+pub mod util;
 
 // Re-exports
 pub use axum::{Json, body};

@@ -66,8 +66,9 @@ impl SystemStateRepository {
         let _ = self
             .base
             .db()
-            .query("UPDATE system_state SET updated_at = time::now() WHERE id = $id RETURN AFTER")
+            .query("UPDATE system_state SET updated_at = $now WHERE id = $id RETURN AFTER")
             .bind(("id", singleton_id))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         // Merge the actual data
@@ -102,10 +103,11 @@ impl SystemStateRepository {
             .query(
                 "UPDATE system_state SET \
                     order_count = order_count + 1, \
-                    updated_at = time::now() \
+                    updated_at = $now \
                 WHERE id = $id RETURN AFTER.order_count",
             )
             .bind(("id", singleton_id))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         let new_count: Option<i32> = result.take(0)?;
@@ -136,12 +138,13 @@ impl SystemStateRepository {
                     last_order = $order_id, \
                     last_order_hash = $hash, \
                     order_count = order_count + 1, \
-                    updated_at = time::now() \
+                    updated_at = $now \
                 WHERE id = $id RETURN AFTER",
             )
             .bind(("order_id", order_thing))
             .bind(("hash", order_hash))
             .bind(("id", singleton_id))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         let updated: Option<SystemState> = result.take(0)?;
@@ -162,7 +165,7 @@ impl SystemStateRepository {
         self.update(SystemStateUpdate {
             synced_up_to: Some(synced_thing),
             synced_up_to_hash: Some(synced_up_to_hash),
-            last_sync_time: Some(chrono::Utc::now().to_rfc3339()),
+            last_sync_time: Some(shared::util::now_millis()),
             ..Default::default()
         })
         .await

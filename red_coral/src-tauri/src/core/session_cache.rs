@@ -46,13 +46,15 @@ pub struct EmployeeSession {
     pub token: String,
     pub user_info: shared::client::UserInfo,
     pub login_mode: LoginMode,
-    pub expires_at: Option<u64>,
-    pub logged_in_at: u64,
+    /// Token 过期时间 (Unix millis)
+    pub expires_at: Option<i64>,
+    /// 登录时间 (Unix millis)
+    pub logged_in_at: i64,
 }
 
 impl EmployeeSession {
-    /// 从 JWT token 中解析过期时间 (Unix timestamp)
-    pub fn parse_jwt_exp(token: &str) -> Option<u64> {
+    /// 从 JWT token 中解析过期时间 (返回 Unix millis i64)
+    pub fn parse_jwt_exp(token: &str) -> Option<i64> {
         // JWT 格式: header.payload.signature
         let parts: Vec<&str> = token.split('.').collect();
         if parts.len() != 3 {
@@ -64,9 +66,10 @@ impl EmployeeSession {
         let payload_bytes = URL_SAFE_NO_PAD.decode(parts[1]).ok()?;
         let payload_str = String::from_utf8(payload_bytes).ok()?;
 
-        // 解析 JSON 提取 exp 字段
+        // 解析 JSON 提取 exp 字段 (JWT exp 是秒，转为毫秒)
         let payload: serde_json::Value = serde_json::from_str(&payload_str).ok()?;
-        payload.get("exp")?.as_u64()
+        let exp_secs = payload.get("exp")?.as_i64()?;
+        Some(exp_secs * 1000)
     }
 }
 
@@ -77,12 +80,12 @@ struct CachedEmployee {
     password_hash: String,
     /// 缓存的 JWT token
     cached_token: String,
-    /// Token 过期时间
-    token_expires_at: Option<u64>,
+    /// Token 过期时间 (Unix millis)
+    token_expires_at: Option<i64>,
     /// 用户信息
     user_info: shared::client::UserInfo,
-    /// 上次在线登录时间
-    last_online_login: u64,
+    /// 上次在线登录时间 (Unix millis)
+    last_online_login: i64,
 }
 
 /// 会话缓存文件结构
@@ -183,14 +186,11 @@ impl SessionCache {
 
         // 检查缓存的 token 是否过期
         // 离线模式下我们仍然使用缓存的 token，但标记为离线登录
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = shared::util::now_millis();
 
         // 如果 token 过期超过 7 天，拒绝离线登录
         if let Some(expires_at) = cached.token_expires_at {
-            let max_offline_duration = 7 * 24 * 60 * 60; // 7 days in seconds
+            let max_offline_duration = 7 * 24 * 60 * 60 * 1000_i64; // 7 days in millis
             if now > expires_at + max_offline_duration {
                 return Err(SessionCacheError::SessionExpired);
             }
@@ -268,11 +268,8 @@ impl SessionCache {
         let content = std::fs::read_to_string(&path)?;
         let session: EmployeeSession = serde_json::from_str(&content)?;
 
-        // 检查 session 是否过期 (token expires_at)
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        // 检查 session 是否过期 (token expires_at, millis)
+        let now = shared::util::now_millis();
 
         if let Some(expires_at) = session.expires_at {
             if now > expires_at {

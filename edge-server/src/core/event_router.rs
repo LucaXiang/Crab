@@ -166,7 +166,7 @@ mod tests {
             event_id: uuid::Uuid::new_v4().to_string(),
             sequence,
             order_id: "test".to_string(),
-            timestamp: chrono::Utc::now().timestamp_millis(),
+            timestamp: shared::util::now_millis(),
             client_timestamp: None,
             operator_id: "op".to_string(),
             operator_name: "Test Operator".to_string(),

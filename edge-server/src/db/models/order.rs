@@ -39,8 +39,8 @@ pub struct Order {
     pub discount_amount: f64,
     pub surcharge_amount: f64,
     pub tax: f64,
-    pub start_time: String,
-    pub end_time: Option<String>,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
     pub operator_id: Option<String>,
     pub operator_name: Option<String>,
     #[serde(default, with = "serde_helpers::option_record_id")]
@@ -60,7 +60,7 @@ pub struct Order {
     pub void_note: Option<String>,
     pub prev_hash: String,
     pub curr_hash: String,
-    pub created_at: Option<String>,
+    pub created_at: Option<i64>,
 }
 
 /// Split item in a payment

@@ -381,14 +381,14 @@ export interface PriceRule {
   is_stackable: boolean;
   is_exclusive: boolean;
   // Time fields
-  valid_from: string | null;        // ISO 8601 datetime string
-  valid_until: string | null;       // ISO 8601 datetime string
+  valid_from: number | null;        // Unix millis (i64)
+  valid_until: number | null;       // Unix millis (i64)
   active_days: number[] | null;     // [0=Sunday, 1=Monday, ...]
   active_start_time: string | null; // HH:MM format
   active_end_time: string | null;   // HH:MM format
   is_active: boolean;
   created_by: string | null;
-  created_at: string;               // ISO 8601 datetime string
+  created_at: number;               // Unix millis (i64)
 }
 
 export interface PriceRuleCreate {
@@ -407,8 +407,8 @@ export interface PriceRuleCreate {
   is_stackable?: boolean;
   is_exclusive?: boolean;
   // Time fields
-  valid_from?: string;        // ISO 8601 datetime string
-  valid_until?: string;       // ISO 8601 datetime string
+  valid_from?: number;        // Unix millis (i64)
+  valid_until?: number;       // Unix millis (i64)
   active_days?: number[];     // [0=Sunday, 1=Monday, ...]
   active_start_time?: string; // HH:MM format
   active_end_time?: string;   // HH:MM format
@@ -431,8 +431,8 @@ export interface PriceRuleUpdate {
   is_stackable?: boolean;
   is_exclusive?: boolean;
   // Time fields
-  valid_from?: string;        // ISO 8601 datetime string
-  valid_until?: string;       // ISO 8601 datetime string
+  valid_from?: number;        // Unix millis (i64)
+  valid_until?: number;       // Unix millis (i64)
   active_days?: number[];     // [0=Sunday, 1=Monday, ...]
   active_start_time?: string; // HH:MM format
   active_end_time?: string;   // HH:MM format
@@ -533,8 +533,8 @@ export interface User {
   is_system: boolean;
   is_active: boolean;
   // 可选字段（后端可能不返回）
-  created_at?: string;
-  updated_at?: string;
+  created_at?: number;
+  updated_at?: number;
 }
 
 // ============ Product/Category Attribute Bindings ============
@@ -606,7 +606,7 @@ export interface KitchenOrder {
   order_id: string;
   /** Table name (if applicable) */
   table_name: string | null;
-  /** Unix timestamp (seconds) */
+  /** Unix millis */
   created_at: number;
   /** Items in this kitchen order */
   items: KitchenOrderItem[];
@@ -627,7 +627,7 @@ export interface LabelPrintRecord {
   kitchen_order_id: string;
   /** Table name (if applicable) */
   table_name: string | null;
-  /** Unix timestamp (seconds) */
+  /** Unix millis */
   created_at: number;
   /** Print context for this label */
   context: PrintItemContext;
@@ -663,8 +663,8 @@ export interface StoreInfo {
    * Default "00:00" (midnight), bars/nightclubs can set to "06:00"
    */
   business_day_cutoff: string;
-  created_at: string | null;
-  updated_at: string | null;
+  created_at: number | null;
+  updated_at: number | null;
 }
 
 export interface StoreInfoUpdate {
@@ -735,10 +735,10 @@ export interface Shift {
   operator_name: string;
   /** Shift status */
   status: ShiftStatus;
-  /** Shift start time (ISO 8601) */
-  start_time: string;
-  /** Shift end time (ISO 8601), null if still open */
-  end_time: string | null;
+  /** Shift start time (Unix millis) */
+  start_time: number;
+  /** Shift end time (Unix millis), null if still open */
+  end_time: number | null;
   /** Starting cash amount */
   starting_cash: number;
   /** Expected cash amount (starting + cash payments received) */
@@ -749,12 +749,12 @@ export interface Shift {
   cash_variance: number | null;
   /** Whether shift was closed abnormally (power failure, etc.) */
   abnormal_close: boolean;
-  /** Last heartbeat timestamp */
-  last_active_at: string | null;
+  /** Last heartbeat timestamp (Unix millis) */
+  last_active_at: number | null;
   /** Notes */
   note: string | null;
-  created_at: string | null;
-  updated_at: string | null;
+  created_at: number | null;
+  updated_at: number | null;
 }
 
 export interface ShiftCreate {
@@ -845,8 +845,8 @@ export interface DailyReport {
   tax_breakdowns: TaxBreakdown[];
   /** Payment breakdown by method */
   payment_breakdowns: PaymentMethodBreakdown[];
-  /** When the report was generated (ISO 8601) */
-  generated_at: string | null;
+  /** When the report was generated (Unix millis) */
+  generated_at: number | null;
   /** Who generated the report (employee ID) */
   generated_by_id: string | null;
   /** Who generated the report (name) */

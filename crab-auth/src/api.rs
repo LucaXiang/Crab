@@ -368,23 +368,15 @@ async fn activate(
 
     // 8. Build subscription info (mock for now)
     // Subscription signature valid for 7 days
-    let signature_valid_until = Utc::now()
-        .checked_add_signed(Duration::days(7))
-        .expect("valid timestamp")
-        .to_rfc3339();
+    let signature_valid_until = shared::util::now_millis() + 7 * 24 * 60 * 60 * 1000;
 
     let subscription = SubscriptionInfo {
         tenant_id: tenant_id.clone(),
         id: None,
         status: SubscriptionStatus::Active,
         plan: PlanType::Pro,
-        starts_at: Utc::now().to_rfc3339(),
-        expires_at: Some(
-            Utc::now()
-                .checked_add_signed(Duration::days(365))
-                .expect("valid timestamp")
-                .to_rfc3339(),
-        ),
+        starts_at: shared::util::now_millis(),
+        expires_at: Some(shared::util::now_millis() + 365 * 24 * 60 * 60 * 1000),
         features: vec![
             "audit_log".to_string(),
             "advanced_reporting".to_string(),
@@ -476,25 +468,22 @@ async fn get_subscription_status(
 
     // Mock subscription logic
     // In production: query database (e.g. Stripe/Paddle webhook data)
-    let (status, plan, features) = if tenant_id == "expired_tenant" {
-        (SubscriptionStatus::PastDue, PlanType::Free, vec![])
-    } else {
-        (
-            SubscriptionStatus::Active,
-            PlanType::Pro,
-            vec![
-                "audit_log".to_string(),
-                "advanced_reporting".to_string(),
-                "api_access".to_string(),
-            ],
-        )
+    let pro_features = vec![
+        "audit_log".to_string(),
+        "advanced_reporting".to_string(),
+        "api_access".to_string(),
+    ];
+    let (status, plan, features) = match tenant_id.as_str() {
+        "tenant-inactive" => (SubscriptionStatus::Inactive, PlanType::Free, vec![]),
+        "tenant-expired" | "expired_tenant" => (SubscriptionStatus::Expired, PlanType::Free, vec![]),
+        "tenant-canceled" => (SubscriptionStatus::Canceled, PlanType::Pro, vec![]),
+        "tenant-unpaid" => (SubscriptionStatus::Unpaid, PlanType::Pro, vec![]),
+        "tenant-pastdue" => (SubscriptionStatus::PastDue, PlanType::Pro, pro_features.clone()),
+        _ => (SubscriptionStatus::Active, PlanType::Pro, pro_features),
     };
 
     // Subscription signature valid for 7 days (short TTL for security)
-    let signature_valid_until = Utc::now()
-        .checked_add_signed(Duration::days(7))
-        .expect("valid timestamp")
-        .to_rfc3339();
+    let signature_valid_until = shared::util::now_millis() + 7 * 24 * 60 * 60 * 1000;
 
     // Build subscription info
     let subscription = SubscriptionInfo {
@@ -502,13 +491,8 @@ async fn get_subscription_status(
         id: None,
         status,
         plan,
-        starts_at: Utc::now().to_rfc3339(),
-        expires_at: Some(
-            Utc::now()
-                .checked_add_signed(Duration::days(365))
-                .expect("valid timestamp")
-                .to_rfc3339(),
-        ),
+        starts_at: shared::util::now_millis(),
+        expires_at: Some(shared::util::now_millis() + 365 * 24 * 60 * 60 * 1000),
         features,
         signature_valid_until,
         signature: String::new(),

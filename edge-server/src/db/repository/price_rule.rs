@@ -2,7 +2,6 @@
 
 use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{serde_helpers, PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
-use chrono::Utc;
 use surrealdb::engine::local::Db;
 use surrealdb::{RecordId, Surreal};
 
@@ -129,9 +128,9 @@ impl PriceRuleRepository {
             is_stackable: bool,
             is_exclusive: bool,
             #[serde(skip_serializing_if = "Option::is_none")]
-            valid_from: Option<chrono::DateTime<Utc>>,
+            valid_from: Option<i64>,
             #[serde(skip_serializing_if = "Option::is_none")]
-            valid_until: Option<chrono::DateTime<Utc>>,
+            valid_until: Option<i64>,
             #[serde(skip_serializing_if = "Option::is_none")]
             active_days: Option<Vec<u8>>,
             #[serde(skip_serializing_if = "Option::is_none")]
@@ -230,9 +229,9 @@ impl PriceRuleRepository {
             #[serde(skip_serializing_if = "Option::is_none")]
             is_exclusive: Option<bool>,
             #[serde(skip_serializing_if = "Option::is_none")]
-            valid_from: Option<chrono::DateTime<Utc>>,
+            valid_from: Option<i64>,
             #[serde(skip_serializing_if = "Option::is_none")]
-            valid_until: Option<chrono::DateTime<Utc>>,
+            valid_until: Option<i64>,
             #[serde(skip_serializing_if = "Option::is_none")]
             active_days: Option<Vec<u8>>,
             #[serde(skip_serializing_if = "Option::is_none")]

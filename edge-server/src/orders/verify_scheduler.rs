@@ -145,10 +145,10 @@ impl VerifyScheduler {
 
             let date_str = date.format("%Y-%m-%d").to_string();
             let next = date + chrono::Duration::days(1);
-            let start = format!("{}T{}:00Z", date, cutoff);
-            let end = format!("{}T{}:00Z", next, cutoff);
+            let start = Self::date_cutoff_to_millis(date, cutoff);
+            let end = Self::date_cutoff_to_millis(next, cutoff);
 
-            match self.archive_service.verify_daily_chain(&date_str, &start, &end).await {
+            match self.archive_service.verify_daily_chain(&date_str, start, end).await {
                 Ok(result) => {
                     let intact = result.chain_intact;
                     let total = result.total_orders;
@@ -207,11 +207,11 @@ impl VerifyScheduler {
             let yesterday = Self::yesterday_business_date(cutoff_time);
             let date_str = yesterday.format("%Y-%m-%d").to_string();
             let next = yesterday + chrono::Duration::days(1);
-            let start = format!("{}T{}:00Z", yesterday, cutoff_str);
-            let end = format!("{}T{}:00Z", next, cutoff_str);
+            let start = Self::date_cutoff_to_millis(yesterday, &cutoff_str);
+            let end = Self::date_cutoff_to_millis(next, &cutoff_str);
 
             tracing::info!("🔍 Running daily verification for {}", date_str);
-            match self.archive_service.verify_daily_chain(&date_str, &start, &end).await {
+            match self.archive_service.verify_daily_chain(&date_str, start, end).await {
                 Ok(result) => {
                     let intact = result.chain_intact;
                     let total = result.total_orders;
@@ -326,20 +326,21 @@ impl VerifyScheduler {
     async fn earliest_order_date(&self) -> Result<Option<NaiveDate>, String> {
         #[derive(Debug, Deserialize)]
         struct DateRow {
-            created_at: String,
+            created_at: i64,
         }
 
         let mut result = self
             .db
-            .query("SELECT string::slice(<string>created_at, 0, 10) AS created_at FROM order ORDER BY created_at LIMIT 1")
+            .query("SELECT created_at FROM order ORDER BY created_at LIMIT 1")
             .await
             .map_err(|e| e.to_string())?;
 
         let rows: Vec<DateRow> = result.take(0).map_err(|e| e.to_string())?;
         match rows.into_iter().next() {
             Some(r) => {
-                let date = NaiveDate::parse_from_str(&r.created_at, "%Y-%m-%d")
-                    .map_err(|e| format!("Invalid order date: {}", e))?;
+                let date = chrono::DateTime::from_timestamp_millis(r.created_at)
+                    .map(|dt| dt.date_naive())
+                    .ok_or_else(|| format!("Invalid timestamp: {}", r.created_at))?;
                 Ok(Some(date))
             }
             None => Ok(None),
@@ -387,6 +388,14 @@ impl VerifyScheduler {
             now.date_naive()
         };
         today_business - chrono::Duration::days(1)
+    }
+
+    /// 将日期 + cutoff 时间字符串转为 Unix millis (UTC)
+    fn date_cutoff_to_millis(date: NaiveDate, cutoff: &str) -> i64 {
+        let time = NaiveTime::parse_from_str(&format!("{}:00", cutoff), "%H:%M:%S")
+            .unwrap_or(NaiveTime::MIN);
+        let dt = date.and_time(time);
+        dt.and_utc().timestamp_millis()
     }
 
     /// 计算距离下一次 cutoff 的 Duration

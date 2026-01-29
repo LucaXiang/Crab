@@ -340,8 +340,6 @@ mod tests {
     #[test]
     fn test_input_to_snapshot_with_rules_discount() {
         use crate::db::models::{AdjustmentType, ProductScope, RuleType};
-        use chrono::Utc;
-
         let input = shared::order::CartItemInput {
             product_id: "product:1".to_string(),
             name: "Test Product".to_string(),
@@ -380,7 +378,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: Utc::now(),
+            created_at: shared::util::now_millis(),
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
@@ -397,7 +395,6 @@ mod tests {
     #[test]
     fn test_input_to_snapshot_with_rules_and_options() {
         use crate::db::models::{AdjustmentType, ProductScope, RuleType};
-        use chrono::Utc;
         use shared::order::ItemOption;
 
         let input = shared::order::CartItemInput {
@@ -453,7 +450,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: Utc::now(),
+            created_at: shared::util::now_millis(),
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
@@ -469,7 +466,7 @@ mod tests {
     #[test]
     fn test_input_to_snapshot_with_manual_and_rule_discount() {
         use crate::db::models::{AdjustmentType, ProductScope, RuleType};
-        use chrono::Utc;
+
 
         let input = shared::order::CartItemInput {
             product_id: "product:1".to_string(),
@@ -509,7 +506,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: Utc::now(),
+            created_at: shared::util::now_millis(),
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
@@ -526,7 +523,7 @@ mod tests {
     #[test]
     fn test_instance_id_consistent_with_or_without_rules() {
         use crate::db::models::{AdjustmentType, ProductScope, RuleType};
-        use chrono::Utc;
+
 
         // Same input for both cases
         let input = shared::order::CartItemInput {
@@ -570,7 +567,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: Utc::now(),
+            created_at: shared::util::now_millis(),
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
@@ -591,7 +588,7 @@ mod tests {
     #[test]
     fn test_product_scope_filtering() {
         use crate::db::models::{AdjustmentType, ProductScope, RuleType};
-        use chrono::Utc;
+
         use surrealdb::RecordId;
 
         // Item for product:p1
@@ -633,7 +630,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: Utc::now(),
+            created_at: shared::util::now_millis(),
         };
 
         // Product-specific rule for product:p1 - should apply
@@ -659,7 +656,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: Utc::now(),
+            created_at: shared::util::now_millis(),
         };
 
         // Product-specific rule for product:p2 - should NOT apply to p1
@@ -685,7 +682,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: Utc::now(),
+            created_at: shared::util::now_millis(),
         };
 
         // Pass ALL rules - filtering should happen inside input_to_snapshot_with_rules

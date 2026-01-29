@@ -173,7 +173,7 @@ export const UserManagement: React.FC = React.memo(() => {
   };
 
   const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString('zh-CN', {
+    return new Date(timestamp).toLocaleDateString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -231,7 +231,7 @@ export const UserManagement: React.FC = React.memo(() => {
         render: (user) => (
           <div className="flex items-center gap-1.5 text-sm text-gray-600">
             <Calendar size={14} />
-            <span>{formatDate(new Date(user.created_at).getTime() / 1000)}</span>
+            <span>{formatDate(user.created_at)}</span>
           </div>
         ),
       },

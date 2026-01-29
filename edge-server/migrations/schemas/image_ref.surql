@@ -22,8 +22,7 @@ DEFINE FIELD OVERWRITE entity_id ON image_ref TYPE string
     PERMISSIONS FULL;
 
 -- 创建时间
-DEFINE FIELD OVERWRITE created_at ON image_ref TYPE datetime
-    DEFAULT time::now()
+DEFINE FIELD OVERWRITE created_at ON image_ref TYPE int
     PERMISSIONS FULL;
 
 -- 唯一索引：同一实体对同一图片只记录一次

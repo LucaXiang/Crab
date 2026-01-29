@@ -56,10 +56,10 @@ pub struct PriceRule {
     /// Whether this rule is exclusive (cannot be combined with other rules)
     #[serde(default)]
     pub is_exclusive: bool,
-    /// Valid from datetime (ISO 8601 string)
-    pub valid_from: Option<String>,
-    /// Valid until datetime (ISO 8601 string)
-    pub valid_until: Option<String>,
+    /// Valid from datetime (Unix millis)
+    pub valid_from: Option<i64>,
+    /// Valid until datetime (Unix millis)
+    pub valid_until: Option<i64>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
     pub active_days: Option<Vec<u8>>,
     /// Active start time (HH:MM format)
@@ -69,13 +69,13 @@ pub struct PriceRule {
     #[serde(default = "default_true")]
     pub is_active: bool,
     pub created_by: Option<String>,
-    /// Created datetime (ISO 8601 string)
+    /// Created datetime (Unix millis)
     #[serde(default = "default_created_at")]
-    pub created_at: String,
+    pub created_at: i64,
 }
 
-fn default_created_at() -> String {
-    "1970-01-01T00:00:00Z".to_string()
+fn default_created_at() -> i64 {
+    0
 }
 
 fn default_true() -> bool {
@@ -101,10 +101,10 @@ pub struct PriceRuleCreate {
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
     pub is_exclusive: Option<bool>,
-    /// Valid from datetime (ISO 8601 string)
-    pub valid_from: Option<String>,
-    /// Valid until datetime (ISO 8601 string)
-    pub valid_until: Option<String>,
+    /// Valid from datetime (Unix millis)
+    pub valid_from: Option<i64>,
+    /// Valid until datetime (Unix millis)
+    pub valid_until: Option<i64>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
     pub active_days: Option<Vec<u8>>,
     /// Active start time (HH:MM format)
@@ -133,10 +133,10 @@ pub struct PriceRuleUpdate {
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
     pub is_exclusive: Option<bool>,
-    /// Valid from datetime (ISO 8601 string)
-    pub valid_from: Option<String>,
-    /// Valid until datetime (ISO 8601 string)
-    pub valid_until: Option<String>,
+    /// Valid from datetime (Unix millis)
+    pub valid_from: Option<i64>,
+    /// Valid until datetime (Unix millis)
+    pub valid_until: Option<i64>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
     pub active_days: Option<Vec<u8>>,
     /// Active start time (HH:MM format)

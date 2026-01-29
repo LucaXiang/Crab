@@ -2,12 +2,11 @@
 //!
 //! Utility types used across the framework
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Timestamp type with timezone
-pub type Timestamp = DateTime<Utc>;
+/// Timestamp type (Unix milliseconds)
+pub type Timestamp = i64;
 
 /// Entity ID type
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,7 +141,7 @@ impl HealthStatus {
         Self {
             status: HealthCheckStatus::Healthy,
             version,
-            timestamp: Utc::now(),
+            timestamp: crate::util::now_millis(),
             uptime_seconds,
         }
     }

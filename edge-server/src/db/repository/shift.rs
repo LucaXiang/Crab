@@ -63,14 +63,14 @@ impl ShiftRepository {
                     operator_id = $operator_id,
                     operator_name = $operator_name,
                     status = 'OPEN',
-                    start_time = time::now(),
+                    start_time = $now,
                     starting_cash = $starting_cash,
                     expected_cash = $starting_cash,
                     abnormal_close = false,
-                    last_active_at = time::now(),
+                    last_active_at = $now,
                     note = $note,
-                    created_at = time::now(),
-                    updated_at = time::now()
+                    created_at = $now,
+                    updated_at = $now
                 RETURN AFTER;
             "#,
             )
@@ -78,6 +78,7 @@ impl ShiftRepository {
             .bind(("operator_name", data.operator_name))
             .bind(("starting_cash", data.starting_cash))
             .bind(("note", data.note))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         let shifts: Vec<Shift> = result.take(0)?;
@@ -145,11 +146,11 @@ impl ShiftRepository {
         end_date: &str,
     ) -> RepoResult<Vec<Shift>> {
         // Validate date formats
-        validate_date(start_date)?;
-        validate_date(end_date)?;
+        let start_parsed = validate_date(start_date)?;
+        let end_parsed = validate_date(end_date)?;
 
-        let start_dt = format!("{}T00:00:00Z", start_date);
-        let end_dt = format!("{}T23:59:59Z", end_date);
+        let start_millis = start_parsed.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis();
+        let end_millis = end_parsed.and_hms_opt(23, 59, 59).unwrap().and_utc().timestamp_millis();
 
         let mut result = self
             .base
@@ -157,12 +158,12 @@ impl ShiftRepository {
             .query(
                 r#"
                 SELECT * FROM shift
-                WHERE start_time >= <datetime>$start AND start_time <= <datetime>$end
+                WHERE start_time >= $start AND start_time <= $end
                 ORDER BY start_time DESC
             "#,
             )
-            .bind(("start", start_dt))
-            .bind(("end", end_dt))
+            .bind(("start", start_millis))
+            .bind(("end", end_millis))
             .await?;
 
         let shifts: Vec<Shift> = result.take(0)?;
@@ -185,8 +186,8 @@ impl ShiftRepository {
                     starting_cash = IF $starting_cash != NONE THEN $starting_cash ELSE starting_cash END,
                     expected_cash = IF $starting_cash != NONE THEN $starting_cash + (expected_cash - starting_cash) ELSE expected_cash END,
                     note = IF $note != NONE THEN $note ELSE note END,
-                    last_active_at = time::now(),
-                    updated_at = time::now()
+                    last_active_at = $now,
+                    updated_at = $now
                 WHERE id = $id AND status = 'OPEN'
                 RETURN AFTER
             "#,
@@ -194,6 +195,7 @@ impl ShiftRepository {
             .bind(("id", record_id))
             .bind(("starting_cash", data.starting_cash))
             .bind(("note", data.note))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         let shifts: Vec<Shift> = result.take(0)?;
@@ -218,13 +220,13 @@ impl ShiftRepository {
                 r#"
                 UPDATE shift SET
                     status = 'CLOSED',
-                    end_time = time::now(),
+                    end_time = $now,
                     actual_cash = $actual_cash,
                     cash_variance = $actual_cash - expected_cash,
                     abnormal_close = false,
                     note = IF $note != NONE THEN $note ELSE note END,
-                    last_active_at = time::now(),
-                    updated_at = time::now()
+                    last_active_at = $now,
+                    updated_at = $now
                 WHERE id = $id AND status = 'OPEN'
                 RETURN AFTER
             "#,
@@ -232,6 +234,7 @@ impl ShiftRepository {
             .bind(("id", record_id))
             .bind(("actual_cash", data.actual_cash))
             .bind(("note", data.note))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         let shifts: Vec<Shift> = result.take(0)?;
@@ -253,17 +256,18 @@ impl ShiftRepository {
                 r#"
                 UPDATE shift SET
                     status = 'CLOSED',
-                    end_time = time::now(),
+                    end_time = $now,
                     abnormal_close = true,
                     note = IF $note != NONE THEN $note ELSE '强制关闭，未盘点现金' END,
-                    last_active_at = time::now(),
-                    updated_at = time::now()
+                    last_active_at = $now,
+                    updated_at = $now
                 WHERE id = $id AND status = 'OPEN'
                 RETURN AFTER
             "#,
             )
             .bind(("id", record_id))
             .bind(("note", data.note))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         let shifts: Vec<Shift> = result.take(0)?;
@@ -274,12 +278,12 @@ impl ShiftRepository {
 
     /// Recover stale shifts (启动时自动关闭跨营业日的班次)
     ///
-    /// `business_day_start` - 当前营业日开始时间 (ISO 8601 格式)
+    /// `business_day_start` - 当前营业日开始时间 (Unix millis)
     /// 例如: 如果 cutoff 是 06:00，当前时间是 2024-01-15 10:00
-    ///       则 business_day_start = "2024-01-15T06:00:00Z"
+    ///       则 business_day_start = millis of 2024-01-15T06:00:00Z
     ///       如果当前时间是 2024-01-15 03:00 (凌晨)
-    ///       则 business_day_start = "2024-01-14T06:00:00Z" (昨天的 06:00)
-    pub async fn recover_stale_shifts(&self, business_day_start: &str) -> RepoResult<Vec<Shift>> {
+    ///       则 business_day_start = millis of 2024-01-14T06:00:00Z (昨天的 06:00)
+    pub async fn recover_stale_shifts(&self, business_day_start: i64) -> RepoResult<Vec<Shift>> {
         let mut result = self
             .base
             .db()
@@ -287,16 +291,17 @@ impl ShiftRepository {
                 r#"
                 UPDATE shift SET
                     status = 'CLOSED',
-                    end_time = time::now(),
+                    end_time = $now,
                     abnormal_close = true,
                     note = '跨营业日自动结算',
-                    updated_at = time::now()
+                    updated_at = $now
                 WHERE status = 'OPEN'
-                AND start_time < <datetime>$business_day_start
+                AND start_time < $business_day_start
                 RETURN AFTER
             "#,
             )
-            .bind(("business_day_start", business_day_start.to_string()))
+            .bind(("business_day_start", business_day_start))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         let recovered: Vec<Shift> = result.take(0)?;
@@ -315,13 +320,14 @@ impl ShiftRepository {
                 r#"
                 UPDATE shift SET
                     expected_cash = expected_cash + $amount,
-                    last_active_at = time::now(),
-                    updated_at = time::now()
+                    last_active_at = $now,
+                    updated_at = $now
                 WHERE operator_id = $op AND status = 'OPEN'
             "#,
             )
             .bind(("op", operator_rid))
             .bind(("amount", amount))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         Ok(())
@@ -338,11 +344,12 @@ impl ShiftRepository {
             .query(
                 r#"
                 UPDATE shift SET
-                    last_active_at = time::now()
+                    last_active_at = $now
                 WHERE id = $id AND status = 'OPEN'
             "#,
             )
             .bind(("id", record_id))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         Ok(())

@@ -43,8 +43,8 @@ impl OrderRepository {
                     paid_amount,
                     discount_amount AS total_discount,
                     surcharge_amount AS total_surcharge,
-                    time::millis(start_time) AS start_time,
-                    time::millis(end_time) AS end_time,
+                    start_time,
+                    end_time,
                     operator_name,
                     void_type,
                     loss_reason,
@@ -77,7 +77,7 @@ impl OrderRepository {
                         SELECT
                             method,
                             amount,
-                            time::millis(time) AS timestamp,
+                            time AS timestamp,
                             reference AS note,
                             cancelled,
                             cancel_reason,
@@ -88,7 +88,7 @@ impl OrderRepository {
                         SELECT
                             <string>id AS event_id,
                             string::uppercase(event_type) AS event_type,
-                            time::millis(timestamp) AS timestamp,
+                            timestamp,
                             data AS payload
                         FROM ->has_event->order_event
                         ORDER BY timestamp

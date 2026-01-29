@@ -63,8 +63,8 @@ export interface LabelTemplate {
   fields: LabelField[];
   isDefault: boolean;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: number;
+  updatedAt: number;
   // UI-specific properties
   widthMm?: number;
   heightMm?: number;
@@ -105,8 +105,8 @@ export interface LabelPrintJob {
   quantity: number;
   status: 'pending' | 'printing' | 'completed' | 'failed';
   printerId?: number;
-  createdAt: string;
-  printedAt?: string;
+  createdAt: number;
+  printedAt?: number;
   error?: string;
 }
 
@@ -125,8 +125,8 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     padding: 1,
     isDefault: true,
     isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
     fields: [
       {
         id: 'name',
@@ -181,8 +181,8 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     padding: 2,
     isDefault: false,
     isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
     fields: [
       {
         id: 'name',
@@ -264,8 +264,8 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     padding: 3,
     isDefault: false,
     isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
     fields: [
       {
         id: 'orderNum',

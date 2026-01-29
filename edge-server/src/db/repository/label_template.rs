@@ -92,8 +92,8 @@ impl LabelTemplateRepository {
                     padding_mm_y: $padding_mm_y,
                     render_dpi: $render_dpi,
                     test_data: $test_data,
-                    created_at: time::now(),
-                    updated_at: time::now()
+                    created_at: $now,
+                    updated_at: $now
                 }",
             )
             .bind(("name", data.name.clone()))
@@ -110,6 +110,7 @@ impl LabelTemplateRepository {
             .bind(("padding_mm_y", data.padding_mm_y))
             .bind(("render_dpi", data.render_dpi))
             .bind(("test_data", data.test_data.clone()))
+            .bind(("now", shared::util::now_millis()))
             .await?
             .take(0)?;
 
@@ -143,8 +144,9 @@ impl LabelTemplateRepository {
         let _ = self
             .base
             .db()
-            .query("UPDATE $id SET updated_at = time::now()")
+            .query("UPDATE $id SET updated_at = $now")
             .bind(("id", id.clone()))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         // Merge update data

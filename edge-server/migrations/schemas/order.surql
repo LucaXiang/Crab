@@ -59,11 +59,10 @@ DEFINE FIELD OVERWRITE tax ON order TYPE float
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE start_time ON order TYPE datetime
-    DEFAULT time::now()
+DEFINE FIELD OVERWRITE start_time ON order TYPE int
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE end_time ON order TYPE option<datetime>
+DEFINE FIELD OVERWRITE end_time ON order TYPE option<int>
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE operator_id ON order TYPE option<string>
@@ -81,8 +80,7 @@ DEFINE FIELD OVERWRITE prev_hash ON order TYPE string
 DEFINE FIELD OVERWRITE curr_hash ON order TYPE string
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE created_at ON order TYPE datetime
-    DEFAULT time::now()
+DEFINE FIELD OVERWRITE created_at ON order TYPE int
     PERMISSIONS FULL;
 
 DEFINE INDEX OVERWRITE order_receipt ON order FIELDS receipt_number UNIQUE;
@@ -188,8 +186,7 @@ DEFINE FIELD OVERWRITE amount ON order_payment TYPE float
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE time ON order_payment TYPE datetime
-    DEFAULT time::now()
+DEFINE FIELD OVERWRITE time ON order_payment TYPE int
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE reference ON order_payment TYPE option<string>
@@ -220,8 +217,7 @@ DEFINE TABLE OVERWRITE order_event TYPE NORMAL SCHEMAFULL
 DEFINE FIELD OVERWRITE event_type ON order_event TYPE string
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE timestamp ON order_event TYPE datetime
-    DEFAULT time::now()
+DEFINE FIELD OVERWRITE timestamp ON order_event TYPE int
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE data ON order_event TYPE option<string>

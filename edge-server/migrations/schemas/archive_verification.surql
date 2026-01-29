@@ -48,7 +48,7 @@ DEFINE FIELD OVERWRITE details ON archive_verification TYPE option<object>
     PERMISSIONS FULL;
 
 -- 时间戳（自动生成，只读）
-DEFINE FIELD OVERWRITE created_at ON archive_verification TYPE datetime VALUE time::now() READONLY
+DEFINE FIELD OVERWRITE created_at ON archive_verification TYPE int READONLY
     PERMISSIONS FULL;
 
 -- 索引

@@ -70,7 +70,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
     return shifts.filter(
       (shift) =>
         shift.operator_name.toLowerCase().includes(q) ||
-        shift.start_time.includes(q)
+        new Date(shift.start_time).toLocaleString('zh-CN').includes(q)
     );
   }, [shifts, searchQuery]);
 
@@ -96,16 +96,16 @@ export const ShiftManagement: React.FC = React.memo(() => {
   }, []);
 
   // Format time
-  const formatTime = (isoString: string) => {
+  const formatTime = (millis: number) => {
     try {
-      return new Date(isoString).toLocaleString('zh-CN', {
+      return new Date(millis).toLocaleString('zh-CN', {
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
       });
     } catch {
-      return isoString;
+      return String(millis);
     }
   };
 
@@ -324,7 +324,7 @@ export const ShiftManagement: React.FC = React.memo(() => {
         data={filteredShifts}
         columns={columns}
         loading={loading}
-        getRowKey={(item) => item.id || item.start_time}
+        getRowKey={(item) => item.id || String(item.start_time)}
         emptyText={t('settings.shift.empty')}
         themeColor="teal"
       />

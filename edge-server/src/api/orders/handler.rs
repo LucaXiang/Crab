@@ -204,8 +204,13 @@ pub async fn fetch_order_list(
     State(state): State<ServerState>,
     Query(params): Query<OrderHistoryQuery>,
 ) -> AppResult<Json<OrderListResponse>> {
-    let start_datetime = format!("{}T00:00:00Z", params.start_date);
-    let end_datetime = format!("{}T23:59:59Z", params.end_date);
+    // Convert date strings to millis
+    let start_millis = chrono::NaiveDate::parse_from_str(&params.start_date, "%Y-%m-%d")
+        .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis())
+        .unwrap_or(0);
+    let end_millis = chrono::NaiveDate::parse_from_str(&params.end_date, "%Y-%m-%d")
+        .map(|d| d.and_hms_opt(23, 59, 59).unwrap().and_utc().timestamp_millis())
+        .unwrap_or(0);
     let limit = params.limit.unwrap_or(100);
     let offset = params.offset.unwrap_or(0);
     let page = if limit > 0 { offset / limit + 1 } else { 1 };
@@ -213,12 +218,12 @@ pub async fn fetch_order_list(
     // Build WHERE clause
     let (where_clause, search_bind) = if let Some(ref search) = params.search {
         (
-            "WHERE end_time >= <datetime>$start AND end_time <= <datetime>$end AND string::lowercase(receipt_number) CONTAINS $search",
+            "WHERE end_time >= $start AND end_time <= $end AND string::lowercase(receipt_number) CONTAINS $search",
             Some(search.to_lowercase()),
         )
     } else {
         (
-            "WHERE end_time >= <datetime>$start AND end_time <= <datetime>$end",
+            "WHERE end_time >= $start AND end_time <= $end",
             None,
         )
     };
@@ -228,15 +233,15 @@ pub async fn fetch_order_list(
     let mut count_result = if let Some(ref search) = search_bind {
         state.db
             .query(&count_query)
-            .bind(("start", start_datetime.clone()))
-            .bind(("end", end_datetime.clone()))
+            .bind(("start", start_millis))
+            .bind(("end", end_millis))
             .bind(("search", search.clone()))
             .await
     } else {
         state.db
             .query(&count_query)
-            .bind(("start", start_datetime.clone()))
-            .bind(("end", end_datetime.clone()))
+            .bind(("start", start_millis))
+            .bind(("end", end_millis))
             .await
     }.map_err(|e| AppError::database(e.to_string()))?;
 
@@ -260,8 +265,8 @@ pub async fn fetch_order_list(
          is_retail, \
          total_amount AS total, \
          guest_count, \
-         time::millis(start_time) AS start_time, \
-         time::millis(end_time) AS end_time, \
+         start_time, \
+         end_time, \
          void_type, \
          loss_reason, \
          loss_amount \
@@ -271,8 +276,8 @@ pub async fn fetch_order_list(
     let mut data_result = if let Some(ref search) = search_bind {
         state.db
             .query(&data_query)
-            .bind(("start", start_datetime))
-            .bind(("end", end_datetime))
+            .bind(("start", start_millis))
+            .bind(("end", end_millis))
             .bind(("search", search.clone()))
             .bind(("limit", limit))
             .bind(("offset", offset))
@@ -280,8 +285,8 @@ pub async fn fetch_order_list(
     } else {
         state.db
             .query(&data_query)
-            .bind(("start", start_datetime))
-            .bind(("end", end_datetime))
+            .bind(("start", start_millis))
+            .bind(("end", end_millis))
             .bind(("limit", limit))
             .bind(("offset", offset))
             .await

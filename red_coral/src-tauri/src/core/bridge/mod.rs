@@ -25,8 +25,6 @@ use crab_client::CrabClient;
 use edge_server::services::tenant_binding::SubscriptionStatus;
 use shared::app_state::{ActivationRequiredReason, ClockDirection, SubscriptionBlockedInfo};
 use shared::order::{CommandResponse, OrderCommand, OrderEvent, OrderSnapshot, SyncResponse};
-use time::OffsetDateTime;
-
 use super::tenant_manager::{TenantError, TenantManager};
 
 /// 客户端桥接层
@@ -297,18 +295,21 @@ impl ClientBridge {
             if let Some(paths) = tenant_manager.current_paths() {
                 if let Ok(cert_pem) = std::fs::read_to_string(paths.edge_cert()) {
                     if let Ok(metadata) = crab_cert::CertMetadata::from_pem(&cert_pem) {
-                        let now = OffsetDateTime::now_utc();
+                        let now = time::OffsetDateTime::now_utc();
                         let duration = metadata.not_after - now;
                         let days_overdue = -duration.whole_days();
+                        let expired_at_millis =
+                            metadata.not_after.unix_timestamp() * 1000
+                                + metadata.not_after.millisecond() as i64;
                         return ActivationRequiredReason::CertificateExpired {
-                            expired_at: metadata.not_after.to_string(),
+                            expired_at: expired_at_millis,
                             days_overdue,
                         };
                     }
                 }
             }
             ActivationRequiredReason::CertificateExpired {
-                expired_at: "unknown".to_string(),
+                expired_at: 0,
                 days_overdue: 0,
             }
         } else if error_lower.contains("hardware id mismatch") || error_lower.contains("device id mismatch") || error_lower.contains("device_id") {
@@ -329,7 +330,7 @@ impl ClientBridge {
             ActivationRequiredReason::ClockTampering {
                 direction,
                 drift_seconds,
-                last_verified_at: "unknown".to_string(),
+                last_verified_at: 0,
             }
         } else if error_lower.contains("signature") {
             // 签名无效
@@ -414,20 +415,23 @@ impl ClientBridge {
         };
 
         // 4. 检查证书过期
-        let now = OffsetDateTime::now_utc();
+        let now = time::OffsetDateTime::now_utc();
         let duration = metadata.not_after - now;
         let days_remaining = duration.whole_days();
+        let not_after_millis =
+            metadata.not_after.unix_timestamp() * 1000
+                + metadata.not_after.millisecond() as i64;
 
         if days_remaining < 0 {
             return ActivationRequiredReason::CertificateExpired {
-                expired_at: metadata.not_after.to_string(),
+                expired_at: not_after_millis,
                 days_overdue: -days_remaining,
             };
         }
 
         if days_remaining <= 30 {
             return ActivationRequiredReason::CertificateExpiringSoon {
-                expires_at: metadata.not_after.to_string(),
+                expires_at: not_after_millis,
                 days_remaining,
             };
         }
@@ -504,7 +508,10 @@ impl ClientBridge {
                     let subscription_blocked = cred.subscription.as_ref().is_some_and(|sub| {
                         matches!(
                             sub.status,
-                            SubscriptionStatus::Canceled | SubscriptionStatus::Unpaid
+                            SubscriptionStatus::Inactive
+                                | SubscriptionStatus::Expired
+                                | SubscriptionStatus::Canceled
+                                | SubscriptionStatus::Unpaid
                         )
                     });
 
@@ -512,9 +519,10 @@ impl ClientBridge {
                         let sub = cred.subscription.as_ref().unwrap();
                         // Convert edge_server types to shared types
                         let status = match sub.status {
+                            SubscriptionStatus::Inactive => shared::activation::SubscriptionStatus::Inactive,
                             SubscriptionStatus::Active => shared::activation::SubscriptionStatus::Active,
-                            SubscriptionStatus::Trial => shared::activation::SubscriptionStatus::Trial,
                             SubscriptionStatus::PastDue => shared::activation::SubscriptionStatus::PastDue,
+                            SubscriptionStatus::Expired => shared::activation::SubscriptionStatus::Expired,
                             SubscriptionStatus::Canceled => shared::activation::SubscriptionStatus::Canceled,
                             SubscriptionStatus::Unpaid => shared::activation::SubscriptionStatus::Unpaid,
                         };
@@ -523,7 +531,7 @@ impl ClientBridge {
                             edge_server::services::tenant_binding::PlanType::Pro => shared::activation::PlanType::Pro,
                             edge_server::services::tenant_binding::PlanType::Enterprise => shared::activation::PlanType::Enterprise,
                         };
-                        let expired_at = sub.expires_at.map(|dt| dt.to_rfc3339());
+                        let expired_at = sub.expires_at;
                         let info = SubscriptionBlockedInfo {
                             status,
                             plan,
@@ -534,9 +542,13 @@ impl ClientBridge {
                             support_url: Some("https://support.example.com".to_string()),
                             renewal_url: Some("https://billing.example.com/renew".to_string()),
                             user_message: match sub.status {
-                                SubscriptionStatus::Canceled => "订阅已取消".to_string(),
-                                SubscriptionStatus::Unpaid => "订阅欠费".to_string(),
-                                _ => format!("订阅状态异常: {:?}", sub.status),
+                                SubscriptionStatus::Inactive => "subscription_inactive".to_string(),
+                                SubscriptionStatus::Expired => "subscription_expired".to_string(),
+                                SubscriptionStatus::Canceled => "subscription_canceled".to_string(),
+                                SubscriptionStatus::Unpaid => "subscription_unpaid".to_string(),
+                                SubscriptionStatus::Active | SubscriptionStatus::PastDue => {
+                                    unreachable!("Active/PastDue 不触发订阅阻止")
+                                }
                             },
                         };
                         AppState::ServerSubscriptionBlocked { info }
@@ -608,11 +620,12 @@ impl ClientBridge {
                     Ok(Some(cred)) => {
                         if let Some(sub) = &cred.subscription {
                             let status = match sub.status {
-                                SubscriptionStatus::Active | SubscriptionStatus::Trial => {
-                                    HealthLevel::Healthy
-                                }
+                                SubscriptionStatus::Active => HealthLevel::Healthy,
                                 SubscriptionStatus::PastDue => HealthLevel::Warning,
-                                SubscriptionStatus::Canceled | SubscriptionStatus::Unpaid => {
+                                SubscriptionStatus::Expired | SubscriptionStatus::Canceled => {
+                                    HealthLevel::Critical
+                                }
+                                SubscriptionStatus::Inactive | SubscriptionStatus::Unpaid => {
                                     HealthLevel::Critical
                                 }
                             };
@@ -625,9 +638,7 @@ impl ClientBridge {
                                 },
                                 plan: Some(format!("{:?}", sub.plan)),
                                 subscription_status: Some(format!("{:?}", sub.status)),
-                                signature_valid_until: sub
-                                    .signature_valid_until
-                                    .map(|dt| dt.to_rfc3339()),
+                                signature_valid_until: sub.signature_valid_until,
                                 needs_refresh,
                             }
                         } else {
@@ -663,7 +674,7 @@ impl ClientBridge {
                         Ok(c) => {
                             match c.get(format!("{}/health", auth_url)).send().await {
                                 Ok(resp) if resp.status().is_success() => {
-                                    (true, Some(chrono::Utc::now().to_rfc3339()))
+                                    (true, Some(shared::util::now_millis()))
                                 }
                                 _ => (false, None),
                             }
@@ -741,7 +752,7 @@ impl ClientBridge {
                     status: network_status,
                     auth_server_reachable: reachable,
                     last_connected_at: if reachable {
-                        Some(chrono::Utc::now().to_rfc3339())
+                        Some(shared::util::now_millis())
                     } else {
                         None
                     },
@@ -1274,10 +1285,7 @@ impl ClientBridge {
                                     user_info,
                                     login_mode: super::session_cache::LoginMode::Online,
                                     expires_at,
-                                    logged_in_at: std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap()
-                                        .as_secs(),
+                                    logged_in_at: shared::util::now_millis(),
                                 };
 
                                 *client = Some(LocalClientState::Authenticated(authenticated));
@@ -1311,10 +1319,7 @@ impl ClientBridge {
                                     user_info,
                                     login_mode: super::session_cache::LoginMode::Online,
                                     expires_at,
-                                    logged_in_at: std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap()
-                                        .as_secs(),
+                                    logged_in_at: shared::util::now_millis(),
                                 };
 
                                 *client = Some(LocalClientState::Authenticated(authenticated));
@@ -1352,10 +1357,7 @@ impl ClientBridge {
                                     user_info,
                                     login_mode: super::session_cache::LoginMode::Online,
                                     expires_at,
-                                    logged_in_at: std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap()
-                                        .as_secs(),
+                                    logged_in_at: shared::util::now_millis(),
                                 };
 
                                 *client = Some(RemoteClientState::Authenticated(authenticated));
@@ -1388,10 +1390,7 @@ impl ClientBridge {
                                     user_info,
                                     login_mode: super::session_cache::LoginMode::Online,
                                     expires_at,
-                                    logged_in_at: std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap()
-                                        .as_secs(),
+                                    logged_in_at: shared::util::now_millis(),
                                 };
 
                                 *client = Some(RemoteClientState::Authenticated(authenticated));

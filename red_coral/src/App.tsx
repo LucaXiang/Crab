@@ -21,7 +21,7 @@ import { POSScreen } from '@/screens/POS';
 import { SetupScreen } from '@/screens/Setup';
 import { TenantSelectScreen } from '@/screens/TenantSelect';
 import { OrderDebug } from '@/screens/Debug';
-import { ActivationRequiredScreen } from '@/screens/Status';
+import { ActivationRequiredScreen, SubscriptionBlockedScreen } from '@/screens/Status';
 
 // Initial route component that handles first-run detection and mode auto-start
 // 使用新的 AppState 状态机进行路由决策
@@ -286,6 +286,7 @@ const App: React.FC = () => {
 
         {/* Status Routes */}
         <Route path="/status/activation-required" element={<ActivationRequiredScreen />} />
+        <Route path="/status/subscription-blocked" element={<SubscriptionBlockedScreen />} />
 
         {/* Public Routes */}
         <Route path="/login" element={<LoginScreen />} />

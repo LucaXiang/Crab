@@ -55,8 +55,9 @@ impl StoreInfoRepository {
         let _ = self
             .base
             .db()
-            .query("UPDATE $id SET updated_at = time::now()")
+            .query("UPDATE $id SET updated_at = $now")
             .bind(("id", singleton_id.clone()))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         // Merge update data

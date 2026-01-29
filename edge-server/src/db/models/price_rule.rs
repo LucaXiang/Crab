@@ -1,7 +1,6 @@
 //! Price Rule Model
 
 use super::serde_helpers;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use surrealdb::RecordId;
 
@@ -62,10 +61,10 @@ pub struct PriceRule {
     /// Whether this rule is exclusive (cannot be combined with other rules)
     #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_exclusive: bool,
-    /// Valid from datetime
-    pub valid_from: Option<DateTime<Utc>>,
-    /// Valid until datetime
-    pub valid_until: Option<DateTime<Utc>>,
+    /// Valid from datetime (Unix timestamp millis)
+    pub valid_from: Option<i64>,
+    /// Valid until datetime (Unix timestamp millis)
+    pub valid_until: Option<i64>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
     pub active_days: Option<Vec<u8>>,
     /// Active start time (HH:MM format)
@@ -79,9 +78,9 @@ pub struct PriceRule {
     pub is_active: bool,
     #[serde(default, with = "serde_helpers::option_record_id")]
     pub created_by: Option<RecordId>,
-    /// Created datetime (set by database DEFAULT)
-    #[serde(default = "Utc::now")]
-    pub created_at: DateTime<Utc>,
+    /// Created datetime (Unix timestamp millis)
+    #[serde(default)]
+    pub created_at: i64,
 }
 
 fn default_true() -> bool {
@@ -111,10 +110,10 @@ pub struct PriceRuleCreate {
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
     pub is_exclusive: Option<bool>,
-    /// Valid from datetime
-    pub valid_from: Option<DateTime<Utc>>,
-    /// Valid until datetime
-    pub valid_until: Option<DateTime<Utc>>,
+    /// Valid from datetime (Unix timestamp millis)
+    pub valid_from: Option<i64>,
+    /// Valid until datetime (Unix timestamp millis)
+    pub valid_until: Option<i64>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
     pub active_days: Option<Vec<u8>>,
     /// Active start time (HH:MM format)
@@ -157,12 +156,12 @@ pub struct PriceRuleUpdate {
     /// Whether this rule is exclusive (cannot be combined with other rules)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_exclusive: Option<bool>,
-    /// Valid from datetime
+    /// Valid from datetime (Unix timestamp millis)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub valid_from: Option<DateTime<Utc>>,
-    /// Valid until datetime
+    pub valid_from: Option<i64>,
+    /// Valid until datetime (Unix timestamp millis)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub valid_until: Option<DateTime<Utc>>,
+    pub valid_until: Option<i64>,
     /// Active days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_days: Option<Vec<u8>>,

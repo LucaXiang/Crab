@@ -123,9 +123,9 @@ export function useShiftCloseGuard() {
 /**
  * 格式化时间显示
  */
-function formatTime(isoString: string): string {
+function formatTime(millis: number): string {
   try {
-    const date = new Date(isoString);
+    const date = new Date(millis);
     return date.toLocaleString('zh-CN', {
       month: '2-digit',
       day: '2-digit',
@@ -133,6 +133,6 @@ function formatTime(isoString: string): string {
       minute: '2-digit',
     });
   } catch {
-    return isoString;
+    return String(millis);
   }
 }

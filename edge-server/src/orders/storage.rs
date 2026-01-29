@@ -627,7 +627,7 @@ impl OrderStorage {
         let mut table = txn.open_table(PENDING_ARCHIVE_TABLE)?;
         let pending = PendingArchive {
             order_id: order_id.to_string(),
-            created_at: chrono::Utc::now().timestamp_millis(),
+            created_at: shared::util::now_millis(),
             retry_count: 0,
             last_error: None,
         };
@@ -745,7 +745,7 @@ impl OrderStorage {
                 let dead_letter = DeadLetterEntry {
                     order_id: order_id.to_string(),
                     created_at: pending.created_at,
-                    failed_at: chrono::Utc::now().timestamp_millis(),
+                    failed_at: shared::util::now_millis(),
                     retry_count: pending.retry_count,
                     last_error: error.to_string(),
                 };
@@ -830,7 +830,7 @@ mod tests {
             event_id: uuid::Uuid::new_v4().to_string(),
             sequence,
             order_id: order_id.to_string(),
-            timestamp: chrono::Utc::now().timestamp_millis(),
+            timestamp: shared::util::now_millis(),
             client_timestamp: None,
             operator_id: "test_op".to_string(),
             operator_name: "Test Operator".to_string(),
@@ -881,10 +881,10 @@ mod tests {
             order_applied_rules: None,
             order_manual_discount_percent: None,
             order_manual_discount_fixed: None,
-            start_time: chrono::Utc::now().timestamp_millis(),
+            start_time: shared::util::now_millis(),
             end_time: None,
-            created_at: chrono::Utc::now().timestamp_millis(),
-            updated_at: chrono::Utc::now().timestamp_millis(),
+            created_at: shared::util::now_millis(),
+            updated_at: shared::util::now_millis(),
             last_sequence: 0,
             state_checksum: String::new(),
             void_type: None,

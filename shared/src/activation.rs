@@ -72,13 +72,13 @@ pub struct SignedBinding {
     pub device_id: String,
     /// 证书指纹 (SHA256)
     pub fingerprint: String,
-    /// 绑定时间 (RFC3339)
-    pub bound_at: String,
+    /// 绑定时间 (Unix millis)
+    pub bound_at: i64,
     /// 实体类型
     pub entity_type: EntityType,
-    /// 最后验证时间 (RFC3339) - 用于时钟篡改检测
+    /// 最后验证时间 (Unix millis) - 用于时钟篡改检测
     #[serde(default)]
-    pub last_verified_at: String,
+    pub last_verified_at: i64,
     /// Tenant CA 签名 (base64)
     /// 签名内容: "{entity_id}|{tenant_id}|{device_id}|{fingerprint}|{bound_at}|{entity_type}|{last_verified_at}"
     pub signature: String,
@@ -98,13 +98,13 @@ impl SignedBinding {
         fingerprint: impl Into<String>,
         entity_type: EntityType,
     ) -> Self {
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = crate::util::now_millis();
         Self {
             entity_id: entity_id.into(),
             tenant_id: tenant_id.into(),
             device_id: device_id.into(),
             fingerprint: fingerprint.into(),
-            bound_at: now.clone(),
+            bound_at: now,
             entity_type,
             last_verified_at: now,
             signature: String::new(),
@@ -127,23 +127,19 @@ impl SignedBinding {
 
     /// 更新 last_verified_at (需要重新签名)
     pub fn refresh(mut self) -> Self {
-        self.last_verified_at = chrono::Utc::now().to_rfc3339();
+        self.last_verified_at = crate::util::now_millis();
         self.signature = String::new(); // 清除旧签名，需要重新签名
         self
     }
 
     /// 检测时钟篡改
     pub fn check_clock_tampering(&self) -> Result<(), String> {
-        if self.last_verified_at.is_empty() {
+        if self.last_verified_at == 0 {
             return Ok(()); // 未设置时跳过检查
         }
 
-        let last_verified = chrono::DateTime::parse_from_rfc3339(&self.last_verified_at)
-            .map(|dt| dt.with_timezone(&chrono::Utc))
-            .map_err(|e| format!("Failed to parse last_verified_at: {}", e))?;
-
-        let now = chrono::Utc::now();
-        let diff_secs = (now - last_verified).num_seconds();
+        let now_ms = crate::util::now_millis();
+        let diff_secs = (now_ms - self.last_verified_at) / 1000;
 
         // 时钟回拨检测
         if diff_secs < -Self::MAX_CLOCK_BACKWARD_SECS {
@@ -242,16 +238,16 @@ pub struct SubscriptionInfo {
     pub status: SubscriptionStatus,
     /// 计划类型
     pub plan: PlanType,
-    /// 开始时间 (RFC3339)
-    pub starts_at: String,
-    /// 过期时间 (RFC3339)
+    /// 开始时间 (Unix millis)
+    pub starts_at: i64,
+    /// 过期时间 (Unix millis)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expires_at: Option<String>,
+    pub expires_at: Option<i64>,
     /// 启用的功能
     #[serde(default)]
     pub features: Vec<String>,
-    /// 签名有效期 (RFC3339，超过此时间需要刷新)
-    pub signature_valid_until: String,
+    /// 签名有效期 (Unix millis，超过此时间需要刷新)
+    pub signature_valid_until: i64,
     /// Tenant CA 签名 (base64)
     /// 签名内容: "{tenant_id}|{plan}|{status}|{features}|{signature_valid_until}"
     pub signature: String,
@@ -296,11 +292,7 @@ impl SubscriptionInfo {
 
     /// 检查签名是否过期
     pub fn is_signature_expired(&self) -> bool {
-        use chrono::{DateTime, Utc};
-        match DateTime::parse_from_rfc3339(&self.signature_valid_until) {
-            Ok(valid_until) => Utc::now() > valid_until,
-            Err(_) => true, // 解析失败视为过期
-        }
+        crate::util::now_millis() > self.signature_valid_until
     }
 
     /// 完整验证 (签名 + 有效期)
@@ -316,9 +308,10 @@ impl SubscriptionInfo {
 impl SubscriptionStatus {
     pub fn as_str(&self) -> &'static str {
         match self {
+            SubscriptionStatus::Inactive => "inactive",
             SubscriptionStatus::Active => "active",
-            SubscriptionStatus::Trial => "trial",
             SubscriptionStatus::PastDue => "past_due",
+            SubscriptionStatus::Expired => "expired",
             SubscriptionStatus::Canceled => "canceled",
             SubscriptionStatus::Unpaid => "unpaid",
         }
@@ -339,10 +332,17 @@ impl PlanType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SubscriptionStatus {
+    /// 注册未付费/合同未签
+    Inactive,
+    /// 合同有效，付费正常
     Active,
-    Trial,
+    /// 扣费失败，Stripe 重试中
     PastDue,
+    /// 合同到期未续约
+    Expired,
+    /// 主动终止/重试全败
     Canceled,
+    /// 长期欠费
     Unpaid,
 }
 

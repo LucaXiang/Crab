@@ -504,14 +504,14 @@ fn to_shared_rule(rule: &PriceRule) -> shared::models::price_rule::PriceRule {
         priority: rule.priority,
         is_stackable: rule.is_stackable,
         is_exclusive: rule.is_exclusive,
-        valid_from: rule.valid_from.map(|dt| dt.to_rfc3339()),
-        valid_until: rule.valid_until.map(|dt| dt.to_rfc3339()),
+        valid_from: rule.valid_from,
+        valid_until: rule.valid_until,
         active_days: rule.active_days.clone(),
         active_start_time: rule.active_start_time.clone(),
         active_end_time: rule.active_end_time.clone(),
         is_active: rule.is_active,
         created_by: rule.created_by.as_ref().map(|t| t.to_string()),
-        created_at: rule.created_at.to_rfc3339(),
+        created_at: rule.created_at,
     }
 }
 
@@ -641,8 +641,6 @@ pub fn calculate_item_price(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
-
     /// Helper to create a test rule
     fn make_rule(
         rule_type: RuleType,
@@ -674,7 +672,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: Utc::now(),
+            created_at: shared::util::now_millis(),
         }
     }
 

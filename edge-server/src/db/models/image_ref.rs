@@ -41,7 +41,7 @@ pub struct ImageRef {
     /// 引用实体 ID
     pub entity_id: String,
     /// 创建时间
-    pub created_at: Option<String>,
+    pub created_at: Option<i64>,
 }
 
 impl ImageRef {

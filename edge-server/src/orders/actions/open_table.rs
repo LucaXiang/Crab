@@ -58,7 +58,7 @@ pub async fn load_matching_rules(
         "[LoadRules] Loaded all rules from database"
     );
 
-    let current_time = chrono::Utc::now().timestamp_millis();
+    let current_time = shared::util::now_millis();
 
     // 过滤规则: is_active + zone_scope + 时间有效性
     let matched_rules: Vec<PriceRule> = all_rules

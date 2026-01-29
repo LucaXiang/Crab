@@ -37,11 +37,11 @@ pub struct Shift {
     #[serde(default)]
     pub status: ShiftStatus,
 
-    /// 开班时间 (ISO 8601)
-    pub start_time: String,
+    /// 开班时间 (Unix timestamp millis)
+    pub start_time: i64,
 
-    /// 收班时间 (ISO 8601)
-    pub end_time: Option<String>,
+    /// 收班时间 (Unix timestamp millis)
+    pub end_time: Option<i64>,
 
     /// 备用金 (开班时的现金准备金)
     #[serde(default)]
@@ -62,16 +62,16 @@ pub struct Shift {
     pub abnormal_close: bool,
 
     /// 最后活动时间 (心跳)
-    pub last_active_at: Option<String>,
+    pub last_active_at: Option<i64>,
 
     /// 备注
     pub note: Option<String>,
 
     /// 创建时间
-    pub created_at: Option<String>,
+    pub created_at: Option<i64>,
 
     /// 更新时间
-    pub updated_at: Option<String>,
+    pub updated_at: Option<i64>,
 }
 
 /// Create shift payload (开班)
@@ -113,8 +113,8 @@ pub struct ShiftSummary {
     pub id: Option<ShiftId>,
     pub operator_name: String,
     pub status: ShiftStatus,
-    pub start_time: String,
-    pub end_time: Option<String>,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
     pub starting_cash: f64,
     pub expected_cash: f64,
     pub actual_cash: Option<f64>,

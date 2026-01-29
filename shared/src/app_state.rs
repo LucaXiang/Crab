@@ -29,13 +29,13 @@ pub enum ActivationRequiredReason {
 
     /// 证书过期
     CertificateExpired {
-        expired_at: String,
+        expired_at: i64,
         days_overdue: i64,
     },
 
     /// 证书即将过期 (警告)
     CertificateExpiringSoon {
-        expires_at: String,
+        expires_at: i64,
         days_remaining: i64,
     },
 
@@ -52,14 +52,14 @@ pub enum ActivationRequiredReason {
     ClockTampering {
         direction: ClockDirection,
         drift_seconds: i64,
-        last_verified_at: String,
+        last_verified_at: i64,
     },
 
     /// Binding 无效
     BindingInvalid { error: String },
 
     /// Token 过期
-    TokenExpired { expired_at: String },
+    TokenExpired { expired_at: i64 },
 
     /// 网络错误
     NetworkError {
@@ -68,7 +68,7 @@ pub enum ActivationRequiredReason {
     },
 
     /// 已被吊销
-    Revoked { revoked_at: String, reason: String },
+    Revoked { revoked_at: i64, reason: String },
 }
 
 impl ActivationRequiredReason {
@@ -143,11 +143,11 @@ pub struct SubscriptionBlockedInfo {
     pub status: SubscriptionStatus,
     pub plan: PlanType,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expired_at: Option<String>,
+    pub expired_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grace_period_days: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub grace_period_ends_at: Option<String>,
+    pub grace_period_ends_at: Option<i64>,
     pub in_grace_period: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub support_url: Option<String>,
@@ -205,7 +205,7 @@ pub struct ActivationProgress {
     pub total_steps: u8,
     pub current_step: u8,
     pub message: String,
-    pub started_at: String,
+    pub started_at: i64,
 }
 
 impl ActivationProgress {
@@ -215,7 +215,7 @@ impl ActivationProgress {
             total_steps: ActivationStep::TOTAL_STEPS,
             current_step: step.step_number(),
             message: step.message_zh().to_string(),
-            started_at: chrono::Utc::now().to_rfc3339(),
+            started_at: crate::util::now_millis(),
         }
     }
 }
@@ -239,7 +239,7 @@ pub enum HealthLevel {
 pub struct CertificateHealth {
     pub status: HealthLevel,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expires_at: Option<String>,
+    pub expires_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub days_remaining: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -257,7 +257,7 @@ pub struct SubscriptionHealth {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subscription_status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub signature_valid_until: Option<String>,
+    pub signature_valid_until: Option<i64>,
     pub needs_refresh: bool,
 }
 
@@ -267,7 +267,7 @@ pub struct NetworkHealth {
     pub status: HealthLevel,
     pub auth_server_reachable: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_connected_at: Option<String>,
+    pub last_connected_at: Option<i64>,
 }
 
 /// 数据库健康状态
@@ -277,7 +277,7 @@ pub struct DatabaseHealth {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_write_at: Option<String>,
+    pub last_write_at: Option<i64>,
 }
 
 /// 组件健康状态
@@ -304,6 +304,6 @@ pub struct DeviceInfo {
 pub struct HealthStatus {
     pub overall: HealthLevel,
     pub components: ComponentsHealth,
-    pub checked_at: String,
+    pub checked_at: i64,
     pub device_info: DeviceInfo,
 }

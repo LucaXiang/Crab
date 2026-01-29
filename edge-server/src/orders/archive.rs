@@ -226,14 +226,14 @@ impl OrderArchiveService {
             snapshot: OrderSnapshot,
             events: Vec<OrderEvent>,
             error: String,
-            timestamp: String,
+            timestamp: i64,
         }
 
         let bad_archive = BadArchive {
             snapshot: snapshot.clone(),
             events: events.to_vec(),
             error: error.to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
+            timestamp: shared::util::now_millis(),
         };
 
         // Create directory if needed
@@ -244,7 +244,7 @@ impl OrderArchiveService {
 
         let filename = format!(
             "{}-{}.json",
-            chrono::Utc::now().format("%Y%m%d%H%M%S"),
+            shared::util::now_millis(),
             snapshot.order_id
         );
         let path = self.bad_archive_dir.join(&filename);
@@ -389,8 +389,8 @@ impl OrderArchiveService {
                 discount_amount = $discount_amount,
                 surcharge_amount = $surcharge_amount,
                 tax = $tax,
-                start_time = <datetime>$start_time,
-                end_time = <datetime>$end_time,
+                start_time = $start_time,
+                end_time = $end_time,
                 operator_id = $operator_id,
                 operator_name = $operator_name,
                 void_type = $void_type,
@@ -399,7 +399,7 @@ impl OrderArchiveService {
                 void_note = $void_note,
                 prev_hash = $prev_hash,
                 curr_hash = $curr_hash,
-                created_at = time::now();
+                created_at = $now;
             "#,
         );
 
@@ -454,7 +454,7 @@ impl OrderArchiveService {
                 LET $payment{} = CREATE order_payment SET
                     method = $payment{}_method,
                     amount = $payment{}_amount,
-                    time = <datetime>$payment{}_time,
+                    time = $payment{}_time,
                     reference = $payment{}_reference,
                     cancelled = $payment{}_cancelled,
                     cancel_reason = $payment{}_cancel_reason,
@@ -471,7 +471,7 @@ impl OrderArchiveService {
                 r#"
                 LET $event{} = CREATE order_event SET
                     event_type = $event{}_type,
-                    timestamp = <datetime>$event{}_timestamp,
+                    timestamp = $event{}_timestamp,
                     data = $event{}_data,
                     prev_hash = $event{}_prev_hash,
                     curr_hash = $event{}_curr_hash;
@@ -487,7 +487,7 @@ impl OrderArchiveService {
             UPSERT system_state:main SET
                 last_order = $order[0].id,
                 last_order_hash = $order_hash,
-                updated_at = time::now();
+                updated_at = $now;
             COMMIT TRANSACTION;
             RETURN { success: true, order_id: <string>$order[0].id };
             "#,
@@ -528,7 +528,8 @@ impl OrderArchiveService {
             .bind(("void_note", order.void_note.clone()))
             .bind(("prev_hash", order.prev_hash.clone()))
             .bind(("curr_hash", order.curr_hash.clone()))
-            .bind(("order_hash", order_hash.to_string()));
+            .bind(("order_hash", order_hash.to_string()))
+            .bind(("now", shared::util::now_millis()));
 
         // Bind item fields
         for (i, item) in snapshot.items.iter().enumerate() {
@@ -577,9 +578,6 @@ impl OrderArchiveService {
 
         // Bind payment fields
         for (i, payment) in snapshot.payments.iter().enumerate() {
-            let time = chrono::DateTime::from_timestamp_millis(payment.timestamp)
-                .map(|dt| dt.to_rfc3339())
-                .unwrap_or_default();
             // Serialize split_items to JSON string (SurrealDB SDK has issues with Vec binding)
             let split_items_str: Option<String> = payment
                 .split_items
@@ -597,7 +595,7 @@ impl OrderArchiveService {
             db_query = db_query
                 .bind((format!("payment{}_method", i), payment.method.clone()))
                 .bind((format!("payment{}_amount", i), payment.amount))
-                .bind((format!("payment{}_time", i), time))
+                .bind((format!("payment{}_time", i), payment.timestamp))
                 .bind((format!("payment{}_reference", i), payment.note.clone()))
                 .bind((format!("payment{}_cancelled", i), payment.cancelled))
                 .bind((format!("payment{}_cancel_reason", i), payment.cancel_reason.clone()))
@@ -619,18 +617,13 @@ impl OrderArchiveService {
                 .and_then(|v| v.as_str().map(|s| s.to_string()))
                 .unwrap_or_else(|| format!("{:?}", event.event_type).to_uppercase());
 
-            // Convert timestamp (millis) to RFC3339 for SurrealDB datetime
-            let timestamp_str = chrono::DateTime::from_timestamp_millis(event.timestamp)
-                .map(|dt| dt.to_rfc3339())
-                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
-
             // Serialize payload to JSON string
             let payload_str = serde_json::to_string(&event.payload)
                 .unwrap_or_else(|_| "{}".to_string());
 
             db_query = db_query
                 .bind((format!("event{}_type", i), event_type_str))
-                .bind((format!("event{}_timestamp", i), timestamp_str))
+                .bind((format!("event{}_timestamp", i), event.timestamp))
                 .bind((format!("event{}_data", i), payload_str))
                 .bind((format!("event{}_prev_hash", i), prev_event_hash))
                 .bind((format!("event{}_curr_hash", i), curr_event_hash));
@@ -774,12 +767,12 @@ impl OrderArchiveService {
     /// 验证指定时间范围内所有订单的哈希链连续性
     ///
     /// - `date`: 标签（用于返回值，如 "2026-01-29"）
-    /// - `start`/`end`: ISO 8601 格式的时间范围（由 handler 层根据 business_day_cutoff 计算）
+    /// - `start`/`end`: Unix millis 时间范围（由 handler 层根据 business_day_cutoff 计算）
     pub async fn verify_daily_chain(
         &self,
         date: &str,
-        start: &str,
-        end: &str,
+        start: i64,
+        end: i64,
     ) -> ArchiveResult<DailyChainVerification> {
 
         // 1. 查询当天所有订单，按 created_at 排序
@@ -793,12 +786,12 @@ impl OrderArchiveService {
                     prev_hash,
                     curr_hash
                 FROM order
-                WHERE created_at >= <datetime>$start AND created_at < <datetime>$end
+                WHERE created_at >= $start AND created_at < $end
                 ORDER BY created_at
                 "#,
             )
-            .bind(("start", start.to_string()))
-            .bind(("end", end.to_string()))
+            .bind(("start", start))
+            .bind(("end", end))
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
@@ -815,12 +808,12 @@ impl OrderArchiveService {
                 r#"
                 SELECT curr_hash
                 FROM order
-                WHERE created_at < <datetime>$start
+                WHERE created_at < $start
                 ORDER BY created_at DESC
                 LIMIT 1
                 "#,
             )
-            .bind(("start", start.to_string()))
+            .bind(("start", start))
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
@@ -933,14 +926,8 @@ impl OrderArchiveService {
             discount_amount: snapshot.total_discount,
             surcharge_amount: snapshot.total_surcharge,
             tax: snapshot.tax,
-            start_time: chrono::DateTime::from_timestamp_millis(snapshot.start_time)
-                .map(|dt| dt.to_rfc3339())
-                .unwrap_or_default(),
-            end_time: snapshot.end_time.map(|ts| {
-                chrono::DateTime::from_timestamp_millis(ts)
-                    .map(|dt| dt.to_rfc3339())
-                    .unwrap_or_default()
-            }),
+            start_time: snapshot.start_time,
+            end_time: snapshot.end_time,
             void_type: snapshot.void_type.as_ref().map(|v| {
                 serde_json::to_value(v).ok()
                     .and_then(|val| val.as_str().map(String::from))

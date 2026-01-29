@@ -170,8 +170,6 @@ pub fn calculate_adjustments(rules: &[&PriceRule], base_price: f64) -> PriceAdju
 mod tests {
     use super::*;
     use crate::db::models::ProductScope;
-    use chrono::Utc;
-
     fn make_rule(
         rule_type: RuleType,
         adjustment_type: AdjustmentType,
@@ -201,7 +199,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: Utc::now(),
+            created_at: shared::util::now_millis(),
         }
     }
 

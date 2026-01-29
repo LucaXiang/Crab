@@ -105,7 +105,7 @@ pub struct DailyReport {
     pub payment_breakdowns: Vec<PaymentMethodBreakdown>,
 
     /// 生成时间
-    pub generated_at: Option<String>,
+    pub generated_at: Option<i64>,
 
     /// 生成人 ID
     pub generated_by_id: Option<String>,

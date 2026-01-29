@@ -80,12 +80,10 @@ DEFINE FIELD OVERWRITE render_dpi ON label_template TYPE option<int> PERMISSIONS
 DEFINE FIELD OVERWRITE test_data ON label_template TYPE option<string> PERMISSIONS FULL;
 
 -- 时间戳
-DEFINE FIELD OVERWRITE created_at ON label_template TYPE option<datetime>
-    DEFAULT time::now()
+DEFINE FIELD OVERWRITE created_at ON label_template TYPE option<int>
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE updated_at ON label_template TYPE option<datetime>
-    DEFAULT time::now()
+DEFINE FIELD OVERWRITE updated_at ON label_template TYPE option<int>
     PERMISSIONS FULL;
 
 -- 索引

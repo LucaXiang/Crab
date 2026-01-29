@@ -1727,10 +1727,31 @@
   },
   "subscription": {
     "status": {
+      "Inactive": "未激活",
       "Active": "已激活",
+      "PastDue": "逾期待付",
+      "Expired": "已过期",
       "Canceled": "已取消",
-      "Unpaid": "未付款",
-      "Expired": "已过期"
+      "Unpaid": "未付款"
+    }
+  },
+  "subscriptionBlocked": {
+    "title": "订阅受限",
+    "plan": "当前套餐",
+    "expired_at": "到期时间",
+    "grace_period_ends": "宽限期截止",
+    "button_renew": "续费 / 升级套餐",
+    "button_contact_support": "联系客服",
+    "message": {
+      "Inactive": "订阅未激活，请先完成付费",
+      "Expired": "合同已到期，请续约",
+      "Canceled": "订阅已取消",
+      "Unpaid": "订阅欠费"
+    },
+    "planType": {
+      "free": "免费版",
+      "pro": "专业版",
+      "enterprise": "企业版"
     }
   },
   "fonts": {

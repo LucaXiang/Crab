@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Target, LayoutGrid, Tag, Package, MapPin } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Target, LayoutGrid, Tag, Package, MapPin, Search, Check } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import type { WizardState } from './index';
 import { FormSection, FormField, selectClass } from '@/shared/components/FormField';
@@ -10,6 +10,91 @@ interface Step3ScopeProps {
   updateState: (updates: Partial<WizardState>) => void;
 }
 
+/** Generic card-grid selector with search, used for Category / Tag / Product */
+function CardGridSelector<T extends { id: string; name: string }>({
+  items,
+  selectedId,
+  onSelect,
+  searchPlaceholder,
+  emptyText,
+  renderExtra,
+}: {
+  items: T[];
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  searchPlaceholder: string;
+  emptyText: string;
+  renderExtra?: (item: T) => React.ReactNode;
+}) {
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return items;
+    const lower = search.toLowerCase();
+    return items.filter((item) => item.name.toLowerCase().includes(lower));
+  }, [items, search]);
+
+  const handleSelect = (id: string) => {
+    onSelect(selectedId === id ? null : id);
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Search */}
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={searchPlaceholder}
+          className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-white"
+        />
+      </div>
+
+      {/* Card Grid */}
+      <div className="grid grid-cols-3 gap-2 max-h-[16rem] overflow-y-auto custom-scrollbar content-start">
+        {filtered.length === 0 ? (
+          <div className="col-span-3 text-center py-6 text-sm text-gray-400">
+            {emptyText}
+          </div>
+        ) : (
+          filtered.map((item) => {
+            const isSelected = selectedId === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleSelect(item.id)}
+                className={`
+                  relative p-3 rounded-xl border-2 transition-all text-left flex flex-col items-start min-h-[3.5rem] justify-center
+                  ${isSelected
+                    ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-200'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-teal-300 hover:bg-teal-50/30'
+                  }
+                `}
+              >
+                <span className={`text-xs font-bold leading-tight ${isSelected ? 'text-teal-800' : 'text-gray-900'}`}>
+                  {item.name}
+                </span>
+                {renderExtra?.(item)}
+                {/* Checkmark */}
+                {isSelected && (
+                  <div className="absolute top-1.5 right-1.5">
+                    <div className="w-4 h-4 bg-teal-500 rounded-full flex items-center justify-center">
+                      <Check size={10} className="text-white" strokeWidth={3} />
+                    </div>
+                  </div>
+                )}
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 export const Step3Scope: React.FC<Step3ScopeProps> = ({ state, updateState }) => {
   const { t } = useI18n();
 
@@ -18,6 +103,13 @@ export const Step3Scope: React.FC<Step3ScopeProps> = ({ state, updateState }) =>
   const products = useProductStore((s) => s.items);
   const zones = useZoneStore((s) => s.items);
   const fetchZones = useZoneStore((s) => s.fetchAll);
+
+  // Build category lookup for product cards
+  const categoryMap = useMemo(() => {
+    const map = new Map<string, string>();
+    categories.forEach((cat) => map.set(cat.id, cat.name));
+    return map;
+  }, [categories]);
 
   // Load zones on mount
   useEffect(() => {
@@ -40,52 +132,52 @@ export const Step3Scope: React.FC<Step3ScopeProps> = ({ state, updateState }) =>
       case 'CATEGORY':
         return (
           <FormField label={t('settings.price_rule.wizard.select_category')} required>
-            <select
-              value={state.target || ''}
-              onChange={(e) => updateState({ target: e.target.value || null })}
-              className={selectClass}
-            >
-              <option value="">{t('common.hint.please_select')}</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
+            <CardGridSelector
+              key="category"
+              items={categories}
+              selectedId={state.target}
+              onSelect={(id) => updateState({ target: id })}
+              searchPlaceholder={t('common.action.search')}
+              emptyText={t('common.empty.no_results')}
+            />
           </FormField>
         );
       case 'TAG':
         return (
           <FormField label={t('settings.price_rule.wizard.select_tag')} required>
-            <select
-              value={state.target || ''}
-              onChange={(e) => updateState({ target: e.target.value || null })}
-              className={selectClass}
-            >
-              <option value="">{t('common.hint.please_select')}</option>
-              {tags.map((tag) => (
-                <option key={tag.id} value={tag.id}>
-                  {tag.name}
-                </option>
-              ))}
-            </select>
+            <CardGridSelector
+              key="tag"
+              items={tags}
+              selectedId={state.target}
+              onSelect={(id) => updateState({ target: id })}
+              searchPlaceholder={t('common.action.search')}
+              emptyText={t('common.empty.no_results')}
+              renderExtra={(tag) => (
+                <span
+                  className="w-2.5 h-2.5 rounded-full mt-1 shrink-0"
+                  style={{ backgroundColor: tag.color || '#9ca3af' }}
+                />
+              )}
+            />
           </FormField>
         );
       case 'PRODUCT':
         return (
           <FormField label={t('settings.price_rule.wizard.select_product')} required>
-            <select
-              value={state.target || ''}
-              onChange={(e) => updateState({ target: e.target.value || null })}
-              className={selectClass}
-            >
-              <option value="">{t('common.hint.please_select')}</option>
-              {products.map((prod) => (
-                <option key={prod.id} value={prod.id}>
-                  {prod.name}
-                </option>
-              ))}
-            </select>
+            <CardGridSelector
+              key="product"
+              items={products}
+              selectedId={state.target}
+              onSelect={(id) => updateState({ target: id })}
+              searchPlaceholder={t('common.action.search')}
+              emptyText={t('common.empty.no_results')}
+              renderExtra={(prod) => {
+                const catName = 'category' in prod ? categoryMap.get(prod.category as string) : undefined;
+                return catName ? (
+                  <span className="text-[0.625rem] text-gray-400 mt-0.5 leading-tight">{catName}</span>
+                ) : null;
+              }}
+            />
           </FormField>
         );
       default:

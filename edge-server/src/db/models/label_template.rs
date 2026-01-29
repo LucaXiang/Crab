@@ -141,9 +141,9 @@ pub struct LabelTemplate {
     #[serde(default = "default_true")]
     pub is_active: bool,
     /// Created timestamp
-    pub created_at: Option<String>,
+    pub created_at: Option<i64>,
     /// Updated timestamp
-    pub updated_at: Option<String>,
+    pub updated_at: Option<i64>,
     /// UI-specific: width in mm (duplicate for compatibility)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub width_mm: Option<f32>,

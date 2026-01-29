@@ -393,10 +393,7 @@ impl TenantManager {
             user_info: data.user,
             login_mode: LoginMode::Online,
             expires_at: EmployeeSession::parse_jwt_exp(&data.token),
-            logged_in_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            logged_in_at: shared::util::now_millis(),
         };
 
         // 更新缓存

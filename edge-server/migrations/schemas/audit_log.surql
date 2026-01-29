@@ -49,7 +49,7 @@ DEFINE FIELD OVERWRITE error ON audit_log TYPE option<string>
     PERMISSIONS FULL;
 
 -- 时间戳（自动生成，只读）
-DEFINE FIELD OVERWRITE created_at ON audit_log TYPE datetime VALUE time::now() READONLY
+DEFINE FIELD OVERWRITE created_at ON audit_log TYPE int READONLY
     PERMISSIONS FULL;
 
 -- 索引

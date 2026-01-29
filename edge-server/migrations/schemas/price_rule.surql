@@ -61,11 +61,11 @@ DEFINE FIELD OVERWRITE is_exclusive ON price_rule TYPE bool
     PERMISSIONS FULL;
 
 -- 有效期开始时间
-DEFINE FIELD OVERWRITE valid_from ON price_rule TYPE option<datetime>
+DEFINE FIELD OVERWRITE valid_from ON price_rule TYPE option<int>
     PERMISSIONS FULL;
 
 -- 有效期结束时间
-DEFINE FIELD OVERWRITE valid_until ON price_rule TYPE option<datetime>
+DEFINE FIELD OVERWRITE valid_until ON price_rule TYPE option<int>
     PERMISSIONS FULL;
 
 -- 活动日 (0=周日, 1=周一, ..., 6=周六)
@@ -87,8 +87,7 @@ DEFINE FIELD OVERWRITE is_active ON price_rule TYPE bool
 DEFINE FIELD OVERWRITE created_by ON price_rule TYPE option<record<employee>>
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE created_at ON price_rule TYPE datetime
-    DEFAULT time::now()
+DEFINE FIELD OVERWRITE created_at ON price_rule TYPE int
     PERMISSIONS FULL;
 
 DEFINE INDEX OVERWRITE rule_active ON price_rule FIELDS is_active, product_scope;

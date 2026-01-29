@@ -8,7 +8,6 @@
 
 use crate::utils::AppError;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use chrono::{DateTime, Utc};
 use crab_cert::{CertMetadata, generate_hardware_id};
 use serde::{Deserialize, Serialize};
 use shared::activation::SignedBinding;
@@ -57,11 +56,18 @@ pub const CREDENTIAL_FILE: &str = "credential.json";
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SubscriptionStatus {
+    /// 注册未付费/合同未签
+    Inactive,
+    /// 合同有效，付费正常
     Active,
+    /// 扣费失败，Stripe 重试中
     PastDue,
+    /// 合同到期未续约
+    Expired,
+    /// 主动终止/重试全败
     Canceled,
+    /// 长期欠费
     Unpaid,
-    Trial,
 }
 
 /// 订阅计划类型
@@ -73,8 +79,8 @@ pub enum PlanType {
     Enterprise,
 }
 
-fn default_now() -> DateTime<Utc> {
-    Utc::now()
+fn default_now_millis() -> i64 {
+    shared::util::now_millis()
 }
 
 /// 订阅详情
@@ -87,16 +93,16 @@ pub struct Subscription {
     pub tenant_id: String,
     pub status: SubscriptionStatus,
     pub plan: PlanType,
-    #[serde(default = "default_now")]
-    pub starts_at: DateTime<Utc>,
-    pub expires_at: Option<DateTime<Utc>>,
+    #[serde(default = "default_now_millis")]
+    pub starts_at: i64,
+    pub expires_at: Option<i64>,
     #[serde(default)]
     pub features: Vec<String>,
-    #[serde(default = "default_now")]
-    pub last_checked_at: DateTime<Utc>,
-    /// 签名有效期 (超过此时间需要从 Auth Server 刷新)
+    #[serde(default = "default_now_millis")]
+    pub last_checked_at: i64,
+    /// 签名有效期 (Unix millis，超过此时间需要从 Auth Server 刷新)
     #[serde(default)]
-    pub signature_valid_until: Option<DateTime<Utc>>,
+    pub signature_valid_until: Option<i64>,
     /// Tenant CA 签名 (base64)
     /// 签名内容: "{tenant_id}|{plan}|{status}|{features_joined}|{signature_valid_until}"
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -109,7 +115,7 @@ impl Subscription {
         let features_str = self.features.join(",");
         let valid_until = self
             .signature_valid_until
-            .map(|t| t.to_rfc3339())
+            .map(|t| t.to_string())
             .unwrap_or_default();
         format!(
             "{}|{}|{:?}|{}|{}",
@@ -149,7 +155,7 @@ impl Subscription {
     /// 检查签名是否过期 (需要刷新)
     pub fn is_signature_expired(&self) -> bool {
         match self.signature_valid_until {
-            Some(valid_until) => Utc::now() > valid_until,
+            Some(valid_until) => shared::util::now_millis() > valid_until,
             None => true, // 没有有效期 = 已过期
         }
     }
@@ -177,15 +183,16 @@ impl Subscription {
 
 impl Default for Subscription {
     fn default() -> Self {
+        let now = shared::util::now_millis();
         Self {
             id: None,
             tenant_id: "default".to_string(),
-            status: SubscriptionStatus::Active,
+            status: SubscriptionStatus::Inactive,
             plan: PlanType::Free,
-            starts_at: Utc::now(),
+            starts_at: now,
             expires_at: None,
             features: vec![],
-            last_checked_at: Utc::now(),
+            last_checked_at: now,
             signature_valid_until: None,
             signature: None,
         }

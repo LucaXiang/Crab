@@ -148,7 +148,7 @@ impl ArchiveWorker {
         let delay_secs =
             (RETRY_BASE_DELAY_SECS * 2u64.pow(entry.retry_count)).min(RETRY_MAX_DELAY_SECS);
         let retry_after_ms = entry.created_at + (delay_secs as i64 * 1000);
-        let now = chrono::Utc::now().timestamp_millis();
+        let now = shared::util::now_millis();
 
         now >= retry_after_ms
     }

@@ -193,11 +193,9 @@ impl Default for KitchenTicketRenderer {
     }
 }
 
-/// Format unix timestamp to readable string (MM-DD HH:mm:ss)
+/// Format unix timestamp (millis) to readable string (MM-DD HH:mm:ss)
 fn format_timestamp(ts: i64) -> String {
-    use chrono::{TimeZone, Utc};
-
-    if let Some(dt) = Utc.timestamp_opt(ts, 0).single() {
+    if let Some(dt) = chrono::DateTime::from_timestamp_millis(ts) {
         dt.format("%m-%d %H:%M:%S").to_string()
     } else {
         "时间未知".to_string()

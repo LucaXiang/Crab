@@ -204,11 +204,11 @@ pub async fn recover_stale(
     } else {
         now.date_naive()
     };
-    let business_day_start = format!("{}T{}:00Z", today_business_date, cutoff);
+    let business_day_start = today_business_date.and_time(cutoff_time).and_utc().timestamp_millis();
 
     let repo = ShiftRepository::new(state.db.clone());
     let recovered = repo
-        .recover_stale_shifts(&business_day_start)
+        .recover_stale_shifts(business_day_start)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 
@@ -240,14 +240,15 @@ pub async fn debug_simulate_auto_close(
             r#"
             UPDATE shift SET
                 status = 'CLOSED',
-                end_time = time::now(),
+                end_time = $now,
                 abnormal_close = true,
                 note = 'Debug: 模拟自动关闭',
-                updated_at = time::now()
+                updated_at = $now
             WHERE status = 'OPEN'
             RETURN AFTER
             "#,
         )
+        .bind(("now", shared::util::now_millis()))
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 

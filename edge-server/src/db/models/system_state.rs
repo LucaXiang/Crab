@@ -17,11 +17,11 @@ pub struct SystemState {
     /// Sync state
     pub synced_up_to: Option<RecordId>,
     pub synced_up_to_hash: Option<String>,
-    pub last_sync_time: Option<String>,
+    pub last_sync_time: Option<i64>,
     /// Statistics
     pub order_count: i32,
-    pub created_at: Option<String>,
-    pub updated_at: Option<String>,
+    pub created_at: Option<i64>,
+    pub updated_at: Option<i64>,
 }
 
 /// Update system state payload
@@ -32,6 +32,6 @@ pub struct SystemStateUpdate {
     pub last_order_hash: Option<String>,
     pub synced_up_to: Option<RecordId>,
     pub synced_up_to_hash: Option<String>,
-    pub last_sync_time: Option<String>,
+    pub last_sync_time: Option<i64>,
     pub order_count: Option<i32>,
 }

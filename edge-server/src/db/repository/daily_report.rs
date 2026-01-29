@@ -56,8 +56,9 @@ impl DailyReportRepository {
             )));
         }
 
-        let start_dt = format!("{}T00:00:00Z", data.business_date);
-        let end_dt = format!("{}T23:59:59Z", data.business_date);
+        let parsed_date = validate_date(&data.business_date)?;
+        let start_millis = parsed_date.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis();
+        let end_millis = parsed_date.and_hms_opt(23, 59, 59).unwrap().and_utc().timestamp_millis();
 
         // Complex aggregation query for daily report
         let mut result = self
@@ -67,8 +68,8 @@ impl DailyReportRepository {
                 r#"
                 -- Get all orders for the day (archived orders)
                 LET $all_orders = SELECT * FROM order
-                    WHERE created_at >= <datetime>$start
-                    AND created_at <= <datetime>$end;
+                    WHERE created_at >= $start
+                    AND created_at <= $end;
 
                 -- Filter by status
                 LET $completed = SELECT * FROM $all_orders WHERE status = 'COMPLETED';
@@ -141,7 +142,7 @@ impl DailyReportRepository {
                     total_surcharge = $total_surcharge,
                     tax_breakdowns = $tax_breakdown,
                     payment_breakdowns = $payment_breakdown,
-                    generated_at = time::now(),
+                    generated_at = $now,
                     generated_by_id = $gen_id,
                     generated_by_name = $gen_name,
                     note = $note
@@ -149,11 +150,12 @@ impl DailyReportRepository {
             "#,
             )
             .bind(("date", data.business_date))
-            .bind(("start", start_dt))
-            .bind(("end", end_dt))
+            .bind(("start", start_millis))
+            .bind(("end", end_millis))
             .bind(("gen_id", operator_id))
             .bind(("gen_name", operator_name))
             .bind(("note", data.note))
+            .bind(("now", shared::util::now_millis()))
             .await?;
 
         let reports: Vec<DailyReport> = result.take(0)?;

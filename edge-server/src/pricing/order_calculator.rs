@@ -122,8 +122,6 @@ pub fn calculate_order_price(
 mod tests {
     use super::*;
     use crate::db::models::{AdjustmentType, ProductScope, RuleType};
-    use chrono::Utc;
-
     /// Helper to create a test rule
     fn make_rule(
         rule_type: RuleType,
@@ -155,7 +153,7 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: Utc::now(),
+            created_at: shared::util::now_millis(),
         }
     }
 

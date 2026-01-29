@@ -120,13 +120,13 @@ fn default_page() -> i32 {
 // ============================================================================
 
 /// Calculate business day time range based on cutoff time
-/// Returns (start_datetime, end_datetime) in ISO 8601 format
+/// Returns (start_millis, end_millis) as Unix timestamp milliseconds
 fn calculate_time_range(
     time_range: &str,
     cutoff: &str,
     custom_start: Option<&str>,
     custom_end: Option<&str>,
-) -> (String, String) {
+) -> (i64, i64) {
     let now = Local::now();
 
     // Parse cutoff time (e.g., "06:00")
@@ -142,66 +142,75 @@ fn calculate_time_range(
         now.date_naive()
     };
 
+    /// Helper: convert date + cutoff time string to millis
+    fn date_cutoff_to_millis(date: chrono::NaiveDate, cutoff: &str) -> i64 {
+        let time = NaiveTime::parse_from_str(&format!("{}:00", cutoff), "%H:%M:%S")
+            .unwrap_or(NaiveTime::MIN);
+        let dt = date.and_time(time);
+        dt.and_utc().timestamp_millis()
+    }
+
+    /// Helper: parse datetime string to millis
+    fn datetime_str_to_millis(s: &str, cutoff: &str) -> i64 {
+        if s.contains('T') {
+            // datetime-local format: YYYY-MM-DDTHH:mm or YYYY-MM-DDTHH:mm:ssZ
+            let normalized = if s.ends_with('Z') || s.contains('+') {
+                s.to_string()
+            } else if s.len() == 16 {
+                // YYYY-MM-DDTHH:mm
+                format!("{}:00Z", s)
+            } else {
+                format!("{}Z", s)
+            };
+            chrono::DateTime::parse_from_rfc3339(&normalized)
+                .or_else(|_| chrono::DateTime::parse_from_rfc3339(&format!("{}Z", s)))
+                .map(|dt| dt.timestamp_millis())
+                .unwrap_or(0)
+        } else {
+            // Date only: YYYY-MM-DD
+            chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                .map(|d| date_cutoff_to_millis(d, cutoff))
+                .unwrap_or(0)
+        }
+    }
+
     match time_range {
         "today" => {
-            let start = format!("{}T{}:00Z", today_business_start, cutoff);
-            let end_date = today_business_start + Duration::days(1);
-            let end = format!("{}T{}:00Z", end_date, cutoff);
+            let start = date_cutoff_to_millis(today_business_start, cutoff);
+            let end = date_cutoff_to_millis(today_business_start + Duration::days(1), cutoff);
             (start, end)
         }
         "week" => {
             // Get Monday of current week (based on business day)
             let weekday = today_business_start.weekday().num_days_from_monday();
             let week_start = today_business_start - Duration::days(weekday as i64);
-            let start = format!("{}T{}:00Z", week_start, cutoff);
-            let end_date = today_business_start + Duration::days(1);
-            let end = format!("{}T{}:00Z", end_date, cutoff);
+            let start = date_cutoff_to_millis(week_start, cutoff);
+            let end = date_cutoff_to_millis(today_business_start + Duration::days(1), cutoff);
             (start, end)
         }
         "month" => {
             // First day of current month
             let month_start = today_business_start.with_day(1).unwrap_or(today_business_start);
-            let start = format!("{}T{}:00Z", month_start, cutoff);
-            let end_date = today_business_start + Duration::days(1);
-            let end = format!("{}T{}:00Z", end_date, cutoff);
+            let start = date_cutoff_to_millis(month_start, cutoff);
+            let end = date_cutoff_to_millis(today_business_start + Duration::days(1), cutoff);
             (start, end)
         }
         "custom" => {
             if let (Some(s), Some(e)) = (custom_start, custom_end) {
-                // Custom dates from datetime-local input (format: YYYY-MM-DDTHH:mm)
-                // Add seconds and Z suffix for SurrealDB datetime parsing
-                let start = if s.contains('T') {
-                    if s.ends_with('Z') || s.contains('+') || s.contains('-') && s.len() > 19 {
-                        s.to_string()
-                    } else {
-                        format!("{}:00Z", s) // Add seconds and Z
-                    }
-                } else {
-                    format!("{}T{}:00Z", s, cutoff)
-                };
-                let end = if e.contains('T') {
-                    if e.ends_with('Z') || e.contains('+') || e.contains('-') && e.len() > 19 {
-                        e.to_string()
-                    } else {
-                        format!("{}:00Z", e) // Add seconds and Z
-                    }
-                } else {
-                    format!("{}T{}:00Z", e, cutoff)
-                };
+                let start = datetime_str_to_millis(s, cutoff);
+                let end = datetime_str_to_millis(e, cutoff);
                 (start, end)
             } else {
                 // Fallback to today
-                let start = format!("{}T{}:00Z", today_business_start, cutoff);
-                let end_date = today_business_start + Duration::days(1);
-                let end = format!("{}T{}:00Z", end_date, cutoff);
+                let start = date_cutoff_to_millis(today_business_start, cutoff);
+                let end = date_cutoff_to_millis(today_business_start + Duration::days(1), cutoff);
                 (start, end)
             }
         }
         _ => {
             // Default to today
-            let start = format!("{}T{}:00Z", today_business_start, cutoff);
-            let end_date = today_business_start + Duration::days(1);
-            let end = format!("{}T{}:00Z", end_date, cutoff);
+            let start = date_cutoff_to_millis(today_business_start, cutoff);
+            let end = date_cutoff_to_millis(today_business_start + Duration::days(1), cutoff);
             (start, end)
         }
     }
@@ -252,8 +261,8 @@ pub async fn get_statistics(
         .query(r#"
             -- Get all orders in time range
             LET $all_orders = SELECT * FROM order
-                WHERE end_time >= <datetime>$start
-                AND end_time < <datetime>$end;
+                WHERE end_time >= $start
+                AND end_time < $end;
 
             -- Filter by status
             LET $completed = SELECT * FROM $all_orders WHERE status = 'COMPLETED';
@@ -282,7 +291,7 @@ pub async fn get_statistics(
 
             -- Average dining time (minutes)
             LET $dining_times = (
-                SELECT (time::millis(end_time) - time::millis(start_time)) / 60000 AS minutes
+                SELECT (end_time - start_time) / 60000 AS minutes
                 FROM $completed
                 WHERE end_time IS NOT NULL AND start_time IS NOT NULL
             );
@@ -327,30 +336,30 @@ pub async fn get_statistics(
 
     // Query for revenue trend (hourly for today, daily for week/month)
     let trend_query = if query.time_range == "today" {
-        // Hourly trend
+        // Hourly trend (convert millis to datetime for time::format)
         r#"
             SELECT
-                time::format(end_time, '%H:00') AS time,
+                time::format(<datetime>(end_time / 1000), '%H:00') AS time,
                 math::sum(total_amount) AS value
             FROM order
             WHERE status = 'COMPLETED'
-            AND end_time >= <datetime>$start
-            AND end_time < <datetime>$end
-            GROUP BY time::format(end_time, '%H:00')
+            AND end_time >= $start
+            AND end_time < $end
+            GROUP BY time::format(<datetime>(end_time / 1000), '%H:00')
             ORDER BY time
         "#
     } else {
-        // Daily trend
+        // Daily trend (convert millis to datetime for time::format)
         r#"
             SELECT
-                time::format(end_time, '%m-%d') AS time,
+                time::format(<datetime>(end_time / 1000), '%m-%d') AS time,
                 math::sum(total_amount) AS value
             FROM order
             WHERE status = 'COMPLETED'
-            AND end_time >= <datetime>$start
-            AND end_time < <datetime>$end
-            GROUP BY time::format(end_time, '%Y-%m-%d')
-            ORDER BY time::format(end_time, '%Y-%m-%d')
+            AND end_time >= $start
+            AND end_time < $end
+            GROUP BY time::format(<datetime>(end_time / 1000), '%Y-%m-%d')
+            ORDER BY time::format(<datetime>(end_time / 1000), '%Y-%m-%d')
         "#
     };
 
@@ -370,8 +379,8 @@ pub async fn get_statistics(
             LET $completed_ids = (
                 SELECT VALUE id FROM order
                 WHERE status = 'COMPLETED'
-                AND end_time >= <datetime>$start
-                AND end_time < <datetime>$end
+                AND end_time >= $start
+                AND end_time < $end
             );
 
             SELECT
@@ -415,8 +424,8 @@ pub async fn get_statistics(
             LET $completed_ids = (
                 SELECT VALUE id FROM order
                 WHERE status = 'COMPLETED'
-                AND end_time >= <datetime>$start
-                AND end_time < <datetime>$end
+                AND end_time >= $start
+                AND end_time < $end
             );
 
             SELECT
@@ -474,8 +483,8 @@ pub async fn get_sales_report(
     let mut count_result = state.db
         .query(r#"
             SELECT count() FROM order
-            WHERE end_time >= <datetime>$start
-            AND end_time < <datetime>$end
+            WHERE end_time >= $start
+            AND end_time < $end
             GROUP ALL
         "#)
         .bind(("start", start_dt.clone()))
@@ -502,12 +511,12 @@ pub async fn get_sales_report(
             SELECT
                 <string>id AS order_id,
                 receipt_number,
-                time::format(end_time, '%Y-%m-%d %H:%M') AS date,
+                time::format(<datetime>(end_time / 1000), '%Y-%m-%d %H:%M') AS date,
                 total_amount AS total,
                 string::uppercase(status) AS status
             FROM order
-            WHERE end_time >= <datetime>$start
-            AND end_time < <datetime>$end
+            WHERE end_time >= $start
+            AND end_time < $end
             ORDER BY end_time DESC
             LIMIT $limit START $offset
         "#)

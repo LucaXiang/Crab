@@ -106,10 +106,31 @@ pub struct UserStore {
 impl UserStore {
     pub fn new() -> Self {
         let mut users = std::collections::HashMap::new();
-        // Default admin user
+        // Default admin user (Active subscription)
         users.insert(
             "admin".to_string(),
             ("admin123".to_string(), "tenant-1".to_string()),
+        );
+        // Test users for each subscription status
+        users.insert(
+            "test_inactive".to_string(),
+            ("test123".to_string(), "tenant-inactive".to_string()),
+        );
+        users.insert(
+            "test_expired".to_string(),
+            ("test123".to_string(), "tenant-expired".to_string()),
+        );
+        users.insert(
+            "test_canceled".to_string(),
+            ("test123".to_string(), "tenant-canceled".to_string()),
+        );
+        users.insert(
+            "test_unpaid".to_string(),
+            ("test123".to_string(), "tenant-unpaid".to_string()),
+        );
+        users.insert(
+            "test_pastdue".to_string(),
+            ("test123".to_string(), "tenant-pastdue".to_string()),
         );
         Self {
             users: Arc::new(RwLock::new(users)),

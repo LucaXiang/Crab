@@ -51,15 +51,18 @@ pub async fn verify_daily_chain(
         .map(|s| s.business_day_cutoff)
         .unwrap_or_else(|| "00:00".to_string());
 
-    let start = format!("{}T{}:00Z", date, cutoff);
     // 营业日结束 = 下一天的 cutoff
-    let end_date = chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d")
-        .map_err(|e| AppError::validation(format!("Invalid date format: {}", e)))?
-        + chrono::Duration::days(1);
-    let end = format!("{}T{}:00Z", end_date, cutoff);
+    let parsed_date = chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+        .map_err(|e| AppError::validation(format!("Invalid date format: {}", e)))?;
+    let end_date = parsed_date + chrono::Duration::days(1);
+
+    let cutoff_time = chrono::NaiveTime::parse_from_str(&format!("{}:00", cutoff), "%H:%M:%S")
+        .unwrap_or(chrono::NaiveTime::MIN);
+    let start = parsed_date.and_time(cutoff_time).and_utc().timestamp_millis();
+    let end = end_date.and_time(cutoff_time).and_utc().timestamp_millis();
 
     let verification = archive_service
-        .verify_daily_chain(&date, &start, &end)
+        .verify_daily_chain(&date, start, end)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 

@@ -59,7 +59,7 @@ impl ShiftAutoCloseScheduler {
         let business_day_start = Self::business_day_start(cutoff_time);
 
         let repo = ShiftRepository::new(self.state.db.clone());
-        match repo.recover_stale_shifts(&business_day_start).await {
+        match repo.recover_stale_shifts(business_day_start).await {
             Ok(shifts) if shifts.is_empty() => {
                 tracing::debug!("No stale shifts to recover");
             }
@@ -110,15 +110,15 @@ impl ShiftAutoCloseScheduler {
         }
     }
 
-    /// 计算当前营业日起始时间（ISO 8601 字符串）
-    fn business_day_start(cutoff_time: NaiveTime) -> String {
+    /// 计算当前营业日起始时间（Unix millis）
+    fn business_day_start(cutoff_time: NaiveTime) -> i64 {
         let now = Local::now();
         let today_business_date = if now.time() < cutoff_time {
             (now - chrono::Duration::days(1)).date_naive()
         } else {
             now.date_naive()
         };
-        format!("{}T{}:00Z", today_business_date, cutoff_time.format("%H:%M"))
+        today_business_date.and_time(cutoff_time).and_utc().timestamp_millis()
     }
 
     /// 计算距离下一次 cutoff 的 Duration

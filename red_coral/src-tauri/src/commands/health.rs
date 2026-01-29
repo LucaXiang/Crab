@@ -9,7 +9,6 @@ use crate::core::response::ApiResponse;
 use shared::app_state::{
     CertificateHealth, ComponentsHealth, DeviceInfo, HealthLevel, HealthStatus,
 };
-use time::OffsetDateTime;
 
 /// 获取系统健康状态
 #[tauri::command]
@@ -28,7 +27,7 @@ pub async fn get_health_status(
             match std::fs::read_to_string(paths.edge_cert()) {
                 Ok(cert_pem) => match crab_cert::CertMetadata::from_pem(&cert_pem) {
                     Ok(metadata) => {
-                        let now = OffsetDateTime::now_utc();
+                        let now = time::OffsetDateTime::now_utc();
                         let duration = metadata.not_after - now;
                         let days_remaining = duration.whole_days();
                         let status = if days_remaining < 0 {
@@ -38,9 +37,12 @@ pub async fn get_health_status(
                         } else {
                             HealthLevel::Healthy
                         };
+                        let expires_at_millis =
+                            metadata.not_after.unix_timestamp() * 1000
+                                + metadata.not_after.millisecond() as i64;
                         CertificateHealth {
                             status,
-                            expires_at: Some(metadata.not_after.to_string()),
+                            expires_at: Some(expires_at_millis),
                             days_remaining: Some(days_remaining),
                             fingerprint: Some(metadata.fingerprint_sha256.clone()),
                             issuer: metadata.common_name.clone(),
@@ -115,7 +117,7 @@ pub async fn get_health_status(
             network,
             database,
         },
-        checked_at: chrono::Utc::now().to_rfc3339(),
+        checked_at: shared::util::now_millis(),
         device_info: DeviceInfo {
             device_id: format!("{}...", &device_id[..8]),
             entity_id: None,

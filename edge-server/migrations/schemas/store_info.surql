@@ -45,10 +45,8 @@ DEFINE FIELD OVERWRITE business_day_cutoff ON store_info TYPE string
     PERMISSIONS FULL;
 
 -- 时间戳
-DEFINE FIELD OVERWRITE created_at ON store_info TYPE option<datetime>
-    DEFAULT time::now()
+DEFINE FIELD OVERWRITE created_at ON store_info TYPE option<int>
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE updated_at ON store_info TYPE option<datetime>
-    DEFAULT time::now()
+DEFINE FIELD OVERWRITE updated_at ON store_info TYPE option<int>
     PERMISSIONS FULL;

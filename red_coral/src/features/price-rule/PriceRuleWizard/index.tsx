@@ -186,9 +186,9 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({
       payload.active_start_time = state.active_start_time;
       payload.active_end_time = state.active_end_time;
     } else if (state.time_mode === 'ONETIME') {
-      // Convert local datetime to ISO string for backend
-      payload.valid_from = state.valid_from ? new Date(state.valid_from).toISOString() : undefined;
-      payload.valid_until = state.valid_until ? new Date(state.valid_until).toISOString() : undefined;
+      // Convert local datetime string to Unix millis for backend
+      payload.valid_from = state.valid_from ? new Date(state.valid_from).getTime() : undefined;
+      payload.valid_until = state.valid_until ? new Date(state.valid_until).getTime() : undefined;
     }
 
     return payload;

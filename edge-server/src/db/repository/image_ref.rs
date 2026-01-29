@@ -64,12 +64,13 @@ impl ImageRefRepository {
                         hash: $hash,
                         entity_type: $entity_type,
                         entity_id: $entity_id,
-                        created_at: time::now()
+                        created_at: $now
                     }",
                 )
                 .bind(("hash", hash.clone()))
                 .bind(("entity_type", entity_type_str.clone()))
                 .bind(("entity_id", entity_id_owned.clone()))
+                .bind(("now", shared::util::now_millis()))
                 .await?;
         }
 

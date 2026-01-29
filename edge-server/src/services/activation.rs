@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -47,7 +46,7 @@ pub struct ActivationStatus {
     /// 证书指纹
     pub cert_fingerprint: Option<String>,
     /// 证书过期时间
-    pub cert_expires_at: Option<DateTime<Utc>>,
+    pub cert_expires_at: Option<i64>,
 }
 
 impl ActivationService {
@@ -493,9 +492,10 @@ impl ActivationService {
 
         // Convert SubscriptionInfo to local Subscription
         let status = match sub_info.status {
+            shared::activation::SubscriptionStatus::Inactive => SubscriptionStatus::Inactive,
             shared::activation::SubscriptionStatus::Active => SubscriptionStatus::Active,
-            shared::activation::SubscriptionStatus::Trial => SubscriptionStatus::Trial,
             shared::activation::SubscriptionStatus::PastDue => SubscriptionStatus::PastDue,
+            shared::activation::SubscriptionStatus::Expired => SubscriptionStatus::Expired,
             shared::activation::SubscriptionStatus::Canceled => SubscriptionStatus::Canceled,
             shared::activation::SubscriptionStatus::Unpaid => SubscriptionStatus::Unpaid,
         };
@@ -506,20 +506,9 @@ impl ActivationService {
             shared::activation::PlanType::Enterprise => PlanType::Enterprise,
         };
 
-        let starts_at = chrono::DateTime::parse_from_rfc3339(&sub_info.starts_at)
-            .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|_| chrono::Utc::now());
-
-        let expires_at = sub_info.expires_at.as_ref().and_then(|s| {
-            chrono::DateTime::parse_from_rfc3339(s)
-                .map(|dt| dt.with_timezone(&chrono::Utc))
-                .ok()
-        });
-
-        let signature_valid_until =
-            chrono::DateTime::parse_from_rfc3339(&sub_info.signature_valid_until)
-                .map(|dt| dt.with_timezone(&chrono::Utc))
-                .ok();
+        let starts_at = sub_info.starts_at;
+        let expires_at = sub_info.expires_at;
+        let signature_valid_until = Some(sub_info.signature_valid_until);
 
         Some(Subscription {
             id: sub_info.id,
@@ -529,7 +518,7 @@ impl ActivationService {
             starts_at,
             expires_at,
             features: sub_info.features,
-            last_checked_at: chrono::Utc::now(),
+            last_checked_at: shared::util::now_millis(),
             signature_valid_until,
             signature: Some(sub_info.signature),
         })

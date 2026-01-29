@@ -352,7 +352,7 @@ impl MessageProcessor for RequestCommandProcessor {
                 // 返回 epoch 以便客户端检测服务器重启
                 let pong_payload = serde_json::json!({
                     "epoch": &self.state.epoch,
-                    "server_time": chrono::Utc::now().to_rfc3339()
+                    "server_time": shared::util::now_millis()
                 });
                 Ok(ProcessResult::Success {
                     message: "Pong".to_string(),
@@ -367,7 +367,7 @@ impl MessageProcessor for RequestCommandProcessor {
                 let status = serde_json::json!({
                     "activated": self.state.is_activated().await,
                     "version": env!("CARGO_PKG_VERSION"),
-                    "server_time": chrono::Utc::now().to_rfc3339()
+                    "server_time": shared::util::now_millis()
                 });
 
                 Ok(ProcessResult::Success {

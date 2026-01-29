@@ -12,33 +12,33 @@ export type ClockDirection = 'backward' | 'forward';
 
 export type ActivationRequiredReason =
   | { code: 'FirstTimeSetup' }
-  | { code: 'CertificateExpired'; details: { expired_at: string; days_overdue: number } }
-  | { code: 'CertificateExpiringSoon'; details: { expires_at: string; days_remaining: number } }
+  | { code: 'CertificateExpired'; details: { expired_at: number; days_overdue: number } }
+  | { code: 'CertificateExpiringSoon'; details: { expires_at: number; days_remaining: number } }
   | { code: 'CertificateInvalid'; details: { error: string } }
   | { code: 'SignatureInvalid'; details: { component: string; error: string } }
   | { code: 'DeviceMismatch'; details: { expected: string; actual: string } }
   | {
       code: 'ClockTampering';
-      details: { direction: ClockDirection; drift_seconds: number; last_verified_at: string };
+      details: { direction: ClockDirection; drift_seconds: number; last_verified_at: number };
     }
   | { code: 'BindingInvalid'; details: { error: string } }
-  | { code: 'TokenExpired'; details: { expired_at: string } }
+  | { code: 'TokenExpired'; details: { expired_at: number } }
   | { code: 'NetworkError'; details: { error: string; can_continue_offline: boolean } }
-  | { code: 'Revoked'; details: { revoked_at: string; reason: string } };
+  | { code: 'Revoked'; details: { revoked_at: number; reason: string } };
 
 // =============================================================================
 // 订阅阻止信息
 // =============================================================================
 
-export type SubscriptionStatus = 'active' | 'trial' | 'past_due' | 'canceled' | 'unpaid';
+export type SubscriptionStatus = 'inactive' | 'active' | 'past_due' | 'expired' | 'canceled' | 'unpaid';
 export type PlanType = 'free' | 'pro' | 'enterprise';
 
 export interface SubscriptionBlockedInfo {
   status: SubscriptionStatus;
   plan: PlanType;
-  expired_at?: string;
+  expired_at?: number;
   grace_period_days?: number;
-  grace_period_ends_at?: string;
+  grace_period_ends_at?: number;
   in_grace_period: boolean;
   support_url?: string;
   renewal_url?: string;
@@ -62,7 +62,7 @@ export interface ActivationProgress {
   total_steps: number;
   current_step: number;
   message: string;
-  started_at: string;
+  started_at: number;
 }
 
 // =============================================================================
@@ -73,7 +73,7 @@ export type HealthLevel = 'healthy' | 'warning' | 'critical' | 'unknown';
 
 export interface CertificateHealth {
   status: HealthLevel;
-  expires_at?: string;
+  expires_at?: number;
   days_remaining?: number;
   fingerprint?: string;
   issuer?: string;
@@ -83,20 +83,20 @@ export interface SubscriptionHealth {
   status: HealthLevel;
   plan?: string;
   subscription_status?: string;
-  signature_valid_until?: string;
+  signature_valid_until?: number;
   needs_refresh: boolean;
 }
 
 export interface NetworkHealth {
   status: HealthLevel;
   auth_server_reachable: boolean;
-  last_connected_at?: string;
+  last_connected_at?: number;
 }
 
 export interface DatabaseHealth {
   status: HealthLevel;
   size_bytes?: number;
-  last_write_at?: string;
+  last_write_at?: number;
 }
 
 export interface ComponentsHealth {
@@ -115,7 +115,7 @@ export interface DeviceInfo {
 export interface HealthStatus {
   overall: HealthLevel;
   components: ComponentsHealth;
-  checked_at: string;
+  checked_at: number;
   device_info: DeviceInfo;
 }
 
