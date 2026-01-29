@@ -259,7 +259,7 @@ impl ServerState {
     /// - **Warmup**: CatalogService 预热, 价格规则缓存预热
     /// - **Worker**: ArchiveWorker, MessageHandler
     /// - **Listener**: 订单事件转发器, 厨房打印事件监听器
-    /// - **Periodic**: 打印记录清理任务, 归档验证调度器
+    /// - **Periodic**: 打印记录清理任务, 归档验证调度器, 班次自动关闭调度器
     ///
     /// 返回 `BackgroundTasks` 用于 graceful shutdown
     pub async fn start_background_tasks(&self) -> BackgroundTasks {
@@ -320,6 +320,9 @@ impl ServerState {
 
         // VerifyScheduler: 归档哈希链验证（启动补扫 + 每日触发）
         self.register_verify_scheduler(&mut tasks);
+
+        // ShiftAutoCloseScheduler: 自动关闭跨营业日僵尸班次
+        self.register_shift_auto_close(&mut tasks);
 
         // 打印任务摘要
         tasks.log_summary();
@@ -615,6 +618,23 @@ impl ServerState {
                 scheduler.run().await;
             });
         }
+    }
+
+    /// 注册班次自动关闭调度器
+    ///
+    /// - 启动时立即扫描关闭跨营业日僵尸班次
+    /// - 运行期间按 business_day_cutoff 每日触发
+    fn register_shift_auto_close(&self, tasks: &mut BackgroundTasks) {
+        use crate::shifts::ShiftAutoCloseScheduler;
+
+        let scheduler = ShiftAutoCloseScheduler::new(
+            self.clone(),
+            tasks.shutdown_token(),
+        );
+
+        tasks.spawn("shift_auto_close", TaskKind::Periodic, async move {
+            scheduler.run().await;
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════════════

@@ -226,3 +226,47 @@ pub async fn recover_stale(
 
     Ok(Json(recovered))
 }
+
+/// POST /api/shifts/debug/simulate-auto-close
+/// Debug: 强制关闭所有 OPEN 班次并广播，模拟自动关闭调度器行为
+/// @TEST 上线前删除
+pub async fn debug_simulate_auto_close(
+    State(state): State<ServerState>,
+) -> AppResult<Json<Vec<Shift>>> {
+    // 关闭所有 OPEN 班次（不判断 business_day_start）
+    let mut result = state
+        .db
+        .query(
+            r#"
+            UPDATE shift SET
+                status = 'CLOSED',
+                end_time = last_active_at,
+                abnormal_close = true,
+                note = 'Debug: 模拟自动关闭',
+                updated_at = time::now()
+            WHERE status = 'OPEN'
+            RETURN AFTER
+            "#,
+        )
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?;
+
+    let closed: Vec<Shift> = result
+        .take(0)
+        .map_err(|e| AppError::database(e.to_string()))?;
+
+    for shift in &closed {
+        let id = shift
+            .id
+            .as_ref()
+            .map(|id| id.to_string())
+            .unwrap_or_default();
+        state
+            .broadcast_sync(RESOURCE, "recovered", &id, Some(shift))
+            .await;
+    }
+
+    tracing::info!("🐛 Debug: simulated auto-close for {} shift(s)", closed.len());
+
+    Ok(Json(closed))
+}

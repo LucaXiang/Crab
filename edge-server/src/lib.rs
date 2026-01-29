@@ -31,6 +31,7 @@ pub mod db;
 pub mod message;
 pub mod orders;
 pub mod pricing;
+pub mod shifts;
 pub mod printing;
 pub mod services;
 pub mod utils;

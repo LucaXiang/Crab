@@ -29,6 +29,7 @@ fn routes() -> Router<ServerState> {
         .route("/{id}/close", post(handler::close))
         .route("/{id}/force-close", post(handler::force_close))
         .route("/{id}/heartbeat", post(handler::heartbeat))
+        .route("/debug/simulate-auto-close", post(handler::debug_simulate_auto_close)) // @TEST 上线前删除
         .layer(middleware::from_fn(require_permission("system:write")));
 
     read_routes.merge(write_routes)

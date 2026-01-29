@@ -499,6 +499,11 @@ export class TauriApiClient {
     return invokeAndUnwrap<Shift[]>('recover_stale_shifts');
   }
 
+  /** @TEST 上线前删除 */
+  async debugSimulateShiftAutoClose(): Promise<Shift[]> {
+    return invokeAndUnwrap<Shift[]>('debug_simulate_shift_auto_close');
+  }
+
   // ============ Daily Reports (日结报告) ============
 
   async listDailyReports(params?: { limit?: number; offset?: number; start_date?: string; end_date?: string }): Promise<DailyReport[]> {

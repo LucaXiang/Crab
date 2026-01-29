@@ -169,6 +169,21 @@ pub async fn recover_stale_shifts(
     }
 }
 
+/// @TEST 上线前删除
+#[tauri::command(rename_all = "snake_case")]
+pub async fn debug_simulate_shift_auto_close(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+) -> Result<ApiResponse<Vec<Shift>>, String> {
+    let bridge = bridge.read().await;
+    match bridge
+        .post::<Vec<Shift>, _>("/api/shifts/debug/simulate-auto-close", &())
+        .await
+    {
+        Ok(shifts) => Ok(ApiResponse::success(shifts)),
+        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
+    }
+}
+
 // ============ Daily Reports ============
 
 #[tauri::command(rename_all = "snake_case")]

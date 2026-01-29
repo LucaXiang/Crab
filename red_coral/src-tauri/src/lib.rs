@@ -288,6 +288,7 @@ pub async fn run() {
             commands::force_close_shift,
             commands::heartbeat_shift,
             commands::recover_stale_shifts,
+            commands::debug_simulate_shift_auto_close, // @TEST 上线前删除
             // Daily Report commands (日结报告)
             commands::list_daily_reports,
             commands::get_daily_report,
