@@ -64,10 +64,7 @@ impl Server {
         // Phase 4: Subscription check — wait & retry if subscription invalid
         // ═══════════════════════════════════════════════════════════════════
         while state.is_subscription_blocked().await {
-            tracing::warn!(
-                "⛔ Subscription is blocked. Waiting 60s before re-checking..."
-            );
-            state.print_activated_banner_content().await;
+            state.print_subscription_blocked_banner().await;
 
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
 

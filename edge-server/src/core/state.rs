@@ -807,6 +807,31 @@ impl ServerState {
     }
 
     /// 打印激活后的横幅内容 (日志)
+    pub async fn print_subscription_blocked_banner(&self) {
+        let cred = self.activation.get_credential().await.unwrap_or_default();
+        if let Some(c) = cred {
+            tracing::warn!(
+                "╔══════════════════════════════════════════════════════════════════════╗"
+            );
+            tracing::warn!(
+                "║              ⛔ SUBSCRIPTION BLOCKED - SERVICES STOPPED             ║"
+            );
+            tracing::warn!(
+                "╚══════════════════════════════════════════════════════════════════════╝"
+            );
+            tracing::warn!("  Tenant ID    : {}", c.binding.tenant_id);
+            if let Some(sub) = &c.subscription {
+                tracing::warn!("  Subscription : {:?} ({:?})", sub.status, sub.plan);
+            }
+            tracing::warn!("  HTTPS Server : NOT STARTED");
+            tracing::warn!("  Message Bus  : NOT STARTED");
+            tracing::warn!("  Waiting 60s before re-checking...");
+            tracing::warn!(
+                "════════════════════════════════════════════════════════════════════════"
+            );
+        }
+    }
+
     pub async fn print_activated_banner_content(&self) {
         let cred = self.activation.get_credential().await.unwrap_or_default();
         if let Some(c) = cred {
