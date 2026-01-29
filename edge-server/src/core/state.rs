@@ -259,7 +259,7 @@ impl ServerState {
     /// - **Warmup**: CatalogService 预热, 价格规则缓存预热
     /// - **Worker**: ArchiveWorker, MessageHandler
     /// - **Listener**: 订单事件转发器, 厨房打印事件监听器
-    /// - **Periodic**: 打印记录清理任务
+    /// - **Periodic**: 打印记录清理任务, 归档验证调度器
     ///
     /// 返回 `BackgroundTasks` 用于 graceful shutdown
     pub async fn start_background_tasks(&self) -> BackgroundTasks {
@@ -317,6 +317,9 @@ impl ServerState {
 
         // PrintRecordCleanup: 清理过期打印记录
         self.register_print_record_cleanup(&mut tasks);
+
+        // VerifyScheduler: 归档哈希链验证（启动补扫 + 每日触发）
+        self.register_verify_scheduler(&mut tasks);
 
         // 打印任务摘要
         tasks.log_summary();
@@ -591,6 +594,27 @@ impl ServerState {
                 }
             }
         });
+    }
+
+    /// 注册归档验证调度器
+    ///
+    /// - 启动时补扫未验证的营业日
+    /// - 启动时检查是否需要全链扫描（>7 天未执行）
+    /// - 运行期间按 business_day_cutoff 每日触发
+    fn register_verify_scheduler(&self, tasks: &mut BackgroundTasks) {
+        use crate::orders::VerifyScheduler;
+
+        if let Some(archive_service) = self.orders_manager.archive_service() {
+            let scheduler = VerifyScheduler::new(
+                archive_service.clone(),
+                self.db.clone(),
+                tasks.shutdown_token(),
+            );
+
+            tasks.spawn("verify_scheduler", TaskKind::Periodic, async move {
+                scheduler.run().await;
+            });
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════

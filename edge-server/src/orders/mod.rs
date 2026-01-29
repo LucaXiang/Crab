@@ -37,6 +37,7 @@ pub mod reducer;
 pub mod storage;
 pub mod sync;
 pub mod traits;
+pub mod verify_scheduler;
 
 // Re-exports
 pub use archive::{ArchiveError, ArchiveResult, OrderArchiveService};
@@ -45,6 +46,7 @@ pub use manager::OrdersManager;
 pub use reducer::{generate_instance_id, input_to_snapshot};
 pub use storage::OrderStorage;
 pub use sync::{SyncRequest, SyncResponse};
+pub use verify_scheduler::VerifyScheduler;
 
 // Re-export shared types for convenience
 pub use shared::order::{
