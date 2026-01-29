@@ -3,10 +3,12 @@
  *
  * 登录后自动检测班次状态:
  * - 如果没有打开的班次 → 弹出开班弹窗
+ * - 如果班次被异常关闭 → 先显示通知 Dialog，再弹出开班弹窗
  * - 用户必须开班才能继续使用 POS
  */
 
 import React, { useEffect, useState } from 'react';
+import { AlertTriangle, X } from 'lucide-react';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useShiftStore } from '@/core/stores/shift';
 import { useShiftCloseGuard } from '@/core/hooks';
@@ -26,12 +28,15 @@ export const ShiftGuard: React.FC<ShiftGuardProps> = ({ children }) => {
   const {
     currentShift,
     needsOpenShift,
+    forceClosedMessage,
     fetchCurrentShift,
     setNeedsOpenShift,
+    setForceClosedMessage,
   } = useShiftStore();
 
   const [isChecking, setIsChecking] = useState(true);
   const [showOpenModal, setShowOpenModal] = useState(false);
+  const [showForceClosedDialog, setShowForceClosedDialog] = useState(false);
 
   // 登录后检查班次状态
   useEffect(() => {
@@ -54,12 +59,26 @@ export const ShiftGuard: React.FC<ShiftGuardProps> = ({ children }) => {
     checkShift();
   }, [user, fetchCurrentShift]);
 
+  // 监听异常关闭通知
+  useEffect(() => {
+    if (forceClosedMessage && !isChecking) {
+      setShowForceClosedDialog(true);
+    }
+  }, [forceClosedMessage, isChecking]);
+
   // 监听 needsOpenShift 标记
   useEffect(() => {
-    if (needsOpenShift && !showOpenModal && !isChecking) {
+    if (needsOpenShift && !showOpenModal && !showForceClosedDialog && !isChecking) {
       setShowOpenModal(true);
     }
-  }, [needsOpenShift, showOpenModal, isChecking]);
+  }, [needsOpenShift, showOpenModal, showForceClosedDialog, isChecking]);
+
+  // 异常关闭通知确认后 → 弹出开班弹窗
+  const handleForceClosedConfirm = () => {
+    setShowForceClosedDialog(false);
+    setForceClosedMessage(null);
+    setShowOpenModal(true);
+  };
 
   // 开班成功后关闭弹窗
   const handleOpenSuccess = () => {
@@ -91,6 +110,47 @@ export const ShiftGuard: React.FC<ShiftGuardProps> = ({ children }) => {
   return (
     <>
       {children}
+
+      {/* 异常关闭通知 Dialog */}
+      {showForceClosedDialog && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                  <AlertTriangle className="text-orange-500" size={20} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">
+                  {t('settings.shift.force_closed_notice_title')}
+                </h3>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                <p className="text-sm text-orange-800">
+                  {forceClosedMessage}
+                </p>
+              </div>
+              <p className="mt-4 text-sm text-gray-600">
+                {t('settings.shift.force_closed_notice_hint')}
+              </p>
+            </div>
+
+            {/* Action */}
+            <div className="p-6 pt-0">
+              <button
+                onClick={handleForceClosedConfirm}
+                className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors"
+              >
+                {t('settings.shift.open_new_shift')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 开班弹窗 - 登录后自动显示 */}
       <ShiftActionModal

@@ -287,7 +287,7 @@ impl ShiftRepository {
                 r#"
                 UPDATE shift SET
                     status = 'CLOSED',
-                    end_time = last_active_at,
+                    end_time = time::now(),
                     abnormal_close = true,
                     note = '跨营业日自动结算',
                     updated_at = time::now()

@@ -1553,6 +1553,9 @@
       "close_success_balanced": "收班成功，现金无差异",
       "close_success_variance": "收班成功，差异: {{variance}}",
       "force_close_success": "班次已强制关闭",
+      "force_closed_notice_title": "班次异常关闭",
+      "force_closed_notice_hint": "请开启新班次以继续使用 POS 系统。",
+      "open_new_shift": "开启新班次",
       "action_failed": "操作失败",
       "invalid_amount": "请输入有效金额",
       "variance": {

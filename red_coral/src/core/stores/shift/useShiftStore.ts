@@ -22,6 +22,9 @@ interface ShiftStore {
   // 需要开班的标记 (登录后检测到没有班次)
   needsOpenShift: boolean;
 
+  // 异常关闭通知消息 (显示后自动清除)
+  forceClosedMessage: string | null;
+
   // Actions
   fetchCurrentShift: (operatorId: string) => Promise<Shift | null>;
   openShift: (data: ShiftCreate) => Promise<Shift>;
@@ -29,6 +32,7 @@ interface ShiftStore {
   forceCloseShift: (shiftId: string, data: ShiftForceClose) => Promise<Shift>;
   clearShift: () => void;
   setNeedsOpenShift: (needs: boolean) => void;
+  setForceClosedMessage: (message: string | null) => void;
 }
 
 export const useShiftStore = create<ShiftStore>((set, get) => ({
@@ -37,6 +41,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
   isLoading: false,
   error: null,
   needsOpenShift: false,
+  forceClosedMessage: null,
 
   /**
    * Fetch current open shift for operator
@@ -108,7 +113,12 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const shift = await getApi().forceCloseShift(shiftId, data);
-      set({ currentShift: null, isLoading: false });
+      set({
+        currentShift: null,
+        isLoading: false,
+        needsOpenShift: true,
+        forceClosedMessage: data.note || '班次已被强制关闭',
+      });
       return shift;
     } catch (error) {
       console.error('Failed to force close shift:', error);
@@ -124,7 +134,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
    * Clear shift state (on logout)
    */
   clearShift: () => {
-    set({ currentShift: null, needsOpenShift: false, error: null });
+    set({ currentShift: null, needsOpenShift: false, forceClosedMessage: null, error: null });
   },
 
   /**
@@ -132,6 +142,13 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
    */
   setNeedsOpenShift: (needs: boolean) => {
     set({ needsOpenShift: needs });
+  },
+
+  /**
+   * Set force closed message (异常关闭通知)
+   */
+  setForceClosedMessage: (message: string | null) => {
+    set({ forceClosedMessage: message });
   },
 }));
 

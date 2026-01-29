@@ -240,7 +240,7 @@ pub async fn debug_simulate_auto_close(
             r#"
             UPDATE shift SET
                 status = 'CLOSED',
-                end_time = last_active_at,
+                end_time = time::now(),
                 abnormal_close = true,
                 note = 'Debug: 模拟自动关闭',
                 updated_at = time::now()
