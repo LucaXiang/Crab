@@ -8,6 +8,7 @@ use crate::db::models::{
     Order as SurrealOrder, OrderStatus as SurrealOrderStatus, SplitItem,
 };
 use crate::db::repository::SystemStateRepository;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
 use std::path::PathBuf;
@@ -28,6 +29,100 @@ pub enum ArchiveError {
 }
 
 pub type ArchiveResult<T> = Result<T, ArchiveError>;
+
+// ============================================================================
+// Verification Models
+// ============================================================================
+
+/// 单个事件的链路验证结果
+#[derive(Debug, Serialize)]
+pub struct EventVerification {
+    pub event_id: String,
+    pub event_type: String,
+    pub expected_prev_hash: String,
+    pub actual_prev_hash: String,
+    pub valid: bool,
+}
+
+/// 单个订单的哈希链验证结果
+#[derive(Debug, Serialize)]
+pub struct OrderVerification {
+    pub receipt_number: String,
+    pub order_id: String,
+    pub prev_hash: String,
+    pub curr_hash: String,
+    /// 事件链内部是否连续
+    pub events_chain_valid: bool,
+    pub event_count: usize,
+    /// 仅包含链路断裂的事件
+    pub invalid_events: Vec<EventVerification>,
+}
+
+/// 日链路验证结果
+#[derive(Debug, Serialize)]
+pub struct DailyChainVerification {
+    pub date: String,
+    pub total_orders: usize,
+    pub verified_orders: usize,
+    /// 整条日链是否完整（无任何断裂，含事故和损坏）
+    pub chain_intact: bool,
+    /// 断联事故导致的链重置（prev_hash 从 genesis 重新开始）
+    /// 性质：系统事故，非数据篡改
+    pub chain_resets: Vec<ChainReset>,
+    /// 真正的数据损坏/篡改（prev_hash 不匹配且不是 genesis）
+    pub chain_breaks: Vec<ChainBreak>,
+    /// 事件链内部验证失败的订单
+    pub invalid_orders: Vec<OrderVerification>,
+}
+
+/// 全链验证结果（周扫描）
+#[derive(Debug, Serialize)]
+pub struct FullChainVerification {
+    pub total_orders: usize,
+    pub verified_orders: usize,
+    pub chain_intact: bool,
+    pub chain_resets: Vec<ChainReset>,
+    pub chain_breaks: Vec<ChainBreak>,
+    pub invalid_orders: Vec<OrderVerification>,
+}
+
+/// 断联事故导致的链重置
+#[derive(Debug, Serialize)]
+pub struct ChainReset {
+    pub receipt_number: String,
+    /// 前一个订单的 curr_hash（重置前链尾的哈希）
+    pub prev_chain_hash: String,
+}
+
+/// 数据损坏导致的链路断裂
+#[derive(Debug, Serialize)]
+pub struct ChainBreak {
+    pub receipt_number: String,
+    /// 上一订单的 curr_hash（期望值）
+    pub expected_prev_hash: String,
+    /// 该订单存储的 prev_hash（实际值）
+    pub actual_prev_hash: String,
+}
+
+// ============================================================================
+// DB query helper types for verification
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+struct VerifyOrderRow {
+    order_id: String,
+    receipt_number: String,
+    prev_hash: String,
+    curr_hash: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct VerifyEventRow {
+    event_id: String,
+    event_type: String,
+    prev_hash: String,
+    curr_hash: String,
+}
 
 /// Maximum retry attempts for archiving
 const MAX_RETRY_ATTEMPTS: u32 = 3;
@@ -590,6 +685,302 @@ impl OrderArchiveService {
         format!("{:x}", hasher.finalize())
     }
 
+    // ========================================================================
+    // Verification Methods
+    // ========================================================================
+
+    /// 验证单个订单的事件哈希链完整性
+    pub async fn verify_order(&self, receipt_number: &str) -> ArchiveResult<OrderVerification> {
+        // 1. 查询订单
+        let mut result = self
+            .db
+            .query(
+                r#"
+                SELECT
+                    <string>id AS order_id,
+                    receipt_number,
+                    prev_hash,
+                    curr_hash
+                FROM order
+                WHERE receipt_number = $receipt
+                "#,
+            )
+            .bind(("receipt", receipt_number.to_string()))
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+        let order: VerifyOrderRow = result
+            .take::<Vec<VerifyOrderRow>>(0)
+            .map_err(|e| ArchiveError::Database(e.to_string()))?
+            .into_iter()
+            .next()
+            .ok_or_else(|| {
+                ArchiveError::Database(format!("Order not found: {}", receipt_number))
+            })?;
+
+        // 2. 查询该订单的所有事件（按 timestamp 排序）
+        //    使用 record ID 变量绑定，通过 graph traversal 查询
+        let order_record_id: surrealdb::RecordId = order
+            .order_id
+            .parse()
+            .map_err(|e: surrealdb::Error| ArchiveError::Database(e.to_string()))?;
+
+        let mut event_result = self
+            .db
+            .query(
+                r#"
+                SELECT
+                    <string>id AS event_id,
+                    event_type,
+                    prev_hash,
+                    curr_hash
+                FROM $order_id->has_event->order_event
+                ORDER BY timestamp
+                "#,
+            )
+            .bind(("order_id", order_record_id))
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+        let events: Vec<VerifyEventRow> = event_result
+            .take(0)
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+        // 3. 验证事件链连续性
+        let mut invalid_events = Vec::new();
+        let mut events_chain_valid = true;
+
+        for (i, event) in events.iter().enumerate() {
+            let expected_prev = if i == 0 {
+                "order_start".to_string()
+            } else {
+                events[i - 1].curr_hash.clone()
+            };
+
+            if event.prev_hash != expected_prev {
+                events_chain_valid = false;
+                invalid_events.push(EventVerification {
+                    event_id: event.event_id.clone(),
+                    event_type: event.event_type.clone(),
+                    expected_prev_hash: expected_prev,
+                    actual_prev_hash: event.prev_hash.clone(),
+                    valid: false,
+                });
+            }
+        }
+
+        Ok(OrderVerification {
+            receipt_number: order.receipt_number,
+            order_id: order.order_id,
+            prev_hash: order.prev_hash,
+            curr_hash: order.curr_hash,
+            events_chain_valid,
+            event_count: events.len(),
+            invalid_events,
+        })
+    }
+
+    /// 验证指定时间范围内所有订单的哈希链连续性
+    ///
+    /// - `date`: 标签（用于返回值，如 "2026-01-29"）
+    /// - `start`/`end`: ISO 8601 格式的时间范围（由 handler 层根据 business_day_cutoff 计算）
+    pub async fn verify_daily_chain(
+        &self,
+        date: &str,
+        start: &str,
+        end: &str,
+    ) -> ArchiveResult<DailyChainVerification> {
+
+        // 1. 查询当天所有订单，按 created_at 排序
+        let mut result = self
+            .db
+            .query(
+                r#"
+                SELECT
+                    <string>id AS order_id,
+                    receipt_number,
+                    prev_hash,
+                    curr_hash
+                FROM order
+                WHERE created_at >= <datetime>$start AND created_at <= <datetime>$end
+                ORDER BY created_at
+                "#,
+            )
+            .bind(("start", start.to_string()))
+            .bind(("end", end.to_string()))
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+        let orders: Vec<VerifyOrderRow> = result
+            .take(0)
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+        let total_orders = orders.len();
+
+        // 2. 查询范围之前最后一个订单的 curr_hash
+        let mut prev_result = self
+            .db
+            .query(
+                r#"
+                SELECT curr_hash
+                FROM order
+                WHERE created_at < <datetime>$start
+                ORDER BY created_at DESC
+                LIMIT 1
+                "#,
+            )
+            .bind(("start", start.to_string()))
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+        #[derive(Debug, Deserialize)]
+        struct HashRow {
+            curr_hash: String,
+        }
+
+        let prev_day_hash = prev_result
+            .take::<Vec<HashRow>>(0)
+            .map_err(|e| ArchiveError::Database(e.to_string()))?
+            .into_iter()
+            .next()
+            .map(|r| r.curr_hash);
+
+        // 确定当天第一个订单的 expected prev_hash
+        // 有前一天订单 → 用其 curr_hash；没有 → 用第一个订单自身的 prev_hash（不猜）
+        let expected_first_prev = prev_day_hash.unwrap_or_else(|| {
+            orders
+                .first()
+                .map(|o| o.prev_hash.clone())
+                .unwrap_or_else(|| "genesis".to_string())
+        });
+
+        // 3. 遍历验证
+        let mut chain_intact = true;
+        let mut chain_resets: Vec<ChainReset> = Vec::new();
+        let mut chain_breaks: Vec<ChainBreak> = Vec::new();
+        let mut invalid_orders = Vec::new();
+        let mut verified_orders = 0usize;
+        let mut expected_prev = expected_first_prev;
+
+        for order in &orders {
+            verified_orders += 1;
+
+            if order.prev_hash != expected_prev {
+                chain_intact = false;
+                if order.prev_hash == "genesis" {
+                    // 断联事故：system_state 丢失后链从 genesis 重新开始
+                    chain_resets.push(ChainReset {
+                        receipt_number: order.receipt_number.clone(),
+                        prev_chain_hash: expected_prev.clone(),
+                    });
+                } else {
+                    // 数据损坏：prev_hash 既不匹配也不是 genesis
+                    chain_breaks.push(ChainBreak {
+                        receipt_number: order.receipt_number.clone(),
+                        expected_prev_hash: expected_prev.clone(),
+                        actual_prev_hash: order.prev_hash.clone(),
+                    });
+                }
+            }
+
+            // 验证订单内部事件链
+            let order_verification = self.verify_order(&order.receipt_number).await?;
+            if !order_verification.events_chain_valid {
+                chain_intact = false;
+                invalid_orders.push(order_verification);
+            }
+
+            expected_prev = order.curr_hash.clone();
+        }
+
+        Ok(DailyChainVerification {
+            date: date.to_string(),
+            total_orders,
+            verified_orders,
+            chain_intact,
+            chain_resets,
+            chain_breaks,
+            invalid_orders,
+        })
+    }
+
+    /// 全链验证：从第一个 genesis 扫描到最后一个订单
+    /// 适合每周执行一次
+    pub async fn verify_full_chain(&self) -> ArchiveResult<FullChainVerification> {
+        // 查询所有订单，按 created_at 排序
+        let mut result = self
+            .db
+            .query(
+                r#"
+                SELECT
+                    <string>id AS order_id,
+                    receipt_number,
+                    prev_hash,
+                    curr_hash
+                FROM order
+                ORDER BY created_at
+                "#,
+            )
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+        let orders: Vec<VerifyOrderRow> = result
+            .take(0)
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+
+        let total_orders = orders.len();
+
+        let mut chain_intact = true;
+        let mut chain_resets: Vec<ChainReset> = Vec::new();
+        let mut chain_breaks: Vec<ChainBreak> = Vec::new();
+        let mut invalid_orders = Vec::new();
+        let mut verified_orders = 0usize;
+
+        // 第一个订单的 expected prev_hash 就是它自身存储的值（不猜）
+        let mut expected_prev = orders
+            .first()
+            .map(|o| o.prev_hash.clone())
+            .unwrap_or_else(|| "genesis".to_string());
+
+        for order in &orders {
+            verified_orders += 1;
+
+            if order.prev_hash != expected_prev {
+                chain_intact = false;
+                if order.prev_hash == "genesis" {
+                    chain_resets.push(ChainReset {
+                        receipt_number: order.receipt_number.clone(),
+                        prev_chain_hash: expected_prev.clone(),
+                    });
+                } else {
+                    chain_breaks.push(ChainBreak {
+                        receipt_number: order.receipt_number.clone(),
+                        expected_prev_hash: expected_prev.clone(),
+                        actual_prev_hash: order.prev_hash.clone(),
+                    });
+                }
+            }
+
+            // 验证订单内部事件链
+            let order_verification = self.verify_order(&order.receipt_number).await?;
+            if !order_verification.events_chain_valid {
+                chain_intact = false;
+                invalid_orders.push(order_verification);
+            }
+
+            expected_prev = order.curr_hash.clone();
+        }
+
+        Ok(FullChainVerification {
+            total_orders,
+            verified_orders,
+            chain_intact,
+            chain_resets,
+            chain_breaks,
+            invalid_orders,
+        })
+    }
+
     fn convert_snapshot_to_order(
         &self,
         snapshot: &OrderSnapshot,
@@ -809,5 +1200,320 @@ mod tests {
         let payload_json = serde_json::to_string(&event.payload).unwrap_or_default();
         hasher.update(payload_json.as_bytes());
         format!("{:x}", hasher.finalize())
+    }
+
+    // ========================================================================
+    // Chain Verification Logic Tests
+    // ========================================================================
+
+    /// Helper: build a chain of VerifyEventRow with valid prev/curr linkage
+    fn build_valid_event_chain(count: usize) -> Vec<VerifyEventRow> {
+        let mut events = Vec::with_capacity(count);
+        let mut prev = "order_start".to_string();
+        for i in 0..count {
+            let curr = format!("event_hash_{}", i);
+            events.push(VerifyEventRow {
+                event_id: format!("order_event:{}", i),
+                event_type: "TABLE_OPENED".to_string(),
+                prev_hash: prev,
+                curr_hash: curr.clone(),
+            });
+            prev = curr;
+        }
+        events
+    }
+
+    /// Helper: validate event chain (mirrors the logic in verify_order)
+    fn validate_event_chain(events: &[VerifyEventRow]) -> (bool, Vec<EventVerification>) {
+        let mut invalid = Vec::new();
+        let mut valid = true;
+        for (i, event) in events.iter().enumerate() {
+            let expected_prev = if i == 0 {
+                "order_start".to_string()
+            } else {
+                events[i - 1].curr_hash.clone()
+            };
+            if event.prev_hash != expected_prev {
+                valid = false;
+                invalid.push(EventVerification {
+                    event_id: event.event_id.clone(),
+                    event_type: event.event_type.clone(),
+                    expected_prev_hash: expected_prev,
+                    actual_prev_hash: event.prev_hash.clone(),
+                    valid: false,
+                });
+            }
+        }
+        (valid, invalid)
+    }
+
+    #[test]
+    fn test_event_chain_valid() {
+        let events = build_valid_event_chain(5);
+        let (valid, invalid) = validate_event_chain(&events);
+        assert!(valid);
+        assert!(invalid.is_empty());
+    }
+
+    #[test]
+    fn test_event_chain_broken_first_event() {
+        let mut events = build_valid_event_chain(3);
+        // Break the first event's prev_hash (should be "order_start")
+        events[0].prev_hash = "wrong_start".to_string();
+
+        let (valid, invalid) = validate_event_chain(&events);
+        assert!(!valid);
+        assert_eq!(invalid.len(), 1);
+        assert_eq!(invalid[0].event_id, "order_event:0");
+        assert_eq!(invalid[0].expected_prev_hash, "order_start");
+        assert_eq!(invalid[0].actual_prev_hash, "wrong_start");
+    }
+
+    #[test]
+    fn test_event_chain_broken_middle() {
+        let mut events = build_valid_event_chain(5);
+        // Break event[2]'s prev_hash
+        events[2].prev_hash = "tampered".to_string();
+
+        let (valid, invalid) = validate_event_chain(&events);
+        assert!(!valid);
+        assert_eq!(invalid.len(), 1);
+        assert_eq!(invalid[0].event_id, "order_event:2");
+        assert_eq!(invalid[0].expected_prev_hash, "event_hash_1");
+        assert_eq!(invalid[0].actual_prev_hash, "tampered");
+    }
+
+    #[test]
+    fn test_event_chain_multiple_breaks() {
+        let mut events = build_valid_event_chain(5);
+        events[1].prev_hash = "tampered_1".to_string();
+        events[3].prev_hash = "tampered_3".to_string();
+
+        let (valid, invalid) = validate_event_chain(&events);
+        assert!(!valid);
+        assert_eq!(invalid.len(), 2);
+        assert_eq!(invalid[0].event_id, "order_event:1");
+        assert_eq!(invalid[1].event_id, "order_event:3");
+    }
+
+    #[test]
+    fn test_event_chain_empty() {
+        let events: Vec<VerifyEventRow> = vec![];
+        let (valid, invalid) = validate_event_chain(&events);
+        assert!(valid);
+        assert!(invalid.is_empty());
+    }
+
+    /// Helper: build a chain of VerifyOrderRow with valid prev/curr linkage
+    fn build_valid_order_chain(count: usize, genesis: &str) -> Vec<VerifyOrderRow> {
+        let mut orders = Vec::with_capacity(count);
+        let mut prev = genesis.to_string();
+        for i in 0..count {
+            let curr = format!("order_hash_{}", i);
+            orders.push(VerifyOrderRow {
+                order_id: format!("order:{}", i),
+                receipt_number: format!("FAC202601290{:04}", i + 1),
+                prev_hash: prev,
+                curr_hash: curr.clone(),
+            });
+            prev = curr;
+        }
+        orders
+    }
+
+    /// Helper: validate order chain (mirrors the logic in verify_daily_chain)
+    fn validate_order_chain(
+        orders: &[VerifyOrderRow],
+        expected_first_prev: &str,
+    ) -> (bool, Option<ChainBreak>) {
+        let mut intact = true;
+        let mut first_break = None;
+        let mut expected_prev = expected_first_prev.to_string();
+
+        for order in orders {
+            if order.prev_hash != expected_prev {
+                intact = false;
+                if first_break.is_none() {
+                    first_break = Some(ChainBreak {
+                        receipt_number: order.receipt_number.clone(),
+                        expected_prev_hash: expected_prev.clone(),
+                        actual_prev_hash: order.prev_hash.clone(),
+                    });
+                }
+            }
+            expected_prev = order.curr_hash.clone();
+        }
+
+        (intact, first_break)
+    }
+
+    #[test]
+    fn test_order_chain_valid_from_genesis() {
+        let orders = build_valid_order_chain(3, "genesis");
+        let (intact, first_break) = validate_order_chain(&orders, "genesis");
+        assert!(intact);
+        assert!(first_break.is_none());
+    }
+
+    #[test]
+    fn test_order_chain_valid_from_previous_day() {
+        let prev_day_hash = "prev_day_last_order_hash";
+        let orders = build_valid_order_chain(3, prev_day_hash);
+        let (intact, first_break) = validate_order_chain(&orders, prev_day_hash);
+        assert!(intact);
+        assert!(first_break.is_none());
+    }
+
+    #[test]
+    fn test_order_chain_broken_first_order() {
+        let orders = build_valid_order_chain(3, "genesis");
+        // Validate with wrong expected prev — simulates missing previous day data
+        let (intact, first_break) = validate_order_chain(&orders, "wrong_genesis");
+        assert!(!intact);
+        let brk = first_break.unwrap();
+        assert_eq!(brk.receipt_number, "FAC2026012900001");
+        assert_eq!(brk.expected_prev_hash, "wrong_genesis");
+        assert_eq!(brk.actual_prev_hash, "genesis");
+    }
+
+    #[test]
+    fn test_order_chain_broken_middle() {
+        let mut orders = build_valid_order_chain(5, "genesis");
+        // Tamper with order[2]'s prev_hash
+        orders[2].prev_hash = "tampered".to_string();
+
+        let (intact, first_break) = validate_order_chain(&orders, "genesis");
+        assert!(!intact);
+        let brk = first_break.unwrap();
+        assert_eq!(brk.receipt_number, "FAC2026012900003");
+        assert_eq!(brk.expected_prev_hash, "order_hash_1");
+        assert_eq!(brk.actual_prev_hash, "tampered");
+    }
+
+    #[test]
+    fn test_order_chain_empty() {
+        let orders: Vec<VerifyOrderRow> = vec![];
+        let (intact, first_break) = validate_order_chain(&orders, "genesis");
+        assert!(intact);
+        assert!(first_break.is_none());
+    }
+
+    #[test]
+    fn test_daily_chain_verification_intact() {
+        let verification = DailyChainVerification {
+            date: "2026-01-29".to_string(),
+            total_orders: 10,
+            verified_orders: 10,
+            chain_intact: true,
+            chain_resets: vec![],
+            chain_breaks: vec![],
+            invalid_orders: vec![],
+        };
+        assert!(verification.chain_intact);
+        assert!(verification.chain_resets.is_empty());
+        assert!(verification.chain_breaks.is_empty());
+
+        let json = serde_json::to_string(&verification).unwrap();
+        assert!(json.contains("\"chain_intact\":true"));
+    }
+
+    #[test]
+    fn test_daily_chain_verification_with_reset() {
+        // 断联事故：O4 从 genesis 重新开始
+        let verification = DailyChainVerification {
+            date: "2026-01-29".to_string(),
+            total_orders: 6,
+            verified_orders: 6,
+            chain_intact: false,
+            chain_resets: vec![ChainReset {
+                receipt_number: "FAC2026012910004".to_string(),
+                prev_chain_hash: "ccc".to_string(),
+            }],
+            chain_breaks: vec![],
+            invalid_orders: vec![],
+        };
+        assert!(!verification.chain_intact);
+        assert_eq!(verification.chain_resets.len(), 1);
+        assert!(verification.chain_breaks.is_empty()); // 不是数据损坏
+
+        let json = serde_json::to_string(&verification).unwrap();
+        assert!(json.contains("\"chain_resets\""));
+        assert!(json.contains("\"prev_chain_hash\":\"ccc\""));
+    }
+
+    #[test]
+    fn test_daily_chain_verification_with_corruption() {
+        // 数据损坏：O3.prev_hash 被篡改
+        let verification = DailyChainVerification {
+            date: "2026-01-29".to_string(),
+            total_orders: 5,
+            verified_orders: 5,
+            chain_intact: false,
+            chain_resets: vec![],
+            chain_breaks: vec![ChainBreak {
+                receipt_number: "FAC2026012910003".to_string(),
+                expected_prev_hash: "bbb".to_string(),
+                actual_prev_hash: "tampered".to_string(),
+            }],
+            invalid_orders: vec![],
+        };
+        assert!(!verification.chain_intact);
+        assert!(verification.chain_resets.is_empty());
+        assert_eq!(verification.chain_breaks.len(), 1);
+    }
+
+    #[test]
+    fn test_daily_chain_verification_both_issues() {
+        // 同时有事故和损坏
+        let verification = DailyChainVerification {
+            date: "2026-01-29".to_string(),
+            total_orders: 10,
+            verified_orders: 10,
+            chain_intact: false,
+            chain_resets: vec![ChainReset {
+                receipt_number: "FAC2026012910005".to_string(),
+                prev_chain_hash: "ddd".to_string(),
+            }],
+            chain_breaks: vec![ChainBreak {
+                receipt_number: "FAC2026012910008".to_string(),
+                expected_prev_hash: "ggg".to_string(),
+                actual_prev_hash: "tampered".to_string(),
+            }],
+            invalid_orders: vec![],
+        };
+        assert!(!verification.chain_intact);
+        assert_eq!(verification.chain_resets.len(), 1);
+        assert_eq!(verification.chain_breaks.len(), 1);
+    }
+
+    #[test]
+    fn test_order_verification_model() {
+        let verification = OrderVerification {
+            receipt_number: "FAC2026012910001".to_string(),
+            order_id: "order:abc123".to_string(),
+            prev_hash: "genesis".to_string(),
+            curr_hash: "some_hash".to_string(),
+            events_chain_valid: true,
+            event_count: 5,
+            invalid_events: vec![],
+        };
+        assert!(verification.events_chain_valid);
+        assert_eq!(verification.event_count, 5);
+
+        let json = serde_json::to_string(&verification).unwrap();
+        assert!(json.contains("\"events_chain_valid\":true"));
+    }
+
+    #[test]
+    fn test_chain_break_model() {
+        let brk = ChainBreak {
+            receipt_number: "FAC2026012910003".to_string(),
+            expected_prev_hash: "hash_of_order_2".to_string(),
+            actual_prev_hash: "tampered_hash".to_string(),
+        };
+
+        let json = serde_json::to_string(&brk).unwrap();
+        assert!(json.contains("\"expected_prev_hash\":\"hash_of_order_2\""));
+        assert!(json.contains("\"actual_prev_hash\":\"tampered_hash\""));
     }
 }

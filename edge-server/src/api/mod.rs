@@ -48,5 +48,8 @@ pub mod daily_reports;
 // Analytics (数据统计)
 pub mod statistics;
 
+// Archive (归档验证)
+pub mod archive_verify;
+
 // Re-export common types for handlers
 pub use crate::utils::AppResult;
