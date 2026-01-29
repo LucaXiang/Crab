@@ -31,6 +31,10 @@ pub struct OrderSummary {
     pub guest_count: i32,
     pub start_time: i64,
     pub end_time: Option<i64>,
+    // === Void Metadata ===
+    pub void_type: Option<String>,
+    pub loss_reason: Option<String>,
+    pub loss_amount: Option<f64>,
 }
 
 /// Split item in a payment
@@ -110,6 +114,10 @@ pub struct OrderDetail {
     pub start_time: i64,
     pub end_time: Option<i64>,
     pub operator_name: Option<String>,
+    // === Void Metadata ===
+    pub void_type: Option<String>,
+    pub loss_reason: Option<String>,
+    pub loss_amount: Option<f64>,
     pub items: Vec<OrderItemDetail>,
     pub payments: Vec<OrderPaymentDetail>,
     pub timeline: Vec<OrderEventDetail>,

@@ -88,8 +88,12 @@ export const SetupScreen: React.FC = () => {
   };
 
   const handleCloseApp = async () => {
-    const appWindow = getCurrentWindow();
-    await appWindow.close();
+    try {
+      const appWindow = getCurrentWindow();
+      await appWindow.destroy();
+    } catch (err) {
+      console.error('Failed to close app:', err);
+    }
   };
 
   const stepLabels = ['Activate', 'Mode', 'Configure', 'Complete'];

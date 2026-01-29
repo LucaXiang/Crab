@@ -42,7 +42,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
   });
 
   return (
-    <div className="w-80 bg-white border-r border-gray-200 flex flex-col shrink-0">
+    <div className="w-96 bg-white border-r border-gray-200 flex flex-col shrink-0">
       <div className="p-4 border-b border-gray-100 shrink-0">
         <div className="flex items-center gap-3 mb-4">
           <button onClick={onBack} className="p-2 -ml-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors">
@@ -86,25 +86,21 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                 <button
                   key={order.order_id}
                   onClick={() => onSelect(order.order_id)}
-                  className={`w-full p-4 text-left transition-colors flex justify-between items-center group ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
+                  className={`w-full p-4 text-left transition-colors flex justify-between items-start group ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
                 >
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`font-bold ${isSelected ? 'text-primary-600' : 'text-gray-800'}`}>
                         {order.receipt_number || order.table_name}
                       </span>
-                      {isVoid && (
-                        <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">
-                          {t('common.status.void')}
-                        </span>
-                      )}
                     </div>
                     <div className="flex gap-2 text-[0.625rem] items-center mb-1">
-                      {order.receipt_number && order.table_name !== 'RETAIL' && (
-                        <span className="text-gray-500 bg-gray-100 px-1 rounded">{order.table_name}</span>
-                      )}
-                      {!order.receipt_number && (
-                        <span className="text-gray-500 bg-gray-100 px-1 rounded">{order.table_name}</span>
+                      {order.is_retail ? (
+                        <span className="text-gray-500 bg-gray-100 px-1 rounded">{t('common.label.retail')}</span>
+                      ) : (
+                        order.table_name && (
+                          <span className="text-gray-500 bg-gray-100 px-1 rounded">{order.table_name}</span>
+                        )
                       )}
                       <span className={`px-1.5 py-0.5 rounded-full font-bold ${isVoid ? 'bg-gray-200 text-gray-600' : (isMoved || isMerged) ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                         {isVoid
@@ -119,6 +115,24 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                     <div className="text-xs text-gray-400 font-mono">
                       {new Date(order.end_time || order.start_time).toLocaleString([], { hour12: false })}
                     </div>
+                    {isVoid && (order.void_type || order.loss_reason || (order.loss_amount ?? 0) > 0) && (
+                      <div className="mt-2 text-xs bg-red-50 p-2 rounded border border-red-100 flex flex-col gap-1">
+                        <div className="flex items-center gap-2 flex-wrap text-red-700 font-medium">
+                          {order.void_type && <span>{t(`history.void_type.${order.void_type}`)}</span>}
+                          {order.loss_reason && (
+                            <>
+                              <span className="w-1 h-1 rounded-full bg-red-300"></span>
+                              <span>{t(`history.loss_reason.${order.loss_reason}`)}</span>
+                            </>
+                          )}
+                        </div>
+                        {(order.loss_amount ?? 0) > 0 && (
+                          <div className="text-red-600 font-semibold">
+                            {t('common.label.loss_amount')}: {formatCurrency(order.loss_amount || 0)}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                     <div className="text-right">
 	                    <div className={`font-bold ${isVoid || isMoved || isMerged ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{formatCurrency(order.total)}</div>

@@ -161,16 +161,9 @@ pub async fn heartbeat_shift(
 #[tauri::command(rename_all = "snake_case")]
 pub async fn recover_stale_shifts(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    today: Option<String>,
 ) -> Result<ApiResponse<Vec<Shift>>, String> {
     let bridge = bridge.read().await;
-
-    let path = match today {
-        Some(t) => format!("/api/shifts/recover?today={}", encode(&t)),
-        None => "/api/shifts/recover".to_string(),
-    };
-
-    match bridge.post::<Vec<Shift>, _>(&path, &()).await {
+    match bridge.post::<Vec<Shift>, _>("/api/shifts/recover", &()).await {
         Ok(shifts) => Ok(ApiResponse::success(shifts)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }

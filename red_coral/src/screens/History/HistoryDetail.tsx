@@ -99,7 +99,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
         <div>
           <div className="flex items-center gap-3 mb-2">
             <h1 className={`text-2xl font-bold ${isVoid || isMerged || isMoved ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
-              {order.receipt_number || order.table_name}
+              {order.receipt_number || (order.is_retail ? t('common.label.retail') : order.table_name)}
             </h1>
             {isVoid && (
               <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded uppercase">
@@ -150,6 +150,30 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
               </span>
             </div>
           </div>
+
+          {/* Void Information */}
+          {isVoid && (order.void_type || order.loss_reason || order.loss_amount !== null) && (
+            <div className="mt-4 pt-3 border-t border-red-100 flex flex-wrap gap-6 text-sm">
+              {order.void_type && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs text-red-400 font-medium uppercase">{t('common.status.void')}</span>
+                  <span className="text-red-700 font-medium">{t(`history.void_type.${order.void_type}`)}</span>
+                </div>
+              )}
+              {order.loss_reason && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs text-gray-400 font-medium uppercase">{t('common.label.description')}</span>
+                  <span className="text-gray-700 font-medium">{t(`history.loss_reason.${order.loss_reason}`)}</span>
+                </div>
+              )}
+              {order.loss_amount !== null && order.loss_amount !== undefined && (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs text-red-400 font-medium uppercase">{t('common.label.loss_amount')}</span>
+                  <span className="text-red-700 font-bold">{formatCurrency(order.loss_amount)}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="text-right">
           <div className="text-sm text-gray-500 uppercase font-bold tracking-wider mb-1">{t('history.info.total_amount')}</div>

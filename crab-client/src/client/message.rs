@@ -2,7 +2,7 @@
 // RPC 消息客户端 - mTLS 和内存通信
 
 use rustls_pki_types::{CertificateDer, ServerName};
-use shared::message::{BusMessage, HandshakePayload, RequestCommandPayload, PROTOCOL_VERSION};
+use shared::message::{BusMessage, HandshakePayload, PROTOCOL_VERSION, RequestCommandPayload};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -10,8 +10,8 @@ use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio::sync::{Mutex, Notify, RwLock, broadcast, oneshot};
-use tokio_rustls::client::TlsStream;
 use tokio_rustls::TlsConnector;
+use tokio_rustls::client::TlsStream;
 use uuid::Uuid;
 
 use crate::MessageClientConfig;
@@ -231,25 +231,32 @@ impl NetworkMessageClient {
         let mut ca_reader = std::io::Cursor::new(&params.ca_cert_pem);
         let ca_certs: Vec<CertificateDer> = rustls_pemfile::certs(&mut ca_reader)
             .collect::<Result<_, _>>()
-            .map_err(|e| crate::MessageError::Connection(format!("Failed to parse CA certs: {}", e)))?;
+            .map_err(|e| {
+                crate::MessageError::Connection(format!("Failed to parse CA certs: {}", e))
+            })?;
         if ca_certs.is_empty() {
-            return Err(crate::MessageError::Connection("No CA certificates found".to_string()));
+            return Err(crate::MessageError::Connection(
+                "No CA certificates found".to_string(),
+            ));
         }
 
         // 解析客户端证书
         let mut cert_reader = std::io::Cursor::new(&params.client_cert_pem);
         let client_certs: Vec<CertificateDer> = rustls_pemfile::certs(&mut cert_reader)
             .collect::<Result<_, _>>()
-            .map_err(|e| crate::MessageError::Connection(format!("Failed to parse client cert: {}", e)))?;
-        let client_cert = client_certs
-            .into_iter()
-            .next()
-            .ok_or_else(|| crate::MessageError::Connection("No client certificate found".to_string()))?;
+            .map_err(|e| {
+                crate::MessageError::Connection(format!("Failed to parse client cert: {}", e))
+            })?;
+        let client_cert = client_certs.into_iter().next().ok_or_else(|| {
+            crate::MessageError::Connection("No client certificate found".to_string())
+        })?;
 
         // 解析私钥
         let mut key_reader = std::io::Cursor::new(&params.client_key_pem);
         let private_key = rustls_pemfile::private_key(&mut key_reader)
-            .map_err(|e| crate::MessageError::Connection(format!("Failed to parse private key: {}", e)))?
+            .map_err(|e| {
+                crate::MessageError::Connection(format!("Failed to parse private key: {}", e))
+            })?
             .ok_or_else(|| crate::MessageError::Connection("No private key found".to_string()))?;
 
         // 构建 TLS 配置
@@ -266,7 +273,9 @@ impl NetworkMessageClient {
             .dangerous()
             .with_custom_certificate_verifier(Arc::new(verifier))
             .with_client_auth_cert(client_cert_chain, private_key)
-            .map_err(|e| crate::MessageError::Connection(format!("Failed to configure TLS: {}", e)))?;
+            .map_err(|e| {
+                crate::MessageError::Connection(format!("Failed to configure TLS: {}", e))
+            })?;
 
         // TCP 连接
         let tcp_stream = TcpStream::connect(&params.addr)
@@ -294,7 +303,16 @@ impl NetworkMessageClient {
         let stopped = self.stopped.clone();
 
         tokio::spawn(async move {
-            Self::reader_task_loop(read_half, pending, notify_tx, state, reconnect_tx, stop_notify, stopped).await;
+            Self::reader_task_loop(
+                read_half,
+                pending,
+                notify_tx,
+                state,
+                reconnect_tx,
+                stop_notify,
+                stopped,
+            )
+            .await;
         });
     }
 
@@ -346,14 +364,18 @@ impl NetworkMessageClient {
             match self.request(&ping_msg, timeout).await {
                 Ok(response) => {
                     tracing::trace!("Heartbeat: pong received");
-                    
+
                     // 解析 pong 响应中的 epoch 和 server_time
-                    let (server_epoch, server_time) = if let Ok(payload) = 
-                        response.parse_payload::<shared::message::ResponsePayload>() 
+                    let (server_epoch, server_time) = if let Ok(payload) =
+                        response.parse_payload::<shared::message::ResponsePayload>()
                     {
                         if let Some(data) = payload.data {
-                            let epoch = data.get("epoch").and_then(|v| v.as_str()).map(String::from);
-                            let time = data.get("server_time").and_then(|v| v.as_str()).map(String::from);
+                            let epoch =
+                                data.get("epoch").and_then(|v| v.as_str()).map(String::from);
+                            let time = data
+                                .get("server_time")
+                                .and_then(|v| v.as_str())
+                                .map(String::from);
                             (epoch, time)
                         } else {
                             (None, None)
@@ -372,7 +394,7 @@ impl NetworkMessageClient {
                 }
                 Err(e) => {
                     tracing::warn!("Heartbeat failed: {}", e);
-                    
+
                     // 广播心跳失败状态
                     let _ = self.heartbeat_tx.send(HeartbeatStatus {
                         healthy: false,
@@ -380,7 +402,7 @@ impl NetworkMessageClient {
                         server_time: None,
                         last_heartbeat_ms: now_ms,
                     });
-                    
+
                     // 心跳失败，触发断连处理
                     self.handle_disconnection().await;
                 }
@@ -432,7 +454,9 @@ impl NetworkMessageClient {
         let Some(params) = params else {
             tracing::error!("No connection parameters for reconnection");
             self.set_state(ConnectionState::Disconnected);
-            let _ = self.reconnect_tx.send(ReconnectEvent::ReconnectFailed { attempts: 0 });
+            let _ = self
+                .reconnect_tx
+                .send(ReconnectEvent::ReconnectFailed { attempts: 0 });
             return;
         };
 
@@ -498,11 +522,9 @@ impl NetworkMessageClient {
                 remaining = remaining.saturating_sub(wait_time);
 
                 // 如果还有剩余等待时间，做快速网络探测
-                if remaining > Duration::ZERO {
-                    if Self::quick_tcp_probe(&params.addr).await {
-                        tracing::info!("Network recovered, attempting immediate reconnection");
-                        break; // 跳出等待循环，立即重连
-                    }
+                if remaining > Duration::ZERO && Self::quick_tcp_probe(&params.addr).await {
+                    tracing::info!("Network recovered, attempting immediate reconnection");
+                    break; // 跳出等待循环，立即重连
                 }
             }
 
@@ -513,12 +535,7 @@ impl NetworkMessageClient {
 
     /// 快速 TCP 探测 - 检测网络是否可达
     async fn quick_tcp_probe(addr: &str) -> bool {
-        match tokio::time::timeout(
-            Duration::from_millis(500),
-            TcpStream::connect(addr),
-        )
-        .await
-        {
+        match tokio::time::timeout(Duration::from_millis(500), TcpStream::connect(addr)).await {
             Ok(Ok(_)) => true,
             _ => false,
         }
@@ -688,15 +705,17 @@ impl NetworkMessageClient {
         {
             let guard = self.write_stream.read().await;
             if guard.is_none() {
-                return Err(crate::MessageError::Connection("No active connection".to_string()));
+                return Err(crate::MessageError::Connection(
+                    "No active connection".to_string(),
+                ));
             }
         }
 
         // 获取写锁来实际写入
         let mut guard = self.write_stream.write().await;
-        let stream = guard.as_mut().ok_or_else(|| {
-            crate::MessageError::Connection("No active connection".to_string())
-        })?;
+        let stream = guard
+            .as_mut()
+            .ok_or_else(|| crate::MessageError::Connection("No active connection".to_string()))?;
 
         // 序列化消息
         let mut data = Vec::new();
@@ -733,11 +752,11 @@ impl NetworkMessageClient {
         self.stopped.store(true, Ordering::SeqCst);
         self.set_state(ConnectionState::Disconnected);
         self.stop_notify.notify_waiters();
-        
+
         // 清理写入流
         let mut guard = self.write_stream.write().await;
         *guard = None;
-        
+
         Ok(())
     }
 
@@ -853,7 +872,7 @@ impl NetworkMessageClient {
             // 清理
             let mut pending = self.pending_requests.lock().await;
             pending.remove(&correlation_id);
-            
+
             // 写入失败可能意味着连接已断开
             self.handle_disconnection().await;
             return Err(e);

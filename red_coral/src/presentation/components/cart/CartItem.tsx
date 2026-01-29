@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Minus, Plus, Percent } from 'lucide-react';
 import { CartItem as CartItemType } from '@/core/domain/types';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
@@ -16,6 +16,7 @@ export const CartItem = React.memo<CartItemProps>(({
   onQuantityChange,
   onClick
 }) => {
+  const [isHoveringControl, setIsHoveringControl] = useState(false);
   const performanceMode = useSettingsStore(state => state.performanceMode);
   const discountPercent = item.manual_discount_percent || 0;
   
@@ -67,78 +68,81 @@ export const CartItem = React.memo<CartItemProps>(({
 
   return (
     <div
-      className={`flex justify-between items-start py-2 px-3 relative group cursor-pointer ${
-        performanceMode ? 'hover:bg-gray-100' : 'hover:bg-gray-50'
+      className={`flex justify-between items-stretch py-2 px-3 relative group cursor-pointer antialiased ${
+        !isHoveringControl ? (performanceMode ? 'hover:bg-gray-100' : 'hover:bg-gray-50') : ''
       }`}
+      {...clickHandlers}
     >
-      <div className="flex-1 min-w-0 pr-4" {...clickHandlers}>
-        {/* Line 1: Product Name */}
-        <div className="font-medium text-gray-800 text-lg truncate">
-          {item.name}
-        </div>
-
-        {/* Line 2: Specification (if multi-spec) */}
-        {hasMultiSpec && (
-          <div className="text-sm text-gray-600 mt-0.5">
-            {item.selected_specification!.name}
+      <div className="flex-1 min-w-0 pr-4 flex flex-col justify-between">
+        <div>
+          {/* Line 1: Product Name */}
+          <div className="font-medium text-gray-800 text-lg truncate">
+            {item.name}
           </div>
-        )}
 
-        {/* Line 3: Attribute Tags */}
-        {hasOptions && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {item.selected_options!.map((opt, idx) => (
-              <span
-                key={idx}
-                className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded"
-              >
-                {opt.attribute_name}:{opt.option_name}
-                {opt.price_modifier != null && opt.price_modifier !== 0 && (
-                  <span className={opt.price_modifier > 0 ? 'text-orange-600 ml-0.5' : 'text-green-600 ml-0.5'}>
-                    {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
-                  </span>
-                )}
-              </span>
-            ))}
-          </div>
-        )}
+          {/* Line 2: Specification (if multi-spec) */}
+          {hasMultiSpec && (
+            <div className="text-sm text-gray-600 mt-0.5">
+              {item.selected_specification!.name}
+            </div>
+          )}
 
-        {/* Line 4: Note */}
-        {hasNote && (
-          <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-            <span>📝</span>
-            <span className="truncate">{item.note}</span>
-          </div>
-        )}
-
-        {/* Line 5: Applied Price Rules (max 2 displayed) */}
-        {hasActiveRules && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {activeRules.slice(0, 2).map((rule) => (
-              <span
-                key={rule.rule_id}
-                className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
-                  rule.rule_type === 'DISCOUNT'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-amber-100 text-amber-700'
-                }`}
-                title={`${rule.display_name}: ${rule.adjustment_type === 'PERCENTAGE' ? `${rule.adjustment_value}%` : formatCurrency(rule.adjustment_value)}`}
-              >
-                <Percent size={10} />
-                <span>{rule.receipt_name || rule.display_name}</span>
-                <span className="font-medium">
-                  {rule.rule_type === 'DISCOUNT' ? '-' : '+'}
-                  {formatCurrency(Math.abs(rule.calculated_amount))}
+          {/* Line 3: Attribute Tags */}
+          {hasOptions && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {item.selected_options!.map((opt, idx) => (
+                <span
+                  key={idx}
+                  className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded"
+                >
+                  {opt.attribute_name}:{opt.option_name}
+                  {opt.price_modifier != null && opt.price_modifier !== 0 && (
+                    <span className={opt.price_modifier > 0 ? 'text-orange-600 ml-0.5' : 'text-green-600 ml-0.5'}>
+                      {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
+                    </span>
+                  )}
                 </span>
-              </span>
-            ))}
-            {activeRules.length > 2 && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
-                +{activeRules.length - 2}
-              </span>
-            )}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+
+          {/* Line 4: Note */}
+          {hasNote && (
+            <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+              <span>📝</span>
+              <span className="truncate">{item.note}</span>
+            </div>
+          )}
+
+          {/* Line 5: Applied Price Rules (max 2 displayed) */}
+          {hasActiveRules && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {activeRules.slice(0, 2).map((rule) => (
+                <span
+                  key={rule.rule_id}
+                  className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
+                    rule.rule_type === 'DISCOUNT'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}
+                  title={`${rule.display_name}: ${rule.adjustment_type === 'PERCENTAGE' ? `${rule.adjustment_value}%` : formatCurrency(rule.adjustment_value)}`}
+                >
+                  <Percent size={10} />
+                  <span>{rule.receipt_name || rule.display_name}</span>
+                  <span className="font-medium">
+                    {rule.rule_type === 'DISCOUNT' ? '-' : '+'}
+                    {formatCurrency(Math.abs(rule.calculated_amount))}
+                  </span>
+                </span>
+              ))}
+              {activeRules.length > 2 && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                  +{activeRules.length - 2}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Line 6: Unit Price */}
         <div className="flex items-center gap-2 mt-1">
@@ -154,7 +158,7 @@ export const CartItem = React.memo<CartItemProps>(({
       </div>
 
       {/* Right Column */}
-      <div className="flex flex-col items-end gap-2 shrink-0">
+      <div className="flex flex-col items-end justify-between gap-2 shrink-0">
         {/* Line Total + Discount Badge */}
         <div className="flex items-center gap-2">
           {discountPercent > 0 && (
@@ -168,26 +172,36 @@ export const CartItem = React.memo<CartItemProps>(({
         </div>
 
         {/* External ID + Quantity Control */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-end gap-2">
           {item.selected_specification?.external_id && (
             <div className="text-xs text-white bg-gray-900/85 font-bold font-mono px-2 py-0.5 rounded">
               {item.selected_specification.external_id}
             </div>
           )}
-          <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+          {/* Quantity Controls */}
+          <div 
+            className="flex items-center bg-gray-100 rounded-lg overflow-hidden border border-gray-200 shadow-sm"
+            onClick={e => e.stopPropagation()}
+            onMouseEnter={() => setIsHoveringControl(true)}
+            onMouseLeave={() => setIsHoveringControl(false)}
+          >
             <button
               onClick={(e) => handleQuantityChange(e, -1)}
               className="p-3 min-w-[2.75rem] min-h-[2.75rem] flex items-center justify-center hover:bg-gray-200 active:bg-gray-300 text-gray-600 transition-colors"
               disabled={item.quantity <= 1}
             >
-              <Minus size={18} strokeWidth={3} />
+              <Minus size={18} strokeWidth={2.5} />
             </button>
-            <span className="w-10 text-center font-semibold text-gray-700 text-base">{item.quantity}</span>
+            
+            <span className="w-10 text-center font-bold text-gray-900 text-lg tabular-nums select-none">
+              {item.quantity}
+            </span>
+
             <button
               onClick={(e) => handleQuantityChange(e, 1)}
               className="p-3 min-w-[2.75rem] min-h-[2.75rem] flex items-center justify-center hover:bg-gray-200 active:bg-gray-300 text-gray-600 transition-colors"
             >
-              <Plus size={18} strokeWidth={3} />
+              <Plus size={18} strokeWidth={2.5} />
             </button>
           </div>
         </div>

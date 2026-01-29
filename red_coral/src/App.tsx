@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
-import { useSyncListener, useConnectionRecovery, useOrderEventListener, useSyncConnection, useShiftCloseGuard } from '@/core/hooks';
+import { useSyncListener, useConnectionRecovery, useOrderEventListener, useSyncConnection, useShiftRecovery } from '@/core/hooks';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
@@ -115,8 +115,8 @@ const App: React.FC = () => {
   // 挂载订单事件监听 hook (Event Sourcing)
   useOrderEventListener();
 
-  // 挂载班次关闭守卫 (退出时检查未关闭班次)
-  useShiftCloseGuard();
+  // 启动时自动恢复跨营业日的僵尸班次
+  useShiftRecovery();
 
   // Check for first run and clear storage if needed
   useEffect(() => {

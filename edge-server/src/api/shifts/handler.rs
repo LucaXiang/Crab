@@ -4,11 +4,12 @@ use axum::{
     Json,
     extract::{Path, Query, State},
 };
+use chrono::{Local, NaiveTime};
 use serde::Deserialize;
 
 use crate::core::ServerState;
 use crate::db::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
-use crate::db::repository::ShiftRepository;
+use crate::db::repository::{ShiftRepository, StoreInfoRepository};
 use crate::utils::{AppError, AppResult};
 
 const RESOURCE: &str = "shift";
@@ -175,24 +176,39 @@ pub async fn heartbeat(
     Ok(Json(true))
 }
 
-/// Recover query params
-#[derive(Debug, Deserialize)]
-pub struct RecoverQuery {
-    pub today: Option<String>,
-}
-
 /// POST /api/shifts/recover - 恢复跨天的僵尸班次
+///
+/// 根据 store_info.business_day_cutoff 计算当前营业日起始时间，
+/// 自动关闭所有在此之前开启的僵尸班次。
 pub async fn recover_stale(
     State(state): State<ServerState>,
-    Query(query): Query<RecoverQuery>,
 ) -> AppResult<Json<Vec<Shift>>> {
-    let today = query
-        .today
-        .unwrap_or_else(|| chrono::Local::now().format("%Y-%m-%d").to_string());
+    // 读取营业日分界时间
+    let store_repo = StoreInfoRepository::new(state.db.clone());
+    let cutoff = store_repo
+        .get()
+        .await
+        .ok()
+        .flatten()
+        .map(|s| s.business_day_cutoff)
+        .unwrap_or_else(|| "00:00".to_string());
+
+    let cutoff_time = NaiveTime::parse_from_str(&cutoff, "%H:%M")
+        .unwrap_or(NaiveTime::MIN);
+
+    // 计算当前营业日起始时间
+    // 如果当前时间 < cutoff，说明还在"昨天"的营业日
+    let now = Local::now();
+    let today_business_date = if now.time() < cutoff_time {
+        (now - chrono::Duration::days(1)).date_naive()
+    } else {
+        now.date_naive()
+    };
+    let business_day_start = format!("{}T{}:00Z", today_business_date, cutoff);
 
     let repo = ShiftRepository::new(state.db.clone());
     let recovered = repo
-        .recover_stale_shifts(&today)
+        .recover_stale_shifts(&business_day_start)
         .await
         .map_err(|e| AppError::database(e.to_string()))?;
 

@@ -172,6 +172,9 @@ mod tests {
             loss_reason: None,
             loss_amount: None,
             void_note: None,
+            has_amount_split: false,
+            aa_total_shares: None,
+            aa_paid_shares: 0,
         };
 
         // Create a Sync message with resource="order_sync" (like edge-server does)

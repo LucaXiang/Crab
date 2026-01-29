@@ -9,6 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useShiftStore } from '@/core/stores/shift';
+import { useShiftCloseGuard } from '@/core/hooks';
 import { ShiftActionModal } from '@/features/shift';
 import { useI18n } from '@/hooks/useI18n';
 
@@ -19,6 +20,9 @@ interface ShiftGuardProps {
 export const ShiftGuard: React.FC<ShiftGuardProps> = ({ children }) => {
   const { t } = useI18n();
   const user = useAuthStore((state) => state.user);
+
+  // 只在 POS 页面拦截窗口关闭（检查未关闭班次）
+  useShiftCloseGuard();
   const {
     currentShift,
     needsOpenShift,

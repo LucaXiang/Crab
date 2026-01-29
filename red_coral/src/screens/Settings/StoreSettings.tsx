@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStoreInfo, useStoreInfoStore } from '@/core/stores/settings';
 import { useI18n } from '@/hooks/useI18n';
-import { Save, Store, Building2, MapPin, Phone, Mail, Globe, CreditCard, ImageIcon, Loader2 } from 'lucide-react';
+import { Save, Store, Building2, MapPin, Phone, Mail, Globe, CreditCard, ImageIcon, Loader2, Clock } from 'lucide-react';
 import { useDirtyForm } from '@/shared/hooks/useDirtyForm';
 import { toast } from '@/presentation/components/Toast';
 
@@ -25,6 +25,7 @@ export const StoreSettings: React.FC = () => {
     phone: info.phone || '',
     email: info.email || '',
     website: info.website || '',
+    businessDayCutoff: info.business_day_cutoff || '00:00',
   };
 
   const { values: formData, handleChange, isDirty, reset } = useDirtyForm(formInfo);
@@ -40,6 +41,7 @@ export const StoreSettings: React.FC = () => {
         phone: info.phone || '',
         email: info.email || '',
         website: info.website || '',
+        businessDayCutoff: info.business_day_cutoff || '00:00',
       });
     }
   }, [isLoaded, info]);
@@ -61,6 +63,7 @@ export const StoreSettings: React.FC = () => {
         phone: formData.phone || null,
         email: formData.email || null,
         website: formData.website || null,
+        business_day_cutoff: formData.businessDayCutoff,
       });
       reset(formData);
       toast.success(t('common.message.save_success'));
@@ -253,6 +256,59 @@ export const StoreSettings: React.FC = () => {
                     autoComplete="new-password"
                     className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2.5 border transition-colors"
                   />
+                </div>
+              </div>
+            </div>
+
+            <div className="col-span-2 border-t border-gray-100 my-2"></div>
+
+            {/* Business Settings Group */}
+            <div className="col-span-2">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-gray-400" />
+                {t('settings.store.form.business_settings')}
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('settings.store.form.business_day_cutoff')}
+                  </label>
+                  <input
+                    type="time"
+                    name="businessDayCutoff"
+                    value={formData.businessDayCutoff}
+                    onChange={onInputChange}
+                    className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2.5 border transition-colors"
+                  />
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    {t('settings.store.form.business_day_cutoff_help')}
+                  </p>
+                  {/* 快捷预设 */}
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleChange('businessDayCutoff', '00:00')}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        formData.businessDayCutoff === '00:00'
+                          ? 'bg-blue-50 border-blue-300 text-blue-700'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                      }`}
+                    >
+                      {t('settings.store.form.cutoff_presets.midnight')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('businessDayCutoff', '06:00')}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        formData.businessDayCutoff === '06:00'
+                          ? 'bg-blue-50 border-blue-300 text-blue-700'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                      }`}
+                    >
+                      {t('settings.store.form.cutoff_presets.early_morning')}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

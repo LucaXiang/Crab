@@ -205,6 +205,11 @@ export class TauriApiClient {
     return data.products;
   }
 
+  async getProductFull(id: string): Promise<ProductFull> {
+    const result = await invokeAndUnwrap<{ product: ProductFull }>('get_product_full', { id });
+    return result.product;
+  }
+
   async createProduct(data: ProductCreate): Promise<ProductFull> {
     const result = await invokeAndUnwrap<{ product: ProductFull }>('create_product', { data });
     return result.product;
@@ -490,8 +495,8 @@ export class TauriApiClient {
     return invokeAndUnwrap<boolean>('heartbeat_shift', { id });
   }
 
-  async recoverStaleShifts(today?: string): Promise<Shift[]> {
-    return invokeAndUnwrap<Shift[]>('recover_stale_shifts', { today });
+  async recoverStaleShifts(): Promise<Shift[]> {
+    return invokeAndUnwrap<Shift[]>('recover_stale_shifts');
   }
 
   // ============ Daily Reports (日结报告) ============

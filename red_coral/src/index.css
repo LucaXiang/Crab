@@ -16,6 +16,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Roboto';
+  src: url('./assets/Roboto-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   /* Roboto for Latin, system fonts for CJK fallback */
   --font-sans: "Roboto", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
@@ -60,13 +68,13 @@ body {
   /* Enable font smoothing for better rendering */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Global bold text */
-  font-weight: bold;
+  /* Global bold text for POS systems */
+  font-weight: 700;
   /* Disable scrolling on body to create an app-like feel */
   overflow: hidden;
-  /* Prevent rubber-banding/overscroll effects */
-  overscroll-behavior: none;
-  touch-action: pan-x pan-y;
+  user-select: none;
+  cursor: default;
+  text-rendering: optimizeLegibility;
 }
 
 /* Custom scrollbar for webkit */

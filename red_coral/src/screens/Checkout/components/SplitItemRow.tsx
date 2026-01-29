@@ -21,7 +21,7 @@ export const SplitItemRow: React.FC<SplitItemRowProps> = ({ item }) => {
   const lineTotal = item.line_total ?? (unitPrice * item.quantity);
 
   return (
-    <div className="flex items-center gap-3 py-2">
+    <div className="flex items-center gap-3 py-2 select-none">
       {/* Image */}
       <div className="w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
         {product?.image ? (
@@ -52,7 +52,7 @@ export const SplitItemRow: React.FC<SplitItemRowProps> = ({ item }) => {
       </div>
 
       {/* Price */}
-      <div className="text-right shrink-0">
+      <div className="text-right shrink-0 tabular-nums">
         <div className="text-sm text-gray-500">
           x{item.quantity} @ {formatCurrency(unitPrice)}
         </div>

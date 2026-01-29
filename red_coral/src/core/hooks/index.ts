@@ -11,3 +11,4 @@ export * from './useCommandLock';
 export * from './useSyncConnection';
 export * from './useImageUrl';
 export * from './useShiftCloseGuard';
+export * from './useShiftRecovery';

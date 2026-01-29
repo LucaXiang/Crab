@@ -221,20 +221,27 @@ export async function deleteProduct(id: string): Promise<{ success: boolean }> {
 }
 
 /**
- * Load full product data for editing (from store)
+ * Load full product data for editing (from API)
+ *
+ * list_products 返回的是 Product（不含 attributes），
+ * 编辑时需要通过 get_product_full 获取完整的 ProductFull 数据。
  */
-export function loadProductFullData(productId: string) {
-  const productFull = useProductStore.getState().getById(productId);
+export async function loadProductFullData(productId: string) {
+  const productFull = await getApi().getProductFull(productId);
   if (!productFull) {
     throw new Error('Failed to load product full data');
   }
 
+  const attributes = productFull.attributes ?? [];
+  const tags = productFull.tags ?? [];
+  const specs = productFull.specs ?? [];
+
   // Extract attribute bindings
-  const attributeIds = productFull.attributes.map((binding) => binding.attribute.id).filter(Boolean) as string[];
+  const attributeIds = attributes.map((binding) => binding.attribute.id).filter(Boolean) as string[];
 
   // Load default options from attributes
   const defaultOptions: Record<string, string[]> = {};
-  productFull.attributes.forEach((binding) => {
+  attributes.forEach((binding) => {
     const attrId = binding.attribute.id;
     const defaultIdx = binding.attribute.default_option_idx;
     if (attrId && defaultIdx !== null && defaultIdx !== undefined) {
@@ -243,19 +250,19 @@ export function loadProductFullData(productId: string) {
   });
 
   // Extract tag IDs
-  const tagIds = productFull.tags.map((tag) => tag.id).filter(Boolean) as string[];
+  const tagIds = tags.map((tag) => tag.id).filter(Boolean) as string[];
 
   // Get price and externalId from default spec
-  const defaultSpec = productFull.specs.find((s) => s.is_default === true) ?? productFull.specs[0];
+  const defaultSpec = specs.find((s) => s.is_default === true) ?? specs[0];
   const price = defaultSpec?.price ?? 0;
   const externalId = defaultSpec?.external_id ?? undefined;
 
   return {
     selected_attribute_ids: attributeIds,
     attribute_default_options: defaultOptions,
-    specs: productFull.specs,
+    specs,
     tags: tagIds,
-    has_multi_spec: productFull.specs.length > 1,
+    has_multi_spec: specs.length > 1,
     is_kitchen_print_enabled: productFull.is_kitchen_print_enabled,
     is_label_print_enabled: productFull.is_label_print_enabled,
     print_destinations: productFull.kitchen_print_destinations,

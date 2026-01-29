@@ -55,7 +55,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
     <div
       {...clickHandlers}
       className={`
-        group relative bg-white border rounded-xl p-4 transition-all duration-200
+        group relative bg-white border rounded-xl p-4 transition-all duration-200 select-none
         ${isSelected
           ? 'border-blue-500 ring-1 ring-blue-500 shadow-md bg-blue-50/5'
           : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
@@ -106,7 +106,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
           )}
 
           {/* Line 5: Quantity × Unit Price */}
-          <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 mt-2 text-sm text-gray-500 tabular-nums">
             <span className="font-medium">x{remainingQty}</span>
             <span className="w-1 h-1 bg-gray-300 rounded-full" />
             {hasDiscount ? (
@@ -134,7 +134,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
                 +{formatCurrency(item.surcharge)}
               </span>
             ) : null}
-            <div className={`font-bold text-xl ${isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
+            <div className={`font-bold text-xl tabular-nums ${isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
               {formatCurrency(unitPrice * remainingQty)}
             </div>
           </div>

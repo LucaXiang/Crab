@@ -90,6 +90,11 @@ pub struct OrderDetail {
     pub start_time: i64,
     pub end_time: Option<i64>,
     pub operator_name: Option<String>,
+    // === Void Metadata ===
+    pub void_type: Option<String>,
+    pub loss_reason: Option<String>,
+    pub loss_amount: Option<f64>,
+    pub void_note: Option<String>,
     pub items: Vec<OrderItemDetail>,
     pub payments: Vec<OrderPaymentDetail>,
     pub timeline: Vec<OrderEventDetail>,
@@ -122,6 +127,10 @@ pub async fn get_by_id(
         start_time: detail.start_time,
         end_time: detail.end_time,
         operator_name: detail.operator_name,
+        void_type: detail.void_type,
+        loss_reason: detail.loss_reason,
+        loss_amount: detail.loss_amount,
+        void_note: detail.void_note,
         items: detail.items.into_iter().map(|i| OrderItemDetail {
             id: i.id,
             instance_id: i.instance_id,
@@ -252,7 +261,10 @@ pub async fn fetch_order_list(
          total_amount AS total, \
          guest_count, \
          time::millis(start_time) AS start_time, \
-         time::millis(end_time) AS end_time \
+         time::millis(end_time) AS end_time, \
+         void_type, \
+         loss_reason, \
+         loss_amount \
          FROM order {} ORDER BY end_time DESC LIMIT $limit START $offset",
         where_clause
     );
