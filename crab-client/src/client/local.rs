@@ -328,7 +328,6 @@ impl CrabClient<Local, Authenticated> {
         message_client
             .request_default(msg)
             .await
-            .map_err(ClientError::Message)
     }
 
     /// Sends an RPC request with a custom timeout.
@@ -345,7 +344,6 @@ impl CrabClient<Local, Authenticated> {
         message_client
             .request(msg, timeout)
             .await
-            .map_err(ClientError::Message)
     }
 
     /// Logs out the employee.

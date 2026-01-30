@@ -76,3 +76,7 @@ temp_*/
 docs/PROJECT_ANALYSIS.md
 docs/tasks/
 .worktrees/
+
+# Archives and root lockfiles
+*.zip
+/package-lock.json

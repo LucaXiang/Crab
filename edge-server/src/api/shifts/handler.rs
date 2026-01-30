@@ -41,7 +41,7 @@ pub async fn list(
     } else {
         repo.find_all(query.limit, query.offset).await
     }
-    .map_err(|e| AppError::database(e.to_string()))?;
+    ?;
 
     Ok(Json(shifts))
 }
@@ -55,7 +55,7 @@ pub async fn get_by_id(
     let shift = repo
         .find_by_id(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?
+        ?
         .ok_or_else(|| AppError::not_found(format!("Shift {} not found", id)))?;
     Ok(Json(shift))
 }
@@ -78,7 +78,7 @@ pub async fn get_current(
     } else {
         repo.find_any_open().await
     }
-    .map_err(|e| AppError::database(e.to_string()))?;
+    ?;
 
     Ok(Json(shift))
 }
@@ -92,7 +92,7 @@ pub async fn create(
     let shift = repo
         .create(payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     let id = shift
@@ -117,7 +117,7 @@ pub async fn update(
     let shift = repo
         .update(&id, payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     state
         .broadcast_sync(RESOURCE, "updated", &id, Some(&shift))
@@ -136,7 +136,7 @@ pub async fn close(
     let shift = repo
         .close(&id, payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     state
         .broadcast_sync(RESOURCE, "closed", &id, Some(&shift))
@@ -155,7 +155,7 @@ pub async fn force_close(
     let shift = repo
         .force_close(&id, payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     state
         .broadcast_sync(RESOURCE, "force_closed", &id, Some(&shift))
@@ -172,7 +172,7 @@ pub async fn heartbeat(
     let repo = ShiftRepository::new(state.db.clone());
     repo.heartbeat(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(true))
 }
 
@@ -210,7 +210,7 @@ pub async fn recover_stale(
     let recovered = repo
         .recover_stale_shifts(business_day_start)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播每个恢复的班次
     for shift in &recovered {

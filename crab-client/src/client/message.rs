@@ -15,6 +15,7 @@ use tokio_rustls::client::TlsStream;
 use uuid::Uuid;
 
 use crate::MessageClientConfig;
+use crate::error::ClientError;
 
 /// 连接参数 (用于重连)
 #[derive(Clone)]
@@ -145,7 +146,7 @@ impl NetworkMessageClient {
         client_cert_pem: &[u8],
         client_key_pem: &[u8],
         client_name: &str,
-    ) -> Result<Self, crate::MessageError> {
+    ) -> Result<Self, ClientError> {
         Self::connect_mtls_with_config(
             addr,
             ca_cert_pem,
@@ -165,7 +166,7 @@ impl NetworkMessageClient {
         client_key_pem: &[u8],
         client_name: &str,
         config: MessageClientConfig,
-    ) -> Result<Self, crate::MessageError> {
+    ) -> Result<Self, ClientError> {
         use tokio::io::split;
 
         // 保存连接参数
@@ -223,7 +224,7 @@ impl NetworkMessageClient {
     /// 建立 TLS 连接 (内部方法，用于初始连接和重连)
     async fn establish_tls_connection(
         params: &ConnectionParams,
-    ) -> Result<TlsStream<TcpStream>, crate::MessageError> {
+    ) -> Result<TlsStream<TcpStream>, ClientError> {
         // 安装 aws-lc-rs CryptoProvider
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
@@ -232,10 +233,10 @@ impl NetworkMessageClient {
         let ca_certs: Vec<CertificateDer> = rustls_pemfile::certs(&mut ca_reader)
             .collect::<Result<_, _>>()
             .map_err(|e| {
-                crate::MessageError::Connection(format!("Failed to parse CA certs: {}", e))
+                ClientError::Connection(format!("Failed to parse CA certs: {}", e))
             })?;
         if ca_certs.is_empty() {
-            return Err(crate::MessageError::Connection(
+            return Err(ClientError::Connection(
                 "No CA certificates found".to_string(),
             ));
         }
@@ -245,25 +246,25 @@ impl NetworkMessageClient {
         let client_certs: Vec<CertificateDer> = rustls_pemfile::certs(&mut cert_reader)
             .collect::<Result<_, _>>()
             .map_err(|e| {
-                crate::MessageError::Connection(format!("Failed to parse client cert: {}", e))
+                ClientError::Connection(format!("Failed to parse client cert: {}", e))
             })?;
         let client_cert = client_certs.into_iter().next().ok_or_else(|| {
-            crate::MessageError::Connection("No client certificate found".to_string())
+            ClientError::Connection("No client certificate found".to_string())
         })?;
 
         // 解析私钥
         let mut key_reader = std::io::Cursor::new(&params.client_key_pem);
         let private_key = rustls_pemfile::private_key(&mut key_reader)
             .map_err(|e| {
-                crate::MessageError::Connection(format!("Failed to parse private key: {}", e))
+                ClientError::Connection(format!("Failed to parse private key: {}", e))
             })?
-            .ok_or_else(|| crate::MessageError::Connection("No private key found".to_string()))?;
+            .ok_or_else(|| ClientError::Connection("No private key found".to_string()))?;
 
         // 构建 TLS 配置
         let mut root_store = rustls::RootCertStore::empty();
         for ca_cert in ca_certs {
             root_store.add(ca_cert).map_err(|e| {
-                crate::MessageError::Connection(format!("Failed to add CA cert: {}", e))
+                ClientError::Connection(format!("Failed to add CA cert: {}", e))
             })?;
         }
 
@@ -274,23 +275,23 @@ impl NetworkMessageClient {
             .with_custom_certificate_verifier(Arc::new(verifier))
             .with_client_auth_cert(client_cert_chain, private_key)
             .map_err(|e| {
-                crate::MessageError::Connection(format!("Failed to configure TLS: {}", e))
+                ClientError::Connection(format!("Failed to configure TLS: {}", e))
             })?;
 
         // TCP 连接
         let tcp_stream = TcpStream::connect(&params.addr)
             .await
-            .map_err(|e| crate::MessageError::Connection(format!("TCP connect failed: {}", e)))?;
+            .map_err(|e| ClientError::Connection(format!("TCP connect failed: {}", e)))?;
 
         // TLS 握手
         let connector = TlsConnector::from(Arc::new(tls_config));
         let domain = ServerName::try_from("edge-server")
-            .map_err(|e| crate::MessageError::Connection(format!("Invalid domain: {}", e)))?;
+            .map_err(|e| ClientError::Connection(format!("Invalid domain: {}", e)))?;
 
         connector
             .connect(domain, tcp_stream)
             .await
-            .map_err(|e| crate::MessageError::Connection(format!("TLS handshake failed: {}", e)))
+            .map_err(|e| ClientError::Connection(format!("TLS handshake failed: {}", e)))
     }
 
     /// 启动后台读取任务
@@ -604,29 +605,29 @@ impl NetworkMessageClient {
     /// 从读取流读取一条消息
     async fn read_message_from(
         stream: &mut ReadHalf<TlsStream<TcpStream>>,
-    ) -> Result<BusMessage, crate::MessageError> {
+    ) -> Result<BusMessage, ClientError> {
         // 读取事件类型 (1 字节)
         let type_buf = &mut [0u8; 1];
         stream
             .read_exact(type_buf)
             .await
-            .map_err(|e| crate::MessageError::Connection(format!("Read type failed: {}", e)))?;
+            .map_err(|e| ClientError::Connection(format!("Read type failed: {}", e)))?;
 
         let event_type = shared::EventType::try_from(type_buf[0])
-            .map_err(|_| crate::MessageError::InvalidMessage("Invalid event type".to_string()))?;
+            .map_err(|_| ClientError::InvalidMessage("Invalid event type".to_string()))?;
 
         // 读取 Request ID (16 字节)
         let uuid_buf = &mut [0u8; 16];
         stream
             .read_exact(uuid_buf)
             .await
-            .map_err(|e| crate::MessageError::Connection(format!("Read UUID failed: {}", e)))?;
+            .map_err(|e| ClientError::Connection(format!("Read UUID failed: {}", e)))?;
         let request_id = Uuid::from_bytes(*uuid_buf);
 
         // 读取 Correlation ID (16 字节)
         let correlation_buf = &mut [0u8; 16];
         stream.read_exact(correlation_buf).await.map_err(|e| {
-            crate::MessageError::Connection(format!("Read Correlation UUID failed: {}", e))
+            ClientError::Connection(format!("Read Correlation UUID failed: {}", e))
         })?;
         let correlation_id_raw = Uuid::from_bytes(*correlation_buf);
         let correlation_id = if correlation_id_raw.is_nil() {
@@ -640,7 +641,7 @@ impl NetworkMessageClient {
         stream
             .read_exact(len_buf)
             .await
-            .map_err(|e| crate::MessageError::Connection(format!("Read len failed: {}", e)))?;
+            .map_err(|e| ClientError::Connection(format!("Read len failed: {}", e)))?;
 
         let len = u32::from_le_bytes(*len_buf) as usize;
 
@@ -649,7 +650,7 @@ impl NetworkMessageClient {
         stream
             .read_exact(&mut payload)
             .await
-            .map_err(|e| crate::MessageError::Connection(format!("Read payload failed: {}", e)))?;
+            .map_err(|e| ClientError::Connection(format!("Read payload failed: {}", e)))?;
 
         Ok(BusMessage {
             request_id,
@@ -662,7 +663,7 @@ impl NetworkMessageClient {
     }
 
     /// 执行协议握手
-    async fn perform_handshake(&self, client_name: &str) -> Result<(), crate::MessageError> {
+    async fn perform_handshake(&self, client_name: &str) -> Result<(), ClientError> {
         let handshake = BusMessage::handshake(&HandshakePayload {
             version: PROTOCOL_VERSION,
             client_name: Some(client_name.to_string()),
@@ -685,7 +686,7 @@ impl NetworkMessageClient {
             && let Ok(payload) = response.parse_payload::<shared::message::ResponsePayload>()
         {
             if !payload.success {
-                return Err(crate::MessageError::Connection(format!(
+                return Err(ClientError::Connection(format!(
                     "Handshake failed: {}",
                     payload.message
                 )));
@@ -697,12 +698,12 @@ impl NetworkMessageClient {
     }
 
     /// 写入消息
-    async fn write_message(&self, msg: &BusMessage) -> Result<(), crate::MessageError> {
+    async fn write_message(&self, msg: &BusMessage) -> Result<(), ClientError> {
         // 检查是否有活跃连接
         {
             let guard = self.write_stream.read().await;
             if guard.is_none() {
-                return Err(crate::MessageError::Connection(
+                return Err(ClientError::Connection(
                     "No active connection".to_string(),
                 ));
             }
@@ -712,7 +713,7 @@ impl NetworkMessageClient {
         let mut guard = self.write_stream.write().await;
         let stream = guard
             .as_mut()
-            .ok_or_else(|| crate::MessageError::Connection("No active connection".to_string()))?;
+            .ok_or_else(|| ClientError::Connection("No active connection".to_string()))?;
 
         // 序列化消息
         let mut data = Vec::new();
@@ -735,17 +736,17 @@ impl NetworkMessageClient {
         stream
             .write_all(&data)
             .await
-            .map_err(|e| crate::MessageError::Connection(format!("Write failed: {}", e)))?;
+            .map_err(|e| ClientError::Connection(format!("Write failed: {}", e)))?;
         stream
             .flush()
             .await
-            .map_err(|e| crate::MessageError::Connection(format!("Flush failed: {}", e)))?;
+            .map_err(|e| ClientError::Connection(format!("Flush failed: {}", e)))?;
 
         Ok(())
     }
 
     /// 关闭连接
-    pub async fn close(&self) -> Result<(), crate::MessageError> {
+    pub async fn close(&self) -> Result<(), ClientError> {
         self.stopped.store(true, Ordering::SeqCst);
         self.set_state(ConnectionState::Disconnected);
         self.stop_notify.notify_waiters();
@@ -810,7 +811,7 @@ impl NetworkMessageClient {
         &self,
         msg: &BusMessage,
         timeout: Duration,
-    ) -> Result<BusMessage, crate::MessageError> {
+    ) -> Result<BusMessage, ClientError> {
         let correlation_id = msg.request_id;
 
         // 创建响应通道
@@ -833,10 +834,10 @@ impl NetworkMessageClient {
 
         match result {
             Ok(Ok(response)) => Ok(response),
-            Ok(Err(_)) => Err(crate::MessageError::Connection(
+            Ok(Err(_)) => Err(ClientError::Connection(
                 "Response channel closed".to_string(),
             )),
-            Err(_) => Err(crate::MessageError::Timeout(format!(
+            Err(_) => Err(ClientError::Timeout(format!(
                 "Request timed out after {:?}",
                 timeout
             ))),
@@ -848,9 +849,9 @@ impl NetworkMessageClient {
         &self,
         msg: &BusMessage,
         timeout: Duration,
-    ) -> Result<BusMessage, crate::MessageError> {
+    ) -> Result<BusMessage, ClientError> {
         if !self.is_connected() {
-            return Err(crate::MessageError::Connection("Not connected".to_string()));
+            return Err(ClientError::Connection("Not connected".to_string()));
         }
 
         let correlation_id = msg.request_id;
@@ -886,10 +887,10 @@ impl NetworkMessageClient {
 
         match result {
             Ok(Ok(response)) => Ok(response),
-            Ok(Err(_)) => Err(crate::MessageError::Connection(
+            Ok(Err(_)) => Err(ClientError::Connection(
                 "Response channel closed".to_string(),
             )),
-            Err(_) => Err(crate::MessageError::Timeout(format!(
+            Err(_) => Err(ClientError::Timeout(format!(
                 "Request timed out after {:?}",
                 timeout
             ))),
@@ -900,12 +901,12 @@ impl NetworkMessageClient {
     pub async fn request_default(
         &self,
         msg: &BusMessage,
-    ) -> Result<BusMessage, crate::MessageError> {
+    ) -> Result<BusMessage, ClientError> {
         self.request(msg, self.config.request_timeout).await
     }
 
     /// 手动触发重连
-    pub async fn reconnect(&self) -> Result<(), crate::MessageError> {
+    pub async fn reconnect(&self) -> Result<(), ClientError> {
         if self.get_state() == ConnectionState::Connected {
             return Ok(());
         }
@@ -917,7 +918,7 @@ impl NetworkMessageClient {
         };
 
         let Some(params) = params else {
-            return Err(crate::MessageError::Connection(
+            return Err(ClientError::Connection(
                 "No connection parameters for reconnection".to_string(),
             ));
         };
@@ -1016,7 +1017,7 @@ impl InMemoryMessageClient {
         &self,
         msg: &BusMessage,
         timeout: Duration,
-    ) -> Result<BusMessage, crate::MessageError> {
+    ) -> Result<BusMessage, ClientError> {
         let correlation_id = msg.request_id;
 
         // 订阅响应通道
@@ -1025,40 +1026,40 @@ impl InMemoryMessageClient {
         // 发送请求
         self.client_tx
             .send(msg.clone())
-            .map_err(|e| crate::MessageError::Connection(e.to_string()))?;
+            .map_err(|e| ClientError::Connection(e.to_string()))?;
 
         // 等待响应
         let response = tokio::time::timeout(timeout, async {
             loop {
                 let received = rx.recv().await.map_err(|e: broadcast::error::RecvError| {
-                    crate::MessageError::Connection(e.to_string())
+                    ClientError::Connection(e.to_string())
                 })?;
                 if received.correlation_id == Some(correlation_id) {
-                    return Ok::<BusMessage, crate::MessageError>(received);
+                    return Ok::<BusMessage, ClientError>(received);
                 }
             }
         })
         .await
         .map_err(|_| {
-            crate::MessageError::Timeout(format!("Request timed out after {:?}", timeout))
+            ClientError::Timeout(format!("Request timed out after {:?}", timeout))
         })??;
 
         Ok(response)
     }
 
     /// 发送消息 (不等待响应)
-    pub fn send(&self, msg: &BusMessage) -> Result<(), crate::MessageError> {
+    pub fn send(&self, msg: &BusMessage) -> Result<(), ClientError> {
         self.client_tx
             .send(msg.clone())
-            .map_err(|e| crate::MessageError::Connection(e.to_string()))?;
+            .map_err(|e| ClientError::Connection(e.to_string()))?;
         Ok(())
     }
 
     /// 接收一条服务器消息
-    pub async fn recv(&self) -> Result<BusMessage, crate::MessageError> {
+    pub async fn recv(&self) -> Result<BusMessage, ClientError> {
         let mut rx = self.server_tx.subscribe();
         rx.recv().await.map_err(|e: broadcast::error::RecvError| {
-            crate::MessageError::Connection(e.to_string())
+            ClientError::Connection(e.to_string())
         })
     }
 
@@ -1066,7 +1067,7 @@ impl InMemoryMessageClient {
     pub async fn request_default(
         &self,
         msg: &BusMessage,
-    ) -> Result<BusMessage, crate::MessageError> {
+    ) -> Result<BusMessage, ClientError> {
         let timeout = crate::MessageClientConfig::default().request_timeout;
         self.request(msg, timeout).await
     }

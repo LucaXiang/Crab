@@ -41,7 +41,7 @@ pub async fn list(
     } else {
         repo.find_all(query.limit, query.offset).await
     }
-    .map_err(|e| AppError::database(e.to_string()))?;
+    ?;
 
     Ok(Json(reports))
 }
@@ -55,7 +55,7 @@ pub async fn get_by_id(
     let report = repo
         .find_by_id(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?
+        ?
         .ok_or_else(|| AppError::not_found(format!("Daily report {} not found", id)))?;
     Ok(Json(report))
 }
@@ -69,7 +69,7 @@ pub async fn get_by_date(
     let report = repo
         .find_by_date(&date)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?
+        ?
         .ok_or_else(|| AppError::not_found(format!("Daily report for {} not found", date)))?;
     Ok(Json(report))
 }
@@ -93,7 +93,7 @@ pub async fn generate(
     let report = repo
         .generate(payload, operator_id, operator_name)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     let id = report
         .id
@@ -116,7 +116,7 @@ pub async fn delete(
     let result = repo
         .delete(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     if result {
         state

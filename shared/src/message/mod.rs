@@ -148,27 +148,6 @@ pub type RequestCommandMessage = Message<RequestCommandPayload>;
 pub type SyncMessage = Message<SyncPayload>;
 pub type ResponseMessage = Message<ResponsePayload>;
 
-/// 消息创建器
-pub struct MessageBuilder<T> {
-    data: T,
-    event_type: EventType,
-}
-
-impl<T> MessageBuilder<T> {
-    pub fn new(event_type: EventType, data: T) -> Self {
-        Self { data, event_type }
-    }
-
-    pub fn build(self) -> Message<T> {
-        Message {
-            event_type: self.event_type,
-            data: self.data,
-            request_id: Uuid::new_v4(),
-            correlation_id: None,
-        }
-    }
-}
-
 /// 消息总线消息体
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BusMessage {
@@ -285,18 +264,6 @@ mod tests {
         assert_eq!(msg.event_type, EventType::RequestCommand);
         assert!(msg.is_request());
         assert!(msg.correlation_id.is_none()); // 初始创建时correlation_id为None
-    }
-
-    #[test]
-    fn test_message_builder() {
-        let msg = MessageBuilder::new(
-            EventType::Notification,
-            NotificationPayload::info("System", "Ready"),
-        )
-        .build();
-
-        assert_eq!(msg.event_type, EventType::Notification);
-        assert!(msg.correlation_id.is_none()); // 默认没有关联ID
     }
 
     #[test]

@@ -3,7 +3,7 @@
 //! This module implements the Remote mode functionality, which uses
 //! mTLS certificates to connect to Edge Servers.
 
-use crate::error::{ClientError, MessageError};
+use crate::error::ClientError;
 use crate::types::{Authenticated, Connected, Disconnected, Remote};
 use shared::message::BusMessage;
 
@@ -249,11 +249,11 @@ impl CrabClient<Remote, Connected> {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn request(&self, msg: &BusMessage) -> Result<BusMessage, MessageError> {
+    pub async fn request(&self, msg: &BusMessage) -> Result<BusMessage, ClientError> {
         let client = self
             .message
             .as_ref()
-            .ok_or_else(|| MessageError::Connection("Not connected".into()))?;
+            .ok_or_else(|| ClientError::Connection("Not connected".into()))?;
 
         client.request_default(msg).await
     }
@@ -265,11 +265,11 @@ impl CrabClient<Remote, Connected> {
         &self,
         msg: &BusMessage,
         timeout: Duration,
-    ) -> Result<BusMessage, MessageError> {
+    ) -> Result<BusMessage, ClientError> {
         let client = self
             .message
             .as_ref()
-            .ok_or_else(|| MessageError::Connection("Not connected".into()))?;
+            .ok_or_else(|| ClientError::Connection("Not connected".into()))?;
 
         client.request(msg, timeout).await
     }
@@ -423,11 +423,11 @@ impl CrabClient<Remote, Authenticated> {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn request(&self, msg: &BusMessage) -> Result<BusMessage, MessageError> {
+    pub async fn request(&self, msg: &BusMessage) -> Result<BusMessage, ClientError> {
         let client = self
             .message
             .as_ref()
-            .ok_or_else(|| MessageError::Connection("Not connected".into()))?;
+            .ok_or_else(|| ClientError::Connection("Not connected".into()))?;
 
         client.request_default(msg).await
     }
@@ -437,11 +437,11 @@ impl CrabClient<Remote, Authenticated> {
         &self,
         msg: &BusMessage,
         timeout: Duration,
-    ) -> Result<BusMessage, MessageError> {
+    ) -> Result<BusMessage, ClientError> {
         let client = self
             .message
             .as_ref()
-            .ok_or_else(|| MessageError::Connection("Not connected".into()))?;
+            .ok_or_else(|| ClientError::Connection("Not connected".into()))?;
 
         client.request(msg, timeout).await
     }

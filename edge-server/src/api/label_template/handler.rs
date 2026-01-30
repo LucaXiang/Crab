@@ -20,7 +20,7 @@ pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<LabelT
     let templates = repo
         .list()
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(templates))
 }
 
@@ -30,7 +30,7 @@ pub async fn list_all(State(state): State<ServerState>) -> AppResult<Json<Vec<La
     let templates = repo
         .list_all()
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(templates))
 }
 
@@ -40,7 +40,7 @@ pub async fn get_default(State(state): State<ServerState>) -> AppResult<Json<Opt
     let template = repo
         .get_default()
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(template))
 }
 
@@ -54,7 +54,7 @@ pub async fn get_by_id(
     let template = repo
         .get(&record_id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?
+        ?
         .ok_or_else(|| AppError::not_found(format!("Label template {} not found", id)))?;
     Ok(Json(template))
 }
@@ -68,7 +68,7 @@ pub async fn create(
     let template = repo
         .create(payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // Broadcast sync notification
     let id = template.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
@@ -90,7 +90,7 @@ pub async fn update(
     let template = repo
         .update(&record_id, payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // Broadcast sync notification
     state
@@ -110,7 +110,7 @@ pub async fn delete(
     let result = repo
         .delete(&record_id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // Broadcast sync notification
     if result {

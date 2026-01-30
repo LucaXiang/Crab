@@ -1,45 +1,6 @@
 //! Request types for the shared crate
 //!
-//! Common request types and extractors used across the framework
-
-use crate::http::Request;
-use http::HeaderMap;
-use uuid::Uuid;
-
-/// Request context containing common extracted data
-#[derive(Debug, Clone)]
-pub struct RequestContext {
-    /// Unique request ID for tracing
-    pub request_id: Uuid,
-    /// Request headers
-    pub headers: HeaderMap,
-    /// Remote address (if available)
-    pub remote_addr: Option<std::net::SocketAddr>,
-}
-
-impl RequestContext {
-    /// Extract request context from an Axum request
-    pub fn from_request<B>(req: &Request<B>) -> Self {
-        let request_id = req
-            .extensions()
-            .get::<Uuid>()
-            .cloned()
-            .unwrap_or_else(Uuid::new_v4);
-
-        let remote_addr = req.extensions().get::<std::net::SocketAddr>().copied();
-
-        Self {
-            request_id,
-            headers: req.headers().clone(),
-            remote_addr,
-        }
-    }
-
-    /// Get the request ID as a string
-    pub fn request_id_str(&self) -> String {
-        self.request_id.to_string()
-    }
-}
+//! Common request types used across the framework
 
 /// Pagination query parameters
 #[derive(Debug, Clone, Default, serde::Deserialize)]

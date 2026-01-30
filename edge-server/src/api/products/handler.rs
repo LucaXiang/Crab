@@ -114,7 +114,7 @@ pub async fn create(
         .catalog_service
         .create_product(payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知 (发送完整 ProductFull 数据)
     let id = product.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
@@ -155,7 +155,7 @@ pub async fn update(
         .catalog_service
         .update_product(&id, payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     tracing::debug!(
         "Product updated - is_kitchen_print_enabled: {}, is_label_print_enabled: {}",
@@ -181,7 +181,7 @@ pub async fn delete(
         .catalog_service
         .delete_product(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     state
@@ -202,7 +202,7 @@ pub async fn list_product_attributes(
     let bindings = attr_repo
         .find_bindings_for_product(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // Convert to API type
     let result: Vec<AttributeBindingFull> = bindings
@@ -232,7 +232,7 @@ pub async fn add_product_tag(
         .catalog_service
         .add_product_tag(&product_id, &tag_id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知 (发送完整 ProductFull 数据)
     let product_for_api: shared::models::ProductFull = product.into();
@@ -252,7 +252,7 @@ pub async fn remove_product_tag(
         .catalog_service
         .remove_product_tag(&product_id, &tag_id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知 (发送完整 ProductFull 数据)
     let product_for_api: shared::models::ProductFull = product.into();

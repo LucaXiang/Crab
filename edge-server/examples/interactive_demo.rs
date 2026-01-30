@@ -208,7 +208,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "-".to_string()
                     } else {
                         // 显示相对时间（秒前）
-                        let secs_ago = (shared::util::now_millis() - cred.binding.last_verified_at) / 1000;
+                        let secs_ago =
+                            (shared::util::now_millis() - cred.binding.last_verified_at) / 1000;
                         format!("{}s ago", secs_ago)
                     };
 

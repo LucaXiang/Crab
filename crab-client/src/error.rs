@@ -116,9 +116,6 @@ pub enum ClientError {
     #[error("Internal error: {0}")]
     Internal(String),
 
-    /// Message bus error.
-    #[error("Message error: {0}")]
-    Message(#[from] MessageError),
 }
 
 // ============================================================================
@@ -163,47 +160,8 @@ impl From<tokio::sync::broadcast::error::RecvError> for ClientError {
 }
 
 // ============================================================================
-// Legacy compatibility - MessageError
-// ============================================================================
-
-/// Legacy error type for message operations.
-/// Deprecated: Use `ClientError` instead.
-#[derive(Debug, Error)]
-pub enum MessageError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("Connection failed: {0}")]
-    Connection(String),
-
-    #[error("Request timed out: {0}")]
-    Timeout(String),
-
-    #[error("Invalid message format: {0}")]
-    InvalidMessage(String),
-
-    #[error("Protocol error: {0}")]
-    Protocol(String),
-}
-
-impl From<tokio::sync::broadcast::error::RecvError> for MessageError {
-    fn from(e: tokio::sync::broadcast::error::RecvError) -> Self {
-        MessageError::Connection(e.to_string())
-    }
-}
-
-impl From<serde_json::Error> for MessageError {
-    fn from(e: serde_json::Error) -> Self {
-        MessageError::InvalidMessage(e.to_string())
-    }
-}
-
-// ============================================================================
 // Result type aliases
 // ============================================================================
 
 /// Result type for client operations.
 pub type ClientResult<T> = Result<T, ClientError>;
-
-/// Result type for message operations (legacy).
-pub type MessageResult<T> = Result<T, MessageError>;

@@ -60,7 +60,7 @@ pub async fn list(
     } else {
         repo.find_all().await
     }
-    .map_err(|e| AppError::database(e.to_string()))?;
+    ?;
 
     Ok(Json(roles))
 }
@@ -74,7 +74,7 @@ pub async fn get_by_id(
     let role = repo
         .find_by_id(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?
+        ?
         .ok_or_else(|| AppError::not_found(format!("Role {} not found", id)))?;
 
     Ok(Json(role))
@@ -100,7 +100,7 @@ pub async fn create(
     let role = repo
         .create(payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     Ok(Json(role))
 }
@@ -128,7 +128,7 @@ pub async fn update(
     let role = repo
         .update(&id, payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     Ok(Json(role))
 }
@@ -150,7 +150,7 @@ pub async fn delete(
     let result = repo
         .delete(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     Ok(Json(result))
 }
@@ -173,7 +173,7 @@ pub async fn get_role_permissions(
     let role = repo
         .find_by_id(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?
+        ?
         .ok_or_else(|| AppError::not_found(format!("Role {} not found", id)))?;
 
     Ok(Json(role.permissions))
@@ -209,7 +209,7 @@ pub async fn update_role_permissions(
     let role = repo
         .update(&id, update)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     Ok(Json(role))
 }

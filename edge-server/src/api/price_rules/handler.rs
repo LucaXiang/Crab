@@ -18,7 +18,7 @@ pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<PriceR
     let rules = repo
         .find_all()
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(rules))
 }
 
@@ -39,7 +39,7 @@ pub async fn list_by_scope(
     let rules = repo
         .find_by_scope(scope)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(rules))
 }
 
@@ -52,7 +52,7 @@ pub async fn list_for_product(
     let rules = repo
         .find_for_product(&product_id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(rules))
 }
 
@@ -65,7 +65,7 @@ pub async fn get_by_id(
     let rule = repo
         .find_by_id(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?
+        ?
         .ok_or_else(|| AppError::not_found(format!("Price rule {} not found", id)))?;
     Ok(Json(rule))
 }
@@ -79,7 +79,7 @@ pub async fn create(
     let rule = repo
         .create(payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知 (使用完整 id 格式，与 rule.id 一致)
     let id = rule.id.as_ref().map(|t| t.to_string()).unwrap_or_default();
@@ -100,7 +100,7 @@ pub async fn update(
     let rule = repo
         .update(&id, payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     state
@@ -119,7 +119,7 @@ pub async fn delete(
     let result = repo
         .delete(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     if result {

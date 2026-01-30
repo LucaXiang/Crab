@@ -4,41 +4,6 @@
 pub use shared::message::{BusMessage, EventType};
 
 use std::time::Duration;
-use thiserror::Error;
-use tokio::sync::broadcast;
-
-/// Error type for message client operations
-#[derive(Debug, Error)]
-pub enum MessageError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("Connection failed: {0}")]
-    Connection(String),
-
-    #[error("Request timed out: {0}")]
-    Timeout(String),
-
-    #[error("Invalid message format: {0}")]
-    InvalidMessage(String),
-
-    #[error("Protocol error: {0}")]
-    Protocol(String),
-}
-
-impl From<broadcast::error::RecvError> for MessageError {
-    fn from(e: broadcast::error::RecvError) -> Self {
-        MessageError::Connection(e.to_string())
-    }
-}
-
-impl From<serde_json::Error> for MessageError {
-    fn from(e: serde_json::Error) -> Self {
-        MessageError::InvalidMessage(e.to_string())
-    }
-}
-
-pub type MessageResult<T> = Result<T, MessageError>;
 
 /// 消息客户端配置
 #[derive(Debug, Clone)]

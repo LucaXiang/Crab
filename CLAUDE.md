@@ -6,18 +6,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Crab - 分布式餐饮管理系统
 
-Rust workspace 架构，专注离线优先、边缘计算、mTLS 安全通信。
+Rust workspace 架构，专注离线优先、边缘计算、mTLS 安全通信的 POS 系统。
 
 ## Workspace 成员
 
 | Crate | 用途 | 详细文档 |
 |-------|------|----------|
-| `shared` | 共享类型、协议、消息定义 | [`shared/CLAUDE.md`](shared/CLAUDE.md) |
-| `edge-server` | 边缘服务器 (SurrealDB + Axum + MessageBus) | [`edge-server/CLAUDE.md`](edge-server/CLAUDE.md) |
-| `crab-client` | 统一客户端库 (Local/Remote + Typestate) | [`crab-client/CLAUDE.md`](crab-client/CLAUDE.md) |
+| `shared` | 共享类型、协议、错误系统、事件溯源定义 | [`shared/CLAUDE.md`](shared/CLAUDE.md) |
+| `edge-server` | 边缘服务器 (SurrealDB + Axum + MessageBus + 事件溯源) | [`edge-server/CLAUDE.md`](edge-server/CLAUDE.md) |
+| `crab-client` | 统一客户端库 (Local/Remote + Typestate + 心跳重连) | [`crab-client/CLAUDE.md`](crab-client/CLAUDE.md) |
 | `crab-cert` | PKI/证书管理 (Root CA → Tenant CA → Entity) | [`crab-cert/CLAUDE.md`](crab-cert/CLAUDE.md) |
-| `crab-auth` | 认证服务器 (Port 3001) | [`crab-auth/CLAUDE.md`](crab-auth/CLAUDE.md) |
-| `red_coral` | **Tauri POS 前端** | [`red_coral/CLAUDE.md`](red_coral/CLAUDE.md) |
+| `crab-auth` | 认证服务器 (激活 + 订阅校验) | [`crab-auth/CLAUDE.md`](crab-auth/CLAUDE.md) |
+| `crab-printer` | ESC/POS 热敏打印底层库 (GBK 编码) | [`crab-printer/CLAUDE.md`](crab-printer/CLAUDE.md) |
+| `red_coral` | **Tauri POS 前端** (React 19 + Zustand + Tailwind) | [`red_coral/CLAUDE.md`](red_coral/CLAUDE.md) |
 
 ## 技术文档
 
@@ -35,8 +36,8 @@ cargo test --workspace --lib   # 测试
 cargo clippy --workspace       # Lint
 
 # POS 前端 (red_coral/)
-cd red_coral && npm run tauri:dev   # 开发
-cd red_coral && npx tsc --noEmit    # TS 检查
+cd red_coral && npm run tauri:dev   # Tauri 开发
+cd red_coral && npx tsc --noEmit    # TS 类型检查
 ```
 
 ## 核心架构
@@ -44,9 +45,9 @@ cd red_coral && npx tsc --noEmit    # TS 检查
 ```
 ┌─────────────────┐     ┌─────────────────┐
 │   red_coral     │     │   crab-auth     │
-│  (Tauri POS)    │     │ (认证服务器)     │
+│  (Tauri POS)    │     │ (认证 + 订阅)   │
 └────────┬────────┘     └────────┬────────┘
-         │ In-Process / mTLS     │ 激活/证书
+         │ In-Process / mTLS     │ 激活/证书/订阅
          ▼                       ▼
 ┌─────────────────────────────────────────┐
 │            edge-server                   │
@@ -54,119 +55,65 @@ cd red_coral && npx tsc --noEmit    # TS 检查
 │  │ Axum API│ MessageBus│ SurrealDB   │  │
 │  │ (HTTP)  │ (TCP/TLS) │ (Embedded)  │  │
 │  └─────────┴──────────┴──────────────┘  │
+│  ┌─────────┬──────────┬──────────────┐  │
+│  │ Orders  │ Pricing  │ Printing     │  │
+│  │(Event   │ (规则    │ (厨房/标签)  │  │
+│  │ Sourcing)│ 引擎)   │              │  │
+│  └─────────┴──────────┴──────────────┘  │
+│  ┌─────────────────────────────────────┐ │
+│  │ redb (事件存储) + ArchiveWorker     │ │
+│  └─────────────────────────────────────┘ │
 └─────────────────────────────────────────┘
 ```
 
-**ClientBridge 双模式**:
-- Server 模式: 内嵌 edge-server，进程内通信 (LocalClient)
-- Client 模式: mTLS 连接远程 edge-server (RemoteClient)
+**ClientBridge 双模式** (详见 [`red_coral/CLAUDE.md`](red_coral/CLAUDE.md)):
+- **Server 模式**: 内嵌 edge-server，进程内通信 (LocalClient)
+- **Client 模式**: mTLS 连接远程 edge-server (RemoteClient)
 
-## 数据库规则 (SurrealDB)
+## 跨项目规则
 
-### ID 格式规范
-
-**核心原则**: 全栈统一使用 `surrealdb::RecordId`，格式 `"table:id"`。
-
-| 层级 | 类型 | 示例 |
-|------|------|------|
-| **前端 (TypeScript)** | `string` | `"product:abc123"` |
-| **API 传输 (JSON)** | `string` | `"product:abc123"` |
-| **后端 (Rust)** | `RecordId` | `surrealdb::RecordId` |
-| **数据库** | `record` | SurrealDB 原生 record |
-
-**RecordId 使用**:
-```rust
-use surrealdb::RecordId;
-
-// 解析
-let id: RecordId = "product:abc".parse()?;
-
-// 创建
-let id = RecordId::from_table_key("product", "abc");
-
-// 获取组件
-id.table()        // "product"
-id.key()          // Key 类型
-id.to_string()    // "product:abc"
-
-// SDK 操作
-db.select(id.clone()).await?;
-db.delete(id).await?;
-```
-
-**禁止**:
-- ❌ `surrealdb::sql::Thing` - 不要用
-- ❌ `serde_thing` 模块 - 已删除
-- ❌ 任何 ID 适配层/转换层
-
-**RELATE 边关系**:
-- `has_attribute`: product/category → attribute
-- `has_event`: order → order_event
-
-**删除规则**:
-- Order/OrderEvent **禁止删除** (使用状态管理)
-- 删除 Product/Category 时**必须清理** `attribute_binding` 边
-- 删除 Attribute 时自动清理关联边
-
-## 安全
-
-- mTLS 双向认证 (TLS 1.3 + aws-lc-rs)
-- 三层 CA 层级: Root CA → Tenant CA → Entity Cert
-- 硬件绑定: 证书包含 device_id 防克隆
-
-## 类型对齐
+### 类型对齐
 
 TypeScript (前端) ↔ Rust (后端) 类型必须完全匹配：
 1. 先改 Rust 类型 (`shared/`, `edge-server/src/db/models/`)
 2. 再改 TypeScript (`red_coral/src/core/domain/types/`)
 3. 验证: `cargo check && npx tsc --noEmit`
 
-## 约束与准则
-
-### 代码规范
-
-| 规则 | 说明 |
-|------|------|
-| **类型优先** | 修改数据结构时：Rust 先行 → TypeScript 跟进 → 双端验证 |
-| **金额计算** | 前端必须使用 `Currency` 工具类，禁止直接浮点运算 |
-| **错误处理** | 使用 `shared::error::ErrorCode` 统一错误码 |
-| **异步运行时** | 统一使用 `tokio`，trait object (`dyn Trait`) 场景使用 `#[async_trait]` |
-| **共享状态** | 使用 `Arc` 包装，`ServerState` 设计为 clone-cheap |
-
-### 数据库约束
-
-| 约束 | 说明 |
-|------|------|
-| **Order 不可删除** | 订单使用状态管理（VOID），禁止物理删除 |
-| **OrderEvent 不可删除** | 事件溯源，只追加不删除 |
-| **RELATE 边清理** | 删除实体时必须清理关联的图边 |
-| **ID 格式** | 全栈统一 `"table:id"` 格式，直接使用 `RecordId` 序列化 |
-
-### 安全约束
-
-| 约束 | 说明 |
-|------|------|
-| **mTLS 必须** | 生产环境必须启用双向 TLS 认证 |
-| **硬件绑定** | 证书包含 device_id，防止凭据克隆 |
-| **密码存储** | 使用 Argon2 哈希，禁止明文存储 |
-| **JWT 过期** | Access Token 短期，Refresh Token 长期 |
-
-### 架构约定
+### 全栈统一约定
 
 | 约定 | 说明 |
 |------|------|
+| **ID 格式** | 全栈统一 `"table:id"` 字符串，后端用 `RecordId`，详见 [`edge-server/CLAUDE.md`](edge-server/CLAUDE.md) |
+| **时间戳** | `i64` Unix 毫秒 (Rust `i64` / TS `number` / SurrealDB `int`) |
+| **金额计算** | 后端 `rust_decimal`，前端 `Currency` (decimal.js)，禁止原生浮点 |
+| **货币** | 欧元 (€)，前端用 `formatCurrency()` 格式化 |
+| **支付方式** | 统一大写: `CASH`, `CARD` |
+| **错误码** | `shared::error::ErrorCode` (u16，按领域分区 0xxx-9xxx) |
+| **异步运行时** | `tokio`，trait object 场景用 `#[async_trait]` |
+| **共享状态** | `Arc` 包装，`ServerState` 设计为 clone-cheap |
+| **依赖管理** | 所有依赖在 workspace `Cargo.toml` 统一声明 |
+
+### 架构原则
+
+| 原则 | 说明 |
+|------|------|
+| **服务端权威** | 所有金额计算、状态变更由服务端完成，前端不做乐观更新 |
+| **事件溯源** | 订单用 Event Sourcing + CQRS，详见 [`edge-server/CLAUDE.md`](edge-server/CLAUDE.md) |
 | **离线优先** | 边缘节点必须支持完全离线运行 |
-| **事件溯源** | 订单系统使用 Event Sourcing 模式 |
-| **类型状态** | 客户端使用 Typestate 模式确保状态转换安全 |
-| **依赖集中** | 所有依赖在 workspace Cargo.toml 统一管理 |
+| **RBAC 双层防御** | 前端 PermissionGate + 后端 `require_permission()` 中间件 |
+| **mTLS 安全** | 生产环境必须启用双向 TLS (TLS 1.3 + aws-lc-rs) |
 
 ### 禁止事项
 
-- ❌ 直接删除 Order/OrderEvent 记录
-- ❌ 前端直接进行金额浮点运算
+- ❌ 直接删除 Order/OrderEvent 记录 (用 VOID 状态管理)
+- ❌ 前端直接进行金额浮点运算 (用 `Currency` 类)
 - ❌ 跳过类型对齐直接部署
 - ❌ 在非 mTLS 环境传输敏感数据
 - ❌ 子 crate 单独声明依赖版本
+- ❌ 使用 `surrealdb::sql::Thing` (用 `RecordId`)
+- ❌ 使用 `string` 格式的时间戳 (用 `i64` Unix 毫秒)
+- ❌ EventApplier 中执行 I/O 或副作用
+- ❌ 使用 `f64` 进行金额计算 (用 `rust_decimal`)
 
 ## 响应语言
 

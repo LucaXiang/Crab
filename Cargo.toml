@@ -77,9 +77,6 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 time = { version = "0.3", features = ["macros", "parsing", "formatting"] }
 
-# ========== Validation ==========
-validator = { version = "0.20", features = ["derive"] }
-
 # ========== Cryptography ==========
 sha2 = "0.10"
 hex = "0.4"
@@ -108,7 +105,6 @@ redb = "3.0"
 rust_decimal = "1.37"
 
 # ========== Utilities ==========
-enum_dispatch = "0.3"
 dotenv = "0.15"
 socketioxide = "0.18"
 mime_guess = "2.0"

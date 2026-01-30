@@ -18,7 +18,7 @@ pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Employ
     let employees = repo
         .find_all()
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(employees))
 }
 
@@ -30,7 +30,7 @@ pub async fn list_with_inactive(
     let employees = repo
         .find_all_with_inactive()
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(employees))
 }
 
@@ -43,7 +43,7 @@ pub async fn get_by_id(
     let employee = repo
         .find_by_id_safe(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?
+        ?
         .ok_or_else(|| AppError::not_found(format!("Employee {} not found", id)))?;
     Ok(Json(employee))
 }
@@ -57,7 +57,7 @@ pub async fn create(
     let employee = repo
         .create(payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     let id = employee.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
     state
@@ -77,7 +77,7 @@ pub async fn update(
     let employee = repo
         .update(&id, payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     state
         .broadcast_sync(RESOURCE, "updated", &id, Some(&employee))
@@ -95,7 +95,7 @@ pub async fn delete(
     let result = repo
         .delete(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     if result {
         state

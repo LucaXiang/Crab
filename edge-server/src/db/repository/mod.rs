@@ -53,6 +53,7 @@ pub use daily_report::DailyReportRepository;
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
 use thiserror::Error;
+use shared::error::{AppError, ErrorCode};
 
 /// Repository error types
 #[derive(Debug, Error)]
@@ -76,18 +77,19 @@ impl From<surrealdb::Error> for RepoError {
     }
 }
 
+impl From<RepoError> for AppError {
+    fn from(err: RepoError) -> Self {
+        match err {
+            RepoError::NotFound(msg) => AppError::not_found(msg),
+            RepoError::Duplicate(msg) => AppError::with_message(ErrorCode::AlreadyExists, msg),
+            RepoError::Database(msg) => AppError::database(msg),
+            RepoError::Validation(msg) => AppError::validation(msg),
+        }
+    }
+}
+
 /// Result type for repository operations
 pub type RepoResult<T> = Result<T, RepoError>;
-
-/// Common repository trait for basic CRUD
-#[allow(async_fn_in_trait)]
-pub trait Repository<T, CreateDto, UpdateDto> {
-    async fn find_all(&self) -> RepoResult<Vec<T>>;
-    async fn find_by_id(&self, id: &str) -> RepoResult<Option<T>>;
-    async fn create(&self, data: CreateDto) -> RepoResult<T>;
-    async fn update(&self, id: &str, data: UpdateDto) -> RepoResult<T>;
-    async fn delete(&self, id: &str) -> RepoResult<bool>;
-}
 
 // =============================================================================
 // ID Convention: 全栈统一使用 "table:id" 格式

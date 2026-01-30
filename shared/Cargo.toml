@@ -31,8 +31,5 @@ chrono.workspace = true
 # UUID
 uuid.workspace = true
 
-# Validation
-validator.workspace = true
-
 # Logging
 tracing.workspace = true

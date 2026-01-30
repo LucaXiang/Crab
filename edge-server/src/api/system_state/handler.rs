@@ -5,7 +5,7 @@ use axum::{Json, extract::State};
 use crate::core::ServerState;
 use crate::db::models::{Order, SystemState, SystemStateUpdate};
 use crate::db::repository::SystemStateRepository;
-use crate::utils::{AppError, AppResult};
+use crate::utils::AppResult;
 
 const RESOURCE: &str = "system_state";
 
@@ -15,7 +15,7 @@ pub async fn get(State(state): State<ServerState>) -> AppResult<Json<SystemState
     let system_state = repo
         .get_or_create()
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(system_state))
 }
 
@@ -28,7 +28,7 @@ pub async fn update(
     let system_state = repo
         .update(payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     state
         .broadcast_sync(RESOURCE, "updated", "main", Some(&system_state))
@@ -52,7 +52,7 @@ pub async fn init_genesis(
     let system_state = repo
         .init_genesis(payload.genesis_hash)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     state
         .broadcast_sync(RESOURCE, "genesis_initialized", "main", Some(&system_state))
@@ -77,7 +77,7 @@ pub async fn update_last_order(
     let system_state = repo
         .update_last_order(&payload.order_id, payload.order_hash)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     state
         .broadcast_sync(RESOURCE, "last_order_updated", "main", Some(&system_state))
@@ -102,7 +102,7 @@ pub async fn update_sync_state(
     let system_state = repo
         .update_sync_state(&payload.synced_up_to_id, payload.synced_up_to_hash)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     state
         .broadcast_sync(RESOURCE, "sync_state_updated", "main", Some(&system_state))
@@ -117,6 +117,6 @@ pub async fn get_pending_sync(State(state): State<ServerState>) -> AppResult<Jso
     let orders = repo
         .get_pending_sync_orders()
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(orders))
 }

@@ -109,7 +109,7 @@ pub async fn get_by_id(
     let detail = repo
         .get_order_detail(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // Convert from db model to API response
     let response = OrderDetail {

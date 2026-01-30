@@ -18,7 +18,7 @@ pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Tag>>>
     let tags = repo
         .find_all()
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(tags))
 }
 
@@ -31,7 +31,7 @@ pub async fn get_by_id(
     let tag = repo
         .find_by_id(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?
+        ?
         .ok_or_else(|| AppError::not_found(format!("Tag {} not found", id)))?;
     Ok(Json(tag))
 }
@@ -45,7 +45,7 @@ pub async fn create(
     let tag = repo
         .create(payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     let id = tag.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
@@ -66,7 +66,7 @@ pub async fn update(
     let tag = repo
         .update(&id, payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     state
@@ -85,7 +85,7 @@ pub async fn delete(
     let result = repo
         .delete(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     if result {

@@ -18,7 +18,7 @@ pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Attrib
     let attrs = repo
         .find_all()
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(attrs))
 }
 
@@ -31,7 +31,7 @@ pub async fn get_by_id(
     let attr = repo
         .find_by_id(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?
+        ?
         .ok_or_else(|| AppError::not_found(format!("Attribute {} not found", id)))?;
     Ok(Json(attr))
 }
@@ -45,7 +45,7 @@ pub async fn create(
     let attr = repo
         .create(payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     let id = attr.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
@@ -66,7 +66,7 @@ pub async fn update(
     let attr = repo
         .update(&id, payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     state
@@ -85,7 +85,7 @@ pub async fn delete(
     let result = repo
         .delete(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     if result {
@@ -107,7 +107,7 @@ pub async fn add_option(
     let attr = repo
         .add_option(&id, option)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     state
@@ -127,7 +127,7 @@ pub async fn update_option(
     let attr = repo
         .update_option(&id, idx, option)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     state
@@ -146,7 +146,7 @@ pub async fn remove_option(
     let attr = repo
         .remove_option(&id, idx)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     state

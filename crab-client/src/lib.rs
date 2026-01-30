@@ -89,7 +89,7 @@ pub use types::{
 };
 
 // Re-export error types
-pub use error::{ClientError, ClientResult, MessageError, MessageResult};
+pub use error::{ClientError, ClientResult};
 
 // Re-export message types
 pub use message::{BusMessage, EventType};

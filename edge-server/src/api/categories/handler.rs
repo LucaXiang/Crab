@@ -40,7 +40,7 @@ pub async fn create(
         .catalog_service
         .create_category(payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     let id = category.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
@@ -61,7 +61,7 @@ pub async fn update(
         .catalog_service
         .update_category(&id, payload)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     state
@@ -82,7 +82,7 @@ pub async fn delete(
         .catalog_service
         .delete_category(&id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     tracing::info!(id = %id, "Category deleted successfully");
 
@@ -198,7 +198,7 @@ pub async fn list_category_attributes(
     let attributes = repo
         .find_by_category(&category_id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
     Ok(Json(attributes))
 }
 
@@ -218,7 +218,7 @@ pub async fn bind_category_attribute(
             payload.default_option_idx,
         )
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     state
@@ -242,7 +242,7 @@ pub async fn unbind_category_attribute(
     let deleted = repo
         .unlink_from_category(&category_id, &attr_id)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     // 广播同步通知
     if deleted {
