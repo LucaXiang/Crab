@@ -151,7 +151,12 @@ impl SyncService {
                     Some(s) => {
                         // Compare key fields
                         let match_status = s.status == rebuilt.status;
-                        let match_items = s.items.len() == rebuilt.items.len();
+                        let match_items = s.items.len() == rebuilt.items.len()
+                            && s.items.iter().zip(rebuilt.items.iter()).all(|(a, b)| {
+                                a.id == b.id
+                                    && a.quantity == b.quantity
+                                    && (to_decimal(a.price) - to_decimal(b.price)).abs() < to_decimal(0.01)
+                            });
                         let match_total = (to_decimal(s.total) - to_decimal(rebuilt.total)).abs() < to_decimal(0.01);
                         let match_sequence = s.last_sequence == rebuilt.last_sequence;
 
