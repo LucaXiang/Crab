@@ -136,6 +136,9 @@ pub enum OrderCommandPayload {
         order_id: String,
         payment_method: String,
         items: Vec<SplitItem>,
+        /// 现金实收（仅 CASH 有值）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tendered: Option<f64>,
     },
 
     /// Split by amount (金额分单)
@@ -143,6 +146,9 @@ pub enum OrderCommandPayload {
         order_id: String,
         split_amount: f64,
         payment_method: String,
+        /// 现金实收（仅 CASH 有值）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tendered: Option<f64>,
     },
 
     /// Start AA split (锁定人数 + 支付第一份)
@@ -151,6 +157,9 @@ pub enum OrderCommandPayload {
         total_shares: i32,
         shares: i32,
         payment_method: String,
+        /// 现金实收（仅 CASH 有值）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tendered: Option<f64>,
     },
 
     /// Pay AA split (后续 AA 支付)
@@ -158,6 +167,9 @@ pub enum OrderCommandPayload {
         order_id: String,
         shares: i32,
         payment_method: String,
+        /// 现金实收（仅 CASH 有值）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tendered: Option<f64>,
     },
 
     // ========== Table Operations ==========

@@ -311,13 +311,15 @@ export function useOrderCommands() {
     async (
       orderId: string,
       paymentMethod: string,
-      items: SplitItem[]
+      items: SplitItem[],
+      tendered?: number,
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'SPLIT_BY_ITEMS',
         order_id: orderId,
         payment_method: paymentMethod,
         items,
+        tendered: tendered ?? null,
       });
 
       return sendCommand(command);
@@ -333,12 +335,14 @@ export function useOrderCommands() {
       orderId: string,
       splitAmount: number,
       paymentMethod: string,
+      tendered?: number,
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'SPLIT_BY_AMOUNT',
         order_id: orderId,
         split_amount: splitAmount,
         payment_method: paymentMethod,
+        tendered: tendered ?? null,
       });
 
       return sendCommand(command);
@@ -355,6 +359,7 @@ export function useOrderCommands() {
       totalShares: number,
       shares: number,
       paymentMethod: string,
+      tendered?: number,
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'START_AA_SPLIT',
@@ -362,6 +367,7 @@ export function useOrderCommands() {
         total_shares: totalShares,
         shares,
         payment_method: paymentMethod,
+        tendered: tendered ?? null,
       });
 
       return sendCommand(command);
@@ -377,12 +383,14 @@ export function useOrderCommands() {
       orderId: string,
       shares: number,
       paymentMethod: string,
+      tendered?: number,
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'PAY_AA_SPLIT',
         order_id: orderId,
         shares,
         payment_method: paymentMethod,
+        tendered: tendered ?? null,
       });
 
       return sendCommand(command);

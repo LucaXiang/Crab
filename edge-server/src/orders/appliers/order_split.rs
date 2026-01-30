@@ -26,6 +26,8 @@ impl EventApplier for ItemSplitApplier {
             split_amount,
             payment_method,
             items,
+            tendered,
+            change,
         } = &event.payload
         {
             // Track paid quantities for each item
@@ -69,8 +71,8 @@ impl EventApplier for ItemSplitApplier {
                 payment_id: payment_id.clone(),
                 method: payment_method.clone(),
                 amount: *split_amount,
-                tendered: None,
-                change: None,
+                tendered: *tendered,
+                change: *change,
                 note,
                 timestamp: event.timestamp,
                 cancelled: false,
@@ -117,6 +119,8 @@ impl EventApplier for AmountSplitApplier {
             payment_id,
             split_amount,
             payment_method,
+            tendered,
+            change,
         } = &event.payload
         {
             // Update paid amount
@@ -130,8 +134,8 @@ impl EventApplier for AmountSplitApplier {
                 payment_id: payment_id.clone(),
                 method: payment_method.clone(),
                 amount: *split_amount,
-                tendered: None,
-                change: None,
+                tendered: *tendered,
+                change: *change,
                 note: None,
                 timestamp: event.timestamp,
                 cancelled: false,
@@ -185,6 +189,8 @@ impl EventApplier for AaSplitPaidApplier {
             shares,
             amount,
             payment_method,
+            tendered,
+            change,
             ..
         } = &event.payload
         {
@@ -199,8 +205,8 @@ impl EventApplier for AaSplitPaidApplier {
                 payment_id: payment_id.clone(),
                 method: payment_method.clone(),
                 amount: *amount,
-                tendered: None,
-                change: None,
+                tendered: *tendered,
+                change: *change,
                 note: None,
                 timestamp: event.timestamp,
                 cancelled: false,
@@ -330,6 +336,8 @@ mod tests {
                     quantity: 2,
                     unit_price: 10.0,
                 }],
+                tendered: None,
+                change: None,
             },
         );
 
@@ -375,6 +383,8 @@ mod tests {
                         unit_price: 8.0,
                     },
                 ],
+                tendered: None,
+                change: None,
             },
         );
 
@@ -406,6 +416,8 @@ mod tests {
                 payment_id: "pay-1".to_string(),
                 split_amount: 20.0,
                 payment_method: "CASH".to_string(),
+                tendered: None,
+                change: None,
             },
         );
 
@@ -475,6 +487,8 @@ mod tests {
                 payment_method: "CASH".to_string(),
                 progress_paid: 1,
                 progress_total: 3,
+                tendered: None,
+                change: None,
             },
         );
 

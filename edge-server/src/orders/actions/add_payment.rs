@@ -4,7 +4,9 @@
 
 use async_trait::async_trait;
 
+use crate::orders::money::{to_decimal, to_f64, MONEY_TOLERANCE};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use rust_decimal::Decimal;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, PaymentInput};
 
 /// AddPayment action
@@ -52,13 +54,23 @@ impl CommandHandler for AddPaymentAction {
         // 5. Generate payment_id
         let payment_id = uuid::Uuid::new_v4().to_string();
 
-        // 6. Calculate change for cash payments
-        let change = self
-            .payment
-            .tendered
-            .map(|t| (t - self.payment.amount).max(0.0));
+        // 6. Validate tendered amount
+        if let Some(t) = self.payment.tendered {
+            if to_decimal(t) < to_decimal(self.payment.amount) - MONEY_TOLERANCE {
+                return Err(OrderError::InvalidOperation(format!(
+                    "Tendered {:.2} is less than required {:.2}",
+                    t, self.payment.amount
+                )));
+            }
+        }
 
-        // 7. Create event
+        // 7. Calculate change for cash payments (using rust_decimal)
+        let change = self.payment.tendered.map(|t| {
+            let diff = to_decimal(t) - to_decimal(self.payment.amount);
+            to_f64(diff.max(Decimal::ZERO))
+        });
+
+        // 8. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),

@@ -229,6 +229,8 @@ export interface ItemSplitPayload {
   split_amount: number;
   payment_method: string;
   items: SplitItem[];
+  tendered?: number | null;
+  change?: number | null;
 }
 
 /** 金额分单 */
@@ -237,6 +239,8 @@ export interface AmountSplitPayload {
   payment_id: string;
   split_amount: number;
   payment_method: string;
+  tendered?: number | null;
+  change?: number | null;
 }
 
 /** AA 开始（锁人数，记录每份金额） */
@@ -256,6 +260,8 @@ export interface AaSplitPaidPayload {
   payment_method: string;
   progress_paid: number;
   progress_total: number;
+  tendered?: number | null;
+  change?: number | null;
 }
 
 /** AA 取消 */
@@ -462,6 +468,7 @@ export interface SplitByItemsCommand {
   order_id: string;
   payment_method: string;
   items: SplitItem[];
+  tendered?: number | null;
 }
 
 /** 金额分单 */
@@ -470,6 +477,7 @@ export interface SplitByAmountCommand {
   order_id: string;
   split_amount: number;
   payment_method: string;
+  tendered?: number | null;
 }
 
 /** AA 开始（锁定人数 + 支付第一份） */
@@ -479,6 +487,7 @@ export interface StartAaSplitCommand {
   total_shares: number;
   shares: number;
   payment_method: string;
+  tendered?: number | null;
 }
 
 /** AA 后续支付 */
@@ -487,6 +496,7 @@ export interface PayAaSplitCommand {
   order_id: string;
   shares: number;
   payment_method: string;
+  tendered?: number | null;
 }
 
 export interface MoveOrderCommand {

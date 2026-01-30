@@ -9,7 +9,7 @@
 use super::archive::OrderArchiveService;
 use super::money::{to_decimal, to_f64};
 use super::storage::{OrderStorage, PendingArchive};
-use crate::db::repository::ShiftRepository;
+use crate::db::repository::{PaymentRepository, ShiftRepository};
 use rust_decimal::prelude::*;
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot};
 use std::sync::Arc;
@@ -178,7 +178,10 @@ impl ArchiveWorker {
                 // 3. Update shift expected_cash for cash payments
                 self.update_shift_cash(&snapshot, &events).await;
 
-                // 4. Cleanup redb (synchronous)
+                // 4. Write payment records to independent payment table
+                self.write_payment_records(&snapshot, &events).await;
+
+                // 5. Cleanup redb (synchronous)
                 if let Err(e) = self.storage.complete_archive(order_id) {
                     tracing::error!(order_id = %order_id, error = %e, "Failed to complete archive cleanup");
                 }
@@ -216,6 +219,45 @@ impl ArchiveWorker {
         };
 
         Some((snapshot, events))
+    }
+
+    /// Write payment records to independent payment table (for statistics/reconciliation)
+    async fn write_payment_records(&self, snapshot: &OrderSnapshot, events: &[OrderEvent]) {
+        if snapshot.payments.is_empty() {
+            return;
+        }
+
+        // Extract operator from terminal event
+        let (op_id, op_name) = events
+            .iter()
+            .rev()
+            .find(|e| {
+                matches!(
+                    e.event_type,
+                    OrderEventType::OrderCompleted | OrderEventType::OrderVoided
+                )
+            })
+            .map(|e| (Some(e.operator_id.as_str()), Some(e.operator_name.as_str())))
+            .unwrap_or((None, None));
+
+        let repo = PaymentRepository::new(self.db.clone());
+        match repo.create_from_snapshot(snapshot, op_id, op_name).await {
+            Ok(count) => {
+                tracing::info!(
+                    order_id = %snapshot.order_id,
+                    payment_count = count,
+                    "Payment records written to payment table"
+                );
+            }
+            Err(e) => {
+                // Non-fatal: payment table is a projection, not critical path
+                tracing::warn!(
+                    order_id = %snapshot.order_id,
+                    error = %e,
+                    "Failed to write payment records"
+                );
+            }
+        }
     }
 
     /// Update shift expected_cash for cash payments in the order

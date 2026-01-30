@@ -325,6 +325,7 @@ export const splitByItems = async (
   orderId: string,
   items: { instance_id: string; name: string; quantity: number; unit_price: number }[],
   paymentMethod: string,
+  tendered?: number,
 ): Promise<void> => {
   const command = createCommand({
     type: 'SPLIT_BY_ITEMS',
@@ -336,6 +337,7 @@ export const splitByItems = async (
       quantity: item.quantity,
       unit_price: item.unit_price,
     })),
+    tendered: tendered ?? null,
   });
 
   const response = await sendCommand(command);
@@ -350,12 +352,14 @@ export const splitByAmount = async (
   orderId: string,
   splitAmount: number,
   paymentMethod: string,
+  tendered?: number,
 ): Promise<void> => {
   const command = createCommand({
     type: 'SPLIT_BY_AMOUNT',
     order_id: orderId,
     split_amount: splitAmount,
     payment_method: paymentMethod,
+    tendered: tendered ?? null,
   });
 
   const response = await sendCommand(command);
@@ -371,6 +375,7 @@ export const startAaSplit = async (
   totalShares: number,
   shares: number,
   paymentMethod: string,
+  tendered?: number,
 ): Promise<void> => {
   const command = createCommand({
     type: 'START_AA_SPLIT',
@@ -378,6 +383,7 @@ export const startAaSplit = async (
     total_shares: totalShares,
     shares,
     payment_method: paymentMethod,
+    tendered: tendered ?? null,
   });
 
   const response = await sendCommand(command);
@@ -392,12 +398,14 @@ export const payAaSplit = async (
   orderId: string,
   shares: number,
   paymentMethod: string,
+  tendered?: number,
 ): Promise<void> => {
   const command = createCommand({
     type: 'PAY_AA_SPLIT',
     order_id: orderId,
     shares,
     payment_method: paymentMethod,
+    tendered: tendered ?? null,
   });
 
   const response = await sendCommand(command);

@@ -224,39 +224,47 @@ impl From<&OrderCommand> for CommandAction {
                 order_id,
                 payment_method,
                 items,
+                tendered,
             } => CommandAction::SplitByItems(SplitByItemsAction {
                 order_id: order_id.clone(),
                 payment_method: payment_method.clone(),
                 items: items.clone(),
+                tendered: *tendered,
             }),
             OrderCommandPayload::SplitByAmount {
                 order_id,
                 split_amount,
                 payment_method,
+                tendered,
             } => CommandAction::SplitByAmount(SplitByAmountAction {
                 order_id: order_id.clone(),
                 split_amount: *split_amount,
                 payment_method: payment_method.clone(),
+                tendered: *tendered,
             }),
             OrderCommandPayload::StartAaSplit {
                 order_id,
                 total_shares,
                 shares,
                 payment_method,
+                tendered,
             } => CommandAction::StartAaSplit(StartAaSplitAction {
                 order_id: order_id.clone(),
                 total_shares: *total_shares,
                 shares: *shares,
                 payment_method: payment_method.clone(),
+                tendered: *tendered,
             }),
             OrderCommandPayload::PayAaSplit {
                 order_id,
                 shares,
                 payment_method,
+                tendered,
             } => CommandAction::PayAaSplit(PayAaSplitAction {
                 order_id: order_id.clone(),
                 shares: *shares,
                 payment_method: payment_method.clone(),
+                tendered: *tendered,
             }),
             OrderCommandPayload::ToggleRuleSkip {
                 order_id,

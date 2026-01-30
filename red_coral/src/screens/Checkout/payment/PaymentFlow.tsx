@@ -430,6 +430,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
             unit_price: i.unit_price,
           })),
           method,
+          method === 'CASH' ? cashDetails?.tendered : undefined,
         );
 
         // Show success modal for cash payments
@@ -494,20 +495,22 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           await openCashDrawer();
         }
 
+        const tendered = method === 'CASH' ? cashDetails?.tendered : undefined;
+
         if (splitMode === 'AA') {
           // AA split: server calculates amount from shares
           const payShares = parseInt(aaPayStr) || 1;
           if (isAALocked) {
             // Subsequent AA payment
-            await payAaSplit(order.order_id, payShares, method);
+            await payAaSplit(order.order_id, payShares, method, tendered);
           } else {
             // First AA payment — lock headcount + pay
             const totalShares = parseInt(aaTotalStr) || 2;
-            await startAaSplit(order.order_id, totalShares, payShares, method);
+            await startAaSplit(order.order_id, totalShares, payShares, method, tendered);
           }
         } else {
           // Amount-based split
-          await splitByAmount(order.order_id, amount, method);
+          await splitByAmount(order.order_id, amount, method, tendered);
         }
 
         // Show success modal for cash payments

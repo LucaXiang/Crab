@@ -234,6 +234,10 @@ pub enum EventPayload {
         split_amount: f64,
         payment_method: String,
         items: Vec<SplitItem>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tendered: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        change: Option<f64>,
     },
 
     /// 金额分单
@@ -241,6 +245,10 @@ pub enum EventPayload {
         payment_id: String,
         split_amount: f64,
         payment_method: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tendered: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        change: Option<f64>,
     },
 
     /// AA 开始（锁人数，记录每份金额）
@@ -258,6 +266,10 @@ pub enum EventPayload {
         payment_method: String,
         progress_paid: i32,
         progress_total: i32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tendered: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        change: Option<f64>,
     },
 
     /// AA 取消（所有 AA 支付被取消，解锁 AA 模式）

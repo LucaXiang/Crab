@@ -108,6 +108,7 @@ pub struct SplitByItemsAction {
     pub order_id: String,
     pub payment_method: String,
     pub items: Vec<SplitItem>,
+    pub tendered: Option<f64>,
 }
 
 #[async_trait]
@@ -145,6 +146,18 @@ impl CommandHandler for SplitByItemsAction {
 
         let payment_id = uuid::Uuid::new_v4().to_string();
         let seq = ctx.next_sequence();
+        if let Some(t) = self.tendered {
+            if to_decimal(t) < to_decimal(amount_f64) - MONEY_TOLERANCE {
+                return Err(OrderError::InvalidOperation(format!(
+                    "Tendered {:.2} is less than required {:.2}",
+                    t, amount_f64
+                )));
+            }
+        }
+        let change = self.tendered.map(|t| {
+            let diff = to_decimal(t) - to_decimal(amount_f64);
+            to_f64(diff.max(Decimal::ZERO))
+        });
 
         let event = OrderEvent::new(
             seq,
@@ -159,6 +172,8 @@ impl CommandHandler for SplitByItemsAction {
                 split_amount: amount_f64,
                 payment_method: self.payment_method.clone(),
                 items: self.items.clone(),
+                tendered: self.tendered,
+                change,
             },
         );
 
@@ -176,6 +191,7 @@ pub struct SplitByAmountAction {
     pub order_id: String,
     pub split_amount: f64,
     pub payment_method: String,
+    pub tendered: Option<f64>,
 }
 
 #[async_trait]
@@ -204,6 +220,18 @@ impl CommandHandler for SplitByAmountAction {
 
         let payment_id = uuid::Uuid::new_v4().to_string();
         let seq = ctx.next_sequence();
+        if let Some(t) = self.tendered {
+            if to_decimal(t) < to_decimal(self.split_amount) - MONEY_TOLERANCE {
+                return Err(OrderError::InvalidOperation(format!(
+                    "Tendered {:.2} is less than required {:.2}",
+                    t, self.split_amount
+                )));
+            }
+        }
+        let change = self.tendered.map(|t| {
+            let diff = to_decimal(t) - to_decimal(self.split_amount);
+            to_f64(diff.max(Decimal::ZERO))
+        });
 
         let event = OrderEvent::new(
             seq,
@@ -217,6 +245,8 @@ impl CommandHandler for SplitByAmountAction {
                 payment_id,
                 split_amount: self.split_amount,
                 payment_method: self.payment_method.clone(),
+                tendered: self.tendered,
+                change,
             },
         );
 
@@ -235,6 +265,7 @@ pub struct StartAaSplitAction {
     pub total_shares: i32,
     pub shares: i32,
     pub payment_method: String,
+    pub tendered: Option<f64>,
 }
 
 #[async_trait]
@@ -307,6 +338,18 @@ impl CommandHandler for StartAaSplitAction {
         // Event 2: AASplitPaid (first payment)
         let payment_id = uuid::Uuid::new_v4().to_string();
         let seq2 = ctx.next_sequence();
+        if let Some(t) = self.tendered {
+            if to_decimal(t) < to_decimal(amount_f64) - MONEY_TOLERANCE {
+                return Err(OrderError::InvalidOperation(format!(
+                    "Tendered {:.2} is less than required {:.2}",
+                    t, amount_f64
+                )));
+            }
+        }
+        let change = self.tendered.map(|t| {
+            let diff = to_decimal(t) - to_decimal(amount_f64);
+            to_f64(diff.max(Decimal::ZERO))
+        });
         let paid_event = OrderEvent::new(
             seq2,
             self.order_id.clone(),
@@ -322,6 +365,8 @@ impl CommandHandler for StartAaSplitAction {
                 payment_method: self.payment_method.clone(),
                 progress_paid: self.shares,
                 progress_total: self.total_shares,
+                tendered: self.tendered,
+                change,
             },
         );
 
@@ -339,6 +384,7 @@ pub struct PayAaSplitAction {
     pub order_id: String,
     pub shares: i32,
     pub payment_method: String,
+    pub tendered: Option<f64>,
 }
 
 #[async_trait]
@@ -387,6 +433,18 @@ impl CommandHandler for PayAaSplitAction {
 
         let payment_id = uuid::Uuid::new_v4().to_string();
         let seq = ctx.next_sequence();
+        if let Some(t) = self.tendered {
+            if to_decimal(t) < to_decimal(amount_f64) - MONEY_TOLERANCE {
+                return Err(OrderError::InvalidOperation(format!(
+                    "Tendered {:.2} is less than required {:.2}",
+                    t, amount_f64
+                )));
+            }
+        }
+        let change = self.tendered.map(|t| {
+            let diff = to_decimal(t) - to_decimal(amount_f64);
+            to_f64(diff.max(Decimal::ZERO))
+        });
 
         let progress_paid = snapshot.aa_paid_shares + self.shares;
 
@@ -405,6 +463,8 @@ impl CommandHandler for PayAaSplitAction {
                 payment_method: self.payment_method.clone(),
                 progress_paid,
                 progress_total: total_shares,
+                tendered: self.tendered,
+                change,
             },
         );
 
@@ -510,6 +570,7 @@ mod tests {
                 quantity: 2,
                 unit_price: 10.0,
             }],
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -548,6 +609,7 @@ mod tests {
             order_id: "order-1".to_string(),
             payment_method: "CASH".to_string(),
             items: vec![],
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -572,6 +634,7 @@ mod tests {
             order_id: "order-1".to_string(),
             split_amount: 20.0,
             payment_method: "CARD".to_string(),
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -608,6 +671,7 @@ mod tests {
             order_id: "order-1".to_string(),
             split_amount: 0.0,
             payment_method: "CASH".to_string(),
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -633,6 +697,7 @@ mod tests {
             total_shares: 3,
             shares: 1,
             payment_method: "CASH".to_string(),
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -686,6 +751,7 @@ mod tests {
             total_shares: 1, // Must be >= 2
             shares: 1,
             payment_method: "CASH".to_string(),
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -714,6 +780,7 @@ mod tests {
             order_id: "order-1".to_string(),
             shares: 1,
             payment_method: "CARD".to_string(),
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -752,6 +819,7 @@ mod tests {
             order_id: "order-1".to_string(),
             shares: 1,
             payment_method: "CASH".to_string(),
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -782,6 +850,7 @@ mod tests {
             order_id: "order-1".to_string(),
             split_amount: 10.0,
             payment_method: "CASH".to_string(),
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -811,6 +880,7 @@ mod tests {
             total_shares: 3,
             shares: 1,
             payment_method: "CASH".to_string(),
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -841,6 +911,7 @@ mod tests {
                 quantity: 1,
                 unit_price: 10.0,
             }],
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -870,6 +941,7 @@ mod tests {
             total_shares: 3,
             shares: 1,
             payment_method: "CASH".to_string(),
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -900,6 +972,7 @@ mod tests {
                 quantity: 1,
                 unit_price: 10.0,
             }],
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -928,6 +1001,7 @@ mod tests {
             order_id: "order-1".to_string(),
             split_amount: 10.0,
             payment_method: "CASH".to_string(),
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
@@ -958,6 +1032,7 @@ mod tests {
             order_id: "order-1".to_string(),
             shares: 2, // Only 1 available
             payment_method: "CASH".to_string(),
+            tendered: None,
         };
 
         let metadata = create_test_metadata();
