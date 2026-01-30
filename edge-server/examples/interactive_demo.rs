@@ -204,17 +204,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     status.edge_id = cred.binding.entity_id.clone();
                     status.device_id = cred.binding.device_id.clone();
                     status.is_signed = cred.is_signed();
-                    status.last_verified_at = if cred.binding.last_verified_at.is_empty() {
+                    status.last_verified_at = if cred.binding.last_verified_at == 0 {
                         "-".to_string()
                     } else {
-                        // 只显示时间部分
-                        cred.binding
-                            .last_verified_at
-                            .split('T')
-                            .nth(1)
-                            .and_then(|t| t.split('+').next())
-                            .unwrap_or(&cred.binding.last_verified_at)
-                            .to_string()
+                        // 显示相对时间（秒前）
+                        let secs_ago = (shared::util::now_millis() - cred.binding.last_verified_at) / 1000;
+                        format!("{}s ago", secs_ago)
                     };
 
                     if let Some(sub) = &cred.subscription {
@@ -222,7 +217,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         status.sub_status = format!("{:?}", sub.status);
                         status.expires_at = sub
                             .expires_at
-                            .map(|d| d.to_rfc3339())
+                            .map(|ts| {
+                                let days = (ts - shared::util::now_millis()) / 86_400_000;
+                                format!("in {}d", days)
+                            })
                             .unwrap_or_else(|| "Never".to_string());
                     } else {
                         status.plan = "None".to_string();
