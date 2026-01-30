@@ -5,6 +5,8 @@ use axum::extract::{Extension, Path, Query, State};
 use axum::response::IntoResponse;
 use serde::Deserialize;
 
+use crate::audit::AuditAction;
+use crate::audit_log;
 use crate::auth::permissions::{is_valid_permission, ALL_PERMISSIONS};
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
@@ -102,6 +104,16 @@ pub async fn create(
         .await
         ?;
 
+    let id = role.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+    audit_log!(
+        state.audit_service,
+        AuditAction::RoleCreated,
+        "role", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"role_name": &role.name, "permissions": &role.permissions})
+    );
+
     Ok(Json(role))
 }
 
@@ -130,6 +142,15 @@ pub async fn update(
         .await
         ?;
 
+    audit_log!(
+        state.audit_service,
+        AuditAction::RoleUpdated,
+        "role", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"role_name": &role.name})
+    );
+
     Ok(Json(role))
 }
 
@@ -151,6 +172,17 @@ pub async fn delete(
         .delete(&id)
         .await
         ?;
+
+    if result {
+        audit_log!(
+            state.audit_service,
+            AuditAction::RoleDeleted,
+            "role", &id,
+            operator_id = Some(current_user.id.clone()),
+            operator_name = Some(current_user.display_name.clone()),
+            details = serde_json::json!({})
+        );
+    }
 
     Ok(Json(result))
 }
@@ -210,6 +242,15 @@ pub async fn update_role_permissions(
         .update(&id, update)
         .await
         ?;
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::RoleUpdated,
+        "role", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"role_name": &role.name, "permissions": &role.permissions})
+    );
 
     Ok(Json(role))
 }

@@ -2,9 +2,12 @@
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
 };
 
+use crate::audit::AuditAction;
+use crate::audit_log;
+use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{Employee, EmployeeCreate, EmployeeUpdate};
 use crate::db::repository::EmployeeRepository;
@@ -51,6 +54,7 @@ pub async fn get_by_id(
 /// Create a new employee
 pub async fn create(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<EmployeeCreate>,
 ) -> AppResult<Json<Employee>> {
     let repo = EmployeeRepository::new(state.db.clone());
@@ -60,6 +64,16 @@ pub async fn create(
         ?;
 
     let id = employee.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::EmployeeCreated,
+        "employee", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"username": &employee.username})
+    );
+
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&employee))
         .await;
@@ -70,6 +84,7 @@ pub async fn create(
 /// Update an employee
 pub async fn update(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(payload): Json<EmployeeUpdate>,
 ) -> AppResult<Json<Employee>> {
@@ -78,6 +93,15 @@ pub async fn update(
         .update(&id, payload)
         .await
         ?;
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::EmployeeUpdated,
+        "employee", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"username": &employee.username})
+    );
 
     state
         .broadcast_sync(RESOURCE, "updated", &id, Some(&employee))
@@ -89,6 +113,7 @@ pub async fn update(
 /// Soft delete an employee
 pub async fn delete(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let repo = EmployeeRepository::new(state.db.clone());
@@ -98,6 +123,15 @@ pub async fn delete(
         ?;
 
     if result {
+        audit_log!(
+            state.audit_service,
+            AuditAction::EmployeeDeleted,
+            "employee", &id,
+            operator_id = Some(current_user.id.clone()),
+            operator_name = Some(current_user.display_name.clone()),
+            details = serde_json::json!({})
+        );
+
         state
             .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
             .await;
