@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Ban, AlertTriangle, CreditCard, ExternalLink, Power, RefreshCw } from 'lucide-react';
+import { Ban, AlertTriangle, CreditCard, ExternalLink, Power, RefreshCw, LogOut } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAppState, useBridgeStore } from '@/core/stores/bridge';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
@@ -48,8 +48,10 @@ function getTheme(status: SubscriptionStatus) {
 
 export const SubscriptionBlockedScreen: React.FC = () => {
   const appState = useAppState();
+  const fetchAppState = useBridgeStore((s) => s.fetchAppState);
   const [isChecking, setIsChecking] = useState(false);
   const [checkMessage, setCheckMessage] = useState<string | null>(null);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   if (appState?.type !== 'ServerSubscriptionBlocked') {
     return null;
@@ -62,6 +64,15 @@ export const SubscriptionBlockedScreen: React.FC = () => {
   const handleCloseApp = async () => {
     const appWindow = getCurrentWindow();
     await appWindow.close();
+  };
+
+  const handleExitTenant = async () => {
+    try {
+      await invokeApi('exit_tenant');
+      await fetchAppState();
+    } catch (error) {
+      console.error('Exit tenant failed:', error);
+    }
   };
 
   const handleCheckSubscription = async () => {
@@ -179,6 +190,39 @@ export const SubscriptionBlockedScreen: React.FC = () => {
               {t('subscriptionBlocked.button_contact_support')}
             </a>
           )}
+
+          {/* 退出租户 */}
+          <div className="pt-3 border-t border-gray-100">
+            {!showExitConfirm ? (
+              <button
+                onClick={() => setShowExitConfirm(true)}
+                className="w-full py-3 text-gray-400 hover:text-red-500 font-medium rounded-xl hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+              >
+                <LogOut size={18} />
+                {t('subscriptionBlocked.button_exit_tenant')}
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-center text-gray-500">
+                  {t('subscriptionBlocked.confirm_exit_tenant')}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowExitConfirm(false)}
+                    className="flex-1 py-2 bg-gray-100 text-gray-600 font-medium rounded-xl hover:bg-gray-200 transition-all"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                  <button
+                    onClick={handleExitTenant}
+                    className="flex-1 py-2 bg-red-500 text-white font-medium rounded-xl hover:bg-red-600 transition-all"
+                  >
+                    {t('common.confirm')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

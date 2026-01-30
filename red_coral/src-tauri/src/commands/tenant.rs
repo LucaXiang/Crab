@@ -84,6 +84,21 @@ pub async fn remove_tenant(
     }
 }
 
+/// 退出当前租户（停止服务器 + 移除租户数据）
+#[tauri::command(rename_all = "snake_case")]
+pub async fn exit_tenant(
+    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+) -> Result<ApiResponse<()>, String> {
+    let bridge = bridge.read().await;
+    match bridge.exit_tenant().await {
+        Ok(_) => Ok(ApiResponse::success(())),
+        Err(e) => Ok(ApiResponse::error_with_code(
+            ErrorCode::InternalError,
+            e.to_string(),
+        )),
+    }
+}
+
 /// 获取当前租户ID
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_current_tenant(

@@ -841,9 +841,10 @@ impl ClientBridge {
             return Ok(());
         }
 
-        // 如果在 Client 模式，需要先停止
+        // 如果在 Client 模式，先停止再切换
         if matches!(&*mode_guard, ClientMode::Client { .. }) {
-            return Err(BridgeError::AlreadyRunning("client".to_string()));
+            tracing::info!("Stopping Client mode to switch to Server mode...");
+            *mode_guard = ClientMode::Disconnected;
         }
 
         let config = self.config.read().await;
@@ -1007,13 +1008,14 @@ impl ClientBridge {
     ) -> Result<(), BridgeError> {
         let mut mode_guard = self.mode.write().await;
 
-        if !matches!(&*mode_guard, ClientMode::Disconnected) {
-            let current = match &*mode_guard {
-                ClientMode::Server { .. } => "server",
-                ClientMode::Client { .. } => "client",
-                ClientMode::Disconnected => "disconnected",
-            };
-            return Err(BridgeError::AlreadyRunning(current.to_string()));
+        // 如果在其他模式，先停止
+        if let ClientMode::Server { server_task, .. } = &*mode_guard {
+            tracing::info!("Stopping Server mode to switch to Client mode...");
+            server_task.abort();
+            *mode_guard = ClientMode::Disconnected;
+        } else if matches!(&*mode_guard, ClientMode::Client { .. }) {
+            tracing::info!("Already in Client mode, stopping first...");
+            *mode_guard = ClientMode::Disconnected;
         }
 
         let tenant_manager = self.tenant_manager.read().await;
@@ -1203,6 +1205,37 @@ impl ClientBridge {
 
         tracing::info!("Mode stopped, now disconnected");
 
+        Ok(())
+    }
+
+    /// 退出当前租户：停止服务器 → 清除当前租户选择（保留文件）
+    pub async fn exit_tenant(&self) -> Result<(), BridgeError> {
+        let tenant_id = {
+            let tm = self.tenant_manager.read().await;
+            tm.current_tenant_id().map(|s| s.to_string())
+        };
+
+        let Some(tenant_id) = tenant_id else {
+            return Err(BridgeError::Config("No current tenant".to_string()));
+        };
+
+        // 1. 停止服务器模式（切换到 Disconnected）
+        self.stop().await?;
+
+        // 2. 清除当前租户选择（不删除文件）
+        {
+            let mut tm = self.tenant_manager.write().await;
+            tm.clear_current_tenant();
+        }
+
+        // 3. 清除配置中的当前租户
+        {
+            let mut config = self.config.write().await;
+            config.current_tenant = None;
+            config.save(&self.config_path)?;
+        }
+
+        tracing::info!(tenant_id = %tenant_id, "Exited tenant (files preserved)");
         Ok(())
     }
 

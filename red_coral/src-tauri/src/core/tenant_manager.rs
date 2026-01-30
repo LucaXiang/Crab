@@ -368,6 +368,12 @@ impl TenantManager {
         Ok(())
     }
 
+    /// 清除当前租户选择（不删除文件）
+    pub fn clear_current_tenant(&mut self) {
+        self.current_tenant = None;
+        self.current_session = None;
+    }
+
     /// 移除租户 (删除本地证书和缓存)
     pub fn remove_tenant(&mut self, tenant_id: &str) -> Result<(), TenantError> {
         // 如果是当前租户，先清除
