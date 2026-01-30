@@ -77,7 +77,7 @@ let client = CrabClient::remote()
 // Local 模式
 let client = CrabClient::local()
     .with_router(router)
-    .with_message_sender(sender)
+    .with_message_channels(client_tx, server_tx)
     .build()?
     .connect().await?
     .login("waiter", "1234").await?;

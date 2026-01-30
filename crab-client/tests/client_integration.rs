@@ -152,7 +152,7 @@ mod local_tests {
         // Build local client
         let client = CrabClient::local()
             .with_router(router)
-            .with_message_sender(sender)
+            .with_message_channels(sender.clone(), sender)
             .build()
             .expect("Failed to build local client");
 
@@ -168,7 +168,7 @@ mod local_tests {
         let (sender, _) = broadcast::channel::<BusMessage>(16);
 
         // Missing router
-        let result = CrabClient::local().with_message_sender(sender).build();
+        let result = CrabClient::local().with_message_channels(sender.clone(), sender).build();
         assert!(result.is_err());
     }
 
@@ -188,7 +188,7 @@ mod local_tests {
 
         let client = CrabClient::local()
             .with_router(router)
-            .with_message_sender(sender)
+            .with_message_channels(sender.clone(), sender)
             .build()
             .unwrap();
 

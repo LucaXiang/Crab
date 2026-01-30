@@ -82,12 +82,9 @@ impl LabelTemplateRepository {
                     description: $description,
                     width: $width,
                     height: $height,
-                    padding: $padding,
                     fields: $fields,
                     is_default: $is_default,
                     is_active: $is_active,
-                    width_mm: $width_mm,
-                    height_mm: $height_mm,
                     padding_mm_x: $padding_mm_x,
                     padding_mm_y: $padding_mm_y,
                     render_dpi: $render_dpi,
@@ -100,12 +97,9 @@ impl LabelTemplateRepository {
             .bind(("description", data.description.clone()))
             .bind(("width", data.width))
             .bind(("height", data.height))
-            .bind(("padding", data.padding))
             .bind(("fields", data.fields.clone()))
             .bind(("is_default", data.is_default))
             .bind(("is_active", data.is_active))
-            .bind(("width_mm", data.width_mm))
-            .bind(("height_mm", data.height_mm))
             .bind(("padding_mm_x", data.padding_mm_x))
             .bind(("padding_mm_y", data.padding_mm_y))
             .bind(("render_dpi", data.render_dpi))

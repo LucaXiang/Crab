@@ -689,12 +689,9 @@ export interface LabelTemplateCreate {
   description?: string;
   width: number;
   height: number;
-  padding?: number;
   fields?: import('../print/labelTemplate').LabelField[];
   is_default?: boolean;
   is_active?: boolean;
-  width_mm?: number;
-  height_mm?: number;
   padding_mm_x?: number;
   padding_mm_y?: number;
   render_dpi?: number;
@@ -706,12 +703,9 @@ export interface LabelTemplateUpdate {
   description?: string;
   width?: number;
   height?: number;
-  padding?: number;
   fields?: import('../print/labelTemplate').LabelField[];
   is_default?: boolean;
   is_active?: boolean;
-  width_mm?: number;
-  height_mm?: number;
   padding_mm_x?: number;
   padding_mm_y?: number;
   render_dpi?: number;

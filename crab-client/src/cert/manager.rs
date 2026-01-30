@@ -404,7 +404,10 @@ impl CertManager {
                 }
                 tracing::info!("  ✅ Credential signature and device binding verified.");
             } else {
-                tracing::warn!("  ⚠️ Credential is not signed (legacy format).");
+                return Err(CertError::Invalid(
+                    "Credential is not signed. Please re-activate to obtain a signed credential."
+                        .to_string(),
+                ));
             }
 
             // 检查凭证过期

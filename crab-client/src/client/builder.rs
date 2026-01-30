@@ -220,15 +220,6 @@ impl LocalClientBuilder {
         self
     }
 
-    /// Sets a single message sender (legacy, for simple cases).
-    ///
-    /// 使用同一通道发送和接收。注意：客户端会收到自己发送的消息。
-    pub fn with_message_sender(mut self, sender: broadcast::Sender<BusMessage>) -> Self {
-        self.client_tx = Some(sender.clone());
-        self.server_tx = Some(sender);
-        self
-    }
-
     /// Builds the local client.
     ///
     /// # Errors

@@ -27,8 +27,8 @@ function mapApiToFrontend(apiTemplate: Record<string, unknown>): LabelTemplate {
     isActive: apiTemplate.is_active as boolean ?? true,
     createdAt: apiTemplate.created_at as number || Date.now(),
     updatedAt: apiTemplate.updated_at as number || Date.now(),
-    widthMm: apiTemplate.width_mm as number || apiTemplate.width as number,
-    heightMm: apiTemplate.height_mm as number || apiTemplate.height as number,
+    widthMm: apiTemplate.width as number,
+    heightMm: apiTemplate.height as number,
     paddingMmX: apiTemplate.padding_mm_x as number,
     paddingMmY: apiTemplate.padding_mm_y as number,
     renderDpi: apiTemplate.render_dpi as number,
@@ -41,14 +41,11 @@ function mapFrontendToApiCreate(template: Partial<LabelTemplate>): LabelTemplate
   return {
     name: template.name || '',
     description: template.description,
-    width: template.width || 40,
-    height: template.height || 30,
-    padding: template.padding || 2,
+    width: template.widthMm || template.width || 40,
+    height: template.heightMm || template.height || 30,
     fields: template.fields || [],
     is_default: template.isDefault || false,
     is_active: template.isActive ?? true,
-    width_mm: template.widthMm || template.width,
-    height_mm: template.heightMm || template.height,
     padding_mm_x: template.paddingMmX,
     padding_mm_y: template.paddingMmY,
     render_dpi: template.renderDpi,
@@ -63,12 +60,11 @@ function mapFrontendToApiUpdate(template: Partial<LabelTemplate>): LabelTemplate
   if (template.description !== undefined) update.description = template.description;
   if (template.width !== undefined) update.width = template.width;
   if (template.height !== undefined) update.height = template.height;
-  if (template.padding !== undefined) update.padding = template.padding;
   if (template.fields !== undefined) update.fields = template.fields;
   if (template.isDefault !== undefined) update.is_default = template.isDefault;
   if (template.isActive !== undefined) update.is_active = template.isActive;
-  if (template.widthMm !== undefined) update.width_mm = template.widthMm;
-  if (template.heightMm !== undefined) update.height_mm = template.heightMm;
+  if (template.widthMm !== undefined) update.width = template.widthMm;
+  if (template.heightMm !== undefined) update.height = template.heightMm;
   if (template.paddingMmX !== undefined) update.padding_mm_x = template.paddingMmX;
   if (template.paddingMmY !== undefined) update.padding_mm_y = template.paddingMmY;
   if (template.renderDpi !== undefined) update.render_dpi = template.renderDpi;

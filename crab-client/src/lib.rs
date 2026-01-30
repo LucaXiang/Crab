@@ -51,7 +51,7 @@
 //!
 //! let client = CrabClient::local()
 //!     .with_router(router)
-//!     .with_message_sender(sender)
+//!     .with_message_channels(client_tx, server_tx)
 //!     .build()?;
 //!
 //! let client = client.connect().await?;

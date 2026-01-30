@@ -128,9 +128,6 @@ pub struct LabelTemplate {
     pub width: f32,
     /// Label height in mm
     pub height: f32,
-    /// Padding in mm
-    #[serde(default = "default_padding")]
-    pub padding: f32,
     /// Template fields
     #[serde(default)]
     pub fields: Vec<LabelField>,
@@ -144,28 +141,18 @@ pub struct LabelTemplate {
     pub created_at: Option<i64>,
     /// Updated timestamp
     pub updated_at: Option<i64>,
-    /// UI-specific: width in mm (duplicate for compatibility)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub width_mm: Option<f32>,
-    /// UI-specific: height in mm (duplicate for compatibility)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub height_mm: Option<f32>,
-    /// UI-specific: horizontal padding in mm
+    /// Horizontal padding in mm
     #[serde(skip_serializing_if = "Option::is_none")]
     pub padding_mm_x: Option<f32>,
-    /// UI-specific: vertical padding in mm
+    /// Vertical padding in mm
     #[serde(skip_serializing_if = "Option::is_none")]
     pub padding_mm_y: Option<f32>,
-    /// UI-specific: render DPI
+    /// Render DPI
     #[serde(skip_serializing_if = "Option::is_none")]
     pub render_dpi: Option<i32>,
-    /// UI-specific: test data JSON
+    /// Test data JSON
     #[serde(skip_serializing_if = "Option::is_none")]
     pub test_data: Option<String>,
-}
-
-fn default_padding() -> f32 {
-    2.0
 }
 
 /// Create label template payload
@@ -176,18 +163,12 @@ pub struct LabelTemplateCreate {
     pub description: Option<String>,
     pub width: f32,
     pub height: f32,
-    #[serde(default = "default_padding")]
-    pub padding: f32,
     #[serde(default)]
     pub fields: Vec<LabelField>,
     #[serde(default)]
     pub is_default: bool,
     #[serde(default = "default_true")]
     pub is_active: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub width_mm: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub height_mm: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub padding_mm_x: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -210,17 +191,11 @@ pub struct LabelTemplateUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub padding: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub fields: Option<Vec<LabelField>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_default: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_active: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub width_mm: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub height_mm: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub padding_mm_x: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
