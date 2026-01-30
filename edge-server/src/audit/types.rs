@@ -163,10 +163,24 @@ pub struct AuditChainVerification {
 pub struct AuditChainBreak {
     /// 断裂处的序列号
     pub entry_id: u64,
-    /// 期望的 prev_hash
-    pub expected_prev_hash: String,
-    /// 实际的 prev_hash
-    pub actual_prev_hash: String,
+    /// 断裂类型
+    pub kind: ChainBreakKind,
+    /// 期望值
+    pub expected: String,
+    /// 实际值
+    pub actual: String,
+}
+
+/// 审计链断裂类型
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChainBreakKind {
+    /// prev_hash 不匹配
+    HashMismatch,
+    /// curr_hash 重新计算不一致
+    HashRecompute,
+    /// 序列号不连续（可能有条目被删除）
+    SequenceGap,
 }
 
 /// 启动异常事件（需要前端用户确认）

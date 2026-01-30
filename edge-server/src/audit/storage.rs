@@ -3,12 +3,13 @@
 //! Append-only 设计，没有任何删除/更新接口。
 //! SHA256 哈希链确保防篡改。
 
+use std::sync::Arc;
 use sha2::{Digest, Sha256};
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
 use thiserror::Error;
 
-use super::types::{AuditAction, AuditChainBreak, AuditChainVerification, AuditEntry, AuditQuery};
+use super::types::{AuditAction, AuditChainBreak, AuditChainVerification, AuditEntry, AuditQuery, ChainBreakKind};
 
 /// 存储错误
 #[derive(Debug, Error)]
@@ -104,11 +105,16 @@ struct AuditInsert {
 #[derive(Clone)]
 pub struct AuditStorage {
     db: Surreal<Db>,
+    /// 序列化所有 append 操作，防止 read-modify-write 竞争
+    append_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl AuditStorage {
     pub fn new(db: Surreal<Db>) -> Self {
-        Self { db }
+        Self {
+            db,
+            append_lock: Arc::new(tokio::sync::Mutex::new(())),
+        }
     }
 
     /// 追加一条审计日志
@@ -125,6 +131,9 @@ impl AuditStorage {
         operator_name: Option<String>,
         details: serde_json::Value,
     ) -> AuditStorageResult<AuditEntry> {
+        // 序列化：防止并发 append 导致 sequence 冲突
+        let _guard = self.append_lock.lock().await;
+
         // 1. 读取当前最大序列号和 last_hash
         let mut result = self
             .db
@@ -271,6 +280,7 @@ impl AuditStorage {
 
         let mut breaks = Vec::new();
         let mut expected_prev_hash = "genesis".to_string();
+        let mut expected_sequence: Option<u64> = None;
         let mut checked_count = 0u64;
 
         for record in records {
@@ -281,6 +291,7 @@ impl AuditStorage {
                 && entry.timestamp < from_ts
             {
                 expected_prev_hash = entry.curr_hash.clone();
+                expected_sequence = Some(entry.id + 1);
                 continue;
             }
             if let Some(to_ts) = to
@@ -289,12 +300,25 @@ impl AuditStorage {
                 break;
             }
 
+            // 验证序列号连续性（检测删除）
+            if let Some(expected_seq) = expected_sequence
+                && entry.id != expected_seq
+            {
+                breaks.push(AuditChainBreak {
+                    entry_id: entry.id,
+                    kind: ChainBreakKind::SequenceGap,
+                    expected: expected_seq.to_string(),
+                    actual: entry.id.to_string(),
+                });
+            }
+
             // 验证 prev_hash
             if entry.prev_hash != expected_prev_hash {
                 breaks.push(AuditChainBreak {
                     entry_id: entry.id,
-                    expected_prev_hash: expected_prev_hash.clone(),
-                    actual_prev_hash: entry.prev_hash.clone(),
+                    kind: ChainBreakKind::HashMismatch,
+                    expected: expected_prev_hash.clone(),
+                    actual: entry.prev_hash.clone(),
                 });
             }
 
@@ -312,12 +336,14 @@ impl AuditStorage {
             if entry.curr_hash != recomputed {
                 breaks.push(AuditChainBreak {
                     entry_id: entry.id,
-                    expected_prev_hash: format!("recomputed:{}", recomputed),
-                    actual_prev_hash: format!("stored:{}", entry.curr_hash),
+                    kind: ChainBreakKind::HashRecompute,
+                    expected: recomputed,
+                    actual: entry.curr_hash.clone(),
                 });
             }
 
             expected_prev_hash = entry.curr_hash.clone();
+            expected_sequence = Some(entry.id + 1);
             checked_count += 1;
         }
 

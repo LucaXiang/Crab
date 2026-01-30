@@ -117,6 +117,7 @@ impl AuditService {
                 "note": "Previous session did not shut down cleanly"
             });
 
+            // 审计日志始终记录（每次异常关闭都是独立事件）
             match self
                 .storage
                 .append(
@@ -130,12 +131,15 @@ impl AuditService {
                 .await
             {
                 Ok(entry) => {
-                    issues.push(StartupIssue {
-                        sequence: entry.id,
-                        action: AuditAction::SystemAbnormalShutdown,
-                        details,
-                        timestamp: entry.timestamp,
-                    });
+                    // 去重：如果已有同类型未确认 issue，不重复加入 pending dialog
+                    if !issues.iter().any(|i| i.action == AuditAction::SystemAbnormalShutdown) {
+                        issues.push(StartupIssue {
+                            sequence: entry.id,
+                            action: AuditAction::SystemAbnormalShutdown,
+                            details,
+                            timestamp: entry.timestamp,
+                        });
+                    }
                 }
                 Err(e) => tracing::error!("Failed to log abnormal shutdown: {:?}", e),
             }
@@ -169,12 +173,15 @@ impl AuditService {
                     .await
                 {
                     Ok(entry) => {
-                        issues.push(StartupIssue {
-                            sequence: entry.id,
-                            action: AuditAction::SystemLongDowntime,
-                            details,
-                            timestamp: entry.timestamp,
-                        });
+                        // 去重：如果已有同类型未确认 issue，不重复加入 pending dialog
+                        if !issues.iter().any(|i| i.action == AuditAction::SystemLongDowntime) {
+                            issues.push(StartupIssue {
+                                sequence: entry.id,
+                                action: AuditAction::SystemLongDowntime,
+                                details,
+                                timestamp: entry.timestamp,
+                            });
+                        }
                     }
                     Err(e) => tracing::error!("Failed to log long downtime: {:?}", e),
                 }
