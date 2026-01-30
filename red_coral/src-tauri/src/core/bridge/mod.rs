@@ -934,7 +934,12 @@ impl ClientBridge {
                     let tenant_manager = self.tenant_manager.read().await;
                     let _ = tenant_manager.clear_current_session();
                     let client = CrabClient::local()
-                        .with_router(state_arc.https_service().router().unwrap())
+                        .with_router(
+                            state_arc
+                                .https_service()
+                                .router()
+                                .ok_or_else(|| BridgeError::Server("Router not initialized".to_string()))?,
+                        )
                         .with_message_channels(
                             state_arc.message_bus().sender_to_server().clone(),
                             state_arc.message_bus().sender().clone(),
@@ -987,6 +992,9 @@ impl ClientBridge {
                 ..
             } = old_mode
             {
+                let server_abort = server_task.abort_handle();
+                let listener_abort = listener_task.as_ref().map(|lt| lt.abort_handle());
+
                 match tokio::time::timeout(std::time::Duration::from_secs(10), async {
                     let server_result = server_task.await;
                     if let Some(lt) = listener_task {
@@ -999,7 +1007,13 @@ impl ClientBridge {
                     Ok(Ok(())) => tracing::info!("Server tasks completed gracefully"),
                     Ok(Err(e)) if e.is_cancelled() => tracing::info!("Server task cancelled"),
                     Ok(Err(e)) => tracing::error!("Server task panicked: {}", e),
-                    Err(_) => tracing::warn!("Server shutdown timed out (10s)"),
+                    Err(_) => {
+                        tracing::warn!("Server shutdown timed out (10s), aborting remaining tasks");
+                        server_abort.abort();
+                        if let Some(la) = listener_abort {
+                            la.abort();
+                        }
+                    }
                 }
             }
         } else if let ClientMode::Client { shutdown_token, .. } = &*mode_guard {
@@ -1187,6 +1201,13 @@ impl ClientBridge {
 
         {
             let mut mode_guard = self.mode.write().await;
+            if !matches!(&*mode_guard, ClientMode::Disconnected) {
+                tracing::warn!("Mode changed during Client setup, aborting");
+                client_shutdown_token.cancel();
+                return Err(BridgeError::Server(
+                    "Mode changed during client setup".to_string(),
+                ));
+            }
             *mode_guard = ClientMode::Client {
                 client: Some(RemoteClientState::Connected(connected_client)),
                 edge_url: edge_url.to_string(),
@@ -1240,6 +1261,9 @@ impl ClientBridge {
             ..
         } = old_mode
         {
+            let server_abort = server_task.abort_handle();
+            let listener_abort = listener_task.as_ref().map(|lt| lt.abort_handle());
+
             match tokio::time::timeout(std::time::Duration::from_secs(10), async {
                 // 并行等待 server_task 和 listener_task
                 let server_result = server_task.await;
@@ -1253,7 +1277,13 @@ impl ClientBridge {
                 Ok(Ok(())) => tracing::info!("Server tasks completed gracefully"),
                 Ok(Err(e)) if e.is_cancelled() => tracing::info!("Server task cancelled"),
                 Ok(Err(e)) => tracing::error!("Server task panicked: {}", e),
-                Err(_) => tracing::warn!("Server shutdown timed out (10s)"),
+                Err(_) => {
+                    tracing::warn!("Server shutdown timed out (10s), aborting remaining tasks");
+                    server_abort.abort();
+                    if let Some(la) = listener_abort {
+                        la.abort();
+                    }
+                }
             }
         }
 

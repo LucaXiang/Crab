@@ -510,7 +510,7 @@ impl ActivationService {
                             .map(|v| {
                                 let remaining_ms = (v + Subscription::SIGNATURE_GRACE_PERIOD_MS)
                                     - shared::util::now_millis();
-                                remaining_ms / 86_400_000
+                                (remaining_ms / 86_400_000).max(0)
                             })
                             .unwrap_or(0)
                     );

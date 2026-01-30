@@ -96,10 +96,10 @@ impl Server {
 
             // Re-sync subscription from auth-server
             state.sync_subscription().await;
-            tracing::info!("🔄 Re-checked subscription (next retry in {:?})", retry_delay);
 
             // 指数退避: 10s → 20s → 40s → 80s → 160s → 300s
             retry_delay = (retry_delay * 2).min(MAX_DELAY);
+            tracing::info!("🔄 Re-checked subscription (next retry in {:?})", retry_delay);
         }
         tracing::info!("✅ Subscription OK, proceeding to start services");
 
