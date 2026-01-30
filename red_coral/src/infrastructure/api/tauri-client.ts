@@ -237,7 +237,7 @@ export class TauriApiClient {
   // ============ Product Attributes ============
 
   async fetchProductAttributes(productId: string): Promise<ProductAttribute[]> {
-    const data = await invokeAndUnwrap<ProductAttributeListData>('list_product_attributes', { product_id: productId });
+    const data = await invokeAndUnwrap<ProductAttributeListData>('list_product_attributes', { productId });
     return data.product_attributes;
   }
 
@@ -253,7 +253,7 @@ export class TauriApiClient {
   // ============ Category Attributes ============
 
   async listCategoryAttributes(categoryId: string | number): Promise<Attribute[]> {
-    const data = await invokeAndUnwrap<{ templates: Attribute[] }>('list_category_attributes', { category_id: String(categoryId) });
+    const data = await invokeAndUnwrap<{ templates: Attribute[] }>('list_category_attributes', { categoryId: String(categoryId) });
     return data.templates;
   }
 
@@ -263,7 +263,7 @@ export class TauriApiClient {
   }
 
   async unbindCategoryAttribute(categoryId: string, attributeId: string): Promise<void> {
-    await invokeAndUnwrap<{ deleted: boolean }>('unbind_category_attribute', { category_id: categoryId, attribute_id: attributeId });
+    await invokeAndUnwrap<{ deleted: boolean }>('unbind_category_attribute', { categoryId, attributeId });
   }
 
   // ============ Attributes ============
@@ -295,17 +295,17 @@ export class TauriApiClient {
   // ============ Attribute Options ============
 
   async addAttributeOption(attributeId: string, data: { name: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string; kitchen_print_name?: string }): Promise<Attribute> {
-    const result = await invokeAndUnwrap<{ template: Attribute }>('add_attribute_option', { attribute_id: attributeId, data });
+    const result = await invokeAndUnwrap<{ template: Attribute }>('add_attribute_option', { attributeId, data });
     return result.template;
   }
 
   async updateAttributeOption(attributeId: string, index: number, data: { name?: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string; kitchen_print_name?: string }): Promise<Attribute> {
-    const result = await invokeAndUnwrap<{ template: Attribute }>('update_attribute_option', { attribute_id: attributeId, index, data });
+    const result = await invokeAndUnwrap<{ template: Attribute }>('update_attribute_option', { attributeId, index, data });
     return result.template;
   }
 
   async deleteAttributeOption(attributeId: string, index: number): Promise<Attribute> {
-    const result = await invokeAndUnwrap<{ template: Attribute }>('delete_attribute_option', { attribute_id: attributeId, index });
+    const result = await invokeAndUnwrap<{ template: Attribute }>('delete_attribute_option', { attributeId, index });
     return result.template;
   }
 
@@ -451,7 +451,7 @@ export class TauriApiClient {
   }
 
   async getRolePermissions(roleId: string): Promise<RolePermissionListData> {
-    return invokeAndUnwrap<RolePermissionListData>('get_role_permissions', { role_id: roleId });
+    return invokeAndUnwrap<RolePermissionListData>('get_role_permissions', { roleId });
   }
 
   // ============ Token Management ============
@@ -463,7 +463,7 @@ export class TauriApiClient {
 
   // ============ Shifts (班次管理) ============
 
-  async listShifts(params?: { limit?: number; offset?: number; start_date?: string; end_date?: string }): Promise<Shift[]> {
+  async listShifts(params?: { limit?: number; offset?: number; startDate?: string; endDate?: string }): Promise<Shift[]> {
     return invokeAndUnwrap<Shift[]>('list_shifts', params);
   }
 
@@ -472,7 +472,7 @@ export class TauriApiClient {
   }
 
   async getCurrentShift(operatorId?: string): Promise<Shift | null> {
-    return invokeAndUnwrap<Shift | null>('get_current_shift', { operator_id: operatorId });
+    return invokeAndUnwrap<Shift | null>('get_current_shift', { operatorId });
   }
 
   async openShift(data: ShiftCreate): Promise<Shift> {
@@ -506,7 +506,7 @@ export class TauriApiClient {
 
   // ============ Daily Reports (日结报告) ============
 
-  async listDailyReports(params?: { limit?: number; offset?: number; start_date?: string; end_date?: string }): Promise<DailyReport[]> {
+  async listDailyReports(params?: { limit?: number; offset?: number; startDate?: string; endDate?: string }): Promise<DailyReport[]> {
     return invokeAndUnwrap<DailyReport[]>('list_daily_reports', params);
   }
 

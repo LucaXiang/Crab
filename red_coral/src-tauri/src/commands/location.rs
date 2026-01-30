@@ -15,7 +15,7 @@ use shared::models::{
 
 // ============ Zones ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_zones(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<ZoneListData>, String> {
@@ -29,7 +29,7 @@ pub async fn list_zones(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_zone(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -47,7 +47,7 @@ pub async fn get_zone(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn create_zone(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: ZoneCreate,
@@ -62,7 +62,7 @@ pub async fn create_zone(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_zone(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -81,7 +81,7 @@ pub async fn update_zone(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_zone(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -103,7 +103,7 @@ pub async fn delete_zone(
 
 // ============ Dining Tables ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_tables(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<TableListData>, String> {
@@ -117,7 +117,7 @@ pub async fn list_tables(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_tables_by_zone(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     zone_id: String,
@@ -135,7 +135,7 @@ pub async fn list_tables_by_zone(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_table(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -153,7 +153,7 @@ pub async fn get_table(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn create_table(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: DiningTableCreate,
@@ -168,7 +168,7 @@ pub async fn create_table(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_table(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -187,7 +187,7 @@ pub async fn update_table(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_table(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,

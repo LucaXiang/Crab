@@ -10,7 +10,7 @@ use crate::core::response::{ApiResponse, ErrorCode};
 use crate::core::ClientBridge;
 
 /// 通用 GET 请求
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn api_get(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     path: String,
@@ -26,7 +26,7 @@ pub async fn api_get(
 }
 
 /// 通用 POST 请求
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn api_post(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     path: String,
@@ -43,7 +43,7 @@ pub async fn api_post(
 }
 
 /// 通用 PUT 请求
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn api_put(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     path: String,
@@ -60,7 +60,7 @@ pub async fn api_put(
 }
 
 /// 通用 DELETE 请求
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn api_delete(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     path: String,

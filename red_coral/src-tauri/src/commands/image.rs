@@ -74,7 +74,7 @@ enum ImageContext {
 /// 获取单个图片的本地路径
 ///
 /// 如果是 Client 模式且图片未缓存，会自动下载。
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_image_path(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     hash: String,
@@ -115,7 +115,7 @@ pub async fn get_image_path(
 /// 返回 `ResolveResult`:
 /// - `paths`: hash -> 本地路径 的映射
 /// - `failed`: 解析失败的 hash 列表
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn resolve_image_paths(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     hashes: Vec<String>,
@@ -148,7 +148,7 @@ pub async fn resolve_image_paths(
 /// 在后台下载指定的图片到本地缓存。
 /// 适用于提前加载可能需要的图片。
 /// Server 模式下直接返回成功（无需预加载）。
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn prefetch_images(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     hashes: Vec<String>,
@@ -183,7 +183,7 @@ pub async fn prefetch_images(
 /// 传入当前活跃的图片 hash 列表，删除不在列表中的缓存。
 /// 适用于产品删除或图片更换后清理旧缓存。
 /// Server 模式下直接返回成功（EdgeServer 自行管理）。
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn cleanup_image_cache(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     active_hashes: Vec<String>,
@@ -217,7 +217,7 @@ pub async fn cleanup_image_cache(
 /// - Client 模式：上传到 EdgeServer
 ///
 /// 返回图片的 content hash (SHA256)，用于后续引用。
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn save_image(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     source_path: String,

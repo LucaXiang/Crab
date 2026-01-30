@@ -314,7 +314,7 @@ export const useBridgeStore = create<BridgeStore>()(
       startClientMode: async (edgeUrl: string, messageAddr: string) => {
         try {
           set({ isLoading: true, error: null });
-          await invokeApi('start_client_mode', { edge_url: edgeUrl, message_addr: messageAddr });
+          await invokeApi('start_client_mode', { edgeUrl, messageAddr });
           await get().fetchAppState();
         } catch (error: unknown) {
           set({ error: error instanceof Error ? error.message : 'Operation failed' });
@@ -344,7 +344,7 @@ export const useBridgeStore = create<BridgeStore>()(
       updateServerConfig: async (httpPort: number, messagePort: number) => {
         try {
           set({ isLoading: true, error: null });
-          await invokeApi('update_server_config', { http_port: httpPort, message_port: messagePort });
+          await invokeApi('update_server_config', { httpPort, messagePort });
         } catch (error: unknown) {
           set({ error: error instanceof Error ? error.message : 'Failed to update server config' });
           throw error;
@@ -356,7 +356,7 @@ export const useBridgeStore = create<BridgeStore>()(
       updateClientConfig: async (edgeUrl: string, messageAddr: string, authUrl: string) => {
         try {
           set({ isLoading: true, error: null });
-          await invokeApi('update_client_config', { edge_url: edgeUrl, message_addr: messageAddr, auth_url: authUrl });
+          await invokeApi('update_client_config', { edgeUrl, messageAddr, authUrl });
         } catch (error: unknown) {
           set({ error: error instanceof Error ? error.message : 'Failed to update client config' });
           throw error;
@@ -380,7 +380,7 @@ export const useBridgeStore = create<BridgeStore>()(
         try {
           set({ isLoading: true, error: null });
           const result = await invokeApi<ActivationResult>('activate_tenant', {
-            auth_url: authUrl,
+            authUrl,
             username,
             password,
           });
@@ -398,7 +398,7 @@ export const useBridgeStore = create<BridgeStore>()(
       switchTenant: async (tenantId) => {
         try {
           set({ isLoading: true });
-          await invokeApi('switch_tenant', { tenant_id: tenantId });
+          await invokeApi('switch_tenant', { tenantId });
           await get().fetchAppState();
         } catch (error: unknown) {
           set({ error: error instanceof Error ? error.message : 'Operation failed' });
@@ -410,7 +410,7 @@ export const useBridgeStore = create<BridgeStore>()(
 
       removeTenant: async (tenantId) => {
         try {
-          await invokeApi('remove_tenant', { tenant_id: tenantId });
+          await invokeApi('remove_tenant', { tenantId });
           await get().fetchTenants();
         } catch (error: unknown) {
           set({ error: error instanceof Error ? error.message : 'Operation failed' });

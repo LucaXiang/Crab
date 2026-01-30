@@ -14,7 +14,7 @@ use shared::models::{
 
 // ============ Shifts ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_shifts(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     limit: Option<i32>,
@@ -50,7 +50,7 @@ pub async fn list_shifts(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_shift(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -65,7 +65,7 @@ pub async fn get_shift(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_current_shift(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     operator_id: Option<String>,
@@ -83,7 +83,7 @@ pub async fn get_current_shift(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn open_shift(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: ShiftCreate,
@@ -95,7 +95,7 @@ pub async fn open_shift(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_shift(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -111,7 +111,7 @@ pub async fn update_shift(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn close_shift(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -127,7 +127,7 @@ pub async fn close_shift(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn force_close_shift(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -143,7 +143,7 @@ pub async fn force_close_shift(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn heartbeat_shift(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -158,7 +158,7 @@ pub async fn heartbeat_shift(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn recover_stale_shifts(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<Vec<Shift>>, String> {
@@ -170,7 +170,7 @@ pub async fn recover_stale_shifts(
 }
 
 /// @TEST 上线前删除
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn debug_simulate_shift_auto_close(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<Vec<Shift>>, String> {
@@ -186,7 +186,7 @@ pub async fn debug_simulate_shift_auto_close(
 
 // ============ Daily Reports ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_daily_reports(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     limit: Option<i32>,
@@ -222,7 +222,7 @@ pub async fn list_daily_reports(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_daily_report(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -237,7 +237,7 @@ pub async fn get_daily_report(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_daily_report_by_date(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     date: String,
@@ -252,7 +252,7 @@ pub async fn get_daily_report_by_date(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn generate_daily_report(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: DailyReportGenerate,
@@ -267,7 +267,7 @@ pub async fn generate_daily_report(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_daily_report(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,

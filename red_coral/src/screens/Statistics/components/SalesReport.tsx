@@ -65,9 +65,9 @@ export const SalesReport: React.FC<SalesReportProps> = ({
          return;
       }
 
-      const params: Record<string, unknown> = { time_range: timeRange, page };
-      if (customStartDate) params.start_date = customStartDate;
-      if (customEndDate) params.end_date = customEndDate;
+      const params: Record<string, unknown> = { timeRange, page };
+      if (customStartDate) params.startDate = customStartDate;
+      if (customEndDate) params.endDate = customEndDate;
       const result = await invokeApi<SalesReportResponse>('get_sales_report', params);
       setData(result.items);
       setTotalPages(result.totalPages);

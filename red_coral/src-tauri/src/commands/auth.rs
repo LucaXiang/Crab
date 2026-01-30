@@ -13,7 +13,7 @@ use crate::core::{ApiResponse, AuthData, ClientBridge};
 /// 根据当前模式自动选择登录方式：
 /// - Server 模式: 使用 CrabClient 的 In-Process 登录
 /// - Client 模式: 使用 mTLS HTTP 登录到远程 Edge Server
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn login_employee(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     username: String,
@@ -34,7 +34,7 @@ pub async fn login_employee(
 }
 
 /// 登出 (使用 ClientBridge)
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn logout_employee(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<()>, String> {
@@ -51,7 +51,7 @@ pub async fn logout_employee(
 /// 获取当前活动会话 (用于启动时恢复登录状态)
 ///
 /// 返回从磁盘恢复的会话，如果没有缓存会话则返回 null
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_current_session(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<Option<EmployeeSession>>, String> {

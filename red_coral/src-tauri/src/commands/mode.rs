@@ -11,7 +11,7 @@ use crate::core::{AppState, ClientBridge, ModeInfo, ModeType, ServerModeConfig};
 ///
 /// 返回当前应用所处的状态，前端可据此决定显示哪个页面。
 /// 参考设计文档: `docs/plans/2026-01-18-application-state-machine.md`
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_app_state(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<AppState>, String> {
@@ -20,7 +20,7 @@ pub async fn get_app_state(
 }
 
 /// 获取当前模式信息
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_mode_info(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<ModeInfo>, String> {
@@ -29,7 +29,7 @@ pub async fn get_mode_info(
 }
 
 /// 启动 Server 模式
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn start_server_mode(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<()>, String> {
@@ -44,7 +44,7 @@ pub async fn start_server_mode(
 }
 
 /// 启动 Client 模式
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn start_client_mode(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     edge_url: String,
@@ -61,7 +61,7 @@ pub async fn start_client_mode(
 }
 
 /// 停止当前模式
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn stop_mode(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<()>, String> {
@@ -76,7 +76,7 @@ pub async fn stop_mode(
 }
 
 /// 获取当前模式类型
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_current_mode_type(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<ModeType>, String> {
@@ -86,7 +86,7 @@ pub async fn get_current_mode_type(
 }
 
 /// 检查是否首次运行
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn check_first_run(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<bool>, String> {
@@ -99,7 +99,7 @@ pub async fn check_first_run(
 }
 
 /// 重新连接 (仅 Client 模式)
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn reconnect(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<()>, String> {
@@ -163,7 +163,7 @@ pub async fn reconnect(
 }
 
 /// 更新 Server 模式配置
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_server_config(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     http_port: u16,
@@ -180,7 +180,7 @@ pub async fn update_server_config(
 }
 
 /// 更新 Client 模式配置
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_client_config(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     edge_url: String,
@@ -200,7 +200,7 @@ pub async fn update_client_config(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_app_config(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<AppConfigResponse>, String> {

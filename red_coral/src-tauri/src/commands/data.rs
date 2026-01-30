@@ -41,7 +41,7 @@ use urlencoding::encode;
 
 // ============ Tags ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_tags(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<TagListData>, String> {
@@ -52,7 +52,7 @@ pub async fn list_tags(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_tag(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -67,7 +67,7 @@ pub async fn get_tag(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn create_tag(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: TagCreate,
@@ -79,7 +79,7 @@ pub async fn create_tag(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_tag(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -95,7 +95,7 @@ pub async fn update_tag(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_tag(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -112,7 +112,7 @@ pub async fn delete_tag(
 
 // ============ Categories ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_categories(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<CategoryListData>, String> {
@@ -123,7 +123,7 @@ pub async fn list_categories(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_category(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -138,7 +138,7 @@ pub async fn get_category(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn create_category(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: CategoryCreate,
@@ -150,7 +150,7 @@ pub async fn create_category(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_category(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -166,7 +166,7 @@ pub async fn update_category(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_category(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -183,7 +183,7 @@ pub async fn delete_category(
 
 // ============ Products ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_products(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<ProductListData>, String> {
@@ -194,7 +194,7 @@ pub async fn list_products(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_product(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -210,7 +210,7 @@ pub async fn get_product(
 }
 
 /// 获取商品完整信息 (含规格、属性、标签)
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_product_full(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -225,7 +225,7 @@ pub async fn get_product_full(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn create_product(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: ProductCreate,
@@ -237,7 +237,7 @@ pub async fn create_product(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_product(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -253,7 +253,7 @@ pub async fn update_product(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_product(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -270,7 +270,7 @@ pub async fn delete_product(
 
 // ============ Attributes ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_attributes(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<AttributeListData>, String> {
@@ -281,7 +281,7 @@ pub async fn list_attributes(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_attribute(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -296,7 +296,7 @@ pub async fn get_attribute(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn create_attribute(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: AttributeCreate,
@@ -308,7 +308,7 @@ pub async fn create_attribute(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_attribute(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -324,7 +324,7 @@ pub async fn update_attribute(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_attribute(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -341,7 +341,7 @@ pub async fn delete_attribute(
 
 // ============ Attribute Options ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn add_attribute_option(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     attribute_id: String,
@@ -360,7 +360,7 @@ pub async fn add_attribute_option(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_attribute_option(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     attribute_id: String,
@@ -384,7 +384,7 @@ pub async fn update_attribute_option(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_attribute_option(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     attribute_id: String,
@@ -406,7 +406,7 @@ pub async fn delete_attribute_option(
 
 // ============ Product Attributes (Bindings) ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_product_attributes(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     product_id: String,
@@ -421,7 +421,7 @@ pub async fn list_product_attributes(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn bind_product_attribute(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: serde_json::Value,
@@ -436,7 +436,7 @@ pub async fn bind_product_attribute(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn unbind_product_attribute(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -451,7 +451,7 @@ pub async fn unbind_product_attribute(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_product_attribute_binding(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -470,7 +470,7 @@ pub async fn update_product_attribute_binding(
 // ============ Category Attributes (Bindings) ============
 
 /// List attributes for a category
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_category_attributes(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     category_id: String,
@@ -496,7 +496,7 @@ pub struct BindCategoryAttributeData {
 }
 
 /// Bind attribute to category
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn bind_category_attribute(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: BindCategoryAttributeData,
@@ -524,7 +524,7 @@ pub async fn bind_category_attribute(
 }
 
 /// Unbind attribute from category
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn unbind_category_attribute(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     category_id: String,
@@ -557,7 +557,7 @@ pub struct BatchUpdateResponse {
 }
 
 /// Batch update category sort order
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn batch_update_category_sort_order(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     updates: Vec<CategorySortOrderUpdate>,
@@ -580,7 +580,7 @@ pub struct ProductSortOrderUpdate {
 }
 
 /// Batch update product sort order
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn batch_update_product_sort_order(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     updates: Vec<ProductSortOrderUpdate>,
@@ -597,7 +597,7 @@ pub async fn batch_update_product_sort_order(
 
 // ============ Print Destinations ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_print_destinations(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<PrintDestinationListData>, String> {
@@ -613,7 +613,7 @@ pub async fn list_print_destinations(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_print_destination(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -630,7 +630,7 @@ pub async fn get_print_destination(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn create_print_destination(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: PrintDestinationCreate,
@@ -647,7 +647,7 @@ pub async fn create_print_destination(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_print_destination(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -665,7 +665,7 @@ pub async fn update_print_destination(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_print_destination(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,

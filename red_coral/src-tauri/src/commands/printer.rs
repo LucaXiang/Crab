@@ -7,7 +7,7 @@ use crate::core::response::{ApiResponse, ErrorCode};
 use crate::utils::printing;
 
 /// 获取本地驱动打印机列表
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub fn list_printers() -> Result<ApiResponse<Vec<String>>, String> {
     match printing::list_printers() {
         Ok(printers) => Ok(ApiResponse::success(printers)),
@@ -26,7 +26,7 @@ pub fn list_printers() -> Result<ApiResponse<Vec<String>>, String> {
 }
 
 /// 打开钱箱
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub fn open_cash_drawer(printer_name: Option<String>) -> Result<ApiResponse<()>, String> {
     match printing::open_cash_drawer(printer_name) {
         Ok(()) => Ok(ApiResponse::success(())),
@@ -44,7 +44,7 @@ pub fn open_cash_drawer(printer_name: Option<String>) -> Result<ApiResponse<()>,
 }
 
 /// 打印收据
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub fn print_receipt(
     printer_name: Option<String>,
     receipt: ReceiptData,
@@ -65,7 +65,7 @@ pub fn print_receipt(
 }
 
 /// 打印标签
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub fn print_label(
     printer_name: Option<String>,
     label: LabelData,

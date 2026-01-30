@@ -82,7 +82,7 @@ pub struct SalesReportResponse {
 // ============================================================================
 
 /// 获取统计数据
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_statistics(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     time_range: String,
@@ -107,7 +107,7 @@ pub async fn get_statistics(
 }
 
 /// 获取销售报告（分页）
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_sales_report(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     time_range: String,

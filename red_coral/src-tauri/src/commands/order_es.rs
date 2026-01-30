@@ -20,7 +20,7 @@ use crate::core::{ApiResponse, ClientBridge, OrderEventListData, OrderSnapshotLi
 /// This is the unified entry point for all order mutations.
 /// The command is processed by OrdersManager, which generates events
 /// and broadcasts them via MessageBus.
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn order_execute_command(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     command: OrderCommand,
@@ -38,7 +38,7 @@ pub async fn order_execute_command(
 /// Execute an order command with raw payload
 ///
 /// Convenience wrapper that constructs the OrderCommand from parts.
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn order_execute(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     operator_id: String,
@@ -61,7 +61,7 @@ pub async fn order_execute(
 /// Get all active order snapshots
 ///
 /// Returns the current state of all active (non-completed, non-voided) orders.
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn order_get_active_orders(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<OrderSnapshotListData>, String> {
@@ -76,7 +76,7 @@ pub async fn order_get_active_orders(
 }
 
 /// Get a single order snapshot by ID
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn order_get_snapshot(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     order_id: String,
@@ -96,7 +96,7 @@ pub async fn order_get_snapshot(
 /// Sync orders since a given sequence
 ///
 /// Used for reconnection to get missed events and current state.
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn order_sync_since(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     since_sequence: u64,
@@ -114,7 +114,7 @@ pub async fn order_sync_since(
 /// Get events for active orders since a given sequence
 ///
 /// More efficient than full sync when only recent events are needed.
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn order_get_events_since(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     since_sequence: u64,
@@ -132,7 +132,7 @@ pub async fn order_get_events_since(
 /// Get all events for a specific order
 ///
 /// Used to reconstruct full order history including timeline for history details view.
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn order_get_events_for_order(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     order_id: String,

@@ -59,9 +59,9 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
         return;
       }
 
-      const params: Record<string, unknown> = { time_range: timeRange };
-      if (customStartDate) params.start_date = customStartDate;
-      if (customEndDate) params.end_date = customEndDate;
+      const params: Record<string, unknown> = { timeRange };
+      if (customStartDate) params.startDate = customStartDate;
+      if (customEndDate) params.endDate = customEndDate;
       const result = await invokeApi<StatisticsResponse>('get_statistics', params);
       setData(result);
     } catch (error) {

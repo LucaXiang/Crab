@@ -184,7 +184,7 @@ export const RolePermissionsEditor: React.FC = () => {
         if (role.name === 'admin') continue;
 
         await invokeApi('update_role_permissions', {
-          role_id: role.id,
+          roleId: role.id,
           permissions: rolePermissions[role.name] || []
         });
       }

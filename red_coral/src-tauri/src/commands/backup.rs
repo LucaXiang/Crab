@@ -48,7 +48,7 @@ fn zip_dir(
     Ok(())
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn export_data(app: AppHandle, path: String) -> Result<ApiResponse<()>, String> {
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
 
@@ -95,7 +95,7 @@ pub async fn export_data(app: AppHandle, path: String) -> Result<ApiResponse<()>
     Ok(ApiResponse::success(()))
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn import_data(app: AppHandle, path: String) -> Result<ApiResponse<()>, String> {
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
 

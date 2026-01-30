@@ -17,7 +17,7 @@ pub struct SyncStatusResponse {
 }
 
 /// 获取同步状态
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_sync_status(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<SyncStatusResponse>, String> {

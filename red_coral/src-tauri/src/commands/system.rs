@@ -21,7 +21,7 @@ use shared::models::{
 
 // ============ System State ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_system_state(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<SystemState>, String> {
@@ -35,7 +35,7 @@ pub async fn get_system_state(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_system_state(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: SystemStateUpdate,
@@ -50,7 +50,7 @@ pub async fn update_system_state(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn init_genesis(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: InitGenesisRequest,
@@ -65,7 +65,7 @@ pub async fn init_genesis(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_last_order(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: UpdateLastOrderRequest,
@@ -80,7 +80,7 @@ pub async fn update_last_order(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_sync_state(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: UpdateSyncStateRequest,
@@ -97,7 +97,7 @@ pub async fn update_sync_state(
 
 // ============ Store Info ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_store_info(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<StoreInfo>, String> {
@@ -111,7 +111,7 @@ pub async fn get_store_info(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_store_info(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: StoreInfoUpdate,
@@ -128,7 +128,7 @@ pub async fn update_store_info(
 
 // ============ Label Templates ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_label_templates(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<Vec<LabelTemplate>>, String> {
@@ -142,7 +142,7 @@ pub async fn list_label_templates(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_label_template(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -157,7 +157,7 @@ pub async fn get_label_template(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn create_label_template(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: LabelTemplateCreate,
@@ -172,7 +172,7 @@ pub async fn create_label_template(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_label_template(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -191,7 +191,7 @@ pub async fn update_label_template(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_label_template(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -211,7 +211,7 @@ pub async fn delete_label_template(
 
 // ============ Employees ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_employees(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<EmployeeListData>, String> {
@@ -225,7 +225,7 @@ pub async fn list_employees(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_all_employees(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<EmployeeListData>, String> {
@@ -242,7 +242,7 @@ pub async fn list_all_employees(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_employee(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -257,7 +257,7 @@ pub async fn get_employee(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn create_employee(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: EmployeeCreate,
@@ -272,7 +272,7 @@ pub async fn create_employee(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_employee(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -291,7 +291,7 @@ pub async fn update_employee(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_employee(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -311,7 +311,7 @@ pub async fn delete_employee(
 
 // ============ Price Rules ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_price_rules(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<PriceRuleListData>, String> {
@@ -325,7 +325,7 @@ pub async fn list_price_rules(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_active_price_rules(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<PriceRuleListData>, String> {
@@ -342,7 +342,7 @@ pub async fn list_active_price_rules(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_price_rule(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -360,7 +360,7 @@ pub async fn get_price_rule(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn create_price_rule(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: PriceRuleCreate,
@@ -375,7 +375,7 @@ pub async fn create_price_rule(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_price_rule(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -394,7 +394,7 @@ pub async fn update_price_rule(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_price_rule(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -414,7 +414,7 @@ pub async fn delete_price_rule(
 
 // ============ Roles ============
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn list_roles(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<RoleListData>, String> {
@@ -428,7 +428,7 @@ pub async fn list_roles(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_role(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -443,7 +443,7 @@ pub async fn get_role(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn create_role(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     data: serde_json::Value,
@@ -458,7 +458,7 @@ pub async fn create_role(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_role(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -477,7 +477,7 @@ pub async fn update_role(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn delete_role(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
@@ -495,7 +495,7 @@ pub async fn delete_role(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_role_permissions(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     role_id: String,
@@ -513,7 +513,7 @@ pub async fn get_role_permissions(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn get_all_permissions(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<Vec<String>>, String> {
@@ -527,7 +527,7 @@ pub async fn get_all_permissions(
     }
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn update_role_permissions(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     role_id: String,

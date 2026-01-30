@@ -141,7 +141,7 @@ pub struct FetchOrderListSummaryResponse {
     pub page: i32,
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn fetch_order_list(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     params: FetchOrderListParams,
@@ -195,7 +195,7 @@ pub async fn fetch_order_list(
 }
 
 /// Fetch archived order detail by ID (graph model)
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub async fn fetch_order_detail(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     order_id: String,
