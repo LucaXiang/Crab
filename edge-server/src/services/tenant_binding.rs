@@ -83,6 +83,18 @@ impl SubscriptionStatus {
                 | SubscriptionStatus::Unpaid
         )
     }
+
+    /// 转换为 shared 类型
+    pub fn to_shared(&self) -> shared::activation::SubscriptionStatus {
+        match self {
+            SubscriptionStatus::Inactive => shared::activation::SubscriptionStatus::Inactive,
+            SubscriptionStatus::Active => shared::activation::SubscriptionStatus::Active,
+            SubscriptionStatus::PastDue => shared::activation::SubscriptionStatus::PastDue,
+            SubscriptionStatus::Expired => shared::activation::SubscriptionStatus::Expired,
+            SubscriptionStatus::Canceled => shared::activation::SubscriptionStatus::Canceled,
+            SubscriptionStatus::Unpaid => shared::activation::SubscriptionStatus::Unpaid,
+        }
+    }
 }
 
 /// 订阅计划类型
@@ -102,6 +114,15 @@ impl PlanType {
             PlanType::Basic => 1,
             PlanType::Pro => 3,
             PlanType::Enterprise => 0, // 无限
+        }
+    }
+
+    /// 转换为 shared 类型
+    pub fn to_shared(&self) -> shared::activation::PlanType {
+        match self {
+            PlanType::Basic => shared::activation::PlanType::Basic,
+            PlanType::Pro => shared::activation::PlanType::Pro,
+            PlanType::Enterprise => shared::activation::PlanType::Enterprise,
         }
     }
 }
@@ -140,6 +161,12 @@ pub struct Subscription {
 }
 
 impl Subscription {
+    /// 签名过期宽限期 (3 天)
+    ///
+    /// 签名有效期 7 天 + 宽限期 3 天 = 最多 10 天离线容忍。
+    /// 超过此限制必须联网刷新，否则阻止使用。
+    pub const SIGNATURE_GRACE_PERIOD_MS: i64 = 3 * 24 * 60 * 60 * 1000;
+
     /// 返回待签名的数据
     pub fn signable_data(&self) -> String {
         let features_str = self.features.join(",");
@@ -187,6 +214,19 @@ impl Subscription {
         match self.signature_valid_until {
             Some(valid_until) => shared::util::now_millis() > valid_until,
             None => true, // 没有有效期 = 已过期
+        }
+    }
+
+    /// 检查签名是否陈旧 (过期 + 宽限期也已过)
+    ///
+    /// 签名有效期 7 天 + 宽限期 3 天 = 最多 10 天离线容忍。
+    /// 超过此限制必须联网刷新，否则阻止使用。
+    pub fn is_signature_stale(&self) -> bool {
+        match self.signature_valid_until {
+            Some(valid_until) => {
+                shared::util::now_millis() > valid_until + Self::SIGNATURE_GRACE_PERIOD_MS
+            }
+            None => true,
         }
     }
 

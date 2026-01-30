@@ -17,11 +17,13 @@
 use crate::core::{Config, ServerState};
 use crate::utils::AppError;
 use axum_server::tls_rustls::RustlsConfig;
+use tokio_util::sync::CancellationToken;
 
 /// HTTP Server
 pub struct Server {
     config: Config,
     state: Option<ServerState>,
+    shutdown_token: CancellationToken,
 }
 
 impl Server {
@@ -29,6 +31,7 @@ impl Server {
         Self {
             config,
             state: None,
+            shutdown_token: CancellationToken::new(),
         }
     }
 
@@ -37,7 +40,13 @@ impl Server {
         Self {
             config,
             state: Some(state),
+            shutdown_token: CancellationToken::new(),
         }
+    }
+
+    /// Get the shutdown token for external shutdown control
+    pub fn shutdown_token(&self) -> CancellationToken {
+        self.shutdown_token.clone()
     }
 
     pub async fn run(&self) -> Result<(), AppError> {
@@ -55,22 +64,42 @@ impl Server {
         let mut background_tasks = state.start_background_tasks().await;
 
         // ═══════════════════════════════════════════════════════════════════
-        // Phase 3: Wait for activation and load TLS
+        // Phase 3: Wait for activation and load TLS (可取消)
         // ═══════════════════════════════════════════════════════════════════
-        let tls_config = self.wait_for_tls(&state).await;
+        let tls_config = match self.wait_for_tls(&state).await {
+            Some(cfg) => cfg,
+            None => {
+                tracing::info!("Shutdown requested during activation wait");
+                background_tasks.shutdown().await;
+                return Ok(());
+            }
+        };
         let rustls_config = RustlsConfig::from_config(tls_config.clone());
 
         // ═══════════════════════════════════════════════════════════════════
-        // Phase 4: Subscription check — wait & retry if subscription invalid
+        // Phase 4: Subscription check — 指数退避重试
         // ═══════════════════════════════════════════════════════════════════
+        let mut retry_delay = std::time::Duration::from_secs(10);
+        const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(300);
+
         while state.is_subscription_blocked().await {
             state.print_subscription_blocked_banner().await;
 
-            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            tokio::select! {
+                _ = self.shutdown_token.cancelled() => {
+                    tracing::info!("Shutdown requested during subscription check");
+                    background_tasks.shutdown().await;
+                    return Ok(());
+                }
+                _ = tokio::time::sleep(retry_delay) => {}
+            }
 
             // Re-sync subscription from auth-server
             state.sync_subscription().await;
-            tracing::info!("🔄 Re-checked subscription status");
+            tracing::info!("🔄 Re-checked subscription (next retry in {:?})", retry_delay);
+
+            // 指数退避: 10s → 20s → 40s → 80s → 160s → 300s
+            retry_delay = (retry_delay * 2).min(MAX_DELAY);
         }
         tracing::info!("✅ Subscription OK, proceeding to start services");
 
@@ -86,8 +115,9 @@ impl Server {
         let addr = std::net::SocketAddr::from(([0, 0, 0, 0], self.config.http_port));
         tracing::info!("🦀 Crab Edge Server starting on {}", addr);
 
-        let shutdown = async {
-            let _ = tokio::signal::ctrl_c().await;
+        let token = self.shutdown_token.clone();
+        let shutdown = async move {
+            token.cancelled().await;
             tracing::info!("Shutting down...");
         };
 
@@ -105,16 +135,19 @@ impl Server {
         Ok(())
     }
 
-    /// Wait for activation and load TLS config
+    /// Wait for activation and load TLS config (可取消)
     ///
     /// Blocks until device is activated and TLS certificates are loaded.
+    /// Returns `None` if shutdown was requested during activation wait.
     /// Retries on failure by re-entering unbound state.
-    async fn wait_for_tls(&self, state: &ServerState) -> std::sync::Arc<rustls::ServerConfig> {
+    async fn wait_for_tls(&self, state: &ServerState) -> Option<std::sync::Arc<rustls::ServerConfig>> {
         loop {
-            state.wait_for_activation().await;
+            if state.wait_for_activation(&self.shutdown_token).await.is_err() {
+                return None; // shutdown requested
+            }
 
             match state.load_tls_config() {
-                Ok(Some(cfg)) => return cfg,
+                Ok(Some(cfg)) => return Some(cfg),
                 Ok(None) => {
                     tracing::error!("❌ TLS certificates not found after activation!");
                     state.enter_unbound_state().await;

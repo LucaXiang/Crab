@@ -23,7 +23,7 @@ use tokio::sync::RwLock;
 
 use crab_client::CrabClient;
 use edge_server::services::tenant_binding::SubscriptionStatus;
-use shared::app_state::{ActivationRequiredReason, ClockDirection, SubscriptionBlockedInfo};
+use shared::app_state::{ActivationRequiredReason, ClockDirection};
 use shared::order::{CommandResponse, OrderCommand, OrderEvent, OrderSnapshot, SyncResponse};
 use super::tenant_manager::{TenantError, TenantManager};
 
@@ -510,58 +510,9 @@ impl ClientBridge {
                     .ok()
                     .flatten();
 
-                if let Some(cred) = credential {
-                    let subscription_blocked = cred.subscription.as_ref().is_some_and(|sub| {
-                        matches!(
-                            sub.status,
-                            SubscriptionStatus::Inactive
-                                | SubscriptionStatus::Expired
-                                | SubscriptionStatus::Canceled
-                                | SubscriptionStatus::Unpaid
-                        )
-                    });
-
-                    if subscription_blocked {
-                        let sub = cred.subscription.as_ref().unwrap();
-                        // Convert edge_server types to shared types
-                        let status = match sub.status {
-                            SubscriptionStatus::Inactive => shared::activation::SubscriptionStatus::Inactive,
-                            SubscriptionStatus::Active => shared::activation::SubscriptionStatus::Active,
-                            SubscriptionStatus::PastDue => shared::activation::SubscriptionStatus::PastDue,
-                            SubscriptionStatus::Expired => shared::activation::SubscriptionStatus::Expired,
-                            SubscriptionStatus::Canceled => shared::activation::SubscriptionStatus::Canceled,
-                            SubscriptionStatus::Unpaid => shared::activation::SubscriptionStatus::Unpaid,
-                        };
-                        let plan = match sub.plan {
-                            edge_server::services::tenant_binding::PlanType::Basic => shared::activation::PlanType::Basic,
-                            edge_server::services::tenant_binding::PlanType::Pro => shared::activation::PlanType::Pro,
-                            edge_server::services::tenant_binding::PlanType::Enterprise => shared::activation::PlanType::Enterprise,
-                        };
-                        // Inactive/Unpaid 未激活状态不应有过期时间
-                        let expired_at = match sub.status {
-                            SubscriptionStatus::Inactive | SubscriptionStatus::Unpaid => None,
-                            _ => sub.expires_at,
-                        };
-                        let info = SubscriptionBlockedInfo {
-                            status,
-                            plan,
-                            max_stores: sub.max_stores,
-                            expired_at,
-                            grace_period_days: None,
-                            grace_period_ends_at: None,
-                            in_grace_period: false,
-                            support_url: Some("https://support.example.com".to_string()),
-                            renewal_url: Some("https://billing.example.com/renew".to_string()),
-                            user_message: match sub.status {
-                                SubscriptionStatus::Inactive => "subscription_inactive".to_string(),
-                                SubscriptionStatus::Expired => "subscription_expired".to_string(),
-                                SubscriptionStatus::Canceled => "subscription_canceled".to_string(),
-                                SubscriptionStatus::Unpaid => "subscription_unpaid".to_string(),
-                                SubscriptionStatus::Active | SubscriptionStatus::PastDue => {
-                                    unreachable!("Active/PastDue 不触发订阅阻止")
-                                }
-                            },
-                        };
+                if let Some(_cred) = credential {
+                    // 订阅阻止检查 (统一使用 edge-server 判断，包含签名陈旧检查)
+                    if let Some(info) = server_state.get_subscription_blocked_info().await {
                         AppState::ServerSubscriptionBlocked { info }
                     } else {
                         // 2. 检查员工登录状态
@@ -875,6 +826,7 @@ impl ClientBridge {
 
         let server_instance =
             edge_server::Server::with_state(edge_config.clone(), server_state.clone());
+        let shutdown_token = server_instance.shutdown_token();
 
         let server_task = tokio::spawn(async move {
             tracing::info!("🚀 Starting Edge Server background task...");
@@ -895,47 +847,59 @@ impl ClientBridge {
         let server_tx = message_bus.sender().clone();
 
         // 启动消息广播订阅 (转发给前端)
-        if let Some(handle) = &self.app_handle {
+        let listener_task = if let Some(handle) = &self.app_handle {
             let mut server_rx = message_bus.subscribe();
             let handle_clone = handle.clone();
+            let listener_token = shutdown_token.clone();
 
-            tokio::spawn(async move {
+            let handle = tokio::spawn(async move {
                 tracing::info!("Message listener task started");
                 loop {
-                    match server_rx.recv().await {
-                        Ok(msg) => {
-                            tracing::info!(event_type = ?msg.event_type, "Received message from bus");
-                            // Route messages to appropriate channels
-                            use crate::events::MessageRoute;
-                            match MessageRoute::from_bus_message(msg) {
-                                MessageRoute::OrderSync(order_sync) => {
-                                    // Server Authority: emit event + snapshot together
-                                    tracing::debug!("Emitting order-sync (event + snapshot)");
-                                    if let Err(e) = handle_clone.emit("order-sync", &*order_sync) {
-                                        tracing::warn!("Failed to emit order sync: {}", e);
+                    tokio::select! {
+                        _ = listener_token.cancelled() => {
+                            tracing::info!("Message listener shutdown");
+                            break;
+                        }
+                        result = server_rx.recv() => {
+                            match result {
+                                Ok(msg) => {
+                                    tracing::info!(event_type = ?msg.event_type, "Received message from bus");
+                                    // Route messages to appropriate channels
+                                    use crate::events::MessageRoute;
+                                    match MessageRoute::from_bus_message(msg) {
+                                        MessageRoute::OrderSync(order_sync) => {
+                                            // Server Authority: emit event + snapshot together
+                                            tracing::debug!("Emitting order-sync (event + snapshot)");
+                                            if let Err(e) = handle_clone.emit("order-sync", &*order_sync) {
+                                                tracing::warn!("Failed to emit order sync: {}", e);
+                                            }
+                                        }
+                                        MessageRoute::ServerMessage(event) => {
+                                            tracing::info!(event_type = %event.event_type, "Emitting server-message");
+                                            if let Err(e) = handle_clone.emit("server-message", &event) {
+                                                tracing::warn!("Failed to emit server message: {}", e);
+                                            }
+                                        }
                                     }
                                 }
-                                MessageRoute::ServerMessage(event) => {
-                                    tracing::info!(event_type = %event.event_type, "Emitting server-message");
-                                    if let Err(e) = handle_clone.emit("server-message", &event) {
-                                        tracing::warn!("Failed to emit server message: {}", e);
-                                    }
+                                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                    tracing::warn!("Server message listener lagged {} messages", n);
+                                }
+                                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                    tracing::debug!("Server message channel closed");
+                                    break;
                                 }
                             }
-                        }
-                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                            tracing::warn!("Server message listener lagged {} messages", n);
-                        }
-                        Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                            tracing::debug!("Server message channel closed");
-                            break;
                         }
                     }
                 }
             });
 
             tracing::info!("Server message listener started");
-        }
+            Some(handle)
+        } else {
+            None
+        };
 
         let client = CrabClient::local()
             .with_router(router)
@@ -988,6 +952,8 @@ impl ClientBridge {
             server_state: state_arc,
             client: Some(client_state),
             server_task,
+            listener_task,
+            shutdown_token,
         };
 
         drop(config);
@@ -1009,13 +975,40 @@ impl ClientBridge {
         let mut mode_guard = self.mode.write().await;
 
         // 如果在其他模式，先停止
-        if let ClientMode::Server { server_task, .. } = &*mode_guard {
+        if let ClientMode::Server { shutdown_token, .. } = &*mode_guard {
             tracing::info!("Stopping Server mode to switch to Client mode...");
-            server_task.abort();
-            *mode_guard = ClientMode::Disconnected;
-        } else if matches!(&*mode_guard, ClientMode::Client { .. }) {
+            shutdown_token.cancel();
+            let old_mode = std::mem::replace(&mut *mode_guard, ClientMode::Disconnected);
+            drop(mode_guard);
+
+            if let ClientMode::Server {
+                server_task,
+                listener_task,
+                ..
+            } = old_mode
+            {
+                match tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                    let server_result = server_task.await;
+                    if let Some(lt) = listener_task {
+                        let _ = lt.await;
+                    }
+                    server_result
+                })
+                .await
+                {
+                    Ok(Ok(())) => tracing::info!("Server tasks completed gracefully"),
+                    Ok(Err(e)) if e.is_cancelled() => tracing::info!("Server task cancelled"),
+                    Ok(Err(e)) => tracing::error!("Server task panicked: {}", e),
+                    Err(_) => tracing::warn!("Server shutdown timed out (10s)"),
+                }
+            }
+        } else if let ClientMode::Client { shutdown_token, .. } = &*mode_guard {
             tracing::info!("Already in Client mode, stopping first...");
+            shutdown_token.cancel();
             *mode_guard = ClientMode::Disconnected;
+            drop(mode_guard);
+        } else {
+            drop(mode_guard);
         }
 
         let tenant_manager = self.tenant_manager.read().await;
@@ -1052,41 +1045,51 @@ impl ClientBridge {
 
         tracing::info!(edge_url = %edge_url, message_addr = %message_addr, "Client mode connected");
 
+        let client_shutdown_token = tokio_util::sync::CancellationToken::new();
+
         // 启动消息广播订阅 (转发给前端)
         if let Some(handle) = &self.app_handle {
             if let Some(mc) = connected_client.message_client() {
                 // 消息监听
                 let mut rx = mc.subscribe();
                 let handle_clone = handle.clone();
+                let token = client_shutdown_token.clone();
 
                 tokio::spawn(async move {
                     loop {
-                        match rx.recv().await {
-                            Ok(msg) => {
-                                use crate::events::MessageRoute;
-                                match MessageRoute::from_bus_message(msg) {
-                                    MessageRoute::OrderSync(order_sync) => {
-                                        // Server Authority: emit event + snapshot together
-                                        if let Err(e) =
-                                            handle_clone.emit("order-sync", &*order_sync)
-                                        {
-                                            tracing::warn!("Failed to emit order sync: {}", e);
+                        tokio::select! {
+                            _ = token.cancelled() => {
+                                tracing::info!("Client message listener shutdown");
+                                break;
+                            }
+                            result = rx.recv() => {
+                                match result {
+                                    Ok(msg) => {
+                                        use crate::events::MessageRoute;
+                                        match MessageRoute::from_bus_message(msg) {
+                                            MessageRoute::OrderSync(order_sync) => {
+                                                if let Err(e) =
+                                                    handle_clone.emit("order-sync", &*order_sync)
+                                                {
+                                                    tracing::warn!("Failed to emit order sync: {}", e);
+                                                }
+                                            }
+                                            MessageRoute::ServerMessage(event) => {
+                                                if let Err(e) = handle_clone.emit("server-message", &event)
+                                                {
+                                                    tracing::warn!("Failed to emit server message: {}", e);
+                                                }
+                                            }
                                         }
                                     }
-                                    MessageRoute::ServerMessage(event) => {
-                                        if let Err(e) = handle_clone.emit("server-message", &event)
-                                        {
-                                            tracing::warn!("Failed to emit server message: {}", e);
-                                        }
+                                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                        tracing::warn!("Client message listener lagged {} messages", n);
+                                    }
+                                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                        tracing::debug!("Client message channel closed");
+                                        break;
                                     }
                                 }
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                                tracing::warn!("Client message listener lagged {} messages", n);
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                                tracing::debug!("Client message channel closed");
-                                break;
                             }
                         }
                     }
@@ -1097,40 +1100,48 @@ impl ClientBridge {
                 // 重连事件监听 (心跳失败或网络断开时触发)
                 let mut reconnect_rx = mc.subscribe_reconnect();
                 let handle_reconnect = handle.clone();
+                let token = client_shutdown_token.clone();
 
                 tokio::spawn(async move {
                     loop {
-                        match reconnect_rx.recv().await {
-                            Ok(event) => {
-                                use crab_client::ReconnectEvent;
-                                match event {
-                                    ReconnectEvent::Disconnected => {
-                                        tracing::warn!("Client disconnected, waiting for reconnection...");
-                                        if let Err(e) = handle_reconnect.emit("connection-state-changed", false) {
-                                            tracing::warn!("Failed to emit connection state: {}", e);
+                        tokio::select! {
+                            _ = token.cancelled() => {
+                                tracing::info!("Client reconnect listener shutdown");
+                                break;
+                            }
+                            result = reconnect_rx.recv() => {
+                                match result {
+                                    Ok(event) => {
+                                        use crab_client::ReconnectEvent;
+                                        match event {
+                                            ReconnectEvent::Disconnected => {
+                                                tracing::warn!("Client disconnected, waiting for reconnection...");
+                                                if let Err(e) = handle_reconnect.emit("connection-state-changed", false) {
+                                                    tracing::warn!("Failed to emit connection state: {}", e);
+                                                }
+                                            }
+                                            ReconnectEvent::Reconnected => {
+                                                tracing::info!("Client reconnected successfully");
+                                                if let Err(e) = handle_reconnect.emit("connection-state-changed", true) {
+                                                    tracing::warn!("Failed to emit connection state: {}", e);
+                                                }
+                                            }
+                                            ReconnectEvent::ReconnectFailed { attempts } => {
+                                                tracing::error!("Client reconnection failed after {} attempts", attempts);
+                                                if let Err(e) = handle_reconnect.emit("connection-state-changed", false) {
+                                                    tracing::warn!("Failed to emit connection state: {}", e);
+                                                }
+                                            }
                                         }
                                     }
-                                    ReconnectEvent::Reconnected => {
-                                        tracing::info!("Client reconnected successfully");
-                                        if let Err(e) = handle_reconnect.emit("connection-state-changed", true) {
-                                            tracing::warn!("Failed to emit connection state: {}", e);
-                                        }
+                                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                        tracing::warn!("Reconnect event listener lagged {} events", n);
                                     }
-                                    ReconnectEvent::ReconnectFailed { attempts } => {
-                                        tracing::error!("Client reconnection failed after {} attempts", attempts);
-                                        // 仍然发送断开状态，让前端知道连接失败
-                                        if let Err(e) = handle_reconnect.emit("connection-state-changed", false) {
-                                            tracing::warn!("Failed to emit connection state: {}", e);
-                                        }
+                                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                        tracing::debug!("Reconnect event channel closed");
+                                        break;
                                     }
                                 }
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                                tracing::warn!("Reconnect event listener lagged {} events", n);
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                                tracing::debug!("Reconnect event channel closed");
-                                break;
                             }
                         }
                     }
@@ -1141,22 +1152,30 @@ impl ClientBridge {
                 // 心跳状态监听 (每次心跳成功/失败都会触发)
                 let mut heartbeat_rx = mc.subscribe_heartbeat();
                 let handle_heartbeat = handle.clone();
+                let token = client_shutdown_token.clone();
 
                 tokio::spawn(async move {
                     loop {
-                        match heartbeat_rx.recv().await {
-                            Ok(status) => {
-                                // 转发心跳状态给前端
-                                if let Err(e) = handle_heartbeat.emit("heartbeat-status", &status) {
-                                    tracing::warn!("Failed to emit heartbeat status: {}", e);
-                                }
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                                tracing::warn!("Heartbeat listener lagged {} events", n);
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                                tracing::debug!("Heartbeat channel closed");
+                        tokio::select! {
+                            _ = token.cancelled() => {
+                                tracing::info!("Client heartbeat listener shutdown");
                                 break;
+                            }
+                            result = heartbeat_rx.recv() => {
+                                match result {
+                                    Ok(status) => {
+                                        if let Err(e) = handle_heartbeat.emit("heartbeat-status", &status) {
+                                            tracing::warn!("Failed to emit heartbeat status: {}", e);
+                                        }
+                                    }
+                                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                        tracing::warn!("Heartbeat listener lagged {} events", n);
+                                    }
+                                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                        tracing::debug!("Heartbeat channel closed");
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
@@ -1166,11 +1185,15 @@ impl ClientBridge {
             }
         }
 
-        *mode_guard = ClientMode::Client {
-            client: Some(RemoteClientState::Connected(connected_client)),
-            edge_url: edge_url.to_string(),
-            message_addr: message_addr.to_string(),
-        };
+        {
+            let mut mode_guard = self.mode.write().await;
+            *mode_guard = ClientMode::Client {
+                client: Some(RemoteClientState::Connected(connected_client)),
+                edge_url: edge_url.to_string(),
+                message_addr: message_addr.to_string(),
+                shutdown_token: client_shutdown_token,
+            };
+        }
 
         {
             let mut config = self.config.write().await;
@@ -1186,17 +1209,55 @@ impl ClientBridge {
         Ok(())
     }
 
-    /// 停止当前模式
+    /// 停止当前模式（优雅关闭）
+    ///
+    /// Server 模式: cancel shutdown_token → 等待 server_task + listener_task（10s 超时）
+    /// Client 模式: cancel shutdown_token → 监听器自行退出
     pub async fn stop(&self) -> Result<(), BridgeError> {
         let mut mode_guard = self.mode.write().await;
 
-        if let ClientMode::Server { server_task, .. } = &*mode_guard {
-            server_task.abort();
-            tracing::info!("Server background task aborted");
+        // 1. 发送 graceful shutdown 信号
+        match &*mode_guard {
+            ClientMode::Server { shutdown_token, .. } => {
+                shutdown_token.cancel();
+                tracing::info!("Server shutdown signal sent, waiting for tasks to stop...");
+            }
+            ClientMode::Client { shutdown_token, .. } => {
+                shutdown_token.cancel();
+                tracing::info!("Client shutdown signal sent");
+            }
+            ClientMode::Disconnected => {}
         }
 
-        *mode_guard = ClientMode::Disconnected;
+        // 2. 取出 mode（move ownership of server_task 才能 await）
+        let old_mode = std::mem::replace(&mut *mode_guard, ClientMode::Disconnected);
+        drop(mode_guard);
 
+        // 3. 等待 server_task + listener_task 完成（10s 超时保底）
+        if let ClientMode::Server {
+            server_task,
+            listener_task,
+            ..
+        } = old_mode
+        {
+            match tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                // 并行等待 server_task 和 listener_task
+                let server_result = server_task.await;
+                if let Some(lt) = listener_task {
+                    let _ = lt.await;
+                }
+                server_result
+            })
+            .await
+            {
+                Ok(Ok(())) => tracing::info!("Server tasks completed gracefully"),
+                Ok(Err(e)) if e.is_cancelled() => tracing::info!("Server task cancelled"),
+                Ok(Err(e)) => tracing::error!("Server task panicked: {}", e),
+                Err(_) => tracing::warn!("Server shutdown timed out (10s)"),
+            }
+        }
+
+        // 4. 更新配置
         {
             let mut config = self.config.write().await;
             config.current_mode = ModeType::Disconnected;

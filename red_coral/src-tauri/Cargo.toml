@@ -52,6 +52,7 @@ http.workspace = true
 
 # ========== Async Runtime (workspace) ==========
 tokio.workspace = true
+tokio-util.workspace = true
 
 # ========== Time and UUID (workspace) ==========
 chrono.workspace = true

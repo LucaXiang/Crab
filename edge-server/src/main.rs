@@ -92,6 +92,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 4. 启动 HTTP 服务器 (Server::run 会自动启动后台任务)
     let server = Server::with_state(config, state);
+    let token = server.shutdown_token();
+    tokio::spawn(async move {
+        let _ = tokio::signal::ctrl_c().await;
+        token.cancel();
+    });
 
     if let Err(e) = server.run().await {
         tracing::error!("Server error: {}", e);

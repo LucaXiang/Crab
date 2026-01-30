@@ -125,6 +125,7 @@ pub struct ModeInfo {
 
 use edge_server::ServerState;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 /// Server 模式的客户端状态
 #[allow(dead_code)]
@@ -148,12 +149,15 @@ pub(crate) enum ClientMode {
         server_state: Arc<ServerState>,
         client: Option<LocalClientState>,
         server_task: tokio::task::JoinHandle<()>,
+        listener_task: Option<tokio::task::JoinHandle<()>>,
+        shutdown_token: CancellationToken,
     },
     /// Client 模式: 连接远程 edge-server
     Client {
         client: Option<RemoteClientState>,
         edge_url: String,
         message_addr: String,
+        shutdown_token: CancellationToken,
     },
     /// 未连接状态
     Disconnected,

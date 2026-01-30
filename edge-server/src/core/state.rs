@@ -740,19 +740,32 @@ impl ServerState {
             .await
     }
 
-    /// 等待激活（阻塞）
+    /// 等待激活（阻塞，可取消）
     ///
     /// 阻塞直到激活成功且自检通过。
     /// 用于 `Server::run()`，确保 HTTPS 只在激活后启动。
-    pub async fn wait_for_activation(&self) {
+    /// 返回 `Err(())` 表示 shutdown 被请求。
+    pub async fn wait_for_activation(
+        &self,
+        shutdown_token: &tokio_util::sync::CancellationToken,
+    ) -> Result<(), ()> {
         self.activation
-            .wait_for_activation(&self.cert_service)
+            .wait_for_activation(&self.cert_service, shutdown_token)
             .await
     }
 
     /// 检查订阅是否被阻止
     pub async fn is_subscription_blocked(&self) -> bool {
         self.activation.is_subscription_blocked().await
+    }
+
+    /// 获取订阅阻止信息 (供 Bridge 使用)
+    ///
+    /// 返回 None 表示未阻止
+    pub async fn get_subscription_blocked_info(
+        &self,
+    ) -> Option<shared::app_state::SubscriptionBlockedInfo> {
+        self.activation.get_subscription_blocked_info().await
     }
 
     /// 从 auth-server 同步订阅状态

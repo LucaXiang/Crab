@@ -2,9 +2,11 @@ use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tokio_util::sync::CancellationToken;
 
 use crate::services::tenant_binding::{PlanType, Subscription, SubscriptionStatus, TenantBinding};
 use crate::utils::AppError;
+use shared::app_state::SubscriptionBlockedInfo;
 
 /// 激活服务 - 管理边缘节点激活状态
 ///
@@ -87,13 +89,81 @@ impl ActivationService {
 
     /// 检查订阅是否被阻止
     ///
-    /// 读取缓存的凭证，检查订阅状态是否为 Inactive/Expired/Canceled/Unpaid
+    /// 阻止条件 (任一满足):
+    /// 1. status 为 Inactive/Expired/Canceled/Unpaid
+    /// 2. 签名已陈旧 (过期 + 3 天宽限期也已过)
     pub async fn is_subscription_blocked(&self) -> bool {
         let cache = self.credential_cache.read().await;
-        cache
-            .as_ref()
-            .and_then(|c| c.subscription.as_ref())
-            .is_some_and(|sub| sub.status.is_blocked())
+        let sub = match cache.as_ref().and_then(|c| c.subscription.as_ref()) {
+            Some(s) => s,
+            None => return false, // 无订阅数据 = 首次激活，不阻止
+        };
+
+        // 1. 状态阻止
+        if sub.status.is_blocked() {
+            return true;
+        }
+
+        // 2. 签名陈旧检查 (签名过期 + 宽限期也已过)
+        if sub.is_signature_stale() {
+            tracing::warn!(
+                "Subscription signature stale (expired + grace period exceeded). Blocking."
+            );
+            return true;
+        }
+
+        false
+    }
+
+    /// 获取订阅阻止信息 (供 Bridge 使用)
+    ///
+    /// 返回 `None` 表示未阻止，可正常使用。
+    /// 将阻止判断和 info 构建统一到 edge-server，避免 Bridge 重复实现。
+    pub async fn get_subscription_blocked_info(&self) -> Option<SubscriptionBlockedInfo> {
+        let cache = self.credential_cache.read().await;
+        let sub = cache.as_ref()?.subscription.as_ref()?;
+
+        let status_blocked = sub.status.is_blocked();
+        let signature_stale = sub.is_signature_stale();
+
+        if !status_blocked && !signature_stale {
+            return None;
+        }
+
+        let status = sub.status.to_shared();
+        let plan = sub.plan.to_shared();
+
+        let (user_message, expired_at) = if signature_stale && !status_blocked {
+            // 签名陈旧但状态本身是 Active/PastDue → 需要联网刷新
+            ("subscription_signature_stale".to_string(), None)
+        } else {
+            let msg = match sub.status {
+                SubscriptionStatus::Inactive => "subscription_inactive",
+                SubscriptionStatus::Expired => "subscription_expired",
+                SubscriptionStatus::Canceled => "subscription_canceled",
+                SubscriptionStatus::Unpaid => "subscription_unpaid",
+                _ => "subscription_blocked",
+            };
+            // Inactive/Unpaid 未激活状态不应有过期时间
+            let expired_at = match sub.status {
+                SubscriptionStatus::Inactive | SubscriptionStatus::Unpaid => None,
+                _ => sub.expires_at,
+            };
+            (msg.to_string(), expired_at)
+        };
+
+        Some(SubscriptionBlockedInfo {
+            status,
+            plan,
+            max_stores: sub.max_stores,
+            expired_at,
+            grace_period_days: None,
+            grace_period_ends_at: None,
+            in_grace_period: false,
+            support_url: Some("https://support.example.com".to_string()),
+            renewal_url: Some("https://billing.example.com/renew".to_string()),
+            user_message,
+        })
     }
 
     /// 检查激活状态并执行自检
@@ -145,30 +215,43 @@ impl ActivationService {
         Ok(())
     }
 
-    /// 等待激活并执行自检（阻塞）
+    /// 等待激活并执行自检（阻塞，可取消）
     ///
     /// # 行为
     ///
-    /// - 已激活且自检通过：立即返回
+    /// - 已激活且自检通过：立即返回 `Ok(())`
     /// - 未激活：阻塞等待 `notify.notified()`
     /// - 自检失败：清理后继续等待
+    /// - shutdown_token 取消：返回 `Err(())`
     ///
     /// # 用途
     ///
     /// 供 `Server::run()` 使用，确保 HTTPS 只在激活成功后启动。
-    pub async fn wait_for_activation(&self, cert_service: &crate::services::cert::CertService) {
+    /// shutdown_token 使得 graceful shutdown 时不再卡在激活等待。
+    pub async fn wait_for_activation(
+        &self,
+        cert_service: &crate::services::cert::CertService,
+        shutdown_token: &CancellationToken,
+    ) -> Result<(), ()> {
         loop {
             // 1. Check activation status
             if !self.is_activated().await {
                 tracing::info!("⏳ Server not activated. Waiting for activation signal...");
-                self.notify.notified().await;
-                tracing::info!("📡 Activation signal received!");
+                tokio::select! {
+                    _ = shutdown_token.cancelled() => {
+                        tracing::info!("Shutdown requested during activation wait");
+                        return Err(());
+                    }
+                    _ = self.notify.notified() => {
+                        tracing::info!("📡 Activation signal received!");
+                    }
+                }
             }
 
             // 2. Perform self-check (cert chain + hardware binding + credential signature + clock)
             tracing::info!("🔍 Performing self-check...");
             let cached_binding = self.credential_cache.read().await.clone();
-            
+
             match cert_service
                 .self_check_with_binding(cached_binding.as_ref())
                 .await
@@ -195,6 +278,7 @@ impl ActivationService {
 
         // 4. Subscription Sync (only after successful self-check)
         self.sync_subscription().await;
+        Ok(())
     }
 
     /// 进入未绑定状态 (公开接口)
@@ -416,9 +500,34 @@ impl ActivationService {
                 *cache = Some(credential);
             }
         } else {
-            tracing::warn!(
-                "Subscription sync failed (network/auth error). Using offline/cached trust."
-            );
+            // 网络失败 → 检查签名是否过期
+            if let Some(sub) = &credential.subscription {
+                if sub.is_signature_expired() {
+                    tracing::warn!(
+                        "Subscription sync failed AND signature expired! \
+                         Offline grace period applies ({}d remaining).",
+                        sub.signature_valid_until
+                            .map(|v| {
+                                let remaining_ms = (v + Subscription::SIGNATURE_GRACE_PERIOD_MS)
+                                    - shared::util::now_millis();
+                                remaining_ms / 86_400_000
+                            })
+                            .unwrap_or(0)
+                    );
+                } else {
+                    tracing::info!(
+                        "Subscription sync failed but signature still valid \
+                         (expires in {}h). Using cached data.",
+                        sub.signature_valid_until
+                            .map(|v| (v - shared::util::now_millis()) / 3_600_000)
+                            .unwrap_or(0)
+                    );
+                }
+            } else {
+                tracing::warn!(
+                    "Subscription sync failed (network/auth error). No cached subscription."
+                );
+            }
         }
     }
 
