@@ -40,11 +40,9 @@ const InitialRoute: React.FC = () => {
     const init = async () => {
       // 1. 获取租户列表
       await fetchTenants();
-      console.log('[InitialRoute] tenants:', useBridgeStore.getState().tenants);
 
       // 2. 获取当前应用状态
-      const state = await fetchAppState();
-      console.log('[InitialRoute] initial appState:', state);
+      await fetchAppState();
 
       // 3. 如果状态是 Uninitialized 且有租户，说明后端已启动但模式未选择
       // 不再自动启动 Server 模式，让用户通过 Setup 页面选择
@@ -54,7 +52,6 @@ const InitialRoute: React.FC = () => {
       // 并同步 auth store（以后端为唯一认证状态来源）
       const currentAppState = useBridgeStore.getState().appState;
       if (currentAppState?.type === 'ServerAuthenticated' || currentAppState?.type === 'ClientAuthenticated') {
-        console.log('[InitialRoute] Restoring session from backend...');
         const session = await fetchCurrentSession();
         if (session) {
           // 后端有有效 session，同步到 auth store
@@ -78,9 +75,6 @@ const InitialRoute: React.FC = () => {
         useAuthStore.getState().logout();
       }
 
-      const finalState = useBridgeStore.getState().appState;
-      console.log('[InitialRoute] final appState:', finalState);
-      console.log('[InitialRoute] route:', AppStateHelpers.getRouteForState(finalState));
       setIsChecking(false);
     };
     init();
