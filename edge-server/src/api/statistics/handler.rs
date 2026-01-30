@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
 use crate::db::repository::StoreInfoRepository;
-use crate::utils::{AppError, AppResult};
+use crate::utils::AppResult;
 
 // ============================================================================
 // Response Types
@@ -315,10 +315,10 @@ pub async fn get_statistics(
         .bind(("start", start_dt))
         .bind(("end", end_dt))
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     let overview: OverviewStats = result.take::<Option<OverviewStats>>(0)
-        .map_err(|e| AppError::database(e.to_string()))?
+        .map_err(crate::db::repository::surreal_err_to_app)?
         .unwrap_or(OverviewStats {
             today_revenue: 0.0,
             today_orders: 0,
@@ -368,10 +368,10 @@ pub async fn get_statistics(
         .bind(("start", start_dt))
         .bind(("end", end_dt))
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     let revenue_trend: Vec<RevenueTrendPoint> = trend_result.take(0)
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     // Query for category sales
     let mut category_result = state.db
@@ -395,7 +395,7 @@ pub async fn get_statistics(
         .bind(("start", start_dt))
         .bind(("end", end_dt))
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     #[derive(Deserialize)]
     struct CategoryRaw {
@@ -404,7 +404,7 @@ pub async fn get_statistics(
     }
 
     let category_raw: Vec<CategoryRaw> = category_result.take(0)
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     let category_sales: Vec<CategorySale> = category_raw
         .into_iter()
@@ -440,10 +440,10 @@ pub async fn get_statistics(
         .bind(("start", start_dt))
         .bind(("end", end_dt))
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     let top_products: Vec<TopProduct> = product_result.take(0)
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     Ok(Json(StatisticsResponse {
         overview,
@@ -490,7 +490,7 @@ pub async fn get_sales_report(
         .bind(("start", start_dt))
         .bind(("end", end_dt))
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     #[derive(Deserialize)]
     struct CountResult {
@@ -499,7 +499,7 @@ pub async fn get_sales_report(
 
     let total: i32 = count_result
         .take::<Option<CountResult>>(0)
-        .map_err(|e| AppError::database(e.to_string()))?
+        .map_err(crate::db::repository::surreal_err_to_app)?
         .map(|r| r.count)
         .unwrap_or(0);
 
@@ -525,10 +525,10 @@ pub async fn get_sales_report(
         .bind(("limit", page_size))
         .bind(("offset", offset))
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     let items: Vec<SalesReportItem> = data_result.take(0)
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     Ok(Json(SalesReportResponse {
         items,

@@ -23,6 +23,24 @@ pub enum PrintServiceError {
 
 pub type PrintServiceResult<T> = Result<T, PrintServiceError>;
 
+impl From<PrintServiceError> for shared::error::AppError {
+    fn from(err: PrintServiceError) -> Self {
+        use shared::error::{AppError, ErrorCode};
+        match err {
+            PrintServiceError::Storage(e) => AppError::database(e.to_string()),
+            PrintServiceError::KitchenOrderNotFound(id) => {
+                AppError::not_found(format!("Kitchen order {}", id))
+            }
+            PrintServiceError::LabelRecordNotFound(id) => {
+                AppError::not_found(format!("Label record {}", id))
+            }
+            PrintServiceError::PrintingDisabled => {
+                AppError::with_message(ErrorCode::PrinterNotAvailable, "Printing disabled".to_string())
+            }
+        }
+    }
+}
+
 /// Kitchen/Label print service
 ///
 /// Responsibilities:

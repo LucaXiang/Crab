@@ -56,12 +56,12 @@ pub async fn list(
         // Get all kitchen orders for a specific order
         service
             .get_kitchen_orders_for_order(&order_id)
-            .map_err(|e| AppError::database(e.to_string()))?
+            ?
     } else {
         // Get paginated list
         service
             .get_all_kitchen_orders(query.offset, query.limit)
-            .map_err(|e| AppError::database(e.to_string()))?
+            ?
     };
 
     Ok(Json(KitchenOrderListResponse { items, total: None }))
@@ -76,7 +76,7 @@ pub async fn get_by_id(
 
     let order = service
         .get_kitchen_order(&id)
-        .map_err(|e| AppError::database(e.to_string()))?
+        ?
         .ok_or_else(|| AppError::not_found(format!("Kitchen order {} not found", id)))?;
 
     Ok(Json(order))
@@ -91,7 +91,7 @@ pub async fn reprint(
 
     service
         .reprint_kitchen_order(&id)
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     tracing::info!(kitchen_order_id = %id, "Kitchen order reprinted via API");
 
@@ -114,7 +114,7 @@ pub async fn list_labels(
 
     let records = service
         .get_label_records_for_order(&query.order_id)
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     Ok(Json(records))
 }
@@ -128,7 +128,7 @@ pub async fn get_label_by_id(
 
     let record = service
         .get_label_record(&id)
-        .map_err(|e| AppError::database(e.to_string()))?
+        ?
         .ok_or_else(|| AppError::not_found(format!("Label record {} not found", id)))?;
 
     Ok(Json(record))
@@ -143,7 +143,7 @@ pub async fn reprint_label(
 
     service
         .reprint_label_record(&id)
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     tracing::info!(label_record_id = %id, "Label record reprinted via API");
 

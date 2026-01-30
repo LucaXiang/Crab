@@ -250,11 +250,11 @@ pub async fn debug_simulate_auto_close(
         )
         .bind(("now", shared::util::now_millis()))
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     let closed: Vec<Shift> = result
         .take(0)
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     for shift in &closed {
         let id = shift

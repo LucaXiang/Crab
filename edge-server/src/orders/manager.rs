@@ -81,6 +81,15 @@ pub enum ManagerError {
 
 /// 将存储错误转换为错误码（前端负责本地化）
 fn classify_storage_error(e: &StorageError) -> CommandErrorCode {
+    // 先按枚举变体精确匹配
+    match e {
+        StorageError::Serialization(_) => return CommandErrorCode::InternalError,
+        StorageError::OrderNotFound(_) => return CommandErrorCode::OrderNotFound,
+        StorageError::EventNotFound(_, _) => return CommandErrorCode::InternalError,
+        _ => {}
+    }
+
+    // redb 错误通过字符串匹配分类
     let err_str = e.to_string().to_lowercase();
 
     // 磁盘空间不足
@@ -99,7 +108,7 @@ fn classify_storage_error(e: &StorageError) -> CommandErrorCode {
         return CommandErrorCode::StorageCorrupted;
     }
 
-    // 默认：系统繁忙
+    // 默认：系统繁忙（redb 的 Database/Transaction/Table/Storage/Commit 错误）
     CommandErrorCode::SystemBusy
 }
 

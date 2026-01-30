@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::ServerState;
 use crate::db::models::OrderSummary;
 use crate::db::repository::OrderRepository;
-use crate::utils::{AppError, AppResult};
+use crate::utils::AppResult;
 
 // =========================================================================
 // Order Detail (Archived)
@@ -243,7 +243,7 @@ pub async fn fetch_order_list(
             .bind(("start", start_millis))
             .bind(("end", end_millis))
             .await
-    }.map_err(|e| AppError::database(e.to_string()))?;
+    }.map_err(crate::db::repository::surreal_err_to_app)?;
 
     #[derive(Deserialize)]
     struct CountResult {
@@ -251,7 +251,7 @@ pub async fn fetch_order_list(
     }
     let total: i64 = count_result
         .take::<Option<CountResult>>(0)
-        .map_err(|e| AppError::database(e.to_string()))?
+        .map_err(crate::db::repository::surreal_err_to_app)?
         .map(|r| r.count)
         .unwrap_or(0);
 
@@ -290,9 +290,9 @@ pub async fn fetch_order_list(
             .bind(("limit", limit))
             .bind(("offset", offset))
             .await
-    }.map_err(|e| AppError::database(e.to_string()))?;
+    }.map_err(crate::db::repository::surreal_err_to_app)?;
 
-    let orders: Vec<OrderSummary> = data_result.take(0).map_err(|e| AppError::database(e.to_string()))?;
+    let orders: Vec<OrderSummary> = data_result.take(0).map_err(crate::db::repository::surreal_err_to_app)?;
 
     Ok(Json(OrderListResponse {
         orders,

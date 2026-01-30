@@ -61,11 +61,13 @@ impl ErrorCode {
             // 402 Payment Required
             Self::PaymentInsufficientAmount => StatusCode::PAYMENT_REQUIRED,
 
+            // 503 Service Unavailable (transient errors, client can retry)
+            Self::NetworkError
+            | Self::TimeoutError => StatusCode::SERVICE_UNAVAILABLE,
+
             // 500 Internal Server Error
             Self::InternalError
             | Self::DatabaseError
-            | Self::NetworkError
-            | Self::TimeoutError
             | Self::ConfigError
             | Self::BridgeNotInitialized
             | Self::BridgeNotConnected
@@ -187,12 +189,20 @@ mod tests {
             StatusCode::INTERNAL_SERVER_ERROR
         );
         assert_eq!(
-            ErrorCode::NetworkError.http_status(),
-            StatusCode::INTERNAL_SERVER_ERROR
-        );
-        assert_eq!(
             ErrorCode::BridgeNotInitialized.http_status(),
             StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_service_unavailable_status() {
+        assert_eq!(
+            ErrorCode::NetworkError.http_status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(
+            ErrorCode::TimeoutError.http_status(),
+            StatusCode::SERVICE_UNAVAILABLE
         );
     }
 

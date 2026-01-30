@@ -20,8 +20,8 @@ async fn check_duplicate_external_ids(
     db: &Surreal<Db>,
     external_ids: &[i64],
     exclude_product_id: Option<&str>,
-) -> Option<Vec<i64>> {
-    let query_result = if let Some(exclude_id) = exclude_product_id {
+) -> AppResult<Option<Vec<i64>>> {
+    let mut query = if let Some(exclude_id) = exclude_product_id {
         // Strip "product:" prefix if present, since type::thing() will add it
         let exclude_id = exclude_id
             .strip_prefix("product:")
@@ -31,24 +31,24 @@ async fn check_duplicate_external_ids(
             .bind(("ids", external_ids.to_vec()))
             .bind(("exclude", exclude_id))
             .await
+            .map_err(crate::db::repository::surreal_err_to_app)?
     } else {
         db.query("SELECT external_id FROM product_spec WHERE external_id IN $ids")
             .bind(("ids", external_ids.to_vec()))
             .await
+            .map_err(crate::db::repository::surreal_err_to_app)?
     };
-
-    let query = query_result.ok()?;
 
     #[derive(serde::Deserialize)]
     struct Found {
         external_id: i64,
     }
 
-    let found: Vec<Found> = query.check().ok()?.take(0).unwrap_or_default();
+    let found: Vec<Found> = query.take(0).unwrap_or_default();
     if found.is_empty() {
-        None
+        Ok(None)
     } else {
-        Some(found.into_iter().map(|f| f.external_id).collect())
+        Ok(Some(found.into_iter().map(|f| f.external_id).collect()))
     }
 }
 
@@ -103,11 +103,11 @@ pub async fn create(
 ) -> AppResult<Json<shared::models::ProductFull>> {
     // 检查 external_id 是否已存在
     let external_ids: Vec<i64> = payload.specs.iter().filter_map(|s| s.external_id).collect();
-    if !external_ids.is_empty()
-        && let Some(duplicates) = check_duplicate_external_ids(&state.db, &external_ids, None).await
-    {
-        return Err(AppError::new(ErrorCode::SpecExternalIdExists)
-            .with_detail("external_ids", duplicates));
+    if !external_ids.is_empty() {
+        if let Some(duplicates) = check_duplicate_external_ids(&state.db, &external_ids, None).await? {
+            return Err(AppError::new(ErrorCode::SpecExternalIdExists)
+                .with_detail("external_ids", duplicates));
+        }
     }
 
     let product = state
@@ -142,12 +142,13 @@ pub async fn update(
     // 检查 external_id 是否已存在 (排除当前产品)
     if let Some(ref specs) = payload.specs {
         let external_ids: Vec<i64> = specs.iter().filter_map(|s| s.external_id).collect();
-        if !external_ids.is_empty()
-            && let Some(duplicates) =
-                check_duplicate_external_ids(&state.db, &external_ids, Some(&id)).await
-        {
-            return Err(AppError::new(ErrorCode::SpecExternalIdExists)
-                .with_detail("external_ids", duplicates));
+        if !external_ids.is_empty() {
+            if let Some(duplicates) =
+                check_duplicate_external_ids(&state.db, &external_ids, Some(&id)).await?
+            {
+                return Err(AppError::new(ErrorCode::SpecExternalIdExists)
+                    .with_detail("external_ids", duplicates));
+            }
         }
     }
 

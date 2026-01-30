@@ -73,8 +73,35 @@ pub enum RepoError {
 
 impl From<surrealdb::Error> for RepoError {
     fn from(err: surrealdb::Error) -> Self {
-        RepoError::Database(err.to_string())
+        let msg = err.to_string();
+        let lower = msg.to_lowercase();
+
+        // Unique constraint / duplicate record
+        if lower.contains("already exists")
+            || lower.contains("duplicate")
+            || lower.contains("unique")
+        {
+            return RepoError::Duplicate(msg);
+        }
+
+        // Record not found
+        if lower.contains("not found")
+            || lower.contains("no record")
+            || lower.contains("can not find")
+        {
+            return RepoError::NotFound(msg);
+        }
+
+        RepoError::Database(msg)
     }
+}
+
+/// Convert a surrealdb::Error to AppError through RepoError's semantic mapping.
+///
+/// Use this instead of `.map_err(|e| AppError::database(e.to_string()))` to preserve
+/// error semantics (NotFound → 404, Duplicate → 409, etc.)
+pub fn surreal_err_to_app(err: surrealdb::Error) -> AppError {
+    AppError::from(RepoError::from(err))
 }
 
 impl From<RepoError> for AppError {

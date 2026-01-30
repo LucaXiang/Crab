@@ -130,6 +130,9 @@ impl From<reqwest::Error> for ClientError {
             ClientError::Connection(e.to_string())
         } else if e.is_status() {
             match e.status() {
+                Some(status) if status == reqwest::StatusCode::BAD_REQUEST => {
+                    ClientError::Validation(format!("HTTP 400: {e}"))
+                }
                 Some(status) if status == reqwest::StatusCode::UNAUTHORIZED => {
                     ClientError::Unauthorized("HTTP 401".into())
                 }
@@ -138,6 +141,15 @@ impl From<reqwest::Error> for ClientError {
                 }
                 Some(status) if status == reqwest::StatusCode::NOT_FOUND => {
                     ClientError::NotFound("HTTP 404".into())
+                }
+                Some(status) if status == reqwest::StatusCode::CONFLICT => {
+                    ClientError::Request(format!("HTTP 409 Conflict: {e}"))
+                }
+                Some(status) if status == reqwest::StatusCode::TOO_MANY_REQUESTS => {
+                    ClientError::Request(format!("HTTP 429 Too Many Requests: {e}"))
+                }
+                Some(status) if status == reqwest::StatusCode::SERVICE_UNAVAILABLE => {
+                    ClientError::Connection(format!("HTTP 503 Service Unavailable: {e}"))
                 }
                 _ => ClientError::Request(e.to_string()),
             }

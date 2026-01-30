@@ -24,7 +24,7 @@ pub async fn verify_order(
     let verification = archive_service
         .verify_order(&receipt_number)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     Ok(Json(verification))
 }
@@ -64,7 +64,7 @@ pub async fn verify_daily_chain(
     let verification = archive_service
         .verify_daily_chain(&date, start, end)
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        ?;
 
     Ok(Json(verification))
 }

@@ -30,6 +30,17 @@ pub enum ArchiveError {
 
 pub type ArchiveResult<T> = Result<T, ArchiveError>;
 
+impl From<ArchiveError> for shared::error::AppError {
+    fn from(err: ArchiveError) -> Self {
+        use shared::error::AppError;
+        match err {
+            ArchiveError::Database(msg) => AppError::database(msg),
+            ArchiveError::HashChain(msg) => AppError::internal(msg),
+            ArchiveError::Conversion(msg) => AppError::internal(msg),
+        }
+    }
+}
+
 // ============================================================================
 // Verification Models
 // ============================================================================
@@ -487,7 +498,6 @@ impl OrderArchiveService {
             UPSERT system_state:main SET
                 last_order = $order[0].id,
                 last_order_hash = $order_hash,
-                created_at = created_at ?? $now,
                 updated_at = $now;
             COMMIT TRANSACTION;
             RETURN { success: true, order_id: <string>$order[0].id };
@@ -519,8 +529,8 @@ impl OrderArchiveService {
             .bind(("discount_amount", order.discount_amount))
             .bind(("surcharge_amount", order.surcharge_amount))
             .bind(("tax", order.tax))
-            .bind(("start_time", order.start_time))
-            .bind(("end_time", order.end_time))
+            .bind(("start_time", order.start_time.clone()))
+            .bind(("end_time", order.end_time.clone()))
             .bind(("operator_id", order.operator_id.clone()))
             .bind(("operator_name", order.operator_name.clone()))
             .bind(("void_type", order.void_type.clone()))

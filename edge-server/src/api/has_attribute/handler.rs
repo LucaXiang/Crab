@@ -54,8 +54,7 @@ pub async fn create(
             payload.display_order,
             payload.default_option_idx,
         )
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .await?;
 
     Ok(Json(binding))
 }
@@ -74,11 +73,11 @@ pub async fn get_by_id(
         .query("SELECT * FROM has_attribute WHERE id = $id")
         .bind(("id", thing))
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     let bindings: Vec<AttributeBinding> = result
         .take(0)
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     bindings
         .into_iter()
@@ -103,11 +102,11 @@ pub async fn update(
         .bind(("thing", thing))
         .bind(("data", payload))
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     let bindings: Vec<AttributeBinding> = result
         .take(0)
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     bindings
         .into_iter()
@@ -130,7 +129,7 @@ pub async fn delete(
         .query("DELETE $thing")
         .bind(("thing", thing))
         .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .map_err(crate::db::repository::surreal_err_to_app)?;
 
     Ok(Json(true))
 }
@@ -144,8 +143,7 @@ pub async fn list_by_product(
 
     let bindings = repo
         .find_bindings_for_product(&product_id)
-        .await
-        .map_err(|e| AppError::database(e.to_string()))?;
+        .await?;
 
     let result: Vec<BindingWithAttribute> = bindings
         .into_iter()
