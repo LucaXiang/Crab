@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Server, Wifi, AlertCircle, ChevronRight, Settings, Power } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
+import { useI18n } from '@/hooks/useI18n';
+import { friendlyError } from '@/utils/error/friendlyError';
 
 type SetupStep = 'mode' | 'configure' | 'complete';
 type ModeChoice = 'server' | 'client' | null;
@@ -12,6 +14,7 @@ const DEFAULT_HTTP_PORT = 9625;
 const DEFAULT_MESSAGE_PORT = 9626;
 
 export const SetupScreen: React.FC = () => {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const {
     startServerMode,
@@ -59,7 +62,8 @@ export const SetupScreen: React.FC = () => {
       }
       setStep('complete');
     } catch (err: unknown) {
-      setConfigError(err instanceof Error ? err.message : 'Failed to start mode');
+      const raw = err instanceof Error ? err.message : String(err);
+      setConfigError(friendlyError(raw));
     }
   };
 
@@ -79,14 +83,14 @@ export const SetupScreen: React.FC = () => {
     }
   };
 
-  const stepLabels = ['Mode', 'Configure', 'Complete'];
+  const stepLabels = [t('setup.step.mode'), t('setup.step.configure'), t('setup.step.complete')];
   const stepKeys: SetupStep[] = ['mode', 'configure', 'complete'];
 
   const renderModeStep = () => (
     <div className="space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Choose Operation Mode</h1>
-        <p className="text-gray-500">Select how you want to run the application</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('setup.title')}</h1>
+        <p className="text-gray-500">{t('setup.description')}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -100,15 +104,15 @@ export const SetupScreen: React.FC = () => {
               <Server className="text-primary-500" size={28} />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-gray-900">Server Mode</h3>
-              <p className="text-sm text-gray-500">Run locally with built-in server</p>
+              <h3 className="text-xl font-semibold text-gray-900">{t('setup.server_mode.title')}</h3>
+              <p className="text-sm text-gray-500">{t('setup.server_mode.subtitle')}</p>
             </div>
           </div>
           <p className="text-gray-600 text-sm mb-4">
-            Best for standalone POS terminals. Data is stored locally and synced when online.
+            {t('setup.server_mode.description')}
           </p>
           <div className="flex items-center text-primary-500 text-sm font-medium">
-            <span>Select this mode</span>
+            <span>{t('setup.server_mode.select')}</span>
             <ChevronRight size={16} className="ml-1 group-hover:translate-x-1 transition-transform" />
           </div>
         </button>
@@ -123,15 +127,15 @@ export const SetupScreen: React.FC = () => {
               <Wifi className="text-blue-500" size={28} />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-gray-900">Client Mode</h3>
-              <p className="text-sm text-gray-500">Connect to remote server</p>
+              <h3 className="text-xl font-semibold text-gray-900">{t('setup.client_mode.title')}</h3>
+              <p className="text-sm text-gray-500">{t('setup.client_mode.subtitle')}</p>
             </div>
           </div>
           <p className="text-gray-600 text-sm mb-4">
-            Connect to an existing Edge Server. Requires network connection to the server.
+            {t('setup.client_mode.description')}
           </p>
           <div className="flex items-center text-blue-500 text-sm font-medium">
-            <span>Select this mode</span>
+            <span>{t('setup.client_mode.select')}</span>
             <ChevronRight size={16} className="ml-1 group-hover:translate-x-1 transition-transform" />
           </div>
         </button>
@@ -150,12 +154,10 @@ export const SetupScreen: React.FC = () => {
           <Settings className={modeChoice === 'server' ? 'text-primary-500' : 'text-blue-500'} size={32} />
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Configure {modeChoice === 'server' ? 'Server' : 'Client'} Mode
+          {modeChoice === 'server' ? t('setup.configure_server_title') : t('setup.configure_client_title')}
         </h1>
         <p className="text-gray-500">
-          {modeChoice === 'server'
-            ? 'Set the ports for the local server'
-            : 'Enter the connection details for the remote server'}
+          {modeChoice === 'server' ? t('setup.configure_server_desc') : t('setup.configure_client_desc')}
         </p>
       </div>
 
@@ -164,7 +166,7 @@ export const SetupScreen: React.FC = () => {
           <>
             {/* HTTP Port */}
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">HTTP Port</label>
+              <label className="text-sm font-medium text-gray-700">{t('setup.server.http_port_label')}</label>
               <input
                 type="number"
                 value={httpPort}
@@ -175,12 +177,12 @@ export const SetupScreen: React.FC = () => {
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                 disabled={isLoading}
               />
-              <p className="text-xs text-gray-400">Port for HTTP API (default: 9625)</p>
+              <p className="text-xs text-gray-400">{t('setup.server.http_port_help')}</p>
             </div>
 
             {/* Message Port */}
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Message Bus Port</label>
+              <label className="text-sm font-medium text-gray-700">{t('setup.server.message_port_label')}</label>
               <input
                 type="number"
                 value={messagePort}
@@ -191,14 +193,14 @@ export const SetupScreen: React.FC = () => {
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                 disabled={isLoading}
               />
-              <p className="text-xs text-gray-400">Port for real-time messaging (default: 9626)</p>
+              <p className="text-xs text-gray-400">{t('setup.server.message_port_help')}</p>
             </div>
           </>
         ) : (
           <>
             {/* Edge Server URL */}
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Edge Server URL</label>
+              <label className="text-sm font-medium text-gray-700">{t('setup.client.edge_url_label')}</label>
               <input
                 type="url"
                 value={edgeUrl}
@@ -207,12 +209,12 @@ export const SetupScreen: React.FC = () => {
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 disabled={isLoading}
               />
-              <p className="text-xs text-gray-400">HTTPS URL of the Edge Server</p>
+              <p className="text-xs text-gray-400">{t('setup.client.edge_url_help')}</p>
             </div>
 
             {/* Message Server Address */}
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Message Server Address</label>
+              <label className="text-sm font-medium text-gray-700">{t('setup.client.message_addr_label')}</label>
               <input
                 type="text"
                 value={messageAddr}
@@ -221,7 +223,7 @@ export const SetupScreen: React.FC = () => {
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 disabled={isLoading}
               />
-              <p className="text-xs text-gray-400">Host:Port for real-time messaging</p>
+              <p className="text-xs text-gray-400">{t('setup.client.message_addr_help')}</p>
             </div>
           </>
         )}
@@ -242,7 +244,7 @@ export const SetupScreen: React.FC = () => {
             disabled={isLoading}
             className="px-6 py-3 text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
           >
-            Back
+            {t('setup.button_back')}
           </button>
           <button
             type="submit"
@@ -257,7 +259,7 @@ export const SetupScreen: React.FC = () => {
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                <span>Start {modeChoice === 'server' ? 'Server' : 'Client'} Mode</span>
+                <span>{modeChoice === 'server' ? t('setup.button_start_server') : t('setup.button_start_client')}</span>
                 <ChevronRight size={20} />
               </>
             )}
@@ -276,11 +278,11 @@ export const SetupScreen: React.FC = () => {
       </div>
 
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Setup Complete!</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('setup.complete_title')}</h1>
         <p className="text-gray-500">
-          Your device is activated and running in{' '}
-          <span className="font-medium">{modeChoice === 'server' ? 'Server' : 'Client'}</span> mode. You can
-          now log in with your employee credentials.
+          {t('setup.complete_description', {
+            mode: modeChoice === 'server' ? t('setup.complete_mode_server') : t('setup.complete_mode_client'),
+          })}
         </p>
       </div>
 
@@ -288,7 +290,7 @@ export const SetupScreen: React.FC = () => {
         onClick={handleComplete}
         className="w-full py-4 bg-primary-500 text-white font-bold rounded-xl hover:bg-primary-600 active:scale-[0.98] transition-all shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2"
       >
-        <span>Continue to Login</span>
+        <span>{t('setup.button_continue')}</span>
         <ChevronRight size={20} />
       </button>
     </div>
@@ -300,7 +302,7 @@ export const SetupScreen: React.FC = () => {
       <button
         onClick={handleCloseApp}
         className="absolute top-6 right-6 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-20"
-        title="Close Application"
+        title={t('common.dialog.close_app')}
       >
         <Power size={24} />
       </button>

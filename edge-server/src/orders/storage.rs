@@ -785,6 +785,45 @@ impl OrderStorage {
         Ok(())
     }
 
+    /// Move all dead letter entries back to pending queue (reset retry count)
+    ///
+    /// Used at startup to retry previously failed archives after bug fixes.
+    pub fn recover_dead_letters(&self) -> StorageResult<usize> {
+        let txn = self.begin_write()?;
+        let count = {
+            let mut pending_table = txn.open_table(PENDING_ARCHIVE_TABLE)?;
+            let mut dead_letter_table = txn.open_table(DEAD_LETTER_TABLE)?;
+
+            // Collect order_ids first (can't iterate and mutate simultaneously)
+            let dead_order_ids: Vec<String> = dead_letter_table.iter()?
+                .filter_map(|r| r.ok())
+                .map(|(k, _v)| k.value().to_string())
+                .collect();
+
+            if dead_order_ids.is_empty() {
+                return Ok(0);
+            }
+
+            let now = shared::util::now_millis();
+            let mut recovered = 0;
+            for order_id in &dead_order_ids {
+                let pending = PendingArchive {
+                    order_id: order_id.clone(),
+                    created_at: now,
+                    retry_count: 0,
+                    last_error: None,
+                };
+                let value = serde_json::to_vec(&pending)?;
+                pending_table.insert(order_id.as_str(), value.as_slice())?;
+                dead_letter_table.remove(order_id.as_str())?;
+                recovered += 1;
+            }
+            recovered
+        };
+        txn.commit()?;
+        Ok(count)
+    }
+
     // ========== Statistics ==========
 
     /// Get storage statistics

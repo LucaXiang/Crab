@@ -65,6 +65,13 @@ impl ArchiveWorker {
 
         let worker = Arc::new(self);
 
+        // Recover dead letter entries (previously failed archives) back to pending queue
+        match worker.storage.recover_dead_letters() {
+            Ok(0) => {}
+            Ok(n) => tracing::info!(count = n, "Recovered dead letter entries to pending queue"),
+            Err(e) => tracing::error!(error = %e, "Failed to recover dead letter entries"),
+        }
+
         // Process any pending archives from previous run
         worker.process_pending_queue().await;
 

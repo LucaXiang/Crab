@@ -22,10 +22,10 @@ pub struct Shift {
     pub operator_name: String,
     /// Shift status
     pub status: ShiftStatus,
-    /// Shift start time (ISO 8601)
-    pub start_time: String,
-    /// Shift end time (ISO 8601), null if still open
-    pub end_time: Option<String>,
+    /// Shift start time (Unix timestamp millis)
+    pub start_time: i64,
+    /// Shift end time (Unix timestamp millis), null if still open
+    pub end_time: Option<i64>,
     /// Starting cash amount
     pub starting_cash: f64,
     /// Expected cash amount (starting + cash payments received)
@@ -37,12 +37,14 @@ pub struct Shift {
     /// Whether shift was closed abnormally (power failure, etc.)
     #[serde(default)]
     pub abnormal_close: bool,
-    /// Last heartbeat timestamp
-    pub last_active_at: Option<String>,
+    /// Last heartbeat timestamp (Unix timestamp millis)
+    pub last_active_at: Option<i64>,
     /// Notes
     pub note: Option<String>,
-    pub created_at: Option<String>,
-    pub updated_at: Option<String>,
+    /// Created at (Unix timestamp millis)
+    pub created_at: Option<i64>,
+    /// Updated at (Unix timestamp millis)
+    pub updated_at: Option<i64>,
 }
 
 /// Create shift payload (open shift)

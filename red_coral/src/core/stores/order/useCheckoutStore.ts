@@ -228,14 +228,20 @@ export const useCurrentOrderKey = () => useCheckoutStore((s) => s.currentOrderKe
 import { useActiveOrdersStore } from './useActiveOrdersStore';
 
 export const useCheckoutOrder = () => {
-  // currentOrderKey 是 table ID，不是 order ID
+  // currentOrderKey: 堂食订单是 table_id，零售订单是 order_id
   const currentOrderKey = useCheckoutStore((s) => s.currentOrderKey);
   const fallbackOrder = useCheckoutStore((s) => s.checkoutOrder);
-  
-  // 从 useActiveOrdersStore 按 table_id 查找订单
-  // 当 orders Map 更新时，selector 会重新执行，组件会重新渲染
+
+  // 从 useActiveOrdersStore 查找订单
+  // 先按 order_id 直接查找（零售订单），再按 table_id 查找（堂食订单）
   const orderFromStore = useActiveOrdersStore((state) => {
     if (!currentOrderKey) return null;
+    // 零售订单: currentOrderKey 是 order_id，直接从 Map 查找
+    const directMatch = state.orders.get(currentOrderKey);
+    if (directMatch && directMatch.status === 'ACTIVE') {
+      return directMatch;
+    }
+    // 堂食订单: currentOrderKey 是 table_id，按 table_id 遍历查找
     for (const order of state.orders.values()) {
       if (order.table_id === currentOrderKey && order.status === 'ACTIVE') {
         return order;
@@ -243,7 +249,7 @@ export const useCheckoutOrder = () => {
     }
     return null;
   });
-  
+
   // 优先使用 store 数据（单一数据源），fallback 到 checkoutOrder
   return (orderFromStore as HeldOrder | null) ?? fallbackOrder;
 };

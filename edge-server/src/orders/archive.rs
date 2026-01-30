@@ -487,6 +487,7 @@ impl OrderArchiveService {
             UPSERT system_state:main SET
                 last_order = $order[0].id,
                 last_order_hash = $order_hash,
+                created_at = created_at ?? $now,
                 updated_at = $now;
             COMMIT TRANSACTION;
             RETURN { success: true, order_id: <string>$order[0].id };

@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Building2, Plus, Trash2, ChevronRight, Power, AlertCircle } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useBridgeStore, AppStateHelpers, type TenantInfo } from '@/core/stores/bridge';
-import { t } from '@/infrastructure/i18n';
+import { useI18n } from '@/hooks/useI18n';
 
 /** 订阅状态标签 */
 function TenantStatusBadge({ status }: { status: string | null }) {
+  const { t } = useI18n();
+
   if (!status) {
     return (
       <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">
@@ -33,6 +35,7 @@ function TenantStatusBadge({ status }: { status: string | null }) {
 }
 
 export const TenantSelectScreen: React.FC = () => {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const {
     tenants,
@@ -61,7 +64,7 @@ export const TenantSelectScreen: React.FC = () => {
       const route = AppStateHelpers.getRouteForState(appState);
       navigate(route, { replace: true });
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Failed to switch tenant');
+      setActionError(err instanceof Error ? err.message : t('tenant_select.error.switch_failed'));
     }
   };
 
@@ -71,7 +74,7 @@ export const TenantSelectScreen: React.FC = () => {
       await removeTenant(tenantId);
       setShowDeleteConfirm(null);
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Failed to remove tenant');
+      setActionError(err instanceof Error ? err.message : t('tenant_select.error.remove_failed'));
     }
   };
 
@@ -90,7 +93,7 @@ export const TenantSelectScreen: React.FC = () => {
       <button
         onClick={handleCloseApp}
         className="absolute top-6 right-6 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-20"
-        title="Close Application"
+        title={t('common.dialog.close_app')}
       >
         <Power size={24} />
       </button>
@@ -102,10 +105,10 @@ export const TenantSelectScreen: React.FC = () => {
             <Building2 className="text-primary-500" size={32} />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Select Tenant
+            {t('tenant_select.title')}
           </h1>
           <p className="text-gray-500">
-            Choose a tenant to continue, or add a new one
+            {t('tenant_select.description')}
           </p>
         </div>
 
@@ -122,7 +125,7 @@ export const TenantSelectScreen: React.FC = () => {
           {tenants.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Building2 size={48} className="mx-auto mb-4 text-gray-300" />
-              <p>No tenants activated yet</p>
+              <p>{t('tenant_select.empty_state')}</p>
             </div>
           ) : (
             tenants.map((tenant) => (
@@ -162,7 +165,7 @@ export const TenantSelectScreen: React.FC = () => {
                         setShowDeleteConfirm(tenant.tenant_id);
                       }}
                       className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                      title="Remove Tenant"
+                      title={t('tenant_select.button_remove')}
                     >
                       <Trash2 size={20} />
                     </button>
@@ -173,7 +176,7 @@ export const TenantSelectScreen: React.FC = () => {
                       disabled={isLoading}
                       className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
                     >
-                      <span>Select</span>
+                      <span>{t('tenant_select.button_select')}</span>
                       <ChevronRight size={16} />
                     </button>
                   </div>
@@ -182,18 +185,18 @@ export const TenantSelectScreen: React.FC = () => {
                 {/* Delete Confirmation */}
                 {showDeleteConfirm === tenant.tenant_id && (
                   <div className="absolute inset-0 bg-white/95 rounded-2xl flex items-center justify-center gap-4 p-6">
-                    <span className="text-gray-600">Remove this tenant?</span>
+                    <span className="text-gray-600">{t('tenant_select.confirm_remove')}</span>
                     <button
                       onClick={() => setShowDeleteConfirm(null)}
                       className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
                     >
-                      Cancel
+                      {t('tenant_select.confirm_cancel')}
                     </button>
                     <button
                       onClick={() => handleDeleteTenant(tenant.tenant_id)}
                       className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
                     >
-                      Remove
+                      {t('tenant_select.confirm_remove_button')}
                     </button>
                   </div>
                 )}
@@ -208,7 +211,7 @@ export const TenantSelectScreen: React.FC = () => {
           className="w-full p-6 rounded-2xl border-2 border-dashed border-gray-300 hover:border-primary-500 hover:bg-primary-50 transition-all flex items-center justify-center gap-3 text-gray-500 hover:text-primary-500"
         >
           <Plus size={24} />
-          <span className="font-medium">Add New Tenant</span>
+          <span className="font-medium">{t('tenant_select.button_add')}</span>
         </button>
       </div>
     </div>

@@ -87,8 +87,8 @@ DEFINE FIELD OVERWRITE payment_breakdowns.*.count ON daily_report TYPE int DEFAU
 
 -- === 生成信息 ===
 
--- 生成时间
-DEFINE FIELD OVERWRITE generated_at ON daily_report TYPE option<string>
+-- 生成时间 (Unix timestamp millis)
+DEFINE FIELD OVERWRITE generated_at ON daily_report TYPE option<int>
     PERMISSIONS FULL;
 
 -- 生成人 ID

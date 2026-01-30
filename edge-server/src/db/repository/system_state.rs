@@ -28,6 +28,7 @@ impl SystemStateRepository {
         }
 
         // Create new singleton (直接使用 SystemState，无需 workaround)
+        let now = shared::util::now_millis();
         let state = SystemState {
             id: None,
             genesis_hash: None,
@@ -37,8 +38,8 @@ impl SystemStateRepository {
             synced_up_to_hash: None,
             last_sync_time: None,
             order_count: 0,
-            created_at: None,
-            updated_at: None,
+            created_at: now,
+            updated_at: now,
         };
 
         let created: Option<SystemState> = self

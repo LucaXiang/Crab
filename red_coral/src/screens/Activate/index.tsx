@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { AlertCircle, ChevronRight, Shield, Power } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useBridgeStore } from '@/core/stores/bridge';
+import { useI18n } from '@/hooks/useI18n';
+import { friendlyError } from '@/utils/error/friendlyError';
 
 // 订阅被阻止的状态
 const BLOCKED_STATUSES = ['inactive', 'expired', 'canceled', 'unpaid'];
 
 export const ActivateScreen: React.FC = () => {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const {
     activateTenant,
@@ -26,7 +29,7 @@ export const ActivateScreen: React.FC = () => {
     setActivationError('');
 
     if (!username.trim() || !password.trim()) {
-      setActivationError('Please enter username and password');
+      setActivationError(t('auth.activate.error.empty_fields'));
       return;
     }
 
@@ -42,7 +45,8 @@ export const ActivateScreen: React.FC = () => {
       // 订阅正常，进入模式选择（Setup 页面）
       navigate('/setup', { replace: true });
     } catch (err: unknown) {
-      setActivationError(err instanceof Error ? err.message : 'Activation failed');
+      const raw = err instanceof Error ? err.message : String(err);
+      setActivationError(friendlyError(raw));
     }
   };
 
@@ -61,7 +65,7 @@ export const ActivateScreen: React.FC = () => {
       <button
         onClick={handleCloseApp}
         className="absolute top-6 right-6 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-20"
-        title="Close Application"
+        title={t('common.dialog.close_app')}
       >
         <Power size={24} />
       </button>
@@ -71,19 +75,19 @@ export const ActivateScreen: React.FC = () => {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-500/10 rounded-2xl mb-4">
             <Shield className="text-primary-500" size={32} />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Activate Device</h1>
-          <p className="text-gray-500">Enter your tenant credentials to activate this device</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('auth.activate.title')}</h1>
+          <p className="text-gray-500">{t('auth.activate.description')}</p>
         </div>
 
         <form onSubmit={handleActivate} className="space-y-6">
           {/* Username */}
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Tenant Username</label>
+            <label className="text-sm font-medium text-gray-700">{t('auth.activate.username_label')}</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your tenant username"
+              placeholder={t('auth.activate.username_placeholder')}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
               disabled={isLoading}
             />
@@ -91,12 +95,12 @@ export const ActivateScreen: React.FC = () => {
 
           {/* Password */}
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Password</label>
+            <label className="text-sm font-medium text-gray-700">{t('auth.activate.password_label')}</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder={t('auth.activate.password_placeholder')}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
               disabled={isLoading}
             />
@@ -120,7 +124,7 @@ export const ActivateScreen: React.FC = () => {
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                <span>Activate Device</span>
+                <span>{t('auth.activate.button_submit')}</span>
                 <ChevronRight size={20} />
               </>
             )}

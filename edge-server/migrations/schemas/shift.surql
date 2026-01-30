@@ -20,12 +20,12 @@ DEFINE FIELD OVERWRITE status ON shift TYPE string
     ASSERT $value IN ["OPEN", "CLOSED"]
     PERMISSIONS FULL;
 
--- 开班时间 (ISO 8601)
-DEFINE FIELD OVERWRITE start_time ON shift TYPE string
+-- 开班时间 (Unix timestamp millis)
+DEFINE FIELD OVERWRITE start_time ON shift TYPE int
     PERMISSIONS FULL;
 
--- 收班时间 (ISO 8601)
-DEFINE FIELD OVERWRITE end_time ON shift TYPE option<string>
+-- 收班时间 (Unix timestamp millis)
+DEFINE FIELD OVERWRITE end_time ON shift TYPE option<int>
     PERMISSIONS FULL;
 
 -- 备用金 (开班时的现金准备金)
@@ -51,8 +51,8 @@ DEFINE FIELD OVERWRITE abnormal_close ON shift TYPE bool
     DEFAULT false
     PERMISSIONS FULL;
 
--- 最后活动时间 (心跳)
-DEFINE FIELD OVERWRITE last_active_at ON shift TYPE option<string>
+-- 最后活动时间 (心跳, Unix timestamp millis)
+DEFINE FIELD OVERWRITE last_active_at ON shift TYPE option<int>
     PERMISSIONS FULL;
 
 -- 备注

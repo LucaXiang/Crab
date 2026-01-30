@@ -230,10 +230,10 @@ export const LoginScreen: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">
-                    {modeInfo?.tenant_id || 'No Tenant Selected'}
+                    {modeInfo?.tenant_id || t('auth.login.tenant_no_tenant')}
                   </h3>
                   <p className="text-xs text-gray-500">
-                    {modeInfo?.tenant_id ? 'Active Workspace' : 'Please select a workspace'}
+                    {modeInfo?.tenant_id ? t('auth.login.tenant_active') : t('auth.login.tenant_select_prompt')}
                   </p>
                 </div>
               </div>
@@ -242,7 +242,7 @@ export const LoginScreen: React.FC = () => {
                 onClick={() => navigate('/setup', { replace: true })}
                 className="px-3 py-1.5 text-xs font-medium text-primary-500 bg-primary-500/10 hover:bg-primary-500/20 rounded-lg transition-colors"
               >
-                {isDisconnected ? 'Setup' : 'Switch'}
+                {isDisconnected ? t('auth.login.button_setup') : t('auth.login.button_switch')}
               </button>
             </div>
 
@@ -250,7 +250,7 @@ export const LoginScreen: React.FC = () => {
             <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-50">
               {/* Mode Status */}
               <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-500 mb-1">Current Mode</p>
+                <p className="text-xs text-gray-500 mb-1">{t('auth.login.mode_current')}</p>
                 <div className="flex items-center gap-2">
                   {modeInfo?.mode === 'Server' ? (
                     <Server size={16} className="text-green-600" />
@@ -264,14 +264,14 @@ export const LoginScreen: React.FC = () => {
                     modeInfo?.mode === 'Client' ? 'text-blue-700' :
                     'text-gray-600'
                   }`}>
-                    {modeInfo?.mode || 'Disconnected'}
+                    {modeInfo?.mode || t('auth.login.mode_disconnected')}
                   </span>
                 </div>
               </div>
 
               {/* Connection Status */}
               <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-500 mb-1">Connection</p>
+                <p className="text-xs text-gray-500 mb-1">{t('auth.login.connection')}</p>
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${
                     modeInfo?.is_connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
@@ -279,7 +279,7 @@ export const LoginScreen: React.FC = () => {
                   <span className={`text-sm font-medium ${
                     modeInfo?.is_connected ? 'text-green-700' : 'text-red-700'
                   }`}>
-                    {modeInfo?.is_connected ? 'Online' : 'Offline'}
+                    {modeInfo?.is_connected ? t('auth.login.connection_online') : t('auth.login.connection_offline')}
                   </span>
                 </div>
               </div>

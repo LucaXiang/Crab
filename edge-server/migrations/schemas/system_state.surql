@@ -33,7 +33,9 @@ DEFINE FIELD OVERWRITE order_count ON system_state TYPE int
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE created_at ON system_state TYPE int
+    DEFAULT 0
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE updated_at ON system_state TYPE int
+    DEFAULT 0
     PERMISSIONS FULL;

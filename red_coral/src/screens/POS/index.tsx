@@ -297,7 +297,7 @@ export const POSScreen: React.FC = () => {
       // Get full product data from store (ProductFull includes attributes)
       const productFull = useProductStore.getState().getById(String(product.id));
       if (!productFull) {
-        toast.error('Product not found');
+        toast.error(t('pos.error.product_not_found'));
         return;
       }
 

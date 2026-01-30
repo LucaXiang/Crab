@@ -20,8 +20,8 @@ pub struct SystemState {
     pub last_sync_time: Option<i64>,
     /// Statistics
     pub order_count: i32,
-    pub created_at: Option<i64>,
-    pub updated_at: Option<i64>,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 /// Update system state payload

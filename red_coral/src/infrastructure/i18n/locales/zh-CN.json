@@ -179,6 +179,19 @@
     "roles": {
       "admin": "管理员"
     },
+    "activate": {
+      "title": "激活设备",
+      "description": "输入您的租户凭证以激活此设备",
+      "username_label": "租户用户名",
+      "username_placeholder": "请输入租户用户名",
+      "password_label": "密码",
+      "password_placeholder": "请输入密码",
+      "button_submit": "激活设备",
+      "error": {
+        "empty_fields": "请输入用户名和密码",
+        "failed": "激活失败"
+      }
+    },
     "login": {
       "title": "登录",
       "subtitle": "欢迎使用 RedCoral POS",
@@ -198,9 +211,82 @@
         "multi_zone_desc": "支持多个营业区域",
         "fast_checkout": "快速结账",
         "fast_checkout_desc": "高效收银体验"
-      }
+      },
+      "tenant_no_tenant": "未选择租户",
+      "tenant_active": "当前工作区",
+      "tenant_select_prompt": "请选择一个工作区",
+      "mode_current": "当前模式",
+      "connection": "连接状态",
+      "connection_online": "在线",
+      "connection_offline": "离线",
+      "mode_disconnected": "未连接",
+      "button_setup": "设置",
+      "button_switch": "切换"
     },
     "supervisor_approval": "需要主管审批"
+  },
+  "setup": {
+    "title": "选择运行模式",
+    "description": "选择应用程序的运行方式",
+    "server_mode": {
+      "title": "服务器模式",
+      "subtitle": "使用内置服务器本地运行",
+      "description": "适合独立 POS 终端。数据存储在本地，联网时自动同步。",
+      "select": "选择此模式"
+    },
+    "client_mode": {
+      "title": "客户端模式",
+      "subtitle": "连接远程服务器",
+      "description": "连接到已有的 Edge Server。需要与服务器保持网络连接。",
+      "select": "选择此模式"
+    },
+    "configure_server_title": "配置服务器模式",
+    "configure_server_desc": "设置本地服务器的端口",
+    "configure_client_title": "配置客户端模式",
+    "configure_client_desc": "输入远程服务器的连接信息",
+    "server": {
+      "http_port_label": "HTTP 端口",
+      "http_port_help": "HTTP API 端口（默认: 9625）",
+      "message_port_label": "消息总线端口",
+      "message_port_help": "实时消息端口（默认: 9626）"
+    },
+    "client": {
+      "edge_url_label": "Edge Server 地址",
+      "edge_url_help": "Edge Server 的 HTTPS 地址",
+      "message_addr_label": "消息服务器地址",
+      "message_addr_help": "实时消息的 Host:Port"
+    },
+    "button_back": "返回",
+    "button_start_server": "启动服务器模式",
+    "button_start_client": "启动客户端模式",
+    "complete_title": "设置完成！",
+    "complete_description": "您的设备已激活，正在以{mode}运行。现在可以使用员工账号登录。",
+    "complete_mode_server": "服务器模式",
+    "complete_mode_client": "客户端模式",
+    "button_continue": "继续登录",
+    "step": {
+      "mode": "模式",
+      "configure": "配置",
+      "complete": "完成"
+    },
+    "error": {
+      "failed": "启动模式失败"
+    }
+  },
+  "tenant_select": {
+    "title": "选择租户",
+    "description": "选择一个租户继续，或添加新租户",
+    "empty_state": "暂无已激活的租户",
+    "button_select": "选择",
+    "button_remove": "移除租户",
+    "button_add": "添加新租户",
+    "confirm_remove": "确定移除此租户？",
+    "confirm_cancel": "取消",
+    "confirm_remove_button": "移除",
+    "error": {
+      "switch_failed": "切换租户失败",
+      "remove_failed": "移除租户失败"
+    }
   },
   "pos": {
     "search_product": "搜索商品...",
@@ -250,6 +336,9 @@
       "select_prompt": "请从右侧选择物品",
       "per_unit": "/份",
       "confirm": "确认添加"
+    },
+    "error": {
+      "product_not_found": "找不到该商品"
     }
   },
   "checkout": {
@@ -609,6 +698,14 @@
     },
     "status": {
       "reloading": "正在重新加载..."
+    },
+    "friendly": {
+      "network": "无法连接到服务器。请检查网络连接，或确认目标服务器已启动",
+      "auth": "认证失败。请检查账号密码是否正确",
+      "certificate": "证书验证失败。请尝试重新激活设备",
+      "port": "端口配置错误或被占用。请尝试更换端口",
+      "activation": "设备未激活。请先完成设备激活流程",
+      "unknown": "操作失败，请稍后重试"
     }
   },
   "settings": {
