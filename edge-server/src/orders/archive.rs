@@ -284,12 +284,7 @@ impl OrderArchiveService {
         snapshot: &OrderSnapshot,
         events: &[OrderEvent],
     ) -> ArchiveResult<()> {
-        // Acquire hash chain lock FIRST to prevent TOCTOU race condition:
-        // Without this, two concurrent archives could both pass the idempotency check
-        // before either writes, corrupting the hash chain.
-        let _hash_lock = self.hash_chain_lock.lock().await;
-
-        // 0. Check idempotency - skip if already archived (now safe under lock)
+        // 0. Check idempotency - skip if already archived
         let receipt = snapshot.receipt_number.clone();
         let exists: Option<bool> = self
             .db
@@ -305,6 +300,9 @@ impl OrderArchiveService {
             tracing::info!(order_id = %snapshot.order_id, "Order already archived, skipping");
             return Ok(());
         }
+
+        // Acquire hash chain lock to prevent concurrent hash chain corruption
+        let _hash_lock = self.hash_chain_lock.lock().await;
 
         // 1. Get last order hash from system_state
         let system_state = self
@@ -531,8 +529,8 @@ impl OrderArchiveService {
             .bind(("discount_amount", order.discount_amount))
             .bind(("surcharge_amount", order.surcharge_amount))
             .bind(("tax", order.tax))
-            .bind(("start_time", order.start_time.clone()))
-            .bind(("end_time", order.end_time.clone()))
+            .bind(("start_time", order.start_time))
+            .bind(("end_time", order.end_time))
             .bind(("operator_id", order.operator_id.clone()))
             .bind(("operator_name", order.operator_name.clone()))
             .bind(("void_type", order.void_type.clone()))
