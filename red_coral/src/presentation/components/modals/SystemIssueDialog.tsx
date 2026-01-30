@@ -8,7 +8,7 @@
  * - 选项按钮由 options[] 驱动，选择"其他"时弹出文本输入
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
@@ -24,6 +24,12 @@ export const SystemIssueDialog: React.FC<SystemIssueDialogProps> = ({ issue, onR
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [customInput, setCustomInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // issue 切换时重置选择状态，防止上一个 issue 的选项残留
+  useEffect(() => {
+    setSelectedOption(null);
+    setCustomInput('');
+  }, [issue?.id]);
 
   if (!issue) return null;
 

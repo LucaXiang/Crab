@@ -34,7 +34,7 @@ pub async fn resolve(
     state
         .audit_service
         .log(
-            crate::audit::AuditAction::AcknowledgeStartupIssue,
+            crate::audit::AuditAction::ResolveSystemIssue,
             "system",
             &req.id,
             Some(current_user.id.clone()),

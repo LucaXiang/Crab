@@ -865,7 +865,7 @@ export type AuditAction =
   | 'system_shutdown'
   | 'system_abnormal_shutdown'
   | 'system_long_downtime'
-  | 'acknowledge_startup_issue'
+  | 'resolve_system_issue'
   // 认证
   | 'login_success'
   | 'login_failed'

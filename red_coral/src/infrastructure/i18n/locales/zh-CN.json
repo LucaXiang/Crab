@@ -1965,7 +1965,7 @@
       "system_shutdown": "系统关闭",
       "system_abnormal_shutdown": "异常关闭",
       "system_long_downtime": "长时间停机",
-      "acknowledge_startup_issue": "确认启动异常",
+      "resolve_system_issue": "回应系统问题",
       "login_success": "登录成功",
       "login_failed": "登录失败",
       "logout": "登出",

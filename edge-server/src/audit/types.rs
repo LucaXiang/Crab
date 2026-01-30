@@ -20,8 +20,8 @@ pub enum AuditAction {
     SystemAbnormalShutdown,
     /// 系统长时间停机（>24h 未运行）
     SystemLongDowntime,
-    /// 用户确认启动异常（前端 dialog 回应）
-    AcknowledgeStartupIssue,
+    /// 用户回应系统问题（启动异常/远程通知）
+    ResolveSystemIssue,
 
     // ═══ 认证 ═══
     /// 登录成功

@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use chrono::Local;
 use std::sync::Arc;
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
@@ -132,10 +133,10 @@ impl AuditService {
             match issue_repo.find_pending_by_kind("abnormal_shutdown").await {
                 Ok(existing) if existing.is_empty() => {
                     let mut params = HashMap::new();
-                    params.insert(
-                        "last_start_timestamp".to_string(),
-                        last_start_ts.to_string(),
-                    );
+                    let formatted_ts = chrono::DateTime::from_timestamp_millis(last_start_ts)
+                        .map(|dt| dt.with_timezone(&Local).format("%Y-%m-%d %H:%M").to_string())
+                        .unwrap_or_else(|| last_start_ts.to_string());
+                    params.insert("last_start_timestamp".to_string(), formatted_ts);
                     if let Err(e) = issue_repo
                         .create(CreateSystemIssue {
                             source: "local".to_string(),
