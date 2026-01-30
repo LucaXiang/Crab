@@ -14,7 +14,6 @@ use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use std::{fs, io::Cursor};
 
-use crate::audit_log;
 use crate::{AppError, CurrentUser, ServerState};
 
 /// Maximum file size (5MB)
@@ -199,12 +198,18 @@ pub async fn upload(
         .map_err(|e| AppError::internal(format!("Failed to save file: {}", e)))?;
 
     // Log audit event
-    audit_log!(
-        "system",
+    state.audit_service.log(
+        crate::audit::AuditAction::StoreInfoChanged,
         "upload",
-        &hash,
-        format!("Uploaded image: {} -> {}", original_name, filename)
-    );
+        format!("image:{}", hash),
+        None,
+        None,
+        serde_json::json!({
+            "original_name": original_name,
+            "filename": filename,
+            "size": compressed_data.len(),
+        }),
+    ).await;
 
     tracing::info!(
         original_name = %original_name,

@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use axum::{Extension, Json, extract::State};
 
-use crate::audit_log;
+use crate::audit::AuditAction;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{Employee, Role};
@@ -56,8 +56,11 @@ pub async fn login(
                 .map_err(|e| AppError::internal(format!("Password verification failed: {}", e)))?;
 
             if !password_valid {
-                // Log failed login for audit
-                audit_log!(&username, "login_failed", &username);
+                state.audit_service.log(
+                    AuditAction::LoginFailed, "auth", format!("employee:{}", username),
+                    None, None,
+                    serde_json::json!({"reason": "invalid_credentials"}),
+                ).await;
                 tracing::warn!(username = %username, "Login failed - invalid credentials");
                 return Err(AppError::invalid(
                     "Invalid username or password".to_string(),
@@ -67,8 +70,11 @@ pub async fn login(
             e
         }
         None => {
-            // User not found - log and return same error as wrong password
-            audit_log!(&username, "login_failed", &username);
+            state.audit_service.log(
+                AuditAction::LoginFailed, "auth", format!("employee:{}", username),
+                None, None,
+                serde_json::json!({"reason": "user_not_found"}),
+            ).await;
             tracing::warn!(username = %username, "Login failed - user not found");
             return Err(AppError::invalid(
                 "Invalid username or password".to_string(),
@@ -115,7 +121,11 @@ pub async fn login(
         .map_err(|e| AppError::internal(format!("Failed to generate token: {}", e)))?;
 
     // Log successful login
-    audit_log!(&user_id, "login", &req.username);
+    state.audit_service.log(
+        AuditAction::LoginSuccess, "auth", format!("employee:{}", user_id),
+        Some(user_id.clone()), Some(employee.display_name.clone()),
+        serde_json::json!({"username": &employee.username}),
+    ).await;
 
     tracing::info!(
         user_id = %user_id,
@@ -159,9 +169,14 @@ pub async fn me(
 
 /// Logout handler
 pub async fn logout(
+    State(state): State<ServerState>,
     Extension(user): Extension<CurrentUser>,
 ) -> Result<Json<()>, AppError> {
-    audit_log!(&user.id, "logout", &user.username);
+    state.audit_service.log(
+        AuditAction::Logout, "auth", format!("employee:{}", user.id),
+        Some(user.id.clone()), Some(user.display_name.clone()),
+        serde_json::json!({"username": &user.username}),
+    ).await;
 
     tracing::info!(
         user_id = %user.id,

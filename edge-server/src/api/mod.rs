@@ -51,5 +51,8 @@ pub mod statistics;
 // Archive (归档验证)
 pub mod archive_verify;
 
+// Audit (审计日志)
+pub mod audit_log;
+
 // Re-export common types for handlers
 pub use crate::utils::AppResult;

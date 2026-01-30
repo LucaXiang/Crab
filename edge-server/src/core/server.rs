@@ -70,6 +70,7 @@ impl Server {
             Some(cfg) => cfg,
             None => {
                 tracing::info!("Shutdown requested during activation wait");
+                state.audit_service.on_shutdown();
                 background_tasks.shutdown().await;
                 return Ok(());
             }
@@ -88,6 +89,7 @@ impl Server {
             tokio::select! {
                 _ = self.shutdown_token.cancelled() => {
                     tracing::info!("Shutdown requested during subscription check");
+                    state.audit_service.on_shutdown();
                     background_tasks.shutdown().await;
                     return Ok(());
                 }
@@ -130,6 +132,19 @@ impl Server {
         // ═══════════════════════════════════════════════════════════════════
         // Phase 7: Graceful shutdown
         // ═══════════════════════════════════════════════════════════════════
+
+        // 记录系统关闭审计日志（同步写入，确保持久化）
+        if let Err(e) = state.audit_service.log_sync(
+            crate::audit::AuditAction::SystemShutdown,
+            "system",
+            "server:main",
+            serde_json::json!({"epoch": &state.epoch}),
+        ).await {
+            tracing::error!("Failed to log system shutdown: {:?}", e);
+        }
+        // 删除 LOCK 文件，标记正常关闭
+        state.audit_service.on_shutdown();
+
         background_tasks.shutdown().await;
 
         Ok(())

@@ -5,7 +5,8 @@ import { toast } from '@/presentation/components/Toast';
 import { Download, FileText, Loader2, AlertCircle, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown } from 'lucide-react';
 import { OrderDetailModal } from '@/presentation/components/modals/OrderDetailModal';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
-import { getSalesReport } from '@/infrastructure/apiValidator';
+import { invokeApi } from '@/infrastructure/api/tauri-client';
+import type { SalesReportResponse } from '@/core/domain/types';
 
 interface SalesReportProps {
   timeRange: TimeRange;
@@ -64,7 +65,10 @@ export const SalesReport: React.FC<SalesReportProps> = ({
          return;
       }
 
-      const result = await getSalesReport(timeRange, page, customStartDate, customEndDate);
+      const params: Record<string, unknown> = { time_range: timeRange, page };
+      if (customStartDate) params.start_date = customStartDate;
+      if (customEndDate) params.end_date = customEndDate;
+      const result = await invokeApi<SalesReportResponse>('get_sales_report', params);
       setData(result.items);
       setTotalPages(result.totalPages);
       setTotalCount(result.total);

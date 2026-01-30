@@ -250,6 +250,7 @@ impl Config {
         self.data_dir().join("print.redb")
     }
 
+
     /// 获取图片存储目录路径: {tenant}/server/images/
     pub fn images_dir(&self) -> PathBuf {
         PathBuf::from(&self.work_dir).join("images")

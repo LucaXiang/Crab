@@ -1,5 +1,6 @@
 -- Audit Log Table Schema
--- 审计日志表，记录系统操作历史
+-- 税务级审计日志表，SHA256 哈希链防篡改
+-- Append-only: 不允许 update/delete
 
 DEFINE TABLE OVERWRITE audit_log TYPE NORMAL SCHEMAFULL
     PERMISSIONS
@@ -7,55 +8,49 @@ DEFINE TABLE OVERWRITE audit_log TYPE NORMAL SCHEMAFULL
         FOR create FULL
         FOR update, delete NONE;
 
--- 操作类型
+-- 序列号（全局递增，哈希链标识）
+DEFINE FIELD OVERWRITE sequence ON audit_log TYPE int
+    PERMISSIONS FULL;
+
+-- 时间戳（Unix 毫秒）
+DEFINE FIELD OVERWRITE timestamp ON audit_log TYPE int
+    PERMISSIONS FULL;
+
+-- 操作类型（snake_case 字符串，与 Rust AuditAction 枚举对应）
 DEFINE FIELD OVERWRITE action ON audit_log TYPE string
-    ASSERT $value IN [
-        'login', 'logout', 'login_failed', 'token_refresh',
-        'read', 'create', 'update', 'delete',
-        'config_change', 'user_create', 'user_update', 'user_delete',
-        'role_change', 'permission_change',
-        'server_start', 'server_stop', 'backup_create', 'backup_restore',
-        'unauthorized_access', 'invalid_token'
-    ]
     PERMISSIONS FULL;
 
--- 操作资源
-DEFINE FIELD OVERWRITE resource ON audit_log TYPE string
+-- 资源类型（如 "system", "auth", "order", "employee"）
+DEFINE FIELD OVERWRITE resource_type ON audit_log TYPE string
     PERMISSIONS FULL;
 
--- 是否成功
-DEFINE FIELD OVERWRITE success ON audit_log TYPE bool DEFAULT true
+-- 资源 ID（如 "server:main", "employee:emp1"）
+DEFINE FIELD OVERWRITE resource_id ON audit_log TYPE string
     PERMISSIONS FULL;
 
--- 用户信息（可选）
-DEFINE FIELD OVERWRITE user_id ON audit_log TYPE option<string>
+-- 操作人 ID（系统事件为 null）
+DEFINE FIELD OVERWRITE operator_id ON audit_log TYPE option<string>
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE username ON audit_log TYPE option<string>
+-- 操作人名称
+DEFINE FIELD OVERWRITE operator_name ON audit_log TYPE option<string>
     PERMISSIONS FULL;
 
--- 请求上下文
-DEFINE FIELD OVERWRITE ip_address ON audit_log TYPE option<string>
+-- 结构化详情（任意 JSON 对象）
+DEFINE FIELD OVERWRITE details ON audit_log FLEXIBLE TYPE object DEFAULT {}
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE user_agent ON audit_log TYPE option<string>
+-- SHA256 哈希链 — 前一条审计日志哈希
+DEFINE FIELD OVERWRITE prev_hash ON audit_log TYPE string
     PERMISSIONS FULL;
 
--- 详情
-DEFINE FIELD OVERWRITE details ON audit_log TYPE option<string>
-    PERMISSIONS FULL;
-
-DEFINE FIELD OVERWRITE error ON audit_log TYPE option<string>
-    PERMISSIONS FULL;
-
--- 时间戳（自动生成，只读）
-DEFINE FIELD OVERWRITE created_at ON audit_log TYPE int READONLY
-    DEFAULT 0
+-- SHA256 哈希链 — 当前记录哈希
+DEFINE FIELD OVERWRITE curr_hash ON audit_log TYPE string
     PERMISSIONS FULL;
 
 -- 索引
+DEFINE INDEX OVERWRITE audit_sequence_idx ON audit_log FIELDS sequence UNIQUE;
+DEFINE INDEX OVERWRITE audit_timestamp_idx ON audit_log FIELDS timestamp;
 DEFINE INDEX OVERWRITE audit_action_idx ON audit_log FIELDS action;
-DEFINE INDEX OVERWRITE audit_user_idx ON audit_log FIELDS user_id;
-DEFINE INDEX OVERWRITE audit_resource_idx ON audit_log FIELDS resource;
-DEFINE INDEX OVERWRITE audit_created_idx ON audit_log FIELDS created_at;
-DEFINE INDEX OVERWRITE audit_success_idx ON audit_log FIELDS success;
+DEFINE INDEX OVERWRITE audit_operator_idx ON audit_log FIELDS operator_id;
+DEFINE INDEX OVERWRITE audit_resource_type_idx ON audit_log FIELDS resource_type;

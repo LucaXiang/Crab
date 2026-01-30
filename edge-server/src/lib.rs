@@ -25,6 +25,7 @@
 //! ```
 
 pub mod api;
+pub mod audit;
 pub mod auth;
 pub mod core;
 pub mod db;
@@ -50,10 +51,45 @@ pub use utils::{ApiResponse, ErrorCategory, ErrorCode};
 // Re-export logger functions
 pub use utils::logger::{cleanup_old_logs, init_logger, init_logger_with_file};
 
-// Audit logging macro - 空操作 (1-3 客户端场景不需要审计)
+/// 审计日志宏 — 异步记录到 AuditService
+///
+/// # 用法
+///
+/// ```ignore
+/// audit_log!(
+///     state.audit_service,
+///     AuditAction::LoginSuccess,
+///     "auth", "employee:emp1",
+///     operator_id = Some("emp1".into()),
+///     operator_name = Some("张三".into()),
+///     details = serde_json::json!({"ip": "127.0.0.1"})
+/// );
+/// ```
 #[macro_export]
 macro_rules! audit_log {
-    ($($arg:tt)*) => {};
+    ($service:expr, $action:expr, $res_type:expr, $res_id:expr,
+     operator_id = $op_id:expr, operator_name = $op_name:expr, details = $details:expr) => {
+        $service
+            .log($action, $res_type, $res_id, $op_id, $op_name, $details)
+            .await;
+    };
+    ($service:expr, $action:expr, $res_type:expr, $res_id:expr, details = $details:expr) => {
+        $service
+            .log($action, $res_type, $res_id, None, None, $details)
+            .await;
+    };
+    ($service:expr, $action:expr, $res_type:expr, $res_id:expr) => {
+        $service
+            .log(
+                $action,
+                $res_type,
+                $res_id,
+                None,
+                None,
+                serde_json::json!({}),
+            )
+            .await;
+    };
 }
 
 // Security logging macro - 支持 tracing 格式说明符

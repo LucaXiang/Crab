@@ -89,7 +89,6 @@ pub const DEFAULT_MANAGER_PERMISSIONS: &[&str] = &[
     "orders:discount",
     "orders:refund",
     "orders:cancel_item",
-    "users:read",
     "zones:read",
     "zones:manage",
     "tables:read",

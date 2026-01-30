@@ -6,6 +6,7 @@ use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
 use tokio::sync::mpsc;
 
+use crate::audit::{AuditService, AuditWorker};
 use crate::auth::JwtService;
 use crate::core::tasks::{BackgroundTasks, TaskKind};
 use crate::core::Config;
@@ -124,6 +125,8 @@ pub struct ServerState {
     pub kitchen_print_service: Arc<KitchenPrintService>,
     /// 产品和分类统一管理 (含内存缓存)
     pub catalog_service: Arc<CatalogService>,
+    /// 审计日志服务 (税务级防篡改)
+    pub audit_service: Arc<AuditService>,
     /// 服务器实例 epoch (启动时生成的 UUID)
     /// 用于客户端检测服务器重启
     pub epoch: String,
@@ -147,6 +150,7 @@ impl ServerState {
         price_rule_engine: PriceRuleEngine,
         kitchen_print_service: Arc<KitchenPrintService>,
         catalog_service: Arc<CatalogService>,
+        audit_service: Arc<AuditService>,
         epoch: String,
     ) -> Self {
         Self {
@@ -162,6 +166,7 @@ impl ServerState {
             price_rule_engine,
             kitchen_print_service,
             catalog_service,
+            audit_service,
             epoch,
         }
     }
@@ -226,7 +231,20 @@ impl ServerState {
             PrintStorage::open(&print_db_path).expect("Failed to initialize print storage");
         let kitchen_print_service = Arc::new(KitchenPrintService::new(print_storage));
 
-        // 7. Generate epoch (UUID for server restart detection)
+        // 7. Initialize AuditService (税务级审计日志 — SurrealDB)
+        let data_dir = config.data_dir();
+        let (audit_service, audit_rx) = AuditService::new(db.clone(), &data_dir, 1024);
+
+        // 检测异常关闭和长时间停机（通过 LOCK 文件 + pending-ack.json）
+        audit_service.on_startup().await;
+
+        // 启动审计日志 worker
+        let audit_worker = AuditWorker::new(audit_service.storage().clone());
+        tokio::spawn(async move {
+            audit_worker.run(audit_rx).await;
+        });
+
+        // 8. Generate epoch (UUID for server restart detection)
         let epoch = uuid::Uuid::new_v4().to_string();
 
         let state = Self::new(
@@ -242,11 +260,22 @@ impl ServerState {
             price_rule_engine,
             kitchen_print_service,
             catalog_service,
+            audit_service,
             epoch,
         );
 
         // 3. Late initialization for HttpsService (needs state)
         https.initialize(state.clone());
+
+        // 9. 记录系统启动审计日志
+        state.audit_service.log(
+            crate::audit::AuditAction::SystemStartup,
+            "system",
+            "server:main",
+            None,
+            None,
+            serde_json::json!({"epoch": &state.epoch}),
+        ).await;
 
         state
     }

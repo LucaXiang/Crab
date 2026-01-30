@@ -7,7 +7,7 @@ import { Overview } from './components/Overview';
 import { SalesReport } from './components/SalesReport';
 import { DailyReportManagement } from '@/features/daily-report/DailyReportManagement';
 import { TimeRange, ActiveTab, StatisticsResponse } from '@/core/domain/types';
-import { getStatistics } from '@/infrastructure/apiValidator';
+import { invokeApi } from '@/infrastructure/api/tauri-client';
 
 interface StatisticsScreenProps {
   isVisible: boolean;
@@ -59,7 +59,10 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
         return;
       }
 
-      const result = await getStatistics(timeRange, customStartDate, customEndDate);
+      const params: Record<string, unknown> = { time_range: timeRange };
+      if (customStartDate) params.start_date = customStartDate;
+      if (customEndDate) params.end_date = customEndDate;
+      const result = await invokeApi<StatisticsResponse>('get_statistics', params);
       setData(result);
     } catch (error) {
       console.error('Failed to fetch statistics:', error);
