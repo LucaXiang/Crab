@@ -183,22 +183,3 @@ pub enum ChainBreakKind {
     SequenceGap,
 }
 
-/// 启动异常事件（需要前端用户确认）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StartupIssue {
-    /// 对应审计日志的序列号
-    pub sequence: u64,
-    /// 异常类型
-    pub action: AuditAction,
-    /// 详情
-    pub details: serde_json::Value,
-    /// 时间戳
-    pub timestamp: i64,
-}
-
-/// 前端确认启动异常请求
-#[derive(Debug, Deserialize)]
-pub struct AcknowledgeStartupRequest {
-    /// 用户填写的原因（自由文本）
-    pub reason: String,
-}

@@ -73,6 +73,29 @@ pub enum ServerCommand {
 
     /// 健康检查 Ping
     Ping,
+
+    /// 系统问题推送 — 远程服务器创建问题，前端渲染对话框
+    SystemIssue {
+        /// 问题类型标识 (i18n key 或自定义标识)
+        kind: String,
+        /// 是否阻塞 POS 操作
+        blocking: bool,
+        /// 关联实体 ("table:id" 格式, 可选)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        target: Option<String>,
+        /// i18n 动态插值参数
+        #[serde(default)]
+        params: std::collections::HashMap<String, String>,
+        /// 远程广播: 标题文本 (可选)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+        /// 远程广播: 描述文本 (可选)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+        /// 预定义选项
+        #[serde(default)]
+        options: Vec<String>,
+    },
 }
 
 // ==================== Payloads ====================

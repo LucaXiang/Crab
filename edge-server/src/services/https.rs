@@ -62,6 +62,8 @@ pub fn build_app() -> Router<ServerState> {
         .merge(crate::api::archive_verify::router())
         // Audit (审计日志)
         .merge(crate::api::audit_log::router())
+        // System Issues (系统问题)
+        .merge(crate::api::system_issues::router())
         // Sync API
         .merge(crate::api::sync::router())
 }

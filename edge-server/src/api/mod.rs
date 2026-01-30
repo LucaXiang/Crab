@@ -54,5 +54,8 @@ pub mod archive_verify;
 // Audit (审计日志)
 pub mod audit_log;
 
+// System Issues (系统问题)
+pub mod system_issues;
+
 // Re-export common types for handlers
 pub use crate::utils::AppResult;

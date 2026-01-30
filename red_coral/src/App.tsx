@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
-import { useSyncListener, useConnectionRecovery, useOrderEventListener, useSyncConnection, useShiftRecovery } from '@/core/hooks';
+import { useSyncListener, useConnectionRecovery, useOrderEventListener, useSyncConnection, useShiftRecovery, useSystemIssueGuard } from '@/core/hooks';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
@@ -14,6 +14,7 @@ import { ProtectedRoute } from '@/presentation/components/ProtectedRoute';
 import { PermissionEscalationProvider } from '@/presentation/components/auth/PermissionEscalationProvider';
 import { NotificationProvider } from '@/presentation/components/notifications';
 import { ShiftGuard } from '@/presentation/components/shift';
+import { SystemIssueDialog } from '@/presentation/components/modals/SystemIssueDialog';
 
 // Screens
 import { LoginScreen } from '@/screens/Login';
@@ -106,6 +107,9 @@ const App: React.FC = () => {
 
   // 启动时自动恢复跨营业日的僵尸班次
   useShiftRecovery();
+
+  // System issue guard (Server 模式: 登录后检查 pending issues)
+  const { currentIssue, resolveIssue } = useSystemIssueGuard();
 
   // Check for first run and clear storage if needed
   useEffect(() => {
@@ -267,6 +271,7 @@ const App: React.FC = () => {
         <ToastContainer />
         <ServerMessageToastContainer />
         <PermissionEscalationProvider />
+        <SystemIssueDialog issue={currentIssue} onResolve={resolveIssue} />
 
         <Routes>
         {/* Activate & Setup Routes */}

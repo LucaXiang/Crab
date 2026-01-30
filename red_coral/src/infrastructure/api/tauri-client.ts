@@ -59,6 +59,10 @@ import type {
   ShiftUpdate,
   DailyReport,
   DailyReportGenerate,
+  AuditListResponse,
+  AuditChainVerification,
+  SystemIssue,
+  ResolveSystemIssueRequest,
 } from '@/core/domain/types/api';
 
 // API Error class - aligned with shared::error::ErrorCode (u16)
@@ -524,6 +528,50 @@ export class TauriApiClient {
 
   async deleteDailyReport(id: string): Promise<boolean> {
     return invokeAndUnwrap<boolean>('delete_daily_report', { id });
+  }
+
+  // ============ Audit Log (审计日志) ============
+
+  async listAuditLogs(query: {
+    from?: number;
+    to?: number;
+    action?: string;
+    operator_id?: string;
+    resource_type?: string;
+    offset?: number;
+    limit?: number;
+  }): Promise<AuditListResponse> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined) {
+        params.set(key, String(value));
+      }
+    }
+    const qs = params.toString();
+    const path = qs ? `/api/audit-log?${qs}` : '/api/audit-log';
+    return invokeAndUnwrap<AuditListResponse>('api_get', { path });
+  }
+
+  async verifyAuditChain(from?: number, to?: number): Promise<AuditChainVerification> {
+    const params = new URLSearchParams();
+    if (from !== undefined) params.set('from', String(from));
+    if (to !== undefined) params.set('to', String(to));
+    const qs = params.toString();
+    const path = qs ? `/api/audit-log/verify?${qs}` : '/api/audit-log/verify';
+    return invokeAndUnwrap<AuditChainVerification>('api_get', { path });
+  }
+
+  // ============ System Issues (系统问题) ============
+
+  async getSystemIssues(): Promise<SystemIssue[]> {
+    return invokeAndUnwrap<SystemIssue[]>('api_get', { path: '/api/system-issues/pending' });
+  }
+
+  async resolveSystemIssue(data: ResolveSystemIssueRequest): Promise<void> {
+    await invokeAndUnwrap<unknown>('api_post', {
+      path: '/api/system-issues/resolve',
+      body: data,
+    });
   }
 }
 

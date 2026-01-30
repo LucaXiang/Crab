@@ -1747,6 +1747,27 @@
       }
     }
   },
+  "system_issue": {
+    "kind": {
+      "abnormal_shutdown": {
+        "title": "异常关闭检测",
+        "description": "系统检测到上次非正常关闭（上次启动: {{last_start_timestamp}}），请说明原因以满足审计要求。"
+      },
+      "long_downtime": {
+        "title": "长时间停机检测",
+        "description": "系统检测到超过 {{downtime_hours}} 小时未运行，请说明原因以满足审计要求。"
+      }
+    },
+    "option": {
+      "power_outage": "停电",
+      "device_failure": "设备故障",
+      "maintenance_restart": "维护重启",
+      "other": "其他"
+    },
+    "resolve_success": "已提交回应",
+    "resolve_failed": "提交回应失败",
+    "input_placeholder": "请输入原因说明..."
+  },
   "errors": {
     "0": "成功",
     "1": "未知错误",
@@ -1904,6 +1925,79 @@
       "certificate_expired_at": "证书过期时间：{{expired_at}}",
       "clock_backward": "检测到系统时间回拨，请检查系统时间设置。",
       "clock_forward": "检测到系统时间前跳，请检查系统时间设置。"
+    }
+  },
+  "audit": {
+    "title": "审计日志",
+    "sidebar": "审计日志",
+    "entries": "条记录",
+    "system": "系统",
+    "error": {
+      "load": "加载审计日志失败"
+    },
+    "column": {
+      "time": "时间",
+      "action": "操作",
+      "resource": "资源",
+      "operator": "操作人"
+    },
+    "detail": {
+      "details": "详情",
+      "operator_id": "操作人 ID",
+      "prev_hash": "前一条哈希",
+      "curr_hash": "当前哈希"
+    },
+    "filter": {
+      "all_actions": "全部操作",
+      "all_resources": "全部资源类型",
+      "search_operator": "搜索操作人 ID..."
+    },
+    "group": {
+      "system": "系统",
+      "auth": "认证",
+      "order": "订单",
+      "management": "管理",
+      "shift": "班次",
+      "config": "配置"
+    },
+    "action": {
+      "system_startup": "系统启动",
+      "system_shutdown": "系统关闭",
+      "system_abnormal_shutdown": "异常关闭",
+      "system_long_downtime": "长时间停机",
+      "acknowledge_startup_issue": "确认启动异常",
+      "login_success": "登录成功",
+      "login_failed": "登录失败",
+      "logout": "登出",
+      "order_completed": "订单完成",
+      "order_voided": "订单作废",
+      "order_payment_added": "添加支付",
+      "order_payment_cancelled": "取消支付",
+      "order_merged": "订单合并",
+      "order_moved": "订单转移",
+      "order_split": "订单拆分",
+      "order_restored": "订单恢复",
+      "employee_created": "创建员工",
+      "employee_updated": "更新员工",
+      "employee_deleted": "删除员工",
+      "role_created": "创建角色",
+      "role_updated": "更新角色",
+      "role_deleted": "删除角色",
+      "product_price_changed": "商品价格变更",
+      "price_rule_changed": "价格规则变更",
+      "shift_opened": "班次开启",
+      "shift_closed": "班次关闭",
+      "print_config_changed": "打印配置变更",
+      "store_info_changed": "门店信息变更"
+    },
+    "verify": {
+      "button": "验证完整性",
+      "intact": "审计链完整，未发现篡改",
+      "broken": "审计链异常！发现断裂点",
+      "error": "验证失败",
+      "checked": "已验证",
+      "expected": "期望",
+      "more_breaks": "...还有 {count} 处断裂"
     }
   }
 }

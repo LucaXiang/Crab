@@ -1,4 +1,5 @@
 use crate::core::ServerState;
+use crate::db::repository::system_issue::{CreateSystemIssue, SystemIssueRepository};
 use crate::message::{BusMessage, EventType};
 use crate::orders::actions::open_table::load_matching_rules;
 use crate::utils::AppError;
@@ -53,12 +54,6 @@ impl MessageProcessor for NotificationProcessor {
             .parse_payload()
             .map_err(|e| AppError::invalid(format!("Invalid notification payload: {}", e)))?;
 
-        tracing::info!(
-            "🔔 Notification [{}]: {} - {}",
-            payload.level,
-            payload.title,
-            payload.message
-        );
 
         Ok(ProcessResult::Success {
             message: format!("Notification '{}' logged", payload.title),
@@ -91,25 +86,53 @@ impl MessageProcessor for ServerCommandProcessor {
             .parse_payload()
             .map_err(|e| AppError::invalid(format!("Invalid server command payload: {}", e)))?;
 
-        tracing::info!("⚙️ Received server command: {:?}", payload.command);
-
         match &payload.command {
-            shared::message::ServerCommand::Ping => {
-                tracing::info!("Server Ping received");
-            }
+            shared::message::ServerCommand::Ping => {}
             shared::message::ServerCommand::Restart {
                 delay_seconds,
                 reason,
             } => {
-                tracing::info!(
-                    "Server restart requested in {}s. Reason: {:?}",
-                    delay_seconds,
-                    reason
-                );
-                // Trigger restart logic (via state or event)
-                // For now, just log it. In real implementation, we'd use self.state to signal shutdown.
-                // self.state.shutdown_token().cancel(); // Example
-                let _ = self.state; // Suppress unused warning for now until implemented
+                tracing::warn!("Server restart requested in {}s. Reason: {:?}", delay_seconds, reason);
+            }
+            shared::message::ServerCommand::SystemIssue {
+                kind,
+                blocking,
+                target,
+                params,
+                title,
+                description,
+                options,
+            } => {
+                tracing::info!("Remote system issue received: kind={}", kind);
+                let repo = SystemIssueRepository::new(self.state.get_db());
+                match repo
+                    .create(CreateSystemIssue {
+                        source: "remote".to_string(),
+                        kind: kind.clone(),
+                        blocking: *blocking,
+                        target: target.clone(),
+                        params: params.clone(),
+                        title: title.clone(),
+                        description: description.clone(),
+                        options: options.clone(),
+                    })
+                    .await
+                {
+                    Ok(issue) => {
+                        // 广播 sync 事件，前端实时感知新 system_issue
+                        let id_str = issue
+                            .id
+                            .as_ref()
+                            .map(|r| r.to_string())
+                            .unwrap_or_default();
+                        self.state
+                            .broadcast_sync("system_issue", "created", &id_str, Some(&issue))
+                            .await;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to create remote system_issue: {:?}", e);
+                    }
+                }
             }
             _ => {
                 tracing::warn!("Unimplemented server command: {:?}", payload.command);
@@ -339,11 +362,6 @@ impl MessageProcessor for RequestCommandProcessor {
             .parse_payload()
             .map_err(|e| AppError::invalid(format!("Invalid payload: {}", e)))?;
 
-        tracing::info!(
-            request_id = %msg.request_id,
-            action = %payload.action,
-            "Processing RPC request"
-        );
 
         // 处理具体的请求动作
         match payload.action.as_str() {

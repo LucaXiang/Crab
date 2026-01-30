@@ -5,8 +5,9 @@
 //! - 日志查询（直接读取 SurrealDB）
 //! - 链验证
 //! - 系统生命周期管理（LOCK 文件 + 24h 间隔检测）
-//! - 启动异常确认（前端 dialog，持久化到文件）
+//! - 启动异常检测 → 写入 system_issue 表（前端通过 system-issues API 渲染对话框）
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use surrealdb::engine::local::Db;
@@ -15,12 +16,10 @@ use tokio::sync::mpsc;
 
 use super::storage::{AuditStorage, AuditStorageError};
 use super::types::*;
+use crate::db::repository::system_issue::{CreateSystemIssue, SystemIssueRepository};
 
 /// LOCK 文件名
 const LOCK_FILE_NAME: &str = "audit.lock";
-
-/// 待确认启动异常文件名（持久化，重启后仍存在）
-const PENDING_ACK_FILE: &str = "pending-ack.json";
 
 /// 超过此时间未运行视为长时间停机（毫秒）
 const LONG_DOWNTIME_THRESHOLD_MS: i64 = 24 * 60 * 60 * 1000; // 24h
@@ -47,17 +46,16 @@ pub struct AuditLogRequest {
 /// - LOCK 文件存在 → 异常关闭
 /// - LOCK 文件不存在但最后审计时间 >24h 前 → 长时间停机
 ///
-/// ## 启动异常确认（持久化）
+/// ## 启动异常检测
 ///
-/// 检测到异常关闭或长时间停机时，写入 `pending-ack.json` 文件。
-/// 即使用户关机重启，该文件仍存在，前端仍会弹窗要求输入原因。
-/// 用户确认后才删除文件。
+/// 检测到异常关闭或长时间停机时，写入 `system_issue` 表。
+/// 前端通过 `/api/system-issues/pending` 拉取待处理问题，
+/// 渲染阻塞式对话框要求用户回应。
 pub struct AuditService {
     storage: AuditStorage,
+    db: Surreal<Db>,
     tx: mpsc::Sender<AuditLogRequest>,
     lock_path: PathBuf,
-    pending_ack_path: PathBuf,
-    pending_startup_issues: tokio::sync::Mutex<Vec<StartupIssue>>,
 }
 
 impl std::fmt::Debug for AuditService {
@@ -71,7 +69,7 @@ impl std::fmt::Debug for AuditService {
 impl AuditService {
     /// 创建审计服务
     ///
-    /// `data_dir` — 数据目录（LOCK 文件和 pending-ack 文件存放位置）
+    /// `data_dir` — 数据目录（LOCK 文件存放位置）
     pub fn new(
         db: Surreal<Db>,
         data_dir: &std::path::Path,
@@ -79,27 +77,24 @@ impl AuditService {
     ) -> (Arc<Self>, mpsc::Receiver<AuditLogRequest>) {
         let (tx, rx) = mpsc::channel(buffer_size);
         let lock_path = data_dir.join(LOCK_FILE_NAME);
-        let pending_ack_path = data_dir.join(PENDING_ACK_FILE);
-        let storage = AuditStorage::new(db);
+        let storage = AuditStorage::new(db.clone());
         let service = Arc::new(Self {
             storage,
+            db,
             tx,
             lock_path,
-            pending_ack_path,
-            pending_startup_issues: tokio::sync::Mutex::new(Vec::new()),
         });
         (service, rx)
     }
 
     /// 系统启动时调用 — 检测异常关闭和长时间停机，创建 LOCK 文件
     ///
-    /// 检测到的异常会写入审计日志并持久化到 `pending-ack.json`，
-    /// 即使用户关机重启，前端仍会弹窗要求输入原因。
+    /// 检测到的异常会：
+    /// 1. 写入审计日志（不可篡改的记录）
+    /// 2. 写入 system_issue 表（前端对话框渲染）
     pub async fn on_startup(&self) {
         let now = shared::util::now_millis();
-
-        // 先加载已有的 pending-ack 文件（上次未确认的异常）
-        let mut issues = self.load_pending_from_file();
+        let issue_repo = SystemIssueRepository::new(self.db.clone());
 
         // 1. 检测异常关闭：LOCK 文件存在
         if self.lock_path.exists() {
@@ -118,7 +113,7 @@ impl AuditService {
             });
 
             // 审计日志始终记录（每次异常关闭都是独立事件）
-            match self
+            if let Err(e) = self
                 .storage
                 .append(
                     AuditAction::SystemAbnormalShutdown,
@@ -126,22 +121,48 @@ impl AuditService {
                     "server:main".to_string(),
                     None,
                     None,
-                    details.clone(),
+                    details,
                 )
                 .await
             {
-                Ok(entry) => {
-                    // 去重：如果已有同类型未确认 issue，不重复加入 pending dialog
-                    if !issues.iter().any(|i| i.action == AuditAction::SystemAbnormalShutdown) {
-                        issues.push(StartupIssue {
-                            sequence: entry.id,
-                            action: AuditAction::SystemAbnormalShutdown,
-                            details,
-                            timestamp: entry.timestamp,
-                        });
+                tracing::error!("Failed to log abnormal shutdown: {:?}", e);
+            }
+
+            // 去重：如果已有同类型未解决的 issue，不重复创建
+            match issue_repo.find_pending_by_kind("abnormal_shutdown").await {
+                Ok(existing) if existing.is_empty() => {
+                    let mut params = HashMap::new();
+                    params.insert(
+                        "last_start_timestamp".to_string(),
+                        last_start_ts.to_string(),
+                    );
+                    if let Err(e) = issue_repo
+                        .create(CreateSystemIssue {
+                            source: "local".to_string(),
+                            kind: "abnormal_shutdown".to_string(),
+                            blocking: true,
+                            target: None,
+                            params,
+                            title: None,
+                            description: None,
+                            options: vec![
+                                "power_outage".to_string(),
+                                "device_failure".to_string(),
+                                "maintenance_restart".to_string(),
+                                "other".to_string(),
+                            ],
+                        })
+                        .await
+                    {
+                        tracing::error!("Failed to create system_issue for abnormal shutdown: {:?}", e);
                     }
                 }
-                Err(e) => tracing::error!("Failed to log abnormal shutdown: {:?}", e),
+                Ok(_) => {
+                    tracing::debug!("Pending abnormal_shutdown issue already exists, skipping");
+                }
+                Err(e) => {
+                    tracing::error!("Failed to query pending issues: {:?}", e);
+                }
             }
         }
 
@@ -160,7 +181,7 @@ impl AuditService {
                     "downtime_hours": hours,
                 });
 
-                match self
+                if let Err(e) = self
                     .storage
                     .append(
                         AuditAction::SystemLongDowntime,
@@ -168,22 +189,45 @@ impl AuditService {
                         "server:main".to_string(),
                         None,
                         None,
-                        details.clone(),
+                        details,
                     )
                     .await
                 {
-                    Ok(entry) => {
-                        // 去重：如果已有同类型未确认 issue，不重复加入 pending dialog
-                        if !issues.iter().any(|i| i.action == AuditAction::SystemLongDowntime) {
-                            issues.push(StartupIssue {
-                                sequence: entry.id,
-                                action: AuditAction::SystemLongDowntime,
-                                details,
-                                timestamp: entry.timestamp,
-                            });
+                    tracing::error!("Failed to log long downtime: {:?}", e);
+                }
+
+                // 去重：如果已有同类型未解决的 issue，不重复创建
+                match issue_repo.find_pending_by_kind("long_downtime").await {
+                    Ok(existing) if existing.is_empty() => {
+                        let mut params = HashMap::new();
+                        params.insert("downtime_hours".to_string(), hours.to_string());
+                        if let Err(e) = issue_repo
+                            .create(CreateSystemIssue {
+                                source: "local".to_string(),
+                                kind: "long_downtime".to_string(),
+                                blocking: true,
+                                target: None,
+                                params,
+                                title: None,
+                                description: None,
+                                options: vec![
+                                    "power_outage".to_string(),
+                                    "device_failure".to_string(),
+                                    "maintenance_restart".to_string(),
+                                    "other".to_string(),
+                                ],
+                            })
+                            .await
+                        {
+                            tracing::error!("Failed to create system_issue for long downtime: {:?}", e);
                         }
                     }
-                    Err(e) => tracing::error!("Failed to log long downtime: {:?}", e),
+                    Ok(_) => {
+                        tracing::debug!("Pending long_downtime issue already exists, skipping");
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to query pending issues: {:?}", e);
+                    }
                 }
             }
         }
@@ -192,13 +236,6 @@ impl AuditService {
         if let Err(e) = std::fs::write(&self.lock_path, now.to_string()) {
             tracing::error!("Failed to create audit LOCK file: {:?}", e);
         }
-
-        // 4. 持久化 pending issues 到文件（重启后仍存在）
-        if !issues.is_empty() {
-            self.save_pending_to_file(&issues);
-        }
-
-        *self.pending_startup_issues.lock().await = issues;
     }
 
     /// 系统正常关闭时调用 — 删除 LOCK 文件
@@ -275,78 +312,8 @@ impl AuditService {
         self.storage.verify_chain(from, to).await
     }
 
-    /// 获取待确认的启动异常
-    pub async fn get_pending_startup(&self) -> Vec<StartupIssue> {
-        self.pending_startup_issues.lock().await.clone()
-    }
-
-    /// 确认启动异常（前端用户提交原因后调用）
-    ///
-    /// 创建一条 AcknowledgeStartupIssue 审计记录，
-    /// 并删除 pending-ack.json 文件。
-    pub async fn acknowledge_startup(
-        &self,
-        reason: String,
-        operator_id: Option<String>,
-        operator_name: Option<String>,
-    ) -> Result<(), AuditStorageError> {
-        let mut pending = self.pending_startup_issues.lock().await;
-
-        if pending.is_empty() {
-            return Ok(());
-        }
-
-        let sequences: Vec<u64> = pending.iter().map(|i| i.sequence).collect();
-
-        self.storage
-            .append(
-                AuditAction::AcknowledgeStartupIssue,
-                "system".to_string(),
-                "server:main".to_string(),
-                operator_id,
-                operator_name,
-                serde_json::json!({
-                    "reason": reason,
-                    "acknowledged_sequences": sequences,
-                }),
-            )
-            .await?;
-
-        pending.clear();
-
-        // 删除持久化文件
-        let _ = std::fs::remove_file(&self.pending_ack_path);
-
-        Ok(())
-    }
-
     /// 获取存储引用
     pub fn storage(&self) -> &AuditStorage {
         &self.storage
-    }
-
-    // ═══ 内部方法 ═══
-
-    /// 从 pending-ack.json 加载已有的未确认异常
-    fn load_pending_from_file(&self) -> Vec<StartupIssue> {
-        if !self.pending_ack_path.exists() {
-            return Vec::new();
-        }
-        match std::fs::read_to_string(&self.pending_ack_path) {
-            Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
-            Err(_) => Vec::new(),
-        }
-    }
-
-    /// 持久化 pending issues 到 pending-ack.json
-    fn save_pending_to_file(&self, issues: &[StartupIssue]) {
-        match serde_json::to_string_pretty(issues) {
-            Ok(json) => {
-                if let Err(e) = std::fs::write(&self.pending_ack_path, json) {
-                    tracing::error!("Failed to write pending-ack.json: {:?}", e);
-                }
-            }
-            Err(e) => tracing::error!("Failed to serialize pending issues: {:?}", e),
-        }
     }
 }

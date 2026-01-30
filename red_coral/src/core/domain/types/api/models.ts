@@ -855,3 +855,116 @@ export interface DailyReportGenerate {
   /** Notes */
   note?: string;
 }
+
+// ============ Audit Log (审计日志) ============
+
+/** 审计操作类型 — 与 Rust AuditAction 枚举对齐 (snake_case) */
+export type AuditAction =
+  // 系统生命周期
+  | 'system_startup'
+  | 'system_shutdown'
+  | 'system_abnormal_shutdown'
+  | 'system_long_downtime'
+  | 'acknowledge_startup_issue'
+  // 认证
+  | 'login_success'
+  | 'login_failed'
+  | 'logout'
+  // 订单（财务关键）
+  | 'order_completed'
+  | 'order_voided'
+  | 'order_payment_added'
+  | 'order_payment_cancelled'
+  | 'order_merged'
+  | 'order_moved'
+  | 'order_split'
+  | 'order_restored'
+  // 管理操作
+  | 'employee_created'
+  | 'employee_updated'
+  | 'employee_deleted'
+  | 'role_created'
+  | 'role_updated'
+  | 'role_deleted'
+  | 'product_price_changed'
+  | 'price_rule_changed'
+  // 班次
+  | 'shift_opened'
+  | 'shift_closed'
+  // 系统配置
+  | 'print_config_changed'
+  | 'store_info_changed';
+
+/** 审计日志条目 — 与 Rust AuditEntry 对齐 */
+export interface AuditEntry {
+  /** 全局递增序列号 */
+  id: number;
+  /** 时间戳 (Unix 毫秒) */
+  timestamp: number;
+  /** 操作类型 */
+  action: AuditAction;
+  /** 资源类型 (如 "system", "order", "employee") */
+  resource_type: string;
+  /** 资源 ID (如 "order:xxx", "employee:yyy") */
+  resource_id: string;
+  /** 操作人 ID (系统事件为 null) */
+  operator_id: string | null;
+  /** 操作人名称 */
+  operator_name: string | null;
+  /** 结构化详情 */
+  details: Record<string, unknown>;
+  /** 前一条审计日志哈希 (SHA256) */
+  prev_hash: string;
+  /** 当前记录哈希 (SHA256) */
+  curr_hash: string;
+}
+
+/** 审计日志查询响应 */
+export interface AuditListResponse {
+  items: AuditEntry[];
+  total: number;
+}
+
+/** 审计链断裂类型 */
+export type ChainBreakKind = 'hash_mismatch' | 'hash_recompute' | 'sequence_gap';
+
+/** 审计链断裂点 */
+export interface AuditChainBreak {
+  entry_id: number;
+  kind: ChainBreakKind;
+  expected: string;
+  actual: string;
+}
+
+/** 审计链验证结果 */
+export interface AuditChainVerification {
+  total_entries: number;
+  chain_intact: boolean;
+  breaks: AuditChainBreak[];
+}
+
+// ============ System Issues (系统问题) ============
+
+/** 系统问题 — 与 Rust SystemIssueRow 对齐 */
+export interface SystemIssue {
+  id: string;
+  source: string;
+  kind: string;
+  blocking: boolean;
+  target?: string;
+  params: Record<string, string>;
+  title?: string;
+  description?: string;
+  options: string[];
+  status: string;
+  response?: string;
+  resolved_by?: string;
+  resolved_at?: number;
+  created_at: number;
+}
+
+/** 解决系统问题请求 */
+export interface ResolveSystemIssueRequest {
+  id: string;
+  response: string;
+}

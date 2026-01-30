@@ -21,8 +21,8 @@
 //!
 //! - **LOCK 文件**: 检测异常关闭
 //! - **24h 间隔**: 检测长时间停机
-//! - **pending-ack.json**: 持久化待确认异常（重启后仍存在）
-//! - **前端 dialog**: 强制用户输入原因后才能使用系统
+//! - **system_issue 表**: 持久化待确认异常（SurrealDB）
+//! - **前端 system-issues API**: 渲染对话框要求用户回应
 
 pub mod service;
 pub mod storage;
@@ -32,7 +32,6 @@ pub mod worker;
 pub use service::{AuditLogRequest, AuditService};
 pub use storage::{AuditStorage, AuditStorageError};
 pub use types::{
-    AcknowledgeStartupRequest, AuditAction, AuditChainVerification, AuditEntry, AuditListResponse,
-    AuditQuery, StartupIssue,
+    AuditAction, AuditChainVerification, AuditEntry, AuditListResponse, AuditQuery,
 };
 pub use worker::AuditWorker;

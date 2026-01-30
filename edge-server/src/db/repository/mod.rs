@@ -21,10 +21,14 @@ pub mod price_rule;
 // Orders
 pub mod order;
 
+// Payments
+pub mod payment;
+
 // System
 pub mod store_info;
 pub mod label_template;
 pub mod system_state;
+pub mod system_issue;
 
 // Image
 pub mod image_ref;
@@ -49,6 +53,8 @@ pub use zone::ZoneRepository;
 pub use image_ref::ImageRefRepository;
 pub use shift::ShiftRepository;
 pub use daily_report::DailyReportRepository;
+pub use payment::PaymentRepository;
+pub use system_issue::SystemIssueRepository;
 
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
