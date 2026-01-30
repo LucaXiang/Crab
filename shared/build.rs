@@ -52,6 +52,7 @@ export const ErrorCode = {
   ActivationFailed: 3003,
   CertificateInvalid: 3004,
   LicenseExpired: 3005,
+  SubscriptionBlocked: 3006,
 
   // 4xxx: Order
   OrderNotFound: 4001,
@@ -77,6 +78,7 @@ export const ErrorCode = {
   CategoryHasProducts: 6102,
   CategoryNameExists: 6103,
   SpecNotFound: 6201,
+  SpecExternalIdExists: 6202,
   AttributeNotFound: 6301,
   AttributeBindFailed: 6302,
 
@@ -107,6 +109,14 @@ export const ErrorCode = {
   BridgeConnectionFailed: 9103,
   PrinterNotAvailable: 9201,
   PrintFailed: 9202,
+  LabelPrintingNotImplemented: 9203,
+  ClientDisconnected: 9301,
+
+  // 94xx: Storage
+  StorageFull: 9401,
+  OutOfMemory: 9402,
+  StorageCorrupted: 9403,
+  SystemBusy: 9404,
 } as const;
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
