@@ -3,7 +3,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { invokeApi } from '@/infrastructure/api';
 import { ArrowLeft, Save, Layers, Type, Image as ImageIcon, Trash2, GripVertical, Settings, Minus, Printer, HelpCircle, Loader2 } from 'lucide-react';
 import { LabelTemplate, LabelField, SUPPORTED_LABEL_FIELDS } from '@/core/domain/types/print';
-import { convertTemplateToRust } from '@/infrastructure/print';
 import { LabelTemplateEditor } from './LabelTemplateEditor';
 import { FieldPropertiesPanel } from './FieldPropertiesPanel';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -174,9 +173,9 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         type: 'text',
         name: t("settings.label.field.new_text"),
         x: 10, y: 10, width: 100, height: 20,
-        fontSize: 12, fontWeight: 'normal', alignment: 'left',
+        font_size: 12, font_weight: 'normal', alignment: 'left',
         template: t("settings.label.field.default_text"),
-        dataSource: '',
+        data_source: '',
         visible: true,
       };
     } else if (type === 'image') {
@@ -185,10 +184,10 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         type: 'image',
         name: t("settings.label.field.new_image"),
         x: 10, y: 10, width: 80, height: 80,
-        fontSize: 12,
-        maintainAspectRatio: true, dataKey: '',
-        sourceType: 'image',
-        dataSource: '',
+        font_size: 12,
+        maintain_aspect_ratio: true, data_key: '',
+        source_type: 'image',
+        data_source: '',
         visible: true,
       };
     } else {
@@ -197,8 +196,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
          type: 'separator',
          name: t("settings.label.field.default_separator"),
          x: 8, y: 50, width: 100, height: 2,
-         fontSize: 12,
-         dataSource: '',
+         font_size: 12,
+         data_source: '',
          visible: true,
        };
     }
@@ -224,18 +223,18 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
     try {
       // Upload any pending images first
       const fieldsWithPendingImages = template.fields.filter(
-        f => f.sourceType === 'image' && f._pendingImagePath
+        f => f.source_type === 'image' && f._pending_image_path
       );
 
       let updatedFields = [...template.fields];
 
       for (const field of fieldsWithPendingImages) {
         try {
-          const hash = await invoke<string>('save_image', { source_path: field._pendingImagePath });
+          const hash = await invoke<string>('save_image', { source_path: field._pending_image_path });
           // Update the field with the hash and clear pending path
           updatedFields = updatedFields.map(f =>
             f.id === field.id
-              ? { ...f, template: hash, _pendingImagePath: undefined }
+              ? { ...f, template: hash, _pending_image_path: undefined }
               : f
           );
         } catch (e) {
@@ -244,9 +243,9 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         }
       }
 
-      // Clean up _pendingImagePath from all fields before saving
+      // Clean up _pending_image_path from all fields before saving
       const cleanedFields = updatedFields.map(f => {
-        const { _pendingImagePath, ...rest } = f;
+        const { _pending_image_path, ...rest } = f;
         return rest as LabelField;
       });
 
@@ -266,10 +265,10 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         }
 
         // Parse test data
-        let testData: Record<string, unknown> = {};
+        let test_data: Record<string, unknown> = {};
         try {
-          if (template.testData) {
-            testData = JSON.parse(template.testData) as Record<string, unknown>;
+          if (template.test_data) {
+            test_data = JSON.parse(template.test_data) as Record<string, unknown>;
           }
         } catch {
           alert(t("settings.label.invalid_json"));
@@ -279,14 +278,14 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
         // Generate/Load Base64 images for all Image fields
         const imageFields = template.fields.filter(f => f.type === 'image' || f.type === 'barcode' || f.type === 'qrcode');
         for (const field of imageFields) {
-          const sourceType = (field.sourceType || 'image').toLowerCase();
+          const source_type = (field.source_type || 'image').toLowerCase();
 
-          if (sourceType === 'qrcode' || sourceType === 'barcode') {
-            // Normalize sourceType for comparison
-            const normalizedType = sourceType as 'qrcode' | 'barcode';
-            let content = field.template || field.dataKey || '';
+          if (source_type === 'qrcode' || source_type === 'barcode') {
+            // Normalize source_type for comparison
+            const normalizedType = source_type as 'qrcode' | 'barcode';
+            let content = field.template || field.data_key || '';
             content = content.replace(/\{(\w+)\}/g, (_, key) => {
-              return testData[key] !== undefined ? String(testData[key]) : `{${key}}`;
+              return test_data[key] !== undefined ? String(test_data[key]) : `{${key}}`;
             });
 
             if (!content) continue;
@@ -298,7 +297,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                   margin: 1,
                   errorCorrectionLevel: 'M'
                 });
-                testData[field.dataKey || field.name] = dataUri;
+                test_data[field.data_key || field.name] = dataUri;
               } else if (normalizedType === 'barcode') {
                 const JsBarcode = (await import('jsbarcode')).default;
                 // Generate barcode on Canvas (converts to PNG for backend compatibility)
@@ -311,25 +310,25 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                   height: 80
                 });
                 const dataUri = canvas.toDataURL('image/png');
-                testData[field.dataKey || field.name] = dataUri;
+                test_data[field.data_key || field.name] = dataUri;
               }
             } catch (genError) {
-              console.warn(`Failed to generate ${sourceType} for field ${field.id}:`, genError);
+              console.warn(`Failed to generate ${source_type} for field ${field.id}:`, genError);
             }
-          } else if (sourceType === 'image' || sourceType === 'productimage') {
+          } else if (source_type === 'image' || source_type === 'productimage') {
             // Load regular image and convert to Base64
-            const imagePath = field.template || field.dataKey || '';
+            const imagePath = field.template || field.data_key || '';
             if (!imagePath) continue;
 
             // Apply variable injection to image path
             let resolvedPath = imagePath.replace(/\{(\w+)\}/g, (_, key) => {
-              return testData[key] !== undefined ? String(testData[key]) : `{${key}}`;
+              return test_data[key] !== undefined ? String(test_data[key]) : `{${key}}`;
             });
 
             try {
               // Check if it's already a data URI
               if (resolvedPath.startsWith('data:')) {
-                testData[field.dataKey || field.name] = resolvedPath;
+                test_data[field.data_key || field.name] = resolvedPath;
               } else if (resolvedPath.startsWith('http://') || resolvedPath.startsWith('https://')) {
                 // URL: fetch and convert to Base64
                 const response = await fetch(resolvedPath);
@@ -339,7 +338,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                   reader.onloadend = () => resolve(reader.result as string);
                   reader.readAsDataURL(blob);
                 });
-                testData[field.dataKey || field.name] = dataUri;
+                test_data[field.data_key || field.name] = dataUri;
               } else {
                 // Local file path: use Tauri's convertFileSrc and fetch
                 const { convertFileSrc } = await import('@tauri-apps/api/core');
@@ -351,7 +350,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                   reader.onloadend = () => resolve(reader.result as string);
                   reader.readAsDataURL(blob);
                 });
-                testData[field.dataKey || field.name] = dataUri;
+                test_data[field.data_key || field.name] = dataUri;
               }
             } catch (loadError) {
               console.warn(`Failed to load image for field ${field.id} (${resolvedPath}):`, loadError);
@@ -360,16 +359,13 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           }
         }
 
-        // Map template to Rust structure (camelCase to snake_case)
-        const rustTemplate = convertTemplateToRust(template);
-
         const ticketData = {
           printer_name: labelPrinter,
-          data: testData,
-          template: rustTemplate,
-          label_width_mm: (template.widthMm ?? 0) + (template.paddingMmX ?? 0), // Auto-expand paper width by offset
-          label_height_mm: (template.heightMm ?? 0) + (template.paddingMmY ?? 0), // Auto-expand paper height by offset
-          override_dpi: template.renderDpi
+          data: test_data,
+          template: template,
+          label_width_mm: (template.width_mm ?? 0) + (template.padding_mm_x ?? 0), // Auto-expand paper width by offset
+          label_height_mm: (template.height_mm ?? 0) + (template.padding_mm_y ?? 0), // Auto-expand paper height by offset
+          override_dpi: template.render_dpi
         };
 
         // TODO: 标签打印功能已移至服务端，前端测试打印暂不可用
@@ -404,9 +400,9 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
   const renderLayerInfo = (field: LabelField) => {
       switch (field.type) {
           case 'text': return field.template || field.name;
-          case 'image': return field.dataKey || field.name;
-          case 'barcode': return field.dataKey || field.name;
-          case 'qrcode': return field.dataKey || field.name;
+          case 'image': return field.data_key || field.name;
+          case 'barcode': return field.data_key || field.name;
+          case 'qrcode': return field.data_key || field.name;
           case 'separator': return t("settings.label.horizontal_line");
           default: return '';
       }
@@ -440,7 +436,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           <div className="flex flex-col ml-2">
             <h1 className="text-lg font-bold text-gray-800">{template.name}</h1>
             <span className="text-xs text-gray-500 font-mono">
-              {template.widthMm}mm × {template.heightMm}mm
+              {template.width_mm}mm × {template.height_mm}mm
             </span>
           </div>
         </div>
@@ -605,16 +601,16 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                    <div>
                      <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.width_mm")}</label>
                      <NumberInput
-                       value={template.widthMm ?? 0}
-                       onValueChange={(val) => handleTemplateChange({ ...template, widthMm: val })}
+                       value={template.width_mm ?? 0}
+                       onValueChange={(val) => handleTemplateChange({ ...template, width_mm: val })}
                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                      />
                    </div>
                    <div>
                      <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.height_mm")}</label>
                      <NumberInput
-                       value={template.heightMm ?? 0}
-                       onValueChange={(val) => handleTemplateChange({ ...template, heightMm: val })}
+                       value={template.height_mm ?? 0}
+                       onValueChange={(val) => handleTemplateChange({ ...template, height_mm: val })}
                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                      />
                    </div>
@@ -624,8 +620,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                    <div>
                      <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.padding_x")}</label>
                      <NumberInput
-                       value={template.paddingMmX || 0}
-                       onValueChange={(val) => handleTemplateChange({ ...template, paddingMmX: val })}
+                       value={template.padding_mm_x || 0}
+                       onValueChange={(val) => handleTemplateChange({ ...template, padding_mm_x: val })}
                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                        step="0.1"
                      />
@@ -633,8 +629,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                    <div>
                      <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.padding_y")}</label>
                      <NumberInput
-                       value={template.paddingMmY || 0}
-                       onValueChange={(val) => handleTemplateChange({ ...template, paddingMmY: val })}
+                       value={template.padding_mm_y || 0}
+                       onValueChange={(val) => handleTemplateChange({ ...template, padding_mm_y: val })}
                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                        step="0.1"
                      />
@@ -657,8 +653,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                  <div>
                    <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.render_dpi")}</label>
                    <NumberInput
-                     value={template.renderDpi || 203}
-                     onValueChange={(val) => handleTemplateChange({ ...template, renderDpi: val })}
+                     value={template.render_dpi || 203}
+                     onValueChange={(val) => handleTemplateChange({ ...template, render_dpi: val })}
                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                      step="1"
                    />
@@ -680,7 +676,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                             acc[field.key] = field.example;
                             return acc;
                           }, {} as Record<string, string>);
-                          handleTemplateChange({ ...template, testData: JSON.stringify(sampleData, null, 2) });
+                          handleTemplateChange({ ...template, test_data: JSON.stringify(sampleData, null, 2) });
                         }}
                         className="text-xs text-blue-600 hover:text-blue-700 font-medium hover:underline"
                       >
@@ -688,8 +684,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
                       </button>
                     </div>
                     <JsonEditor
-                      value={template.testData || ''}
-                      onChange={(val) => handleTemplateChange({ ...template, testData: val })}
+                      value={template.test_data || ''}
+                      onChange={(val) => handleTemplateChange({ ...template, test_data: val })}
                       className="h-40"
                       placeholder='{"price": "€10.00", "item_name": "Test Item"}'
                     />

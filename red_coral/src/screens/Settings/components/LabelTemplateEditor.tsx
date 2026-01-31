@@ -46,13 +46,13 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
   const isDraggingRef = useRef(false);
 
   // Memoize parsed test data (eliminates repeated JSON parsing)
-  const testDataObj = useMemo(() => {
+  const test_dataObj = useMemo(() => {
     try {
-      return template.testData ? JSON.parse(template.testData) : {};
+      return template.test_data ? JSON.parse(template.test_data) : {};
     } catch {
       return {};
     }
-  }, [template.testData]);
+  }, [template.test_data]);
 
   // Generate Previews for Images/QRCodes/Barcodes
   useEffect(() => {
@@ -62,26 +62,26 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       const imageFields = template.fields.filter(f => f.type === 'image' || f.type === 'barcode' || f.type === 'qrcode');
 
       await Promise.all(imageFields.map(async (field) => {
-        const sourceType = (field.sourceType || 'image').toLowerCase();
+        const source_type = (field.source_type || 'image').toLowerCase();
         let src = '';
 
         try {
           // Check for pending local image first (not yet uploaded)
-          if (field._pendingImagePath && sourceType === 'image') {
-            src = convertFileSrc(field._pendingImagePath);
+          if (field._pending_image_path && source_type === 'image') {
+            src = convertFileSrc(field._pending_image_path);
           } else {
-            let content = field.template || field.dataKey || '';
+            let content = field.template || field.data_key || '';
 
             // Inject test data variables
             content = content.replace(/\{(\w+)\}/g, (_, key) =>
-              testDataObj[key] !== undefined ? String(testDataObj[key]) : `{${key}}`
+              test_dataObj[key] !== undefined ? String(test_dataObj[key]) : `{${key}}`
             );
 
             if (!content) return;
 
-            if (sourceType === 'qrcode') {
+            if (source_type === 'qrcode') {
               src = await QRCode.toDataURL(content, { margin: 1, errorCorrectionLevel: 'M' });
-            } else if (sourceType === 'barcode') {
+            } else if (source_type === 'barcode') {
               // Generate barcode on Canvas (converts to PNG for backend compatibility)
               const canvas = document.createElement('canvas');
               JsBarcode(canvas, content, {
@@ -128,15 +128,15 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       isMounted = false;
       clearTimeout(debounceTimer);
     };
-  }, [template.fields, testDataObj]);
+  }, [template.fields, test_dataObj]);
 
   // Initialize Viewport (Center the label)
   useEffect(() => {
     if (containerSize.width === 0 || containerSize.height === 0) return;
     if (viewState.scale !== 1.0 || viewState.x !== 0 || viewState.y !== 0) return;
 
-    const labelWidth = (template.widthMm ?? template.width ?? 0) * MM_TO_PX_SCALE;
-    const labelHeight = (template.heightMm ?? template.height ?? 0) * MM_TO_PX_SCALE;
+    const labelWidth = (template.width_mm ?? template.width ?? 0) * MM_TO_PX_SCALE;
+    const labelHeight = (template.height_mm ?? template.height ?? 0) * MM_TO_PX_SCALE;
     const padding = 40;
 
     // Calculate available area respecting insets
@@ -153,7 +153,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
     setViewState({ x, y, scale: initialScale });
     setNeedsRedraw(true);
-  }, [containerSize, template.widthMm, template.heightMm, template.width, template.height, viewState, visibleAreaInsets]);
+  }, [containerSize, template.width_mm, template.height_mm, template.width, template.height, viewState, visibleAreaInsets]);
 
   // Ensure selected field is visible
   useEffect(() => {
@@ -230,14 +230,14 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
   // Helper: Get padding in pixels
   const getPadding = useCallback(() => ({
-    x: (template.paddingMmX || 0) * MM_TO_PX_SCALE,
-    y: (template.paddingMmY || 0) * MM_TO_PX_SCALE
-  }), [template.paddingMmX, template.paddingMmY]);
+    x: (template.padding_mm_x || 0) * MM_TO_PX_SCALE,
+    y: (template.padding_mm_y || 0) * MM_TO_PX_SCALE
+  }), [template.padding_mm_x, template.padding_mm_y]);
 
   // Pre-render static background (grid + paper shadow) to OffscreenCanvas
   const renderBackground = useCallback(() => {
-    const labelWidth = (template.widthMm ?? template.width ?? 0) * MM_TO_PX_SCALE;
-    const labelHeight = (template.heightMm ?? template.height ?? 0) * MM_TO_PX_SCALE;
+    const labelWidth = (template.width_mm ?? template.width ?? 0) * MM_TO_PX_SCALE;
+    const labelHeight = (template.height_mm ?? template.height ?? 0) * MM_TO_PX_SCALE;
 
     if (!backgroundCanvasRef.current ||
         backgroundCanvasRef.current.width !== labelWidth ||
@@ -261,7 +261,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
     // Grid removed from background to avoid duplication and confusion when offset is applied
     // The grid will be drawn in drawTemplate relative to content
-  }, [template.widthMm, template.heightMm, template.width, template.height]);
+  }, [template.width_mm, template.height_mm, template.width, template.height]);
 
   // Draw template on canvas (optimized)
   const drawTemplate = useCallback(() => {
@@ -285,8 +285,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
     ctx.translate(viewState.x, viewState.y);
     ctx.scale(viewState.scale, viewState.scale);
 
-    const labelWidth = (template.widthMm ?? template.width ?? 0) * MM_TO_PX_SCALE;
-    const labelHeight = (template.heightMm ?? template.height ?? 0) * MM_TO_PX_SCALE;
+    const labelWidth = (template.width_mm ?? template.width ?? 0) * MM_TO_PX_SCALE;
+    const labelHeight = (template.height_mm ?? template.height ?? 0) * MM_TO_PX_SCALE;
     const { x: paddingX, y: paddingY } = getPadding();
 
     // Calculate paper position
@@ -362,18 +362,18 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       ctx.clip();
 
       if (field.type === 'text') {
-        const fontSize = field.fontSize;
-        const fontStyle = field.fontWeight === 'bold' ? 'bold' : 'normal';
-        const fontFamily = field.fontFamily || 'Arial';
-        ctx.font = `${fontStyle} ${fontSize}px "${fontFamily}"`;
+        const font_size = field.font_size;
+        const fontStyle = field.font_weight === 'bold' ? 'bold' : 'normal';
+        const font_family = field.font_family || 'Arial';
+        ctx.font = `${fontStyle} ${font_size}px "${font_family}"`;
         ctx.fillStyle = '#000000';
         ctx.textBaseline = 'top';
 
         // Get display text (with injected test data)
         let displayText = field.template || field.name || '';
-        if (testDataObj && field.template) {
+        if (test_dataObj && field.template) {
           displayText = field.template.replace(/\{(\w+)\}/g, (_, key) =>
-            testDataObj[key] !== undefined ? String(testDataObj[key]) : `{${key}}`
+            test_dataObj[key] !== undefined ? String(test_dataObj[key]) : `{${key}}`
           );
         }
 
@@ -396,10 +396,10 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
         lines.push(line);
 
         // Calculate position based on alignment
-        const lineHeight = fontSize * 1.2;
+        const lineHeight = font_size * 1.2;
         const totalTextHeight = lines.length * lineHeight;
         const align = field.alignment || 'left';
-        const verticalAlign = (field as LabelField & { verticalAlign?: string }).verticalAlign || 'top';
+        const vertical_align = (field as LabelField & { vertical_align?: string }).vertical_align || 'top';
 
         ctx.textAlign = align as CanvasTextAlign;
         const x = align === 'center' ? field.x + field.width / 2
@@ -407,9 +407,9 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
                 : field.x + 4;
 
         let y = field.y + 4;
-        if (verticalAlign === 'middle') {
-          y = field.y + (field.height - totalTextHeight) / 2 + fontSize * 0.1;
-        } else if (verticalAlign === 'bottom') {
+        if (vertical_align === 'middle') {
+          y = field.y + (field.height - totalTextHeight) / 2 + font_size * 0.1;
+        } else if (vertical_align === 'bottom') {
           y = field.y + field.height - totalTextHeight - 4;
         }
 
@@ -419,7 +419,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       } else if (field.type === 'image' || field.type === 'barcode' || field.type === 'qrcode') {
         const img = fieldImages[field.id];
         if (img?.complete && img.naturalWidth > 0) {
-          if (field.maintainAspectRatio) {
+          if (field.maintain_aspect_ratio) {
             const aspect = img.width / img.height;
             let drawW = field.width;
             let drawH = field.height;
@@ -498,7 +498,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
 
     ctx.restore();
     setNeedsRedraw(false);
-  }, [template, selectedFieldId, draggingField, containerSize, viewState, fieldImages, testDataObj, renderBackground, showOffsetBorder, getPadding]);
+  }, [template, selectedFieldId, draggingField, containerSize, viewState, fieldImages, test_dataObj, renderBackground, showOffsetBorder, getPadding]);
 
   // Continuous render loop for smooth interactions
   useEffect(() => {
@@ -533,7 +533,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       const field = template.fields[i];
       if (field.type === 'separator') {
         // Separator is drawn relative to padding too
-        if (x >= 8 && x <= (template.widthMm ?? template.width ?? 0) * MM_TO_PX_SCALE - 8 && Math.abs(y - field.y) <= 5) return field;
+        if (x >= 8 && x <= (template.width_mm ?? template.width ?? 0) * MM_TO_PX_SCALE - 8 && Math.abs(y - field.y) <= 5) return field;
         continue;
       }
       if (x >= field.x && x <= field.x + field.width &&
@@ -542,7 +542,7 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
       }
     }
     return null;
-  }, [template.fields, template.widthMm, template.width]);
+  }, [template.fields, template.width_mm, template.width]);
 
   const getResizeHandle = useCallback((
     field: LabelField, x: number, y: number
@@ -794,8 +794,8 @@ export const LabelTemplateEditor: React.FC<LabelTemplateEditorProps> = ({
         <button
           onClick={() => {
             if (containerSize.width === 0) return;
-            const labelWidth = (template.widthMm ?? template.width ?? 0) * MM_TO_PX_SCALE;
-            const labelHeight = (template.heightMm ?? template.height ?? 0) * MM_TO_PX_SCALE;
+            const labelWidth = (template.width_mm ?? template.width ?? 0) * MM_TO_PX_SCALE;
+            const labelHeight = (template.height_mm ?? template.height ?? 0) * MM_TO_PX_SCALE;
             const padding = 40;
 
             // Calculate available area respecting insets

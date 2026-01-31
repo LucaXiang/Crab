@@ -22,16 +22,16 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
 
   // Get image URL for preview
   // Priority: pending local path > uploaded hash
-  const imageHash = field?.sourceType === 'image' && !field?._pendingImagePath ? field?.template : null;
+  const imageHash = field?.source_type === 'image' && !field?._pending_image_path ? field?.template : null;
   const [hashUrl] = useImageUrl(imageHash);
 
   // Convert local path to asset URL for preview
   const previewUrl = useMemo(() => {
-    if (field?._pendingImagePath) {
-      return convertFileSrc(field._pendingImagePath);
+    if (field?._pending_image_path) {
+      return convertFileSrc(field._pending_image_path);
     }
     return hashUrl;
-  }, [field?._pendingImagePath, hashUrl]);
+  }, [field?._pending_image_path, hashUrl]);
 
   if (!field) {
     return (
@@ -59,14 +59,14 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
       if (!file || Array.isArray(file)) return;
 
       // Save local path for preview, actual upload happens on template save
-      handleUpdate({ _pendingImagePath: file, template: '' });
+      handleUpdate({ _pending_image_path: file, template: '' });
     } catch (e) {
       console.error('Failed to select image:', e);
     }
   };
 
   const handleClearImage = () => {
-    handleUpdate({ template: '', _pendingImagePath: undefined });
+    handleUpdate({ template: '', _pending_image_path: undefined });
   };
 
   const renderAlignIcon = (align: TextAlign) => {
@@ -192,8 +192,8 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.font_size")}</label>
                   <NumberInput
-                    value={field.fontSize}
-                    onValueChange={(val) => handleUpdate({ fontSize: val })}
+                    value={field.font_size}
+                    onValueChange={(val) => handleUpdate({ font_size: val })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     min="6"
                     max="48"
@@ -202,8 +202,8 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.font_family")}</label>
                   <select
-                    value={field.fontFamily || 'Arial'}
-                    onChange={(e) => handleUpdate({ fontFamily: e.target.value })}
+                    value={field.font_family || 'Arial'}
+                    onChange={(e) => handleUpdate({ font_family: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="Arial">{t('fonts.arial')}</option>
@@ -218,8 +218,8 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t("settings.label.font_style")}</label>
               <select
-                value={field.fontWeight || 'normal'}
-                onChange={(e) => handleUpdate({ fontWeight: e.target.value })}
+                value={field.font_weight || 'normal'}
+                onChange={(e) => handleUpdate({ font_weight: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="normal">{t("settings.label.style_regular")}</option>
@@ -254,10 +254,10 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                     {(['top', 'middle', 'bottom'] as VerticalAlign[]).map((align) => (
                       <button
                         key={align}
-                        onClick={() => handleUpdate({ verticalAlign: align })}
+                        onClick={() => handleUpdate({ vertical_align: align })}
                         title={t(`settings.align${align.charAt(0).toUpperCase() + align.slice(1)}`) || align}
                         className={`flex-1 p-2 rounded-lg border transition-all flex items-center justify-center ${
-                          (field.verticalAlign ?? 'top') === align
+                          (field.vertical_align ?? 'top') === align
                             ? 'border-blue-500 bg-blue-50 text-blue-600'
                             : 'border-gray-300 text-gray-500 hover:border-gray-400 hover:bg-gray-50'
                         }`}
@@ -280,8 +280,8 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                  {t("settings.label.source_type")}
                </label>
                <select
-                 value={field.sourceType || 'image'}
-                 onChange={(e) => handleUpdate({ sourceType: e.target.value as 'productImage' | 'qrCode' | 'barcode' | 'image', template: '' })}
+                 value={field.source_type || 'image'}
+                 onChange={(e) => handleUpdate({ source_type: e.target.value as 'productImage' | 'qrCode' | 'barcode' | 'image', template: '' })}
                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                >
                  <option value="image">{t("settings.label.source_type_image")}</option>
@@ -291,8 +291,8 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                </select>
              </div>
 
-             {/* Static Image Upload (only for 'image' sourceType) */}
-             {field.sourceType === 'image' && (
+             {/* Static Image Upload (only for 'image' source_type) */}
+             {field.source_type === 'image' && (
                <div>
                  <label className="block text-sm font-medium text-gray-700 mb-2">
                    {t("settings.label.static_image")}
@@ -304,7 +304,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                        alt="Preview"
                        className="w-full h-32 object-contain bg-gray-100 rounded-lg border border-gray-200"
                      />
-                     {field._pendingImagePath && (
+                     {field._pending_image_path && (
                        <div className="absolute top-2 left-2 px-2 py-0.5 bg-amber-500 text-white text-xs rounded-full">
                          {t("settings.label.pending_upload")}
                        </div>
@@ -339,8 +339,8 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                </div>
              )}
 
-             {/* Content Template (for dynamic sourceTypes) */}
-             {field.sourceType !== 'image' && (
+             {/* Content Template (for dynamic source_types) */}
+             {field.source_type !== 'image' && (
                <div>
                  <label className="block text-sm font-medium text-gray-700 mb-1">
                    {t("settings.label.content_template")}
@@ -350,7 +350,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                     value={field.template || ''}
                     onChange={(e) => handleUpdate({ template: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-                    placeholder={field.sourceType === 'productImage' ? '{product_image}' : field.sourceType === 'qrCode' ? '{product_code}' : '{barcode}'}
+                    placeholder={field.source_type === 'productImage' ? '{product_image}' : field.source_type === 'qrCode' ? '{product_code}' : '{barcode}'}
                  />
                  <p className="mt-1 text-xs text-gray-500">
                     {t("settings.label.image_template_hint")}
@@ -362,12 +362,12 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
              <div className="flex items-center gap-2">
                <input
                  type="checkbox"
-                 id="maintainAspectRatio"
-                 checked={field.maintainAspectRatio ?? true}
-                 onChange={(e) => handleUpdate({ maintainAspectRatio: e.target.checked })}
+                 id="maintain_aspect_ratio"
+                 checked={field.maintain_aspect_ratio ?? true}
+                 onChange={(e) => handleUpdate({ maintain_aspect_ratio: e.target.checked })}
                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
                />
-               <label htmlFor="maintainAspectRatio" className="text-sm text-gray-600 select-none cursor-pointer">
+               <label htmlFor="maintain_aspect_ratio" className="text-sm text-gray-600 select-none cursor-pointer">
                  {t("settings.label.maintain_aspect_ratio")}
                </label>
              </div>

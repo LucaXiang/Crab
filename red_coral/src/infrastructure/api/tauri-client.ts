@@ -10,6 +10,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useBridgeStore } from '@/core/stores/bridge';
+import { t } from '@/infrastructure/i18n';
+import { friendlyError } from '@/utils/error/friendlyError';
 import type {
   ApiResponse,
   LoginResponseData,
@@ -39,8 +41,8 @@ import type {
   AttributeListData,
   RoleListData,
   RolePermissionListData,
-  ProductAttribute,
-  ProductAttributeListData,
+  AttributeBindingFull,
+  AttributeBinding,
   Employee,
   PriceRule,
   PriceRuleCreate,
@@ -100,17 +102,23 @@ function handleAuthError(code: number) {
   }
 }
 
-/**
- * 调用 Tauri command 并自动解包 ApiResponse
- * 返回 data 字段，错误时抛出 ApiError
- * 认证错误（1001/1003/1005）会自动清除前端认证状态
- */
+/** 根据错误码查找本地化消息 */
+function localizeErrorCode(code: number): string {
+  const key = `errors.${code}`;
+  const localized = t(key);
+  if (localized === key) {
+    console.warn(`[invokeApi] Missing i18n for error code ${code}, add to zh-CN.json`);
+    return `${t('error.friendly.unknown')} (${code})`;
+  }
+  return localized;
+}
+
 export async function invokeApi<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {
     const response = await invoke<ApiResponse<T>>(command, args);
     if (response.code && response.code > 0) {
       handleAuthError(response.code);
-      throw new ApiError(response.code, response.message, response.details ?? undefined);
+      throw new ApiError(response.code, localizeErrorCode(response.code), response.details ?? undefined);
     }
     return response.data as T;
   } catch (error) {
@@ -118,8 +126,8 @@ export async function invokeApi<T>(command: string, args?: Record<string, unknow
       handleAuthError(error.code);
       throw error;
     }
-    const message = error instanceof Error ? error.message : String(error);
-    throw new ApiError(9001, message); // 9001 = InternalError
+    const raw = error instanceof Error ? error.message : String(error);
+    throw new ApiError(9001, friendlyError(raw));
   }
 }
 
@@ -240,13 +248,12 @@ export class TauriApiClient {
 
   // ============ Product Attributes ============
 
-  async fetchProductAttributes(productId: string): Promise<ProductAttribute[]> {
-    const data = await invokeAndUnwrap<ProductAttributeListData>('list_product_attributes', { productId });
-    return data.product_attributes;
+  async fetchProductAttributes(productId: string): Promise<AttributeBindingFull[]> {
+    return await invokeAndUnwrap<AttributeBindingFull[]>('list_product_attributes', { productId });
   }
 
-  async bindProductAttribute(data: CreateProductAttributeRequest): Promise<ProductAttribute> {
-    const result = await invokeAndUnwrap<{ binding: ProductAttribute }>('bind_product_attribute', { data });
+  async bindProductAttribute(data: CreateProductAttributeRequest): Promise<AttributeBinding> {
+    const result = await invokeAndUnwrap<{ binding: AttributeBinding }>('bind_product_attribute', { data });
     return result.binding;
   }
 

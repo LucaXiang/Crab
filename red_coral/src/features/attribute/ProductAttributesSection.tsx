@@ -38,15 +38,15 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
     }
   }, []);
 
-  // Load options for selected attributes
+  // Load options for selected + inherited attributes
   useEffect(() => {
-    selectedAttributeIds.forEach(id => {
+    [...selectedAttributeIds, ...inheritedAttributeIds].forEach(id => {
       const options = getOptionsByAttributeId(id);
       if (options.length === 0) {
         loadOptions(id);
       }
     });
-  }, [selectedAttributeIds]);
+  }, [selectedAttributeIds, inheritedAttributeIds]);
 
   const handleAddAttribute = (attributeId: string) => {
     onChange([...selectedAttributeIds, attributeId]);
@@ -82,8 +82,11 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
   };
 
   const activeAttributes = attributes.filter(attr => attr.is_active);
-  const selectedAttributes = activeAttributes.filter(attr => selectedAttributeIds.includes(String(attr.id)));
-  const unselectedAttributes = activeAttributes.filter(attr => !selectedAttributeIds.includes(String(attr.id)));
+  const allSelectedIds = [...selectedAttributeIds, ...inheritedAttributeIds];
+  const selectedAttributes = activeAttributes.filter(attr => allSelectedIds.includes(String(attr.id)));
+  const unselectedAttributes = activeAttributes.filter(attr =>
+    !allSelectedIds.includes(String(attr.id))
+  );
 
   const filteredUnselected = unselectedAttributes.filter(attr =>
     attr.name.toLowerCase().includes(searchTerm.toLowerCase())

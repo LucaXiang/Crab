@@ -188,27 +188,27 @@ impl CatalogService {
 
         let bindings: Vec<BindingRow> = self
             .db
-            .query("SELECT * FROM attribute_binding WHERE in.is_active = true FETCH out")
+            .query("SELECT * FROM has_attribute WHERE in.is_active = true FETCH out")
             .await?
             .take(0)?;
 
-        // Group bindings by product_id
+        // Group bindings by source (product or category)
         let mut product_bindings: HashMap<String, Vec<AttributeBindingFull>> = HashMap::new();
+        let mut category_bindings: HashMap<String, Vec<AttributeBindingFull>> = HashMap::new();
         for binding in bindings {
             let from_id = binding.from.to_string();
-            // Only include product bindings (not category bindings)
+            let full = AttributeBindingFull {
+                id: binding.id,
+                attribute: binding.to,
+                is_required: binding.is_required,
+                display_order: binding.display_order,
+                default_option_idx: binding.default_option_idx,
+                is_inherited: false, // will be set correctly below
+            };
             if from_id.starts_with("product:") {
-                let full = AttributeBindingFull {
-                    id: binding.id,
-                    attribute: binding.to,
-                    is_required: binding.is_required,
-                    display_order: binding.display_order,
-                    default_option_idx: binding.default_option_idx,
-                };
-                product_bindings
-                    .entry(from_id)
-                    .or_default()
-                    .push(full);
+                product_bindings.entry(from_id).or_default().push(full);
+            } else if from_id.starts_with("category:") {
+                category_bindings.entry(from_id).or_default().push(full);
             }
         }
 
@@ -226,10 +226,29 @@ impl CatalogService {
                 // Tags are already fetched as full Tag objects (name, color, etc.)
                 let tags = product.tags;
 
-                // Get attribute bindings for this product
-                let attributes = product_bindings
+                // Merge: category inherited attributes + product direct attributes
+                let category_id = product.category.to_string();
+                let mut attributes = product_bindings
                     .remove(&product_id)
                     .unwrap_or_default();
+
+                // Collect product's own attribute IDs for dedup
+                let product_attr_ids: std::collections::HashSet<String> = attributes.iter()
+                    .filter_map(|b| b.attribute.id.as_ref().map(|id| id.to_string()))
+                    .collect();
+
+                // Add inherited category attributes (skip if product already has direct binding)
+                if let Some(cat_bindings) = category_bindings.get(&category_id) {
+                    for cb in cat_bindings {
+                        let attr_id = cb.attribute.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+                        if !product_attr_ids.contains(&attr_id) {
+                            let mut inherited = cb.clone();
+                            inherited.id = None; // Inherited bindings have no product-level edge ID
+                            inherited.is_inherited = true;
+                            attributes.push(inherited);
+                        }
+                    }
+                }
 
                 let full = ProductFull {
                     id: product.id,
@@ -300,6 +319,34 @@ impl CatalogService {
             .collect();
         products.sort_by_key(|p| p.sort_order);
         products
+    }
+
+    /// Refresh a single product's cache entry
+    pub async fn refresh_product_cache(&self, product_id: &str) -> RepoResult<()> {
+        let full = self.fetch_product_full(product_id).await?;
+        let mut cache = self.products.write();
+        cache.insert(product_id.to_string(), full);
+        Ok(())
+    }
+
+    /// Refresh cached products in a category (re-fetch from DB to pick up inherited attribute changes)
+    pub async fn refresh_products_in_category(&self, category_id: &str) -> RepoResult<()> {
+        let product_ids: Vec<String> = {
+            let cache = self.products.read();
+            cache
+                .iter()
+                .filter(|(_, p)| p.category.to_string() == category_id)
+                .map(|(id, _)| id.clone())
+                .collect()
+        };
+
+        for product_id in product_ids {
+            let full = self.fetch_product_full(&product_id).await?;
+            let mut cache = self.products.write();
+            cache.insert(product_id, full);
+        }
+
+        Ok(())
     }
 
     // =========================================================================
@@ -502,9 +549,9 @@ impl CatalogService {
             .await
             .unwrap_or_default();
 
-        // Clean up attribute_binding edges
+        // Clean up has_attribute edges
         self.db
-            .query("DELETE attribute_binding WHERE in = $product")
+            .query("DELETE has_attribute WHERE in = $product")
             .bind(("product", thing.clone()))
             .await?;
 
@@ -620,14 +667,15 @@ impl CatalogService {
             default_option_idx: Option<i32>,
         }
 
+        // Fetch product's direct attribute bindings
         let mut bindings_result = self
             .db
-            .query("SELECT * FROM attribute_binding WHERE in = $product FETCH out")
+            .query("SELECT * FROM has_attribute WHERE in = $product FETCH out")
             .bind(("product", thing))
             .await?;
         let bindings: Vec<BindingRow> = bindings_result.take(0)?;
 
-        let attributes: Vec<AttributeBindingFull> = bindings
+        let mut attributes: Vec<AttributeBindingFull> = bindings
             .into_iter()
             .map(|b| AttributeBindingFull {
                 id: b.id,
@@ -635,8 +683,36 @@ impl CatalogService {
                 is_required: b.is_required,
                 display_order: b.display_order,
                 default_option_idx: b.default_option_idx,
+                is_inherited: false,
             })
             .collect();
+
+        // Merge inherited category attributes
+        let cat_thing = product.category.clone();
+        let mut cat_bindings_result = self
+            .db
+            .query("SELECT * FROM has_attribute WHERE in = $cat AND out.is_active = true FETCH out")
+            .bind(("cat", cat_thing))
+            .await?;
+        let cat_bindings: Vec<BindingRow> = cat_bindings_result.take(0)?;
+
+        let product_attr_ids: std::collections::HashSet<String> = attributes.iter()
+            .filter_map(|b| b.attribute.id.as_ref().map(|id| id.to_string()))
+            .collect();
+
+        for cb in cat_bindings {
+            let attr_id = cb.to.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+            if !product_attr_ids.contains(&attr_id) {
+                attributes.push(AttributeBindingFull {
+                    id: None, // Inherited bindings have no product-level edge ID
+                    attribute: cb.to,
+                    is_required: cb.is_required,
+                    display_order: cb.display_order,
+                    default_option_idx: cb.default_option_idx,
+                    is_inherited: true,
+                });
+            }
+        }
 
         // Tags are already fetched as full Tag objects
         let tags = product.tags;
@@ -890,9 +966,9 @@ impl CatalogService {
             ));
         }
 
-        // Clean up attribute_binding edges
+        // Clean up has_attribute edges
         self.db
-            .query("DELETE attribute_binding WHERE in = $category")
+            .query("DELETE has_attribute WHERE in = $category")
             .bind(("category", cat_thing.clone()))
             .await?;
 

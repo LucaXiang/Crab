@@ -13,6 +13,7 @@ import { toast } from '@/presentation/components/Toast';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 import { ProductForm } from './ProductForm';
 import { createProduct, updateProduct, deleteProduct, loadProductFullData } from './mutations';
+import { createTauriClient } from '@/infrastructure/api';
 import { DeleteConfirmation } from '@/shared/components/DeleteConfirmation';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
@@ -34,6 +35,7 @@ export const ProductModal: React.FC = React.memo(() => {
   const [isSaving, setIsSaving] = useState(false);
   const [inheritedAttributeIds, setInheritedAttributeIds] = useState<string[]>([]);
   const defaultCategorySet = useRef(false);
+  const initialCategoryRef = useRef<string | null>(null);
 
   // Check if this modal is for PRODUCT entity
   const isProductModal = modal.open && modal.entity === 'PRODUCT';
@@ -72,6 +74,9 @@ export const ProductModal: React.FC = React.memo(() => {
       const loadData = async () => {
         try {
           const fullData = await loadProductFullData(String(productId));
+          if (fullData.inherited_attribute_ids) {
+            setInheritedAttributeIds(fullData.inherited_attribute_ids);
+          }
           setAsyncFormData(fullData);
         } catch (e) {
           setLoadErrorMessage(getErrorMessage(e));
@@ -79,7 +84,32 @@ export const ProductModal: React.FC = React.memo(() => {
       };
       loadData();
     }
+    // Reset initial category tracking
+    initialCategoryRef.current = null;
   }, [isProductModal, modal.open, modal.action, modal.data?.id]);
+
+  // Fetch inherited attribute IDs when category changes
+  // For EDIT mode, skip the first run (server-computed data is authoritative)
+  useEffect(() => {
+    if (!isProductModal || !formData.category) return;
+    const categoryStr = String(formData.category);
+    if (initialCategoryRef.current === null) {
+      // First time category is set — record it, don't fetch (server data is authoritative for EDIT)
+      initialCategoryRef.current = categoryStr;
+      if (modal.action === 'EDIT') return; // Skip; loadProductFullData already set inherited IDs
+    }
+    // Fetch inherited attributes when category actually changes
+    const fetchInherited = async () => {
+      try {
+        const api = createTauriClient();
+        const catAttrs = await api.listCategoryAttributes(categoryStr);
+        setInheritedAttributeIds(catAttrs.map((a) => a.id).filter(Boolean) as string[]);
+      } catch {
+        setInheritedAttributeIds([]);
+      }
+    };
+    fetchInherited();
+  }, [isProductModal, formData.category]);
 
   if (!isProductModal) return null;
 

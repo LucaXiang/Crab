@@ -278,6 +278,7 @@ impl From<ProductFull> for shared::models::ProductFull {
                 is_required: b.is_required,
                 display_order: b.display_order,
                 default_option_idx: b.default_option_idx,
+                is_inherited: b.is_inherited,
             }).collect(),
             tags: p.tags.into_iter().map(|t| shared::models::Tag {
                 id: t.id.map(|id| id.to_string()),

@@ -92,7 +92,7 @@ TypeScript (前端) ↔ Rust (后端) 类型必须完全匹配：
 | **异步运行时** | `tokio`，trait object 场景用 `#[async_trait]` |
 | **共享状态** | `Arc` 包装，`ServerState` 设计为 clone-cheap |
 | **依赖管理** | 所有依赖在 workspace `Cargo.toml` 统一声明 |
-| **Tauri 命令参数** | Tauri 2 默认 snake_case→camelCase 映射；前端 `invokeApi` 顶层参数用 camelCase，struct 内部字段保持 snake_case |
+| **Tauri 命令参数** | Tauri 2 **仅自动映射顶层命令参数名** (camelCase↔snake_case)，不要在 Rust 命令上加 `rename_all`；**嵌套 struct 字段由 serde 反序列化，前端发送时必须手动转为 snake_case**，接收时手动转为 camelCase |
 
 ### 架构原则
 

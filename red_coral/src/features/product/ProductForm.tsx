@@ -158,9 +158,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     { value: 0, label: t('settings.product.form.tax_rate_exempt') },
   ];
 
-  // Get selected attribute objects for display
+  // Get selected attribute objects for display (direct + inherited)
+  const allSelectedIds = [
+    ...(formData.selected_attribute_ids ?? []),
+    ...inheritedAttributeIds,
+  ];
   const selectedAttributes = allAttributes.filter(attr =>
-    formData.selected_attribute_ids?.includes(attr.id)
+    allSelectedIds.includes(attr.id)
   );
 
   return (

@@ -81,11 +81,15 @@ pub struct AttributeUpdate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeBinding {
     pub id: Option<String>,
-    /// Source: product ID or category ID
+    /// Source: product ID or category ID (SurrealDB `in` field)
+    #[serde(rename = "in")]
     pub from: String,
-    /// Target: attribute ID
+    /// Target: attribute ID (SurrealDB `out` field)
+    #[serde(rename = "out")]
     pub to: String,
+    #[serde(default)]
     pub is_required: bool,
+    #[serde(default)]
     pub display_order: i32,
     /// Override attribute's default option (optional)
     pub default_option_idx: Option<i32>,
@@ -104,4 +108,7 @@ pub struct AttributeBindingFull {
     pub display_order: i32,
     /// Override attribute's default option (optional)
     pub default_option_idx: Option<i32>,
+    /// Whether this binding is inherited from the product's category
+    #[serde(default)]
+    pub is_inherited: bool,
 }

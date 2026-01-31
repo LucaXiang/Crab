@@ -172,4 +172,7 @@ pub struct AttributeBindingFull {
     pub display_order: i32,
     /// Override attribute's default option
     pub default_option_idx: Option<i32>,
+    /// Whether this binding is inherited from the product's category
+    #[serde(default)]
+    pub is_inherited: bool,
 }

@@ -213,7 +213,7 @@ features/<name>/
 | **服务端权威** | 不做乐观更新，所有状态以服务端响应为准 |
 | **类型对齐** | `core/domain/types/api/` 必须与 Rust `shared/models` 对齐 |
 | **snake_case** | 表单字段和 API 数据统一使用 snake_case |
-| **Tauri 命令参数** | Tauri 2 默认将 Rust snake_case 参数映射为前端 camelCase，`invokeApi` 调用时**顶层参数 key 必须用 camelCase**（如 `sinceSequence`, `orderId`）；struct 内部字段通过 serde 反序列化，保持 snake_case |
+| **Tauri 命令参数** | Tauri 2 **仅自动映射顶层命令参数名** (camelCase↔snake_case)，不要加 `rename_all`；`invokeApi` 顶层参数用 camelCase（如 `sinceSequence`, `orderId`）；**嵌套 struct/数组内的字段由 serde 反序列化，前端必须手动转为 snake_case 发送**（如 `LabelField.dataSource` → `data_source`），接收时手动转回 camelCase |
 | **懒加载** | Tauri Client 使用懒加载，禁止模块作用域直接创建 |
 | **错误处理** | 关键加载失败使用 dialog 阻断，禁止静默错误 |
 | **时间戳** | `number` 类型 (i64 Unix 毫秒)，禁止 string 格式 |

@@ -189,8 +189,12 @@ impl AttributeRepository {
         display_order: i32,
         default_option_idx: Option<i32>,
     ) -> RepoResult<AttributeBinding> {
-        let product_thing = RecordId::from_table_key("product", product_id);
-        let attr_thing = RecordId::from_table_key(TABLE, attr_id);
+        let product_thing: RecordId = product_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
+        let attr_thing: RecordId = attr_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid attribute ID: {}", attr_id)))?;
         let mut result = self
             .base
             .db()
@@ -219,8 +223,12 @@ impl AttributeRepository {
         display_order: i32,
         default_option_idx: Option<i32>,
     ) -> RepoResult<AttributeBinding> {
-        let category_thing = RecordId::from_table_key("category", category_id);
-        let attr_thing = RecordId::from_table_key(TABLE, attr_id);
+        let category_thing: RecordId = category_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid category ID: {}", category_id)))?;
+        let attr_thing: RecordId = attr_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid attribute ID: {}", attr_id)))?;
         let mut result = self
             .base
             .db()
@@ -242,8 +250,12 @@ impl AttributeRepository {
 
     /// Unlink attribute from product
     pub async fn unlink_from_product(&self, product_id: &str, attr_id: &str) -> RepoResult<bool> {
-        let product_thing = RecordId::from_table_key("product", product_id);
-        let attr_thing = RecordId::from_table_key(TABLE, attr_id);
+        let product_thing: RecordId = product_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
+        let attr_thing: RecordId = attr_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid attribute ID: {}", attr_id)))?;
         self.base
             .db()
             .query("DELETE has_attribute WHERE in = $from AND out = $to")
@@ -255,8 +267,12 @@ impl AttributeRepository {
 
     /// Unlink attribute from category
     pub async fn unlink_from_category(&self, category_id: &str, attr_id: &str) -> RepoResult<bool> {
-        let category_thing = RecordId::from_table_key("category", category_id);
-        let attr_thing = RecordId::from_table_key(TABLE, attr_id);
+        let category_thing: RecordId = category_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid category ID: {}", category_id)))?;
+        let attr_thing: RecordId = attr_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid attribute ID: {}", attr_id)))?;
         self.base
             .db()
             .query("DELETE has_attribute WHERE in = $from AND out = $to")
@@ -268,7 +284,9 @@ impl AttributeRepository {
 
     /// Get attributes for a product (Graph traversal)
     pub async fn find_by_product(&self, product_id: &str) -> RepoResult<Vec<Attribute>> {
-        let product_thing = RecordId::from_table_key("product", product_id);
+        let product_thing: RecordId = product_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
         let attrs: Vec<Attribute> = self
             .base
             .db()
@@ -281,7 +299,9 @@ impl AttributeRepository {
 
     /// Get attributes for a category (Graph traversal)
     pub async fn find_by_category(&self, category_id: &str) -> RepoResult<Vec<Attribute>> {
-        let category_thing = RecordId::from_table_key("category", category_id);
+        let category_thing: RecordId = category_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid category ID: {}", category_id)))?;
         let attrs: Vec<Attribute> = self
             .base
             .db()
@@ -298,7 +318,9 @@ impl AttributeRepository {
         &self,
         product_id: &str,
     ) -> RepoResult<Vec<(AttributeBinding, Attribute)>> {
-        let product_thing = RecordId::from_table_key("product", product_id);
+        let product_thing: RecordId = product_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
         // Query the has_attribute edge table and fetch the attribute
         let mut result = self
             .base
@@ -349,13 +371,14 @@ impl AttributeRepository {
     /// Get all attributes for a product (including inherited from category)
     pub async fn find_effective_for_product(&self, product_id: &str) -> RepoResult<Vec<Attribute>> {
         // Get product's category
-        let pid_owned = product_id.to_string();
+        let prod_thing: RecordId = product_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
         let mut result = self
             .base
             .db()
             .query(
                 r#"
-                LET $prod = type::thing("product", $pid);
                 LET $cat = (SELECT category FROM product WHERE id = $prod)[0].category;
 
                 -- Product direct attributes
@@ -368,7 +391,7 @@ impl AttributeRepository {
                 RETURN array::distinct(array::concat($prod_attrs, $cat_attrs));
                 "#
             )
-            .bind(("pid", pid_owned))
+            .bind(("prod", prod_thing))
             .await?;
 
         let attrs: Vec<Attribute> = result.take(0)?;

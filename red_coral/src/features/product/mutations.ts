@@ -176,15 +176,17 @@ export async function updateProduct(
   // Handle attribute bindings
   const selectedAttributeIds = formData.selected_attribute_ids || [];
 
-  // Get existing bindings
-  let existingBindings: { attributeId: string; id: string }[] = [];
+  // Get existing bindings (exclude inherited ones — they are managed at category level)
+  let existingBindings: { attributeId: string; id: string; defaultOptionIds?: string[] }[] = [];
   try {
     const productAttrs = await getApi().fetchProductAttributes(id);
-    // API returns relation records with 'to' pointing to attribute
-    existingBindings = (productAttrs ?? []).map((pa) => ({
-      attributeId: (pa as unknown as { to: string }).to,
-      id: pa.id as string
-    }));
+    existingBindings = (productAttrs ?? [])
+      .filter((pa) => !pa.is_inherited)
+      .map((pa) => ({
+        attributeId: pa.attribute.id,
+        id: pa.id as string,
+        defaultOptionIds: pa.default_option_idx != null ? [String(pa.default_option_idx)] : [],
+      }));
   } catch (error) {
     console.error('Failed to fetch existing attributes:', error);
   }
@@ -236,14 +238,16 @@ export async function loadProductFullData(productId: string) {
   const tags = productFull.tags ?? [];
   const specs = productFull.specs ?? [];
 
-  // Extract attribute bindings
-  const attributeIds = attributes.map((binding) => binding.attribute.id).filter(Boolean) as string[];
+  // Extract only direct (non-inherited) attribute bindings as editable selections
+  const directAttributes = attributes.filter((binding) => !binding.is_inherited);
+  const attributeIds = directAttributes.map((binding) => binding.attribute.id).filter(Boolean) as string[];
 
-  // Load default options from attributes
+  // Load default options: binding-level override > attribute-level default
+  // Only include direct (non-inherited) attributes for editable defaults
   const defaultOptions: Record<string, string[]> = {};
-  attributes.forEach((binding) => {
+  directAttributes.forEach((binding) => {
     const attrId = binding.attribute.id;
-    const defaultIdx = binding.attribute.default_option_idx;
+    const defaultIdx = binding.default_option_idx ?? binding.attribute.default_option_idx;
     if (attrId && defaultIdx !== null && defaultIdx !== undefined) {
       defaultOptions[attrId] = [String(defaultIdx)];
     }
@@ -257,9 +261,14 @@ export async function loadProductFullData(productId: string) {
   const price = defaultSpec?.price ?? 0;
   const externalId = defaultSpec?.external_id ?? undefined;
 
+  // Extract inherited attribute IDs for UI (shown as locked/read-only)
+  const inheritedAttributes = attributes.filter((binding) => binding.is_inherited);
+  const inheritedAttributeIds = inheritedAttributes.map((binding) => binding.attribute.id).filter(Boolean) as string[];
+
   return {
     selected_attribute_ids: attributeIds,
     attribute_default_options: defaultOptions,
+    inherited_attribute_ids: inheritedAttributeIds,
     specs,
     tags: tagIds,
     has_multi_spec: specs.length > 1,

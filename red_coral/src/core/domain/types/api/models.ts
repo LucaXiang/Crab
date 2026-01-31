@@ -179,6 +179,8 @@ export interface AttributeBindingFull {
   is_required: boolean;
   display_order: number;
   default_option_idx?: number;
+  /** Whether this binding is inherited from the product's category */
+  is_inherited?: boolean;
 }
 
 
@@ -265,10 +267,10 @@ export interface AttributeUpdate {
 
 export interface AttributeBinding {
   id: string;
-  /** Product or Category ID */
-  from: string;
-  /** Attribute ID */
-  to: string;
+  /** Product or Category ID (SurrealDB RELATE `in` field) */
+  in: string;
+  /** Attribute ID (SurrealDB RELATE `out` field) */
+  out: string;
   is_required: boolean;
   display_order: number;
   default_option_idx?: number;

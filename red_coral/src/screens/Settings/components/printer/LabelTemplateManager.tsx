@@ -60,11 +60,11 @@ export const LabelTemplateManager: React.FC = () => {
         name: templateName,
         width: templateWidth,
         height: templateHeight,
-        widthMm: templateWidth,
-        heightMm: templateHeight,
+        width_mm: templateWidth,
+        height_mm: templateHeight,
         padding: 2,
-        isDefault: false,
-        isActive: true,
+        is_default: false,
+        is_active: true,
         fields: [],
       });
 
@@ -87,7 +87,7 @@ export const LabelTemplateManager: React.FC = () => {
     }
   };
 
-  const handleDeleteTemplate = (templateId: string) => {
+  const handleDeleteTemplate = (template_id: string) => {
     if (templates.length === 1) {
       toast.error(t('settings.printer.alert.delete_last_template'));
       return;
@@ -99,12 +99,12 @@ export const LabelTemplateManager: React.FC = () => {
       description: t('settings.printer.alert.confirm_delete_desc'),
       onConfirm: async () => {
         try {
-          await deleteTemplate(templateId);
+          await deleteTemplate(template_id);
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
 
           // If deleted template was active, select another one
-          if (activeTemplateId === templateId) {
-            const remaining = templates.filter((t) => t.id !== templateId);
+          if (activeTemplateId === template_id) {
+            const remaining = templates.filter((t) => t.id !== template_id);
             if (remaining.length > 0) {
               setActiveLabelTemplateId(remaining[0].id);
             }
@@ -168,18 +168,18 @@ export const LabelTemplateManager: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {templates.map((template) => {
-          const isActive = template.id === activeTemplateId;
+          const is_active = template.id === activeTemplateId;
           return (
             <div
               key={template.id}
               onClick={() => setActiveLabelTemplateId(template.id)}
               className={`group bg-white rounded-2xl border p-5 transition-all duration-300 flex flex-col cursor-pointer relative ${
-                isActive
+                is_active
                   ? 'border-blue-500 shadow-md ring-2 ring-blue-100'
                   : 'border-gray-200 hover:shadow-lg hover:border-blue-200'
               }`}
             >
-              {isActive && (
+              {is_active && (
                 <div className="absolute top-4 right-4 bg-blue-500 text-white p-1 rounded-full shadow-sm">
                   <Check size={14} strokeWidth={3} />
                 </div>
@@ -188,7 +188,7 @@ export const LabelTemplateManager: React.FC = () => {
               <div className="flex justify-between items-start mb-4">
                 <div
                   className={`p-3 rounded-xl transition-colors ${
-                    isActive
+                    is_active
                       ? 'bg-blue-100 text-blue-700'
                       : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'
                   }`}
@@ -219,12 +219,12 @@ export const LabelTemplateManager: React.FC = () => {
                 </div>
               </div>
 
-              <h4 className={`font-bold mb-1 ${isActive ? 'text-blue-900' : 'text-gray-800'}`}>
+              <h4 className={`font-bold mb-1 ${is_active ? 'text-blue-900' : 'text-gray-800'}`}>
                 {template.name}
               </h4>
               <p className="text-sm text-gray-500 mb-6 flex items-center gap-2">
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-blue-400' : 'bg-gray-300'}`}
+                  className={`w-1.5 h-1.5 rounded-full ${is_active ? 'bg-blue-400' : 'bg-gray-300'}`}
                 ></span>
                 {template.width}mm × {template.height}mm
               </p>
@@ -235,7 +235,7 @@ export const LabelTemplateManager: React.FC = () => {
                   handleEditTemplate(template);
                 }}
                 className={`mt-auto w-full py-2.5 border font-medium rounded-xl transition-all flex items-center justify-center gap-2 ${
-                  isActive
+                  is_active
                     ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
                     : 'border-gray-200 text-gray-700 hover:bg-blue-600 hover:border-blue-600 hover:text-white'
                 }`}

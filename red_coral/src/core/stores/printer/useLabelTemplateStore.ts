@@ -1,7 +1,7 @@
 /**
  * Label Template Store - Fetches and manages label templates from server API
  *
- * Replaces localStorage-based storage with server-side persistence
+ * 类型统一使用 snake_case，与 Rust 后端 serde 一致，无需映射层
  */
 
 import { create } from 'zustand';
@@ -13,62 +13,55 @@ import { DEFAULT_LABEL_TEMPLATES } from '@/core/domain/types/print';
 // Lazy-load API client to avoid initialization issues
 const getApi = () => createTauriClient();
 
-// Map API snake_case to frontend camelCase
+// 从 API 响应提取 ID (去掉 "label_template:" 前缀)
 function mapApiToFrontend(apiTemplate: Record<string, unknown>): LabelTemplate {
   return {
-    id: (apiTemplate.id as string)?.split(':')[1] || apiTemplate.id as string, // Extract ID from "label_template:xxx"
-    name: apiTemplate.name as string,
-    description: apiTemplate.description as string | undefined,
-    width: apiTemplate.width as number,
-    height: apiTemplate.height as number,
+    ...apiTemplate,
+    id: (apiTemplate.id as string)?.split(':')[1] || apiTemplate.id as string,
     padding: apiTemplate.padding as number || 2,
     fields: (apiTemplate.fields as LabelField[]) || [],
-    isDefault: apiTemplate.is_default as boolean || false,
-    isActive: apiTemplate.is_active as boolean ?? true,
-    createdAt: apiTemplate.created_at as number || Date.now(),
-    updatedAt: apiTemplate.updated_at as number || Date.now(),
-    widthMm: apiTemplate.width as number,
-    heightMm: apiTemplate.height as number,
-    paddingMmX: apiTemplate.padding_mm_x as number,
-    paddingMmY: apiTemplate.padding_mm_y as number,
-    renderDpi: apiTemplate.render_dpi as number,
-    testData: apiTemplate.test_data as string,
-  };
+    is_default: apiTemplate.is_default as boolean || false,
+    is_active: apiTemplate.is_active as boolean ?? true,
+    created_at: apiTemplate.created_at as number || Date.now(),
+    updated_at: apiTemplate.updated_at as number || Date.now(),
+    width_mm: apiTemplate.width_mm as number ?? apiTemplate.width as number,
+    height_mm: apiTemplate.height_mm as number ?? apiTemplate.height as number,
+  } as LabelTemplate;
 }
 
-// Map frontend camelCase to API snake_case for create
-function mapFrontendToApiCreate(template: Partial<LabelTemplate>): LabelTemplateCreate {
+// 构造 Create payload
+function toCreatePayload(template: Partial<LabelTemplate>): LabelTemplateCreate {
   return {
     name: template.name || '',
     description: template.description,
-    width: template.widthMm || template.width || 40,
-    height: template.heightMm || template.height || 30,
+    width: template.width_mm || template.width || 40,
+    height: template.height_mm || template.height || 30,
     fields: template.fields || [],
-    is_default: template.isDefault || false,
-    is_active: template.isActive ?? true,
-    padding_mm_x: template.paddingMmX,
-    padding_mm_y: template.paddingMmY,
-    render_dpi: template.renderDpi,
-    test_data: template.testData,
+    is_default: template.is_default || false,
+    is_active: template.is_active ?? true,
+    padding_mm_x: template.padding_mm_x,
+    padding_mm_y: template.padding_mm_y,
+    render_dpi: template.render_dpi,
+    test_data: template.test_data,
   };
 }
 
-// Map frontend camelCase to API snake_case for update
-function mapFrontendToApiUpdate(template: Partial<LabelTemplate>): LabelTemplateUpdate {
+// 构造 Update payload
+function toUpdatePayload(template: Partial<LabelTemplate>): LabelTemplateUpdate {
   const update: LabelTemplateUpdate = {};
   if (template.name !== undefined) update.name = template.name;
   if (template.description !== undefined) update.description = template.description;
   if (template.width !== undefined) update.width = template.width;
   if (template.height !== undefined) update.height = template.height;
   if (template.fields !== undefined) update.fields = template.fields;
-  if (template.isDefault !== undefined) update.is_default = template.isDefault;
-  if (template.isActive !== undefined) update.is_active = template.isActive;
-  if (template.widthMm !== undefined) update.width = template.widthMm;
-  if (template.heightMm !== undefined) update.height = template.heightMm;
-  if (template.paddingMmX !== undefined) update.padding_mm_x = template.paddingMmX;
-  if (template.paddingMmY !== undefined) update.padding_mm_y = template.paddingMmY;
-  if (template.renderDpi !== undefined) update.render_dpi = template.renderDpi;
-  if (template.testData !== undefined) update.test_data = template.testData;
+  if (template.is_default !== undefined) update.is_default = template.is_default;
+  if (template.is_active !== undefined) update.is_active = template.is_active;
+  if (template.width_mm !== undefined) update.width = template.width_mm;
+  if (template.height_mm !== undefined) update.height = template.height_mm;
+  if (template.padding_mm_x !== undefined) update.padding_mm_x = template.padding_mm_x;
+  if (template.padding_mm_y !== undefined) update.padding_mm_y = template.padding_mm_y;
+  if (template.render_dpi !== undefined) update.render_dpi = template.render_dpi;
+  if (template.test_data !== undefined) update.test_data = template.test_data;
   return update;
 }
 
@@ -128,7 +121,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
   createTemplate: async (templateData) => {
     set({ isLoading: true, error: null });
     try {
-      const createData = mapFrontendToApiCreate(templateData);
+      const createData = toCreatePayload(templateData);
       const rawCreated = await getApi().createLabelTemplate(createData);
       const created = mapApiToFrontend(rawCreated as unknown as Record<string, unknown>);
       set((state) => ({
@@ -147,7 +140,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
   updateTemplate: async (id, templateData) => {
     set({ isLoading: true, error: null });
     try {
-      const updateData = mapFrontendToApiUpdate(templateData);
+      const updateData = toUpdatePayload(templateData);
       const rawUpdated = await getApi().updateLabelTemplate(id, updateData);
       const updated = mapApiToFrontend(rawUpdated as unknown as Record<string, unknown>);
       set((state) => ({
@@ -183,7 +176,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     const duplicateData: Partial<LabelTemplate> = {
       ...template,
       name: `${template.name} (Copy)`,
-      isDefault: false,
+      is_default: false,
     };
     return get().createTemplate(duplicateData);
   },
@@ -201,13 +194,11 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     if (!state.isLoaded) return;
 
     if (!payload) {
-      // No payload, refetch all
       state.fetchAll(true);
       return;
     }
 
     const { id, action, data } = payload;
-    // Extract actual ID from "label_template:xxx" format
     const actualId = id.includes(':') ? id.split(':')[1] : id;
 
     switch (action) {
@@ -224,7 +215,6 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
             }
           });
         } else {
-          // No data provided, refetch
           state.fetchAll(true);
         }
         break;
@@ -239,10 +229,9 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
     const { templates } = get();
 
     if (templates.length === 0) {
-      // Create a default template from predefined templates
       const defaultData: Partial<LabelTemplate> = {
         ...DEFAULT_LABEL_TEMPLATES[0],
-        isDefault: false,
+        is_default: false,
       };
       await get().createTemplate(defaultData);
     }

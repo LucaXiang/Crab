@@ -27,27 +27,27 @@ export interface LabelField {
   y: number;  // Y position in mm
   width: number;
   height: number;
-  fontSize: number;
-  fontWeight?: string;
-  fontFamily?: string;
+  font_size: number;
+  font_weight?: string;
+  font_family?: string;
   color?: string;
   rotate?: number;
   alignment?: 'left' | 'center' | 'right';
-  dataSource: string;  // Field data source path
+  data_source: string;  // Field data source path
   format?: string;  // Format pattern (e.g., for date/time)
   visible: boolean;
   // UI-specific properties for editor
   label?: string;
   template?: string;
-  dataKey?: string;
-  sourceType?: 'productImage' | 'qrCode' | 'barcode' | 'image';
-  maintainAspectRatio?: boolean;
+  data_key?: string;
+  source_type?: 'productImage' | 'qrCode' | 'barcode' | 'image';
+  maintain_aspect_ratio?: boolean;
   /** Temporary local file path for pending image upload (editor only, not persisted) */
-  _pendingImagePath?: string;
+  _pending_image_path?: string;
   style?: string;
   align?: 'left' | 'center' | 'right';
-  verticalAlign?: 'top' | 'middle' | 'bottom';
-  lineStyle?: 'solid' | 'dashed' | 'dotted';
+  vertical_align?: 'top' | 'middle' | 'bottom';
+  line_style?: 'solid' | 'dashed' | 'dotted';
 }
 
 /**
@@ -61,17 +61,17 @@ export interface LabelTemplate {
   height: number;  // Label height in mm
   padding: number;
   fields: LabelField[];
-  isDefault: boolean;
-  isActive: boolean;
-  createdAt: number;
-  updatedAt: number;
+  is_default: boolean;
+  is_active: boolean;
+  created_at: number;
+  updated_at: number;
   // UI-specific properties
-  widthMm?: number;
-  heightMm?: number;
-  paddingMmX?: number;
-  paddingMmY?: number;
-  renderDpi?: number;
-  testData?: string;
+  width_mm?: number;
+  height_mm?: number;
+  padding_mm_x?: number;
+  padding_mm_y?: number;
+  render_dpi?: number;
+  test_data?: string;
 }
 
 /**
@@ -84,8 +84,8 @@ export interface CreateLabelTemplateParams {
   height: number;
   padding?: number;
   fields?: LabelField[];
-  isDefault?: boolean;
-  isActive?: boolean;
+  is_default?: boolean;
+  is_active?: boolean;
 }
 
 /**
@@ -100,13 +100,13 @@ export interface UpdateLabelTemplateParams extends Partial<CreateLabelTemplatePa
  */
 export interface LabelPrintJob {
   id: string;
-  templateId: string;
+  template_id: string;
   data: Record<string, any>;
   quantity: number;
   status: 'pending' | 'printing' | 'completed' | 'failed';
-  printerId?: number;
-  createdAt: number;
-  printedAt?: number;
+  printer_id?: number;
+  created_at: number;
+  printed_at?: number;
   error?: string;
 }
 
@@ -120,13 +120,13 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     description: '适用于小规格标签',
     width: 30,
     height: 20,
-    widthMm: 30,
-    heightMm: 20,
+    width_mm: 30,
+    height_mm: 20,
     padding: 1,
-    isDefault: true,
-    isActive: true,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
+    is_default: true,
+    is_active: true,
+    created_at: Date.now(),
+    updated_at: Date.now(),
     fields: [
       {
         id: 'name',
@@ -136,9 +136,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 2,
         width: 28,
         height: 4,
-        fontSize: 10,
-        fontWeight: 'bold',
-        dataSource: 'product.name',
+        font_size: 10,
+        font_weight: 'bold',
+        data_source: 'product.name',
         visible: true,
       },
       {
@@ -149,9 +149,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 8,
         width: 28,
         height: 4,
-        fontSize: 12,
-        fontWeight: 'bold',
-        dataSource: 'product.price',
+        font_size: 12,
+        font_weight: 'bold',
+        data_source: 'product.price',
         format: '€{value}',
         visible: true,
       },
@@ -163,8 +163,8 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 14,
         width: 28,
         height: 5,
-        fontSize: 8,
-        dataSource: 'product.externalId',
+        font_size: 8,
+        data_source: 'product.externalId',
         format: 'CODE128',
         visible: true,
       },
@@ -176,13 +176,13 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     description: '适用于标准规格标签',
     width: 40,
     height: 30,
-    widthMm: 40,
-    heightMm: 30,
+    width_mm: 40,
+    height_mm: 30,
     padding: 2,
-    isDefault: false,
-    isActive: true,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
+    is_default: false,
+    is_active: true,
+    created_at: Date.now(),
+    updated_at: Date.now(),
     fields: [
       {
         id: 'name',
@@ -192,9 +192,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 2,
         width: 36,
         height: 6,
-        fontSize: 14,
-        fontWeight: 'bold',
-        dataSource: 'product.name',
+        font_size: 14,
+        font_weight: 'bold',
+        data_source: 'product.name',
         visible: true,
       },
       {
@@ -205,8 +205,8 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 10,
         width: 20,
         height: 4,
-        fontSize: 10,
-        dataSource: 'specification.name',
+        font_size: 10,
+        data_source: 'specification.name',
         visible: true,
       },
       {
@@ -217,9 +217,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 10,
         width: 14,
         height: 4,
-        fontSize: 12,
-        fontWeight: 'bold',
-        dataSource: 'product.price',
+        font_size: 12,
+        font_weight: 'bold',
+        data_source: 'product.price',
         format: '€{value}',
         alignment: 'right',
         visible: true,
@@ -232,8 +232,8 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 16,
         width: 36,
         height: 10,
-        fontSize: 10,
-        dataSource: 'product.externalId',
+        font_size: 10,
+        data_source: 'product.externalId',
         format: 'CODE128',
         visible: true,
       },
@@ -245,8 +245,8 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 28,
         width: 36,
         height: 3,
-        fontSize: 8,
-        dataSource: 'print.time',
+        font_size: 8,
+        data_source: 'print.time',
         format: 'yyyy-MM-dd HH:mm',
         alignment: 'center',
         visible: true,
@@ -259,13 +259,13 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
     description: '适用于厨房打印',
     width: 50,
     height: 40,
-    widthMm: 50,
-    heightMm: 40,
+    width_mm: 50,
+    height_mm: 40,
     padding: 3,
-    isDefault: false,
-    isActive: true,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
+    is_default: false,
+    is_active: true,
+    created_at: Date.now(),
+    updated_at: Date.now(),
     fields: [
       {
         id: 'orderNum',
@@ -275,9 +275,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 3,
         width: 44,
         height: 8,
-        fontSize: 24,
-        fontWeight: 'bold',
-        dataSource: 'order.receiptNumber',
+        font_size: 24,
+        font_weight: 'bold',
+        data_source: 'order.receiptNumber',
         alignment: 'center',
         visible: true,
       },
@@ -289,9 +289,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 14,
         width: 22,
         height: 6,
-        fontSize: 18,
-        fontWeight: 'bold',
-        dataSource: 'order.tableName',
+        font_size: 18,
+        font_weight: 'bold',
+        data_source: 'order.tableName',
         visible: true,
       },
       {
@@ -302,9 +302,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 14,
         width: 19,
         height: 6,
-        fontSize: 18,
-        fontWeight: 'bold',
-        dataSource: 'item.quantity',
+        font_size: 18,
+        font_weight: 'bold',
+        data_source: 'item.quantity',
         alignment: 'right',
         visible: true,
       },
@@ -316,9 +316,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 23,
         width: 44,
         height: 10,
-        fontSize: 16,
-        fontWeight: 'bold',
-        dataSource: 'item.productName',
+        font_size: 16,
+        font_weight: 'bold',
+        data_source: 'item.productName',
         alignment: 'center',
         visible: true,
       },
@@ -330,9 +330,9 @@ export const DEFAULT_LABEL_TEMPLATES: LabelTemplate[] = [
         y: 35,
         width: 44,
         height: 4,
-        fontSize: 10,
+        font_size: 10,
         color: '#666666',
-        dataSource: 'item.options',
+        data_source: 'item.options',
         alignment: 'center',
         visible: true,
       },
@@ -356,13 +356,13 @@ export const LabelFieldHelpers = {
       y: 0,
       width: 20,
       height: 10,
-      fontSize: 10,
-      fontWeight: 'normal',
-      fontFamily: 'Arial',
+      font_size: 10,
+      font_weight: 'normal',
+      font_family: 'Arial',
       color: '#000000',
       rotate: 0,
       alignment: 'left',
-      dataSource: '',
+      data_source: '',
       format: '',
       visible: true,
       ...overrides,
@@ -382,9 +382,9 @@ export const LabelFieldHelpers = {
           y: 2,
           width: 28,
           height: 6,
-          fontSize: 10,
-          fontWeight: 'bold',
-          dataSource: 'product.name',
+          font_size: 10,
+          font_weight: 'bold',
+          data_source: 'product.name',
         }),
         this.createField({
           name: '价格',
@@ -393,8 +393,8 @@ export const LabelFieldHelpers = {
           y: 10,
           width: 28,
           height: 5,
-          fontSize: 12,
-          dataSource: 'product.price',
+          font_size: 12,
+          data_source: 'product.price',
           format: '€{value}',
         }),
       ];
@@ -407,9 +407,9 @@ export const LabelFieldHelpers = {
         y: 2,
         width: width - 4,
         height: 8,
-        fontSize: 14,
-        fontWeight: 'bold',
-        dataSource: 'product.name',
+        font_size: 14,
+        font_weight: 'bold',
+        data_source: 'product.name',
         alignment: 'center',
       }),
       this.createField({
@@ -419,8 +419,8 @@ export const LabelFieldHelpers = {
         y: 14,
         width: width - 4,
         height: 6,
-        fontSize: 16,
-        dataSource: 'product.price',
+        font_size: 16,
+        data_source: 'product.price',
         format: '€{value}',
         alignment: 'center',
       }),
@@ -435,30 +435,30 @@ export type VerticalAlign = 'top' | 'middle' | 'bottom';
 export interface TextField {
   type: 'text';
   label: string;
-  dataKey: string;
+  data_key: string;
   style?: TextStyle;
   align?: TextAlign;
 }
 
 export interface ImageField {
   type: 'image';
-  sourceType: 'productImage' | 'qrCode' | 'barcode';
+  source_type: 'productImage' | 'qrCode' | 'barcode';
   template?: string;
-  maintainAspectRatio?: boolean;
+  maintain_aspect_ratio?: boolean;
 }
 
 export interface SeparatorField {
   type: 'separator';
-  lineStyle?: 'solid' | 'dashed' | 'dotted';
+  line_style?: 'solid' | 'dashed' | 'dotted';
 }
 
 export type FieldType = 'text' | 'image' | 'separator';
 
 export interface TextStyle {
-  fontSize: number;
-  fontWeight?: string;
+  font_size: number;
+  font_weight?: string;
   color?: string;
-  fontFamily?: string;
+  font_family?: string;
 }
 
 // Supported label fields for UI
@@ -469,8 +469,8 @@ export interface SupportedLabelField {
   category: string;
   description: string;
   example: string;
-  dataKey?: string;
-  sourceType?: 'productImage' | 'qrCode' | 'barcode';
+  data_key?: string;
+  source_type?: 'productImage' | 'qrCode' | 'barcode';
 }
 
 export const SUPPORTED_LABEL_FIELDS: SupportedLabelField[] = [
