@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { HeldOrder } from '@/core/domain/types';
+import { HeldOrder, User } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { useConfirm } from '@/hooks/useConfirm';
 import { PaymentFlow } from './payment/PaymentFlow';
@@ -137,9 +137,13 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     }
   }, [hasPermission, processVoid]);
 
-  const handleSupervisorSuccess = useCallback(() => {
+  const handleSupervisorSuccess = useCallback((supervisor: User) => {
     if (pendingVoidOptions) {
-      processVoid(pendingVoidOptions);
+      processVoid({
+        ...pendingVoidOptions,
+        authorizerId: supervisor.id,
+        authorizerName: supervisor.display_name,
+      });
       setPendingVoidOptions(null);
     }
     setIsSupervisorModalOpen(false);

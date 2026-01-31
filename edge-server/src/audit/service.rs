@@ -23,7 +23,7 @@ use crate::db::repository::system_issue::{CreateSystemIssue, SystemIssueReposito
 const LOCK_FILE_NAME: &str = "audit.lock";
 
 /// 超过此时间未运行视为长时间停机（毫秒）
-const LONG_DOWNTIME_THRESHOLD_MS: i64 = 24 * 60 * 60 * 1000; // 24h
+const LONG_DOWNTIME_THRESHOLD_MS: i64 = 24 * 60 * 60 * 1000;
 
 /// 发送到 AuditService 的日志请求
 pub struct AuditLogRequest {
@@ -97,6 +97,14 @@ impl AuditService {
     pub async fn on_startup(&self) {
         let now = shared::util::now_millis();
         let issue_repo = SystemIssueRepository::new(self.db.clone());
+
+        // 先采集最后一条审计日志的时间戳（必须在写入新条目之前，否则长时间停机检测会读到刚写入的条目）
+        let last_audit_timestamp = self
+            .storage
+            .query_last(1)
+            .await
+            .ok()
+            .and_then(|(entries, _)| entries.first().map(|e| e.timestamp));
 
         // 1. 检测异常关闭：LOCK 文件存在
         if self.lock_path.exists() {
@@ -174,17 +182,15 @@ impl AuditService {
             }
         }
 
-        // 2. 检测长时间停机：最后审计记录 >24h 前
-        if let Ok((entries, _)) = self.storage.query_last(1).await
-            && let Some(last_entry) = entries.first()
-        {
-            let gap = now - last_entry.timestamp;
+        // 2. 检测长时间停机：使用启动前采集的最后审计时间戳
+        if let Some(last_ts) = last_audit_timestamp {
+            let gap = now - last_ts;
             if gap > LONG_DOWNTIME_THRESHOLD_MS {
                 let hours = gap / (60 * 60 * 1000);
                 tracing::warn!("⚠️ Long downtime detected — system offline for {}h", hours);
 
                 let details = serde_json::json!({
-                    "last_activity_timestamp": last_entry.timestamp,
+                    "last_activity_timestamp": last_ts,
                     "downtime_ms": gap,
                     "downtime_hours": hours,
                 });
@@ -226,7 +232,7 @@ impl AuditService {
                                 options: vec![
                                     "power_outage".to_string(),
                                     "device_failure".to_string(),
-                                    "maintenance_restart".to_string(),
+                                    "vacation".to_string(),
                                     "other".to_string(),
                                 ],
                             })

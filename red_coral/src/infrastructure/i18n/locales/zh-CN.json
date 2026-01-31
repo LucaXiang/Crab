@@ -1767,6 +1767,7 @@
       "day_off": "休息日/假期",
       "equipment_repair": "设备维修",
       "renovation": "装修/搬迁",
+      "vacation": "休假",
       "other": "其他"
     },
     "resolve_success": "已提交回应",
@@ -1983,7 +1984,23 @@
         "last_activity_timestamp": "上次活动时间",
         "downtime_ms": "停机时长(ms)",
         "downtime_hours": "停机时长(小时)",
-        "target": "关联目标"
+        "target": "关联目标",
+        "payment_summary": "支付明细",
+        "paid_amount": "已付金额",
+        "table_name": "桌号",
+        "zone_name": "区域",
+        "void_type": "作废类型",
+        "loss_reason": "损失原因",
+        "loss_amount": "损失金额",
+        "void_note": "作废备注",
+        "source_table": "来源桌号",
+        "target_table": "目标桌号",
+        "target_zone": "目标区域",
+        "merged_item_count": "合并商品数",
+        "merged_payment_count": "合并支付笔数",
+        "merged_paid_amount": "合并已付金额",
+        "authorizer_id": "授权人",
+        "authorizer_name": "授权人姓名"
       },
       "value": {
         "true": "是",
@@ -2005,7 +2022,12 @@
         "device_failure": "设备故障",
         "maintenance_restart": "维护重启",
         "other": "其他",
-        "abnormal_shutdown_detected": "检测到上次异常关闭"
+        "abnormal_shutdown_detected": "检测到上次异常关闭",
+        "CANCELLED": "取消",
+        "LOSS_SETTLED": "损失结算",
+        "CUSTOMER_FLED": "客人逃单",
+        "CUSTOMER_INSOLVENT": "客人无力支付",
+        "OTHER": "其他"
       },
       "empty": "无详情"
     },

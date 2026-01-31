@@ -15,6 +15,8 @@ pub struct VoidOrderAction {
     pub loss_reason: Option<LossReason>,
     pub loss_amount: Option<f64>,
     pub note: Option<String>,
+    pub authorizer_id: Option<String>,
+    pub authorizer_name: Option<String>,
 }
 
 #[async_trait]
@@ -61,8 +63,8 @@ impl CommandHandler for VoidOrderAction {
                 loss_reason: self.loss_reason.clone(),
                 loss_amount: self.loss_amount,
                 note: self.note.clone(),
-                authorizer_id: None,
-                authorizer_name: None,
+                authorizer_id: self.authorizer_id.clone(),
+                authorizer_name: self.authorizer_name.clone(),
             },
         );
 
@@ -93,6 +95,8 @@ mod tests {
             loss_reason: None,
             loss_amount: None,
             note,
+            authorizer_id: None,
+            authorizer_name: None,
         }
     }
 

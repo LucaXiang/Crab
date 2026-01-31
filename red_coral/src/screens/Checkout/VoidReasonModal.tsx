@@ -14,6 +14,8 @@ export interface VoidOrderOptions {
   lossReason?: LossReason;
   lossAmount?: number;
   note?: string;
+  authorizerId?: string | null;
+  authorizerName?: string | null;
 }
 
 interface VoidReasonModalProps {

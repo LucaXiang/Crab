@@ -82,6 +82,8 @@ const ENUM_FIELDS = new Set([
   'reason',     // invalid_credentials, user_not_found
   'note',       // abnormal_shutdown_detected, ...
   'response',   // power_outage, app_crash, device_failure, ...
+  'void_type',  // CANCELLED, LOSS_SETTLED
+  'loss_reason', // CUSTOMER_FLED, CUSTOMER_INSOLVENT, OTHER
 ]);
 
 /**
@@ -102,6 +104,9 @@ const CURRENCY_FIELDS = new Set([
   'expected_cash',
   'actual_cash',
   'cash_variance',
+  'paid_amount',
+  'loss_amount',
+  'merged_paid_amount',
 ]);
 
 /** action 的显示颜色 */
@@ -178,6 +183,20 @@ function formatDetailValue(
   // 货币字段
   if (CURRENCY_FIELDS.has(key) && typeof value === 'number') {
     return `€${value.toFixed(2)}`;
+  }
+
+  // 支付明细 (payment_summary: [{method, amount}])
+  if (key === 'payment_summary' && Array.isArray(value)) {
+    if (value.length === 0) return t('audit.detail.value.none');
+    return (
+      <span className="font-mono text-xs">
+        {(value as { method: string; amount: number }[]).map((p, i) => (
+          <span key={i} className="inline-block bg-gray-100 rounded px-1.5 py-0.5 mr-1 mb-0.5">
+            {p.method} €{p.amount.toFixed(2)}
+          </span>
+        ))}
+      </span>
+    );
   }
 
   // 数组 (permissions 等)
