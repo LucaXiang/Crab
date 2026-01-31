@@ -115,7 +115,7 @@ impl AuditService {
             });
 
             // 审计日志始终记录（每次异常关闭都是独立事件）
-            if let Err(e) = self
+            let audit_seq = match self
                 .storage
                 .append(
                     AuditAction::SystemAbnormalShutdown,
@@ -128,8 +128,12 @@ impl AuditService {
                 )
                 .await
             {
-                tracing::error!("Failed to log abnormal shutdown: {:?}", e);
-            }
+                Ok(entry) => Some(entry.id),
+                Err(e) => {
+                    tracing::error!("Failed to log abnormal shutdown: {:?}", e);
+                    None
+                }
+            };
 
             // 去重：如果已有同类型未解决的 issue，不重复创建
             match issue_repo.find_pending_by_kind("abnormal_shutdown").await {
@@ -144,7 +148,7 @@ impl AuditService {
                             source: "local".to_string(),
                             kind: "abnormal_shutdown".to_string(),
                             blocking: true,
-                            target: None,
+                            target: audit_seq.map(|seq| seq.to_string()),
                             params,
                             title: None,
                             description: None,
@@ -185,7 +189,7 @@ impl AuditService {
                     "downtime_hours": hours,
                 });
 
-                if let Err(e) = self
+                let audit_seq = match self
                     .storage
                     .append(
                         AuditAction::SystemLongDowntime,
@@ -198,8 +202,12 @@ impl AuditService {
                     )
                     .await
                 {
-                    tracing::error!("Failed to log long downtime: {:?}", e);
-                }
+                    Ok(entry) => Some(entry.id),
+                    Err(e) => {
+                        tracing::error!("Failed to log long downtime: {:?}", e);
+                        None
+                    }
+                };
 
                 // 去重：如果已有同类型未解决的 issue，不重复创建
                 match issue_repo.find_pending_by_kind("long_downtime").await {
@@ -211,7 +219,7 @@ impl AuditService {
                                 source: "local".to_string(),
                                 kind: "long_downtime".to_string(),
                                 blocking: true,
-                                target: None,
+                                target: audit_seq.map(|seq| seq.to_string()),
                                 params,
                                 title: None,
                                 description: None,

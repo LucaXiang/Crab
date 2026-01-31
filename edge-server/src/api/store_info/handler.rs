@@ -40,7 +40,7 @@ pub async fn update(
     audit_log!(
         state.audit_service,
         AuditAction::StoreInfoChanged,
-        "store_info", "main",
+        "store_info", "store_info:main",
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"name": &store_info.name})

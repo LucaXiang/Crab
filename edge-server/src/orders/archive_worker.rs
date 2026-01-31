@@ -296,11 +296,12 @@ impl ArchiveWorker {
             "item_count": snapshot.items.len(),
         });
 
+        let resource_id = format!("order:{}", snapshot.order_id);
         self.audit_service
             .log(
                 action,
                 "order",
-                &snapshot.order_id,
+                &resource_id,
                 Some(event.operator_id.clone()),
                 Some(event.operator_name.clone()),
                 details,

@@ -83,34 +83,29 @@ impl EventApplier for PaymentCancelledApplier {
     }
 }
 
-/// Restore split payment items using "add items" logic
+/// Restore split payment items — 回退 paid_item_quantities，必要时恢复已消失的商品
 ///
-/// For each item in split_items:
-/// - If an item with the same instance_id exists in the order, merge quantities
-/// - Otherwise, create a new item entry
+/// ItemSplitApplier 从不修改原始商品的 quantity，只通过 paid_item_quantities
+/// 追踪已付数量。因此取消时只需回退 paid_item_quantities，
+/// 由调用方的 recalculate_totals() 重算 unpaid_quantity。
 ///
-/// This handles the case where the original items may have been modified
-/// (e.g., discounts added to remaining quantity, causing instance_id change)
+/// 边界情况：如果取消期间原商品的 instance_id 已变化（如属性修改导致重新生成），
+/// 则该商品在当前 snapshot.items 中已不存在，需模拟加菜逻辑将其恢复回订单
+/// （复用 add_or_merge_item 合并同 instance_id 的商品）。
 fn restore_split_items(snapshot: &mut OrderSnapshot, items_to_restore: &[CartItemSnapshot]) {
     for restore_item in items_to_restore {
-        // Try to find an existing item with the same instance_id
-        if let Some(existing) = snapshot
+        let item_exists = snapshot
             .items
-            .iter_mut()
-            .find(|i| i.instance_id == restore_item.instance_id)
-        {
-            // Merge: add quantity back
-            existing.quantity += restore_item.quantity;
-            existing.unpaid_quantity += restore_item.quantity;
-        } else {
-            // No matching item found - add as new item
-            let mut new_item = restore_item.clone();
-            // Set unpaid_quantity to quantity (all restored items are unpaid)
-            new_item.unpaid_quantity = new_item.quantity;
-            snapshot.items.push(new_item);
-        }
+            .iter()
+            .any(|i| i.instance_id == restore_item.instance_id);
 
-        // Restore paid_item_quantities
+        if !item_exists {
+            // instance_id 已不在当前商品列表中，模拟加菜回退（合并或新增）
+            super::items_added::add_or_merge_item(snapshot, restore_item);
+        }
+        // 若 item_exists：不修改 quantity — ItemSplitApplier 从未减少过它
+
+        // 回退 paid_item_quantities
         if let Some(paid_qty) = snapshot
             .paid_item_quantities
             .get_mut(&restore_item.instance_id)
@@ -558,10 +553,10 @@ mod tests {
         // Check: paid_amount reduced
         assert_eq!(snapshot.paid_amount, 30.0); // 50 - 20 = 30
 
-        // Check: item quantity restored (merged with existing)
+        // Check: item quantity unchanged — ItemSplitApplier never reduced it
         assert_eq!(snapshot.items.len(), 1);
-        assert_eq!(snapshot.items[0].quantity, 5); // 3 + 2 = 5
-        assert_eq!(snapshot.items[0].unpaid_quantity, 5); // 3 + 2 = 5
+        assert_eq!(snapshot.items[0].quantity, 3); // unchanged
+        assert_eq!(snapshot.items[0].unpaid_quantity, 3); // recalculated: 3 - 0 = 3
 
         // Check: paid_item_quantities updated
         assert!(snapshot.paid_item_quantities.get("inst-1").is_none() 
@@ -673,6 +668,247 @@ mod tests {
             .find(|i| i.instance_id == "inst-2")
             .expect("Modified item should remain");
         assert_eq!(modified.quantity, 3);
+    }
+
+    #[test]
+    fn test_cancel_split_payment_after_item_attribute_change() {
+        // 场景: 4个可乐 → 菜品分单付2个 → 修改剩余2个属性(instance_id变化) → 取消支付
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.total = 40.0;
+        snapshot.paid_amount = 20.0;
+
+        // 分单支付后：原 inst-1 只剩 2 个（属性被修改后 instance_id 变为 inst-1-modified）
+        let modified_item = CartItemSnapshot {
+            id: "product:cola".to_string(),
+            instance_id: "inst-1-modified".to_string(),
+            name: "Cola (加冰)".to_string(),
+            price: 10.0,
+            original_price: None,
+            quantity: 2,
+            unpaid_quantity: 2,
+            selected_options: None, // 属性变化后 instance_id 已不同
+            selected_specification: None,
+            manual_discount_percent: None,
+            surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            unit_price: None,
+            line_total: None,
+            tax: None,
+            tax_rate: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_name: None,
+        };
+        snapshot.items.push(modified_item);
+
+        // 分单支付记录里保存了原始 inst-1 的 2 个可乐
+        let original_split_item = CartItemSnapshot {
+            id: "product:cola".to_string(),
+            instance_id: "inst-1".to_string(),
+            name: "Cola".to_string(),
+            price: 10.0,
+            original_price: None,
+            quantity: 2,
+            unpaid_quantity: 0,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            unit_price: None,
+            line_total: None,
+            tax: None,
+            tax_rate: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_name: None,
+        };
+
+        let mut payment = create_payment_record("split-pay-1", "CASH", 20.0);
+        payment.split_items = Some(vec![original_split_item]);
+        snapshot.payments.push(payment);
+        snapshot
+            .paid_item_quantities
+            .insert("inst-1".to_string(), 2);
+
+        // 取消分单支付
+        let event = create_payment_cancelled_event(
+            "order-1",
+            1,
+            "split-pay-1",
+            "CASH",
+            20.0,
+            None,
+            None,
+            None,
+        );
+
+        let applier = PaymentCancelledApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // paid_amount 减少
+        assert_eq!(snapshot.paid_amount, 0.0);
+
+        // 应有 2 个商品：修改后的 inst-1-modified + 恢复的原始 inst-1
+        assert_eq!(snapshot.items.len(), 2);
+
+        // 恢复的原始可乐
+        let restored = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "inst-1")
+            .expect("原始可乐应被恢复");
+        assert_eq!(restored.quantity, 2);
+        assert_eq!(restored.unpaid_quantity, 2);
+        assert_eq!(restored.name, "Cola");
+        assert!(restored.selected_options.is_none()); // 原始商品无额外选项
+
+        // 修改后的可乐不受影响
+        let modified = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "inst-1-modified")
+            .expect("修改后的可乐应保持不变");
+        assert_eq!(modified.quantity, 2);
+        assert_eq!(modified.unpaid_quantity, 2);
+        assert_eq!(modified.name, "Cola (加冰)");
+
+        // paid_item_quantities 已清除
+        assert!(snapshot.paid_item_quantities.is_empty());
+    }
+
+    #[test]
+    fn test_cancel_split_payment_merges_with_re_added_same_product() {
+        // 场景: 分单付2个可乐 → 修改属性(instance_id变) → 用户又加了1个原始可乐 → 取消支付
+        // 恢复的2个应该合并到已有的1个原始可乐上
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.total = 50.0;
+        snapshot.paid_amount = 20.0;
+
+        // 修改后的可乐 (inst-modified)
+        let modified_item = CartItemSnapshot {
+            id: "product:cola".to_string(),
+            instance_id: "inst-modified".to_string(),
+            name: "Cola (加冰)".to_string(),
+            price: 10.0,
+            original_price: None,
+            quantity: 2,
+            unpaid_quantity: 2,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            unit_price: None,
+            line_total: None,
+            tax: None,
+            tax_rate: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_name: None,
+        };
+        snapshot.items.push(modified_item);
+
+        // 用户又加了 1 个原始可乐 (同 instance_id = inst-original)
+        let re_added_item = CartItemSnapshot {
+            id: "product:cola".to_string(),
+            instance_id: "inst-original".to_string(),
+            name: "Cola".to_string(),
+            price: 10.0,
+            original_price: None,
+            quantity: 1,
+            unpaid_quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            unit_price: None,
+            line_total: None,
+            tax: None,
+            tax_rate: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_name: None,
+        };
+        snapshot.items.push(re_added_item);
+
+        // 分单支付记录里保存了原始 inst-original 的 2 个可乐
+        let original_split_item = CartItemSnapshot {
+            id: "product:cola".to_string(),
+            instance_id: "inst-original".to_string(),
+            name: "Cola".to_string(),
+            price: 10.0,
+            original_price: None,
+            quantity: 2,
+            unpaid_quantity: 0,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            surcharge: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            unit_price: None,
+            line_total: None,
+            tax: None,
+            tax_rate: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_name: None,
+        };
+
+        let mut payment = create_payment_record("split-pay-1", "CASH", 20.0);
+        payment.split_items = Some(vec![original_split_item]);
+        snapshot.payments.push(payment);
+        snapshot
+            .paid_item_quantities
+            .insert("inst-original".to_string(), 2);
+
+        // 取消分单支付
+        let event = create_payment_cancelled_event(
+            "order-1",
+            1,
+            "split-pay-1",
+            "CASH",
+            20.0,
+            None,
+            None,
+            None,
+        );
+
+        let applier = PaymentCancelledApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // inst-original 存在于 items → 不需要 add_or_merge，直接回退 paid_item_quantities
+        // 商品数量不变，仍然是 2 个 items
+        assert_eq!(snapshot.items.len(), 2);
+
+        // inst-original 的可乐：quantity 仍然是 1（add_or_merge 不触发，因为 item_exists=true）
+        let original = snapshot
+            .items
+            .iter()
+            .find(|i| i.instance_id == "inst-original")
+            .expect("原始可乐应存在");
+        assert_eq!(original.quantity, 1);
+        // unpaid = quantity - paid = 1 - 0 = 1 (paid_item_quantities 已清除)
+        assert_eq!(original.unpaid_quantity, 1);
+
+        // paid_item_quantities 已清除
+        assert!(snapshot.paid_item_quantities.is_empty());
     }
 
     #[test]

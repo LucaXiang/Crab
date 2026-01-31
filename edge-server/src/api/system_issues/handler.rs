@@ -30,7 +30,8 @@ pub async fn resolve(
         .resolve(&req.id, &req.response, Some(&current_user.id))
         .await?;
 
-    // 写审计日志（target 指向原始系统问题记录）
+    // 写审计日志（target 指向原始问题的 audit_log 条目序号）
+    let audit_target = resolved.target.clone().map(|seq| format!("#{}", seq));
     state
         .audit_service
         .log_with_target(
@@ -44,7 +45,7 @@ pub async fn resolve(
                 "response": req.response,
                 "source": resolved.source,
             }),
-            Some(req.id.clone()),
+            audit_target,
         )
         .await;
 

@@ -31,7 +31,7 @@ impl EventApplier for ItemsAddedApplier {
 }
 
 /// Add item to snapshot, merging with existing item if instance_id matches
-fn add_or_merge_item(snapshot: &mut OrderSnapshot, item: &CartItemSnapshot) {
+pub(crate) fn add_or_merge_item(snapshot: &mut OrderSnapshot, item: &CartItemSnapshot) {
     if let Some(existing) = snapshot
         .items
         .iter_mut()
