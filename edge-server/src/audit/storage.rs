@@ -47,6 +47,8 @@ struct AuditRecord {
     operator_id: Option<String>,
     operator_name: Option<String>,
     details: serde_json::Value,
+    #[serde(default)]
+    target: Option<String>,
     prev_hash: String,
     curr_hash: String,
 }
@@ -62,6 +64,7 @@ impl From<AuditRecord> for AuditEntry {
             operator_id: r.operator_id,
             operator_name: r.operator_name,
             details: r.details,
+            target: r.target,
             prev_hash: r.prev_hash,
             curr_hash: r.curr_hash,
         }
@@ -92,6 +95,8 @@ struct AuditInsert {
     operator_id: Option<String>,
     operator_name: Option<String>,
     details: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target: Option<String>,
     prev_hash: String,
     curr_hash: String,
 }
@@ -130,6 +135,7 @@ impl AuditStorage {
         operator_id: Option<String>,
         operator_name: Option<String>,
         details: serde_json::Value,
+        target: Option<String>,
     ) -> AuditStorageResult<AuditEntry> {
         // 序列化：防止并发 append 导致 sequence 冲突
         let _guard = self.append_lock.lock().await;
@@ -169,6 +175,7 @@ impl AuditStorage {
             operator_id: operator_id.clone(),
             operator_name: operator_name.clone(),
             details: details.clone(),
+            target: target.clone(),
             prev_hash: prev_hash.clone(),
             curr_hash: curr_hash.clone(),
         };
@@ -182,6 +189,7 @@ impl AuditStorage {
             operator_id,
             operator_name,
             details,
+            target,
             prev_hash,
             curr_hash,
         };

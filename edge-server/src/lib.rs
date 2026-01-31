@@ -67,6 +67,14 @@ pub use utils::logger::{cleanup_old_logs, init_logger, init_logger_with_file};
 /// ```
 #[macro_export]
 macro_rules! audit_log {
+    // 完整版（含 target）
+    ($service:expr, $action:expr, $res_type:expr, $res_id:expr,
+     operator_id = $op_id:expr, operator_name = $op_name:expr, details = $details:expr, target = $target:expr) => {
+        $service
+            .log_with_target($action, $res_type, $res_id, $op_id, $op_name, $details, $target)
+            .await;
+    };
+    // 标准版（无 target）
     ($service:expr, $action:expr, $res_type:expr, $res_id:expr,
      operator_id = $op_id:expr, operator_name = $op_name:expr, details = $details:expr) => {
         $service

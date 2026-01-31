@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { createTauriClient } from '@/infrastructure/api/tauri-client';
-import type { AuditEntry, AuditAction, AuditChainVerification } from '@/core/domain/types/api';
+import type { AuditEntry, AuditChainVerification } from '@/core/domain/types/api';
 import {
   Search,
   ChevronLeft,
@@ -16,25 +16,60 @@ import {
   ShieldAlert,
   Info,
   Calendar,
+  X,
 } from 'lucide-react';
+import { AuditFilterModal } from './AuditFilterModal';
 
 const PAGE_SIZE = 10;
 
-/** action → 分组 key */
-const ACTION_GROUPS: Record<string, AuditAction[]> = {
-  system: ['system_startup', 'system_shutdown', 'system_abnormal_shutdown', 'system_long_downtime', 'resolve_system_issue'],
-  auth: ['login_success', 'login_failed', 'logout'],
-  order: ['order_completed', 'order_voided', 'order_payment_added', 'order_payment_cancelled', 'order_merged', 'order_moved', 'order_split', 'order_restored'],
-  management: ['employee_created', 'employee_updated', 'employee_deleted', 'role_created', 'role_updated', 'role_deleted', 'product_price_changed', 'price_rule_changed'],
-  catalog: ['product_created', 'product_updated', 'product_deleted', 'category_created', 'category_updated', 'category_deleted', 'tag_created', 'tag_updated', 'tag_deleted', 'attribute_created', 'attribute_updated', 'attribute_deleted'],
-  pricing: ['price_rule_created', 'price_rule_updated', 'price_rule_deleted'],
-  venue: ['zone_created', 'zone_updated', 'zone_deleted', 'table_created', 'table_updated', 'table_deleted'],
-  shift: ['shift_opened', 'shift_closed'],
-  config: ['print_config_changed', 'store_info_changed', 'label_template_created', 'label_template_updated', 'label_template_deleted', 'print_destination_created', 'print_destination_updated', 'print_destination_deleted'],
-};
+/** 快捷时间范围预设 */
+type DatePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom';
 
-/** resource_type 选项 */
-const RESOURCE_TYPES = ['system', 'auth', 'order', 'employee', 'role', 'product', 'category', 'tag', 'attribute', 'price_rule', 'zone', 'dining_table', 'shift', 'print_config', 'print_destination', 'label_template', 'store_info', 'system_issue'];
+/** 获取本地时区今天的 YYYY-MM-DD */
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** 获取本地时区昨天的 YYYY-MM-DD */
+function localYesterday(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** 获取本周一的 YYYY-MM-DD（ISO 周：周一为第一天） */
+function localWeekStart(): string {
+  const d = new Date();
+  const day = d.getDay(); // 0=Sun, 1=Mon, ...
+  const diff = day === 0 ? 6 : day - 1; // 距离周一的天数
+  d.setDate(d.getDate() - diff);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** 获取本月第一天的 YYYY-MM-DD */
+function localMonthStart(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+/**
+ * 将本地日期字符串 YYYY-MM-DD 转为该天开始的 UTC 毫秒（本地 00:00:00.000）
+ */
+function dayStartMillis(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+}
+
+/**
+ * 将本地日期字符串 YYYY-MM-DD 转为该天结束的 UTC 毫秒（本地 23:59:59.999）
+ */
+function dayEndMillis(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
+}
+
+
 
 /**
  * 枚举型字段 — 值本身是已知的系统枚举，尝试通过 audit.detail.value.{v} 翻译
@@ -56,6 +91,17 @@ const TIMESTAMP_FIELDS = new Set([
   'last_start_timestamp',
   'detected_at',
   'last_activity_timestamp',
+]);
+
+/**
+ * 货币字段 — 值是数字金额，格式化为 €x.xx
+ */
+const CURRENCY_FIELDS = new Set([
+  'total',
+  'starting_cash',
+  'expected_cash',
+  'actual_cash',
+  'cash_variance',
 ]);
 
 /** action 的显示颜色 */
@@ -96,7 +142,7 @@ function formatFileSize(bytes: number): string {
  * 3. 枚举字段 (kind, source, status, reason, note, response) → i18n value 表翻译，无匹配则原样
  * 4. 时间戳字段 → 格式化为日期
  * 5. size → 文件大小格式化
- * 6. total → 货币格式化（€）
+ * 6. 货币字段 (total, starting_cash, expected_cash, actual_cash, cash_variance) → €格式化
  * 7. 数组 → 标签式排列
  * 8. 其他 → 原样显示
  */
@@ -129,8 +175,8 @@ function formatDetailValue(
     return formatFileSize(value);
   }
 
-  // 金额
-  if (key === 'total' && typeof value === 'number') {
+  // 货币字段
+  if (CURRENCY_FIELDS.has(key) && typeof value === 'number') {
     return `€${value.toFixed(2)}`;
   }
 
@@ -200,13 +246,36 @@ export const AuditLog: React.FC = () => {
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Filters
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  // Filters — 时间范围
+  const [datePreset, setDatePreset] = useState<DatePreset>('today');
+  const [customFrom, setCustomFrom] = useState(''); // YYYY-MM-DD
+  const [customTo, setCustomTo] = useState('');     // YYYY-MM-DD
   const [actionFilter, setActionFilter] = useState('');
   const [resourceTypeFilter, setResourceTypeFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const hasActiveFilter = !!(actionFilter || resourceTypeFilter);
+
+  /** 根据当前 preset 计算实际的 from/to 日期字符串 */
+  const dateRange = useMemo<{ from: string; to: string } | null>(() => {
+    switch (datePreset) {
+      case 'today':
+        return { from: localToday(), to: localToday() };
+      case 'yesterday':
+        return { from: localYesterday(), to: localYesterday() };
+      case 'this_week':
+        return { from: localWeekStart(), to: localToday() };
+      case 'this_month':
+        return { from: localMonthStart(), to: localToday() };
+      case 'custom':
+        if (customFrom && customTo) return { from: customFrom, to: customTo };
+        if (customFrom) return { from: customFrom, to: customFrom };
+        return null; // 未选择自定义日期 → 不限范围
+      default:
+        return null;
+    }
+  }, [datePreset, customFrom, customTo]);
 
   // Chain verification
   const [verifying, setVerifying] = useState(false);
@@ -232,11 +301,9 @@ export const AuditLog: React.FC = () => {
         offset: (page - 1) * PAGE_SIZE,
         limit: PAGE_SIZE,
       };
-      if (dateFrom) {
-        query.from = new Date(dateFrom).getTime();
-      }
-      if (dateTo) {
-        query.to = new Date(dateTo).getTime();
+      if (dateRange) {
+        query.from = dayStartMillis(dateRange.from);
+        query.to = dayEndMillis(dateRange.to);
       }
       if (actionFilter) query.action = actionFilter;
       if (resourceTypeFilter) query.resource_type = resourceTypeFilter;
@@ -256,7 +323,7 @@ export const AuditLog: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, dateFrom, dateTo, actionFilter, resourceTypeFilter, debouncedSearch]);
+  }, [page, dateRange, actionFilter, resourceTypeFilter, debouncedSearch]);
 
   useEffect(() => {
     fetchLogs();
@@ -266,8 +333,8 @@ export const AuditLog: React.FC = () => {
     setVerifying(true);
     setVerification(null);
     try {
-      const from = dateFrom ? new Date(dateFrom).getTime() : undefined;
-      const to = dateTo ? new Date(dateTo).getTime() : undefined;
+      const from = dateRange ? dayStartMillis(dateRange.from) : undefined;
+      const to = dateRange ? dayEndMillis(dateRange.to) : undefined;
       const result = await api.verifyAuditChain(from, to);
       setVerification(result);
       if (result.chain_intact) {
@@ -387,6 +454,12 @@ export const AuditLog: React.FC = () => {
                             <span className="font-semibold text-gray-500">{t('audit.detail.operator_id')}:</span>
                             <span className="ml-2 font-mono text-gray-600">{item.operator_id || '-'}</span>
                           </div>
+                          {item.target && (
+                            <div>
+                              <span className="font-semibold text-gray-500">{t('audit.detail.field.target')}:</span>
+                              <span className="ml-2 font-mono text-indigo-600 text-xs">{item.target}</span>
+                            </div>
+                          )}
                           <div>
                             <span className="font-semibold text-gray-500">{t('audit.detail.prev_hash')}:</span>
                             <span className="ml-2 font-mono text-gray-400 text-[10px] break-all">{item.prev_hash}</span>
@@ -470,64 +543,86 @@ export const AuditLog: React.FC = () => {
 
         {/* Filters */}
         <div className="flex flex-wrap gap-2">
-          {/* Date range */}
-          <div className="flex items-center gap-1 bg-gray-50 rounded-lg border border-gray-200 px-2 py-1">
-            <Calendar size={14} className="text-gray-400" />
-            <input
-              type="datetime-local"
-              value={dateFrom}
-              onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-              className="text-xs border-none bg-transparent focus:ring-0 text-gray-600 p-0.5 outline-none w-36"
-            />
-            <span className="text-gray-300">-</span>
-            <input
-              type="datetime-local"
-              value={dateTo}
-              onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-              className="text-xs border-none bg-transparent focus:ring-0 text-gray-600 p-0.5 outline-none w-36"
-            />
+          {/* Date range presets */}
+          <div className="flex items-center gap-1">
+            {([
+              ['today', t('audit.date.today')],
+              ['yesterday', t('audit.date.yesterday')],
+              ['this_week', t('audit.date.this_week')],
+              ['this_month', t('audit.date.this_month')],
+              ['custom', t('audit.date.custom')],
+            ] as [DatePreset, string][]).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => { setDatePreset(key); setPage(1); }}
+                className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${
+                  datePreset === key
+                    ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-medium'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+            {/* 自定义日期范围 — 仅在 custom 模式下显示 */}
+            {datePreset === 'custom' && (
+              <div className="flex items-center gap-1 bg-gray-50 rounded-lg border border-gray-200 px-2 py-0.5 ml-1">
+                <Calendar size={14} className="text-gray-400 shrink-0" />
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => { setCustomFrom(e.target.value); setPage(1); }}
+                  className="text-xs border-none bg-transparent focus:ring-0 text-gray-600 p-0.5 outline-none"
+                />
+                <span className="text-gray-300">-</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => { setCustomTo(e.target.value); setPage(1); }}
+                  className="text-xs border-none bg-transparent focus:ring-0 text-gray-600 p-0.5 outline-none"
+                />
+                {(customFrom || customTo) && (
+                  <button
+                    onClick={() => { setCustomFrom(''); setCustomTo(''); setPage(1); }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Action filter */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
-              <Filter className="h-3.5 w-3.5 text-gray-400" />
-            </div>
-            <select
-              value={actionFilter}
-              onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
-              className="pl-8 pr-7 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none bg-white cursor-pointer"
-            >
-              <option value="">{t('audit.filter.all_actions')}</option>
-              {Object.entries(ACTION_GROUPS).map(([group, actions]) => (
-                <optgroup key={group} label={t(`audit.group.${group}`)}>
-                  {actions.map((a) => (
-                    <option key={a} value={a}>{t(`audit.action.${a}`) || a}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center px-1.5 pointer-events-none">
-              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-            </div>
-          </div>
-
-          {/* Resource type filter */}
-          <div className="relative">
-            <select
-              value={resourceTypeFilter}
-              onChange={(e) => { setResourceTypeFilter(e.target.value); setPage(1); }}
-              className="pl-3 pr-7 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none bg-white cursor-pointer"
-            >
-              <option value="">{t('audit.filter.all_resources')}</option>
-              {RESOURCE_TYPES.map((rt) => (
-                <option key={rt} value={rt}>{t(`audit.resource_type.${rt}`) || rt}</option>
-              ))}
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center px-1.5 pointer-events-none">
-              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-            </div>
-          </div>
+          {/* Filter button → opens modal */}
+          <button
+            onClick={() => setFilterModalOpen(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors ${
+              hasActiveFilter
+                ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-medium'
+                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Filter size={14} />
+            {hasActiveFilter
+              ? (actionFilter
+                  ? t(`audit.action.${actionFilter}`)
+                  : t(`audit.resource_type.${resourceTypeFilter}`))
+              : t('audit.filter.button')
+            }
+            {hasActiveFilter && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActionFilter('');
+                  setResourceTypeFilter('');
+                  setPage(1);
+                }}
+                className="ml-0.5 p-0.5 hover:bg-indigo-200 rounded-full transition-colors"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </button>
 
           {/* Search (operator) */}
           <div className="relative flex-1 min-w-[160px]">
@@ -574,6 +669,19 @@ export const AuditLog: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Filter Modal */}
+      <AuditFilterModal
+        isOpen={filterModalOpen}
+        onClose={() => setFilterModalOpen(false)}
+        actionFilter={actionFilter}
+        resourceTypeFilter={resourceTypeFilter}
+        onApply={(action, resourceType) => {
+          setActionFilter(action);
+          setResourceTypeFilter(resourceType);
+          setPage(1);
+        }}
+        t={t}
+      />
     </div>
   );
 };

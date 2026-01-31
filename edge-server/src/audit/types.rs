@@ -31,23 +31,15 @@ pub enum AuditAction {
     /// 登出
     Logout,
 
-    // ═══ 订单（财务关键）═══
+    // ═══ 订单（财务关键 — 仅终结状态，中间操作由 OrderEvents 事件溯源覆盖）═══
     /// 订单完成结账
     OrderCompleted,
     /// 订单作废
     OrderVoided,
-    /// 添加支付
-    OrderPaymentAdded,
-    /// 取消支付
-    OrderPaymentCancelled,
     /// 订单合并
     OrderMerged,
     /// 订单转移（换桌）
     OrderMoved,
-    /// 订单拆分
-    OrderSplit,
-    /// 订单恢复（从作废恢复）
-    OrderRestored,
 
     // ═══ 管理操作 ═══
     /// 员工创建
@@ -62,10 +54,6 @@ pub enum AuditAction {
     RoleUpdated,
     /// 角色删除
     RoleDeleted,
-    /// 商品价格变更
-    ProductPriceChanged,
-    /// 价格规则变更
-    PriceRuleChanged,
 
     // ═══ 班次 ═══
     /// 班次开启
@@ -171,6 +159,9 @@ pub struct AuditEntry {
     pub operator_name: Option<String>,
     /// 结构化详情（JSON）
     pub details: serde_json::Value,
+    /// 关联目标（可选，指向相关审计条目或资源，如 "system_issue:xxx"）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
     /// 前一条审计日志哈希
     pub prev_hash: String,
     /// 当前记录哈希（SHA256）

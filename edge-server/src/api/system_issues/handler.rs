@@ -30,12 +30,12 @@ pub async fn resolve(
         .resolve(&req.id, &req.response, Some(&current_user.id))
         .await?;
 
-    // 写审计日志
+    // 写审计日志（target 指向原始系统问题记录）
     state
         .audit_service
-        .log(
+        .log_with_target(
             crate::audit::AuditAction::ResolveSystemIssue,
-            "system",
+            "system_issue",
             &req.id,
             Some(current_user.id.clone()),
             Some(current_user.display_name.clone()),
@@ -44,6 +44,7 @@ pub async fn resolve(
                 "response": req.response,
                 "source": resolved.source,
             }),
+            Some(req.id.clone()),
         )
         .await;
 

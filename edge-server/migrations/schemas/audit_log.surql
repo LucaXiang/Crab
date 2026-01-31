@@ -40,6 +40,10 @@ DEFINE FIELD OVERWRITE operator_name ON audit_log TYPE option<string>
 DEFINE FIELD OVERWRITE details ON audit_log FLEXIBLE TYPE object DEFAULT {}
     PERMISSIONS FULL;
 
+-- 关联目标（可选，指向相关审计条目或资源，如 "system_issue:xxx"）
+DEFINE FIELD OVERWRITE target ON audit_log TYPE option<string>
+    PERMISSIONS FULL;
+
 -- SHA256 哈希链 — 前一条审计日志哈希
 DEFINE FIELD OVERWRITE prev_hash ON audit_log TYPE string
     PERMISSIONS FULL;

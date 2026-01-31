@@ -49,6 +49,7 @@ impl AuditWorker {
                         req.operator_id.clone(),
                         req.operator_name.clone(),
                         req.details.clone(),
+                        req.target.clone(),
                     )
                     .await
                 {

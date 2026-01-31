@@ -33,6 +33,7 @@ pub struct AuditLogRequest {
     pub operator_id: Option<String>,
     pub operator_name: Option<String>,
     pub details: serde_json::Value,
+    pub target: Option<String>,
 }
 
 /// 审计日志服务
@@ -123,6 +124,7 @@ impl AuditService {
                     None,
                     None,
                     details,
+                    None,
                 )
                 .await
             {
@@ -192,6 +194,7 @@ impl AuditService {
                         None,
                         None,
                         details,
+                        None,
                     )
                     .await
                 {
@@ -262,6 +265,20 @@ impl AuditService {
         operator_name: Option<String>,
         details: serde_json::Value,
     ) {
+        self.log_with_target(action, resource_type, resource_id, operator_id, operator_name, details, None).await;
+    }
+
+    /// 写入审计日志（带关联目标）
+    pub async fn log_with_target(
+        &self,
+        action: AuditAction,
+        resource_type: impl Into<String>,
+        resource_id: impl Into<String>,
+        operator_id: Option<String>,
+        operator_name: Option<String>,
+        details: serde_json::Value,
+        target: Option<String>,
+    ) {
         let req = AuditLogRequest {
             action,
             resource_type: resource_type.into(),
@@ -269,6 +286,7 @@ impl AuditService {
             operator_id,
             operator_name,
             details,
+            target,
         };
 
         // 阻塞发送 — 审计日志不允许丢失
@@ -293,6 +311,7 @@ impl AuditService {
                 None,
                 None,
                 details,
+                None,
             )
             .await
     }

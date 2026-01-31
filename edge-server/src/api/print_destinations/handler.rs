@@ -108,6 +108,8 @@ pub async fn delete(
 ) -> AppResult<Json<bool>> {
     tracing::info!(id = %id, "Deleting print destination");
     let repo = PrintDestinationRepository::new(state.db.clone());
+    let name_for_audit = repo.find_by_id(&id).await.ok().flatten()
+        .map(|p| p.name.clone()).unwrap_or_default();
     let result = repo
         .delete(&id)
         .await
@@ -122,7 +124,7 @@ pub async fn delete(
             "print_destination", &id,
             operator_id = Some(current_user.id.clone()),
             operator_name = Some(current_user.display_name.clone()),
-            details = serde_json::json!({})
+            details = serde_json::json!({"name": name_for_audit})
         );
 
         state

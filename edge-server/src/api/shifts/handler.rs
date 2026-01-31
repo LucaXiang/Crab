@@ -110,7 +110,7 @@ pub async fn create(
         "shift", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({})
+        details = serde_json::json!({"starting_cash": shift.starting_cash})
     );
 
     state
@@ -158,7 +158,12 @@ pub async fn close(
         "shift", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({})
+        details = serde_json::json!({
+            "starting_cash": shift.starting_cash,
+            "expected_cash": shift.expected_cash,
+            "actual_cash": shift.actual_cash,
+            "cash_variance": shift.cash_variance,
+        })
     );
 
     state
@@ -187,7 +192,11 @@ pub async fn force_close(
         "shift", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"forced": true})
+        details = serde_json::json!({
+            "forced": true,
+            "starting_cash": shift.starting_cash,
+            "expected_cash": shift.expected_cash,
+        })
     );
 
     state

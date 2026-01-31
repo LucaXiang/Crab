@@ -105,6 +105,8 @@ pub async fn delete(
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let repo = AttributeRepository::new(state.db.clone());
+    let name_for_audit = repo.find_by_id(&id).await.ok().flatten()
+        .map(|a| a.name.clone()).unwrap_or_default();
     let result = repo
         .delete(&id)
         .await
@@ -117,7 +119,7 @@ pub async fn delete(
             "attribute", &id,
             operator_id = Some(current_user.id.clone()),
             operator_name = Some(current_user.display_name.clone()),
-            details = serde_json::json!({})
+            details = serde_json::json!({"name": name_for_audit})
         );
 
         state

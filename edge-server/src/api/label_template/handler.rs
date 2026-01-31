@@ -130,6 +130,8 @@ pub async fn delete(
 ) -> AppResult<Json<bool>> {
     let record_id = RecordId::from_table_key(TABLE, &id);
     let repo = LabelTemplateRepository::new(state.db.clone(), state.images_dir());
+    let name_for_audit = repo.get(&record_id).await.ok().flatten()
+        .map(|t| t.name.clone()).unwrap_or_default();
     let result = repo
         .delete(&record_id)
         .await
@@ -142,7 +144,7 @@ pub async fn delete(
             "label_template", &id,
             operator_id = Some(current_user.id.clone()),
             operator_name = Some(current_user.display_name.clone()),
-            details = serde_json::json!({})
+            details = serde_json::json!({"name": name_for_audit})
         );
 
         state

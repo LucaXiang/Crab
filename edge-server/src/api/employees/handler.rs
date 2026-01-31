@@ -71,7 +71,7 @@ pub async fn create(
         "employee", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"username": &employee.username})
+        details = serde_json::json!({"username": &employee.username, "role": employee.role.to_string()})
     );
 
     state
@@ -100,7 +100,7 @@ pub async fn update(
         "employee", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"username": &employee.username})
+        details = serde_json::json!({"username": &employee.username, "role": employee.role.to_string(), "is_active": employee.is_active})
     );
 
     state
@@ -117,6 +117,9 @@ pub async fn delete(
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let repo = EmployeeRepository::new(state.db.clone());
+    // 删除前查名称用于审计
+    let name_for_audit = repo.find_by_id(&id).await.ok().flatten()
+        .map(|e| e.username.clone()).unwrap_or_default();
     let result = repo
         .delete(&id)
         .await
@@ -129,7 +132,7 @@ pub async fn delete(
             "employee", &id,
             operator_id = Some(current_user.id.clone()),
             operator_name = Some(current_user.display_name.clone()),
-            details = serde_json::json!({})
+            details = serde_json::json!({"username": name_for_audit})
         );
 
         state

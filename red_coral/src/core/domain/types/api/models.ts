@@ -870,15 +870,11 @@ export type AuditAction =
   | 'login_success'
   | 'login_failed'
   | 'logout'
-  // 订单（财务关键）
+  // 订单（财务关键 — 仅终结状态，中间操作由 OrderEvents 覆盖）
   | 'order_completed'
   | 'order_voided'
-  | 'order_payment_added'
-  | 'order_payment_cancelled'
   | 'order_merged'
   | 'order_moved'
-  | 'order_split'
-  | 'order_restored'
   // 管理操作
   | 'employee_created'
   | 'employee_updated'
@@ -886,8 +882,6 @@ export type AuditAction =
   | 'role_created'
   | 'role_updated'
   | 'role_deleted'
-  | 'product_price_changed'
-  | 'price_rule_changed'
   // 商品目录
   | 'product_created'
   | 'product_updated'
@@ -944,6 +938,8 @@ export interface AuditEntry {
   operator_name: string | null;
   /** 结构化详情 */
   details: Record<string, unknown>;
+  /** 关联目标（可选，指向相关审计条目或资源） */
+  target?: string | null;
   /** 前一条审计日志哈希 (SHA256) */
   prev_hash: string;
   /** 当前记录哈希 (SHA256) */

@@ -201,6 +201,9 @@ pub async fn delete(
     Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
+    // 删除前查名称用于审计
+    let name_for_audit = state.catalog_service.get_product(&id)
+        .map(|p| p.name.clone()).unwrap_or_default();
     state
         .catalog_service
         .delete_product(&id)
@@ -213,7 +216,7 @@ pub async fn delete(
         "product", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({})
+        details = serde_json::json!({"name": name_for_audit})
     );
 
     state
