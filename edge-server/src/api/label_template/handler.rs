@@ -2,10 +2,13 @@
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
 };
 use surrealdb::RecordId;
 
+use crate::audit::AuditAction;
+use crate::audit_log;
+use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate};
 use crate::db::repository::LabelTemplateRepository;
@@ -62,6 +65,7 @@ pub async fn get_by_id(
 /// POST /api/label-templates - Create a new label template
 pub async fn create(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<LabelTemplateCreate>,
 ) -> AppResult<Json<LabelTemplate>> {
     let repo = LabelTemplateRepository::new(state.db.clone(), state.images_dir());
@@ -70,8 +74,17 @@ pub async fn create(
         .await
         ?;
 
-    // Broadcast sync notification
     let id = template.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::LabelTemplateCreated,
+        "label_template", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &template.name})
+    );
+
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&template))
         .await;
@@ -82,6 +95,7 @@ pub async fn create(
 /// PUT /api/label-templates/:id - Update a label template
 pub async fn update(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(payload): Json<LabelTemplateUpdate>,
 ) -> AppResult<Json<LabelTemplate>> {
@@ -92,7 +106,15 @@ pub async fn update(
         .await
         ?;
 
-    // Broadcast sync notification
+    audit_log!(
+        state.audit_service,
+        AuditAction::LabelTemplateUpdated,
+        "label_template", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &template.name})
+    );
+
     state
         .broadcast_sync(RESOURCE, "updated", &id, Some(&template))
         .await;
@@ -103,6 +125,7 @@ pub async fn update(
 /// DELETE /api/label-templates/:id - Delete a label template (soft delete)
 pub async fn delete(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let record_id = RecordId::from_table_key(TABLE, &id);
@@ -112,8 +135,16 @@ pub async fn delete(
         .await
         ?;
 
-    // Broadcast sync notification
     if result {
+        audit_log!(
+            state.audit_service,
+            AuditAction::LabelTemplateDeleted,
+            "label_template", &id,
+            operator_id = Some(current_user.id.clone()),
+            operator_name = Some(current_user.display_name.clone()),
+            details = serde_json::json!({})
+        );
+
         state
             .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
             .await;

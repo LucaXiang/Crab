@@ -1,11 +1,14 @@
 //! Category API Handlers
 
 use axum::{
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     Json,
 };
 use serde::{Deserialize, Serialize};
 
+use crate::audit::AuditAction;
+use crate::audit_log;
+use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{Attribute, AttributeBinding, Category, CategoryCreate, CategoryUpdate};
 use crate::db::repository::AttributeRepository;
@@ -34,6 +37,7 @@ pub async fn get_by_id(
 /// POST /api/categories - 创建分类
 pub async fn create(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<CategoryCreate>,
 ) -> AppResult<Json<Category>> {
     let category = state
@@ -42,8 +46,17 @@ pub async fn create(
         .await
         ?;
 
-    // 广播同步通知
     let id = category.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::CategoryCreated,
+        "category", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &category.name})
+    );
+
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&category))
         .await;
@@ -54,6 +67,7 @@ pub async fn create(
 /// PUT /api/categories/:id - 更新分类
 pub async fn update(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(payload): Json<CategoryUpdate>,
 ) -> AppResult<Json<Category>> {
@@ -63,7 +77,15 @@ pub async fn update(
         .await
         ?;
 
-    // 广播同步通知
+    audit_log!(
+        state.audit_service,
+        AuditAction::CategoryUpdated,
+        "category", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &category.name})
+    );
+
     state
         .broadcast_sync(RESOURCE, "updated", &id, Some(&category))
         .await;
@@ -74,6 +96,7 @@ pub async fn update(
 /// DELETE /api/categories/:id - 删除分类
 pub async fn delete(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     tracing::info!(id = %id, "Deleting category");
@@ -84,9 +107,15 @@ pub async fn delete(
         .await
         ?;
 
-    tracing::info!(id = %id, "Category deleted successfully");
+    audit_log!(
+        state.audit_service,
+        AuditAction::CategoryDeleted,
+        "category", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({})
+    );
 
-    // 广播同步通知
     state
         .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
         .await;

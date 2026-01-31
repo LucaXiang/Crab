@@ -9,6 +9,7 @@
 use super::archive::OrderArchiveService;
 use super::money::{to_decimal, to_f64};
 use super::storage::{OrderStorage, PendingArchive};
+use crate::audit::{AuditAction, AuditService};
 use crate::db::repository::{PaymentRepository, ShiftRepository};
 use rust_decimal::prelude::*;
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot};
@@ -43,15 +44,22 @@ const ARCHIVE_CONCURRENCY: usize = 50;
 pub struct ArchiveWorker {
     storage: OrderStorage,
     archive_service: OrderArchiveService,
+    audit_service: Arc<AuditService>,
     db: Surreal<Db>,
     semaphore: Arc<tokio::sync::Semaphore>,
 }
 
 impl ArchiveWorker {
-    pub fn new(storage: OrderStorage, archive_service: OrderArchiveService, db: Surreal<Db>) -> Self {
+    pub fn new(
+        storage: OrderStorage,
+        archive_service: OrderArchiveService,
+        audit_service: Arc<AuditService>,
+        db: Surreal<Db>,
+    ) -> Self {
         Self {
             storage,
             archive_service,
+            audit_service,
             db,
             semaphore: Arc::new(tokio::sync::Semaphore::new(ARCHIVE_CONCURRENCY)),
         }
@@ -181,7 +189,10 @@ impl ArchiveWorker {
                 // 4. Write payment records to independent payment table
                 self.write_payment_records(&snapshot, &events).await;
 
-                // 5. Cleanup redb (synchronous)
+                // 5. Write audit log for terminal event
+                self.write_order_audit(&snapshot, &events).await;
+
+                // 6. Cleanup redb (synchronous)
                 if let Err(e) = self.storage.complete_archive(order_id) {
                     tracing::error!(order_id = %order_id, error = %e, "Failed to complete archive cleanup");
                 }
@@ -258,6 +269,43 @@ impl ArchiveWorker {
                 );
             }
         }
+    }
+
+    /// Write audit log entry for the terminal event in the order
+    async fn write_order_audit(&self, snapshot: &OrderSnapshot, events: &[OrderEvent]) {
+        // Find the terminal event (last event that triggered archival)
+        let terminal = events
+            .iter()
+            .rev()
+            .find(|e| TERMINAL_EVENT_TYPES.contains(&e.event_type));
+
+        let Some(event) = terminal else { return };
+
+        let action = match event.event_type {
+            OrderEventType::OrderCompleted => AuditAction::OrderCompleted,
+            OrderEventType::OrderVoided => AuditAction::OrderVoided,
+            OrderEventType::OrderMoved => AuditAction::OrderMoved,
+            OrderEventType::OrderMerged => AuditAction::OrderMerged,
+            _ => return,
+        };
+
+        let details = serde_json::json!({
+            "receipt_number": snapshot.receipt_number,
+            "status": serde_json::to_value(&snapshot.status).unwrap_or_default(),
+            "total": snapshot.total,
+            "item_count": snapshot.items.len(),
+        });
+
+        self.audit_service
+            .log(
+                action,
+                "order",
+                &snapshot.order_id,
+                Some(event.operator_id.clone()),
+                Some(event.operator_name.clone()),
+                details,
+            )
+            .await;
     }
 
     /// Update shift expected_cash for cash payments in the order

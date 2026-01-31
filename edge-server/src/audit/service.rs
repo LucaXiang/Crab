@@ -110,7 +110,7 @@ impl AuditService {
             let details = serde_json::json!({
                 "last_start_timestamp": last_start_ts,
                 "detected_at": now,
-                "note": "Previous session did not shut down cleanly"
+                "note": "abnormal_shutdown_detected"
             });
 
             // 审计日志始终记录（每次异常关闭都是独立事件）
@@ -148,6 +148,7 @@ impl AuditService {
                             description: None,
                             options: vec![
                                 "power_outage".to_string(),
+                                "app_crash".to_string(),
                                 "device_failure".to_string(),
                                 "maintenance_restart".to_string(),
                                 "other".to_string(),

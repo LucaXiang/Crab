@@ -2,9 +2,12 @@
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
 };
 
+use crate::audit::AuditAction;
+use crate::audit_log;
+use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{Attribute, AttributeCreate, AttributeOption, AttributeUpdate};
 use crate::db::repository::AttributeRepository;
@@ -39,6 +42,7 @@ pub async fn get_by_id(
 /// POST /api/attributes - 创建属性
 pub async fn create(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<AttributeCreate>,
 ) -> AppResult<Json<Attribute>> {
     let repo = AttributeRepository::new(state.db.clone());
@@ -47,8 +51,17 @@ pub async fn create(
         .await
         ?;
 
-    // 广播同步通知
     let id = attr.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::AttributeCreated,
+        "attribute", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &attr.name})
+    );
+
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&attr))
         .await;
@@ -59,6 +72,7 @@ pub async fn create(
 /// PUT /api/attributes/:id - 更新属性
 pub async fn update(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(payload): Json<AttributeUpdate>,
 ) -> AppResult<Json<Attribute>> {
@@ -68,7 +82,15 @@ pub async fn update(
         .await
         ?;
 
-    // 广播同步通知
+    audit_log!(
+        state.audit_service,
+        AuditAction::AttributeUpdated,
+        "attribute", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &attr.name})
+    );
+
     state
         .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
         .await;
@@ -79,6 +101,7 @@ pub async fn update(
 /// DELETE /api/attributes/:id - 删除属性 (软删除)
 pub async fn delete(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let repo = AttributeRepository::new(state.db.clone());
@@ -87,8 +110,16 @@ pub async fn delete(
         .await
         ?;
 
-    // 广播同步通知
     if result {
+        audit_log!(
+            state.audit_service,
+            AuditAction::AttributeDeleted,
+            "attribute", &id,
+            operator_id = Some(current_user.id.clone()),
+            operator_name = Some(current_user.display_name.clone()),
+            details = serde_json::json!({})
+        );
+
         state
             .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
             .await;

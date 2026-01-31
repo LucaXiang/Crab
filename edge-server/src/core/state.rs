@@ -479,6 +479,7 @@ impl ServerState {
             let worker = ArchiveWorker::new(
                 self.orders_manager.storage().clone(),
                 archive_service.clone(),
+                self.audit_service.clone(),
                 self.db.clone(),
             );
 

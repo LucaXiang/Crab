@@ -228,7 +228,7 @@ impl AuditStorage {
             where_clause
         );
         let select_sql = format!(
-            "SELECT * FROM audit_log{} ORDER BY sequence LIMIT {} START {}",
+            "SELECT * FROM audit_log{} ORDER BY sequence DESC LIMIT {} START {}",
             where_clause, q.limit, q.offset
         );
         let sql = format!("{}; {}", count_sql, select_sql);

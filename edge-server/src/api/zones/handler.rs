@@ -2,9 +2,12 @@
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
 };
 
+use crate::audit::AuditAction;
+use crate::audit_log;
+use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{DiningTable, Zone, ZoneCreate, ZoneUpdate};
 use crate::db::repository::{DiningTableRepository, ZoneRepository};
@@ -39,6 +42,7 @@ pub async fn get_by_id(
 /// POST /api/zones - 创建区域
 pub async fn create(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<ZoneCreate>,
 ) -> AppResult<Json<Zone>> {
     let repo = ZoneRepository::new(state.db.clone());
@@ -47,8 +51,17 @@ pub async fn create(
         .await
         ?;
 
-    // 广播同步通知
     let id = zone.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::ZoneCreated,
+        "zone", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &zone.name})
+    );
+
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&zone))
         .await;
@@ -59,6 +72,7 @@ pub async fn create(
 /// PUT /api/zones/:id - 更新区域
 pub async fn update(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(payload): Json<ZoneUpdate>,
 ) -> AppResult<Json<Zone>> {
@@ -68,7 +82,15 @@ pub async fn update(
         .await
         ?;
 
-    // 广播同步通知
+    audit_log!(
+        state.audit_service,
+        AuditAction::ZoneUpdated,
+        "zone", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &zone.name})
+    );
+
     state
         .broadcast_sync(RESOURCE, "updated", &id, Some(&zone))
         .await;
@@ -79,6 +101,7 @@ pub async fn update(
 /// DELETE /api/zones/:id - 删除区域 (软删除)
 pub async fn delete(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let repo = ZoneRepository::new(state.db.clone());
@@ -87,8 +110,16 @@ pub async fn delete(
         .await
         ?;
 
-    // 广播同步通知
     if result {
+        audit_log!(
+            state.audit_service,
+            AuditAction::ZoneDeleted,
+            "zone", &id,
+            operator_id = Some(current_user.id.clone()),
+            operator_name = Some(current_user.display_name.clone()),
+            details = serde_json::json!({})
+        );
+
         state
             .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
             .await;

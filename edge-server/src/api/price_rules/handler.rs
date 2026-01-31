@@ -2,9 +2,12 @@
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
 };
 
+use crate::audit::AuditAction;
+use crate::audit_log;
+use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
 use crate::db::repository::PriceRuleRepository;
@@ -73,6 +76,7 @@ pub async fn get_by_id(
 /// POST /api/price-rules - 创建价格规则
 pub async fn create(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<PriceRuleCreate>,
 ) -> AppResult<Json<PriceRule>> {
     let repo = PriceRuleRepository::new(state.db.clone());
@@ -81,8 +85,17 @@ pub async fn create(
         .await
         ?;
 
-    // 广播同步通知 (使用完整 id 格式，与 rule.id 一致)
     let id = rule.id.as_ref().map(|t| t.to_string()).unwrap_or_default();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::PriceRuleCreated,
+        "price_rule", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &rule.name})
+    );
+
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&rule))
         .await;
@@ -93,6 +106,7 @@ pub async fn create(
 /// PUT /api/price-rules/:id - 更新价格规则
 pub async fn update(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(payload): Json<PriceRuleUpdate>,
 ) -> AppResult<Json<PriceRule>> {
@@ -102,7 +116,15 @@ pub async fn update(
         .await
         ?;
 
-    // 广播同步通知
+    audit_log!(
+        state.audit_service,
+        AuditAction::PriceRuleUpdated,
+        "price_rule", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &rule.name})
+    );
+
     state
         .broadcast_sync(RESOURCE, "updated", &id, Some(&rule))
         .await;
@@ -113,6 +135,7 @@ pub async fn update(
 /// DELETE /api/price-rules/:id - 删除价格规则 (软删除)
 pub async fn delete(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let repo = PriceRuleRepository::new(state.db.clone());
@@ -121,8 +144,16 @@ pub async fn delete(
         .await
         ?;
 
-    // 广播同步通知
     if result {
+        audit_log!(
+            state.audit_service,
+            AuditAction::PriceRuleDeleted,
+            "price_rule", &id,
+            operator_id = Some(current_user.id.clone()),
+            operator_name = Some(current_user.display_name.clone()),
+            details = serde_json::json!({})
+        );
+
         state
             .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
             .await;

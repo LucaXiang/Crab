@@ -2,9 +2,12 @@
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
 };
 
+use crate::audit::AuditAction;
+use crate::audit_log;
+use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{PrintDestination, PrintDestinationCreate, PrintDestinationUpdate};
 use crate::db::repository::PrintDestinationRepository;
@@ -41,6 +44,7 @@ pub async fn get_by_id(
 /// POST /api/print-destinations - 创建打印目的地
 pub async fn create(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<PrintDestinationCreate>,
 ) -> AppResult<Json<PrintDestination>> {
     let repo = PrintDestinationRepository::new(state.db.clone());
@@ -49,8 +53,17 @@ pub async fn create(
         .await
         ?;
 
-    // 广播同步通知
     let id = item.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::PrintDestinationCreated,
+        "print_destination", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &item.name})
+    );
+
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&item))
         .await;
@@ -61,6 +74,7 @@ pub async fn create(
 /// PUT /api/print-destinations/:id - 更新打印目的地
 pub async fn update(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(payload): Json<PrintDestinationUpdate>,
 ) -> AppResult<Json<PrintDestination>> {
@@ -70,7 +84,15 @@ pub async fn update(
         .await
         ?;
 
-    // 广播同步通知
+    audit_log!(
+        state.audit_service,
+        AuditAction::PrintDestinationUpdated,
+        "print_destination", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &item.name})
+    );
+
     state
         .broadcast_sync(RESOURCE, "updated", &id, Some(&item))
         .await;
@@ -81,6 +103,7 @@ pub async fn update(
 /// DELETE /api/print-destinations/:id - 删除打印目的地
 pub async fn delete(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     tracing::info!(id = %id, "Deleting print destination");
@@ -92,13 +115,19 @@ pub async fn delete(
 
     tracing::info!(id = %id, result = %result, "Print destination delete result");
 
-    // 广播同步通知
     if result {
+        audit_log!(
+            state.audit_service,
+            AuditAction::PrintDestinationDeleted,
+            "print_destination", &id,
+            operator_id = Some(current_user.id.clone()),
+            operator_name = Some(current_user.display_name.clone()),
+            details = serde_json::json!({})
+        );
+
         state
             .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
             .await;
-    } else {
-        tracing::warn!(id = %id, "Print destination delete returned false, not broadcasting");
     }
 
     Ok(Json(result))

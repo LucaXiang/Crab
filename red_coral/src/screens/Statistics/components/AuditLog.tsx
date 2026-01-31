@@ -18,7 +18,7 @@ import {
   Calendar,
 } from 'lucide-react';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 /** action → 分组 key */
 const ACTION_GROUPS: Record<string, AuditAction[]> = {
@@ -26,12 +26,37 @@ const ACTION_GROUPS: Record<string, AuditAction[]> = {
   auth: ['login_success', 'login_failed', 'logout'],
   order: ['order_completed', 'order_voided', 'order_payment_added', 'order_payment_cancelled', 'order_merged', 'order_moved', 'order_split', 'order_restored'],
   management: ['employee_created', 'employee_updated', 'employee_deleted', 'role_created', 'role_updated', 'role_deleted', 'product_price_changed', 'price_rule_changed'],
+  catalog: ['product_created', 'product_updated', 'product_deleted', 'category_created', 'category_updated', 'category_deleted', 'tag_created', 'tag_updated', 'tag_deleted', 'attribute_created', 'attribute_updated', 'attribute_deleted'],
+  pricing: ['price_rule_created', 'price_rule_updated', 'price_rule_deleted'],
+  venue: ['zone_created', 'zone_updated', 'zone_deleted', 'table_created', 'table_updated', 'table_deleted'],
   shift: ['shift_opened', 'shift_closed'],
-  config: ['print_config_changed', 'store_info_changed'],
+  config: ['print_config_changed', 'store_info_changed', 'label_template_created', 'label_template_updated', 'label_template_deleted', 'print_destination_created', 'print_destination_updated', 'print_destination_deleted'],
 };
 
 /** resource_type 选项 */
-const RESOURCE_TYPES = ['system', 'auth', 'order', 'employee', 'role', 'product', 'price_rule', 'shift', 'print_config', 'store_info'];
+const RESOURCE_TYPES = ['system', 'auth', 'order', 'employee', 'role', 'product', 'category', 'tag', 'attribute', 'price_rule', 'zone', 'dining_table', 'shift', 'print_config', 'print_destination', 'label_template', 'store_info', 'system_issue'];
+
+/**
+ * 枚举型字段 — 值本身是已知的系统枚举，尝试通过 audit.detail.value.{v} 翻译
+ * 如果 i18n 没有对应 key，则原样显示
+ */
+const ENUM_FIELDS = new Set([
+  'kind',       // abnormal_shutdown, long_downtime, ...
+  'source',     // local, remote
+  'status',     // ACTIVE, COMPLETED, VOID, MOVED, MERGED
+  'reason',     // invalid_credentials, user_not_found
+  'note',       // abnormal_shutdown_detected, ...
+  'response',   // power_outage, app_crash, device_failure, ...
+]);
+
+/**
+ * 时间戳字段 — 值是 i64 Unix 毫秒，格式化为可读日期
+ */
+const TIMESTAMP_FIELDS = new Set([
+  'last_start_timestamp',
+  'detected_at',
+  'last_activity_timestamp',
+]);
 
 /** action 的显示颜色 */
 function getActionColor(action: string): string {
@@ -45,6 +70,120 @@ function getActionColor(action: string): string {
     return 'bg-yellow-100 text-yellow-800';
   }
   return 'bg-gray-100 text-gray-800';
+}
+
+/** 格式化时间戳为本地日期字符串 */
+function formatTs(v: number): string {
+  return new Date(v).toLocaleString('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+}
+
+/** 格式化文件大小 */
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * 格式化单个详情字段值
+ *
+ * 策略优先级：
+ * 1. null/undefined → "无"
+ * 2. boolean → "是"/"否"
+ * 3. 枚举字段 (kind, source, status, reason, note, response) → i18n value 表翻译，无匹配则原样
+ * 4. 时间戳字段 → 格式化为日期
+ * 5. size → 文件大小格式化
+ * 6. total → 货币格式化（€）
+ * 7. 数组 → 标签式排列
+ * 8. 其他 → 原样显示
+ */
+function formatDetailValue(
+  key: string,
+  value: unknown,
+  t: (key: string) => string,
+): React.ReactNode {
+  if (value === null || value === undefined) return t('audit.detail.value.none');
+
+  // boolean
+  if (typeof value === 'boolean') {
+    return t(`audit.detail.value.${value}`);
+  }
+
+  // 枚举字段 — kind, source, status, reason
+  if (ENUM_FIELDS.has(key) && typeof value === 'string') {
+    const translated = t(`audit.detail.value.${value}`);
+    // t() 找不到 key 时返回 key 本身，如果翻译结果和 key 不同说明有翻译
+    return translated !== `audit.detail.value.${value}` ? translated : value;
+  }
+
+  // 时间戳字段
+  if (TIMESTAMP_FIELDS.has(key) && typeof value === 'number') {
+    return formatTs(value);
+  }
+
+  // 文件大小
+  if (key === 'size' && typeof value === 'number') {
+    return formatFileSize(value);
+  }
+
+  // 金额
+  if (key === 'total' && typeof value === 'number') {
+    return `€${value.toFixed(2)}`;
+  }
+
+  // 数组 (permissions 等)
+  if (Array.isArray(value)) {
+    if (value.length === 0) return t('audit.detail.value.none');
+    return (
+      <span className="font-mono text-xs">
+        {value.map((v, i) => (
+          <span key={i} className="inline-block bg-gray-100 rounded px-1 py-0.5 mr-1 mb-0.5">
+            {String(v)}
+          </span>
+        ))}
+      </span>
+    );
+  }
+
+  return String(value);
+}
+
+/**
+ * 渲染审计详情 — 策略模式
+ *
+ * 按字段逐行展示：字段名国际化，值按语义分类渲染。
+ * 枚举值翻译、时间戳格式化、金额/文件大小格式化、用户输入保持原样。
+ */
+function renderAuditDetails(
+  details: Record<string, unknown> | null | undefined,
+  t: (key: string) => string,
+): React.ReactNode {
+  if (!details || typeof details !== 'object') {
+    return <span className="text-gray-400 italic">{t('audit.detail.empty')}</span>;
+  }
+
+  const entries = Object.entries(details);
+  if (entries.length === 0) {
+    return <span className="text-gray-400 italic">{t('audit.detail.empty')}</span>;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {entries.map(([key, value]) => (
+        <div key={key} className="flex items-start gap-2">
+          <span className="font-medium text-gray-500 min-w-[5rem] shrink-0">
+            {t(`audit.detail.field.${key}`) || key}:
+          </span>
+          <span className="text-gray-700 break-all">
+            {formatDetailValue(key, value, t)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export const AuditLog: React.FC = () => {
@@ -238,10 +377,10 @@ export const AuditLog: React.FC = () => {
                     <td colSpan={6} className="bg-gray-50 px-6 py-4">
                       <div className="grid grid-cols-2 gap-4 text-xs">
                         <div>
-                          <span className="font-semibold text-gray-500">{t('audit.detail.details')}:</span>
-                          <pre className="mt-1 p-2 bg-white rounded border border-gray-200 text-gray-600 overflow-auto max-h-40 whitespace-pre-wrap">
-                            {JSON.stringify(item.details, null, 2)}
-                          </pre>
+                          <span className="font-semibold text-gray-500 block mb-1">{t('audit.detail.details')}:</span>
+                          <div className="mt-1 p-2 bg-white rounded border border-gray-200 text-gray-600 overflow-auto max-h-40">
+                            {renderAuditDetails(item.details as Record<string, unknown>, t)}
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <div>
@@ -382,7 +521,7 @@ export const AuditLog: React.FC = () => {
             >
               <option value="">{t('audit.filter.all_resources')}</option>
               {RESOURCE_TYPES.map((rt) => (
-                <option key={rt} value={rt}>{rt}</option>
+                <option key={rt} value={rt}>{t(`audit.resource_type.${rt}`) || rt}</option>
               ))}
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center px-1.5 pointer-events-none">

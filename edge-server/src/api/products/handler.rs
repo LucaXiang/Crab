@@ -1,13 +1,16 @@
 //! Product API Handlers
 
 use axum::{
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     Json,
 };
 use serde::Deserialize;
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
 
+use crate::audit::AuditAction;
+use crate::audit_log;
+use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{AttributeBindingFull, ProductCreate, ProductFull, ProductUpdate};
 use crate::db::repository::AttributeRepository;
@@ -99,6 +102,7 @@ pub async fn get_full(
 /// POST /api/products - 创建商品
 pub async fn create(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<ProductCreate>,
 ) -> AppResult<Json<shared::models::ProductFull>> {
     // 检查 external_id 是否已存在
@@ -116,9 +120,18 @@ pub async fn create(
         .await
         ?;
 
-    // 广播同步通知 (发送完整 ProductFull 数据)
     let id = product.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
     let product_for_api: shared::models::ProductFull = product.into();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::ProductCreated,
+        "product", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &product_for_api.name})
+    );
+
     state
         .broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&product_for_api))
         .await;
@@ -129,6 +142,7 @@ pub async fn create(
 /// PUT /api/products/:id - 更新商品
 pub async fn update(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(payload): Json<ProductUpdate>,
 ) -> AppResult<Json<shared::models::ProductFull>> {
@@ -163,8 +177,17 @@ pub async fn update(
         product.is_label_print_enabled
     );
 
-    // 广播同步通知 (发送完整 ProductFull 数据)
     let product_for_api: shared::models::ProductFull = product.into();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::ProductUpdated,
+        "product", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"name": &product_for_api.name})
+    );
+
     state
         .broadcast_sync(RESOURCE_PRODUCT, "updated", &id, Some(&product_for_api))
         .await;
@@ -175,6 +198,7 @@ pub async fn update(
 /// DELETE /api/products/:id - 删除商品
 pub async fn delete(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     state
@@ -183,7 +207,15 @@ pub async fn delete(
         .await
         ?;
 
-    // 广播同步通知
+    audit_log!(
+        state.audit_service,
+        AuditAction::ProductDeleted,
+        "product", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({})
+    );
+
     state
         .broadcast_sync::<()>(RESOURCE_PRODUCT, "deleted", &id, None)
         .await;

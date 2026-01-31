@@ -65,7 +65,7 @@
       "system": "系统",
       "status": "状态",
       "is_active": "启用状态",
-      "paidQuantity": "已付 {{qty}} 份",
+      "paidQuantity": "已付 {qty} 份",
       "retail": "零售",
       "loss_amount": "损失金额"
     },
@@ -426,7 +426,7 @@
       },
       "note": "备注",
       "note_placeholder": "请输入备注信息...",
-      "loss_amount_notice": "未付金额 {{amount}} 将计入损失"
+      "loss_amount_notice": "未付金额 {amount} 将计入损失"
     },
     "retail": {
       "cancel_title": "确认返回",
@@ -579,7 +579,8 @@
       "title": "数据统计",
       "overview": "概览",
       "analytics": "数据统计",
-      "daily_report": "日结报告"
+      "daily_report": "日结报告",
+      "audit_log": "审计日志"
     },
     "time": {
       "today": "今天"
@@ -1648,7 +1649,7 @@
       "checking": "正在检查班次状态...",
       "open_success": "开班成功",
       "close_success_balanced": "收班成功，现金无差异",
-      "close_success_variance": "收班成功，差异: {{variance}}",
+      "close_success_variance": "收班成功，差异: {variance}",
       "force_close_success": "班次已强制关闭",
       "force_closed_notice_title": "班次异常关闭",
       "force_closed_notice_hint": "请开启新班次以继续使用 POS 系统。",
@@ -1751,17 +1752,21 @@
     "kind": {
       "abnormal_shutdown": {
         "title": "异常关闭检测",
-        "description": "系统检测到上次非正常关闭（上次启动: {{last_start_timestamp}}），请说明原因以满足审计要求。"
+        "description": "系统检测到上次非正常关闭（上次启动: {last_start_timestamp}），请说明原因以满足审计要求。"
       },
       "long_downtime": {
         "title": "长时间停机检测",
-        "description": "系统检测到超过 {{downtime_hours}} 小时未运行，请说明原因以满足审计要求。"
+        "description": "系统检测到超过 {downtime_hours} 小时未运行，请说明原因以满足审计要求。"
       }
     },
     "option": {
       "power_outage": "停电",
+      "app_crash": "程序异常崩溃",
       "device_failure": "设备故障",
       "maintenance_restart": "维护重启",
+      "day_off": "休息日/假期",
+      "equipment_repair": "设备维修",
+      "renovation": "装修/搬迁",
       "other": "其他"
     },
     "resolve_success": "已提交回应",
@@ -1895,13 +1900,13 @@
     "button_retry_later": "稍后再试",
     "reason": {
       "FirstTimeSetup": "欢迎！请激活您的设备",
-      "CertificateExpired": "设备证书已过期 {{days_overdue}} 天",
-      "CertificateExpiringSoon": "证书将在 {{days_remaining}} 天后过期",
+      "CertificateExpired": "设备证书已过期 {days_overdue} 天",
+      "CertificateExpiringSoon": "证书将在 {days_remaining} 天后过期",
       "CertificateInvalid": "证书文件损坏或无效",
       "SignatureInvalid": "安全验证失败",
       "DeviceMismatch": "检测到硬件变更",
-      "ClockTampering_backward": "系统时间异常：回拨了 {{hours}} 小时",
-      "ClockTampering_forward": "系统时间异常：前跳了 {{days}} 天",
+      "ClockTampering_backward": "系统时间异常：回拨了 {hours} 小时",
+      "ClockTampering_forward": "系统时间异常：前跳了 {days} 天",
       "BindingInvalid": "设备绑定无效",
       "TokenExpired": "凭据已过期",
       "NetworkError": "无法连接服务器",
@@ -1922,7 +1927,7 @@
       "revoked": "请联系管理员了解详情"
     },
     "detail": {
-      "certificate_expired_at": "证书过期时间：{{expired_at}}",
+      "certificate_expired_at": "证书过期时间：{expired_at}",
       "clock_backward": "检测到系统时间回拨，请检查系统时间设置。",
       "clock_forward": "检测到系统时间前跳，请检查系统时间设置。"
     }
@@ -1945,18 +1950,91 @@
       "details": "详情",
       "operator_id": "操作人 ID",
       "prev_hash": "前一条哈希",
-      "curr_hash": "当前哈希"
+      "curr_hash": "当前哈希",
+      "field": {
+        "name": "名称",
+        "username": "用户名",
+        "role_name": "角色名",
+        "permissions": "权限列表",
+        "reason": "原因",
+        "epoch": "启动周期",
+        "receipt_number": "小票号",
+        "status": "状态",
+        "total": "金额",
+        "item_count": "商品数",
+        "forced": "强制操作",
+        "kind": "问题类型",
+        "response": "回应内容",
+        "source": "来源",
+        "default_kitchen_printer": "默认厨房打印机",
+        "default_label_printer": "默认标签打印机",
+        "original_name": "原始文件名",
+        "filename": "文件名",
+        "size": "文件大小",
+        "note": "备注",
+        "last_start_timestamp": "上次启动时间",
+        "detected_at": "检测时间",
+        "last_activity_timestamp": "上次活动时间",
+        "downtime_ms": "停机时长(ms)",
+        "downtime_hours": "停机时长(小时)"
+      },
+      "value": {
+        "true": "是",
+        "false": "否",
+        "none": "无",
+        "invalid_credentials": "密码错误",
+        "user_not_found": "用户不存在",
+        "abnormal_shutdown": "异常关闭",
+        "long_downtime": "长时间停机",
+        "local": "本地检测",
+        "remote": "远程推送",
+        "ACTIVE": "进行中",
+        "COMPLETED": "已完成",
+        "VOID": "已作废",
+        "MOVED": "已转移",
+        "MERGED": "已合并",
+        "power_outage": "停电",
+        "app_crash": "应用崩溃",
+        "device_failure": "设备故障",
+        "maintenance_restart": "维护重启",
+        "other": "其他",
+        "abnormal_shutdown_detected": "检测到上次异常关闭"
+      },
+      "empty": "无详情"
     },
     "filter": {
       "all_actions": "全部操作",
       "all_resources": "全部资源类型",
       "search_operator": "搜索操作人 ID..."
     },
+    "resource_type": {
+      "system": "系统",
+      "auth": "认证",
+      "order": "订单",
+      "employee": "员工",
+      "role": "角色",
+      "product": "商品",
+      "category": "分类",
+      "tag": "标签",
+      "attribute": "属性",
+      "price_rule": "价格规则",
+      "zone": "区域",
+      "dining_table": "桌台",
+      "shift": "班次",
+      "print_config": "打印配置",
+      "print_destination": "打印目的地",
+      "label_template": "标签模板",
+      "store_info": "门店信息",
+      "system_issue": "系统问题"
+    },
     "group": {
       "system": "系统",
       "auth": "认证",
       "order": "订单",
       "management": "管理",
+      "catalog": "商品目录",
+      "pricing": "定价",
+      "venue": "区域桌台",
       "shift": "班次",
       "config": "配置"
     },
@@ -1988,7 +2066,34 @@
       "shift_opened": "班次开启",
       "shift_closed": "班次关闭",
       "print_config_changed": "打印配置变更",
-      "store_info_changed": "门店信息变更"
+      "store_info_changed": "门店信息变更",
+      "product_created": "创建商品",
+      "product_updated": "更新商品",
+      "product_deleted": "删除商品",
+      "category_created": "创建分类",
+      "category_updated": "更新分类",
+      "category_deleted": "删除分类",
+      "tag_created": "创建标签",
+      "tag_updated": "更新标签",
+      "tag_deleted": "删除标签",
+      "attribute_created": "创建属性",
+      "attribute_updated": "更新属性",
+      "attribute_deleted": "删除属性",
+      "price_rule_created": "创建价格规则",
+      "price_rule_updated": "更新价格规则",
+      "price_rule_deleted": "删除价格规则",
+      "zone_created": "创建区域",
+      "zone_updated": "更新区域",
+      "zone_deleted": "删除区域",
+      "table_created": "创建桌台",
+      "table_updated": "更新桌台",
+      "table_deleted": "删除桌台",
+      "label_template_created": "创建标签模板",
+      "label_template_updated": "更新标签模板",
+      "label_template_deleted": "删除标签模板",
+      "print_destination_created": "创建打印目的地",
+      "print_destination_updated": "更新打印目的地",
+      "print_destination_deleted": "删除打印目的地"
     },
     "verify": {
       "button": "验证完整性",

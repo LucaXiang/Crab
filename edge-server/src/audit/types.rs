@@ -73,6 +73,68 @@ pub enum AuditAction {
     /// 班次关闭
     ShiftClosed,
 
+    // ═══ 商品目录 ═══
+    /// 商品创建
+    ProductCreated,
+    /// 商品更新
+    ProductUpdated,
+    /// 商品删除
+    ProductDeleted,
+    /// 分类创建
+    CategoryCreated,
+    /// 分类更新
+    CategoryUpdated,
+    /// 分类删除
+    CategoryDeleted,
+    /// 标签创建
+    TagCreated,
+    /// 标签更新
+    TagUpdated,
+    /// 标签删除
+    TagDeleted,
+    /// 属性创建
+    AttributeCreated,
+    /// 属性更新
+    AttributeUpdated,
+    /// 属性删除
+    AttributeDeleted,
+
+    // ═══ 价格规则 ═══
+    /// 价格规则创建
+    PriceRuleCreated,
+    /// 价格规则更新
+    PriceRuleUpdated,
+    /// 价格规则删除
+    PriceRuleDeleted,
+
+    // ═══ 区域与桌台 ═══
+    /// 区域创建
+    ZoneCreated,
+    /// 区域更新
+    ZoneUpdated,
+    /// 区域删除
+    ZoneDeleted,
+    /// 桌台创建
+    TableCreated,
+    /// 桌台更新
+    TableUpdated,
+    /// 桌台删除
+    TableDeleted,
+
+    // ═══ 打印 ═══
+    /// 标签模板创建
+    LabelTemplateCreated,
+    /// 标签模板更新
+    LabelTemplateUpdated,
+    /// 标签模板删除
+    LabelTemplateDeleted,
+    /// 打印目的地创建
+    PrintDestinationCreated,
+    /// 打印目的地更新
+    PrintDestinationUpdated,
+    /// 打印目的地删除
+    PrintDestinationDeleted,
+
     // ═══ 系统配置 ═══
     /// 打印配置变更
     PrintConfigChanged,

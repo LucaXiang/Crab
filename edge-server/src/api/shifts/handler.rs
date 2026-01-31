@@ -2,11 +2,14 @@
 
 use axum::{
     Json,
-    extract::{Path, Query, State},
+    extract::{Extension, Path, Query, State},
 };
 use chrono::{Local, NaiveTime};
 use serde::Deserialize;
 
+use crate::audit::AuditAction;
+use crate::audit_log;
+use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
 use crate::db::repository::{ShiftRepository, StoreInfoRepository};
@@ -86,6 +89,7 @@ pub async fn get_current(
 /// POST /api/shifts - 开班
 pub async fn create(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<ShiftCreate>,
 ) -> AppResult<Json<Shift>> {
     let repo = ShiftRepository::new(state.db.clone());
@@ -94,12 +98,21 @@ pub async fn create(
         .await
         ?;
 
-    // 广播同步通知
     let id = shift
         .id
         .as_ref()
         .map(|id| id.to_string())
         .unwrap_or_default();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::ShiftOpened,
+        "shift", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({})
+    );
+
     state
         .broadcast_sync(RESOURCE, "created", &id, Some(&shift))
         .await;
@@ -129,6 +142,7 @@ pub async fn update(
 /// POST /api/shifts/:id/close - 收班
 pub async fn close(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(payload): Json<ShiftClose>,
 ) -> AppResult<Json<Shift>> {
@@ -137,6 +151,15 @@ pub async fn close(
         .close(&id, payload)
         .await
         ?;
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::ShiftClosed,
+        "shift", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({})
+    );
 
     state
         .broadcast_sync(RESOURCE, "closed", &id, Some(&shift))
@@ -148,6 +171,7 @@ pub async fn close(
 /// POST /api/shifts/:id/force-close - 强制关闭
 pub async fn force_close(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(payload): Json<ShiftForceClose>,
 ) -> AppResult<Json<Shift>> {
@@ -156,6 +180,15 @@ pub async fn force_close(
         .force_close(&id, payload)
         .await
         ?;
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::ShiftClosed,
+        "shift", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"forced": true})
+    );
 
     state
         .broadcast_sync(RESOURCE, "force_closed", &id, Some(&shift))
