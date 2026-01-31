@@ -47,6 +47,11 @@ import type { LucideIcon } from 'lucide-react';
 
 type TranslateFn = (key: string, params?: Record<string, string | number>) => string;
 
+export interface TimelineTag {
+  text: string;
+  type: 'item' | 'payment';
+}
+
 export interface TimelineDisplayData {
   title: string;
   summary?: string;
@@ -56,7 +61,7 @@ export interface TimelineDisplayData {
   customColor?: string;
   timestamp: number;
   isHidden?: boolean;
-  tags?: string[];
+  tags?: TimelineTag[];
 }
 
 /**
@@ -176,7 +181,7 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
       icon: Edit3,
       colorClass: 'bg-yellow-500',
       timestamp: event.timestamp,
-      tags: source?.instance_id ? [`#${source.instance_id.slice(-5)}`] : [],
+      tags: source?.instance_id ? [{ text: `#${source.instance_id.slice(-5)}`, type: 'item' as const }] : [],
     };
   }
 };
@@ -207,7 +212,7 @@ const ItemRemovedRenderer: EventRenderer<ItemRemovedPayload> = {
       icon: Trash2,
       colorClass: 'bg-red-500',
       timestamp: event.timestamp,
-      tags: payload.instance_id ? [`#${payload.instance_id.slice(-5)}`] : [],
+      tags: payload.instance_id ? [{ text: `#${payload.instance_id.slice(-5)}`, type: 'item' as const }] : [],
     };
   }
 };
@@ -221,7 +226,7 @@ const ItemRestoredRenderer: EventRenderer<ItemRestoredPayload> = {
       icon: Utensils,
       colorClass: 'bg-green-400',
       timestamp: event.timestamp,
-      tags: payload.instance_id ? [`#${payload.instance_id.slice(-5)}`] : [],
+      tags: payload.instance_id ? [{ text: `#${payload.instance_id.slice(-5)}`, type: 'item' as const }] : [],
     };
   }
 };
@@ -257,7 +262,7 @@ const PaymentAddedRenderer: EventRenderer<PaymentAddedPayload> = {
       icon: Coins,
       colorClass: 'bg-green-500',
       timestamp: event.timestamp,
-      tags: payload.payment_id ? [`#${payload.payment_id.slice(-6)}`] : [],
+      tags: payload.payment_id ? [{ text: `#${payload.payment_id.slice(-5)}`, type: 'payment' as const }] : [],
     };
   }
 };
@@ -293,7 +298,7 @@ const PaymentCancelledRenderer: EventRenderer<PaymentCancelledPayload> = {
       icon: Ban,
       colorClass: 'bg-red-400',
       timestamp: event.timestamp,
-      tags: payload.payment_id ? [`#${payload.payment_id.slice(-6)}`] : [],
+      tags: payload.payment_id ? [{ text: `#${payload.payment_id.slice(-5)}`, type: 'payment' as const }] : [],
     };
   }
 };
@@ -326,7 +331,7 @@ const ItemSplitRenderer: EventRenderer<ItemSplitPayload> = {
       icon: Split,
       colorClass: 'bg-teal-500',
       timestamp: event.timestamp,
-      tags: payload.payment_id ? [`#${payload.payment_id.slice(-6)}`] : [],
+      tags: payload.payment_id ? [{ text: `#${payload.payment_id.slice(-5)}`, type: 'payment' as const }] : [],
     };
   }
 };
@@ -344,7 +349,7 @@ const AmountSplitRenderer: EventRenderer<AmountSplitPayload> = {
       icon: Split,
       colorClass: 'bg-teal-500',
       timestamp: event.timestamp,
-      tags: payload.payment_id ? [`#${payload.payment_id.slice(-6)}`] : [],
+      tags: payload.payment_id ? [{ text: `#${payload.payment_id.slice(-5)}`, type: 'payment' as const }] : [],
     };
   }
 };
@@ -382,7 +387,7 @@ const AaSplitPaidRenderer: EventRenderer<AaSplitPaidPayload> = {
       icon: Users,
       colorClass: 'bg-cyan-600',
       timestamp: event.timestamp,
-      tags: payload.payment_id ? [`#${payload.payment_id.slice(-6)}`] : [],
+      tags: payload.payment_id ? [{ text: `#${payload.payment_id.slice(-5)}`, type: 'payment' as const }] : [],
     };
   }
 };

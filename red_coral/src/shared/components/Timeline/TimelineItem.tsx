@@ -1,5 +1,10 @@
 import React from 'react';
-import type { TimelineDisplayData } from './renderers';
+import type { TimelineDisplayData, TimelineTag } from './renderers';
+
+const TAG_TYPE_STYLES: Record<TimelineTag['type'], string> = {
+    item: 'bg-blue-100 text-blue-600 border-blue-200',
+    payment: 'bg-emerald-100 text-emerald-600 border-emerald-200',
+};
 
 const TAG_STYLES = [
   'bg-blue-100 text-blue-700 border-blue-200',
@@ -86,8 +91,8 @@ export const TimelineItem: React.FC<TimelineItemProps> = ({ data, showNoteTags =
                 {tags && tags.length > 0 && (
                     <div className="flex items-center gap-1">
                         {tags.map((tag, i) => (
-                            <span key={i} className="px-1.5 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                                {tag}
+                            <span key={i} className={`px-1.5 py-0.5 rounded text-[0.625rem] font-bold font-mono border ${TAG_TYPE_STYLES[tag.type]}`}>
+                                {tag.text}
                             </span>
                         ))}
                     </div>

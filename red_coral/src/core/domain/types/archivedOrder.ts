@@ -70,14 +70,19 @@ export interface ArchivedOrderItem {
 }
 
 /** Payment for detail view */
+export type SplitType = 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'AA_SPLIT';
+
 export interface ArchivedPayment {
+  payment_id?: string | null;
   method: string;
   amount: number;
   timestamp: number; // milliseconds
-  note: string | null;
   cancelled: boolean;
   cancel_reason: string | null;
+  split_type?: SplitType | null;
   split_items: ArchivedSplitItem[];
+  aa_shares?: number | null;
+  aa_total_shares?: number | null;
 }
 
 /** Event for detail view */

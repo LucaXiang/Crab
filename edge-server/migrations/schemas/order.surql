@@ -71,6 +71,18 @@ DEFINE FIELD OVERWRITE operator_id ON order TYPE option<string>
 DEFINE FIELD OVERWRITE operator_name ON order TYPE option<string>
     PERMISSIONS FULL;
 
+DEFINE FIELD OVERWRITE void_type ON order TYPE option<string>
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE loss_reason ON order TYPE option<string>
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE loss_amount ON order TYPE option<float>
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE void_note ON order TYPE option<string>
+    PERMISSIONS FULL;
+
 DEFINE FIELD OVERWRITE related_order_id ON order TYPE option<record<order>>
     PERMISSIONS FULL;
 
@@ -148,9 +160,6 @@ DEFINE FIELD OVERWRITE tax_rate ON order_item TYPE int
 DEFINE FIELD OVERWRITE note ON order_item TYPE option<string>
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE category_name ON order_item TYPE option<string>
-    PERMISSIONS FULL;
-
 DEFINE INDEX OVERWRITE order_item_spec ON order_item FIELDS spec;
 DEFINE INDEX OVERWRITE order_item_instance ON order_item FIELDS instance_id;
 
@@ -182,6 +191,13 @@ DEFINE TABLE OVERWRITE order_payment TYPE NORMAL SCHEMAFULL
         FOR select, create
             WHERE $auth.role = role:admin OR $auth.id = employee:admin;
 
+DEFINE FIELD OVERWRITE seq ON order_payment TYPE int
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE payment_id ON order_payment TYPE string
+    PERMISSIONS FULL;
+
 DEFINE FIELD OVERWRITE method ON order_payment TYPE string
     PERMISSIONS FULL;
 
@@ -192,9 +208,6 @@ DEFINE FIELD OVERWRITE amount ON order_payment TYPE float
 DEFINE FIELD OVERWRITE time ON order_payment TYPE int
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE reference ON order_payment TYPE option<string>
-    PERMISSIONS FULL;
-
 DEFINE FIELD OVERWRITE cancelled ON order_payment TYPE bool
     DEFAULT false
     PERMISSIONS FULL;
@@ -202,7 +215,16 @@ DEFINE FIELD OVERWRITE cancelled ON order_payment TYPE bool
 DEFINE FIELD OVERWRITE cancel_reason ON order_payment TYPE option<string>
     PERMISSIONS FULL;
 
+DEFINE FIELD OVERWRITE split_type ON order_payment TYPE option<string>
+    PERMISSIONS FULL;
+
 DEFINE FIELD OVERWRITE split_items ON order_payment TYPE option<string>
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE aa_shares ON order_payment TYPE option<int>
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE aa_total_shares ON order_payment TYPE option<int>
     PERMISSIONS FULL;
 
 DEFINE INDEX OVERWRITE payment_method ON order_payment FIELDS method;
@@ -216,6 +238,10 @@ DEFINE TABLE OVERWRITE order_event TYPE NORMAL SCHEMAFULL
     PERMISSIONS
         FOR select, create
             WHERE $auth.role = role:admin OR $auth.id = employee:admin;
+
+DEFINE FIELD OVERWRITE seq ON order_event TYPE int
+    DEFAULT 0
+    PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE event_type ON order_event TYPE string
     PERMISSIONS FULL;

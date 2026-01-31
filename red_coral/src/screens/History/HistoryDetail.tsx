@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ArchivedOrderDetail, ArchivedOrderItem, ArchivedPayment, ArchivedEvent } from '@/core/domain/types';
 import type { OrderEvent, OrderEventType, EventPayload } from '@/core/domain/types/orderEvent';
 import { useI18n } from '@/hooks/useI18n';
-import { formatCurrency } from '@/utils/currency';
+import { formatCurrency, Currency } from '@/utils/currency';
 import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban } from 'lucide-react';
 import { Permission } from '@/core/domain/types';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
@@ -370,10 +370,23 @@ interface PaymentRowProps {
   t: (key: string, params?: Record<string, string | number>) => string;
 }
 
+const SPLIT_TYPE_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+  ITEM_SPLIT: { label: 'history.payment.split_type.item', bg: 'bg-violet-100', text: 'text-violet-600' },
+  AMOUNT_SPLIT: { label: 'history.payment.split_type.amount', bg: 'bg-amber-100', text: 'text-amber-600' },
+  AA_SPLIT: { label: 'history.payment.split_type.aa', bg: 'bg-cyan-100', text: 'text-cyan-600' },
+};
+
 const PaymentRow: React.FC<PaymentRowProps> = React.memo(({ payment, t }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const isCash = /cash/i.test(payment.method);
   const hasItems = payment.split_items && payment.split_items.length > 0;
+  // Infer split type: explicit field > fallback from split_items presence
+  const effectiveSplitType = payment.split_type ?? (hasItems ? 'ITEM_SPLIT' : null);
+  const splitConfig = effectiveSplitType ? SPLIT_TYPE_CONFIG[effectiveSplitType] ?? null : null;
+
+  // Icon and color based on payment method
+  const iconBg = isCash ? 'bg-green-100 text-green-600' : 'bg-indigo-100 text-indigo-600';
+  const IconComponent = isCash ? Coins : CreditCard;
 
   return (
     <div className={`transition-colors ${isExpanded ? 'bg-gray-50/50' : ''}`}>
@@ -382,12 +395,22 @@ const PaymentRow: React.FC<PaymentRowProps> = React.memo(({ payment, t }) => {
         onClick={() => hasItems && setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-full ${isCash ? 'bg-green-100 text-green-600' : 'bg-indigo-100 text-indigo-600'}`}>
-            {isCash ? <Coins size={16} /> : <CreditCard size={16} />}
+          <div className={`p-2 rounded-full ${iconBg}`}>
+            <IconComponent size={16} />
           </div>
           <div>
-            <div className="font-medium text-gray-800 flex items-center gap-2">
+            <div className="font-medium text-gray-800 flex items-center gap-2 flex-wrap">
               {isCash ? t('checkout.method.cash') : payment.method}
+              {splitConfig && (
+                <span className={`text-[0.625rem] font-bold px-1.5 py-0.5 rounded ${splitConfig.bg} ${splitConfig.text}`}>
+                  {t(splitConfig.label)}
+                </span>
+              )}
+              {payment.payment_id && (
+                <span className="text-[0.625rem] text-emerald-600 bg-emerald-100 font-bold font-mono px-1.5 py-0.5 rounded">
+                  #{payment.payment_id.slice(-5)}
+                </span>
+              )}
               {payment.cancelled && (
                 <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
                   <Ban size={10} /> {t('common.status.cancelled')}
@@ -399,8 +422,13 @@ const PaymentRow: React.FC<PaymentRowProps> = React.memo(({ payment, t }) => {
                 </span>
               )}
             </div>
-            <div className="text-xs text-gray-400">
-              {new Date(payment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+            <div className="text-xs text-gray-400 flex items-center gap-2">
+              <span>{new Date(payment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+              {effectiveSplitType === 'AA_SPLIT' && payment.aa_shares && payment.aa_total_shares && (
+                <span className="text-cyan-600 font-medium">
+                  {payment.aa_shares}/{payment.aa_total_shares} {t('history.payment.aa_shares_unit')}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -408,9 +436,6 @@ const PaymentRow: React.FC<PaymentRowProps> = React.memo(({ payment, t }) => {
           <div className={`font-bold ${payment.cancelled ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
             {formatCurrency(payment.amount)}
           </div>
-          {payment.note && (
-            <div className="text-xs text-gray-500 mt-1">{payment.note}</div>
-          )}
           {payment.cancel_reason && (
             <div className="text-xs text-red-500 mt-1">{payment.cancel_reason}</div>
           )}
@@ -421,13 +446,24 @@ const PaymentRow: React.FC<PaymentRowProps> = React.memo(({ payment, t }) => {
         <div className="px-14 pb-4 pt-0 animate-in slide-in-from-top-2 duration-200">
           <div className="p-3 bg-white rounded-lg border border-gray-100 space-y-2 shadow-sm">
             {payment.split_items.map((item, idx) => (
-              <div key={idx} className="flex justify-between items-start text-sm">
-                <span className="text-gray-800 font-medium">
-                  {item.name} <span className="text-gray-500">x{item.quantity}</span>
-                  <span className="ml-1.5 text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded">
-                    #{item.instance_id.slice(-5)}
-                  </span>
-                </span>
+              <div key={idx} className="flex items-center gap-3 text-sm">
+                <div className="w-7 h-7 rounded flex items-center justify-center font-bold text-xs shrink-0 bg-green-100 text-green-600">
+                  x{item.quantity}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-gray-800 flex items-center gap-2 flex-wrap">
+                    <span>{item.name}</span>
+                    <span className="text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded">
+                      #{item.instance_id.slice(-5)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {formatCurrency(item.unit_price)} / {t('checkout.amount.unit_price')}
+                  </div>
+                </div>
+                <div className="font-bold text-gray-800 pl-4 shrink-0">
+                  {formatCurrency(Currency.mul(item.unit_price, item.quantity).toNumber())}
+                </div>
               </div>
             ))}
           </div>

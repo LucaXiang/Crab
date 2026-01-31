@@ -143,15 +143,22 @@ pub struct OrderItemDetail {
 /// Payment for detail view
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderPaymentDetail {
+    #[serde(default)]
+    pub payment_id: Option<String>,
     pub method: String,
     pub amount: f64,
     pub timestamp: i64,
-    pub note: Option<String>,
     #[serde(default)]
     pub cancelled: bool,
     pub cancel_reason: Option<String>,
+    #[serde(default)]
+    pub split_type: Option<String>,
     #[serde(default, deserialize_with = "deserialize_split_items")]
     pub split_items: Vec<SplitItem>,
+    #[serde(default)]
+    pub aa_shares: Option<i32>,
+    #[serde(default)]
+    pub aa_total_shares: Option<i32>,
 }
 
 /// Deserialize JSON string to Vec<SplitItem>

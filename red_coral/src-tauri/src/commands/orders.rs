@@ -37,92 +37,6 @@ pub struct OrderSummary {
     pub loss_amount: Option<f64>,
 }
 
-/// Split item in a payment
-#[derive(Debug, serde::Deserialize, serde::Serialize, Default)]
-pub struct SplitItem {
-    #[serde(default)]
-    pub instance_id: String,
-    #[serde(default)]
-    pub name: String,
-    #[serde(default)]
-    pub quantity: i32,
-    #[serde(default)]
-    pub unit_price: f64,
-}
-
-/// Order item option for detail view
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct OrderItemOptionDetail {
-    pub attribute_name: String,
-    pub option_name: String,
-    pub price_modifier: f64,
-}
-
-/// Order item for detail view
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct OrderItemDetail {
-    pub id: String,
-    pub instance_id: String,
-    pub name: String,
-    pub spec_name: Option<String>,
-    pub price: f64,
-    pub quantity: i32,
-    pub unpaid_quantity: i32,
-    pub unit_price: f64,
-    pub line_total: f64,
-    pub discount_amount: f64,
-    pub surcharge_amount: f64,
-    pub note: Option<String>,
-    pub selected_options: Vec<OrderItemOptionDetail>,
-}
-
-/// Payment for detail view
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct OrderPaymentDetail {
-    pub method: String,
-    pub amount: f64,
-    pub timestamp: i64,
-    pub note: Option<String>,
-    pub cancelled: bool,
-    pub cancel_reason: Option<String>,
-    pub split_items: Vec<SplitItem>,
-}
-
-/// Event for detail view
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct OrderEventDetail {
-    pub event_id: String,
-    pub event_type: String,
-    pub timestamp: i64,
-    pub payload: Option<serde_json::Value>,
-}
-
-/// Full order detail (matches backend OrderDetail)
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct OrderDetail {
-    pub order_id: String,
-    pub receipt_number: String,
-    pub table_name: Option<String>,
-    pub zone_name: Option<String>,
-    pub status: String,
-    pub is_retail: bool,
-    pub guest_count: i32,
-    pub total: f64,
-    pub paid_amount: f64,
-    pub total_discount: f64,
-    pub total_surcharge: f64,
-    pub start_time: i64,
-    pub end_time: Option<i64>,
-    pub operator_name: Option<String>,
-    // === Void Metadata ===
-    pub void_type: Option<String>,
-    pub loss_reason: Option<String>,
-    pub loss_amount: Option<f64>,
-    pub items: Vec<OrderItemDetail>,
-    pub payments: Vec<OrderPaymentDetail>,
-    pub timeline: Vec<OrderEventDetail>,
-}
-
 /// Backend response for paginated order list
 #[derive(Debug, serde::Deserialize)]
 #[allow(dead_code)] // limit field required for deserialization but not used
@@ -148,31 +62,21 @@ pub async fn fetch_order_list(
 ) -> Result<ApiResponse<FetchOrderListSummaryResponse>, String> {
     let bridge = bridge.read().await;
 
-    // Calculate date range (default: last 7 days)
-    let end_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
-    let start_date = if let Some(start_time) = params.start_time {
-        // Convert timestamp to date string
-        chrono::DateTime::from_timestamp_millis(start_time as i64)
-            .map(|dt| dt.format("%Y-%m-%d").to_string())
-            .unwrap_or_else(|| {
-                (chrono::Utc::now() - chrono::Duration::days(7))
-                    .format("%Y-%m-%d")
-                    .to_string()
-            })
-    } else {
-        (chrono::Utc::now() - chrono::Duration::days(7))
-            .format("%Y-%m-%d")
-            .to_string()
-    };
+    // Calculate time range in UTC millis (default: last 7 days)
+    let now_millis = chrono::Utc::now().timestamp_millis();
+    let start_millis = params.start_time
+        .map(|t| t as i64)
+        .unwrap_or_else(|| now_millis - 7 * 24 * 60 * 60 * 1000);
+    let end_millis = now_millis;
 
     // Calculate offset from page number (1-indexed)
     let offset = (params.page.max(1) - 1) * params.limit;
 
     // Build query with optional search parameter
     let mut query = format!(
-        "/api/orders/history?start_date={}&end_date={}&limit={}&offset={}",
-        encode(&start_date),
-        encode(&end_date),
+        "/api/orders/history?start_time={}&end_time={}&limit={}&offset={}",
+        start_millis,
+        end_millis,
         params.limit,
         offset
     );
@@ -195,14 +99,15 @@ pub async fn fetch_order_list(
 }
 
 /// Fetch archived order detail by ID (graph model)
+/// Uses serde_json::Value to transparently pass through all fields from edge-server
 #[tauri::command]
 pub async fn fetch_order_detail(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     order_id: String,
-) -> Result<ApiResponse<OrderDetail>, String> {
+) -> Result<ApiResponse<serde_json::Value>, String> {
     let bridge = bridge.read().await;
     match bridge
-        .get::<OrderDetail>(&format!("/api/orders/{}", encode(&order_id)))
+        .get::<serde_json::Value>(&format!("/api/orders/{}", encode(&order_id)))
         .await
     {
         Ok(detail) => Ok(ApiResponse::success(detail)),

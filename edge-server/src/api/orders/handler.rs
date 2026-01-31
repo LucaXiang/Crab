@@ -46,13 +46,16 @@ pub struct OrderItemDetail {
 /// Payment for detail view
 #[derive(Debug, Serialize)]
 pub struct OrderPaymentDetail {
+    pub payment_id: Option<String>,
     pub method: String,
     pub amount: f64,
     pub timestamp: i64,
-    pub note: Option<String>,
     pub cancelled: bool,
     pub cancel_reason: Option<String>,
+    pub split_type: Option<String>,
     pub split_items: Vec<SplitItemDetail>,
+    pub aa_shares: Option<i32>,
+    pub aa_total_shares: Option<i32>,
 }
 
 /// Split item detail
@@ -151,18 +154,21 @@ pub async fn get_by_id(
             }).collect(),
         }).collect(),
         payments: detail.payments.into_iter().map(|p| OrderPaymentDetail {
+            payment_id: p.payment_id,
             method: p.method,
             amount: p.amount,
             timestamp: p.timestamp,
-            note: p.note,
             cancelled: p.cancelled,
             cancel_reason: p.cancel_reason,
+            split_type: p.split_type,
             split_items: p.split_items.into_iter().map(|s| SplitItemDetail {
                 instance_id: s.instance_id,
                 name: s.name,
                 quantity: s.quantity,
                 unit_price: s.unit_price,
             }).collect(),
+            aa_shares: p.aa_shares,
+            aa_total_shares: p.aa_total_shares,
         }).collect(),
         timeline: detail.timeline.into_iter().map(|e| OrderEventDetail {
             event_id: e.event_id,
@@ -182,8 +188,12 @@ pub async fn get_by_id(
 /// Query params for order history
 #[derive(Debug, Deserialize)]
 pub struct OrderHistoryQuery {
-    pub start_date: String,
-    pub end_date: String,
+    /// Start time as UTC milliseconds (preferred) or date string "YYYY-MM-DD" (legacy)
+    pub start_time: Option<i64>,
+    pub start_date: Option<String>,
+    /// End time as UTC milliseconds (preferred) or date string "YYYY-MM-DD" (legacy)
+    pub end_time: Option<i64>,
+    pub end_date: Option<String>,
     pub limit: Option<i32>,
     pub offset: Option<i32>,
     /// Search by receipt number (partial match)
@@ -204,13 +214,19 @@ pub async fn fetch_order_list(
     State(state): State<ServerState>,
     Query(params): Query<OrderHistoryQuery>,
 ) -> AppResult<Json<OrderListResponse>> {
-    // Convert date strings to millis
-    let start_millis = chrono::NaiveDate::parse_from_str(&params.start_date, "%Y-%m-%d")
-        .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis())
-        .unwrap_or(0);
-    let end_millis = chrono::NaiveDate::parse_from_str(&params.end_date, "%Y-%m-%d")
-        .map(|d| d.and_hms_opt(23, 59, 59).unwrap().and_utc().timestamp_millis())
-        .unwrap_or(0);
+    // Resolve start/end millis: prefer direct millis, fallback to date string
+    let start_millis = params.start_time.unwrap_or_else(|| {
+        params.start_date.as_deref()
+            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+            .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis())
+            .unwrap_or(0)
+    });
+    let end_millis = params.end_time.unwrap_or_else(|| {
+        params.end_date.as_deref()
+            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+            .map(|d| d.and_hms_opt(23, 59, 59).unwrap().and_utc().timestamp_millis())
+            .unwrap_or(0)
+    });
     let limit = params.limit.unwrap_or(100);
     let offset = params.offset.unwrap_or(0);
     let page = if limit > 0 { offset / limit + 1 } else { 1 };
@@ -270,7 +286,7 @@ pub async fn fetch_order_list(
          void_type, \
          loss_reason, \
          loss_amount \
-         FROM order {} ORDER BY end_time DESC LIMIT $limit START $offset",
+         FROM order {} ORDER BY end_time DESC, id DESC LIMIT $limit START $offset",
         where_clause
     );
     let mut data_result = if let Some(ref search) = search_bind {

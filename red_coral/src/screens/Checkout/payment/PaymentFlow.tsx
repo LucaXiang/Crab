@@ -1416,7 +1416,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                               minute: '2-digit',
                               hour12: false,
                             })}</span>
-                            <span className="text-xs text-gray-300 font-mono">{payment.payment_id.slice(0, 8)}</span>
+                            <span className="text-[0.625rem] text-emerald-600 bg-emerald-100 font-bold font-mono px-1.5 py-0.5 rounded">#{payment.payment_id.slice(-5)}</span>
                           </div>
                         </div>
                       </div>

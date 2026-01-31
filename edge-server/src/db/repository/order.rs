@@ -75,23 +75,29 @@ impl OrderRepository {
                     ) AS items,
                     (
                         SELECT
+                            seq,
+                            payment_id,
                             method,
                             amount,
                             time AS timestamp,
-                            reference AS note,
                             cancelled,
                             cancel_reason,
-                            split_items
+                            split_type,
+                            split_items,
+                            aa_shares,
+                            aa_total_shares
                         FROM ->has_payment->order_payment
+                        ORDER BY seq, time
                     ) AS payments,
                     (
                         SELECT
+                            seq,
                             <string>id AS event_id,
                             string::uppercase(event_type) AS event_type,
                             timestamp,
                             data AS payload
                         FROM ->has_event->order_event
-                        ORDER BY timestamp
+                        ORDER BY seq, timestamp
                     ) AS timeline
                 FROM order WHERE id = $id
             "#)

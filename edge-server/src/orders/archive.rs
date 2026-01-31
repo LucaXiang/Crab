@@ -433,12 +433,11 @@ impl OrderArchiveService {
                     surcharge_amount = $item{}_surcharge_amount,
                     tax = $item{}_tax,
                     tax_rate = $item{}_tax_rate,
-                    note = $item{}_note,
-                    category_name = $item{}_category_name;
+                    note = $item{}_note;
                 RELATE ($order[0].id)->has_item->({}[0].id);
                 "#,
                 var_name,
-                i, i, i, i, i, i, i, i, i, i, i, i, i, i, i,
+                i, i, i, i, i, i, i, i, i, i, i, i, i, i,
                 var_name
             ));
 
@@ -464,16 +463,20 @@ impl OrderArchiveService {
             query.push_str(&format!(
                 r#"
                 LET $payment{} = CREATE order_payment SET
+                    seq = $payment{}_seq,
+                    payment_id = $payment{}_payment_id,
                     method = $payment{}_method,
                     amount = $payment{}_amount,
                     time = $payment{}_time,
-                    reference = $payment{}_reference,
                     cancelled = $payment{}_cancelled,
                     cancel_reason = $payment{}_cancel_reason,
-                    split_items = $payment{}_split_items;
+                    split_type = $payment{}_split_type,
+                    split_items = $payment{}_split_items,
+                    aa_shares = $payment{}_aa_shares,
+                    aa_total_shares = $payment{}_aa_total_shares;
                 RELATE ($order[0].id)->has_payment->($payment{}[0].id);
                 "#,
-                i, i, i, i, i, i, i, i, i
+                i, i, i, i, i, i, i, i, i, i, i, i, i
             ));
         }
 
@@ -482,6 +485,7 @@ impl OrderArchiveService {
             query.push_str(&format!(
                 r#"
                 LET $event{} = CREATE order_event SET
+                    seq = $event{}_seq,
                     event_type = $event{}_type,
                     timestamp = $event{}_timestamp,
                     data = $event{}_data,
@@ -489,7 +493,7 @@ impl OrderArchiveService {
                     curr_hash = $event{}_curr_hash;
                 RELATE ($order[0].id)->has_event->($event{}[0].id);
                 "#,
-                i, i, i, i, i, i, i
+                i, i, i, i, i, i, i, i
             ));
         }
 
@@ -575,8 +579,7 @@ impl OrderArchiveService {
                 .bind((format!("item{}_surcharge_amount", i), total_surcharge))
                 .bind((format!("item{}_tax", i), item.tax.unwrap_or(0.0)))
                 .bind((format!("item{}_tax_rate", i), item.tax_rate.unwrap_or(0)))
-                .bind((format!("item{}_note", i), item.note.clone()))
-                .bind((format!("item{}_category_name", i), item.category_name.clone()));
+                .bind((format!("item{}_note", i), item.note.clone()));
 
             // Bind option fields
             if let Some(options) = &item.selected_options {
@@ -606,13 +609,21 @@ impl OrderArchiveService {
                 });
 
             db_query = db_query
+                .bind((format!("payment{}_seq", i), i as i64))
+                .bind((format!("payment{}_payment_id", i), payment.payment_id.clone()))
                 .bind((format!("payment{}_method", i), payment.method.clone()))
                 .bind((format!("payment{}_amount", i), payment.amount))
                 .bind((format!("payment{}_time", i), payment.timestamp))
-                .bind((format!("payment{}_reference", i), payment.note.clone()))
                 .bind((format!("payment{}_cancelled", i), payment.cancelled))
                 .bind((format!("payment{}_cancel_reason", i), payment.cancel_reason.clone()))
-                .bind((format!("payment{}_split_items", i), split_items_str));
+                .bind((format!("payment{}_split_type", i), payment.split_type.as_ref().map(|st| {
+                    serde_json::to_value(st).ok()
+                        .and_then(|v| v.as_str().map(String::from))
+                        .unwrap_or_default()
+                })))
+                .bind((format!("payment{}_split_items", i), split_items_str))
+                .bind((format!("payment{}_aa_shares", i), payment.aa_shares))
+                .bind((format!("payment{}_aa_total_shares", i), snapshot.aa_total_shares));
         }
 
         // Bind event fields
@@ -635,6 +646,7 @@ impl OrderArchiveService {
                 .unwrap_or_else(|_| "{}".to_string());
 
             db_query = db_query
+                .bind((format!("event{}_seq", i), i as i64))
                 .bind((format!("event{}_type", i), event_type_str))
                 .bind((format!("event{}_timestamp", i), event.timestamp))
                 .bind((format!("event{}_data", i), payload_str))

@@ -64,7 +64,13 @@ export const useHistoryOrderList = (
       });
 
       // Backend returns OrderSummary directly - no conversion needed
-      setOrders((prev) => (page === 1 ? response.orders : [...prev, ...response.orders]));
+      // Deduplicate when appending pages (guards against unstable DB ordering)
+      setOrders((prev) => {
+        if (page === 1) return response.orders;
+        const existingIds = new Set(prev.map(o => o.order_id));
+        const newOrders = response.orders.filter(o => !existingIds.has(o.order_id));
+        return [...prev, ...newOrders];
+      });
       setTotal(Number(response.total));
     } catch (err) {
       logger.error('Failed to fetch order list', err, { component: 'useHistoryOrderList', action: 'fetchOrderList', page, search: debouncedSearch });
