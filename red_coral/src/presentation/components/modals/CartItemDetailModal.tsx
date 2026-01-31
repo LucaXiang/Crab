@@ -91,8 +91,8 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
             // Convert AttributeBindingFull[] to ProductAttribute[] (AttributeBinding relation)
             const productBindings: ProductAttribute[] = attrBindings.map(binding => ({
               id: binding.id,
-              from: String(item.id),
-              to: String(binding.attribute.id),
+              in: String(item.id),
+              out: String(binding.attribute.id),
               is_required: binding.is_required,
               display_order: binding.display_order,
               attribute: binding.attribute,
@@ -100,8 +100,8 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
             // Add category attributes as bindings (inherited, not required by default)
             const categoryBindings: ProductAttribute[] = categoryAttributes.map((attr, idx) => ({
               id: null, // No binding ID for inherited attributes
-              from: productFull.category,
-              to: String(attr.id),
+              in: productFull.category,
+              out: String(attr.id),
               is_required: false, // Category attributes are optional by default
               display_order: 1000 + idx, // Place after product attributes
               attribute: attr,

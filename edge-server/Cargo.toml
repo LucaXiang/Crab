@@ -44,6 +44,7 @@ hyper.workspace = true
 
 # Time and UUID
 chrono.workspace = true
+chrono-tz.workspace = true
 uuid.workspace = true
 time.workspace = true
 

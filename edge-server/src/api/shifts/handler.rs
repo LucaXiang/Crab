@@ -4,7 +4,7 @@ use axum::{
     Json,
     extract::{Extension, Path, Query, State},
 };
-use chrono::{Local, NaiveTime};
+use chrono::NaiveTime;
 use serde::Deserialize;
 
 use crate::audit::AuditAction;
@@ -240,7 +240,8 @@ pub async fn recover_stale(
 
     // 计算当前营业日起始时间
     // 如果当前时间 < cutoff，说明还在"昨天"的营业日
-    let now = Local::now();
+    let tz = state.config.timezone;
+    let now = chrono::Utc::now().with_timezone(&tz);
     let today_business_date = if now.time() < cutoff_time {
         (now - chrono::Duration::days(1)).date_naive()
     } else {

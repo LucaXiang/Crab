@@ -144,10 +144,12 @@ pub struct OrderArchiveService {
     hash_chain_lock: Arc<Mutex<()>>,
     /// Directory for storing failed archives
     bad_archive_dir: PathBuf,
+    /// 业务时区 (用于收据编号日期)
+    tz: chrono_tz::Tz,
 }
 
 impl OrderArchiveService {
-    pub fn new(db: Surreal<Db>) -> Self {
+    pub fn new(db: Surreal<Db>, tz: chrono_tz::Tz) -> Self {
         let bad_archive_dir = std::env::current_dir()
             .unwrap_or_else(|_| PathBuf::from("."))
             .join("data")
@@ -159,6 +161,7 @@ impl OrderArchiveService {
             archive_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_ARCHIVES)),
             hash_chain_lock: Arc::new(Mutex::new(())),
             bad_archive_dir,
+            tz,
         }
     }
 
@@ -173,7 +176,7 @@ impl OrderArchiveService {
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        let now = chrono::Local::now();
+        let now = chrono::Utc::now().with_timezone(&self.tz);
         let date_str = now.format("%Y%m%d").to_string();
         // Sequence starts at 10001 to match existing format
         let sequence = 10000 + next_num;

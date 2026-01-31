@@ -3,7 +3,8 @@
 //! 在 `business_day_cutoff` 时间点自动关闭跨营业日的僵尸班次。
 //! 启动时立即扫描一次，之后按 cutoff 时间每日触发。
 
-use chrono::{Local, NaiveTime};
+use chrono::NaiveTime;
+use chrono_tz::Tz;
 use tokio_util::sync::CancellationToken;
 
 use crate::core::ServerState;
@@ -34,7 +35,8 @@ impl ShiftAutoCloseScheduler {
         // 2. 定点循环
         loop {
             let cutoff_time = self.get_cutoff_time().await;
-            let sleep_duration = Self::duration_until_next_cutoff(cutoff_time);
+            let tz = self.state.config.timezone;
+            let sleep_duration = Self::duration_until_next_cutoff(cutoff_time, tz);
 
             tracing::info!(
                 "🕐 Next shift auto-close check in {} minutes",
@@ -56,7 +58,8 @@ impl ShiftAutoCloseScheduler {
     /// 执行恢复 + 广播
     async fn recover_and_broadcast(&self) {
         let cutoff_time = self.get_cutoff_time().await;
-        let business_day_start = Self::business_day_start(cutoff_time);
+        let tz = self.state.config.timezone;
+        let business_day_start = Self::business_day_start(cutoff_time, tz);
 
         let repo = ShiftRepository::new(self.state.db.clone());
         match repo.recover_stale_shifts(business_day_start).await {
@@ -111,8 +114,8 @@ impl ShiftAutoCloseScheduler {
     }
 
     /// 计算当前营业日起始时间（Unix millis）
-    fn business_day_start(cutoff_time: NaiveTime) -> i64 {
-        let now = Local::now();
+    fn business_day_start(cutoff_time: NaiveTime, tz: Tz) -> i64 {
+        let now = chrono::Utc::now().with_timezone(&tz);
         let today_business_date = if now.time() < cutoff_time {
             (now - chrono::Duration::days(1)).date_naive()
         } else {
@@ -122,8 +125,8 @@ impl ShiftAutoCloseScheduler {
     }
 
     /// 计算距离下一次 cutoff 的 Duration
-    fn duration_until_next_cutoff(cutoff_time: NaiveTime) -> std::time::Duration {
-        let now = Local::now();
+    fn duration_until_next_cutoff(cutoff_time: NaiveTime, tz: Tz) -> std::time::Duration {
+        let now = chrono::Utc::now().with_timezone(&tz);
         let today = now.date_naive();
 
         let target_date = if now.time() >= cutoff_time {
@@ -134,11 +137,11 @@ impl ShiftAutoCloseScheduler {
 
         let target_datetime = target_date
             .and_time(cutoff_time)
-            .and_local_timezone(Local)
+            .and_local_timezone(tz)
             .single()
             .unwrap_or_else(|| {
                 (target_date.and_time(cutoff_time) + chrono::Duration::minutes(1))
-                    .and_local_timezone(Local)
+                    .and_local_timezone(tz)
                     .latest()
                     .expect("Cannot resolve local time")
             });

@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use crate::auth::JwtConfig;
+use chrono_tz::Tz;
 
 /// 服务器配置 - 边缘节点的所有配置项
 ///
@@ -41,6 +42,8 @@ pub struct Config {
     pub request_timeout_ms: u64,
     /// 关闭超时时间 (毫秒)
     pub shutdown_timeout_ms: u64,
+    /// 业务时区 (IANA 格式，如 "Europe/Madrid")
+    pub timezone: Tz,
 }
 
 /// Config Builder
@@ -55,6 +58,7 @@ pub struct ConfigBuilder {
     max_connections: Option<u32>,
     request_timeout_ms: Option<u64>,
     shutdown_timeout_ms: Option<u64>,
+    timezone: Option<Tz>,
 }
 
 impl ConfigBuilder {
@@ -107,6 +111,13 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn timezone(mut self, value: impl Into<String>) -> Self {
+        if let Ok(tz) = value.into().parse::<Tz>() {
+            self.timezone = Some(tz);
+        }
+        self
+    }
+
     /// 构建配置，使用默认值填充未设置的字段
     pub fn build(self) -> Config {
         Config {
@@ -121,6 +132,7 @@ impl ConfigBuilder {
             max_connections: self.max_connections.unwrap_or(1000),
             request_timeout_ms: self.request_timeout_ms.unwrap_or(30000),
             shutdown_timeout_ms: self.shutdown_timeout_ms.unwrap_or(10000),
+            timezone: self.timezone.unwrap_or(chrono_tz::Europe::Madrid),
         }
     }
 }
@@ -182,6 +194,7 @@ impl Config {
                     .and_then(|p| p.parse().ok())
                     .unwrap_or(10000),
             )
+            .timezone(std::env::var("TIMEZONE").unwrap_or_else(|_| "Europe/Madrid".into()))
             .build()
     }
 

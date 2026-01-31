@@ -3,7 +3,7 @@
 //! Logic for matching rules to products and checking time validity.
 
 use crate::db::models::{PriceRule, ProductScope};
-use chrono::{Datelike, Local};
+use chrono::Datelike;
 use tracing::trace;
 
 /// Check if a rule matches a product based on scope
@@ -146,7 +146,7 @@ pub fn matches_zone_scope(rule: &PriceRule, zone_id: Option<&str>, is_retail: bo
 ///
 /// Note: active_days and active_time use LOCAL time (with DST handling) since rules
 /// are typically configured in local business hours.
-pub fn is_time_valid(rule: &PriceRule, current_time: i64) -> bool {
+pub fn is_time_valid(rule: &PriceRule, current_time: i64, tz: chrono_tz::Tz) -> bool {
     // Check valid_from (i64 millis comparison)
     if let Some(from) = rule.valid_from
         && current_time < from
@@ -165,9 +165,9 @@ pub fn is_time_valid(rule: &PriceRule, current_time: i64) -> bool {
     let current_datetime =
         chrono::DateTime::from_timestamp_millis(current_time).unwrap_or_else(chrono::Utc::now);
 
-    // Convert to local time for day-of-week and time-of-day checks
+    // Convert to business timezone for day-of-week and time-of-day checks
     // This handles daylight saving time automatically
-    let local_datetime = current_datetime.with_timezone(&Local);
+    let local_datetime = current_datetime.with_timezone(&tz);
 
     // Check active_days (0=Sunday, 1=Monday, ..., 6=Saturday) in LOCAL time
     if let Some(ref days) = rule.active_days {
@@ -292,7 +292,7 @@ mod tests {
         let now_millis = shared::util::now_millis();
         rule.valid_from = Some(now_millis + 3_600_000); // 1 hour in the future
 
-        assert!(!is_time_valid(&rule, now_millis));
+        assert!(!is_time_valid(&rule, now_millis, chrono_tz::UTC));
     }
 
     #[test]
@@ -302,7 +302,7 @@ mod tests {
         let now_millis = shared::util::now_millis();
         rule.valid_until = Some(now_millis - 3_600_000); // 1 hour ago
 
-        assert!(!is_time_valid(&rule, now_millis));
+        assert!(!is_time_valid(&rule, now_millis, chrono_tz::UTC));
     }
 
     #[test]
@@ -313,7 +313,7 @@ mod tests {
         rule.valid_from = Some(now_millis - 3_600_000); // 1 hour ago
         rule.valid_until = Some(now_millis + 3_600_000); // 1 hour from now
 
-        assert!(is_time_valid(&rule, now_millis));
+        assert!(is_time_valid(&rule, now_millis, chrono_tz::UTC));
     }
 
     #[test]
@@ -328,15 +328,15 @@ mod tests {
 
         // Only active on Monday (1)
         rule.active_days = Some(vec![1]); // Monday
-        assert!(is_time_valid(&rule, monday_noon));
+        assert!(is_time_valid(&rule, monday_noon, chrono_tz::UTC));
 
         // Only active on Sunday (0)
         rule.active_days = Some(vec![0]); // Sunday
-        assert!(!is_time_valid(&rule, monday_noon));
+        assert!(!is_time_valid(&rule, monday_noon, chrono_tz::UTC));
 
         // Active on Monday and Friday
         rule.active_days = Some(vec![1, 5]); // Monday and Friday
-        assert!(is_time_valid(&rule, monday_noon));
+        assert!(is_time_valid(&rule, monday_noon, chrono_tz::UTC));
     }
 
     #[test]
@@ -352,17 +352,17 @@ mod tests {
         // Active from 10:00 to 18:00
         rule.active_start_time = Some("10:00".to_string());
         rule.active_end_time = Some("18:00".to_string());
-        assert!(is_time_valid(&rule, timestamp)); // 14:30 is within range
+        assert!(is_time_valid(&rule, timestamp, chrono_tz::UTC)); // 14:30 is within range
 
         // Active from 16:00 to 20:00
         rule.active_start_time = Some("16:00".to_string());
         rule.active_end_time = Some("20:00".to_string());
-        assert!(!is_time_valid(&rule, timestamp)); // 14:30 is before 16:00
+        assert!(!is_time_valid(&rule, timestamp, chrono_tz::UTC)); // 14:30 is before 16:00
 
         // Active from 08:00 to 12:00
         rule.active_start_time = Some("08:00".to_string());
         rule.active_end_time = Some("12:00".to_string());
-        assert!(!is_time_valid(&rule, timestamp)); // 14:30 is after 12:00
+        assert!(!is_time_valid(&rule, timestamp, chrono_tz::UTC)); // 14:30 is after 12:00
     }
 
     #[test]
@@ -382,16 +382,16 @@ mod tests {
         rule.active_start_time = Some("10:00".to_string());
         rule.active_end_time = Some("18:00".to_string());
 
-        assert!(is_time_valid(&rule, monday_millis));
+        assert!(is_time_valid(&rule, monday_millis, chrono_tz::UTC));
 
         // Now make one constraint fail - wrong day
         rule.active_days = Some(vec![0]); // Sunday
-        assert!(!is_time_valid(&rule, monday_millis));
+        assert!(!is_time_valid(&rule, monday_millis, chrono_tz::UTC));
 
         // Reset day, make time fail
         rule.active_days = Some(vec![1]); // Monday
         rule.active_start_time = Some("16:00".to_string());
-        assert!(!is_time_valid(&rule, monday_millis));
+        assert!(!is_time_valid(&rule, monday_millis, chrono_tz::UTC));
     }
 
     #[test]
@@ -400,6 +400,6 @@ mod tests {
         let rule = make_rule(ProductScope::Global, None);
         let now = shared::util::now_millis();
 
-        assert!(is_time_valid(&rule, now));
+        assert!(is_time_valid(&rule, now, chrono_tz::UTC));
     }
 }

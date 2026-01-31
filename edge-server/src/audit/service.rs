@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use chrono::Local;
+use chrono_tz::Tz;
 use std::sync::Arc;
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
@@ -58,6 +58,7 @@ pub struct AuditService {
     db: Surreal<Db>,
     tx: mpsc::Sender<AuditLogRequest>,
     lock_path: PathBuf,
+    tz: Tz,
 }
 
 impl std::fmt::Debug for AuditService {
@@ -76,6 +77,7 @@ impl AuditService {
         db: Surreal<Db>,
         data_dir: &std::path::Path,
         buffer_size: usize,
+        tz: Tz,
     ) -> (Arc<Self>, mpsc::Receiver<AuditLogRequest>) {
         let (tx, rx) = mpsc::channel(buffer_size);
         let lock_path = data_dir.join(LOCK_FILE_NAME);
@@ -85,6 +87,7 @@ impl AuditService {
             db,
             tx,
             lock_path,
+            tz,
         });
         (service, rx)
     }
@@ -148,7 +151,7 @@ impl AuditService {
                 Ok(existing) if existing.is_empty() => {
                     let mut params = HashMap::new();
                     let formatted_ts = chrono::DateTime::from_timestamp_millis(last_start_ts)
-                        .map(|dt| dt.with_timezone(&Local).format("%Y-%m-%d %H:%M").to_string())
+                        .map(|dt| dt.with_timezone(&self.tz).format("%Y-%m-%d %H:%M").to_string())
                         .unwrap_or_else(|| last_start_ts.to_string());
                     params.insert("last_start_timestamp".to_string(), formatted_ts);
                     if let Err(e) = issue_repo

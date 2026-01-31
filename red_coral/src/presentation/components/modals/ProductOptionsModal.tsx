@@ -72,7 +72,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
       attributes.forEach((attr) => {
         const options = allOptions.get(String(attr.id)) || [];
         // binding.to is the attribute ID in AttributeBinding relation
-        const binding = bindings?.find(b => b.to === attr.id);
+        const binding = bindings?.find(b => b.out === attr.id);
 
         let initialIds: string[] = [];
 
@@ -116,7 +116,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
     // Validate required attributes
     // Note: With new model, required is determined by binding.is_required, not attr_type
     for (const attr of attributes) {
-      const binding = bindings?.find(b => b.to === attr.id);
+      const binding = bindings?.find(b => b.out === attr.id);
       if (binding?.is_required) {
         const selected = selections.get(String(attr.id)) || [];
         if (selected.length === 0) {

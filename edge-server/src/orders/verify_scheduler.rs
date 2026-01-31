@@ -4,7 +4,8 @@
 //!
 //! 验证结果持久化到 SurrealDB `archive_verification` 表。
 
-use chrono::{Local, NaiveDate, NaiveTime};
+use chrono::{NaiveDate, NaiveTime};
+use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
@@ -55,6 +56,7 @@ pub struct VerifyScheduler {
     archive_service: OrderArchiveService,
     db: Surreal<Db>,
     shutdown: CancellationToken,
+    tz: Tz,
 }
 
 impl VerifyScheduler {
@@ -62,11 +64,13 @@ impl VerifyScheduler {
         archive_service: OrderArchiveService,
         db: Surreal<Db>,
         shutdown: CancellationToken,
+        tz: Tz,
     ) -> Self {
         Self {
             archive_service,
             db,
             shutdown,
+            tz,
         }
     }
 
@@ -92,7 +96,7 @@ impl VerifyScheduler {
     /// 启动时补扫未验证的营业日
     async fn catch_up(&self) -> Result<(), String> {
         let (cutoff_str, cutoff_time) = self.get_cutoff().await;
-        let yesterday = Self::yesterday_business_date(cutoff_time);
+        let yesterday = Self::yesterday_business_date(cutoff_time, self.tz);
         self.catch_up_daily(&cutoff_str, yesterday).await?;
         Ok(())
     }
@@ -190,7 +194,7 @@ impl VerifyScheduler {
             let (cutoff_str, cutoff_time) = self.get_cutoff().await;
 
             // 计算下一次触发时间
-            let sleep_duration = Self::duration_until_next_cutoff(cutoff_time);
+            let sleep_duration = Self::duration_until_next_cutoff(cutoff_time, self.tz);
             tracing::info!(
                 "🔍 Next verification trigger in {} minutes",
                 sleep_duration.as_secs() / 60
@@ -206,7 +210,7 @@ impl VerifyScheduler {
             }
 
             // 触发：验证昨天的营业日
-            let yesterday = Self::yesterday_business_date(cutoff_time);
+            let yesterday = Self::yesterday_business_date(cutoff_time, self.tz);
             let date_str = yesterday.format("%Y-%m-%d").to_string();
             let next = yesterday + chrono::Duration::days(1);
             let start = Self::date_cutoff_to_millis(yesterday, &cutoff_str);
@@ -384,8 +388,8 @@ impl VerifyScheduler {
     ///
     /// 当前时间 >= cutoff → 当前营业日 = 今天 → 昨天 = today - 1
     /// 当前时间 < cutoff → 当前营业日 = 昨天 → 昨天 = today - 2
-    fn yesterday_business_date(cutoff_time: NaiveTime) -> NaiveDate {
-        let now = Local::now();
+    fn yesterday_business_date(cutoff_time: NaiveTime, tz: Tz) -> NaiveDate {
+        let now = chrono::Utc::now().with_timezone(&tz);
         let today_business = if now.time() < cutoff_time {
             now.date_naive() - chrono::Duration::days(1)
         } else {
@@ -403,8 +407,8 @@ impl VerifyScheduler {
     }
 
     /// 计算距离下一次 cutoff 的 Duration
-    fn duration_until_next_cutoff(cutoff_time: NaiveTime) -> std::time::Duration {
-        let now = Local::now();
+    fn duration_until_next_cutoff(cutoff_time: NaiveTime, tz: Tz) -> std::time::Duration {
+        let now = chrono::Utc::now().with_timezone(&tz);
         let today = now.date_naive();
 
         let target_date = if now.time() >= cutoff_time {
@@ -416,12 +420,12 @@ impl VerifyScheduler {
 
         let target_datetime = target_date
             .and_time(cutoff_time)
-            .and_local_timezone(Local)
+            .and_local_timezone(tz)
             .single()
             .unwrap_or_else(|| {
                 // DST edge case: fallback to +1 min
                 (target_date.and_time(cutoff_time) + chrono::Duration::minutes(1))
-                    .and_local_timezone(Local)
+                    .and_local_timezone(tz)
                     .latest()
                     .expect("Cannot resolve local time")
             });
@@ -446,16 +450,17 @@ mod tests {
         // 测试逻辑：cutoff=06:00, 当前时间假设在 cutoff 之后
         // yesterday_business_date 返回 today_business - 1
         let cutoff = NaiveTime::from_hms_opt(6, 0, 0).unwrap();
-        let result = VerifyScheduler::yesterday_business_date(cutoff);
+        let tz = chrono_tz::Europe::Madrid;
+        let result = VerifyScheduler::yesterday_business_date(cutoff, tz);
         // 结果应该是某一天，具体取决于运行时间，这里只验证不 panic
-        assert!(result < Local::now().date_naive());
+        assert!(result < chrono::Utc::now().with_timezone(&tz).date_naive());
     }
 
     #[test]
     fn test_duration_until_next_cutoff_positive() {
         // 使用一个未来的时间点
         let cutoff = NaiveTime::from_hms_opt(23, 59, 0).unwrap();
-        let duration = VerifyScheduler::duration_until_next_cutoff(cutoff);
+        let duration = VerifyScheduler::duration_until_next_cutoff(cutoff, chrono_tz::Europe::Madrid);
         // 应该是正值（除非恰好在 23:59 运行）
         assert!(duration.as_secs() > 0);
     }

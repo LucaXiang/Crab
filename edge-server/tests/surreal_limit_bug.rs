@@ -1,8 +1,8 @@
 //! Minimal reproduction: SurrealDB embedded SDK LIMIT bug
 //! Run: cargo test -p edge-server --test surreal_limit_bug -- --nocapture
 
-use surrealdb::engine::local::{Db, RocksDb};
 use surrealdb::Surreal;
+use surrealdb::engine::local::{Db, RocksDb};
 
 #[tokio::test]
 async fn repro_limit_drops_first_record() {
@@ -12,9 +12,15 @@ async fn repro_limit_drops_first_record() {
 
     // Setup schema
     db.query("DEFINE TABLE test SCHEMAFULL").await.unwrap();
-    db.query("DEFINE FIELD end_time ON test TYPE int").await.unwrap();
-    db.query("DEFINE FIELD status ON test TYPE string").await.unwrap();
-    db.query("DEFINE FIELD name ON test TYPE string").await.unwrap();
+    db.query("DEFINE FIELD end_time ON test TYPE int")
+        .await
+        .unwrap();
+    db.query("DEFINE FIELD status ON test TYPE string")
+        .await
+        .unwrap();
+    db.query("DEFINE FIELD name ON test TYPE string")
+        .await
+        .unwrap();
 
     // Insert 7 records
     for i in 1..=7 {
@@ -36,7 +42,10 @@ async fn repro_limit_drops_first_record() {
         println!("  name={} end_time={}", r["name"], r["end_time"]);
     }
     assert_eq!(all.len(), 7, "Should return all 7 records");
-    assert_eq!(all[0]["name"], "007", "First should be 007 (highest end_time)");
+    assert_eq!(
+        all[0]["name"], "007",
+        "First should be 007 (highest end_time)"
+    );
 
     // Query WITH LIMIT 6 (no WHERE)
     let mut res = db
@@ -44,7 +53,11 @@ async fn repro_limit_drops_first_record() {
         .await
         .unwrap();
     let limited: Vec<serde_json::Value> = res.take(0).unwrap();
-    println!("\nWith LIMIT 6 (no WHERE): {} records, first={}", limited.len(), limited[0]["name"]);
+    println!(
+        "\nWith LIMIT 6 (no WHERE): {} records, first={}",
+        limited.len(),
+        limited[0]["name"]
+    );
     assert_eq!(limited[0]["name"], "007", "no-WHERE: first should be 007");
 
     // Query WITH WHERE + LIMIT 6
@@ -55,7 +68,11 @@ async fn repro_limit_drops_first_record() {
         .await
         .unwrap();
     let limited: Vec<serde_json::Value> = res.take(0).unwrap();
-    println!("With WHERE + LIMIT 6: {} records, first={}", limited.len(), limited[0]["name"]);
+    println!(
+        "With WHERE + LIMIT 6: {} records, first={}",
+        limited.len(),
+        limited[0]["name"]
+    );
     assert_eq!(
         limited[0]["name"], "007",
         "BUG: WHERE+LIMIT first should be 007 but got {}",
@@ -70,7 +87,11 @@ async fn repro_limit_drops_first_record() {
         .await
         .unwrap();
     let limited: Vec<serde_json::Value> = res.take(0).unwrap();
-    println!("With WHERE (i64) + LIMIT 6: {} records, first={}", limited.len(), limited[0]["name"]);
+    println!(
+        "With WHERE (i64) + LIMIT 6: {} records, first={}",
+        limited.len(),
+        limited[0]["name"]
+    );
     assert_eq!(
         limited[0]["name"], "007",
         "BUG: WHERE(i64)+LIMIT first should be 007 but got {}",
@@ -80,7 +101,9 @@ async fn repro_limit_drops_first_record() {
     // Query WITH INDEX on end_time + WHERE + LIMIT 6
     // This matches production: DEFINE INDEX order_end_time ON order FIELDS end_time
     db.query("DELETE test").await.unwrap();
-    db.query("DEFINE INDEX test_end_time ON test FIELDS end_time").await.unwrap();
+    db.query("DEFINE INDEX test_end_time ON test FIELDS end_time")
+        .await
+        .unwrap();
 
     let base: i64 = 1769879000000;
     for i in 1..=7i64 {
@@ -98,7 +121,11 @@ async fn repro_limit_drops_first_record() {
         .await
         .unwrap();
     let limited: Vec<serde_json::Value> = res.take(0).unwrap();
-    println!("With INDEX + WHERE + LIMIT 6: {} records, first={}", limited.len(), limited[0]["name"]);
+    println!(
+        "With INDEX + WHERE + LIMIT 6: {} records, first={}",
+        limited.len(),
+        limited[0]["name"]
+    );
     assert_eq!(
         limited[0]["name"], "007",
         "BUG: INDEX+WHERE+LIMIT first should be 007 but got {}",

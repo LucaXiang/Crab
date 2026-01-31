@@ -34,7 +34,7 @@ pub async fn list(
     State(state): State<ServerState>,
     Query(query): Query<ListQuery>,
 ) -> AppResult<Json<Vec<DailyReport>>> {
-    let repo = DailyReportRepository::new(state.db.clone());
+    let repo = DailyReportRepository::new(state.db.clone(), state.config.timezone);
 
     let reports = if let (Some(start), Some(end)) = (query.start_date, query.end_date) {
         repo.find_by_date_range(&start, &end).await
@@ -51,7 +51,7 @@ pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<DailyReport>> {
-    let repo = DailyReportRepository::new(state.db.clone());
+    let repo = DailyReportRepository::new(state.db.clone(), state.config.timezone);
     let report = repo
         .find_by_id(&id)
         .await
@@ -65,7 +65,7 @@ pub async fn get_by_date(
     State(state): State<ServerState>,
     Path(date): Path<String>,
 ) -> AppResult<Json<DailyReport>> {
-    let repo = DailyReportRepository::new(state.db.clone());
+    let repo = DailyReportRepository::new(state.db.clone(), state.config.timezone);
     let report = repo
         .find_by_date(&date)
         .await
@@ -89,7 +89,7 @@ pub async fn generate(
     let operator_id = Some(current_user.id);
     let operator_name = Some(current_user.display_name);
 
-    let repo = DailyReportRepository::new(state.db.clone());
+    let repo = DailyReportRepository::new(state.db.clone(), state.config.timezone);
     let report = repo
         .generate(payload, operator_id, operator_name)
         .await
@@ -112,7 +112,7 @@ pub async fn delete(
     State(state): State<ServerState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
-    let repo = DailyReportRepository::new(state.db.clone());
+    let repo = DailyReportRepository::new(state.db.clone(), state.config.timezone);
     let result = repo
         .delete(&id)
         .await

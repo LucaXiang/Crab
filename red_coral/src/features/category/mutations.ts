@@ -154,7 +154,7 @@ export async function updateCategory(id: string, formData: CategoryFormData): Pr
     // Transform to expected format for syncAttributeBindings
     // API returns relation records with 'to' pointing to attribute
     existingBindings = catAttrs.map((ca) => ({
-      attributeId: (ca as unknown as { to: string }).to,
+      attributeId: (ca as unknown as { out: string }).out,
       id: ca.id as string
     }));
   } catch (error) {

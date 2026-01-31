@@ -30,7 +30,8 @@ use super::storage::{OrderStorage, StorageError};
 use super::traits::{CommandContext, CommandHandler, CommandMetadata, EventApplier, OrderError};
 use crate::db::models::PriceRule;
 use crate::services::catalog_service::ProductMeta;
-use chrono::Local;
+use chrono::Utc;
+use chrono_tz::Tz;
 use shared::order::{
     CommandError, CommandErrorCode, CommandResponse, OrderCommand, OrderEvent, OrderSnapshot,
     OrderStatus,
@@ -195,6 +196,8 @@ pub struct OrdersManager {
     catalog_service: Option<Arc<crate::services::CatalogService>>,
     /// Archive service for completed orders (optional, only set when SurrealDB is available)
     archive_service: Option<super::OrderArchiveService>,
+    /// 业务时区
+    tz: Tz,
 }
 
 impl std::fmt::Debug for OrdersManager {
@@ -209,7 +212,7 @@ impl std::fmt::Debug for OrdersManager {
 
 impl OrdersManager {
     /// Create a new OrdersManager with the given database path
-    pub fn new(db_path: impl AsRef<Path>) -> ManagerResult<Self> {
+    pub fn new(db_path: impl AsRef<Path>, tz: Tz) -> ManagerResult<Self> {
         let storage = OrderStorage::open(db_path)?;
         let (event_tx, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
         let epoch = uuid::Uuid::new_v4().to_string();
@@ -221,6 +224,7 @@ impl OrdersManager {
             rule_cache: Arc::new(RwLock::new(HashMap::new())),
             catalog_service: None,
             archive_service: None,
+            tz,
         })
     }
 
@@ -231,13 +235,13 @@ impl OrdersManager {
 
     /// Set the archive service for SurrealDB integration
     pub fn set_archive_service(&mut self, db: surrealdb::Surreal<surrealdb::engine::local::Db>) {
-        self.archive_service = Some(super::OrderArchiveService::new(db));
+        self.archive_service = Some(super::OrderArchiveService::new(db, self.tz));
     }
 
     /// Generate next receipt number (crash-safe via redb)
     fn next_receipt_number(&self) -> String {
         let count = self.storage.next_order_count().unwrap_or(1);
-        let date_str = Local::now().format("%Y%m%d").to_string();
+        let date_str = Utc::now().with_timezone(&self.tz).format("%Y%m%d").to_string();
         format!("FAC{}{}", date_str, 10000 + count)
     }
 
@@ -253,6 +257,7 @@ impl OrdersManager {
             rule_cache: Arc::new(RwLock::new(HashMap::new())),
             catalog_service: None,
             archive_service: None,
+            tz: chrono_tz::Europe::Madrid,
         }
     }
 
@@ -382,7 +387,7 @@ impl OrdersManager {
         };
         let pre_generated_queue = match &cmd.payload {
             shared::order::OrderCommandPayload::OpenTable { is_retail: true, .. } => {
-                match self.storage.next_queue_number() {
+                match self.storage.next_queue_number(self.tz) {
                     Ok(qn) => {
                         tracing::info!(queue_number = qn, "Pre-generated queue number");
                         Some(qn)
@@ -610,6 +615,7 @@ impl Clone for OrdersManager {
             rule_cache: self.rule_cache.clone(),
             catalog_service: self.catalog_service.clone(),
             archive_service: self.archive_service.clone(),
+            tz: self.tz,
         }
     }
 }

@@ -52,6 +52,27 @@ DEFINE FIELD OVERWRITE options ON attribute TYPE array<object>
     DEFAULT []
     PERMISSIONS FULL;
 
+DEFINE FIELD OVERWRITE options.*.name ON attribute TYPE string
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE options.*.price_modifier ON attribute TYPE float
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE options.*.display_order ON attribute TYPE int
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE options.*.is_active ON attribute TYPE bool
+    DEFAULT true
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE options.*.receipt_name ON attribute TYPE option<string>
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE options.*.kitchen_print_name ON attribute TYPE option<string>
+    PERMISSIONS FULL;
+
 DEFINE INDEX OVERWRITE attr_order ON attribute FIELDS display_order;
 
 -- =============================================================================

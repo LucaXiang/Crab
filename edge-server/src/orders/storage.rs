@@ -254,11 +254,10 @@ impl OrderStorage {
     ///
     /// Queue number resets daily with a random start between 0-999.
     /// Wraps around after 999 back to 0.
-    pub fn next_queue_number(&self) -> StorageResult<u32> {
-        use chrono::Local;
+    pub fn next_queue_number(&self, tz: chrono_tz::Tz) -> StorageResult<u32> {
         use rand::Rng;
 
-        let today = Local::now().format("%Y%m%d").to_string();
+        let today = chrono::Utc::now().with_timezone(&tz).format("%Y%m%d").to_string();
         let today_u64: u64 = today.parse().unwrap_or(0);
 
         let txn = self.db.begin_write()?;

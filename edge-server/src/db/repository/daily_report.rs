@@ -2,7 +2,7 @@
 
 use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{DailyReport, DailyReportGenerate};
-use chrono::{Local, NaiveDate};
+use chrono::NaiveDate;
 use surrealdb::engine::local::Db;
 use surrealdb::{RecordId, Surreal};
 
@@ -13,9 +13,9 @@ fn validate_date(date: &str) -> RepoResult<NaiveDate> {
 }
 
 /// Validate date is not in the future
-fn validate_not_future_date(date: &str) -> RepoResult<()> {
+fn validate_not_future_date(date: &str, tz: chrono_tz::Tz) -> RepoResult<()> {
     let parsed_date = validate_date(date)?;
-    let today = Local::now().date_naive();
+    let today = chrono::Utc::now().with_timezone(&tz).date_naive();
 
     if parsed_date > today {
         return Err(RepoError::Validation(format!(
@@ -29,12 +29,14 @@ fn validate_not_future_date(date: &str) -> RepoResult<()> {
 #[derive(Clone)]
 pub struct DailyReportRepository {
     base: BaseRepository,
+    tz: chrono_tz::Tz,
 }
 
 impl DailyReportRepository {
-    pub fn new(db: Surreal<Db>) -> Self {
+    pub fn new(db: Surreal<Db>, tz: chrono_tz::Tz) -> Self {
         Self {
             base: BaseRepository::new(db),
+            tz,
         }
     }
 
@@ -46,7 +48,7 @@ impl DailyReportRepository {
         operator_name: Option<String>,
     ) -> RepoResult<DailyReport> {
         // Validate date format and ensure not future
-        validate_not_future_date(&data.business_date)?;
+        validate_not_future_date(&data.business_date, self.tz)?;
 
         // Check if report already exists
         if self.find_by_date(&data.business_date).await?.is_some() {

@@ -184,7 +184,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                     const options = allOptions.get(attrId) || [];
                     const selectedOptionIds = selections.get(attrId) || [];
                     // binding.to is the attribute ID in AttributeBinding relation
-                    const binding = bindings?.find(b => b.to === attr.id);
+                    const binding = bindings?.find(b => b.out === attr.id);
 
                     // Logic to find defaults for display (visual cues in AttributeSelector)
                     // default_option_idx is stored at the attribute level

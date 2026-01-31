@@ -37,7 +37,7 @@ DEFINE FIELD OVERWRITE description ON system_issue TYPE option<string>
     PERMISSIONS FULL;
 
 -- 预定义选项 (远程广播直接填文本, 本地问题填 i18n key)
-DEFINE FIELD OVERWRITE options ON system_issue TYPE array DEFAULT []
+DEFINE FIELD OVERWRITE options ON system_issue TYPE array<string> DEFAULT []
     PERMISSIONS FULL;
 
 -- 状态: "pending" | "resolved"

@@ -188,16 +188,16 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       // Build bindings
       const productBindings: ProductAttribute[] = attrBindings.map(binding => ({
         id: binding.id,
-        from: String(product.id),
-        to: String(binding.attribute.id),
+        in: String(product.id),
+        out: String(binding.attribute.id),
         is_required: binding.is_required,
         display_order: binding.display_order,
         attribute: binding.attribute,
       }));
       const categoryBindings: ProductAttribute[] = categoryAttributes.map((attr, idx) => ({
         id: null,
-        from: productFull.category,
-        to: String(attr.id),
+        in: productFull.category,
+        out: String(attr.id),
         is_required: false,
         display_order: 1000 + idx,
         attribute: attr,

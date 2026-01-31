@@ -37,6 +37,7 @@ pub async fn load_matching_rules(
     db: &Surreal<Db>,
     zone_id: Option<&str>,
     is_retail: bool,
+    tz: chrono_tz::Tz,
 ) -> Vec<PriceRule> {
     info!(
         zone_id = ?zone_id,
@@ -76,7 +77,7 @@ pub async fn load_matching_rules(
             }
 
             // 检查时间有效性
-            if !is_time_valid(r, current_time) {
+            if !is_time_valid(r, current_time, tz) {
                 debug!(
                     rule_name = %rule_name,
                     valid_from = ?r.valid_from,

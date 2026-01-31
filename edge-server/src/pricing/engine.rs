@@ -18,6 +18,7 @@ use super::matcher::{is_time_valid, matches_product_scope, matches_zone_scope};
 pub struct PriceRuleEngine {
     price_rule_repo: PriceRuleRepository,
     catalog_service: Arc<CatalogService>,
+    tz: chrono_tz::Tz,
 }
 
 impl std::fmt::Debug for PriceRuleEngine {
@@ -30,10 +31,11 @@ impl std::fmt::Debug for PriceRuleEngine {
 }
 
 impl PriceRuleEngine {
-    pub fn new(db: Surreal<Db>, catalog_service: Arc<CatalogService>) -> Self {
+    pub fn new(db: Surreal<Db>, catalog_service: Arc<CatalogService>, tz: chrono_tz::Tz) -> Self {
         Self {
             price_rule_repo: PriceRuleRepository::new(db),
             catalog_service,
+            tz,
         }
     }
 
@@ -171,7 +173,7 @@ impl PriceRuleEngine {
                 }
 
                 // Check time validity
-                if !is_time_valid(rule, current_time) {
+                if !is_time_valid(rule, current_time, self.tz) {
                     return false;
                 }
 

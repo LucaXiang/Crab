@@ -214,7 +214,7 @@ impl ServerState {
         // 4. Initialize OrdersManager (event sourcing) with CatalogService
         let orders_db_path = config.orders_db_file();
         let mut orders_manager =
-            OrdersManager::new(&orders_db_path).expect("Failed to initialize orders manager");
+            OrdersManager::new(&orders_db_path, config.timezone).expect("Failed to initialize orders manager");
         orders_manager.set_catalog_service(catalog_service.clone());
         orders_manager.set_archive_service(db.clone());
 
@@ -223,7 +223,7 @@ impl ServerState {
         let orders_manager = Arc::new(orders_manager);
 
         // 5. Initialize PriceRuleEngine
-        let price_rule_engine = PriceRuleEngine::new(db.clone(), catalog_service.clone());
+        let price_rule_engine = PriceRuleEngine::new(db.clone(), catalog_service.clone(), config.timezone);
 
         // 6. Initialize KitchenPrintService
         let print_db_path = config.print_db_file();
@@ -233,7 +233,7 @@ impl ServerState {
 
         // 7. Initialize AuditService (税务级审计日志 — SurrealDB)
         let data_dir = config.data_dir();
-        let (audit_service, audit_rx) = AuditService::new(db.clone(), &data_dir, 1024);
+        let (audit_service, audit_rx) = AuditService::new(db.clone(), &data_dir, 1024, config.timezone);
 
         // 检测异常关闭和长时间停机（通过 LOCK 文件 + pending-ack.json）
         audit_service.on_startup().await;
@@ -407,6 +407,7 @@ impl ServerState {
                 &self.db,
                 order.zone_id.as_deref(),
                 order.is_retail,
+                self.config.timezone,
             )
             .await;
 
@@ -445,6 +446,7 @@ impl ServerState {
             &self.db,
             snapshot.zone_id.as_deref(),
             snapshot.is_retail,
+            self.config.timezone,
         )
         .await;
 
@@ -642,6 +644,7 @@ impl ServerState {
                 archive_service.clone(),
                 self.db.clone(),
                 tasks.shutdown_token(),
+                self.config.timezone,
             );
 
             tasks.spawn("verify_scheduler", TaskKind::Periodic, async move {

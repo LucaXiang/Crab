@@ -201,7 +201,7 @@ impl RequestCommandProcessor {
             {
                 // 加载匹配的价格规则
                 let rules =
-                    load_matching_rules(&self.state.get_db(), zone_id.as_deref(), is_retail).await;
+                    load_matching_rules(&self.state.get_db(), zone_id.as_deref(), is_retail, self.state.config.timezone).await;
 
                 // 缓存到 OrdersManager
                 if !rules.is_empty() {
