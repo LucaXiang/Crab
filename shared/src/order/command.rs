@@ -62,6 +62,11 @@ pub enum OrderCommandPayload {
         /// 备注
         #[serde(skip_serializing_if = "Option::is_none")]
         note: Option<String>,
+        /// Authorizer for void operation
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_name: Option<String>,
     },
 
     /// Restore a voided order
@@ -178,12 +183,24 @@ pub enum OrderCommandPayload {
         order_id: String,
         target_table_id: String,
         target_table_name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        target_zone_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        target_zone_name: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_name: Option<String>,
     },
 
     /// Merge two orders
     MergeOrders {
         source_order_id: String,
         target_order_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_name: Option<String>,
     },
 
     // ========== Other Operations ==========

@@ -35,6 +35,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
 }) => {
     const { t } = useI18n();
     const [mode, setMode] = useState<ManagementMode>('MENU');
+    const [operationAuthorizer, setOperationAuthorizer] = useState<{ id: string; name: string } | null>(null);
 
     const [activeZoneId, setActiveZoneId] = useState<string>(zones[0]?.id || '');
     const [zoneTables, setZoneTables] = useState<Table[]>([]);
@@ -86,7 +87,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
 
         try {
             // Fire & forget - UI updates via WebSocket
-            await orderOps.mergeOrders(sourceOrder.order_id, targetSnapshot.order_id);
+            await orderOps.mergeOrders(sourceOrder.order_id, targetSnapshot.order_id, operationAuthorizer ?? undefined);
             onSuccess(selectedTargetTable.id );
         } catch (err) {
             console.error('Merge failed:', err);
@@ -104,7 +105,9 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                 sourceOrder.order_id,
                 selectedTargetTable.id ,
                 selectedTargetTable.name,
-                targetZone?.name
+                targetZone?.id,
+                targetZone?.name,
+                operationAuthorizer ?? undefined,
             );
             onSuccess(selectedTargetTable.id );
         } catch (err) {
@@ -277,7 +280,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                 permission={Permission.TABLES_MERGE_BILL}
                 mode="intercept"
                 description={t('table.auth_required.merge')}
-                onAuthorized={() => setMode('MERGE')}
+                onAuthorized={(user) => { setOperationAuthorizer({ id: user.id, name: user.display_name }); setMode('MERGE'); }}
             >
                 <button
                     onClick={() => setMode('MERGE')}
@@ -301,7 +304,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                 permission={Permission.TABLES_TRANSFER}
                 mode="intercept"
                 description={t('table.auth_required.move')}
-                onAuthorized={() => setMode('MOVE')}
+                onAuthorized={(user) => { setOperationAuthorizer({ id: user.id, name: user.display_name }); setMode('MOVE'); }}
             >
                 <button
                     onClick={() => setMode('MOVE')}

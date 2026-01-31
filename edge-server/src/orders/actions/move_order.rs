@@ -16,6 +16,8 @@ pub struct MoveOrderAction {
     pub target_table_name: String,
     pub target_zone_id: Option<String>,
     pub target_zone_name: Option<String>,
+    pub authorizer_id: Option<String>,
+    pub authorizer_name: Option<String>,
 }
 
 #[async_trait]
@@ -74,7 +76,11 @@ impl CommandHandler for MoveOrderAction {
                 source_table_name,
                 target_table_id: self.target_table_id.clone(),
                 target_table_name: self.target_table_name.clone(),
+                target_zone_id: self.target_zone_id.clone(),
+                target_zone_name: self.target_zone_name.clone(),
                 items: snapshot.items.clone(),
+                authorizer_id: self.authorizer_id.clone(),
+                authorizer_name: self.authorizer_name.clone(),
             },
         );
 
@@ -125,6 +131,8 @@ mod tests {
             target_table_name: "Table 2".to_string(),
             target_zone_id: Some("zone:z2".to_string()),
             target_zone_name: Some("Zone B".to_string()),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -140,13 +148,18 @@ mod tests {
             source_table_name,
             target_table_id,
             target_table_name,
+            target_zone_id,
+            target_zone_name,
             items,
+            ..
         } = &event.payload
         {
             assert_eq!(source_table_id, "dining_table:t1");
             assert_eq!(source_table_name, "Table 1");
             assert_eq!(target_table_id, "dining_table:t2");
             assert_eq!(target_table_name, "Table 2");
+            assert_eq!(*target_zone_id, Some("zone:z2".to_string()));
+            assert_eq!(*target_zone_name, Some("Zone B".to_string()));
             assert!(items.is_empty());
         } else {
             panic!("Expected OrderMoved payload");
@@ -195,6 +208,8 @@ mod tests {
             target_table_name: "Table 3".to_string(),
             target_zone_id: None,
             target_zone_name: None,
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -227,6 +242,8 @@ mod tests {
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -253,6 +270,8 @@ mod tests {
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -275,6 +294,8 @@ mod tests {
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -300,6 +321,8 @@ mod tests {
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -325,6 +348,8 @@ mod tests {
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = CommandMetadata {
@@ -360,6 +385,8 @@ mod tests {
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -410,6 +437,8 @@ mod tests {
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -441,6 +470,8 @@ mod tests {
             target_table_name: "Table 1".to_string(),
             target_zone_id: None,
             target_zone_name: None,
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();

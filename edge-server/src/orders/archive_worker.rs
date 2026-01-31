@@ -273,6 +273,8 @@ impl ArchiveWorker {
 
     /// Write audit log entry for the terminal event in the order
     async fn write_order_audit(&self, snapshot: &OrderSnapshot, events: &[OrderEvent]) {
+        use shared::order::EventPayload;
+
         // Find the terminal event (last event that triggered archival)
         let terminal = events
             .iter()
@@ -289,22 +291,123 @@ impl ArchiveWorker {
             _ => return,
         };
 
-        let details = serde_json::json!({
+        // Common fields
+        let mut details = serde_json::json!({
             "receipt_number": snapshot.receipt_number,
             "status": serde_json::to_value(&snapshot.status).unwrap_or_default(),
             "total": snapshot.total,
             "item_count": snapshot.items.len(),
         });
 
+        // Event-specific details + target
+        let mut target: Option<String> = None;
+
+        match &event.payload {
+            EventPayload::OrderCompleted { payment_summary, .. } => {
+                let summary: Vec<serde_json::Value> = payment_summary
+                    .iter()
+                    .map(|p| serde_json::json!({ "method": p.method, "amount": p.amount }))
+                    .collect();
+                details["payment_summary"] = serde_json::Value::Array(summary);
+                details["paid_amount"] = serde_json::json!(snapshot.paid_amount);
+                if let Some(ref table_name) = snapshot.table_name {
+                    details["table_name"] = serde_json::json!(table_name);
+                }
+                if let Some(ref zone_name) = snapshot.zone_name {
+                    details["zone_name"] = serde_json::json!(zone_name);
+                }
+            }
+            EventPayload::OrderVoided {
+                void_type,
+                loss_reason,
+                loss_amount,
+                note,
+                authorizer_id,
+                authorizer_name,
+            } => {
+                details["void_type"] = serde_json::to_value(void_type).unwrap_or_default();
+                if let Some(reason) = loss_reason {
+                    details["loss_reason"] = serde_json::to_value(reason).unwrap_or_default();
+                }
+                if let Some(amount) = loss_amount {
+                    details["loss_amount"] = serde_json::json!(amount);
+                }
+                if let Some(n) = note {
+                    details["void_note"] = serde_json::json!(n);
+                }
+                if let Some(id) = authorizer_id {
+                    details["authorizer_id"] = serde_json::json!(id);
+                }
+                if let Some(name) = authorizer_name {
+                    details["authorizer_name"] = serde_json::json!(name);
+                }
+            }
+            EventPayload::OrderMoved {
+                source_table_id,
+                source_table_name,
+                target_table_id,
+                target_table_name,
+                target_zone_id,
+                target_zone_name,
+                authorizer_id,
+                authorizer_name,
+                ..
+            } => {
+                details["source_table"] = serde_json::json!(source_table_name);
+                details["target_table"] = serde_json::json!(target_table_name);
+                if let Some(zone) = target_zone_name {
+                    details["target_zone"] = serde_json::json!(zone);
+                }
+                if let Some(id) = authorizer_id {
+                    details["authorizer_id"] = serde_json::json!(id);
+                }
+                if let Some(name) = authorizer_name {
+                    details["authorizer_name"] = serde_json::json!(name);
+                }
+                // target points to the new table
+                let _ = source_table_id; // suppress unused warning
+                if let Some(zone_id) = target_zone_id {
+                    target = Some(format!("{}@{}", target_table_id, zone_id));
+                } else {
+                    target = Some(target_table_id.clone());
+                }
+            }
+            EventPayload::OrderMerged {
+                source_table_id,
+                source_table_name,
+                items,
+                payments,
+                paid_amount,
+                authorizer_id,
+                authorizer_name,
+                ..
+            } => {
+                details["source_table"] = serde_json::json!(source_table_name);
+                details["merged_item_count"] = serde_json::json!(items.len());
+                details["merged_payment_count"] = serde_json::json!(payments.len());
+                details["merged_paid_amount"] = serde_json::json!(paid_amount);
+                if let Some(id) = authorizer_id {
+                    details["authorizer_id"] = serde_json::json!(id);
+                }
+                if let Some(name) = authorizer_name {
+                    details["authorizer_name"] = serde_json::json!(name);
+                }
+                // target points to the source table (where items came from)
+                target = Some(source_table_id.clone());
+            }
+            _ => {}
+        }
+
         let resource_id = format!("order:{}", snapshot.order_id);
         self.audit_service
-            .log(
+            .log_with_target(
                 action,
                 "order",
                 &resource_id,
                 Some(event.operator_id.clone()),
                 Some(event.operator_name.clone()),
                 details,
+                target,
             )
             .await;
     }

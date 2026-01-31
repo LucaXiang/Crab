@@ -34,13 +34,13 @@ interface ItemConfiguratorModalProps {
   quantity: number;
   discount: number;
   onQuantityChange: (val: number) => void;
-  onDiscountChange: (val: number, authorizer?: { id: string; username: string }) => void;
+  onDiscountChange: (val: number, authorizer?: { id: string; name: string }) => void;
   onBasePriceChange?: (val: number) => void;
 
   // Actions
   onConfirm: () => void;
   confirmLabel?: string;
-  onDelete?: (authorizer?: { id: string; username: string }) => void;
+  onDelete?: (authorizer?: { id: string; name: string }) => void;
   showDelete?: boolean;
   readOnlyAttributes?: boolean;
 }

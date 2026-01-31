@@ -57,6 +57,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   const [mode, setMode] = useState<PaymentMode>('SELECT');
   const [cancellingPaymentId, setCancellingPaymentId] = useState<string | null>(null);
   const [cancelConfirm, setCancelConfirm] = useState<{ paymentId: string; isSplit: boolean } | null>(null);
+  const [cancelAuthorizer, setCancelAuthorizer] = useState<{ id: string; name: string } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [paymentContext, setPaymentContext] = useState<'FULL' | 'SPLIT' | 'AMOUNT_SPLIT'>('FULL');
@@ -243,7 +244,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     setCancellingPaymentId(paymentId);
 
     try {
-      const response = await cancelPayment(order.order_id, paymentId);
+      const response = await cancelPayment(order.order_id, paymentId, undefined, cancelAuthorizer ?? undefined);
       if (response.success) {
         toast.success(t('checkout.payment.cancel_success'));
       } else {
@@ -254,8 +255,9 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
       toast.error(t('checkout.payment.cancel_failed'));
     } finally {
       setCancellingPaymentId(null);
+      setCancelAuthorizer(null);
     }
-  }, [cancelConfirm, order.order_id, cancelPayment, t]);
+  }, [cancelConfirm, order.order_id, cancelPayment, cancelAuthorizer, t]);
 
   /**
    * 处理现金全额支付
@@ -1430,18 +1432,28 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                             </div>
                           )}
                         </div>
-                        <button
-                          onClick={() => handleCancelPayment(payment.payment_id, isSplit)}
-                          disabled={isCancelling}
-                          className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50"
-                          title={t('checkout.payment.cancel')}
+                        <EscalatableGate
+                          permission={Permission.ORDERS_VOID}
+                          mode="intercept"
+                          description={t('checkout.payment.cancel')}
+                          onAuthorized={(user) => {
+                            setCancelAuthorizer({ id: user.id, name: user.display_name });
+                            handleCancelPayment(payment.payment_id, isSplit);
+                          }}
                         >
-                          {isCancelling ? (
-                            <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-                          ) : (
-                            <Trash2 size={20} />
-                          )}
-                        </button>
+                          <button
+                            onClick={() => handleCancelPayment(payment.payment_id, isSplit)}
+                            disabled={isCancelling}
+                            className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50"
+                            title={t('checkout.payment.cancel')}
+                          >
+                            {isCancelling ? (
+                              <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 size={20} />
+                            )}
+                          </button>
+                        </EscalatableGate>
                       </div>
                     </div>
 

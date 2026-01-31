@@ -145,6 +145,8 @@ export function useOrderCommands() {
     lossReason?: 'CUSTOMER_FLED' | 'CUSTOMER_INSOLVENT' | 'OTHER';
     lossAmount?: number;
     note?: string;
+    authorizerId?: string | null;
+    authorizerName?: string | null;
   }
 
   /**
@@ -159,6 +161,8 @@ export function useOrderCommands() {
         loss_reason: options?.lossReason ?? null,
         loss_amount: options?.lossAmount ?? null,
         note: options?.note ?? null,
+        authorizer_id: options?.authorizerId ?? null,
+        authorizer_name: options?.authorizerName ?? null,
       });
 
       return sendCommand(command);
@@ -206,13 +210,16 @@ export function useOrderCommands() {
     async (
       orderId: string,
       instanceId: string,
-      changes: ItemChanges
+      changes: ItemChanges,
+      authorizer?: { id: string; name: string },
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'MODIFY_ITEM',
         order_id: orderId,
         instance_id: instanceId,
         changes,
+        authorizer_id: authorizer?.id ?? null,
+        authorizer_name: authorizer?.name ?? null,
       });
 
       return sendCommand(command);
@@ -229,7 +236,8 @@ export function useOrderCommands() {
       orderId: string,
       instanceId: string,
       quantity?: number,
-      reason?: string
+      reason?: string,
+      authorizer?: { id: string; name: string },
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'REMOVE_ITEM',
@@ -237,6 +245,8 @@ export function useOrderCommands() {
         instance_id: instanceId,
         quantity: quantity ?? null,
         reason: reason ?? null,
+        authorizer_id: authorizer?.id ?? null,
+        authorizer_name: authorizer?.name ?? null,
       });
 
       return sendCommand(command);
@@ -290,13 +300,16 @@ export function useOrderCommands() {
     async (
       orderId: string,
       paymentId: string,
-      reason?: string
+      reason?: string,
+      authorizer?: { id: string; name: string },
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'CANCEL_PAYMENT',
         order_id: orderId,
         payment_id: paymentId,
         reason: reason ?? null,
+        authorizer_id: authorizer?.id ?? null,
+        authorizer_name: authorizer?.name ?? null,
       });
 
       return sendCommand(command);
@@ -408,14 +421,19 @@ export function useOrderCommands() {
       orderId: string,
       targetTableId: string,
       targetTableName: string,
-      targetZoneName?: string
+      targetZoneId?: string | null,
+      targetZoneName?: string | null,
+      authorizer?: { id: string; name: string },
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'MOVE_ORDER',
         order_id: orderId,
         target_table_id: targetTableId,
         target_table_name: targetTableName,
+        target_zone_id: targetZoneId ?? null,
         target_zone_name: targetZoneName ?? null,
+        authorizer_id: authorizer?.id ?? null,
+        authorizer_name: authorizer?.name ?? null,
       });
 
       return sendCommand(command);
@@ -430,12 +448,15 @@ export function useOrderCommands() {
   const mergeOrders = useCallback(
     async (
       sourceOrderId: string,
-      targetOrderId: string
+      targetOrderId: string,
+      authorizer?: { id: string; name: string },
     ): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'MERGE_ORDERS',
         source_order_id: sourceOrderId,
         target_order_id: targetOrderId,
+        authorizer_id: authorizer?.id ?? null,
+        authorizer_name: authorizer?.name ?? null,
       });
 
       return sendCommand(command);

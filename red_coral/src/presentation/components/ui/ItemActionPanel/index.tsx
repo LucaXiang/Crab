@@ -25,7 +25,7 @@ const useItemActionLogic = (props: ItemActionPanelProps) => {
   const [editMode, setEditMode] = useState<EditMode>('STANDARD');
   const [inputBuffer, setInputBuffer] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [authorizedUser, setAuthorizedUser] = useState<{ id: string; username: string } | null>(null);
+  const [authorizedUser, setAuthorizedUser] = useState<{ id: string; name: string } | null>(null);
 
   // --- Calculations ---
   // 1. Base + Options
@@ -39,7 +39,7 @@ const useItemActionLogic = (props: ItemActionPanelProps) => {
 
   // --- Numpad Handlers ---
 
-  const openNumpad = (mode: EditMode, authorizer?: { id: string; username: string }) => {
+  const openNumpad = (mode: EditMode, authorizer?: { id: string; name: string }) => {
     if (mode === 'STANDARD') return;
     setEditMode(mode);
     setIsTyping(false);
@@ -183,14 +183,14 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
 
   const QUICK_DISCOUNTS = [5, 10, 20, 50];
 
-  const handleProtectedDelete = (authorizer?: { id: string; username: string }) => {
+  const handleProtectedDelete = (authorizer?: { id: string; name: string }) => {
      if (onDelete) {
-        onDelete(authorizer || (currentUser ? { id: currentUser.id, username: currentUser.username } : undefined));
+        onDelete(authorizer || (currentUser ? { id: currentUser.id, name: currentUser.display_name ?? currentUser.username } : undefined));
      }
   };
 
-  const handleProtectedDiscount = (val: number, authorizer?: { id: string; username: string }) => {
-      onDiscountChange(val, authorizer || (currentUser ? { id: currentUser.id, username: currentUser.username } : undefined));
+  const handleProtectedDiscount = (val: number, authorizer?: { id: string; name: string }) => {
+      onDiscountChange(val, authorizer || (currentUser ? { id: currentUser.id, name: currentUser.display_name ?? currentUser.username } : undefined));
   };
 
   const getEditModeTitle = () => {
@@ -255,7 +255,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                     permission={Permission.ORDERS_DISCOUNT}
                     mode="intercept"
                     description={t('pos.cart.enter_discount')}
-                    onAuthorized={(user) => openNumpad('DISC', { id: user.id, username: user.username })}
+                    onAuthorized={(user) => openNumpad('DISC', { id: user.id, name: user.display_name })}
                   >
                     <button
                       onClick={() => {
@@ -283,7 +283,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                       permission={Permission.ORDERS_DISCOUNT}
                       mode="intercept"
                       description={`${t('checkout.cart.discount')} ${d}%`}
-                      onAuthorized={(user) => handleProtectedDiscount(d === discount ? 0 : d, { id: user.id, username: user.username })}
+                      onAuthorized={(user) => handleProtectedDiscount(d === discount ? 0 : d, { id: user.id, name: user.display_name })}
                     >
                       <button
                         onClick={() => {
@@ -317,7 +317,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                 permission={Permission.ORDERS_DISCOUNT}
                 mode="intercept"
                 description={t('pos.cart.edit_final_price')}
-                onAuthorized={(user) => openNumpad('PRICE', { id: user.id, username: user.username })}
+                onAuthorized={(user) => openNumpad('PRICE', { id: user.id, name: user.display_name })}
               >
                 <div
                   className="flex items-center justify-between p-4 cursor-pointer hover:bg-blue-50/50 transition-colors group"
@@ -389,7 +389,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                         permission={Permission.ORDERS_VOID}
                         mode="intercept"
                         description={t('common.action.delete')}
-                        onAuthorized={(user) => handleProtectedDelete({ id: user.id, username: user.username })}
+                        onAuthorized={(user) => handleProtectedDelete({ id: user.id, name: user.display_name })}
                     >
                         <button
                             onClick={() => {

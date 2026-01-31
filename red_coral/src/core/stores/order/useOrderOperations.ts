@@ -270,6 +270,10 @@ export interface VoidOrderOptions {
   lossAmount?: number;
   /** 备注 */
   note?: string;
+  /** 授权人 ID（提权操作时传入） */
+  authorizerId?: string | null;
+  /** 授权人名称 */
+  authorizerName?: string | null;
 }
 
 /**
@@ -287,6 +291,8 @@ export const voidOrder = async (
     loss_reason: options?.lossReason ?? null,
     loss_amount: options?.lossAmount ?? null,
     note: options?.note ?? null,
+    authorizer_id: options?.authorizerId ?? null,
+    authorizer_name: options?.authorizerName ?? null,
   });
   const response = await sendCommand(command);
   ensureSuccess(response, 'Void order');
@@ -445,14 +451,19 @@ export const moveOrder = async (
   orderId: string,
   targetTableId: string,
   targetTableName: string,
-  targetZoneName?: string
+  targetZoneId?: string | null,
+  targetZoneName?: string | null,
+  authorizer?: { id: string; name: string },
 ): Promise<void> => {
   const command = createCommand({
     type: 'MOVE_ORDER',
     order_id: orderId,
     target_table_id: targetTableId,
     target_table_name: targetTableName,
+    target_zone_id: targetZoneId ?? null,
     target_zone_name: targetZoneName ?? null,
+    authorizer_id: authorizer?.id ?? null,
+    authorizer_name: authorizer?.name ?? null,
   });
 
   const response = await sendCommand(command);
@@ -465,12 +476,15 @@ export const moveOrder = async (
  */
 export const mergeOrders = async (
   sourceOrderId: string,
-  targetOrderId: string
+  targetOrderId: string,
+  authorizer?: { id: string; name: string },
 ): Promise<void> => {
   const command = createCommand({
     type: 'MERGE_ORDERS',
     source_order_id: sourceOrderId,
     target_order_id: targetOrderId,
+    authorizer_id: authorizer?.id ?? null,
+    authorizer_name: authorizer?.name ?? null,
   });
 
   const response = await sendCommand(command);
@@ -510,7 +524,8 @@ export const modifyItem = async (
     manual_discount_percent?: number;
     surcharge?: number;
     note?: string;
-  }
+  },
+  authorizer?: { id: string; name: string },
 ): Promise<void> => {
   const command = createCommand({
     type: 'MODIFY_ITEM',
@@ -523,6 +538,8 @@ export const modifyItem = async (
       surcharge: changes.surcharge ?? null,
       note: changes.note ?? null,
     },
+    authorizer_id: authorizer?.id ?? null,
+    authorizer_name: authorizer?.name ?? null,
   });
 
   const response = await sendCommand(command);
@@ -536,7 +553,8 @@ export const removeItem = async (
   orderId: string,
   instance_id: string,
   reason?: string,
-  quantity?: number
+  quantity?: number,
+  authorizer?: { id: string; name: string },
 ): Promise<void> => {
   const command = createCommand({
     type: 'REMOVE_ITEM',
@@ -544,6 +562,8 @@ export const removeItem = async (
     instance_id: instance_id,
     reason: reason ?? null,
     quantity: quantity ?? null,
+    authorizer_id: authorizer?.id ?? null,
+    authorizer_name: authorizer?.name ?? null,
   });
 
   const response = await sendCommand(command);

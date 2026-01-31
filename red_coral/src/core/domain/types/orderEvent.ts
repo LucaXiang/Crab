@@ -276,6 +276,8 @@ export interface OrderMovedPayload {
   source_table_name: string;
   target_table_id: string;
   target_table_name: string;
+  target_zone_id?: string | null;
+  target_zone_name?: string | null;
   items: CartItemSnapshot[];
 }
 
@@ -291,6 +293,12 @@ export interface OrderMergedPayload {
   source_table_id: string;
   source_table_name: string;
   items: CartItemSnapshot[];
+  payments: PaymentRecord[];
+  paid_item_quantities: Record<string, number>;
+  paid_amount: number;
+  has_amount_split: boolean;
+  aa_total_shares?: number | null;
+  aa_paid_shares: number;
 }
 
 export interface OrderMergedOutPayload {
@@ -402,6 +410,10 @@ export interface VoidOrderCommand {
   loss_amount?: number | null;
   /** 备注 */
   note?: string | null;
+  /** 授权人 ID（提权操作时传入） */
+  authorizer_id?: string | null;
+  /** 授权人名称 */
+  authorizer_name?: string | null;
 }
 
 export interface RestoreOrderCommand {
@@ -431,6 +443,8 @@ export interface RemoveItemCommand {
   instance_id: string;
   quantity?: number | null;
   reason?: string | null;
+  authorizer_id?: string | null;
+  authorizer_name?: string | null;
 }
 
 export interface RestoreItemCommand {
@@ -504,13 +518,18 @@ export interface MoveOrderCommand {
   order_id: string;
   target_table_id: string;
   target_table_name: string;
+  target_zone_id?: string | null;
   target_zone_name?: string | null;
+  authorizer_id?: string | null;
+  authorizer_name?: string | null;
 }
 
 export interface MergeOrdersCommand {
   type: 'MERGE_ORDERS';
   source_order_id: string;
   target_order_id: string;
+  authorizer_id?: string | null;
+  authorizer_name?: string | null;
 }
 
 /** Update order info (receipt_number is immutable - set at OpenTable) */

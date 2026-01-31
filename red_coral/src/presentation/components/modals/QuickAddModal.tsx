@@ -304,7 +304,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       selectedOptions: ItemOption[],
       quantity: number,
       discount: number,
-      authorizer?: { id: string; username: string },
+      authorizer?: { id: string; name: string },
       selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number }
     ) => {
       if (!selectedProductForOptions) return;
@@ -343,7 +343,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
         } : undefined,
         manual_discount_percent: discount > 0 ? discount : undefined,
         authorizer_id: authorizer?.id,
-        authorizer_name: authorizer?.username,
+        authorizer_name: authorizer?.name,
       };
 
       setTempItems(prev => {

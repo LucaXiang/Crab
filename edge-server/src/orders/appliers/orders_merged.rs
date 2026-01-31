@@ -1,7 +1,7 @@
 //! OrderMerged and OrderMergedOut event appliers
 //!
 //! Handles the merge operation for both orders:
-//! - OrderMerged: Target order receives items from source order
+//! - OrderMerged: Target order receives items, payments, and split state from source order
 //! - OrderMergedOut: Source order is marked as Merged status
 
 use crate::orders::traits::EventApplier;
@@ -9,16 +9,49 @@ use shared::order::{EventPayload, OrderEvent, OrderSnapshot, OrderStatus};
 
 /// OrderMerged applier - applies to the target order
 ///
-/// Adds items from the source order to the target order's items list.
+/// Merges items, payment records, paid amounts, and split state from the source order into the target order.
 pub struct OrderMergedApplier;
 
 impl EventApplier for OrderMergedApplier {
     fn apply(&self, snapshot: &mut OrderSnapshot, event: &OrderEvent) {
-        if let EventPayload::OrderMerged { items, .. } = &event.payload {
-            // Add merged items to the target order
+        if let EventPayload::OrderMerged {
+            items,
+            payments,
+            paid_item_quantities,
+            paid_amount,
+            has_amount_split,
+            aa_total_shares,
+            aa_paid_shares,
+            ..
+        } = &event.payload
+        {
+            // Merge items
             for item in items {
                 snapshot.items.push(item.clone());
             }
+
+            // Merge payment records
+            for payment in payments {
+                snapshot.payments.push(payment.clone());
+            }
+
+            // Merge paid item quantities
+            for (key, qty) in paid_item_quantities {
+                *snapshot.paid_item_quantities.entry(key.clone()).or_insert(0) += qty;
+            }
+
+            // Accumulate paid amount
+            snapshot.paid_amount += paid_amount;
+            snapshot.remaining_amount = snapshot.total - snapshot.paid_amount;
+
+            // Merge split state
+            if *has_amount_split {
+                snapshot.has_amount_split = true;
+            }
+            if let Some(shares) = aa_total_shares {
+                snapshot.aa_total_shares = Some(*shares);
+            }
+            snapshot.aa_paid_shares += aa_paid_shares;
 
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
@@ -98,6 +131,34 @@ mod tests {
         source_table_name: &str,
         items: Vec<CartItemSnapshot>,
     ) -> OrderEvent {
+        create_order_merged_event_with_payments(
+            order_id,
+            seq,
+            source_table_id,
+            source_table_name,
+            items,
+            vec![],
+            std::collections::HashMap::new(),
+            0.0,
+            false,
+            None,
+            0,
+        )
+    }
+
+    fn create_order_merged_event_with_payments(
+        order_id: &str,
+        seq: u64,
+        source_table_id: &str,
+        source_table_name: &str,
+        items: Vec<CartItemSnapshot>,
+        payments: Vec<shared::order::PaymentRecord>,
+        paid_item_quantities: std::collections::HashMap<String, i32>,
+        paid_amount: f64,
+        has_amount_split: bool,
+        aa_total_shares: Option<i32>,
+        aa_paid_shares: i32,
+    ) -> OrderEvent {
         OrderEvent::new(
             seq,
             order_id.to_string(),
@@ -110,6 +171,14 @@ mod tests {
                 source_table_id: source_table_id.to_string(),
                 source_table_name: source_table_name.to_string(),
                 items,
+                payments,
+                paid_item_quantities,
+                paid_amount,
+                has_amount_split,
+                aa_total_shares,
+                aa_paid_shares,
+                authorizer_id: None,
+                authorizer_name: None,
             },
         )
     }
@@ -132,6 +201,8 @@ mod tests {
                 target_table_id: target_table_id.to_string(),
                 target_table_name: target_table_name.to_string(),
                 reason: None,
+                authorizer_id: None,
+                authorizer_name: None,
             },
         )
     }
@@ -440,5 +511,117 @@ mod tests {
         // Tampering should invalidate checksum
         snapshot.last_sequence = 999;
         assert!(!snapshot.verify_checksum());
+    }
+
+    #[test]
+    fn test_order_merged_transfers_payments() {
+        let mut snapshot = create_test_snapshot("target-1");
+        snapshot.total = 30.0;
+        snapshot.remaining_amount = 30.0;
+
+        let payment = shared::order::PaymentRecord {
+            payment_id: "pay-1".to_string(),
+            method: "CASH".to_string(),
+            amount: 5.0,
+            tendered: None,
+            change: None,
+            note: None,
+            timestamp: 1234567890,
+            cancelled: false,
+            cancel_reason: None,
+            split_items: None,
+            aa_shares: None,
+            split_type: None,
+        };
+
+        let mut paid_item_quantities = std::collections::HashMap::new();
+        paid_item_quantities.insert("item-src-1".to_string(), 1);
+
+        let event = create_order_merged_event_with_payments(
+            "target-1",
+            2,
+            "dining_table:t2",
+            "Table 2",
+            vec![create_test_item("item-src-1", "Coffee")],
+            vec![payment],
+            paid_item_quantities,
+            5.0,
+            false,
+            None,
+            0,
+        );
+
+        let applier = OrderMergedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Items merged
+        assert_eq!(snapshot.items.len(), 1);
+        // Payments merged
+        assert_eq!(snapshot.payments.len(), 1);
+        assert_eq!(snapshot.payments[0].payment_id, "pay-1");
+        assert_eq!(snapshot.payments[0].amount, 5.0);
+        // Paid amount accumulated
+        assert_eq!(snapshot.paid_amount, 5.0);
+        assert_eq!(snapshot.remaining_amount, 25.0);
+        // Paid item quantities merged
+        assert_eq!(snapshot.paid_item_quantities.get("item-src-1"), Some(&1));
+    }
+
+    #[test]
+    fn test_order_merged_accumulates_existing_payments() {
+        let mut snapshot = create_test_snapshot("target-1");
+        snapshot.total = 50.0;
+        snapshot.paid_amount = 10.0;
+        snapshot.remaining_amount = 40.0;
+        snapshot.payments.push(shared::order::PaymentRecord {
+            payment_id: "pay-target".to_string(),
+            method: "CARD".to_string(),
+            amount: 10.0,
+            tendered: None,
+            change: None,
+            note: None,
+            timestamp: 1234567890,
+            cancelled: false,
+            cancel_reason: None,
+            split_items: None,
+            aa_shares: None,
+            split_type: None,
+        });
+
+        let source_payment = shared::order::PaymentRecord {
+            payment_id: "pay-source".to_string(),
+            method: "CASH".to_string(),
+            amount: 8.0,
+            tendered: None,
+            change: None,
+            note: None,
+            timestamp: 1234567891,
+            cancelled: false,
+            cancel_reason: None,
+            split_items: None,
+            aa_shares: None,
+            split_type: None,
+        };
+
+        let event = create_order_merged_event_with_payments(
+            "target-1",
+            2,
+            "dining_table:t2",
+            "Table 2",
+            vec![],
+            vec![source_payment],
+            std::collections::HashMap::new(),
+            8.0,
+            false,
+            None,
+            0,
+        );
+
+        let applier = OrderMergedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        assert_eq!(snapshot.payments.len(), 2);
+        assert_eq!(snapshot.paid_amount, 18.0);
+        assert_eq!(snapshot.remaining_amount, 32.0);
     }
 }

@@ -18,7 +18,7 @@ interface ProductOptionsModalProps {
     selectedOptions: ItemOption[],
     quantity: number,
     discount: number,
-    authorizer?: { id: string; username: string },
+    authorizer?: { id: string; name: string },
     selectedSpecification?: { id: string; name: string; receipt_name?: string; price?: number }
   ) => void;
 }
@@ -44,7 +44,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
   const [selections, setSelections] = useState<Map<string, string[]>>(new Map());
   const [quantity, setQuantity] = useState(1);
   const [discount, setDiscount] = useState(0);
-  const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; username: string } | undefined>();
+  const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; name: string } | undefined>();
   // Local override for base price (null = use spec/default price)
   const [localBasePrice, setLocalBasePrice] = useState<number | null>(null);
 

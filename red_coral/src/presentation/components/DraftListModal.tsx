@@ -1,9 +1,7 @@
 import React from 'react';
 import { DraftOrder } from '@/core/domain/types';
-import { Permission as PermissionValues } from '@/core/domain/types';
 import { X, Clock, RotateCcw, Trash2, ClipboardList } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { EscalatableGate } from './auth/EscalatableGate';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface DraftListModalProps {
@@ -63,19 +61,12 @@ export const DraftListModal = React.memo<DraftListModalProps>(({
                   <span className="font-bold text-gray-900 text-lg">
                     {formatCurrency(draft.total)}
                   </span>
-                  <EscalatableGate
-                    permission={PermissionValues.ORDERS_RESTORE}
-                    mode="intercept"
-                    description={t('draft.action.restore')}
-                    onAuthorized={() => draft.order_id && onRestore(draft.order_id)}
+                  <button
+                    onClick={() => draft.order_id && onRestore(draft.order_id)}
+                    className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg font-bold hover:bg-blue-100 transition-colors flex items-center gap-1 text-sm"
                   >
-                    <button
-                      onClick={() => draft.order_id && onRestore(draft.order_id)}
-                      className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg font-bold hover:bg-blue-100 transition-colors flex items-center gap-1 text-sm"
-                    >
-                      <RotateCcw size={16} /> {t('draft.action.restore')}
-                    </button>
-                  </EscalatableGate>
+                    <RotateCcw size={16} /> {t('draft.action.restore')}
+                  </button>
                   <button
                     onClick={() => draft.order_id && onDelete(draft.order_id)}
                     className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"

@@ -64,7 +64,7 @@ interface CartStore {
   itemCount: number;
 
   // Actions
-  addToCart: (product: ProductWithPrice, selectedOptions?: ItemOption[], quantity?: number, discount?: number, authorizer?: { id: string; username: string }, selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number }) => void;
+  addToCart: (product: ProductWithPrice, selectedOptions?: ItemOption[], quantity?: number, discount?: number, authorizer?: { id: string; name: string }, selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number }) => void;
   removeFromCart: (instanceId: string) => void;
   updateCartItem: (instanceId: string, updates: Partial<CartItem>) => void;
   incrementItemQuantity: (instanceId: string, delta: number) => void;
@@ -83,7 +83,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   itemCount: 0,
 
   // Actions
-  addToCart: (product: ProductWithPrice, selectedOptions?: ItemOption[], quantity: number = 1, discount: number = 0, authorizer?: { id: string; username: string }, selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number; is_multi_spec?: boolean }) => {
+  addToCart: (product: ProductWithPrice, selectedOptions?: ItemOption[], quantity: number = 1, discount: number = 0, authorizer?: { id: string; name: string }, selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number; is_multi_spec?: boolean }) => {
     set((state) => {
       // Get default spec from product if no selectedSpecification provided
       let effectiveSpec = selectedSpecification;
@@ -137,7 +137,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
           selected_specification: effectiveSpec,
           instance_id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
           authorizer_id: authorizer?.id,
-          authorizer_name: authorizer?.username,
+          authorizer_name: authorizer?.name,
         }]
       };
     });

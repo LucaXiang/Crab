@@ -461,7 +461,7 @@ export const POSScreen: React.FC = () => {
       selectedOptions: ItemOption[],
       quantity: number,
       discount: number,
-      authorizer?: { id: string; username: string },
+      authorizer?: { id: string; name: string },
       selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number }
     ) => {
       if (!selectedProductForOptions) return;

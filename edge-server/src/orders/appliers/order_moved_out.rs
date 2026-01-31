@@ -57,6 +57,8 @@ mod tests {
                 target_table_id: target_table_id.to_string(),
                 target_table_name: target_table_name.to_string(),
                 reason: None,
+                authorizer_id: None,
+                authorizer_name: None,
             },
         )
     }

@@ -1,7 +1,7 @@
 //! OrderMoved event applier
 //!
-//! Applies the OrderMoved event to update table information in the snapshot.
-//! Updates table_id and table_name from the event's target fields.
+//! Applies the OrderMoved event to update table and zone information in the snapshot.
+//! Updates table_id, table_name, zone_id, and zone_name from the event's target fields.
 
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot};
@@ -14,12 +14,18 @@ impl EventApplier for OrderMovedApplier {
         if let EventPayload::OrderMoved {
             target_table_id,
             target_table_name,
+            target_zone_id,
+            target_zone_name,
             ..
         } = &event.payload
         {
             // Update table information to the target
             snapshot.table_id = Some(target_table_id.clone());
             snapshot.table_name = Some(target_table_name.clone());
+
+            // Update zone information
+            snapshot.zone_id = target_zone_id.clone();
+            snapshot.zone_name = target_zone_name.clone();
 
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
@@ -55,6 +61,30 @@ mod tests {
         target_table_name: &str,
         items: Vec<CartItemSnapshot>,
     ) -> OrderEvent {
+        create_order_moved_event_with_zone(
+            order_id,
+            seq,
+            source_table_id,
+            source_table_name,
+            target_table_id,
+            target_table_name,
+            None,
+            None,
+            items,
+        )
+    }
+
+    fn create_order_moved_event_with_zone(
+        order_id: &str,
+        seq: u64,
+        source_table_id: &str,
+        source_table_name: &str,
+        target_table_id: &str,
+        target_table_name: &str,
+        target_zone_id: Option<String>,
+        target_zone_name: Option<String>,
+        items: Vec<CartItemSnapshot>,
+    ) -> OrderEvent {
         OrderEvent::new(
             seq,
             order_id.to_string(),
@@ -68,7 +98,11 @@ mod tests {
                 source_table_name: source_table_name.to_string(),
                 target_table_id: target_table_id.to_string(),
                 target_table_name: target_table_name.to_string(),
+                target_zone_id,
+                target_zone_name,
                 items,
+                authorizer_id: None,
+                authorizer_name: None,
             },
         )
     }
@@ -97,11 +131,37 @@ mod tests {
     }
 
     #[test]
-    fn test_order_moved_preserves_zone_info() {
+    fn test_order_moved_updates_zone_info() {
         let mut snapshot = create_test_snapshot("order-1");
-        let original_zone_id = snapshot.zone_id.clone();
-        let original_zone_name = snapshot.zone_name.clone();
+        assert_eq!(snapshot.zone_id, Some("zone:z1".to_string()));
+        assert_eq!(snapshot.zone_name, Some("Zone A".to_string()));
 
+        let event = create_order_moved_event_with_zone(
+            "order-1",
+            2,
+            "dining_table:t1",
+            "Table 1",
+            "dining_table:t3",
+            "Table 3",
+            Some("zone:z2".to_string()),
+            Some("Zone B".to_string()),
+            vec![],
+        );
+
+        let applier = OrderMovedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Zone info should be updated to the target zone
+        assert_eq!(snapshot.zone_id, Some("zone:z2".to_string()));
+        assert_eq!(snapshot.zone_name, Some("Zone B".to_string()));
+    }
+
+    #[test]
+    fn test_order_moved_clears_zone_when_none() {
+        let mut snapshot = create_test_snapshot("order-1");
+        assert_eq!(snapshot.zone_id, Some("zone:z1".to_string()));
+
+        // Move without zone info → zone should be cleared
         let event = create_order_moved_event(
             "order-1",
             2,
@@ -115,9 +175,8 @@ mod tests {
         let applier = OrderMovedApplier;
         applier.apply(&mut snapshot, &event);
 
-        // Zone info should remain unchanged (event doesn't contain zone)
-        assert_eq!(snapshot.zone_id, original_zone_id);
-        assert_eq!(snapshot.zone_name, original_zone_name);
+        assert_eq!(snapshot.zone_id, None);
+        assert_eq!(snapshot.zone_name, None);
     }
 
     #[test]

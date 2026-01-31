@@ -45,7 +45,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
     }
   }, [order]);
 
-  const handleSaveItem = React.useCallback(async (index: number, updates: Partial<CartItem>, _options?: { userId?: string }) => {
+  const handleSaveItem = React.useCallback(async (index: number, updates: Partial<CartItem>, authorizer?: { id: string; name: string }) => {
     const item = order.items[index];
     const instanceId = item.instance_id;
 
@@ -56,12 +56,12 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       manual_discount_percent: updates.manual_discount_percent ?? undefined,
       surcharge: updates.surcharge ?? undefined,
       note: updates.note ?? undefined,
-    });
+    }, authorizer);
 
     setEditingItem(null);
   }, [order]);
 
-  const handleDeleteItem = React.useCallback(async (index: number, _options?: { userId?: string }) => {
+  const handleDeleteItem = React.useCallback(async (index: number, authorizer?: { id: string; name: string }) => {
     const item = order.items[index];
     const instanceId = item.instance_id;
     const paidQty = order.paid_item_quantities?.[instanceId] || 0;
@@ -71,13 +71,13 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       const qtyToRemove = item.quantity - paidQty;
 
       // Send command to backend - state will be updated via event (Server Authority)
-      await orderOps.removeItem(order.order_id, instanceId, 'Removed unpaid portion', qtyToRemove);
+      await orderOps.removeItem(order.order_id, instanceId, 'Removed unpaid portion', qtyToRemove, authorizer);
       return;
     }
 
     // Case 2: Fully paid or Unpaid - Remove (Soft Delete)
     // Send command to backend - state will be updated via event (Server Authority)
-    await orderOps.removeItem(order.order_id, instanceId, 'Removed from payment screen');
+    await orderOps.removeItem(order.order_id, instanceId, 'Removed from payment screen', undefined, authorizer);
 
     setEditingItem(null);
   }, [order]);

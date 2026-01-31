@@ -56,11 +56,11 @@ const SidebarInner: React.FC<SidebarProps> = ({
 	  }, []);
 
 	  // Wrap update/remove to match CartItemDetailModal expected signature
-	  const handleUpdateItem = useCallback((instanceId: string, updates: Partial<CartItem>, _options?: { userId?: string }) => {
+	  const handleUpdateItem = useCallback((instanceId: string, updates: Partial<CartItem>, _authorizer?: { id: string; name: string }) => {
 		updateCartItem(instanceId, updates);
 	  }, [updateCartItem]);
 
-	  const handleRemoveItem = useCallback((instanceId: string, _options?: { userId?: string }) => {
+	  const handleRemoveItem = useCallback((instanceId: string, _authorizer?: { id: string; name: string }) => {
 		removeFromCart(instanceId);
 	  }, [removeFromCart]);
 

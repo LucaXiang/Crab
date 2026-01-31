@@ -11,8 +11,8 @@ import { ItemConfiguratorModal } from './ItemConfiguratorModal';
 interface CartItemDetailModalProps {
   item: CartItem;
   onClose: () => void;
-  onUpdate: (instanceId: string, updates: Partial<CartItem>, options?: { userId?: string }) => void;
-  onRemove: (instanceId: string, options?: { userId?: string }) => void;
+  onUpdate: (instanceId: string, updates: Partial<CartItem>, authorizer?: { id: string; name: string }) => void;
+  onRemove: (instanceId: string, authorizer?: { id: string; name: string }) => void;
   readOnlyAttributes?: boolean;
 }
 
@@ -20,7 +20,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
   const { t } = useI18n();
   const [quantity, setQuantity] = useState(item.quantity);
   const [discount, setDiscount] = useState(item.manual_discount_percent || 0);
-  const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; username: string } | undefined>();
+  const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; name: string } | undefined>();
 
   // Specification State
   const [specifications, setSpecifications] = useState<EmbeddedSpec[]>([]);
@@ -227,13 +227,13 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
       manual_discount_percent: finalDisc,
       selected_options: selectedOptions,
       selected_specification: selectedSpecification
-    }, discountAuthorizer ? { userId: discountAuthorizer.id } : undefined);
+    }, discountAuthorizer);
     
     onClose();
   };
 
-  const handleRemove = (authorizer?: { id: string; username: string }) => {
-    onRemove(item.instance_id, authorizer ? { userId: authorizer.id } : undefined);
+  const handleRemove = (authorizer?: { id: string; name: string }) => {
+    onRemove(item.instance_id, authorizer);
     onClose();
   };
 

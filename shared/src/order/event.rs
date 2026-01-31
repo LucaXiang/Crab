@@ -1,8 +1,8 @@
 //! Order events - immutable facts recorded after command processing
 
 use super::types::{
-    CartItemSnapshot, ItemChanges, ItemModificationResult, LossReason, PaymentSummaryItem,
-    ServiceType, SplitItem, VoidType,
+    CartItemSnapshot, ItemChanges, ItemModificationResult, LossReason, PaymentRecord,
+    PaymentSummaryItem, ServiceType, SplitItem, VoidType,
 };
 use serde::{Deserialize, Serialize};
 
@@ -283,7 +283,15 @@ pub enum EventPayload {
         source_table_name: String,
         target_table_id: String,
         target_table_name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        target_zone_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        target_zone_name: Option<String>,
         items: Vec<CartItemSnapshot>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_name: Option<String>,
     },
 
     OrderMovedOut {
@@ -291,12 +299,26 @@ pub enum EventPayload {
         target_table_name: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_name: Option<String>,
     },
 
     OrderMerged {
         source_table_id: String,
         source_table_name: String,
         items: Vec<CartItemSnapshot>,
+        payments: Vec<PaymentRecord>,
+        paid_item_quantities: std::collections::HashMap<String, i32>,
+        paid_amount: f64,
+        has_amount_split: bool,
+        aa_total_shares: Option<i32>,
+        aa_paid_shares: i32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_name: Option<String>,
     },
 
     OrderMergedOut {
@@ -304,6 +326,10 @@ pub enum EventPayload {
         target_table_name: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_name: Option<String>,
     },
 
     TableReassigned {

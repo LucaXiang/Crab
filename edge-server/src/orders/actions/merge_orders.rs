@@ -15,6 +15,8 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 pub struct MergeOrdersAction {
     pub source_order_id: String,
     pub target_order_id: String,
+    pub authorizer_id: Option<String>,
+    pub authorizer_name: Option<String>,
 }
 
 #[async_trait]
@@ -104,6 +106,8 @@ impl CommandHandler for MergeOrdersAction {
                 target_table_id: target_table_id.clone(),
                 target_table_name: target_table_name.clone(),
                 reason: None,
+                authorizer_id: self.authorizer_id.clone(),
+                authorizer_name: self.authorizer_name.clone(),
             },
         );
 
@@ -120,6 +124,14 @@ impl CommandHandler for MergeOrdersAction {
                 source_table_id,
                 source_table_name,
                 items: source_snapshot.items.clone(),
+                payments: source_snapshot.payments.clone(),
+                paid_item_quantities: source_snapshot.paid_item_quantities.clone(),
+                paid_amount: source_snapshot.paid_amount,
+                has_amount_split: source_snapshot.has_amount_split,
+                aa_total_shares: source_snapshot.aa_total_shares,
+                aa_paid_shares: source_snapshot.aa_paid_shares,
+                authorizer_id: self.authorizer_id.clone(),
+                authorizer_name: self.authorizer_name.clone(),
             },
         );
 
@@ -195,6 +207,8 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "source-1".to_string(),
             target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -224,11 +238,16 @@ mod tests {
             source_table_id,
             source_table_name,
             items,
+            payments,
+            paid_amount,
+            ..
         } = &events[1].payload
         {
             assert_eq!(source_table_id, "dining_table:t1");
             assert_eq!(source_table_name, "Table 1");
             assert!(items.is_empty());
+            assert!(payments.is_empty());
+            assert_eq!(*paid_amount, 0.0);
         } else {
             panic!("Expected OrderMerged payload");
         }
@@ -253,18 +272,22 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "source-1".to_string(),
             target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
-        // Check items are included in OrderMerged event
-        if let EventPayload::OrderMerged { items, .. } = &events[1].payload {
+        // Check items and payment state are included in OrderMerged event
+        if let EventPayload::OrderMerged { items, payments, paid_amount, .. } = &events[1].payload {
             assert_eq!(items.len(), 2);
             assert_eq!(items[0].instance_id, "item-1");
             assert_eq!(items[0].name, "Coffee");
             assert_eq!(items[1].instance_id, "item-2");
             assert_eq!(items[1].name, "Tea");
+            assert!(payments.is_empty());
+            assert_eq!(*paid_amount, 0.0);
         } else {
             panic!("Expected OrderMerged payload");
         }
@@ -284,6 +307,8 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "nonexistent".to_string(),
             target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -306,6 +331,8 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "source-1".to_string(),
             target_order_id: "nonexistent".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -331,6 +358,8 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "source-1".to_string(),
             target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -356,6 +385,8 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "source-1".to_string(),
             target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -381,6 +412,8 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "source-1".to_string(),
             target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -406,6 +439,8 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "source-1".to_string(),
             target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -431,6 +466,8 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "source-1".to_string(),
             target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -453,6 +490,8 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "order-1".to_string(),
             target_order_id: "order-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -477,6 +516,8 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "source-1".to_string(),
             target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -503,6 +544,8 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "source-1".to_string(),
             target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = CommandMetadata {
@@ -544,6 +587,8 @@ mod tests {
         let action = MergeOrdersAction {
             source_order_id: "source-1".to_string(),
             target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
         };
 
         let metadata = create_test_metadata();
@@ -565,11 +610,15 @@ mod tests {
         if let EventPayload::OrderMerged {
             source_table_id,
             source_table_name,
+            payments,
+            paid_amount,
             ..
         } = &events[1].payload
         {
             assert_eq!(source_table_id, "");
             assert_eq!(source_table_name, "");
+            assert!(payments.is_empty());
+            assert_eq!(*paid_amount, 0.0);
         } else {
             panic!("Expected OrderMerged payload");
         }
