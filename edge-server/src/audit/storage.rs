@@ -373,9 +373,39 @@ impl AuditStorage {
     }
 }
 
+/// 规范化 JSON Value — 将 SurrealDB 浮点退化的整数还原为 i64
+///
+/// SurrealDB 内部将所有数字存为 float，读出后 `5` 变成 `5.0`。
+/// 此函数确保 `5.0` → `5`（无小数部分时），使序列化结果在写入和读出时一致。
+fn normalize_json(value: &serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::Number(n) => {
+            // 如果是浮点且无小数部分，转为整数
+            if let Some(f) = n.as_f64() {
+                if f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 {
+                    return serde_json::Value::Number(serde_json::Number::from(f as i64));
+                }
+            }
+            value.clone()
+        }
+        serde_json::Value::Object(map) => {
+            let normalized: serde_json::Map<String, serde_json::Value> = map
+                .iter()
+                .map(|(k, v)| (k.clone(), normalize_json(v)))
+                .collect();
+            serde_json::Value::Object(normalized)
+        }
+        serde_json::Value::Array(arr) => {
+            serde_json::Value::Array(arr.iter().map(normalize_json).collect())
+        }
+        _ => value.clone(),
+    }
+}
+
 /// 计算审计条目的 SHA256 哈希
 ///
 /// 包含所有关键字段，任何修改都会导致哈希不匹配。
+/// details 经过 normalize_json 规范化，消除 SurrealDB 数值精度漂移。
 #[allow(clippy::too_many_arguments)]
 fn compute_audit_hash(
     prev_hash: &str,
@@ -395,7 +425,8 @@ fn compute_audit_hash(
     hasher.update(resource_type.as_bytes());
     hasher.update(resource_id.as_bytes());
     hasher.update(operator_id.unwrap_or("system").as_bytes());
-    let details_json = serde_json::to_string(details).unwrap_or_default();
+    let normalized = normalize_json(details);
+    let details_json = serde_json::to_string(&normalized).unwrap_or_default();
     hasher.update(details_json.as_bytes());
     format!("{:x}", hasher.finalize())
 }
