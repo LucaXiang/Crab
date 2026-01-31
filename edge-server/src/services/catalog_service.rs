@@ -65,9 +65,10 @@ fn default_true() -> bool {
 /// Product metadata for price rule matching and tax calculation
 #[derive(Debug, Clone, Default)]
 pub struct ProductMeta {
-    pub category_id: String, // "category:xxx"
-    pub tags: Vec<String>,   // ["tag:xxx", ...]
-    pub tax_rate: i32,       // Tax rate percentage (e.g., 21 for 21% IVA)
+    pub category_id: String,   // "category:xxx"
+    pub category_name: String, // e.g. "饮品"
+    pub tags: Vec<String>,     // ["tag:xxx", ...]
+    pub tax_rate: i32,         // Tax rate percentage (e.g., 21 for 21% IVA)
 }
 
 /// Kitchen print configuration (computed result with fallback chain applied)
@@ -917,24 +918,36 @@ impl CatalogService {
     /// Get product metadata for price rule matching
     pub fn get_product_meta(&self, product_id: &str) -> Option<ProductMeta> {
         let cache = self.products.read();
-        cache.get(product_id).map(|p| ProductMeta {
-            category_id: p.category.to_string(),
-            tags: p.tags.iter().filter_map(|t| t.id.as_ref()).map(|t| t.to_string()).collect(),
-            tax_rate: p.tax_rate,
+        cache.get(product_id).map(|p| {
+            let category_id = p.category.to_string();
+            let category_name = {
+                let cat_cache = self.categories.read();
+                cat_cache.get(&category_id).map(|c| c.name.clone()).unwrap_or_default()
+            };
+            ProductMeta {
+                category_id,
+                category_name,
+                tags: p.tags.iter().filter_map(|t| t.id.as_ref()).map(|t| t.to_string()).collect(),
+                tax_rate: p.tax_rate,
+            }
         })
     }
 
     /// Get product metadata for multiple products
     pub fn get_product_meta_batch(&self, product_ids: &[String]) -> HashMap<String, ProductMeta> {
         let cache = self.products.read();
+        let cat_cache = self.categories.read();
         product_ids
             .iter()
             .filter_map(|id| {
                 cache.get(id).map(|p| {
+                    let category_id = p.category.to_string();
+                    let category_name = cat_cache.get(&category_id).map(|c| c.name.clone()).unwrap_or_default();
                     (
                         id.clone(),
                         ProductMeta {
-                            category_id: p.category.to_string(),
+                            category_id,
+                            category_name,
                             tags: p.tags.iter().filter_map(|t| t.id.as_ref()).map(|t| t.to_string()).collect(),
                             tax_rate: p.tax_rate,
                         },

@@ -433,11 +433,12 @@ impl OrderArchiveService {
                     surcharge_amount = $item{}_surcharge_amount,
                     tax = $item{}_tax,
                     tax_rate = $item{}_tax_rate,
-                    note = $item{}_note;
+                    note = $item{}_note,
+                    category_name = $item{}_category_name;
                 RELATE ($order[0].id)->has_item->({}[0].id);
                 "#,
                 var_name,
-                i, i, i, i, i, i, i, i, i, i, i, i, i, i,
+                i, i, i, i, i, i, i, i, i, i, i, i, i, i, i,
                 var_name
             ));
 
@@ -574,7 +575,8 @@ impl OrderArchiveService {
                 .bind((format!("item{}_surcharge_amount", i), total_surcharge))
                 .bind((format!("item{}_tax", i), item.tax.unwrap_or(0.0)))
                 .bind((format!("item{}_tax_rate", i), item.tax_rate.unwrap_or(0)))
-                .bind((format!("item{}_note", i), item.note.clone()));
+                .bind((format!("item{}_note", i), item.note.clone()))
+                .bind((format!("item{}_category_name", i), item.category_name.clone()));
 
             // Bind option fields
             if let Some(options) = &item.selected_options {

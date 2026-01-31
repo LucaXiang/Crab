@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { Overview } from './components/Overview';
 import { SalesReport } from './components/SalesReport';
 import { DailyReportManagement } from '@/features/daily-report/DailyReportManagement';
+import { AuditLog } from './components/AuditLog';
 import { TimeRange, ActiveTab, StatisticsResponse } from '@/core/domain/types';
 import { invokeApi } from '@/infrastructure/api/tauri-client';
 
@@ -94,6 +95,7 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
               {activeTab === 'daily_report' && t('statistics.sidebar.daily_report')}
               {activeTab === 'products' && t('statistics.report.product')}
               {activeTab === 'categories' && t('statistics.report.category')}
+              {activeTab === 'audit_log' && t('statistics.sidebar.audit_log')}
             </h1>
 
             <div className="flex items-center gap-3">
@@ -154,6 +156,10 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
 
           {activeTab === 'daily_report' && (
             <DailyReportManagement />
+          )}
+
+          {activeTab === 'audit_log' && (
+            <AuditLog />
           )}
 
           {(activeTab === 'products' || activeTab === 'categories') && (

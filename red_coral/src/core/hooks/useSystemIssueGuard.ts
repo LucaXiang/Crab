@@ -72,7 +72,7 @@ export function useSystemIssueGuard() {
       if (!isMounted) return;
       const msg = event.payload;
       // 监听 sync 事件: 当 system_issue 资源变更时 refetch
-      if (msg.event_type.toLowerCase() === 'sync') {
+      if (msg.event_type === 'sync') {
         try {
           const sync = (typeof msg.payload === 'string'
             ? JSON.parse(msg.payload)

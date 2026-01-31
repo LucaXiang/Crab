@@ -117,6 +117,9 @@ pub struct CartItemSnapshot {
     /// Authorizer name snapshot
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authorizer_name: Option<String>,
+    /// Category name snapshot (for statistics)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category_name: Option<String>,
 }
 
 /// Cart item input - for adding items (without instance_id)
@@ -414,6 +417,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_name: None,
         };
 
         assert_eq!(item.manual_discount_percent, Some(10.0));

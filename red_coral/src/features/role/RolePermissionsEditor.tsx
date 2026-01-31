@@ -145,7 +145,7 @@ export const RolePermissionsEditor: React.FC = () => {
       // 3. Get permissions for each role
       const rolePerms: Record<string, string[]> = {};
       for (const role of rolesList) {
-        const permsData = await invokeApi<RolePermissionListData>('get_role_permissions', { role_id: role.id });
+        const permsData = await invokeApi<RolePermissionListData>('get_role_permissions', { roleId: role.id });
         // Extract permission strings from RolePermission objects
         rolePerms[role.name] = permsData?.permissions?.map(p => p.permission) || [];
       }

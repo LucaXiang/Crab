@@ -185,6 +185,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_name: None,
         }
     }
 

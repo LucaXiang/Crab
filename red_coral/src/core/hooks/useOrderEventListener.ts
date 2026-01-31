@@ -55,7 +55,7 @@ export function useOrderEventListener() {
     try {
       // Fetch all active orders from server
       const response = await invokeApi<SyncResponse>('order_sync_since', {
-        since_sequence: 0,
+        sinceSequence: 0,
       });
 
       // Full sync with server state (including events for timeline and server_epoch)
@@ -139,7 +139,7 @@ export function useOrderSyncActions() {
 
     try {
       const response = await invokeApi<SyncResponse>('order_sync_since', {
-        since_sequence: 0, // Always full sync (Server Authority Model)
+        sinceSequence: 0, // Always full sync (Server Authority Model)
       });
 
       store._fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
@@ -216,7 +216,7 @@ export function useOrderTimelineSync() {
       try {
         const response = await invokeApi<OrderEventsResponse>(
           'order_get_events_for_order',
-          { order_id: orderId }
+          { orderId: orderId }
         );
 
         // 检查组件是否仍然挂载

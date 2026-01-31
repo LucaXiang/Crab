@@ -457,6 +457,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_name: None,
         };
         snapshot.items.push(item);
         snapshot.total = 100.0;
@@ -523,6 +524,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_name: None,
         };
         snapshot.items.push(item.clone());
 
@@ -595,6 +597,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_name: None,
         };
         snapshot.items.push(modified_item);
 
@@ -621,6 +624,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_name: None,
         };
 
         let mut payment = create_payment_record("split-pay-1", "CASH", 20.0);
@@ -699,6 +703,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_name: None,
         };
         snapshot.items.push(item);
 

@@ -94,7 +94,7 @@ async function handleGapDetectedSync(): Promise<void> {
   try {
     // 请求全量同步
     const response = await invokeApi<SyncResponse>('order_sync_since', {
-      since_sequence: 0,
+      sinceSequence: 0,
     });
 
     if (response) {
@@ -123,8 +123,8 @@ export function useSyncListener() {
     listen<ServerMessageEvent>('server-message', async (event) => {
       const message = event.payload;
 
-      // Only handle Sync type messages (case-insensitive)
-      if (message.event_type.toLowerCase() !== 'sync') return;
+      // Only handle Sync type messages
+      if (message.event_type !== 'sync') return;
 
       // 检查是否为 WiFi 丢包恢复消息
       if (isLaggedPayload(message.payload)) {
@@ -140,7 +140,7 @@ export function useSyncListener() {
         try {
           // 请求从 sequence 0 开始的全量同步
           const response = await invokeApi<SyncResponse>('order_sync_since', {
-            since_sequence: 0,
+            sinceSequence: 0,
           });
 
           if (response) {

@@ -82,7 +82,7 @@ export const OrderDebug: React.FC = () => {
     setIsLoading(true);
     try {
       const response = await invokeApi<SyncResponse>('order_sync_since', {
-        since_sequence: 0,
+        sinceSequence: 0,
       });
       _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);
       toast.success(`同步完成: ${response.active_orders.length} 个订单`);

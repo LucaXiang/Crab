@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 
 use super::{BaseRepository, RepoResult};
+use crate::db::models::serde_helpers;
 use serde::{Deserialize, Serialize};
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
@@ -13,6 +14,7 @@ use surrealdb::Surreal;
 /// SurrealDB system_issue 记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemIssueRow {
+    #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<surrealdb::RecordId>,
     pub source: String,
     pub kind: String,

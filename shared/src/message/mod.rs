@@ -17,6 +17,7 @@ pub const PROTOCOL_VERSION: u16 = 2;
 
 /// 简化消息总线事件类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EventType {
     /// 握手消息
     Handshake = 0,

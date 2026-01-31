@@ -148,6 +148,9 @@ DEFINE FIELD OVERWRITE tax_rate ON order_item TYPE int
 DEFINE FIELD OVERWRITE note ON order_item TYPE option<string>
     PERMISSIONS FULL;
 
+DEFINE FIELD OVERWRITE category_name ON order_item TYPE option<string>
+    PERMISSIONS FULL;
+
 DEFINE INDEX OVERWRITE order_item_spec ON order_item FIELDS spec;
 DEFINE INDEX OVERWRITE order_item_instance ON order_item FIELDS instance_id;
 

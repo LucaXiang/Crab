@@ -131,6 +131,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_name: None,
         }
     }
 
@@ -329,6 +330,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_name: None,
         }];
         storage.store_snapshot(&txn, &snapshot).unwrap();
 

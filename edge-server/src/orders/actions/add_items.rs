@@ -101,8 +101,9 @@ impl CommandHandler for AddItemsAction {
 
                 let mut snapshot = input_to_snapshot_with_rules(item, &rules_refs, category_id, tags);
 
-                // Set tax_rate from product metadata
+                // Set tax_rate and category_name from product metadata
                 snapshot.tax_rate = meta.map(|m| m.tax_rate);
+                snapshot.category_name = meta.map(|m| m.category_name.clone()).filter(|s| !s.is_empty());
 
                 info!(
                     item_idx = idx,

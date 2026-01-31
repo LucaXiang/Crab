@@ -38,7 +38,7 @@ export const useHistoryOrderDetail = (order_id: string | null): UseHistoryOrderD
     try {
       // Backend returns ArchivedOrderDetail directly via graph traversal
       const detail = await invokeApi<ArchivedOrderDetail>('fetch_order_detail', {
-        order_id,
+        orderId: order_id,
       });
 
       logger.debug('Loaded archived order from SurrealDB', {

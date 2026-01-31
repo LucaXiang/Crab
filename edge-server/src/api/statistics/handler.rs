@@ -336,7 +336,7 @@ pub async fn get_statistics(
 
     // Query for revenue trend (hourly for today, daily for week/month)
     let trend_query = if query.time_range == "today" {
-        // Hourly trend (convert millis to datetime for time::format)
+        // Hourly trend: group by hour bucket
         r#"
             SELECT
                 time::format(<datetime>(end_time / 1000), '%H:00') AS time,
@@ -345,11 +345,11 @@ pub async fn get_statistics(
             WHERE status = 'COMPLETED'
             AND end_time >= $start
             AND end_time < $end
-            GROUP BY time::format(<datetime>(end_time / 1000), '%H:00')
+            GROUP BY time
             ORDER BY time
         "#
     } else {
-        // Daily trend (convert millis to datetime for time::format)
+        // Daily trend: group by date bucket
         r#"
             SELECT
                 time::format(<datetime>(end_time / 1000), '%m-%d') AS time,
@@ -358,8 +358,8 @@ pub async fn get_statistics(
             WHERE status = 'COMPLETED'
             AND end_time >= $start
             AND end_time < $end
-            GROUP BY time::format(<datetime>(end_time / 1000), '%Y-%m-%d')
-            ORDER BY time::format(<datetime>(end_time / 1000), '%Y-%m-%d')
+            GROUP BY time
+            ORDER BY time
         "#
     };
 
@@ -384,11 +384,11 @@ pub async fn get_statistics(
             );
 
             SELECT
-                out.category_name AS name,
+                (out.category_name OR "未分类") AS name,
                 math::sum(out.line_total) AS value
             FROM has_item
             WHERE in IN $completed_ids
-            GROUP BY out.category_name
+            GROUP BY name
             ORDER BY value DESC
             LIMIT 10
         "#)
@@ -403,7 +403,7 @@ pub async fn get_statistics(
         value: f64,
     }
 
-    let category_raw: Vec<CategoryRaw> = category_result.take(0)
+    let category_raw: Vec<CategoryRaw> = category_result.take(1)
         .map_err(crate::db::repository::surreal_err_to_app)?;
 
     let category_sales: Vec<CategorySale> = category_raw
@@ -442,7 +442,7 @@ pub async fn get_statistics(
         .await
         .map_err(crate::db::repository::surreal_err_to_app)?;
 
-    let top_products: Vec<TopProduct> = product_result.take(0)
+    let top_products: Vec<TopProduct> = product_result.take(1)
         .map_err(crate::db::repository::surreal_err_to_app)?;
 
     Ok(Json(StatisticsResponse {
@@ -513,7 +513,8 @@ pub async fn get_sales_report(
                 receipt_number,
                 time::format(<datetime>(end_time / 1000), '%Y-%m-%d %H:%M') AS date,
                 total_amount AS total,
-                string::uppercase(status) AS status
+                string::uppercase(status) AS status,
+                end_time
             FROM order
             WHERE end_time >= $start
             AND end_time < $end

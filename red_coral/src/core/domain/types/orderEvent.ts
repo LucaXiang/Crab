@@ -747,6 +747,8 @@ export interface CartItemSnapshot {
   note?: string | null;
   authorizer_id?: string | null;
   authorizer_name?: string | null;
+  /** Category name snapshot (for statistics) */
+  category_name?: string | null;
   /** Internal: marks item as removed for soft delete */
   _removed?: boolean;
 }

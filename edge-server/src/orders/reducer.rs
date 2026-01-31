@@ -203,6 +203,7 @@ pub fn input_to_snapshot_with_rules(
         note: input.note.clone(),
         authorizer_id: input.authorizer_id.clone(),
         authorizer_name: input.authorizer_name.clone(),
+        category_name: None,
     }
 }
 

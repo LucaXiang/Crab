@@ -75,10 +75,10 @@ export function useOrderSync() {
   /**
    * Request sync from server
    */
-  const syncOrders = useCallback(async (since_sequence: number): Promise<SyncResponse | null> => {
+  const syncOrders = useCallback(async (sinceSequence: number): Promise<SyncResponse | null> => {
     try {
       const response = await invokeApi<SyncResponse>('order_sync_since', {
-        since_sequence,
+        sinceSequence,
       });
       return response;
     } catch (err: unknown) {
@@ -280,7 +280,7 @@ export async function setupOrderEventListeners(): Promise<() => void> {
       try {
         // Always full sync (Server Authority Model)
         const response = await invokeApi<SyncResponse>('order_sync_since', {
-          since_sequence: 0,
+          sinceSequence: 0,
         });
 
         _fullSync(response.active_orders, response.server_sequence, response.server_epoch, response.events);

@@ -233,6 +233,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_name: None,
         });
         snapshot.subtotal = 20.0;
         snapshot.total = 20.0;

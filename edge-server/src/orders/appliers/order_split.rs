@@ -277,6 +277,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_name: None,
             tax: None,
             tax_rate: None,
         };
@@ -300,6 +301,7 @@ mod tests {
             note: None,
             authorizer_id: None,
             authorizer_name: None,
+            category_name: None,
             tax: None,
             tax_rate: None,
         };

@@ -7,7 +7,8 @@ import {
   ShoppingCart,
   PieChart as PieChartIcon,
   Calendar,
-  FileText
+  FileText,
+  ShieldCheck
 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { ActiveTab } from '@/core/domain/types';
@@ -70,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'daily_report' as const, icon: FileText, label: t('statistics.sidebar.daily_report') },
     { id: 'products' as const, icon: ShoppingCart, label: t('statistics.report.product') },
     { id: 'categories' as const, icon: PieChartIcon, label: t('statistics.report.category') },
+    { id: 'audit_log' as const, icon: ShieldCheck, label: t('statistics.sidebar.audit_log') },
   ];
 
   return (
