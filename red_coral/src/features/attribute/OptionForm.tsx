@@ -108,6 +108,7 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
           kitchen_print_name: data.kitchenPrintName?.trim() || undefined,
           price_modifier: data.priceModifier,
           display_order: data.displayOrder,
+          is_active: true,
         });
       },
       onUpdate: async (data) => {

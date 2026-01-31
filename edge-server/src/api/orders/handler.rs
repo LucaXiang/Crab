@@ -244,34 +244,10 @@ pub async fn fetch_order_list(
         )
     };
 
-    // Query 1: Get total count
-    let count_query = format!("SELECT count() FROM order {} GROUP ALL", where_clause);
-    let mut count_result = if let Some(ref search) = search_bind {
-        state.db
-            .query(&count_query)
-            .bind(("start", start_millis))
-            .bind(("end", end_millis))
-            .bind(("search", search.clone()))
-            .await
-    } else {
-        state.db
-            .query(&count_query)
-            .bind(("start", start_millis))
-            .bind(("end", end_millis))
-            .await
-    }.map_err(crate::db::repository::surreal_err_to_app)?;
-
-    #[derive(Deserialize)]
-    struct CountResult {
-        count: i64,
-    }
-    let total: i64 = count_result
-        .take::<Option<CountResult>>(0)
-        .map_err(crate::db::repository::surreal_err_to_app)?
-        .map(|r| r.count)
-        .unwrap_or(0);
-
-    // Query 2: Get paginated results (graph model format)
+    // Fetch all sorted results, paginate in Rust.
+    // Workaround: SurrealDB Rust SDK embedded mode (kv-rocksdb) has a bug where
+    // LIMIT drops the first record when combined with computed fields like <string>id.
+    // The dataset is bounded by time range (typically 7 days), so in-memory pagination is fine.
     let data_query = format!(
         "SELECT \
          <string>id AS order_id, \
@@ -286,7 +262,7 @@ pub async fn fetch_order_list(
          void_type, \
          loss_reason, \
          loss_amount \
-         FROM order {} ORDER BY end_time DESC, id DESC LIMIT $limit START $offset",
+         FROM order {} ORDER BY end_time DESC, start_time DESC",
         where_clause
     );
     let mut data_result = if let Some(ref search) = search_bind {
@@ -295,20 +271,22 @@ pub async fn fetch_order_list(
             .bind(("start", start_millis))
             .bind(("end", end_millis))
             .bind(("search", search.clone()))
-            .bind(("limit", limit))
-            .bind(("offset", offset))
             .await
     } else {
         state.db
             .query(&data_query)
             .bind(("start", start_millis))
             .bind(("end", end_millis))
-            .bind(("limit", limit))
-            .bind(("offset", offset))
             .await
     }.map_err(crate::db::repository::surreal_err_to_app)?;
 
-    let orders: Vec<OrderSummary> = data_result.take(0).map_err(crate::db::repository::surreal_err_to_app)?;
+    let all_orders: Vec<OrderSummary> = data_result.take(0).map_err(crate::db::repository::surreal_err_to_app)?;
+    let total = all_orders.len() as i64;
+    let orders: Vec<OrderSummary> = all_orders
+        .into_iter()
+        .skip(offset as usize)
+        .take(limit as usize)
+        .collect();
 
     Ok(Json(OrderListResponse {
         orders,

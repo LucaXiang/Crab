@@ -4,7 +4,7 @@ use axum::{
     Json,
     extract::{Query, State},
 };
-use chrono::{Local, NaiveTime, Duration, Datelike};
+use chrono::{NaiveTime, Duration, Datelike};
 use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
@@ -126,8 +126,9 @@ fn calculate_time_range(
     cutoff: &str,
     custom_start: Option<&str>,
     custom_end: Option<&str>,
+    tz: chrono_tz::Tz,
 ) -> (i64, i64) {
-    let now = Local::now();
+    let now = chrono::Utc::now().with_timezone(&tz);
 
     // Parse cutoff time (e.g., "06:00")
     let cutoff_time = NaiveTime::parse_from_str(cutoff, "%H:%M")
@@ -246,6 +247,7 @@ pub async fn get_statistics(
         &cutoff,
         query.start_date.as_deref(),
         query.end_date.as_deref(),
+        state.config.timezone,
     );
 
     tracing::debug!(
@@ -473,39 +475,16 @@ pub async fn get_sales_report(
         &cutoff,
         query.start_date.as_deref(),
         query.end_date.as_deref(),
+        state.config.timezone,
     );
 
     let page = query.page.max(1);
     let page_size = 10;
     let offset = (page - 1) * page_size;
 
-    // Get total count
-    let mut count_result = state.db
-        .query(r#"
-            SELECT count() FROM order
-            WHERE end_time >= $start
-            AND end_time < $end
-            GROUP ALL
-        "#)
-        .bind(("start", start_dt))
-        .bind(("end", end_dt))
-        .await
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-
-    #[derive(Deserialize)]
-    struct CountResult {
-        count: i32,
-    }
-
-    let total: i32 = count_result
-        .take::<Option<CountResult>>(0)
-        .map_err(crate::db::repository::surreal_err_to_app)?
-        .map(|r| r.count)
-        .unwrap_or(0);
-
-    let total_pages = if total > 0 { (total + page_size - 1) / page_size } else { 1 };
-
-    // Get paginated orders
+    // Workaround: SurrealDB embedded mode (kv-rocksdb) drops the first record
+    // when LIMIT is combined with computed fields like <string>id on indexed fields.
+    // Dataset is bounded by time range, so in-memory pagination is fine.
     let mut data_result = state.db
         .query(r#"
             SELECT
@@ -519,17 +498,22 @@ pub async fn get_sales_report(
             WHERE end_time >= $start
             AND end_time < $end
             ORDER BY end_time DESC
-            LIMIT $limit START $offset
         "#)
         .bind(("start", start_dt))
         .bind(("end", end_dt))
-        .bind(("limit", page_size))
-        .bind(("offset", offset))
         .await
         .map_err(crate::db::repository::surreal_err_to_app)?;
 
-    let items: Vec<SalesReportItem> = data_result.take(0)
+    let all_items: Vec<SalesReportItem> = data_result.take(0)
         .map_err(crate::db::repository::surreal_err_to_app)?;
+
+    let total = all_items.len() as i32;
+    let total_pages = if total > 0 { (total + page_size - 1) / page_size } else { 1 };
+    let items: Vec<SalesReportItem> = all_items
+        .into_iter()
+        .skip(offset as usize)
+        .take(page_size as usize)
+        .collect();
 
     Ok(Json(SalesReportResponse {
         items,

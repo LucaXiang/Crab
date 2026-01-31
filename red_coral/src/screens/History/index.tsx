@@ -12,10 +12,21 @@ interface HistoryScreenProps {
   onOpenStatistics?: () => void;
 }
 
+// Sidebar layout constants (px)
+const SIDEBAR_HEADER = 120; // title row + search input + padding
+const SIDEBAR_FOOTER = 56; // "load more" button area
+const ORDER_ITEM_HEIGHT = 85; // average height per order card
+
 export const HistoryScreen: React.FC<HistoryScreenProps> = ({ isVisible, onBack, onOpenStatistics }) => {
 
+  // Compute pageSize from available sidebar height (once on mount)
+  const [pageSize] = useState(() => {
+    const listHeight = window.innerHeight - SIDEBAR_HEADER - SIDEBAR_FOOTER;
+    return Math.max(Math.ceil(listHeight / ORDER_ITEM_HEIGHT) + 2, 6);
+  });
+
   // Step 1: Load order list (summary only - lightweight)
-  const { orders, total, page, pageSize, setPage, search, setSearch, loading: listLoading } = useHistoryOrderList(6, isVisible);
+  const { orders, total, page, setPage, search, setSearch, loading: listLoading } = useHistoryOrderList(pageSize, isVisible);
 
   // Step 2: Track selected order key
   const [selectedID, setSelectedID] = useState<string | null>(null);
