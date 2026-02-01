@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Sliders, Check, Layers, Plus, X, Search, AlertCircle, Lock } from 'lucide-react';
 import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions, attributeHelpers } from './store';
+import { formatCurrency } from '@/utils/currency';
 
 interface ProductAttributesSectionProps {
   selectedAttributeIds: string[];
@@ -173,43 +174,42 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
             const isMulti = attr.is_multi_select;
             const defaultOptions = getDefaultOptions(attrId);
             const options = optionsMap.get(attrId) || [];
-            const hasDefault = defaultOptions.length > 0;
+            const isInherited = inheritedAttributeIds.includes(attrId);
 
             return (
-              <div key={attrId} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden group hover:border-teal-200 hover:shadow-md transition-all duration-200">
+              <div key={attrId} className="bg-white rounded-xl border border-gray-100 overflow-hidden group">
                 {/* Header */}
-                <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-800">{attr.name}</span>
-                    <span className="text-[0.625rem] px-1.5 py-0.5 rounded border bg-blue-50 text-blue-600 border-blue-100">
-                      {attr.is_multi_select ? t('settings.attribute.type.multi_select') : t('settings.attribute.type.single_select')}
+                <div className="px-3 py-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-semibold text-sm text-gray-800 truncate">{attr.name}</span>
+                    <span className="text-[0.6rem] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 shrink-0">
+                      {isMulti ? t('settings.attribute.type.multi_select') : t('settings.attribute.type.single_select')}
                     </span>
                   </div>
-                  {inheritedAttributeIds.includes(attrId) ? (
-                    <div className="text-gray-400 p-1" title={t('settings.product.attribute.inherited')}>
-                      <Lock size={16} />
+                  {isInherited ? (
+                    <div className="text-gray-300 p-0.5" title={t('settings.product.attribute.inherited')}>
+                      <Lock size={14} />
                     </div>
                   ) : (
                     <button
                       onClick={() => handleRemoveAttribute(attrId)}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50 opacity-0 group-hover:opacity-100"
+                      className="text-gray-300 hover:text-red-500 transition-colors p-0.5 rounded hover:bg-red-50 opacity-0 group-hover:opacity-100"
                       title={t('common.action.remove')}
                     >
-                      <X size={16} />
+                      <X size={14} />
                     </button>
                   )}
                 </div>
 
-                {/* Options Area */}
-                <div className="p-4">
+                {/* Options */}
+                <div className="px-3 pb-3">
                   {options.length === 0 ? (
-                    <div className="text-sm text-gray-400 italic py-2 text-center">{t('common.empty.no_data')}</div>
+                    <div className="text-xs text-gray-400 italic py-1.5 text-center">{t('common.empty.no_data')}</div>
                   ) : (
-                    <div className="flex flex-wrap gap-2 max-h-[13.75rem] overflow-y-auto custom-scrollbar content-start">
+                    <div className="flex flex-wrap gap-1.5">
                       {options.map((opt) => {
-                        // Use index as option identifier since AttributeOption doesn't have id
                         const optionKey = String(opt.index);
-                        const isSelected = defaultOptions.includes(optionKey);
+                        const isDefault = defaultOptions.includes(optionKey);
                         return (
                           <button
                             key={optionKey}
@@ -217,29 +217,26 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                               if (!onDefaultOptionChange) return;
                               let newDefaults: string[];
                               if (isMulti) {
-                                // Multi-select toggle
-                                newDefaults = isSelected
+                                newDefaults = isDefault
                                   ? defaultOptions.filter(id => id !== optionKey)
                                   : [...defaultOptions, optionKey];
                               } else {
-                                // Single-select toggle (click selected to unselect)
-                                newDefaults = isSelected ? [] : [optionKey];
+                                newDefaults = isDefault ? [] : [optionKey];
                               }
                               onDefaultOptionChange(attrId, newDefaults);
                             }}
                             className={`
-                              relative px-3 py-1.5 rounded-lg text-sm border font-medium transition-all duration-200 flex items-center gap-1.5
-                              ${isSelected
-                                ? 'bg-teal-500 text-white border-teal-600 shadow-sm ring-2 ring-teal-200 ring-offset-1'
-                                : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:bg-teal-50'
+                              px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1
+                              ${isDefault
+                                ? 'bg-teal-50 text-teal-700 border border-teal-300 ring-1 ring-teal-100'
+                                : 'bg-gray-50 text-gray-600 border border-gray-200 hover:border-teal-200 hover:bg-teal-50/50'
                               }
                             `}
                           >
-                            {isSelected && <Check size={12} strokeWidth={3} />}
                             {opt.name}
                             {opt.price_modifier !== 0 && (
-                              <span className={`text-[0.625rem] ml-0.5 ${isSelected ? 'text-teal-100' : 'text-gray-400'}`}>
-                                {opt.price_modifier > 0 ? '+' : ''}{opt.price_modifier}
+                              <span className={`text-[0.6rem] ${isDefault ? 'text-teal-500' : 'text-gray-400'}`}>
+                                {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
                               </span>
                             )}
                           </button>
@@ -247,25 +244,6 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                       })}
                     </div>
                   )}
-
-                  {/* Validation/Hint Status */}
-                  <div className="mt-3 flex items-center justify-between text-xs">
-                     <span className="text-gray-400">
-                        {isMulti ? (t('settings.product.attribute.hint.multi_select')) : (t('settings.product.attribute.hint.single_select'))}
-                     </span>
-                     {!hasDefault && (
-                       <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
-                         <AlertCircle size={10} />
-                         {t('settings.product.attribute.hint.no_default')}
-                       </span>
-                     )}
-                     {hasDefault && (
-                        <span className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
-                          <Check size={10} />
-                          {t('settings.product.attribute.hint.default_set')}
-                        </span>
-                     )}
-                  </div>
                 </div>
               </div>
             );

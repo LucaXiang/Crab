@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Check } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
@@ -74,6 +74,21 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
 }) => {
   const { t } = useI18n();
 
+  // Sort attributes by binding display_order, then by attribute display_order
+  const sortedAttributes = useMemo(() => {
+    return [...attributes].sort((a, b) => {
+      const bindA = bindings.find(bd => bd.out === a.id);
+      const bindB = bindings.find(bd => bd.out === b.id);
+      return (bindA?.display_order ?? a.display_order) - (bindB?.display_order ?? b.display_order);
+    });
+  }, [attributes, bindings]);
+
+  // Sort options by display_order
+  const getSortedOptions = useCallback((attrId: string) => {
+    const opts = allOptions.get(attrId) || [];
+    return [...opts].sort((a, b) => a.display_order - b.display_order);
+  }, [allOptions]);
+
   // Calculate options modifier locally since we have all the data
   const optionsModifier = useMemo(() => {
     let mod = 0;
@@ -90,7 +105,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
 
   if (!isOpen) return null;
 
-  const hasAttributes = attributes.length > 0;
+  const hasAttributes = sortedAttributes.length > 0;
   const hasSpecs = hasMultiSpec && specifications && specifications.length > 0;
   // If loading, we assume we might have attributes/specs, so keep layout wide or show spinner
   // If not loading and no attributes/specs, narrow layout
@@ -179,9 +194,9 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                   )}
 
                   {/* Attribute Selectors */}
-                  {hasAttributes && attributes.map((attr) => {
+                  {hasAttributes && sortedAttributes.map((attr) => {
                     const attrId = String(attr.id);
-                    const options = allOptions.get(attrId) || [];
+                    const options = getSortedOptions(attrId);
                     const selectedOptionIds = selections.get(attrId) || [];
                     // binding.to is the attribute ID in AttributeBinding relation
                     const binding = bindings?.find(b => b.out === attr.id);

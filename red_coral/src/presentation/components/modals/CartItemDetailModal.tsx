@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CartItem, Attribute, AttributeOption, ProductAttribute, ItemOption, EmbeddedSpec } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
-import { createTauriClient } from '@/infrastructure/api';
 import { useProductStore } from '@/features/product';
 import { toast } from '../Toast';
-
-const getApi = () => createTauriClient();
 import { ItemConfiguratorModal } from './ItemConfiguratorModal';
 
 interface CartItemDetailModalProps {
@@ -62,63 +59,25 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                  }
             }
 
-            // Extract attributes from ProductFull.attributes (AttributeBindingFull[])
+            // ProductFull.attributes 已包含产品直接绑定 + 分类继承属性
             const attrBindings = productFull?.attributes || [];
-
-            // Build set of product attribute IDs for deduplication
-            const productAttrIds = new Set(attrBindings.map(b => String(b.attribute.id)));
-
-            // Fetch category attributes (inherited)
-            let categoryAttributes: Attribute[] = [];
-            if (productFull.category) {
-                try {
-                    categoryAttributes = await getApi().listCategoryAttributes(productFull.category);
-                    // Filter out duplicates (product-level binding takes precedence)
-                    categoryAttributes = categoryAttributes.filter(
-                        attr => !productAttrIds.has(String(attr.id))
-                    );
-                } catch (err) {
-                    console.warn('Failed to load category attributes:', err);
-                }
-            }
-
-            // Extract Attribute objects directly (Attribute = Attribute)
-            const productAttributeList: Attribute[] = attrBindings.map(binding => binding.attribute);
-            // Merge: product attributes first, then category attributes (inherited)
-            const attributeList: Attribute[] = [...productAttributeList, ...categoryAttributes];
+            const attributeList: Attribute[] = attrBindings.map(b => b.attribute);
             setAttributes(attributeList);
 
-            // Convert AttributeBindingFull[] to ProductAttribute[] (AttributeBinding relation)
-            const productBindings: ProductAttribute[] = attrBindings.map(binding => ({
-              id: binding.id,
-              in: String(item.id),
+            const allBindings: ProductAttribute[] = attrBindings.map(binding => ({
+              id: binding.id ?? null,
+              in: binding.is_inherited ? productFull.category : String(item.id),
               out: String(binding.attribute.id),
               is_required: binding.is_required,
               display_order: binding.display_order,
+              default_option_indices: binding.default_option_indices,
               attribute: binding.attribute,
             }));
-            // Add category attributes as bindings (inherited, not required by default)
-            const categoryBindings: ProductAttribute[] = categoryAttributes.map((attr, idx) => ({
-              id: null, // No binding ID for inherited attributes
-              in: productFull.category,
-              out: String(attr.id),
-              is_required: false, // Category attributes are optional by default
-              display_order: 1000 + idx, // Place after product attributes
-              attribute: attr,
-            }));
-            setBindings([...productBindings, ...categoryBindings]);
+            setBindings(allBindings);
 
-            // Process options from attributes array (unified structure)
-            // Options are stored as arrays, the index IS the option ID
             const optionsMap = new Map<string, AttributeOption[]>();
             attrBindings.forEach(binding => {
                 const attr = binding.attribute;
-                if (attr.options && attr.options.length > 0) {
-                    optionsMap.set(String(attr.id), attr.options);
-                }
-            });
-            // Add category attribute options
-            categoryAttributes.forEach(attr => {
                 if (attr.options && attr.options.length > 0) {
                     optionsMap.set(String(attr.id), attr.options);
                 }
@@ -140,13 +99,15 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                  attributeList.forEach(attr => {
                      const attrId = String(attr.id);
                      if (!initialSelections.has(attrId)) {
-                         // Check defaults from attribute's default_option_indices
-                         if (attr.default_option_indices && attr.default_option_indices.length > 0) {
-                             const defaults = attr.default_option_indices.map(String);
+                         // Priority: binding override > attribute default
+                         const binding = allBindings.find(b => b.out === attrId);
+                         const defaults = binding?.default_option_indices ?? attr.default_option_indices;
+                         if (defaults && defaults.length > 0) {
+                             const defaultStrs = defaults.map(String);
                              if (!attr.is_multi_select) {
-                                 initialSelections.set(attrId, [defaults[0]]);
+                                 initialSelections.set(attrId, [defaultStrs[0]]);
                              } else {
-                                 initialSelections.set(attrId, defaults);
+                                 initialSelections.set(attrId, defaultStrs);
                              }
                          }
                      }

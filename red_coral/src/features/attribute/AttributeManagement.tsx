@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Plus, Edit, Trash2, ChevronRight, List, Star } from 'lucide-react';
+import { Settings, Plus, Edit, Trash2, ChevronRight, List, Star, ReceiptText, ChefHat } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -65,9 +65,12 @@ export const AttributeManagement: React.FC = React.memo(() => {
   );
 
   const filteredAttributes = React.useMemo(() => {
-    if (!searchQuery.trim()) return attributes;
-    const q = searchQuery.toLowerCase();
-    return attributes.filter(attr => attr.name.toLowerCase().includes(q));
+    let list = [...attributes].sort((a, b) => a.display_order - b.display_order);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(attr => attr.name.toLowerCase().includes(q));
+    }
+    return list;
   }, [attributes, searchQuery]);
 
   // Load attributes on mount
@@ -255,7 +258,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
             {filteredAttributes.map((attr) => {
               const attrId = String(attr.id);
               const isExpanded = expandedAttributes.has(attrId);
-              const options = allOptions.get(attrId) || [];
+              const options = [...(allOptions.get(attrId) || [])].sort((a, b) => a.display_order - b.display_order);
 
               return (
                 <div
@@ -276,7 +279,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
 
                         {/* Attribute Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h3 className={`font-medium text-sm md:text-base ${isExpanded ? 'text-teal-900' : 'text-gray-900'}`}>
                               {attr.name}
                             </h3>
@@ -288,10 +291,21 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                 {t('common.status.inactive')}
                               </span>
                             )}
-                            <span className="text-xs text-gray-400 flex items-center gap-1">
-                              <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-                              {attr.options?.length ?? 0} {t('settings.attribute.option.title')}
+                            <span className="text-xs text-gray-400">
+                              · {attr.options?.length ?? 0} {t('settings.attribute.option.title')}
                             </span>
+                            {attr.show_on_receipt && (
+                              <span className="text-xs text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <ReceiptText size={10} />
+                                {attr.receipt_name || t('settings.attribute.show_on_receipt')}
+                              </span>
+                            )}
+                            {attr.show_on_kitchen_print && (
+                              <span className="text-xs text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <ChefHat size={10} />
+                                {attr.kitchen_print_name || t('settings.attribute.show_on_kitchen_print')}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -329,93 +343,108 @@ export const AttributeManagement: React.FC = React.memo(() => {
 
                   {/* Options List (Expanded) */}
                   {isExpanded && (
-                    <div className="border-t border-gray-100 bg-gray-50/30 shadow-inner">
+                    <div className="border-t border-gray-100 bg-gray-50/30">
                       {options.length === 0 ? (
-                        <div className="p-8 text-sm text-gray-400 text-center flex flex-col items-center justify-center border-dashed border-2 border-gray-100 m-4 rounded-xl">
-                          <span className="mb-2 block text-gray-300"><List size={24} /></span>
+                        <div className="p-6 text-sm text-gray-400 text-center flex flex-col items-center justify-center border-dashed border-2 border-gray-100 m-3 rounded-xl">
+                          <span className="mb-1.5 block text-gray-300"><List size={20} /></span>
                           {t('common.empty.no_data')}
                           <button
                             onClick={(e) => handleAddOption(attrId, e)}
-                            className="mt-2 text-teal-600 hover:text-teal-700 font-medium text-xs hover:underline"
+                            className="mt-1.5 text-teal-600 hover:text-teal-700 font-medium text-xs hover:underline"
                           >
                             {t('settings.attribute.option.hint.add_first')}
                           </button>
                         </div>
                       ) : (
-                        <div className="divide-y divide-gray-100/50">
+                        <div className="py-1.5 px-3">
                           {options.map((option) => {
-                            // Check if this option is one of the defaults
                             const isDefault = attr.default_option_indices?.includes(option.index) ?? false;
+                            const hasPriceMod = option.price_modifier !== 0;
                             return (
-                            <div
-                              key={option.index}
-                              className="p-3 pl-12 hover:bg-white transition-colors group/opt relative"
-                            >
-                              <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-transparent group-hover/opt:bg-teal-400 transition-colors"></div>
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-medium text-gray-700 text-sm">{option.name}</span>
-                                    {isDefault && (
-                                      <span className="text-[0.625rem] uppercase tracking-wider bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded border border-teal-200/50">
-                                        {t('common.label.default')}
-                                      </span>
-                                    )}
-                                    {!option.is_active && (
-                                      <span className="text-[0.625rem] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
-                                        {t('common.status.inactive')}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                              <div
+                                key={option.index}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg my-0.5 group/opt transition-colors ${
+                                  isDefault ? 'bg-amber-50/60' : 'hover:bg-white'
+                                }`}
+                              >
+                                {/* Default star */}
+                                <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
+                                  <button
+                                    onClick={(e) => handleToggleDefault(attr, option.index, e)}
+                                    className={`shrink-0 p-0.5 rounded transition-colors ${
+                                      isDefault
+                                        ? 'text-amber-500 hover:text-amber-600'
+                                        : 'text-gray-300 hover:text-amber-400'
+                                    }`}
+                                    title={isDefault ? t('settings.attribute.option.unset_default') : t('settings.attribute.option.set_default')}
+                                  >
+                                    <Star size={14} fill={isDefault ? 'currentColor' : 'none'} />
+                                  </button>
+                                </ProtectedGate>
+
+                                {/* Option name */}
+                                <span className={`text-sm font-medium min-w-0 truncate ${isDefault ? 'text-gray-800' : 'text-gray-700'}`}>
+                                  {option.name}
+                                </span>
+
+                                {/* Price modifier (only non-zero) */}
+                                {hasPriceMod && (
                                   <span
-                                    className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                                    className={`text-xs font-semibold px-1.5 py-0.5 rounded-md shrink-0 ${
                                       option.price_modifier > 0
-                                        ? 'bg-orange-50 text-orange-700 border-orange-100'
-                                        : option.price_modifier < 0
-                                        ? 'bg-green-50 text-green-700 border-green-100'
-                                        : 'bg-gray-50 text-gray-500 border-gray-100'
+                                        ? 'bg-orange-50 text-orange-600 border border-orange-100'
+                                        : 'bg-green-50 text-green-600 border border-green-100'
                                     }`}
                                   >
-                                    {option.price_modifier > 0 && '+'}
-                                    {formatCurrency(option.price_modifier)}
+                                    {option.price_modifier > 0 ? '+' : ''}{formatCurrency(option.price_modifier)}
                                   </span>
-                                </div>
-                                </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
-                                    <button
-                                      onClick={(e) => handleToggleDefault(attr, option.index, e)}
-                                      className={`p-1.5 rounded-lg transition-colors ${
-                                        isDefault
-                                          ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-50'
-                                          : 'text-gray-300 hover:text-amber-500 hover:bg-amber-50 opacity-0 group-hover/opt:opacity-100'
-                                      }`}
-                                      title={isDefault ? t('settings.attribute.option.unset_default') : t('settings.attribute.option.set_default')}
-                                    >
-                                      <Star size={14} fill={isDefault ? 'currentColor' : 'none'} />
-                                    </button>
-                                  </ProtectedGate>
+                                )}
+
+                                {/* Inactive badge */}
+                                {!option.is_active && (
+                                  <span className="text-[0.625rem] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded shrink-0">
+                                    {t('common.status.inactive')}
+                                  </span>
+                                )}
+
+                                {/* Spacer */}
+                                <div className="flex-1" />
+
+                                {/* ReceiptText / Kitchen print names */}
+                                {option.receipt_name && (
+                                  <span className="text-xs text-blue-500 flex items-center gap-0.5 shrink-0" title={t('settings.attribute.option.receipt_name')}>
+                                    <ReceiptText size={10} />
+                                    {option.receipt_name}
+                                  </span>
+                                )}
+                                {option.kitchen_print_name && (
+                                  <span className="text-xs text-purple-500 flex items-center gap-0.5 shrink-0" title={t('settings.attribute.option.kitchen_print_name')}>
+                                    <ChefHat size={10} />
+                                    {option.kitchen_print_name}
+                                  </span>
+                                )}
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/opt:opacity-100 transition-opacity">
                                   <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
                                     <button
                                       onClick={(e) => handleEditOption(option, e)}
-                                      className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors opacity-0 group-hover/opt:opacity-100"
+                                      className="p-1 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-md transition-colors"
                                     >
-                                      <Edit size={14} />
+                                      <Edit size={13} />
                                     </button>
                                   </ProtectedGate>
                                   <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
                                     <button
                                       onClick={(e) => handleDeleteOption(option, e)}
-                                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover/opt:opacity-100"
+                                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                                     >
-                                      <Trash2 size={14} />
+                                      <Trash2 size={13} />
                                     </button>
                                   </ProtectedGate>
                                 </div>
                               </div>
-                            </div>
-                          );
+                            );
                           })}
                         </div>
                       )}

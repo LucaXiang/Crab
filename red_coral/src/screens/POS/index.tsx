@@ -301,60 +301,26 @@ export const POSScreen: React.FC = () => {
         return;
       }
 
-      // Check if product has attributes or specifications
-      try {
-        const attrBindings = productFull.attributes || [];
-
-        // Build set of product attribute IDs for deduplication
-        const productAttrIds = new Set(attrBindings.map(b => String(b.attribute.id)));
-
-        // Fetch category attributes (inherited) - still need API call for now
-        let categoryAttributes: Attribute[] = [];
-        if (productFull.category) {
-          try {
-            categoryAttributes = await getApi().listCategoryAttributes(productFull.category);
-            // Filter out duplicates (product-level binding takes precedence)
-            categoryAttributes = categoryAttributes.filter(
-              attr => !productAttrIds.has(String(attr.id))
-            );
-          } catch (err) {
-            console.warn('Failed to load category attributes:', err);
-          }
+      // ProductFull.attributes 已包含产品直接绑定 + 分类继承属性
+      const attrBindings = productFull.attributes || [];
+      const attributeList: Attribute[] = attrBindings.map(b => b.attribute);
+      const optionsMap = new Map<string, AttributeOption[]>();
+      attributeList.forEach(attr => {
+        if (attr.options && attr.options.length > 0) {
+          optionsMap.set(String(attr.id), attr.options);
         }
+      });
+      const allBindings: ProductAttribute[] = attrBindings.map(binding => ({
+        id: binding.id ?? null,
+        in: binding.is_inherited ? productFull.category : String(product.id),
+        out: String(binding.attribute.id),
+        is_required: binding.is_required,
+        display_order: binding.display_order,
+        default_option_indices: binding.default_option_indices,
+        attribute: binding.attribute,
+      }));
 
-        // Extract attributes from product bindings
-        const productAttributeList: Attribute[] = attrBindings.map(binding => binding.attribute);
-        // Merge: product attributes first, then category attributes (inherited)
-        const attributeList: Attribute[] = [...productAttributeList, ...categoryAttributes];
-
-        // Build options map from all attributes
-        const optionsMap = new Map<string, AttributeOption[]>();
-        attributeList.forEach(attr => {
-          if (attr.options && attr.options.length > 0) {
-            optionsMap.set(String(attr.id), attr.options);
-          }
-        });
-
-        // Build bindings including category attributes
-        const productBindings: ProductAttribute[] = attrBindings.map(binding => ({
-          id: binding.id,
-          in: String(product.id),
-          out: String(binding.attribute.id),
-          is_required: binding.is_required,
-          display_order: binding.display_order,
-          attribute: binding.attribute,
-        }));
-        const categoryBindings: ProductAttribute[] = categoryAttributes.map((attr, idx) => ({
-          id: null,
-          in: productFull.category,
-          out: String(attr.id),
-          is_required: false, // Category attributes are optional by default
-          display_order: 1000 + idx,
-          attribute: attr,
-        }));
-        const allBindings = [...productBindings, ...categoryBindings];
-
-        // Specs are now embedded in ProductFull (EmbeddedSpec[])
+      // Specs are now embedded in ProductFull (EmbeddedSpec[])
         const hasMultiSpec = productFull.specs.length > 1;
         const specifications: EmbeddedSpec[] = productFull.specs || [];
 
@@ -407,7 +373,75 @@ export const POSScreen: React.FC = () => {
         }
 
         if (hasMultiSpec || allBindings.length > 0) {
-          // Has specifications or attributes -> Open Modal for selection
+          // Quick-add: if all required attributes have defaults and spec is resolved, skip modal
+          const canQuickAdd = allBindings.every(binding => {
+            if (!binding.is_required) return true;
+            const defaults = binding.default_option_indices
+              ?? binding.attribute?.default_option_indices;
+            return defaults && defaults.length > 0;
+          });
+
+          if (canQuickAdd && (!hasMultiSpec || selectedDefaultSpec)) {
+            // Build ItemOption[] from defaults
+            const quickOptions: ItemOption[] = [];
+            allBindings.forEach(binding => {
+              const attr = binding.attribute;
+              if (!attr) return;
+              const defaults = binding.default_option_indices
+                ?? attr.default_option_indices;
+              if (!defaults || defaults.length === 0) return;
+              const attrOpts = optionsMap.get(String(attr.id)) || [];
+              defaults.forEach(idx => {
+                const opt = attrOpts[idx];
+                if (opt && opt.is_active) {
+                  quickOptions.push({
+                    attribute_id: String(attr.id),
+                    attribute_name: attr.name,
+                    option_idx: idx,
+                    option_name: opt.name,
+                    price_modifier: opt.price_modifier ?? null,
+                  });
+                }
+              });
+            });
+
+            // Build spec info
+            let quickSpec: { id: string; name: string; external_id?: number | null; price?: number; is_multi_spec?: boolean } | undefined;
+            if (selectedDefaultSpec) {
+              const specIdx = specifications.indexOf(selectedDefaultSpec);
+              quickSpec = {
+                id: String(specIdx),
+                name: selectedDefaultSpec.name,
+                external_id: selectedDefaultSpec.external_id,
+                price: selectedDefaultSpec.price,
+                is_multi_spec: hasMultiSpec,
+              };
+            } else if (specifications.length > 0) {
+              const spec = specifications.find(s => s.is_default) ?? specifications[0];
+              const specIdx = specifications.indexOf(spec);
+              quickSpec = {
+                id: String(specIdx),
+                name: spec.name,
+                external_id: spec.external_id,
+                price: spec.price,
+                is_multi_spec: hasMultiSpec,
+              };
+            }
+
+            addToCartStore(product, quickOptions, 1, 0, undefined, quickSpec);
+
+            if (startRect && !performanceMode) {
+              const id = `fly-${Date.now()}-${Math.random()}`;
+              const targetX = 190;
+              const targetY = window.innerHeight / 2;
+              getImageUrl(product.image).then((imageForAnim) => {
+                addAnimation({ id, type: 'fly', image: imageForAnim || DefaultImage, startRect, targetX, targetY });
+              });
+            }
+            return;
+          }
+
+          // Cannot quick-add -> Open Modal for selection
           setSelectedProductForOptions({
             product,
             basePrice,
@@ -422,15 +456,9 @@ export const POSScreen: React.FC = () => {
           return;
         }
 
-        // CASE 3: No Attributes + Not forcing modal -> Direct Add
-        // (Fall through to outside try/catch)
+        // CASE 3: No Attributes -> Direct Add
 
-      } catch (error) {
-        console.error('Failed to fetch product data:', error);
-        // Continue with normal add if fetch fails
-      }
-
-      // No attributes or fetch failed: add directly to cart
+      // No attributes: add directly to cart
       if (!skipQuickAdd) {
         addToCartStore(product);
       }

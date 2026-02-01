@@ -76,9 +76,10 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
 
         let initialIds: string[] = [];
 
-        // Use attribute-level default_option_indices
-        if (attr.default_option_indices && attr.default_option_indices.length > 0) {
-           initialIds = attr.default_option_indices
+        // Priority: binding override > attribute default
+        const defaults = binding?.default_option_indices ?? attr.default_option_indices;
+        if (defaults && defaults.length > 0) {
+           initialIds = defaults
              .filter(idx => options[idx] && options[idx].is_active)
              .map(String);
         }

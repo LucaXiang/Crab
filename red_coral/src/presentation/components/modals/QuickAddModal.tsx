@@ -11,9 +11,7 @@ import { CategoryNav } from '@/presentation/components/CategoryNav';
 import { CartList } from '@/presentation/components/cart/CartList';
 import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDetailModal';
 import { ProductOptionsModal } from '@/presentation/components/modals/ProductOptionsModal';
-import { createTauriClient } from '@/infrastructure/api';
 
-const getApi = () => createTauriClient();
 
 interface QuickAddModalProps {
   onClose: () => void;
@@ -154,55 +152,25 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       return;
     }
 
-    try {
+    {
+      // ProductFull.attributes 已包含产品直接绑定 + 分类继承属性
       const attrBindings = productFull.attributes || [];
-
-      // Build set of product attribute IDs for deduplication
-      const productAttrIds = new Set(attrBindings.map(b => String(b.attribute.id)));
-
-      // Fetch category attributes (inherited)
-      let categoryAttributes: Attribute[] = [];
-      if (productFull.category) {
-        try {
-          categoryAttributes = await getApi().listCategoryAttributes(productFull.category);
-          categoryAttributes = categoryAttributes.filter(
-            attr => !productAttrIds.has(String(attr.id))
-          );
-        } catch (err) {
-          console.warn('Failed to load category attributes:', err);
-        }
-      }
-
-      // Extract attributes from product bindings
-      const productAttributeList: Attribute[] = attrBindings.map(binding => binding.attribute);
-      const attributeList: Attribute[] = [...productAttributeList, ...categoryAttributes];
-
-      // Build options map
+      const attributeList: Attribute[] = attrBindings.map(b => b.attribute);
       const optionsMap = new Map<string, AttributeOption[]>();
       attributeList.forEach(attr => {
         if (attr.options && attr.options.length > 0) {
           optionsMap.set(String(attr.id), attr.options);
         }
       });
-
-      // Build bindings
-      const productBindings: ProductAttribute[] = attrBindings.map(binding => ({
-        id: binding.id,
-        in: String(product.id),
+      const allBindings: ProductAttribute[] = attrBindings.map(binding => ({
+        id: binding.id ?? null,
+        in: binding.is_inherited ? productFull.category : String(product.id),
         out: String(binding.attribute.id),
         is_required: binding.is_required,
         display_order: binding.display_order,
+        default_option_indices: binding.default_option_indices,
         attribute: binding.attribute,
       }));
-      const categoryBindings: ProductAttribute[] = categoryAttributes.map((attr, idx) => ({
-        id: null,
-        in: productFull.category,
-        out: String(attr.id),
-        is_required: false,
-        display_order: 1000 + idx,
-        attribute: attr,
-      }));
-      const allBindings = [...productBindings, ...categoryBindings];
 
       // Specs
       const hasMultiSpec = product.specs.length > 1;
@@ -256,8 +224,6 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
         setOptionsModalOpen(true);
         return;
       }
-    } catch (error) {
-      console.error('Failed to fetch product data:', error);
     }
 
     // CASE 3: No attributes - add directly
