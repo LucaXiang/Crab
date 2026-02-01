@@ -733,26 +733,10 @@ const RuleSkipToggledRenderer: EventRenderer<RuleSkipToggledPayload> = {
       ? t('timeline.rule_skipped')
       : t('timeline.rule_applied');
 
-    const details: string[] = [];
-
-    // Show recalculated amounts
-    if (payload.subtotal != null) {
-      details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
-    }
-    if (payload.discount != null && payload.discount !== 0) {
-      details.push(`${t('timeline.labels.discount')}: -${formatCurrency(payload.discount)}`);
-    }
-    if (payload.surcharge != null && payload.surcharge !== 0) {
-      details.push(`${t('timeline.labels.surcharge')}: +${formatCurrency(payload.surcharge)}`);
-    }
-    if (payload.total != null) {
-      details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`);
-    }
-
     return {
       title: t('timeline.rule_toggled'),
       summary: `${actionLabel}: ${payload.rule_id}`,
-      details,
+      details: [],
       icon: Tag,
       colorClass: payload.skipped ? 'bg-orange-400' : 'bg-green-400',
       timestamp: event.timestamp,

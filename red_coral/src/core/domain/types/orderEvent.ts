@@ -364,14 +364,6 @@ export interface RuleSkipToggledPayload {
   type: 'RULE_SKIP_TOGGLED';
   rule_id: string;
   skipped: boolean;
-  /** Recalculated subtotal */
-  subtotal: number;
-  /** Recalculated discount */
-  discount: number;
-  /** Recalculated surcharge */
-  surcharge: number;
-  /** Recalculated total */
-  total: number;
 }
 
 /** 订单级手动折扣已应用 */

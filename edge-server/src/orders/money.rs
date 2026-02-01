@@ -6,6 +6,7 @@
 
 use crate::orders::traits::OrderError;
 use rust_decimal::prelude::*;
+use shared::models::price_rule::RuleType;
 use shared::order::{CartItemInput, CartItemSnapshot, ItemChanges, OrderSnapshot, PaymentInput};
 
 /// Rounding strategy for monetary values (2 decimal places, half-up)
@@ -207,6 +208,70 @@ pub fn to_f64(value: Decimal) -> f64 {
         .unwrap_or_default()
 }
 
+/// Compute effective per-unit rule discount, summing only non-skipped Discount rules.
+/// Falls back to pre-computed `rule_discount_amount` when `applied_rules` is absent.
+fn effective_rule_discount(item: &CartItemSnapshot) -> Decimal {
+    match &item.applied_rules {
+        Some(rules) => rules
+            .iter()
+            .filter(|r| !r.skipped && r.rule_type == RuleType::Discount)
+            .map(|r| to_decimal(r.calculated_amount))
+            .sum(),
+        None => item
+            .rule_discount_amount
+            .map(to_decimal)
+            .unwrap_or(Decimal::ZERO),
+    }
+}
+
+/// Compute effective per-unit rule surcharge, summing only non-skipped Surcharge rules.
+/// Falls back to pre-computed `rule_surcharge_amount` when `applied_rules` is absent.
+fn effective_rule_surcharge(item: &CartItemSnapshot) -> Decimal {
+    match &item.applied_rules {
+        Some(rules) => rules
+            .iter()
+            .filter(|r| !r.skipped && r.rule_type == RuleType::Surcharge)
+            .map(|r| to_decimal(r.calculated_amount))
+            .sum(),
+        None => item
+            .rule_surcharge_amount
+            .map(to_decimal)
+            .unwrap_or(Decimal::ZERO),
+    }
+}
+
+/// Compute effective order-level rule discount, summing only non-skipped Discount rules.
+/// Falls back to pre-computed `order_rule_discount_amount` when `order_applied_rules` is absent.
+fn effective_order_rule_discount(snapshot: &OrderSnapshot) -> Decimal {
+    match &snapshot.order_applied_rules {
+        Some(rules) => rules
+            .iter()
+            .filter(|r| !r.skipped && r.rule_type == RuleType::Discount)
+            .map(|r| to_decimal(r.calculated_amount))
+            .sum(),
+        None => snapshot
+            .order_rule_discount_amount
+            .map(to_decimal)
+            .unwrap_or(Decimal::ZERO),
+    }
+}
+
+/// Compute effective order-level rule surcharge, summing only non-skipped Surcharge rules.
+/// Falls back to pre-computed `order_rule_surcharge_amount` when `order_applied_rules` is absent.
+fn effective_order_rule_surcharge(snapshot: &OrderSnapshot) -> Decimal {
+    match &snapshot.order_applied_rules {
+        Some(rules) => rules
+            .iter()
+            .filter(|r| !r.skipped && r.rule_type == RuleType::Surcharge)
+            .map(|r| to_decimal(r.calculated_amount))
+            .sum(),
+        None => snapshot
+            .order_rule_surcharge_amount
+            .map(to_decimal)
+            .unwrap_or(Decimal::ZERO),
+    }
+}
+
 /// Calculate item unit price with precise decimal arithmetic
 ///
 /// Formula: base_price * (1 - manual_discount_percent/100) - rule_discount + rule_surcharge
@@ -238,11 +303,9 @@ pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
         .map(|d| base_with_options * to_decimal(d) / Decimal::ONE_HUNDRED)
         .unwrap_or(Decimal::ZERO);
 
-    // Rule discount is already calculated as a per-unit amount
-    let rule_discount = item.rule_discount_amount.map(to_decimal).unwrap_or(Decimal::ZERO);
-
-    // Rule surcharge
-    let rule_surcharge = item.rule_surcharge_amount.map(to_decimal).unwrap_or(Decimal::ZERO);
+    // Rule discount/surcharge: compute from applied_rules respecting skipped flag
+    let rule_discount = effective_rule_discount(item);
+    let rule_surcharge = effective_rule_surcharge(item);
 
     // Final unit price = base_with_options - discounts + rule surcharges
     let unit_price = base_with_options - manual_discount - rule_discount + rule_surcharge;
@@ -309,11 +372,11 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
             .manual_discount_percent
             .map(|d| base_with_options * to_decimal(d) / Decimal::ONE_HUNDRED)
             .unwrap_or(Decimal::ZERO);
-        let rule_discount = item.rule_discount_amount.map(to_decimal).unwrap_or(Decimal::ZERO);
+        let rule_discount = effective_rule_discount(item);
         item_discount_total += (manual_discount + rule_discount) * quantity;
 
         // Calculate item-level surcharge (from rules only)
-        let rule_surcharge = item.rule_surcharge_amount.map(to_decimal).unwrap_or(Decimal::ZERO);
+        let rule_surcharge = effective_rule_surcharge(item);
         item_surcharge_total += rule_surcharge * quantity;
 
         // Calculate and set unit_price (final per-unit price for display)
@@ -339,13 +402,13 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         subtotal += item_total;
     }
 
-    // Order-level adjustments
-    let order_discount = snapshot.order_rule_discount_amount.map(to_decimal).unwrap_or(Decimal::ZERO)
+    // Order-level adjustments (rule amounts respect skipped flag)
+    let order_discount = effective_order_rule_discount(snapshot)
         + snapshot.order_manual_discount_fixed.map(to_decimal).unwrap_or(Decimal::ZERO)
         + snapshot.order_manual_discount_percent
             .map(|p| subtotal * to_decimal(p) / Decimal::ONE_HUNDRED)
             .unwrap_or(Decimal::ZERO);
-    let order_surcharge = snapshot.order_rule_surcharge_amount.map(to_decimal).unwrap_or(Decimal::ZERO)
+    let order_surcharge = effective_order_rule_surcharge(snapshot)
         + snapshot.order_manual_surcharge_fixed.map(to_decimal).unwrap_or(Decimal::ZERO);
 
     // Total discount and surcharge (item-level + order-level)
@@ -1579,5 +1642,574 @@ mod tests {
             })
             .collect();
         assert_eq!(sum_payments(&payments), 1.0, "0.1 * 10 = 1.0 with Decimal precision");
+    }
+
+    // ========================================================================
+    // effective_rule_* helpers: skipped flag handling
+    // ========================================================================
+
+    use shared::models::price_rule::{AdjustmentType, ProductScope};
+    use shared::order::AppliedRule;
+
+    fn make_applied_rule(rule_id: &str, rule_type: RuleType, amount: f64, skipped: bool) -> AppliedRule {
+        AppliedRule {
+            rule_id: rule_id.to_string(),
+            name: rule_id.to_string(),
+            display_name: rule_id.to_string(),
+            receipt_name: "R".to_string(),
+            rule_type,
+            adjustment_type: AdjustmentType::Percentage,
+            product_scope: ProductScope::Global,
+            zone_scope: "zone:all".to_string(),
+            adjustment_value: 10.0,
+            calculated_amount: amount,
+            is_stackable: true,
+            is_exclusive: false,
+            skipped,
+        }
+    }
+
+    fn make_item_with_rules(
+        original_price: f64,
+        rules: Vec<AppliedRule>,
+        legacy_discount: Option<f64>,
+        legacy_surcharge: Option<f64>,
+    ) -> CartItemSnapshot {
+        CartItemSnapshot {
+            id: "p1".to_string(),
+            instance_id: "i1".to_string(),
+            name: "Item".to_string(),
+            price: original_price,
+            original_price: Some(original_price),
+            quantity: 1,
+            unpaid_quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            rule_discount_amount: legacy_discount,
+            rule_surcharge_amount: legacy_surcharge,
+            applied_rules: Some(rules),
+            unit_price: None,
+            line_total: None,
+            tax: None,
+            tax_rate: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_name: None,
+            is_comped: false,
+        }
+    }
+
+    #[test]
+    fn test_effective_rule_discount_skipped_excluded() {
+        // One active discount + one skipped discount → only active counts
+        let item = make_item_with_rules(
+            100.0,
+            vec![
+                make_applied_rule("r1", RuleType::Discount, 5.0, false),
+                make_applied_rule("r2", RuleType::Discount, 3.0, true), // skipped
+            ],
+            Some(8.0), // legacy total (should be ignored when applied_rules present)
+            None,
+        );
+        let eff = effective_rule_discount(&item);
+        assert_eq!(to_f64(eff), 5.0, "Only non-skipped discount should count");
+    }
+
+    #[test]
+    fn test_effective_rule_surcharge_skipped_excluded() {
+        let item = make_item_with_rules(
+            100.0,
+            vec![
+                make_applied_rule("s1", RuleType::Surcharge, 7.0, true), // skipped
+                make_applied_rule("s2", RuleType::Surcharge, 4.0, false),
+            ],
+            None,
+            Some(11.0), // legacy total (should be ignored)
+        );
+        let eff = effective_rule_surcharge(&item);
+        assert_eq!(to_f64(eff), 4.0, "Only non-skipped surcharge should count");
+    }
+
+    #[test]
+    fn test_effective_rule_discount_all_skipped() {
+        let item = make_item_with_rules(
+            100.0,
+            vec![
+                make_applied_rule("r1", RuleType::Discount, 5.0, true),
+                make_applied_rule("r2", RuleType::Discount, 3.0, true),
+            ],
+            Some(8.0),
+            None,
+        );
+        let eff = effective_rule_discount(&item);
+        assert_eq!(eff, Decimal::ZERO, "All skipped → zero effective discount");
+    }
+
+    #[test]
+    fn test_effective_rule_surcharge_all_skipped() {
+        let item = make_item_with_rules(
+            100.0,
+            vec![
+                make_applied_rule("s1", RuleType::Surcharge, 5.0, true),
+            ],
+            None,
+            Some(5.0),
+        );
+        let eff = effective_rule_surcharge(&item);
+        assert_eq!(eff, Decimal::ZERO, "All skipped → zero effective surcharge");
+    }
+
+    #[test]
+    fn test_effective_rule_discount_empty_applied_rules() {
+        // applied_rules is Some but empty vec → should return 0, NOT fall back to legacy
+        let item = make_item_with_rules(100.0, vec![], Some(10.0), None);
+        let eff = effective_rule_discount(&item);
+        assert_eq!(eff, Decimal::ZERO, "Empty applied_rules → zero (not legacy fallback)");
+    }
+
+    #[test]
+    fn test_effective_rule_discount_legacy_fallback() {
+        // applied_rules is None → fall back to legacy rule_discount_amount
+        let mut item = make_item_with_rules(100.0, vec![], None, None);
+        item.applied_rules = None;
+        item.rule_discount_amount = Some(7.5);
+        let eff = effective_rule_discount(&item);
+        assert_eq!(to_f64(eff), 7.5, "None applied_rules → use legacy field");
+    }
+
+    #[test]
+    fn test_effective_rule_surcharge_legacy_fallback() {
+        let mut item = make_item_with_rules(100.0, vec![], None, None);
+        item.applied_rules = None;
+        item.rule_surcharge_amount = Some(3.5);
+        let eff = effective_rule_surcharge(&item);
+        assert_eq!(to_f64(eff), 3.5, "None applied_rules → use legacy field");
+    }
+
+    #[test]
+    fn test_effective_rule_discount_ignores_surcharge_rules() {
+        // applied_rules has both discount and surcharge → only discount counted
+        let item = make_item_with_rules(
+            100.0,
+            vec![
+                make_applied_rule("r1", RuleType::Discount, 5.0, false),
+                make_applied_rule("s1", RuleType::Surcharge, 10.0, false),
+            ],
+            None,
+            None,
+        );
+        let eff = effective_rule_discount(&item);
+        assert_eq!(to_f64(eff), 5.0, "Only Discount type rules counted");
+    }
+
+    #[test]
+    fn test_effective_rule_surcharge_ignores_discount_rules() {
+        let item = make_item_with_rules(
+            100.0,
+            vec![
+                make_applied_rule("r1", RuleType::Discount, 5.0, false),
+                make_applied_rule("s1", RuleType::Surcharge, 10.0, false),
+            ],
+            None,
+            None,
+        );
+        let eff = effective_rule_surcharge(&item);
+        assert_eq!(to_f64(eff), 10.0, "Only Surcharge type rules counted");
+    }
+
+    #[test]
+    fn test_unit_price_with_skipped_discount_rule() {
+        // Item: base 100, active discount 5, skipped discount 3 → unit_price = 95
+        let item = make_item_with_rules(
+            100.0,
+            vec![
+                make_applied_rule("r1", RuleType::Discount, 5.0, false),
+                make_applied_rule("r2", RuleType::Discount, 3.0, true), // skipped
+            ],
+            Some(8.0),
+            None,
+        );
+        let up = calculate_unit_price(&item);
+        assert_eq!(to_f64(up), 95.0, "Skipped discount should not reduce price");
+    }
+
+    #[test]
+    fn test_unit_price_with_skipped_surcharge_rule() {
+        // Item: base 100, skipped surcharge 10 → unit_price = 100 (not 110)
+        let item = make_item_with_rules(
+            100.0,
+            vec![
+                make_applied_rule("s1", RuleType::Surcharge, 10.0, true),
+            ],
+            None,
+            Some(10.0),
+        );
+        let up = calculate_unit_price(&item);
+        assert_eq!(to_f64(up), 100.0, "Skipped surcharge should not increase price");
+    }
+
+    #[test]
+    fn test_unit_price_comped_item_ignores_applied_rules() {
+        // Comped item always returns 0 regardless of rules
+        let mut item = make_item_with_rules(
+            100.0,
+            vec![make_applied_rule("r1", RuleType::Discount, 5.0, false)],
+            Some(5.0),
+            None,
+        );
+        item.is_comped = true;
+        let up = calculate_unit_price(&item);
+        assert_eq!(up, Decimal::ZERO, "Comped item always zero");
+    }
+
+    #[test]
+    fn test_unit_price_manual_plus_rule_discount_exceeds_100_percent() {
+        // manual 60% + rule discount 50 → total discount > base → clamp to 0
+        let mut item = make_item_with_rules(
+            100.0,
+            vec![make_applied_rule("r1", RuleType::Discount, 50.0, false)],
+            Some(50.0),
+            None,
+        );
+        item.manual_discount_percent = Some(60.0);
+        let up = calculate_unit_price(&item);
+        // base = 100, manual = 60, rule_discount = 50
+        // 100 - 60 - 50 = -10 → clamp to 0
+        assert_eq!(up, Decimal::ZERO, "Combined discount > price → clamp to 0");
+    }
+
+    #[test]
+    fn test_recalculate_totals_with_skipped_item_rule() {
+        // Verify recalculate_totals produces correct results when item has skipped rules
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.items.push(make_item_with_rules(
+            100.0,
+            vec![
+                make_applied_rule("r1", RuleType::Discount, 10.0, true), // skipped
+                make_applied_rule("r2", RuleType::Discount, 5.0, false), // active
+            ],
+            Some(15.0),
+            None,
+        ));
+        snapshot.items[0].quantity = 2;
+        snapshot.items[0].unpaid_quantity = 2;
+
+        recalculate_totals(&mut snapshot);
+
+        // unit_price = 100 - 5 (only active discount) = 95
+        assert_eq!(snapshot.items[0].unit_price, Some(95.0));
+        // line_total = 95 * 2 = 190
+        assert_eq!(snapshot.items[0].line_total, Some(190.0));
+        // subtotal = 190
+        assert_eq!(snapshot.subtotal, 190.0);
+        assert_eq!(snapshot.total, 190.0);
+        // original_total = 100 * 2 = 200
+        assert_eq!(snapshot.original_total, 200.0);
+        // total_discount should count only active rule: 5 * 2 = 10
+        assert_eq!(snapshot.total_discount, 10.0);
+    }
+
+    #[test]
+    fn test_recalculate_totals_skipped_order_level_discount() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        // Simple item, no item-level rules
+        let mut item = make_item_with_rules(100.0, vec![], None, None);
+        item.applied_rules = None;
+        snapshot.items.push(item);
+
+        // Order-level discount, skipped
+        snapshot.order_applied_rules = Some(vec![
+            make_applied_rule("or1", RuleType::Discount, 20.0, true), // skipped
+        ]);
+        snapshot.order_rule_discount_amount = Some(20.0); // legacy
+
+        recalculate_totals(&mut snapshot);
+
+        // Order discount skipped → total equals subtotal
+        assert_eq!(snapshot.subtotal, 100.0);
+        assert_eq!(snapshot.total, 100.0);
+        assert_eq!(snapshot.discount, 0.0, "Skipped order discount → 0");
+    }
+
+    #[test]
+    fn test_recalculate_totals_skipped_order_level_surcharge() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut item = make_item_with_rules(100.0, vec![], None, None);
+        item.applied_rules = None;
+        snapshot.items.push(item);
+
+        snapshot.order_applied_rules = Some(vec![
+            make_applied_rule("os1", RuleType::Surcharge, 15.0, true), // skipped
+        ]);
+        snapshot.order_rule_surcharge_amount = Some(15.0);
+
+        recalculate_totals(&mut snapshot);
+
+        assert_eq!(snapshot.subtotal, 100.0);
+        assert_eq!(snapshot.total, 100.0, "Skipped order surcharge → no increase");
+    }
+
+    #[test]
+    fn test_recalculate_totals_mixed_active_and_skipped_order_rules() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut item = make_item_with_rules(200.0, vec![], None, None);
+        item.applied_rules = None;
+        snapshot.items.push(item);
+
+        snapshot.order_applied_rules = Some(vec![
+            make_applied_rule("or1", RuleType::Discount, 10.0, false),  // active
+            make_applied_rule("or2", RuleType::Discount, 20.0, true),   // skipped
+            make_applied_rule("os1", RuleType::Surcharge, 5.0, false),  // active
+            make_applied_rule("os2", RuleType::Surcharge, 8.0, true),   // skipped
+        ]);
+
+        recalculate_totals(&mut snapshot);
+
+        // subtotal = 200
+        assert_eq!(snapshot.subtotal, 200.0);
+        // order_discount = 10 (only or1), order_surcharge = 5 (only os1)
+        // total = 200 - 10 + 5 = 195
+        assert_eq!(snapshot.total, 195.0);
+        assert_eq!(snapshot.discount, 10.0);
+    }
+
+    #[test]
+    fn test_recalculate_totals_pre_payment_reset_on_rule_skip() {
+        // When a rule skip causes total to change, is_pre_payment must reset
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.items.push(make_item_with_rules(
+            100.0,
+            vec![make_applied_rule("r1", RuleType::Discount, 10.0, false)],
+            Some(10.0),
+            None,
+        ));
+        // First: calculate initial totals
+        recalculate_totals(&mut snapshot);
+        assert_eq!(snapshot.total, 90.0);
+
+        // Set pre-payment flag
+        snapshot.is_pre_payment = true;
+
+        // Now "skip" the rule (simulating applier toggle)
+        snapshot.items[0].applied_rules.as_mut().unwrap()[0].skipped = true;
+        recalculate_totals(&mut snapshot);
+
+        // Total changed from 90 to 100 → pre_payment should reset
+        assert_eq!(snapshot.total, 100.0);
+        assert!(!snapshot.is_pre_payment, "Pre-payment must reset when total changes from rule skip");
+    }
+
+    #[test]
+    fn test_recalculate_totals_tax_on_item_with_skipped_surcharge() {
+        // Tax should be calculated on the effective total (after skipping surcharge)
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut item = make_item_with_rules(
+            100.0,
+            vec![make_applied_rule("s1", RuleType::Surcharge, 10.0, true)], // skipped
+            None,
+            Some(10.0),
+        );
+        item.tax_rate = Some(21); // 21% IVA
+        snapshot.items.push(item);
+
+        recalculate_totals(&mut snapshot);
+
+        // Surcharge skipped → unit_price = 100, line_total = 100
+        assert_eq!(snapshot.items[0].unit_price, Some(100.0));
+        // Tax: 100 * 21 / (100 + 21) = 100 * 21/121 ≈ 17.36
+        assert_eq!(snapshot.items[0].tax, Some(17.36));
+        assert_eq!(snapshot.tax, 17.36);
+    }
+
+    #[test]
+    fn test_recalculate_totals_tax_on_item_with_active_surcharge() {
+        // Compare: with active surcharge, tax is on higher amount
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        let mut item = make_item_with_rules(
+            100.0,
+            vec![make_applied_rule("s1", RuleType::Surcharge, 10.0, false)], // active
+            None,
+            Some(10.0),
+        );
+        item.tax_rate = Some(21);
+        snapshot.items.push(item);
+
+        recalculate_totals(&mut snapshot);
+
+        // Surcharge active → unit_price = 110, line_total = 110
+        assert_eq!(snapshot.items[0].unit_price, Some(110.0));
+        // Tax: 110 * 21 / 121 ≈ 19.09
+        assert_eq!(snapshot.items[0].tax, Some(19.09));
+    }
+
+    #[test]
+    fn test_recalculate_totals_skip_item_rule_changes_order_discount_basis() {
+        // When item-level rule is skipped, subtotal changes, which affects
+        // order-level percentage discount calculation
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.items.push(make_item_with_rules(
+            100.0,
+            vec![make_applied_rule("r1", RuleType::Discount, 20.0, false)], // active: -20
+            Some(20.0),
+            None,
+        ));
+        // Order-level manual percentage discount
+        snapshot.order_manual_discount_percent = Some(10.0); // 10% of subtotal
+
+        recalculate_totals(&mut snapshot);
+
+        // subtotal = 80 (100-20), order_discount = 80 * 10% = 8, total = 72
+        assert_eq!(snapshot.subtotal, 80.0);
+        assert_eq!(snapshot.total, 72.0);
+
+        // Now skip the item rule
+        snapshot.items[0].applied_rules.as_mut().unwrap()[0].skipped = true;
+        recalculate_totals(&mut snapshot);
+
+        // subtotal = 100 (no item discount), order_discount = 100 * 10% = 10, total = 90
+        assert_eq!(snapshot.subtotal, 100.0);
+        assert_eq!(snapshot.total, 90.0);
+    }
+
+    #[test]
+    fn test_unit_price_with_options_and_skipped_rule() {
+        // Options modifier + skipped rule → options still apply, rule doesn't
+        let mut item = make_item_with_rules(
+            50.0,
+            vec![make_applied_rule("r1", RuleType::Discount, 5.0, true)], // skipped
+            Some(5.0),
+            None,
+        );
+        item.selected_options = Some(vec![shared::order::ItemOption {
+            attribute_id: "attr:size".to_string(),
+            attribute_name: "Size".to_string(),
+            option_idx: 1,
+            option_name: "Large".to_string(),
+            price_modifier: Some(3.0),
+        }]);
+
+        let up = calculate_unit_price(&item);
+        // base = 50, options = 3 → base_with_options = 53
+        // rule discount skipped → 0
+        // unit_price = 53
+        assert_eq!(to_f64(up), 53.0);
+    }
+
+    #[test]
+    fn test_effective_rule_discount_multiple_active_stacked() {
+        // 3 active discount rules → sum all calculated_amounts
+        let item = make_item_with_rules(
+            100.0,
+            vec![
+                make_applied_rule("r1", RuleType::Discount, 3.0, false),
+                make_applied_rule("r2", RuleType::Discount, 4.0, false),
+                make_applied_rule("r3", RuleType::Discount, 2.5, false),
+            ],
+            Some(9.5),
+            None,
+        );
+        let eff = effective_rule_discount(&item);
+        assert_eq!(to_f64(eff), 9.5, "Sum of all active discounts");
+    }
+
+    #[test]
+    fn test_skip_unskip_cycle_preserves_amounts() {
+        // Skip a rule, then unskip it → amounts should return to original
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.items.push(make_item_with_rules(
+            100.0,
+            vec![make_applied_rule("r1", RuleType::Discount, 10.0, false)],
+            Some(10.0),
+            None,
+        ));
+
+        recalculate_totals(&mut snapshot);
+        let original_total = snapshot.total;
+        let original_subtotal = snapshot.subtotal;
+        assert_eq!(original_total, 90.0);
+
+        // Skip
+        snapshot.items[0].applied_rules.as_mut().unwrap()[0].skipped = true;
+        recalculate_totals(&mut snapshot);
+        assert_eq!(snapshot.total, 100.0);
+
+        // Unskip
+        snapshot.items[0].applied_rules.as_mut().unwrap()[0].skipped = false;
+        recalculate_totals(&mut snapshot);
+
+        assert_eq!(snapshot.total, original_total, "Total restored after unskip");
+        assert_eq!(snapshot.subtotal, original_subtotal, "Subtotal restored after unskip");
+    }
+
+    #[test]
+    fn test_effective_order_rule_discount_skipped() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.order_applied_rules = Some(vec![
+            make_applied_rule("or1", RuleType::Discount, 10.0, false),
+            make_applied_rule("or2", RuleType::Discount, 5.0, true), // skipped
+        ]);
+        snapshot.order_rule_discount_amount = Some(15.0);
+
+        let eff = effective_order_rule_discount(&snapshot);
+        assert_eq!(to_f64(eff), 10.0, "Only active order discount counted");
+    }
+
+    #[test]
+    fn test_effective_order_rule_surcharge_skipped() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.order_applied_rules = Some(vec![
+            make_applied_rule("os1", RuleType::Surcharge, 8.0, true), // skipped
+        ]);
+        snapshot.order_rule_surcharge_amount = Some(8.0);
+
+        let eff = effective_order_rule_surcharge(&snapshot);
+        assert_eq!(eff, Decimal::ZERO, "Skipped order surcharge → zero");
+    }
+
+    #[test]
+    fn test_effective_order_rule_discount_legacy_fallback() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.order_applied_rules = None;
+        snapshot.order_rule_discount_amount = Some(12.0);
+
+        let eff = effective_order_rule_discount(&snapshot);
+        assert_eq!(to_f64(eff), 12.0, "None order_applied_rules → legacy fallback");
+    }
+
+    #[test]
+    fn test_effective_order_rule_surcharge_legacy_fallback() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.order_applied_rules = None;
+        snapshot.order_rule_surcharge_amount = Some(6.0);
+
+        let eff = effective_order_rule_surcharge(&snapshot);
+        assert_eq!(to_f64(eff), 6.0, "None order_applied_rules → legacy fallback");
+    }
+
+    #[test]
+    fn test_recalculate_totals_remaining_amount_with_skipped_rule_and_payment() {
+        // Verify remaining_amount is correct when a rule is skipped and partial payment exists
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.items.push(make_item_with_rules(
+            100.0,
+            vec![make_applied_rule("r1", RuleType::Discount, 20.0, false)],
+            Some(20.0),
+            None,
+        ));
+        snapshot.paid_amount = 50.0;
+
+        recalculate_totals(&mut snapshot);
+        // subtotal = 80, total = 80, remaining = 80 - 50 = 30
+        assert_eq!(snapshot.total, 80.0);
+        assert_eq!(snapshot.remaining_amount, 30.0);
+
+        // Skip the discount → total goes up
+        snapshot.items[0].applied_rules.as_mut().unwrap()[0].skipped = true;
+        recalculate_totals(&mut snapshot);
+        // subtotal = 100, total = 100, remaining = 100 - 50 = 50
+        assert_eq!(snapshot.total, 100.0);
+        assert_eq!(snapshot.remaining_amount, 50.0);
     }
 }

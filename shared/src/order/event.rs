@@ -397,11 +397,6 @@ pub enum EventPayload {
     RuleSkipToggled {
         rule_id: String,
         skipped: bool,
-        /// Recalculated amounts after toggle
-        subtotal: f64,
-        discount: f64,
-        surcharge: f64,
-        total: f64,
     },
 
     // ========== Order-level Adjustments ==========

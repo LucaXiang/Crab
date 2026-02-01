@@ -60,11 +60,6 @@ impl CommandHandler for ToggleRuleSkipAction {
             EventPayload::RuleSkipToggled {
                 rule_id: self.rule_id.clone(),
                 skipped: self.skipped,
-                // Placeholder values - will be recalculated by applier
-                subtotal: snapshot.subtotal,
-                discount: snapshot.discount,
-                surcharge: snapshot.order_rule_surcharge_amount.unwrap_or(0.0),
-                total: snapshot.total,
             },
         );
 
@@ -387,5 +382,147 @@ mod tests {
         assert_eq!(event.operator_id, "manager-1");
         assert_eq!(event.operator_name, "Manager");
         assert_eq!(event.client_timestamp, Some(9999999999));
+    }
+
+    #[tokio::test]
+    async fn test_toggle_rule_skip_already_skipped_rule() {
+        // Toggling skip on a rule that's already skipped should still succeed
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        let mut rule = create_test_applied_rule("rule-1");
+        rule.skipped = true; // already skipped
+        snapshot.items = vec![CartItemSnapshot {
+            id: "product:p1".to_string(),
+            instance_id: "item-1".to_string(),
+            name: "Test Product".to_string(),
+            price: 10.0,
+            original_price: None,
+            quantity: 1,
+            unpaid_quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: Some(vec![rule]),
+            unit_price: None,
+            line_total: None,
+            tax: None,
+            tax_rate: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_name: None,
+            is_comped: false,
+        }];
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        // Skip again (idempotent-ish)
+        let action = ToggleRuleSkipAction {
+            order_id: "order-1".to_string(),
+            rule_id: "rule-1".to_string(),
+            skipped: true,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        assert_eq!(events.len(), 1);
+        if let EventPayload::RuleSkipToggled { skipped, .. } = &events[0].payload {
+            assert!(*skipped);
+        } else {
+            panic!("Expected RuleSkipToggled payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_toggle_rule_skip_multiple_rules_on_item() {
+        // Item has multiple rules, toggle one specific rule
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.items = vec![CartItemSnapshot {
+            id: "product:p1".to_string(),
+            instance_id: "item-1".to_string(),
+            name: "Test Product".to_string(),
+            price: 10.0,
+            original_price: None,
+            quantity: 1,
+            unpaid_quantity: 1,
+            selected_options: None,
+            selected_specification: None,
+            manual_discount_percent: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: Some(vec![
+                create_test_applied_rule("rule-1"),
+                create_test_applied_rule("rule-2"),
+            ]),
+            unit_price: None,
+            line_total: None,
+            tax: None,
+            tax_rate: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_name: None,
+            is_comped: false,
+        }];
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        // Toggle only rule-2
+        let action = ToggleRuleSkipAction {
+            order_id: "order-1".to_string(),
+            rule_id: "rule-2".to_string(),
+            skipped: true,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        assert_eq!(events.len(), 1);
+
+        if let EventPayload::RuleSkipToggled { rule_id, skipped } = &events[0].payload {
+            assert_eq!(*rule_id, "rule-2");
+            assert!(*skipped);
+        } else {
+            panic!("Expected RuleSkipToggled payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_toggle_rule_skip_rule_on_both_levels() {
+        // Same rule_id exists at both item and order level → action should find it
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.items = vec![create_test_item_with_rule("shared-rule")];
+        snapshot.order_applied_rules = Some(vec![create_test_applied_rule("shared-rule")]);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = ToggleRuleSkipAction {
+            order_id: "order-1".to_string(),
+            rule_id: "shared-rule".to_string(),
+            skipped: true,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        assert_eq!(events.len(), 1);
     }
 }
