@@ -427,7 +427,6 @@ impl ServerState {
     /// 为单个订单加载并缓存价格规则
     ///
     /// 用于：
-    /// - RestoreOrder 后重新加载规则
     /// - 手动刷新订单规则
     pub async fn load_rules_for_order(&self, order_id: &str) -> bool {
         let snapshot = match self.orders_manager.get_snapshot(order_id) {

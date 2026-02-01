@@ -1919,9 +1919,6 @@ impl ClientBridge {
                                 "order.complete"
                             }
                             shared::order::OrderCommandPayload::VoidOrder { .. } => "order.void",
-                            shared::order::OrderCommandPayload::RestoreOrder { .. } => {
-                                "order.restore"
-                            }
                             shared::order::OrderCommandPayload::AddItems { .. } => {
                                 "order.add_items"
                             }

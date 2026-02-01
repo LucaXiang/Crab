@@ -324,7 +324,6 @@ interface ItemModificationResult {  // ✅ 新增类型
 | `order.merge` | `OrderCommand` | `CommandResponse` | 并单 |
 | `order.complete` | `OrderCommand` | `CommandResponse` | 结账 |
 | `order.void` | `OrderCommand` | `CommandResponse` | 作废 |
-| `order.restore` | `OrderCommand` | `CommandResponse` | 恢复订单 |
 | `order.set_surcharge_exempt` | `OrderCommand` | `CommandResponse` | 设置服务费豁免 |
 | `order.update_info` | `OrderCommand` | `CommandResponse` | 更新订单信息 |
 | `sync.orders` | `{ since_sequence }` | `SyncResponse` | 同步订单 |

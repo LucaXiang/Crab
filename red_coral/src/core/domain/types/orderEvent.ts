@@ -27,7 +27,6 @@ export type OrderEventType =
   | 'TABLE_OPENED'
   | 'ORDER_COMPLETED'
   | 'ORDER_VOIDED'
-  | 'ORDER_RESTORED'
   | 'ITEMS_ADDED'
   | 'ITEM_MODIFIED'
   | 'ITEM_REMOVED'
@@ -86,7 +85,6 @@ export type EventPayload =
   | TableOpenedPayload
   | OrderCompletedPayload
   | OrderVoidedPayload
-  | OrderRestoredPayload
   | ItemsAddedPayload
   | ItemModifiedPayload
   | ItemRemovedPayload
@@ -147,10 +145,6 @@ export interface OrderVoidedPayload {
   note?: string | null;
   authorizer_id?: string | null;
   authorizer_name?: string | null;
-}
-
-export interface OrderRestoredPayload {
-  type: 'ORDER_RESTORED';
 }
 
 export interface ItemsAddedPayload {
@@ -365,7 +359,6 @@ export type OrderCommandPayload =
   | OpenTableCommand
   | CompleteOrderCommand
   | VoidOrderCommand
-  | RestoreOrderCommand
   | AddItemsCommand
   | ModifyItemCommand
   | RemoveItemCommand
@@ -414,11 +407,6 @@ export interface VoidOrderCommand {
   authorizer_id?: string | null;
   /** 授权人名称 */
   authorizer_name?: string | null;
-}
-
-export interface RestoreOrderCommand {
-  type: 'RESTORE_ORDER';
-  order_id: string;
 }
 
 export interface AddItemsCommand {
@@ -785,7 +773,6 @@ export interface AppliedRule {
   zone_scope: string;
   adjustment_value: number;
   calculated_amount: number;
-  priority: number;
   is_stackable: boolean;
   is_exclusive: boolean;
   skipped: boolean;

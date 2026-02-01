@@ -69,9 +69,6 @@ pub enum OrderCommandPayload {
         authorizer_name: Option<String>,
     },
 
-    /// Restore a voided order
-    RestoreOrder { order_id: String },
-
     // ========== Item Operations ==========
     /// Add items to order
     AddItems {
@@ -245,7 +242,6 @@ impl OrderCommand {
             OrderCommandPayload::OpenTable { .. } => None,
             OrderCommandPayload::CompleteOrder { order_id, .. } => Some(order_id),
             OrderCommandPayload::VoidOrder { order_id, .. } => Some(order_id),
-            OrderCommandPayload::RestoreOrder { order_id, .. } => Some(order_id),
             OrderCommandPayload::AddItems { order_id, .. } => Some(order_id),
             OrderCommandPayload::ModifyItem { order_id, .. } => Some(order_id),
             OrderCommandPayload::RemoveItem { order_id, .. } => Some(order_id),

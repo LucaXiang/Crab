@@ -18,7 +18,6 @@ mod move_order;
 pub mod open_table;
 mod remove_item;
 mod restore_item;
-mod restore_order;
 mod split_order;
 mod toggle_rule_skip;
 mod update_order_info;
@@ -34,7 +33,6 @@ pub use move_order::MoveOrderAction;
 pub use open_table::OpenTableAction;
 pub use remove_item::RemoveItemAction;
 pub use restore_item::RestoreItemAction;
-pub use restore_order::RestoreOrderAction;
 pub use split_order::{PayAaSplitAction, SplitByAmountAction, SplitByItemsAction, StartAaSplitAction};
 pub use toggle_rule_skip::ToggleRuleSkipAction;
 pub use update_order_info::UpdateOrderInfoAction;
@@ -52,7 +50,6 @@ pub enum CommandAction {
     CompleteOrder(CompleteOrderAction),
     UpdateOrderInfo(UpdateOrderInfoAction),
     VoidOrder(VoidOrderAction),
-    RestoreOrder(RestoreOrderAction),
     MoveOrder(MoveOrderAction),
     MergeOrders(MergeOrdersAction),
     SplitByItems(SplitByItemsAction),
@@ -81,7 +78,6 @@ impl CommandHandler for CommandAction {
             CommandAction::CompleteOrder(action) => action.execute(ctx, metadata).await,
             CommandAction::UpdateOrderInfo(action) => action.execute(ctx, metadata).await,
             CommandAction::VoidOrder(action) => action.execute(ctx, metadata).await,
-            CommandAction::RestoreOrder(action) => action.execute(ctx, metadata).await,
             CommandAction::MoveOrder(action) => action.execute(ctx, metadata).await,
             CommandAction::MergeOrders(action) => action.execute(ctx, metadata).await,
             CommandAction::SplitByItems(action) => action.execute(ctx, metadata).await,
@@ -183,11 +179,6 @@ impl From<&OrderCommand> for CommandAction {
                 authorizer_id: authorizer_id.clone(),
                 authorizer_name: authorizer_name.clone(),
             }),
-            OrderCommandPayload::RestoreOrder { order_id } => {
-                CommandAction::RestoreOrder(RestoreOrderAction {
-                    order_id: order_id.clone(),
-                })
-            }
             OrderCommandPayload::RestoreItem {
                 order_id,
                 instance_id,

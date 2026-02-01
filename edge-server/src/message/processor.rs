@@ -183,14 +183,6 @@ impl RequestCommandProcessor {
             None
         };
 
-        // 检查是否是 RestoreOrder 命令
-        let restore_order_id =
-            if let OrderCommandPayload::RestoreOrder { order_id } = &command.payload {
-                Some(order_id.clone())
-            } else {
-                None
-            };
-
         // Execute via OrdersManager (CatalogService is injected, metadata lookup is automatic)
         let response = self.state.orders_manager().execute_command(command);
 
@@ -214,14 +206,6 @@ impl RequestCommandProcessor {
                 }
             }
 
-            // 如果是 RestoreOrder 且成功执行，重新加载并缓存价格规则
-            if let Some(order_id) = restore_order_id {
-                tracing::debug!(
-                    order_id = %order_id,
-                    "订单恢复成功，重新加载价格规则"
-                );
-                self.state.load_rules_for_order(&order_id).await;
-            }
         }
 
         // Return result

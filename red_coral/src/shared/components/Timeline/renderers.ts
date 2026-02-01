@@ -20,7 +20,6 @@ import type {
   PaymentCancelledPayload,
   OrderCompletedPayload,
   OrderVoidedPayload,
-  OrderRestoredPayload,
   ItemSplitPayload,
   AmountSplitPayload,
   AaSplitStartedPayload,
@@ -524,18 +523,6 @@ const OrderVoidedRenderer: EventRenderer<OrderVoidedPayload> = {
   }
 };
 
-const OrderRestoredRenderer: EventRenderer<OrderRestoredPayload> = {
-  render(event, payload, t) {
-    return {
-      title: t('timeline.order_restored'),
-      details: [],
-      icon: CheckCircle,
-      colorClass: 'bg-blue-400',
-      timestamp: event.timestamp,
-    };
-  }
-};
-
 const OrderMergedRenderer: EventRenderer<OrderMergedPayload> = {
   render(event, payload, t) {
     const details: string[] = [];
@@ -731,7 +718,6 @@ export const EVENT_RENDERERS: Record<OrderEventType, EventRenderer<any>> = {
   AA_SPLIT_CANCELLED: AaSplitCancelledRenderer,
   ORDER_COMPLETED: OrderCompletedRenderer,
   ORDER_VOIDED: OrderVoidedRenderer,
-  ORDER_RESTORED: OrderRestoredRenderer,
   ORDER_MERGED: OrderMergedRenderer,
   ORDER_MOVED: OrderMovedRenderer,
   ORDER_MOVED_OUT: OrderMovedOutRenderer,

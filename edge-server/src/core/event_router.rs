@@ -159,7 +159,11 @@ mod tests {
                 final_total: 100.0,
                 payment_summary: vec![],
             },
-            _ => EventPayload::OrderRestored {},
+            _ => EventPayload::OrderInfoUpdated {
+                guest_count: None,
+                table_name: None,
+                is_pre_payment: None,
+            },
         };
 
         OrderEvent {

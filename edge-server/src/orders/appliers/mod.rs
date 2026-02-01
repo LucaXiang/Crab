@@ -14,7 +14,6 @@ mod order_completed;
 mod order_info_updated;
 mod order_moved;
 mod order_moved_out;
-mod order_restored;
 mod order_split;
 mod order_voided;
 mod orders_merged;
@@ -32,7 +31,6 @@ pub use order_completed::OrderCompletedApplier;
 pub use order_info_updated::OrderInfoUpdatedApplier;
 pub use order_moved::OrderMovedApplier;
 pub use order_moved_out::OrderMovedOutApplier;
-pub use order_restored::OrderRestoredApplier;
 pub use order_split::{
     AaSplitCancelledApplier, AaSplitPaidApplier, AaSplitStartedApplier, AmountSplitApplier,
     ItemSplitApplier,
@@ -58,7 +56,6 @@ pub enum EventAction {
     OrderInfoUpdated(OrderInfoUpdatedApplier),
     OrderMoved(OrderMovedApplier),
     OrderMovedOut(OrderMovedOutApplier),
-    OrderRestored(OrderRestoredApplier),
     OrderVoided(OrderVoidedApplier),
     OrderMerged(OrderMergedApplier),
     OrderMergedOut(OrderMergedOutApplier),
@@ -86,7 +83,6 @@ impl EventApplier for EventAction {
             EventAction::OrderInfoUpdated(applier) => applier.apply(snapshot, event),
             EventAction::OrderMoved(applier) => applier.apply(snapshot, event),
             EventAction::OrderMovedOut(applier) => applier.apply(snapshot, event),
-            EventAction::OrderRestored(applier) => applier.apply(snapshot, event),
             EventAction::OrderVoided(applier) => applier.apply(snapshot, event),
             EventAction::OrderMerged(applier) => applier.apply(snapshot, event),
             EventAction::OrderMergedOut(applier) => applier.apply(snapshot, event),
@@ -119,7 +115,6 @@ impl From<&OrderEvent> for EventAction {
                 EventAction::OrderCompleted(OrderCompletedApplier)
             }
             EventPayload::OrderVoided { .. } => EventAction::OrderVoided(OrderVoidedApplier),
-            EventPayload::OrderRestored { .. } => EventAction::OrderRestored(OrderRestoredApplier),
             EventPayload::OrderInfoUpdated { .. } => {
                 EventAction::OrderInfoUpdated(OrderInfoUpdatedApplier)
             }

@@ -27,7 +27,6 @@
         "TABLE_OPENED",
         "ORDER_COMPLETED",
         "ORDER_VOIDED",
-        "ORDER_RESTORED",
         "ITEMS_ADDED",
         "ITEM_MODIFIED",
         "ITEM_REMOVED",
@@ -50,7 +49,6 @@
         { "$ref": "#/definitions/TableOpenedPayload" },
         { "$ref": "#/definitions/OrderCompletedPayload" },
         { "$ref": "#/definitions/OrderVoidedPayload" },
-        { "$ref": "#/definitions/OrderRestoredPayload" },
         { "$ref": "#/definitions/ItemsAddedPayload" },
         { "$ref": "#/definitions/ItemModifiedPayload" },
         { "$ref": "#/definitions/ItemRemovedPayload" },
@@ -101,11 +99,6 @@
       "properties": {
         "reason": { "type": ["string", "null"] }
       }
-    },
-
-    "OrderRestoredPayload": {
-      "type": "object",
-      "properties": {}
     },
 
     "ItemsAddedPayload": {
@@ -377,7 +370,6 @@
         { "$ref": "#/definitions/OpenTableCommand" },
         { "$ref": "#/definitions/CompleteOrderCommand" },
         { "$ref": "#/definitions/VoidOrderCommand" },
-        { "$ref": "#/definitions/RestoreOrderCommand" },
         { "$ref": "#/definitions/AddItemsCommand" },
         { "$ref": "#/definitions/ModifyItemCommand" },
         { "$ref": "#/definitions/RemoveItemCommand" },
@@ -423,15 +415,6 @@
         "type": { "const": "VOID_ORDER" },
         "order_id": { "type": "string" },
         "reason": { "type": ["string", "null"] }
-      }
-    },
-
-    "RestoreOrderCommand": {
-      "type": "object",
-      "required": ["type", "order_id"],
-      "properties": {
-        "type": { "const": "RESTORE_ORDER" },
-        "order_id": { "type": "string" }
       }
     },
 

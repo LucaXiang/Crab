@@ -170,21 +170,6 @@ export function useOrderCommands() {
     []
   );
 
-  /**
-   * Restore a voided order
-   */
-  const restoreOrder = useCallback(
-    async (orderId: string): Promise<CommandResponse> => {
-      const command = createCommand({
-        type: 'RESTORE_ORDER',
-        order_id: orderId,
-      });
-
-      return sendCommand(command);
-    },
-    []
-  );
-
   // ==================== Item Operations ====================
 
   /**
@@ -497,8 +482,6 @@ export function useOrderCommands() {
     openTable,
     completeOrder,
     voidOrder,
-    restoreOrder,
-
     // Item Operations
     addItems,
     modifyItem,

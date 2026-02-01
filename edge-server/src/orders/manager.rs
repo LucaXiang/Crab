@@ -3062,4 +3062,871 @@ mod tests {
         assert_eq!(snapshot_after.subtotal, 42.0, "subtotal after modify");
         assert_eq!(snapshot_after.total, 42.0, "total after modify");
     }
+
+    // ========================================================================
+    // ========================================================================
+    //  恶意数据防御 + 死胡同预防测试
+    // ========================================================================
+    // ========================================================================
+
+    // ========================================================================
+    // 状态守卫: Voided 订单不可操作
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_to_voided_order_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-void-add",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        // Void
+        let void_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::VoidOrder {
+                order_id: order_id.clone(),
+                void_type: VoidType::Cancelled,
+                loss_reason: None,
+                loss_amount: None,
+                note: None,
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        manager.execute_command(void_cmd);
+
+        // Try to add items
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![simple_item("product:p2", "Tea", 5.0, 1)],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(!resp.success, "Should not add items to voided order");
+    }
+
+    #[test]
+    fn test_add_payment_to_voided_order_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-void-pay",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let void_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::VoidOrder {
+                order_id: order_id.clone(),
+                void_type: VoidType::Cancelled,
+                loss_reason: None,
+                loss_amount: None,
+                note: None,
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        manager.execute_command(void_cmd);
+
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: 10.0,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        let resp = manager.execute_command(pay_cmd);
+        assert!(!resp.success, "Should not add payment to voided order");
+    }
+
+    #[test]
+    fn test_complete_voided_order_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(&manager, "T-void-complete", vec![]);
+
+        let void_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::VoidOrder {
+                order_id: order_id.clone(),
+                void_type: VoidType::Cancelled,
+                loss_reason: None,
+                loss_amount: None,
+                note: None,
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        manager.execute_command(void_cmd);
+
+        let complete_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CompleteOrder {
+                order_id: order_id.clone(),
+            },
+        );
+        let resp = manager.execute_command(complete_cmd);
+        assert!(!resp.success, "Should not complete a voided order");
+    }
+
+    // ========================================================================
+    // 状态守卫: Completed 订单不可 void
+    // ========================================================================
+
+    #[test]
+    fn test_void_completed_order_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-comp-void",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        // Pay + complete
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: 10.0,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        manager.execute_command(pay_cmd);
+
+        let complete_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CompleteOrder {
+                order_id: order_id.clone(),
+            },
+        );
+        manager.execute_command(complete_cmd);
+
+        // Try to void
+        let void_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::VoidOrder {
+                order_id: order_id.clone(),
+                void_type: VoidType::Cancelled,
+                loss_reason: None,
+                loss_amount: None,
+                note: None,
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(void_cmd);
+        assert!(!resp.success, "Should not void a completed order");
+    }
+
+    #[test]
+    fn test_double_complete_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-dbl-complete",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: 10.0,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        manager.execute_command(pay_cmd);
+
+        let complete_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CompleteOrder {
+                order_id: order_id.clone(),
+            },
+        );
+        let resp1 = manager.execute_command(complete_cmd);
+        assert!(resp1.success);
+
+        let complete_cmd2 = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CompleteOrder {
+                order_id: order_id.clone(),
+            },
+        );
+        let resp2 = manager.execute_command(complete_cmd2);
+        assert!(!resp2.success, "Double complete should fail");
+    }
+
+    // ========================================================================
+    // 恶意 ModifyItem 数据
+    // ========================================================================
+
+    #[test]
+    fn test_modify_item_nan_price_rejected() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-mod-nan",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        let instance_id = snapshot.items[0].instance_id.clone();
+
+        let modify_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::ModifyItem {
+                order_id: order_id.clone(),
+                instance_id,
+                affected_quantity: None,
+                changes: shared::order::ItemChanges {
+                    price: Some(f64::NAN),
+                    quantity: None,
+                    manual_discount_percent: None,
+                    note: None,
+                    selected_options: None,
+                    selected_specification: None,
+                },
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(modify_cmd);
+        assert!(!resp.success, "ModifyItem with NaN price should be rejected");
+    }
+
+    #[test]
+    fn test_modify_item_negative_price_rejected() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-mod-neg",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        let instance_id = snapshot.items[0].instance_id.clone();
+
+        let modify_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::ModifyItem {
+                order_id: order_id.clone(),
+                instance_id,
+                affected_quantity: None,
+                changes: shared::order::ItemChanges {
+                    price: Some(-50.0),
+                    quantity: None,
+                    manual_discount_percent: None,
+                    note: None,
+                    selected_options: None,
+                    selected_specification: None,
+                },
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(modify_cmd);
+        assert!(!resp.success, "ModifyItem with negative price should be rejected");
+    }
+
+    #[test]
+    fn test_modify_item_nan_discount_rejected() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-mod-nan-disc",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        let instance_id = snapshot.items[0].instance_id.clone();
+
+        let modify_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::ModifyItem {
+                order_id: order_id.clone(),
+                instance_id,
+                affected_quantity: None,
+                changes: shared::order::ItemChanges {
+                    price: None,
+                    quantity: None,
+                    manual_discount_percent: Some(f64::NAN),
+                    note: None,
+                    selected_options: None,
+                    selected_specification: None,
+                },
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(modify_cmd);
+        assert!(!resp.success, "ModifyItem with NaN discount should be rejected");
+    }
+
+    #[test]
+    fn test_modify_item_discount_over_100_rejected() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-mod-disc-150",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        let instance_id = snapshot.items[0].instance_id.clone();
+
+        let modify_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::ModifyItem {
+                order_id: order_id.clone(),
+                instance_id,
+                affected_quantity: None,
+                changes: shared::order::ItemChanges {
+                    price: None,
+                    quantity: None,
+                    manual_discount_percent: Some(150.0),
+                    note: None,
+                    selected_options: None,
+                    selected_specification: None,
+                },
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(modify_cmd);
+        assert!(!resp.success, "ModifyItem with 150% discount should be rejected");
+    }
+
+    #[test]
+    fn test_modify_item_zero_quantity_rejected() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-mod-zeroq",
+            vec![simple_item("product:p1", "Coffee", 10.0, 2)],
+        );
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        let instance_id = snapshot.items[0].instance_id.clone();
+
+        let modify_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::ModifyItem {
+                order_id: order_id.clone(),
+                instance_id,
+                affected_quantity: None,
+                changes: shared::order::ItemChanges {
+                    price: None,
+                    quantity: Some(0),
+                    manual_discount_percent: None,
+                    note: None,
+                    selected_options: None,
+                    selected_specification: None,
+                },
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(modify_cmd);
+        assert!(!resp.success, "ModifyItem with quantity=0 should be rejected");
+    }
+
+    // ========================================================================
+    // 空 items 数组攻击
+    // ========================================================================
+
+    #[test]
+    fn test_add_empty_items_array() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(&manager, "T-empty-arr", vec![]);
+
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![], // Empty array
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        // 即使 AddItems 允许空数组（当前行为），订单不应进入不一致状态
+        // 记录当前行为，不管成功与否，订单仍可继续操作
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        assert_eq!(snapshot.status, OrderStatus::Active, "Order should remain Active");
+        assert_eq!(snapshot.items.len(), 0, "No items should be added");
+
+        // 验证可以继续添加正常商品 (不进入死胡同)
+        let add_cmd2 = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            },
+        );
+        let resp2 = manager.execute_command(add_cmd2);
+        assert!(resp2.success, "Should be able to add items after empty array");
+    }
+
+    // ========================================================================
+    // 合并操作: 无效目标
+    // ========================================================================
+
+    #[test]
+    fn test_merge_voided_source_fails() {
+        let manager = create_test_manager();
+        let source_id = open_table_with_items(&manager, "T-merge-vs", vec![]);
+        let target_id = open_table_with_items(&manager, "T-merge-vt", vec![]);
+
+        // Void source
+        let void_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::VoidOrder {
+                order_id: source_id.clone(),
+                void_type: VoidType::Cancelled,
+                loss_reason: None,
+                loss_amount: None,
+                note: None,
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        manager.execute_command(void_cmd);
+
+        let merge_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::MergeOrders {
+                source_order_id: source_id.clone(),
+                target_order_id: target_id.clone(),
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(merge_cmd);
+        assert!(!resp.success, "Should not merge a voided source order");
+    }
+
+    #[test]
+    fn test_merge_into_voided_target_fails() {
+        let manager = create_test_manager();
+        let source_id = open_table_with_items(&manager, "T-merge-ts", vec![]);
+        let target_id = open_table_with_items(&manager, "T-merge-tt", vec![]);
+
+        // Void target
+        let void_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::VoidOrder {
+                order_id: target_id.clone(),
+                void_type: VoidType::Cancelled,
+                loss_reason: None,
+                loss_amount: None,
+                note: None,
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        manager.execute_command(void_cmd);
+
+        let merge_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::MergeOrders {
+                source_order_id: source_id.clone(),
+                target_order_id: target_id.clone(),
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(merge_cmd);
+        assert!(!resp.success, "Should not merge into a voided target order");
+    }
+
+    #[test]
+    fn test_merge_self_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(&manager, "T-self-merge", vec![]);
+
+        let merge_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::MergeOrders {
+                source_order_id: order_id.clone(),
+                target_order_id: order_id.clone(),
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(merge_cmd);
+        assert!(!resp.success, "Should not merge order with itself");
+    }
+
+    // ========================================================================
+    // AA Split 恶意数据
+    // ========================================================================
+
+    #[test]
+    fn test_aa_split_zero_total_shares_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-aa-zero",
+            vec![simple_item("product:p1", "Coffee", 30.0, 1)],
+        );
+
+        let cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::StartAaSplit {
+                order_id: order_id.clone(),
+                total_shares: 0, // Invalid
+                shares: 0,
+                payment_method: "CASH".to_string(),
+                tendered: None,
+            },
+        );
+        let resp = manager.execute_command(cmd);
+        assert!(!resp.success, "AA split with 0 total shares should fail");
+    }
+
+    #[test]
+    fn test_aa_split_one_share_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-aa-one",
+            vec![simple_item("product:p1", "Coffee", 30.0, 1)],
+        );
+
+        let cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::StartAaSplit {
+                order_id: order_id.clone(),
+                total_shares: 1, // Must be >= 2
+                shares: 1,
+                payment_method: "CASH".to_string(),
+                tendered: None,
+            },
+        );
+        let resp = manager.execute_command(cmd);
+        assert!(!resp.success, "AA split with 1 total share should fail (need >= 2)");
+    }
+
+    #[test]
+    fn test_aa_split_shares_exceed_total_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-aa-exceed",
+            vec![simple_item("product:p1", "Coffee", 30.0, 1)],
+        );
+
+        let cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::StartAaSplit {
+                order_id: order_id.clone(),
+                total_shares: 3,
+                shares: 5, // More than total
+                payment_method: "CASH".to_string(),
+                tendered: None,
+            },
+        );
+        let resp = manager.execute_command(cmd);
+        assert!(!resp.success, "AA split shares > total_shares should fail");
+    }
+
+    #[test]
+    fn test_pay_aa_split_exceed_remaining_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-aa-overpay",
+            vec![simple_item("product:p1", "Coffee", 30.0, 1)],
+        );
+
+        // Start AA: 3 shares, pay 2
+        let start_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::StartAaSplit {
+                order_id: order_id.clone(),
+                total_shares: 3,
+                shares: 2,
+                payment_method: "CASH".to_string(),
+                tendered: None,
+            },
+        );
+        let resp = manager.execute_command(start_cmd);
+        assert!(resp.success);
+
+        // Try to pay 3 more shares (only 1 remaining)
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::PayAaSplit {
+                order_id: order_id.clone(),
+                shares: 3,
+                payment_method: "CASH".to_string(),
+                tendered: None,
+            },
+        );
+        let resp = manager.execute_command(pay_cmd);
+        assert!(!resp.success, "Pay AA split with shares > remaining should fail");
+    }
+
+    // ========================================================================
+    // 取消已取消的支付
+    // ========================================================================
+
+    #[test]
+    fn test_cancel_already_cancelled_payment_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-dbl-cancel",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        // Pay
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CARD".to_string(),
+                    amount: 10.0,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        manager.execute_command(pay_cmd);
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        let payment_id = snapshot.payments[0].payment_id.clone();
+
+        // Cancel once
+        let cancel1 = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CancelPayment {
+                order_id: order_id.clone(),
+                payment_id: payment_id.clone(),
+                reason: Some("mistake".to_string()),
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp1 = manager.execute_command(cancel1);
+        assert!(resp1.success);
+
+        // Cancel again (should fail)
+        let cancel2 = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CancelPayment {
+                order_id: order_id.clone(),
+                payment_id,
+                reason: Some("again".to_string()),
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp2 = manager.execute_command(cancel2);
+        assert!(!resp2.success, "Should not cancel an already-cancelled payment");
+    }
+
+    // ========================================================================
+    // 移桌到已占用桌台
+    // ========================================================================
+
+    #[test]
+    fn test_move_to_occupied_table_fails() {
+        let manager = create_test_manager();
+        let _order1 = open_table_with_items(
+            &manager,
+            "T-occ-1",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+        let order2 = open_table_with_items(
+            &manager,
+            "T-occ-2",
+            vec![simple_item("product:p2", "Tea", 5.0, 1)],
+        );
+
+        // Move order2 to T-occ-1 (occupied)
+        let move_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::MoveOrder {
+                order_id: order2.clone(),
+                target_table_id: "T-occ-1".to_string(),
+                target_table_name: "Table 1".to_string(),
+                target_zone_id: None,
+                target_zone_name: None,
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(move_cmd);
+        assert!(!resp.success, "Should not move to an occupied table");
+    }
+
+    // ========================================================================
+    // ModifyItem 对已完成/已取消订单
+    // ========================================================================
+
+    #[test]
+    fn test_modify_item_on_completed_order_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-mod-comp",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        let instance_id = snapshot.items[0].instance_id.clone();
+
+        // Pay + complete
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: 10.0,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        manager.execute_command(pay_cmd);
+        let complete_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CompleteOrder {
+                order_id: order_id.clone(),
+            },
+        );
+        manager.execute_command(complete_cmd);
+
+        // Try to modify
+        let modify_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::ModifyItem {
+                order_id: order_id.clone(),
+                instance_id,
+                affected_quantity: None,
+                changes: shared::order::ItemChanges {
+                    price: Some(999.0),
+                    quantity: None,
+                    manual_discount_percent: None,
+                    note: None,
+                    selected_options: None,
+                    selected_specification: None,
+                },
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(modify_cmd);
+        assert!(!resp.success, "Should not modify items on completed order");
+    }
+
+    // ========================================================================
+    // 支付负金额
+    // ========================================================================
+
+    #[test]
+    fn test_add_payment_negative_amount_rejected() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-neg-pay-amt",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: -10.0,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        let resp = manager.execute_command(pay_cmd);
+        assert!(!resp.success, "Negative payment amount should be rejected");
+    }
+
+    #[test]
+    fn test_add_payment_zero_amount_rejected() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-zero-pay-amt",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: 0.0,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        let resp = manager.execute_command(pay_cmd);
+        assert!(!resp.success, "Zero payment amount should be rejected");
+    }
+
 }

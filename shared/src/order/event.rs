@@ -43,7 +43,6 @@ pub enum OrderEventType {
     TableOpened,
     OrderCompleted,
     OrderVoided,
-    OrderRestored,
 
     // Items
     ItemsAdded,
@@ -82,7 +81,6 @@ impl std::fmt::Display for OrderEventType {
             OrderEventType::TableOpened => write!(f, "TABLE_OPENED"),
             OrderEventType::OrderCompleted => write!(f, "ORDER_COMPLETED"),
             OrderEventType::OrderVoided => write!(f, "ORDER_VOIDED"),
-            OrderEventType::OrderRestored => write!(f, "ORDER_RESTORED"),
             OrderEventType::ItemsAdded => write!(f, "ITEMS_ADDED"),
             OrderEventType::ItemModified => write!(f, "ITEM_MODIFIED"),
             OrderEventType::ItemRemoved => write!(f, "ITEM_REMOVED"),
@@ -155,8 +153,6 @@ pub enum EventPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
     },
-
-    OrderRestored {},
 
     // ========== Items ==========
     ItemsAdded {

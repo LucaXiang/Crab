@@ -20,7 +20,6 @@
 |----------|---------|------|
 | `manage_users` | `users:manage` | 用户管理 |
 | `void_order` | `orders:void` | 作废订单 |
-| `restore_order` | `orders:restore` | 恢复订单 |
 | `manage_products` | `products:manage` | 产品管理(通用) |
 | `create_product` | `products:write` | 创建产品 |
 | `update_product` | `products:write` | 更新产品 |
@@ -100,7 +99,6 @@ pub const ALL_PERMISSIONS: &[&str] = &[
     "orders:read",
     "orders:write",
     "orders:void",
-    "orders:restore",
     "orders:discount",
     "orders:refund",
     "orders:cancel_item",
@@ -169,7 +167,6 @@ pub const DEFAULT_MANAGER_PERMISSIONS: &[&str] = &[
     "orders:read",
     "orders:write",
     "orders:void",
-    "orders:restore",
     "orders:discount",
     "orders:refund",
     "orders:cancel_item",
@@ -386,7 +383,6 @@ export const Permission = {
   ORDERS_READ: 'orders:read' as Permission,
   ORDERS_WRITE: 'orders:write' as Permission,
   ORDERS_VOID: 'orders:void' as Permission,
-  ORDERS_RESTORE: 'orders:restore' as Permission,
   ORDERS_DISCOUNT: 'orders:discount' as Permission,
   ORDERS_REFUND: 'orders:refund' as Permission,
   ORDERS_CANCEL_ITEM: 'orders:cancel_item' as Permission,
@@ -460,7 +456,6 @@ git commit -m "refactor(frontend): rename Permission constants to resource:actio
 |--------|--------|
 | `Permission.MANAGE_USERS` | `Permission.USERS_MANAGE` |
 | `Permission.VOID_ORDER` | `Permission.ORDERS_VOID` |
-| `Permission.RESTORE_ORDER` | `Permission.ORDERS_RESTORE` |
 | `Permission.MANAGE_PRODUCTS` | `Permission.PRODUCTS_MANAGE` |
 | `Permission.CREATE_PRODUCT` | `Permission.PRODUCTS_WRITE` |
 | `Permission.UPDATE_PRODUCT` | `Permission.PRODUCTS_WRITE` |

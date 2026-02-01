@@ -80,7 +80,7 @@ src/
 ### 订单事件溯源
 
 **OrderCommand** → `OrderCommandPayload`:
-- 生命周期: OpenTable, CompleteOrder, VoidOrder, RestoreOrder
+- 生命周期: OpenTable, CompleteOrder, VoidOrder
 - 商品: AddItems, ModifyItem, RemoveItem, RestoreItem
 - 支付: AddPayment, CancelPayment
 - 拆分: SplitByItems, SplitByAmount, StartAaSplit, PayAaSplit

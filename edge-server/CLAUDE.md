@@ -144,7 +144,7 @@ execute_command(cmd)
 ```
 
 **Commands (12+)**:
-OpenTable, AddItems, ModifyItem, RemoveItem, RestoreItem, AddPayment, CancelPayment, CompleteOrder, VoidOrder, RestoreOrder, MergeOrders, MoveOrder, SplitByItems, SplitByAmount, StartAaSplit, PayAaSplit, UpdateOrderInfo, ToggleRuleSkip
+OpenTable, AddItems, ModifyItem, RemoveItem, RestoreItem, AddPayment, CancelPayment, CompleteOrder, VoidOrder, MergeOrders, MoveOrder, SplitByItems, SplitByAmount, StartAaSplit, PayAaSplit, UpdateOrderInfo, ToggleRuleSkip
 
 **EventRouter 分发**:
 - **Archive** (阻塞): 终结事件 (Completed, Voided, Moved, Merged)

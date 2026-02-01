@@ -26,7 +26,6 @@ const usePermissionLabels = () => {
     'orders:read': t('settings.permissions.orders_read'),
     'orders:write': t('settings.permissions.orders_write'),
     'orders:void': t('settings.permissions.void_order'),
-    'orders:restore': t('settings.permissions.restore_order'),
     'orders:discount': t('settings.permissions.apply_discount'),
     'orders:refund': t('settings.permissions.refund_order'),
     'orders:cancel_item': t('settings.permissions.cancel_item'),
@@ -91,7 +90,7 @@ export const RolePermissionsEditor: React.FC = () => {
       },
       pos: {
         title: t('settings.permissions.group.pos'),
-        perms: ['orders:read', 'orders:write', 'orders:void', 'orders:restore', 'orders:discount', 'orders:refund', 'orders:cancel_item', 'tables:merge_bill', 'tables:transfer', 'pos:cash_drawer', 'receipts:print', 'receipts:reprint', 'pricing:read', 'pricing:write']
+        perms: ['orders:read', 'orders:write', 'orders:void', 'orders:discount', 'orders:refund', 'orders:cancel_item', 'tables:merge_bill', 'tables:transfer', 'pos:cash_drawer', 'receipts:print', 'receipts:reprint', 'pricing:read', 'pricing:write']
       },
       store: {
         title: t('settings.permissions.group.store'),
