@@ -323,7 +323,7 @@ export interface UpdateAttributeRequest {
   excluded_categories?: string[];
   is_multi_select?: boolean;
   max_selections?: number;
-  default_option_indices?: number[];
+  default_option_indices?: number[] | null;
   display_order?: number;
   is_active?: boolean;
   show_on_receipt?: boolean;
