@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Plus, Edit, Trash2, ChevronRight, List } from 'lucide-react';
+import { Settings, Plus, Edit, Trash2, ChevronRight, List, Star } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -34,6 +34,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
   const {
     fetchAll,
     deleteAttribute,
+    updateAttribute,
   } = useAttributeActions();
   const { loadOptions, deleteOption } = useOptionActions();
 
@@ -165,6 +166,33 @@ export const AttributeManagement: React.FC = React.memo(() => {
     });
   };
 
+  const handleToggleDefault = async (attr: Attribute, optionIndex: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const current = attr.default_option_indices ?? [];
+    const isCurrentlyDefault = current.includes(optionIndex);
+
+    let newDefaults: number[];
+    if (attr.is_multi_select) {
+      // Multi-select: toggle this index in/out of the array
+      newDefaults = isCurrentlyDefault
+        ? current.filter(i => i !== optionIndex)
+        : [...current, optionIndex];
+    } else {
+      // Single-select: set or clear
+      newDefaults = isCurrentlyDefault ? [] : [optionIndex];
+    }
+
+    try {
+      await updateAttribute({
+        id: attr.id,
+        default_option_indices: newDefaults.length > 0 ? newDefaults : null,
+      });
+    } catch (error) {
+      console.error('Toggle default error:', error);
+      toast.error(getErrorMessage(error));
+    }
+  };
+
   const getAttributeTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       SINGLE_REQUIRED: t('settings.attribute.type.single_required'),
@@ -262,7 +290,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                             )}
                             <span className="text-xs text-gray-400 flex items-center gap-1">
                               <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-                              {options.length} {t('settings.attribute.option.title')}
+                              {attr.options?.length ?? 0} {t('settings.attribute.option.title')}
                             </span>
                           </div>
                         </div>
@@ -354,11 +382,24 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                   </span>
                                 </div>
                                 </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover/opt:opacity-100 transition-opacity shrink-0">
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
+                                    <button
+                                      onClick={(e) => handleToggleDefault(attr, option.index, e)}
+                                      className={`p-1.5 rounded-lg transition-colors ${
+                                        isDefault
+                                          ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-50'
+                                          : 'text-gray-300 hover:text-amber-500 hover:bg-amber-50 opacity-0 group-hover/opt:opacity-100'
+                                      }`}
+                                      title={isDefault ? t('settings.attribute.option.unset_default') : t('settings.attribute.option.set_default')}
+                                    >
+                                      <Star size={14} fill={isDefault ? 'currentColor' : 'none'} />
+                                    </button>
+                                  </ProtectedGate>
                                   <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
                                     <button
                                       onClick={(e) => handleEditOption(option, e)}
-                                      className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                                      className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors opacity-0 group-hover/opt:opacity-100"
                                     >
                                       <Edit size={14} />
                                     </button>
@@ -366,7 +407,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                   <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
                                     <button
                                       onClick={(e) => handleDeleteOption(option, e)}
-                                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover/opt:opacity-100"
                                     >
                                       <Trash2 size={14} />
                                     </button>

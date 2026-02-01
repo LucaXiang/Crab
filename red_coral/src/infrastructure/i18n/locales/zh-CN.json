@@ -1131,7 +1131,9 @@
           "kitchen_print_name_placeholder": "如为空则使用选项名称"
         },
         "add_option": "添加选项",
-        "edit_option": "编辑选项"
+        "edit_option": "编辑选项",
+        "set_default": "设为默认",
+        "unset_default": "取消默认"
       },
       "scope": {
         "global": "全局",
