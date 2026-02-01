@@ -61,6 +61,8 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
 
   applySync: (payload: SyncPayload<PrintDestinationEntity>) => {
     const state = get();
+    if (!state.isLoaded) return;
+
     const { id, version, action, data } = payload;
 
     // Skip duplicate
