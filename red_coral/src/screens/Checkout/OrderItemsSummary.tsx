@@ -9,7 +9,6 @@ interface OrderItemsSummaryProps {
   selectedQuantities: Record<number, number>;
   onUpdateSelectedQty: (index: number, delta: number) => void;
   onEditItem: (item: CartItem) => void;
-  surchargeExempt?: boolean;
 }
 
 export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
@@ -19,7 +18,6 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
   selectedQuantities,
   onUpdateSelectedQty,
   onEditItem,
-  surchargeExempt,
 }) => {
   // Build active (unpaid) items list
   const activeItems: { item: CartItem; remainingQty: number; originalIndex: number }[] = [];
@@ -66,7 +64,6 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
             selectedQuantities={selectedQuantities}
             onUpdateSelectedQty={onUpdateSelectedQty}
             onEditItem={onEditItem}
-            surchargeExempt={surchargeExempt}
           />
         ))}
       </div>

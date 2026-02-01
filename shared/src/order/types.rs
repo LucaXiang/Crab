@@ -78,9 +78,6 @@ pub struct CartItemSnapshot {
     /// Manual discount percentage (0-100)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub manual_discount_percent: Option<f64>,
-    /// Surcharge amount
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub surcharge: Option<f64>,
 
     // === Rule Adjustments ===
     /// Rule discount amount (calculated)
@@ -145,9 +142,6 @@ pub struct CartItemInput {
     /// Manual discount percentage
     #[serde(skip_serializing_if = "Option::is_none")]
     pub manual_discount_percent: Option<f64>,
-    /// Surcharge amount
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub surcharge: Option<f64>,
     /// Item note
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
@@ -193,8 +187,6 @@ pub struct ItemChanges {
     /// Manual discount percentage
     #[serde(skip_serializing_if = "Option::is_none")]
     pub manual_discount_percent: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub surcharge: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
     /// Selected options (None = no change, Some(vec) = replace options)
@@ -406,7 +398,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: Some(10.0),
-            surcharge: None,
             rule_discount_amount: Some(5.0),
             rule_surcharge_amount: Some(3.0),
             applied_rules: Some(vec![]),

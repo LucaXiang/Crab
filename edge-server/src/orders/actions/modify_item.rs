@@ -33,10 +33,13 @@ impl CommandHandler for ModifyItemAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        // 1. Load existing snapshot
+        // 1. Validate changes
+        crate::orders::money::validate_item_changes(&self.changes)?;
+
+        // 2. Load existing snapshot
         let snapshot = ctx.load_snapshot(&self.order_id)?;
 
-        // 2. Validate order status
+        // 3. Validate order status
         match snapshot.status {
             OrderStatus::Completed => {
                 return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
@@ -47,14 +50,14 @@ impl CommandHandler for ModifyItemAction {
             _ => {}
         }
 
-        // 3. Find the item
+        // 4. Find the item
         let item = snapshot
             .items
             .iter()
             .find(|i| i.instance_id == self.instance_id)
             .ok_or_else(|| OrderError::ItemNotFound(self.instance_id.clone()))?;
 
-        // 4. Validate affected quantity
+        // 5. Validate affected quantity
         let affected_qty = self.affected_quantity.unwrap_or(item.quantity);
         if affected_qty <= 0 {
             return Err(OrderError::InvalidOperation(
@@ -65,7 +68,7 @@ impl CommandHandler for ModifyItemAction {
             return Err(OrderError::InsufficientQuantity);
         }
 
-        // 5. Calculate previous values for audit trail
+        // 6. Calculate previous values for audit trail
         let previous_values = ItemChanges {
             price: if self.changes.price.is_some() {
                 Some(item.price)
@@ -79,11 +82,6 @@ impl CommandHandler for ModifyItemAction {
             },
             manual_discount_percent: if self.changes.manual_discount_percent.is_some() {
                 item.manual_discount_percent
-            } else {
-                None
-            },
-            surcharge: if self.changes.surcharge.is_some() {
-                item.surcharge
             } else {
                 None
             },
@@ -104,16 +102,16 @@ impl CommandHandler for ModifyItemAction {
             },
         };
 
-        // 6. Determine operation type for audit
+        // 7. Determine operation type for audit
         let operation = determine_operation(&self.changes);
 
-        // 7. Calculate modification results (handle split scenario)
+        // 8. Calculate modification results (handle split scenario)
         let results = calculate_modification_results(item, affected_qty, &self.changes);
 
-        // 8. Allocate sequence number
+        // 9. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 9. Create event
+        // 10. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -146,8 +144,6 @@ fn determine_operation(changes: &ItemChanges) -> &'static str {
         "MODIFY_PRICE"
     } else if changes.quantity.is_some() {
         "MODIFY_QUANTITY"
-    } else if changes.surcharge.is_some() {
-        "APPLY_SURCHARGE"
     } else if changes.selected_options.is_some() || changes.selected_specification.is_some() {
         "MODIFY_OPTIONS"
     } else if changes.note.is_some() {
@@ -270,7 +266,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            surcharge: None,
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
@@ -607,48 +602,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_modify_item_surcharge() {
-        let storage = OrderStorage::open_in_memory().unwrap();
-        let txn = storage.begin_write().unwrap();
-
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
-        let snapshot = create_active_order_with_item("order-1", item);
-        storage.store_snapshot(&txn, &snapshot).unwrap();
-
-        let current_seq = storage.get_next_sequence(&txn).unwrap();
-        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
-
-        let action = ModifyItemAction {
-            order_id: "order-1".to_string(),
-            instance_id: "item-1".to_string(),
-            affected_quantity: None,
-            changes: ItemChanges {
-                surcharge: Some(5.0),
-                ..Default::default()
-            },
-            authorizer_id: None,
-            authorizer_name: None,
-        };
-
-        let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
-
-        if let EventPayload::ItemModified {
-            operation,
-            changes,
-            previous_values,
-            ..
-        } = &events[0].payload
-        {
-            assert_eq!(operation, "APPLY_SURCHARGE");
-            assert_eq!(changes.surcharge, Some(5.0));
-            assert_eq!(previous_values.surcharge, None);
-        } else {
-            panic!("Expected ItemModified payload");
-        }
-    }
-
-    #[tokio::test]
     async fn test_modify_item_note() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -714,15 +667,6 @@ mod tests {
                 ..Default::default()
             }),
             "MODIFY_QUANTITY"
-        );
-
-        // Surcharge
-        assert_eq!(
-            determine_operation(&ItemChanges {
-                surcharge: Some(3.0),
-                ..Default::default()
-            }),
-            "APPLY_SURCHARGE"
         );
 
         // Note

@@ -92,7 +92,7 @@ impl PriceRuleEngine {
     /// Apply rules to a single item
     fn apply_rules_to_item(
         &self,
-        mut item: CartItemInput,
+        item: CartItemInput,
         rules: &[PriceRule],
         current_time: i64,
     ) -> CartItemInput {
@@ -135,22 +135,12 @@ impl PriceRuleEngine {
         // Calculate adjustments
         let adjustment = calculate_adjustments(&matched_rules, price_with_options);
 
-        // Apply adjustments to item
-        if adjustment.surcharge > 0.0 {
-            item.surcharge = Some(item.surcharge.unwrap_or(0.0) + adjustment.surcharge);
-        }
-
-        // For percentage discount from price rules
-        if adjustment.manual_discount_percent > 0.0 {
-            let existing = item.manual_discount_percent.unwrap_or(0.0);
-            item.manual_discount_percent = Some(existing + adjustment.manual_discount_percent);
-        }
-
-        // For fixed discount, apply as negative surcharge
-        if adjustment.discount_fixed > 0.0 {
-            let current_surcharge = item.surcharge.unwrap_or(0.0);
-            item.surcharge = Some(current_surcharge - adjustment.discount_fixed);
-        }
+        // NOTE: This OLD engine is no longer called from bridge.
+        // Rule adjustments are now handled by item_calculator in the reducer.
+        // The adjustments are computed here but not applied to CartItemInput
+        // (which lacks rule_discount_amount/rule_surcharge_amount fields).
+        // This code is kept for compilation only; consider deleting this engine.
+        let _ = adjustment;
 
         item
     }

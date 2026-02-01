@@ -13,7 +13,6 @@ interface UnpaidItemRowProps {
   selectedQuantities: Record<number, number>;
   onUpdateSelectedQty: (index: number, delta: number) => void;
   onEditItem: (item: CartItem) => void;
-  surchargeExempt?: boolean;
 }
 
 export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
@@ -24,7 +23,6 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
   selectedQuantities,
   onUpdateSelectedQty,
   onEditItem,
-  surchargeExempt,
 }) => {
   const isSelected = selectedQuantities[originalIndex] > 0;
   const currentQty = selectedQuantities[originalIndex] || 0;
@@ -32,9 +30,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
   // Price calculations
   const optionsModifier = (item.selected_options ?? []).reduce((sum, opt) => sum + (opt.price_modifier ?? 0), 0);
   const basePrice = (item.original_price ?? item.price) + optionsModifier;
-  const unitPrice = surchargeExempt
-    ? (item.unit_price ?? item.price) - (item.surcharge ?? 0)
-    : (item.unit_price ?? item.price);
+  const unitPrice = item.unit_price ?? item.price;
   const discountPercent = item.manual_discount_percent || 0;
   const hasDiscount = discountPercent > 0 || basePrice !== unitPrice;
   const isSelectMode = mode === 'SELECT';
@@ -120,11 +116,6 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
                 -{discountPercent}%
               </span>
             )}
-            {!surchargeExempt && item.surcharge ? (
-              <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">
-                +{formatCurrency(item.surcharge)}
-              </span>
-            ) : null}
             <div className={`font-bold text-xl tabular-nums ${isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
               {formatCurrency(unitPrice * remainingQty)}
             </div>

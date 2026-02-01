@@ -1892,14 +1892,9 @@ impl ClientBridge {
 
         match &*mode_guard {
             ClientMode::Server { server_state, .. } => {
-                // Apply price rules for AddItems commands
-                let processed_command = self
-                    .apply_price_rules_if_needed(server_state, command)
-                    .await;
-
                 let (response, events) = server_state
                     .orders_manager()
-                    .execute_command_with_events(processed_command);
+                    .execute_command_with_events(command);
 
                 if let Some(handle) = &self.app_handle {
                     for event in events {
@@ -2023,60 +2018,6 @@ impl ClientBridge {
             }
             ClientMode::Disconnected => Err(BridgeError::NotInitialized),
         }
-    }
-
-    /// Apply price rules to items if the command is AddItems (Server mode only)
-    ///
-    /// This processes CartItemInput through the PriceRuleEngine to apply
-    /// surcharges and discounts based on active price rules.
-    async fn apply_price_rules_if_needed(
-        &self,
-        server_state: &edge_server::ServerState,
-        mut command: OrderCommand,
-    ) -> OrderCommand {
-        // Only process AddItems commands
-        if let shared::order::OrderCommandPayload::AddItems { order_id, items } = &command.payload {
-            // Get order snapshot to find zone_id
-            let snapshot = match server_state.orders_manager().get_snapshot(order_id) {
-                Ok(Some(s)) => s,
-                Ok(None) | Err(_) => {
-                    // If order not found or error, return command unmodified
-                    // (will fail in execute_command anyway)
-                    return command;
-                }
-            };
-
-            // Determine if this is a retail order (no zone)
-            let is_retail = snapshot.zone_id.is_none();
-            let zone_id = snapshot.zone_id.as_deref();
-
-            // Load applicable price rules for this zone
-            let rules = server_state
-                .price_rule_engine
-                .load_rules_for_zone(zone_id, is_retail)
-                .await;
-
-            if rules.is_empty() {
-                // No rules to apply, return command unmodified
-                return command;
-            }
-
-            // Get current timestamp for time-based rule validation
-            let current_time = shared::util::now_millis();
-
-            // Apply price rules to items
-            let processed_items = server_state
-                .price_rule_engine
-                .apply_rules(items.clone(), &rules, current_time);
-
-            // Update command with processed items
-            command.payload = shared::order::OrderCommandPayload::AddItems {
-                order_id: order_id.clone(),
-                items: processed_items,
-            };
-        }
-
-        command
     }
 
     /// Get all active order snapshots (event sourcing)

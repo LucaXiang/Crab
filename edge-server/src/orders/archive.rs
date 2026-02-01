@@ -559,7 +559,7 @@ impl OrderArchiveService {
                 .unwrap_or(0.0);
             let rule_discount_per_unit = item.rule_discount_amount.unwrap_or(0.0);
             let total_discount = (manual_discount_per_unit + rule_discount_per_unit) * item.quantity as f64;
-            let surcharge_per_unit = item.surcharge.unwrap_or(0.0) + item.rule_surcharge_amount.unwrap_or(0.0);
+            let surcharge_per_unit = item.rule_surcharge_amount.unwrap_or(0.0);
             let total_surcharge = surcharge_per_unit * item.quantity as f64;
             let unit_price = item.unit_price.unwrap_or(base_price - manual_discount_per_unit - rule_discount_per_unit + surcharge_per_unit);
             let line_total = item.line_total.unwrap_or(unit_price * item.quantity as f64);

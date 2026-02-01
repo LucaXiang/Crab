@@ -35,11 +35,6 @@ const areItemsEqual = (item1: CartItemType, item2: Partial<CartItemType> & { id:
   const discount2 = item2.manual_discount_percent ?? 0;
   if (discount1 !== discount2) return false;
 
-  // Check manual surcharge (normalize null/undefined)
-  const surcharge1 = item1.surcharge ?? 0;
-  const surcharge2 = item2.surcharge ?? 0;
-  if (surcharge1 !== surcharge2) return false;
-  
   // Check options
   const opts1 = item1.selected_options || [];
   const opts2 = item2.selected_options || [];

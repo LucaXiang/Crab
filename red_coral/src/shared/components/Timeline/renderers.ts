@@ -116,7 +116,6 @@ const ItemsAddedRenderer: EventRenderer<ItemsAddedPayload> = {
       const instanceId = item.instance_id ? `#${item.instance_id.slice(-5)}` : '';
       const modifiers: string[] = [];
       if (item.manual_discount_percent) modifiers.push(`-${item.manual_discount_percent}%`);
-      if (item.surcharge) modifiers.push(`+${formatCurrency(item.surcharge)}`);
       return `${instanceId} ${item.name} x${item.quantity}${modifiers.length ? ` (${modifiers.join(', ')})` : ''}`;
     });
 
@@ -157,7 +156,6 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
     formatChange('price', 'timeline.labels.price', v => formatCurrency(v || 0));
     formatChange('quantity', 'timeline.labels.quantity');
     formatChange('manual_discount_percent', 'timeline.labels.discount', v => `${v}%`);
-    formatChange('surcharge', 'timeline.labels.surcharge', v => formatCurrency(v || 0));
 
     // Show specification change
     if (changes.selected_specification) {

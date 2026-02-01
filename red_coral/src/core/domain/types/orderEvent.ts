@@ -742,8 +742,6 @@ export interface CartItemSnapshot {
   // === Manual Adjustment ===
   /** Manual discount percentage (0-100) */
   manual_discount_percent?: number | null;
-  /** Manual surcharge amount */
-  surcharge?: number | null;
 
   // === Rule Adjustments ===
   /** Rule discount amount (calculated from price rules) */
@@ -754,7 +752,7 @@ export interface CartItemSnapshot {
   applied_rules?: AppliedRule[] | null;
 
   // === Computed Fields ===
-  /** Unit price for display (computed by backend: price with manual discount and surcharge) */
+  /** Unit price for display (computed by backend: price with manual discount and rule adjustments) */
   unit_price?: number | null;
   /** Line total (computed by backend: unit_price * quantity) */
   line_total?: number | null;
@@ -806,8 +804,6 @@ export interface CartItemInput {
   selected_specification?: SpecificationInfo | null;
   /** Manual discount percentage (0-100) */
   manual_discount_percent?: number | null;
-  /** Manual surcharge amount */
-  surcharge?: number | null;
   note?: string | null;
   authorizer_id?: string | null;
   authorizer_name?: string | null;
@@ -836,7 +832,6 @@ export interface ItemChanges {
   quantity?: number | null;
   /** Manual discount percentage (0-100) */
   manual_discount_percent?: number | null;
-  surcharge?: number | null;
   note?: string | null;
   selected_options?: ItemOption[] | null;
   selected_specification?: SpecificationInfo | null;

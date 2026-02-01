@@ -91,7 +91,6 @@ mod tests {
                 is_exclusive: false,
                 skipped: false,
             }]),
-            surcharge: None,
             unit_price: None,
             line_total: None,
             tax: None,

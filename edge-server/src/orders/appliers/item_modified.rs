@@ -104,12 +104,9 @@ fn apply_item_modified(
                     new_item.price = result.price;
                     new_item.manual_discount_percent = result.manual_discount_percent;
 
-                    // Apply additional changes (note, surcharge, options, specification)
+                    // Apply additional changes (note, options, specification)
                     if let Some(ref note) = changes.note {
                         new_item.note = Some(note.clone());
-                    }
-                    if let Some(surcharge) = changes.surcharge {
-                        new_item.surcharge = Some(surcharge);
                     }
                     if let Some(ref options) = changes.selected_options {
                         new_item.selected_options = Some(options.clone());
@@ -136,9 +133,6 @@ fn apply_changes_to_item(item: &mut CartItemSnapshot, changes: &ItemChanges) {
     }
     if let Some(discount) = changes.manual_discount_percent {
         item.manual_discount_percent = Some(discount);
-    }
-    if let Some(surcharge) = changes.surcharge {
-        item.surcharge = Some(surcharge);
     }
     if let Some(ref note) = changes.note {
         item.note = Some(note.clone());
@@ -174,7 +168,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            surcharge: None,
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,
@@ -341,34 +334,6 @@ mod tests {
     }
 
     #[test]
-    fn test_item_modified_surcharge() {
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot
-            .items
-            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 1));
-
-        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 1);
-        let changes = ItemChanges {
-            surcharge: Some(5.0),
-            ..Default::default()
-        };
-        let results = vec![ItemModificationResult {
-            instance_id: "item-1".to_string(),
-            quantity: 1,
-            price: 10.0,
-            manual_discount_percent: None,
-            action: "UPDATED".to_string(),
-        }];
-
-        let event = create_item_modified_event("order-1", 2, source, 1, changes, results);
-
-        let applier = ItemModifiedApplier;
-        applier.apply(&mut snapshot, &event);
-
-        assert_eq!(snapshot.items[0].surcharge, Some(5.0));
-    }
-
-    #[test]
     fn test_item_modified_note() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot
@@ -529,7 +494,6 @@ mod tests {
         let changes = ItemChanges {
             price: Some(15.0),
             manual_discount_percent: Some(10.0),
-            surcharge: Some(2.0),
             note: Some("Special order".to_string()),
             ..Default::default()
         };
@@ -548,11 +512,10 @@ mod tests {
 
         assert_eq!(snapshot.items[0].price, 15.0);
         assert_eq!(snapshot.items[0].manual_discount_percent, Some(10.0));
-        assert_eq!(snapshot.items[0].surcharge, Some(2.0));
         assert_eq!(snapshot.items[0].note, Some("Special order".to_string()));
-        // unit_price = (15.0 * 0.9) + 2.0 surcharge = 15.5
-        // subtotal = 15.5 * 2 = 31.0
-        assert!((snapshot.subtotal - 31.0).abs() < 0.001);
+        // unit_price = 15.0 * 0.9 = 13.5
+        // subtotal = 13.5 * 2 = 27.0
+        assert!((snapshot.subtotal - 27.0).abs() < 0.001);
     }
 
     #[test]
@@ -604,7 +567,6 @@ mod tests {
             price: Some(20.0),
             quantity: Some(5),
             manual_discount_percent: Some(15.0),
-            surcharge: Some(3.0),
             note: Some("Test note".to_string()),
             selected_options: None,
             selected_specification: None,
@@ -616,7 +578,6 @@ mod tests {
         assert_eq!(item.quantity, 5);
         assert_eq!(item.unpaid_quantity, 5);
         assert_eq!(item.manual_discount_percent, Some(15.0));
-        assert_eq!(item.surcharge, Some(3.0));
         assert_eq!(item.note, Some("Test note".to_string()));
     }
 
@@ -624,7 +585,6 @@ mod tests {
     fn test_apply_changes_partial() {
         let mut item = create_test_item("item-1", "product:p1", "Product A", 10.0, 2);
         item.manual_discount_percent = Some(5.0);
-        item.surcharge = Some(1.0);
         item.note = Some("Original note".to_string());
 
         // Only change price
@@ -638,7 +598,6 @@ mod tests {
         assert_eq!(item.price, 20.0);
         assert_eq!(item.quantity, 2); // Unchanged
         assert_eq!(item.manual_discount_percent, Some(5.0)); // Unchanged
-        assert_eq!(item.surcharge, Some(1.0)); // Unchanged
         assert_eq!(item.note, Some("Original note".to_string())); // Unchanged
     }
 

@@ -30,10 +30,15 @@ impl CommandHandler for AddItemsAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        // 1. Load existing snapshot
+        // 1. Validate input items
+        for item in &self.items {
+            crate::orders::money::validate_cart_item(item)?;
+        }
+
+        // 2. Load existing snapshot
         let snapshot = ctx.load_snapshot(&self.order_id)?;
 
-        // 2. Validate order status
+        // 3. Validate order status
         match snapshot.status {
             OrderStatus::Completed => {
                 return Err(OrderError::OrderAlreadyCompleted(self.order_id.clone()));
@@ -44,10 +49,10 @@ impl CommandHandler for AddItemsAction {
             _ => {}
         }
 
-        // 3. Allocate sequence number
+        // 4. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 4. Convert inputs to snapshots with generated instance_ids and price rules applied
+        // 5. Convert inputs to snapshots with generated instance_ids and price rules applied
         let rules_refs: Vec<&PriceRule> = self.rules.iter().collect();
 
         info!(
@@ -93,7 +98,6 @@ impl CommandHandler for AddItemsAction {
                     original_price = ?item.original_price,
                     quantity = item.quantity,
                     manual_discount_percent = ?item.manual_discount_percent,
-                    surcharge = ?item.surcharge,
                     category_id = ?category_id,
                     tags_count = tags.len(),
                     "[AddItems] Processing item"
@@ -135,7 +139,7 @@ impl CommandHandler for AddItemsAction {
             })
             .collect();
 
-        // 5. Create event
+        // 6. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -184,7 +188,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            surcharge: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,

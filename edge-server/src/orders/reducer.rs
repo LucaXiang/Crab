@@ -174,7 +174,7 @@ pub fn input_to_snapshot_with_rules(
         instance_id,
         name: input.name.clone(),
         price: calc_result.item_final,
-        original_price: input.original_price,
+        original_price: Some(input.original_price.unwrap_or(input.price)),
         quantity: input.quantity,
         unpaid_quantity: input.quantity, // Initially all unpaid
         selected_options: input.selected_options.clone(),
@@ -195,7 +195,6 @@ pub fn input_to_snapshot_with_rules(
         } else {
             Some(calc_result.applied_rules)
         },
-        surcharge: input.surcharge,
         unit_price: None,  // Computed by recalculate_totals
         line_total: None,  // Computed by recalculate_totals
         tax: None,         // Computed by recalculate_totals
@@ -260,7 +259,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            surcharge: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -294,7 +292,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: Some(10.0),
-            surcharge: None,
             note: Some("Test note".to_string()),
             authorizer_id: None,
             authorizer_name: None,
@@ -303,6 +300,7 @@ mod tests {
         let snapshot = input_to_snapshot(&input);
 
         assert_eq!(snapshot.id, "product:1");
+        assert_eq!(snapshot.original_price, Some(10.0));
         assert_eq!(snapshot.name, "Test Product");
         // Price is now calculated: base $10, 10% manual discount = $9
         assert_eq!(snapshot.price, 9.0);
@@ -324,7 +322,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            surcharge: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -350,7 +347,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            surcharge: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -422,7 +418,6 @@ mod tests {
             ]),
             selected_specification: None,
             manual_discount_percent: None,
-            surcharge: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -478,7 +473,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: Some(10.0), // 10% manual discount
-            surcharge: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -536,7 +530,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            surcharge: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -602,7 +595,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            surcharge: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,

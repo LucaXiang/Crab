@@ -109,7 +109,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            surcharge: None,
             rule_discount_amount: None,
             rule_surcharge_amount: None,
             applied_rules: None,

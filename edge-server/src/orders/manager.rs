@@ -708,7 +708,6 @@ mod tests {
                     selected_options: None,
                     selected_specification: None,
                     manual_discount_percent: None,
-                    surcharge: None,
                     note: None,
                     authorizer_id: None,
                     authorizer_name: None,
@@ -749,7 +748,6 @@ mod tests {
                     selected_options: None,
                     selected_specification: None,
                     manual_discount_percent: None,
-                    surcharge: None,
                     note: None,
                     authorizer_id: None,
                     authorizer_name: None,
@@ -896,7 +894,6 @@ mod tests {
             selected_options: None,
             selected_specification: None,
             manual_discount_percent: None,
-            surcharge: None,
             note: None,
             authorizer_id: None,
             authorizer_name: None,
@@ -1779,5 +1776,1290 @@ mod tests {
         );
         let resp = manager.execute_command(add_cmd);
         assert!(!resp.success, "Should not allow adding items to completed order");
+    }
+
+    // ========================================================================
+    // ========================================================================
+    //  边界测试: 价格/数量/折扣/支付的极端值
+    // ========================================================================
+    // ========================================================================
+
+    // ========================================================================
+    // 19. 零价格商品可以正常添加和完成
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_with_zero_price() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-zero-price",
+            vec![simple_item("product:p1", "Free Sample", 0.0, 1)],
+        );
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        assert_eq!(snapshot.items.len(), 1);
+        assert_eq!(snapshot.items[0].price, 0.0);
+        assert_eq!(snapshot.subtotal, 0.0);
+        assert_eq!(snapshot.total, 0.0);
+
+        // 零总额可以直接完成
+        let complete_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CompleteOrder {
+                order_id: order_id.clone(),
+            },
+        );
+        let resp = manager.execute_command(complete_cmd);
+        assert!(resp.success, "Zero-price order should complete");
+    }
+
+    // ========================================================================
+    // 20. NaN 价格 — 静默变成 0 (当前行为记录)
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_with_nan_price_rejected() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-nan-price".to_string()),
+                table_name: Some("Table NaN".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![simple_item("product:p1", "NaN Item", f64::NAN, 2)],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(!resp.success, "NaN price should be rejected by validation");
+    }
+
+    // ========================================================================
+    // 21. Infinity 价格 — 静默变成 0
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_with_infinity_price_rejected() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-inf-price".to_string()),
+                table_name: Some("Table Inf".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![simple_item("product:p1", "Infinity Item", f64::INFINITY, 1)],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(!resp.success, "Infinity price should be rejected by validation");
+    }
+
+    // ========================================================================
+    // 22. 负价格 — 当前被 clamp 到 0
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_with_negative_price_rejected() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-neg-price".to_string()),
+                table_name: Some("Table Neg".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![simple_item("product:p1", "Negative Item", -10.0, 1)],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(!resp.success, "Negative price should be rejected by validation");
+    }
+
+    // ========================================================================
+    // 23. 极大价格 × 数量仍正确计算
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_large_price_and_quantity() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-large",
+            vec![simple_item("product:p1", "Expensive Item", 99999.99, 100)],
+        );
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // 99999.99 * 100 = 9_999_999.0
+        assert_eq!(snapshot.subtotal, 9_999_999.0);
+        assert_eq!(snapshot.total, 9_999_999.0);
+    }
+
+    // ========================================================================
+    // 24. f64::MAX 价格 — 转为 0 (Decimal 转换失败)
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_with_f64_max_price_rejected() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-f64max".to_string()),
+                table_name: Some("Table Max".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![simple_item("product:p1", "Max Item", f64::MAX, 1)],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(!resp.success, "f64::MAX price should be rejected (exceeds max)");
+    }
+
+    // ========================================================================
+    // 25. 数量为 0 — 当前被接受（应添加商品但金额为 0）
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_with_zero_quantity_rejected() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-zero-qty".to_string()),
+                table_name: Some("Table Zero Qty".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![simple_item("product:p1", "Zero Qty", 10.0, 0)],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(!resp.success, "Zero quantity should be rejected");
+    }
+
+    // ========================================================================
+    // 26. 负数量 — 当前被接受 (导致负总额)
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_with_negative_quantity_rejected() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-neg-qty".to_string()),
+                table_name: Some("Table Neg Qty".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![simple_item("product:p1", "Negative Qty", 10.0, -3)],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(!resp.success, "Negative quantity should be rejected");
+    }
+
+    // ========================================================================
+    // 27. i32::MAX 数量 — Decimal 可以处理
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_with_i32_max_quantity_rejected() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-maxqty".to_string()),
+                table_name: Some("Table Max Qty".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![simple_item("product:p1", "Max Qty", 0.01, i32::MAX)],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(!resp.success, "i32::MAX quantity exceeds max (9999), should be rejected");
+    }
+
+    #[test]
+    fn test_add_items_with_max_allowed_quantity() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-max-allowed-qty",
+            vec![simple_item("product:p1", "Max Allowed", 0.01, 9999)],
+        );
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        assert_eq!(snapshot.items[0].quantity, 9999);
+        // 0.01 * 9999 = 99.99
+        assert_eq!(snapshot.subtotal, 99.99);
+    }
+
+    // ========================================================================
+    // 28. 折扣超过 100% — unit_price clamp 到 0
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_with_discount_over_100_percent() {
+        let manager = create_test_manager();
+
+        // Open table
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-over-disc".to_string()),
+                table_name: Some("Table Over Discount".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        // Add item with 200% discount
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![CartItemInput {
+                    product_id: "product:p1".to_string(),
+                    name: "Over Discounted".to_string(),
+                    price: 100.0,
+                    original_price: None,
+                    quantity: 1,
+                    selected_options: None,
+                    selected_specification: None,
+                    manual_discount_percent: Some(200.0),
+                    note: None,
+                    authorizer_id: None,
+                    authorizer_name: None,
+                }],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(!resp.success, "200% discount should be rejected (max 100%)");
+    }
+
+    // ========================================================================
+    // 29. 负折扣 — 当前被接受 (相当于加价)
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_with_negative_discount_acts_as_markup() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-neg-disc".to_string()),
+                table_name: Some("Table Neg Discount".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![CartItemInput {
+                    product_id: "product:p1".to_string(),
+                    name: "Neg Discount Item".to_string(),
+                    price: 100.0,
+                    original_price: None,
+                    quantity: 1,
+                    selected_options: None,
+                    selected_specification: None,
+                    manual_discount_percent: Some(-50.0), // -50% = +50%
+                    note: None,
+                    authorizer_id: None,
+                    authorizer_name: None,
+                }],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(!resp.success, "Negative discount should be rejected (min 0%)");
+    }
+
+    // ========================================================================
+    // 30. 支付 NaN 金额 — 当前被 <= 0.0 检查通过 (NaN 比较特殊)
+    // ========================================================================
+
+    #[test]
+    fn test_add_payment_with_nan_amount_rejected() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-nan-pay",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: f64::NAN,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        let resp = manager.execute_command(pay_cmd);
+        assert!(!resp.success, "NaN payment amount should be rejected");
+    }
+
+    // ========================================================================
+    // 31. 支付 Infinity 金额 — 同样绕过 <= 0.0 检查
+    // ========================================================================
+
+    #[test]
+    fn test_add_payment_with_infinity_amount_rejected() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-inf-pay",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CARD".to_string(),
+                    amount: f64::INFINITY,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        let resp = manager.execute_command(pay_cmd);
+        assert!(!resp.success, "Infinity payment amount should be rejected");
+    }
+
+    // ========================================================================
+    // 32. 支付 f64::MAX — 绕过检查，但 Decimal 转换为 0
+    // ========================================================================
+
+    #[test]
+    fn test_add_payment_with_f64_max_amount_rejected() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-maxpay",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CARD".to_string(),
+                    amount: f64::MAX,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        let resp = manager.execute_command(pay_cmd);
+        assert!(!resp.success, "f64::MAX payment should be rejected (exceeds max)");
+    }
+
+    // ========================================================================
+    // 33. 多个极端商品叠加后完成订单
+    // ========================================================================
+
+    #[test]
+    fn test_multiple_edge_items_then_complete() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-multi-edge".to_string()),
+                table_name: Some("Table Multi Edge".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        // 正常商品 + 零价格商品
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![
+                    simple_item("product:p1", "Normal", 25.50, 2),
+                    simple_item("product:p2", "Free", 0.0, 1),
+                    simple_item("product:p3", "Cheap", 0.01, 100),
+                ],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(resp.success);
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // 25.50*2 + 0*1 + 0.01*100 = 51.0 + 0 + 1.0 = 52.0
+        assert_eq!(snapshot.subtotal, 52.0);
+
+        // 支付并完成
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: 52.0,
+                    tendered: Some(60.0),
+                    note: None,
+                },
+            },
+        );
+        manager.execute_command(pay_cmd);
+
+        let complete_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CompleteOrder {
+                order_id: order_id.clone(),
+            },
+        );
+        let resp = manager.execute_command(complete_cmd);
+        assert!(resp.success);
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        assert_eq!(snapshot.status, OrderStatus::Completed);
+        assert_eq!(snapshot.payments[0].change, Some(8.0)); // 60 - 52 = 8
+    }
+
+    // ========================================================================
+    // 34. 带选项价格修改器的边界测试
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_with_option_price_modifiers() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-opts".to_string()),
+                table_name: Some("Table Opts".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![CartItemInput {
+                    product_id: "product:p1".to_string(),
+                    name: "Pizza".to_string(),
+                    price: 12.0,
+                    original_price: None,
+                    quantity: 1,
+                    selected_options: Some(vec![
+                        shared::order::ItemOption {
+                            attribute_id: "attr:size".to_string(),
+                            attribute_name: "Size".to_string(),
+                            option_idx: 2,
+                            option_name: "Large".to_string(),
+                            price_modifier: Some(3.0), // +3
+                        },
+                        shared::order::ItemOption {
+                            attribute_id: "attr:topping".to_string(),
+                            attribute_name: "Topping".to_string(),
+                            option_idx: 0,
+                            option_name: "Extra Cheese".to_string(),
+                            price_modifier: Some(1.50), // +1.50
+                        },
+                    ]),
+                    selected_specification: None,
+                    manual_discount_percent: None,
+                    note: None,
+                    authorizer_id: None,
+                    authorizer_name: None,
+                }],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(resp.success);
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // reducer: item_final = base(12) + options(3+1.50) = 16.50
+        // money: original_price=12.0, options=4.50, base_with_options=16.50
+        //   unit_price=16.50, line_total=16.50
+        assert_eq!(snapshot.subtotal, 16.5);
+    }
+
+    // ========================================================================
+    // 35. 选项修改器为负值 — 当前被接受
+    // ========================================================================
+
+    #[test]
+    fn test_add_items_with_negative_option_modifier() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-neg-opt".to_string()),
+                table_name: Some("Table Neg Opt".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![CartItemInput {
+                    product_id: "product:p1".to_string(),
+                    name: "Special".to_string(),
+                    price: 10.0,
+                    original_price: None,
+                    quantity: 1,
+                    selected_options: Some(vec![shared::order::ItemOption {
+                        attribute_id: "attr:mod".to_string(),
+                        attribute_name: "Mod".to_string(),
+                        option_idx: 0,
+                        option_name: "Smaller".to_string(),
+                        price_modifier: Some(-15.0), // -15 使总价变负
+                    }]),
+                    selected_specification: None,
+                    manual_discount_percent: None,
+                    note: None,
+                    authorizer_id: None,
+                    authorizer_name: None,
+                }],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        // 负的 price_modifier 是被允许的 (比如更小的规格减价)
+        // 但不能超过 MAX_PRICE 的绝对值
+        assert!(resp.success, "Negative option modifier within bounds is allowed");
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // reducer: base=10+(-15)=-5, item_final=max(0,-5)=0
+        // money: base_price=0, options=-15, base_with_options=-15 → clamped to 0
+        assert_eq!(snapshot.subtotal, 0.0, "Negative modifier can reduce price to 0");
+    }
+
+    // ========================================================================
+    // 37. 现金支付 tendered < amount 应被拒绝
+    // ========================================================================
+
+    #[test]
+    fn test_add_cash_payment_tendered_less_than_amount_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-short-tender",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: 10.0,
+                    tendered: Some(5.0), // 给了 5 块，要付 10 块
+                    note: None,
+                },
+            },
+        );
+        let resp = manager.execute_command(pay_cmd);
+        assert!(!resp.success, "Tendered less than amount should be rejected");
+    }
+
+    // ========================================================================
+    // 38. 折扣 + 附加费 + 选项叠加后精度测试
+    // ========================================================================
+
+    #[test]
+    fn test_discount_surcharge_options_combined_precision() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-combo".to_string()),
+                table_name: Some("Table Combo".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![CartItemInput {
+                    product_id: "product:p1".to_string(),
+                    name: "Combo Item".to_string(),
+                    price: 33.33,
+                    original_price: None,
+                    quantity: 3,
+                    selected_options: Some(vec![shared::order::ItemOption {
+                        attribute_id: "attr:size".to_string(),
+                        attribute_name: "Size".to_string(),
+                        option_idx: 1,
+                        option_name: "Large".to_string(),
+                        price_modifier: Some(1.67),
+                    }]),
+                    selected_specification: None,
+                    manual_discount_percent: Some(10.0), // 10% off
+                    note: None,
+                    authorizer_id: None,
+                    authorizer_name: None,
+                }],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(resp.success);
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // reducer: base=33.33+1.67=35.0, discount=3.5, item_final=31.5
+        // money: original_price=33.33, options=1.67, base_with_options=35.0
+        //   manual_discount=35.0*10/100=3.5
+        //   unit_price=35.0-3.5=31.5
+        //   line_total=31.5*3=94.5
+        assert_eq!(snapshot.subtotal, 94.5);
+    }
+
+    // ========================================================================
+    // 39. 支付 NaN 后尝试完成订单 — 应该失败
+    // ========================================================================
+
+    #[test]
+    fn test_nan_payment_then_complete_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-nan-complete",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        // NaN payment — 被输入验证拒绝
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: f64::NAN,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        let pay_resp = manager.execute_command(pay_cmd);
+        assert!(!pay_resp.success, "NaN payment should be rejected by validation");
+
+        // 尝试完成 — 应该失败因为没有成功的支付
+        let complete_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CompleteOrder {
+                order_id: order_id.clone(),
+            },
+        );
+        let resp = manager.execute_command(complete_cmd);
+        assert!(!resp.success, "Should fail: no payment was recorded");
+    }
+
+    // ========================================================================
+    // 40. 快照重建一致性 — 带边界值
+    // ========================================================================
+
+    #[test]
+    fn test_rebuild_snapshot_with_edge_values() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-rebuild-edge".to_string()),
+                table_name: Some("Table Rebuild Edge".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        // 添加零价格商品
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![
+                    simple_item("product:p1", "Free", 0.0, 5),
+                    simple_item("product:p2", "Penny", 0.01, 99),
+                ],
+            },
+        );
+        manager.execute_command(add_cmd);
+
+        let stored = manager.get_snapshot(&order_id).unwrap().unwrap();
+        let rebuilt = manager.rebuild_snapshot(&order_id).unwrap();
+
+        assert_eq!(stored.subtotal, rebuilt.subtotal);
+        assert_eq!(stored.total, rebuilt.total);
+        assert_eq!(stored.state_checksum, rebuilt.state_checksum);
+        // 0*5 + 0.01*99 = 0.99
+        assert_eq!(stored.subtotal, 0.99);
+    }
+
+    // ========================================================================
+    // 41. 批量小金额累加精度
+    // ========================================================================
+
+    #[test]
+    fn test_many_small_amounts_precision() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-small-amounts".to_string()),
+                table_name: Some("Table Small".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        // 添加 10 次，每次 1 个 0.1 的商品
+        for i in 0..10 {
+            let add_cmd = OrderCommand::new(
+                "op-1".to_string(),
+                "Test Operator".to_string(),
+                OrderCommandPayload::AddItems {
+                    order_id: order_id.clone(),
+                    items: vec![CartItemInput {
+                        product_id: format!("product:p{}", i),
+                        name: format!("Item {}", i),
+                        price: 0.1,
+                        original_price: None,
+                        quantity: 1,
+                        selected_options: None,
+                        selected_specification: None,
+                        manual_discount_percent: None,
+                        note: None,
+                        authorizer_id: None,
+                        authorizer_name: None,
+                    }],
+                },
+            );
+            manager.execute_command(add_cmd);
+        }
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // 0.1 * 10 = 1.0 (使用 Decimal 精确计算)
+        assert_eq!(snapshot.subtotal, 1.0, "10 x 0.1 should be exactly 1.0");
+        assert_eq!(snapshot.total, 1.0);
+    }
+
+    // ========================================================================
+    // 42. NaN tendered — 对应 amount 为正值
+    // ========================================================================
+
+    #[test]
+    fn test_add_cash_payment_nan_tendered() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-nan-tender",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: 10.0,
+                    tendered: Some(f64::NAN), // NaN tendered
+                    note: None,
+                },
+            },
+        );
+        let resp = manager.execute_command(pay_cmd);
+        // to_decimal(NaN) = 0, to_decimal(10.0) - 0.01 = 9.99
+        // 0 < 9.99 → tendered 不足被拒绝
+        assert!(!resp.success, "NaN tendered should fail: Decimal(0) < 9.99");
+    }
+
+    // ========================================================================
+    // 43. Moved/Merged 状态的订单不能添加支付
+    // ========================================================================
+
+    #[test]
+    fn test_add_payment_to_moved_order_fails() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-moved-pay",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        // Move order
+        let move_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::MoveOrder {
+                order_id: order_id.clone(),
+                target_table_id: "T-moved-pay-2".to_string(),
+                target_table_name: "Table 2".to_string(),
+                target_zone_id: None,
+                target_zone_name: None,
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        manager.execute_command(move_cmd);
+
+        // MoveOrder 在当前实现中不改变订单状态为 Moved（它只是移动桌台），
+        // 而是保持 Active。验证移桌后仍然可以支付。
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: 10.0,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        let resp = manager.execute_command(pay_cmd);
+        assert!(resp.success, "Moved order should still accept payments (status stays Active)");
+    }
+
+    // ========================================================================
+    // 44. 极小金额差异 — 支付容差边界
+    // ========================================================================
+
+    #[test]
+    fn test_payment_tolerance_boundary() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-tolerance",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        // 支付 9.99 — 差 0.01，在容差内
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CARD".to_string(),
+                    amount: 9.99,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        manager.execute_command(pay_cmd);
+
+        let complete_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CompleteOrder {
+                order_id: order_id.clone(),
+            },
+        );
+        let resp = manager.execute_command(complete_cmd);
+        assert!(resp.success, "9.99 should be sufficient for 10.0 (within 0.01 tolerance)");
+    }
+
+    #[test]
+    fn test_payment_below_tolerance_rejected() {
+        let manager = create_test_manager();
+        let order_id = open_table_with_items(
+            &manager,
+            "T-below-tol",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        // 支付 9.98 — 差 0.02，超出容差
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CARD".to_string(),
+                    amount: 9.98,
+                    tendered: None,
+                    note: None,
+                },
+            },
+        );
+        manager.execute_command(pay_cmd);
+
+        let complete_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CompleteOrder {
+                order_id: order_id.clone(),
+            },
+        );
+        let resp = manager.execute_command(complete_cmd);
+        assert!(!resp.success, "9.98 should be insufficient for 10.0 (outside 0.01 tolerance)");
+    }
+
+    // ========================================================================
+    // 41. 多选项 + 手动折扣 + 规则字段: 端到端精度验证 (无双重计算)
+    // ========================================================================
+
+    #[test]
+    fn test_options_discount_rule_fields_no_double_counting() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-no-double".to_string()),
+                table_name: Some("Table No Double".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        // Item: price=20.0, options=+3.0+2.0=5.0, discount=10%
+        // Expected: base_with_options=25.0, discount=2.5, unit_price=22.5
+        // qty=2 → subtotal=45.0
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![CartItemInput {
+                    product_id: "product:p1".to_string(),
+                    name: "Steak".to_string(),
+                    price: 20.0,
+                    original_price: None,
+                    quantity: 2,
+                    selected_options: Some(vec![
+                        shared::order::ItemOption {
+                            attribute_id: "attr:sauce".to_string(),
+                            attribute_name: "Sauce".to_string(),
+                            option_idx: 0,
+                            option_name: "BBQ".to_string(),
+                            price_modifier: Some(3.0),
+                        },
+                        shared::order::ItemOption {
+                            attribute_id: "attr:side".to_string(),
+                            attribute_name: "Side".to_string(),
+                            option_idx: 1,
+                            option_name: "Fries".to_string(),
+                            price_modifier: Some(2.0),
+                        },
+                    ]),
+                    selected_specification: None,
+                    manual_discount_percent: Some(10.0),
+                    note: None,
+                    authorizer_id: None,
+                    authorizer_name: None,
+                }],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(resp.success);
+
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        let item = &snapshot.items[0];
+
+        // original_price should be set to the input price (spec price)
+        assert_eq!(item.original_price, Some(20.0), "original_price = input price");
+
+        // unit_price: base(20)+options(5)=25, discount=25*10%=2.5, unit=22.5
+        assert_eq!(item.unit_price, Some(22.5), "unit_price = 22.5 (no double counting)");
+
+        // subtotal = 22.5 * 2 = 45.0
+        assert_eq!(snapshot.subtotal, 45.0, "subtotal = 45.0");
+        assert_eq!(snapshot.total, 45.0, "total = 45.0 (no tax)");
+    }
+
+    // ========================================================================
+    // 42. ModifyItem 后 unit_price 一致性
+    // ========================================================================
+
+    #[test]
+    fn test_modify_item_unit_price_consistency() {
+        let manager = create_test_manager();
+
+        let open_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::OpenTable {
+                table_id: Some("T-mod-cons".to_string()),
+                table_name: Some("Table Mod Consistency".to_string()),
+                zone_id: None,
+                zone_name: None,
+                guest_count: 1,
+                is_retail: false,
+                service_type: None,
+            },
+        );
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        // Add item: price=15.0, options=+2.5, no discount, qty=3
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![CartItemInput {
+                    product_id: "product:p1".to_string(),
+                    name: "Pasta".to_string(),
+                    price: 15.0,
+                    original_price: None,
+                    quantity: 3,
+                    selected_options: Some(vec![shared::order::ItemOption {
+                        attribute_id: "attr:cheese".to_string(),
+                        attribute_name: "Cheese".to_string(),
+                        option_idx: 0,
+                        option_name: "Extra".to_string(),
+                        price_modifier: Some(2.5),
+                    }]),
+                    selected_specification: None,
+                    manual_discount_percent: None,
+                    note: None,
+                    authorizer_id: None,
+                    authorizer_name: None,
+                }],
+            },
+        );
+        let resp = manager.execute_command(add_cmd);
+        assert!(resp.success);
+
+        let snapshot_before = manager.get_snapshot(&order_id).unwrap().unwrap();
+        let instance_id = snapshot_before.items[0].instance_id.clone();
+        // unit_price = 15 + 2.5 = 17.5, subtotal = 17.5 * 3 = 52.5
+        assert_eq!(snapshot_before.items[0].unit_price, Some(17.5));
+        assert_eq!(snapshot_before.subtotal, 52.5);
+
+        // Modify: add 20% discount
+        let modify_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::ModifyItem {
+                order_id: order_id.clone(),
+                instance_id,
+                affected_quantity: None,
+                changes: shared::order::ItemChanges {
+                    price: None,
+                    quantity: None,
+                    manual_discount_percent: Some(20.0),
+                    note: None,
+                    selected_options: None,
+                    selected_specification: None,
+                },
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(modify_cmd);
+        assert!(resp.success, "ModifyItem should succeed");
+
+        let snapshot_after = manager.get_snapshot(&order_id).unwrap().unwrap();
+        let item = &snapshot_after.items[0];
+
+        // original_price should still be 15.0
+        assert_eq!(item.original_price, Some(15.0), "original_price unchanged after modify");
+
+        // unit_price: base(15)+options(2.5)=17.5, discount=17.5*20%=3.5, unit=14.0
+        assert_eq!(item.unit_price, Some(14.0), "unit_price after 20% discount");
+
+        // subtotal = 14.0 * 3 = 42.0
+        assert_eq!(snapshot_after.subtotal, 42.0, "subtotal after modify");
+        assert_eq!(snapshot_after.total, 42.0, "total after modify");
     }
 }

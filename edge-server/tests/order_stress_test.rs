@@ -66,7 +66,6 @@ fn random_items(rng: &mut impl Rng) -> Vec<CartItemInput> {
                 selected_options: None,
                 selected_specification: None,
                 manual_discount_percent: if rng.gen_bool(0.1) { Some(10.0) } else { None },
-                surcharge: None,
                 note: None,
                 authorizer_id: None,
                 authorizer_name: None,

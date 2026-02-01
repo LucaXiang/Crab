@@ -72,7 +72,6 @@ function toCartItemInput(item: CartItem): CartItemInput {
     quantity: item.quantity,
     note: item.note ?? null,
     manual_discount_percent: item.manual_discount_percent ?? null,
-    surcharge: item.surcharge ?? null,
     selected_options: selectedOptions,
     selected_specification: item.selected_specification ? {
       id: item.selected_specification.id,
@@ -524,7 +523,6 @@ export const modifyItem = async (
     price?: number;
     quantity?: number;
     manual_discount_percent?: number;
-    surcharge?: number;
     note?: string;
     selected_options?: ItemOption[];
     selected_specification?: SpecificationInfo;
@@ -539,7 +537,6 @@ export const modifyItem = async (
       price: changes.price ?? null,
       quantity: changes.quantity ?? null,
       manual_discount_percent: changes.manual_discount_percent ?? null,
-      surcharge: changes.surcharge ?? null,
       note: changes.note ?? null,
       selected_options: changes.selected_options ?? null,
       selected_specification: changes.selected_specification ?? null,

@@ -23,10 +23,13 @@ impl CommandHandler for AddPaymentAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        // 1. Load existing snapshot
+        // 1. Validate payment input (finite, positive, within bounds)
+        crate::orders::money::validate_payment(&self.payment)?;
+
+        // 2. Load existing snapshot
         let snapshot = ctx.load_snapshot(&self.order_id)?;
 
-        // 2. Validate order status - must be Active
+        // 3. Validate order status - must be Active
         match snapshot.status {
             OrderStatus::Active => {} // OK - continue with payment
             OrderStatus::Completed => {
@@ -41,11 +44,6 @@ impl CommandHandler for AddPaymentAction {
                     snapshot.status
                 )));
             }
-        }
-
-        // 3. Validate payment amount
-        if self.payment.amount <= 0.0 {
-            return Err(OrderError::InvalidAmount);
         }
 
         // 4. Allocate sequence number

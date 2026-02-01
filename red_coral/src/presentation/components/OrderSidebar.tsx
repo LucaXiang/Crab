@@ -54,7 +54,6 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       price: updates.price ?? undefined,
       quantity: updates.quantity ?? undefined,
       manual_discount_percent: updates.manual_discount_percent ?? undefined,
-      surcharge: updates.surcharge ?? undefined,
       note: updates.note ?? undefined,
       selected_options: updates.selected_options ?? undefined,
       selected_specification: updates.selected_specification ?? undefined,
