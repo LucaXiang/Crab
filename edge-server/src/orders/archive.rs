@@ -427,6 +427,7 @@ impl OrderArchiveService {
                     instance_id = $item{}_instance_id,
                     name = $item{}_name,
                     spec_name = $item{}_spec_name,
+                    category_name = $item{}_category_name,
                     price = $item{}_price,
                     quantity = $item{}_quantity,
                     unpaid_quantity = $item{}_unpaid_quantity,
@@ -440,7 +441,7 @@ impl OrderArchiveService {
                 RELATE ($order[0].id)->has_item->({}[0].id);
                 "#,
                 var_name,
-                i, i, i, i, i, i, i, i, i, i, i, i, i, i,
+                i, i, i, i, i, i, i, i, i, i, i, i, i, i, i,
                 var_name
             ));
 
@@ -573,6 +574,7 @@ impl OrderArchiveService {
                 .bind((format!("item{}_instance_id", i), instance_id))
                 .bind((format!("item{}_name", i), item.name.clone()))
                 .bind((format!("item{}_spec_name", i), spec_name))
+                .bind((format!("item{}_category_name", i), item.category_name.clone()))
                 .bind((format!("item{}_price", i), base_price))
                 .bind((format!("item{}_quantity", i), item.quantity))
                 .bind((format!("item{}_unpaid_quantity", i), unpaid_quantity))

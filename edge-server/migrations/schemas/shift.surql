@@ -29,21 +29,21 @@ DEFINE FIELD OVERWRITE end_time ON shift TYPE option<int>
     PERMISSIONS FULL;
 
 -- 备用金 (开班时的现金准备金)
-DEFINE FIELD OVERWRITE starting_cash ON shift TYPE float
+DEFINE FIELD OVERWRITE starting_cash ON shift TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
 -- 预期现金 (starting_cash + 班次内现金收款)
-DEFINE FIELD OVERWRITE expected_cash ON shift TYPE float
+DEFINE FIELD OVERWRITE expected_cash ON shift TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
 -- 实际现金 (收班时盘点)
-DEFINE FIELD OVERWRITE actual_cash ON shift TYPE option<float>
+DEFINE FIELD OVERWRITE actual_cash ON shift TYPE option<decimal>
     PERMISSIONS FULL;
 
 -- 现金差异 (actual_cash - expected_cash)
-DEFINE FIELD OVERWRITE cash_variance ON shift TYPE option<float>
+DEFINE FIELD OVERWRITE cash_variance ON shift TYPE option<decimal>
     PERMISSIONS FULL;
 
 -- 是否异常关闭 (断电/崩溃后自动恢复)

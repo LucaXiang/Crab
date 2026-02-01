@@ -134,17 +134,17 @@ impl LabelTemplateRepository {
                 .await?;
         }
 
-        // Update timestamp
-        let _ = self
+        // Merge update data with timestamp in a single query
+        let mut result = self
             .base
             .db()
-            .query("UPDATE $id SET updated_at = $now")
+            .query("UPDATE $id MERGE $data SET updated_at = $now RETURN AFTER")
             .bind(("id", id.clone()))
+            .bind(("data", data))
             .bind(("now", shared::util::now_millis()))
             .await?;
 
-        // Merge update data
-        let updated: Option<LabelTemplate> = self.base.db().update(id.clone()).merge(data).await?;
+        let updated: Option<LabelTemplate> = result.take(0)?;
         let updated =
             updated.ok_or_else(|| RepoError::NotFound(format!("Label template {} not found", id)))?;
 

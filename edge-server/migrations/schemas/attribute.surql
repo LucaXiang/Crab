@@ -55,7 +55,7 @@ DEFINE FIELD OVERWRITE options ON attribute TYPE array<object>
 DEFINE FIELD OVERWRITE options.*.name ON attribute TYPE string
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE options.*.price_modifier ON attribute TYPE float
+DEFINE FIELD OVERWRITE options.*.price_modifier ON attribute TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 

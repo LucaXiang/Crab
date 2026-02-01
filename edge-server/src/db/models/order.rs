@@ -121,6 +121,7 @@ pub struct OrderItemDetail {
     pub instance_id: String,
     pub name: String,
     pub spec_name: Option<String>,
+    pub category_name: Option<String>,
     #[serde(default)]
     pub price: f64,
     #[serde(default)]

@@ -5,8 +5,6 @@ use crate::db::models::{DiningTable, DiningTableCreate, DiningTableUpdate};
 use surrealdb::engine::local::Db;
 use surrealdb::{RecordId, Surreal};
 
-const TABLE: &str = "dining_table";
-
 #[derive(Clone)]
 pub struct DiningTableRepository {
     base: BaseRepository,
@@ -102,23 +100,23 @@ impl DiningTableRepository {
             )));
         }
 
-        // Internal struct without serde_helpers to preserve native RecordId for SurrealDB
-        #[derive(serde::Serialize)]
-        struct InternalDiningTable {
-            name: String,
-            zone: RecordId,
-            capacity: i32,
-            is_active: bool,
-        }
+        let mut result = self
+            .base
+            .db()
+            .query(
+                r#"CREATE dining_table SET
+                    name = $name,
+                    zone = $zone,
+                    capacity = $capacity,
+                    is_active = true
+                RETURN AFTER"#,
+            )
+            .bind(("name", data.name))
+            .bind(("zone", data.zone))
+            .bind(("capacity", data.capacity.unwrap_or(4)))
+            .await?;
 
-        let table = InternalDiningTable {
-            name: data.name,
-            zone: data.zone,
-            capacity: data.capacity.unwrap_or(4),
-            is_active: true,
-        };
-
-        let created: Option<DiningTable> = self.base.db().create(TABLE).content(table).await?;
+        let created: Option<DiningTable> = result.take(0)?;
         created.ok_or_else(|| RepoError::Database("Failed to create dining table".to_string()))
     }
 

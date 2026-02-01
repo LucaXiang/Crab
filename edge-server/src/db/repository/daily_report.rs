@@ -60,7 +60,8 @@ impl DailyReportRepository {
 
         let parsed_date = validate_date(&data.business_date)?;
         let start_millis = parsed_date.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis();
-        let end_millis = parsed_date.and_hms_opt(23, 59, 59).unwrap().and_utc().timestamp_millis();
+        let next_day = parsed_date.succ_opt().unwrap_or(parsed_date);
+        let end_millis = next_day.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis();
 
         // Complex aggregation query for daily report
         let mut result = self
@@ -68,10 +69,10 @@ impl DailyReportRepository {
             .db()
             .query(
                 r#"
-                -- Get all orders for the day (archived orders)
+                -- Get all orders for the day (by business end_time, not archive created_at)
                 LET $all_orders = SELECT * FROM order
-                    WHERE created_at >= $start
-                    AND created_at <= $end;
+                    WHERE end_time >= $start
+                    AND end_time < $end;
 
                 -- Filter by status
                 LET $completed = SELECT * FROM $all_orders WHERE status = 'COMPLETED';
@@ -130,7 +131,7 @@ impl DailyReportRepository {
                 );
 
                 -- Create the report
-                CREATE daily_report SET
+                LET $report = CREATE daily_report SET
                     business_date = $date,
                     total_orders = count($all_orders),
                     completed_orders = count($completed),
@@ -147,8 +148,8 @@ impl DailyReportRepository {
                     generated_at = $now,
                     generated_by_id = $gen_id,
                     generated_by_name = $gen_name,
-                    note = $note
-                RETURN AFTER
+                    note = $note;
+                RETURN $report
             "#,
             )
             .bind(("date", data.business_date))

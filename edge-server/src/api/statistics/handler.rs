@@ -261,8 +261,11 @@ pub async fn get_statistics(
     // Query for overview stats
     let mut result = state.db
         .query(r#"
-            -- Get all orders in time range
-            LET $all_orders = SELECT * FROM order
+            -- Get all orders in time range (only needed fields)
+            LET $all_orders = SELECT
+                id, status, total_amount, paid_amount, guest_count,
+                discount_amount, start_time, end_time
+            FROM order
                 WHERE end_time >= $start
                 AND end_time < $end;
 

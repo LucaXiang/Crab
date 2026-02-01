@@ -31,31 +31,31 @@ DEFINE FIELD OVERWRITE is_retail ON order TYPE bool
 DEFINE FIELD OVERWRITE guest_count ON order TYPE option<int>
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE original_total ON order TYPE float
+DEFINE FIELD OVERWRITE original_total ON order TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE subtotal ON order TYPE float
+DEFINE FIELD OVERWRITE subtotal ON order TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE total_amount ON order TYPE float
+DEFINE FIELD OVERWRITE total_amount ON order TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE paid_amount ON order TYPE float
+DEFINE FIELD OVERWRITE paid_amount ON order TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE discount_amount ON order TYPE float
+DEFINE FIELD OVERWRITE discount_amount ON order TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE surcharge_amount ON order TYPE float
+DEFINE FIELD OVERWRITE surcharge_amount ON order TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE tax ON order TYPE float
+DEFINE FIELD OVERWRITE tax ON order TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
@@ -77,7 +77,7 @@ DEFINE FIELD OVERWRITE void_type ON order TYPE option<string>
 DEFINE FIELD OVERWRITE loss_reason ON order TYPE option<string>
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE loss_amount ON order TYPE option<float>
+DEFINE FIELD OVERWRITE loss_amount ON order TYPE option<decimal>
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE void_note ON order TYPE option<string>
@@ -99,6 +99,8 @@ DEFINE INDEX OVERWRITE order_receipt ON order FIELDS receipt_number UNIQUE;
 DEFINE INDEX OVERWRITE order_status ON order FIELDS status;
 DEFINE INDEX OVERWRITE order_end_time ON order FIELDS end_time;
 DEFINE INDEX OVERWRITE order_hash ON order FIELDS curr_hash;
+DEFINE INDEX OVERWRITE order_status_end_time ON order FIELDS status, end_time;
+DEFINE INDEX OVERWRITE order_created_at ON order FIELDS created_at;
 
 -- =============================================================================
 -- order_item 表
@@ -121,7 +123,7 @@ DEFINE FIELD OVERWRITE name ON order_item TYPE string
 DEFINE FIELD OVERWRITE spec_name ON order_item TYPE option<string>
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE price ON order_item TYPE float
+DEFINE FIELD OVERWRITE price ON order_item TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
@@ -133,28 +135,31 @@ DEFINE FIELD OVERWRITE unpaid_quantity ON order_item TYPE int
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE unit_price ON order_item TYPE float
+DEFINE FIELD OVERWRITE unit_price ON order_item TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE line_total ON order_item TYPE float
+DEFINE FIELD OVERWRITE line_total ON order_item TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE discount_amount ON order_item TYPE float
+DEFINE FIELD OVERWRITE discount_amount ON order_item TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE surcharge_amount ON order_item TYPE float
+DEFINE FIELD OVERWRITE surcharge_amount ON order_item TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE tax ON order_item TYPE float
+DEFINE FIELD OVERWRITE tax ON order_item TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE tax_rate ON order_item TYPE int
     DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE category_name ON order_item TYPE option<string>
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE note ON order_item TYPE option<string>
@@ -178,7 +183,7 @@ DEFINE FIELD OVERWRITE attribute_name ON order_item_option TYPE string
 DEFINE FIELD OVERWRITE option_name ON order_item_option TYPE string
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE price ON order_item_option TYPE float
+DEFINE FIELD OVERWRITE price ON order_item_option TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
@@ -201,7 +206,7 @@ DEFINE FIELD OVERWRITE payment_id ON order_payment TYPE string
 DEFINE FIELD OVERWRITE method ON order_payment TYPE string
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE amount ON order_payment TYPE float
+DEFINE FIELD OVERWRITE amount ON order_payment TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
@@ -269,17 +274,25 @@ DEFINE TABLE OVERWRITE has_item TYPE RELATION
     PERMISSIONS FOR select, create
         WHERE $auth.role = role:admin OR $auth.id = employee:admin;
 
+DEFINE INDEX OVERWRITE has_item_in ON has_item FIELDS in;
+
 DEFINE TABLE OVERWRITE has_option TYPE RELATION
     FROM order_item TO order_item_option SCHEMAFULL
     PERMISSIONS FOR select, create
         WHERE $auth.role = role:admin OR $auth.id = employee:admin;
+
+DEFINE INDEX OVERWRITE has_option_in ON has_option FIELDS in;
 
 DEFINE TABLE OVERWRITE has_payment TYPE RELATION
     FROM order TO order_payment SCHEMAFULL
     PERMISSIONS FOR select, create
         WHERE $auth.role = role:admin OR $auth.id = employee:admin;
 
+DEFINE INDEX OVERWRITE has_payment_in ON has_payment FIELDS in;
+
 DEFINE TABLE OVERWRITE has_event TYPE RELATION
     FROM order TO order_event SCHEMAFULL
     PERMISSIONS FOR select, create
         WHERE $auth.role = role:admin OR $auth.id = employee:admin;
+
+DEFINE INDEX OVERWRITE has_event_in ON has_event FIELDS in;

@@ -5,8 +5,6 @@ use crate::db::models::{Employee, EmployeeCreate, EmployeeUpdate};
 use surrealdb::engine::local::Db;
 use surrealdb::{RecordId, Surreal};
 
-const TABLE: &str = "employee";
-
 #[derive(Clone)]
 pub struct EmployeeRepository {
     base: BaseRepository,
@@ -88,27 +86,26 @@ impl EmployeeRepository {
 
         let display_name = data.display_name.unwrap_or_else(|| data.username.clone());
 
-        // Internal struct without serde_helpers to preserve native RecordId for SurrealDB
-        #[derive(serde::Serialize)]
-        struct InternalEmployee {
-            username: String,
-            display_name: String,
-            hash_pass: String,
-            role: RecordId,
-            is_system: bool,
-            is_active: bool,
-        }
+        let mut result = self
+            .base
+            .db()
+            .query(
+                r#"CREATE employee SET
+                    username = $username,
+                    display_name = $display_name,
+                    hash_pass = $hash_pass,
+                    role = $role,
+                    is_system = false,
+                    is_active = true
+                RETURN AFTER"#,
+            )
+            .bind(("username", data.username))
+            .bind(("display_name", display_name))
+            .bind(("hash_pass", hash_pass))
+            .bind(("role", data.role))
+            .await?;
 
-        let employee = InternalEmployee {
-            username: data.username,
-            display_name,
-            hash_pass,
-            role: data.role,
-            is_system: false,
-            is_active: true,
-        };
-
-        let created: Option<Employee> = self.base.db().create(TABLE).content(employee).await?;
+        let created: Option<Employee> = result.take(0)?;
         created.ok_or_else(|| RepoError::Database("Failed to create employee".to_string()))
     }
 
@@ -142,21 +139,6 @@ impl EmployeeRepository {
             )));
         }
 
-        // Build update document
-        #[derive(serde::Serialize)]
-        struct UpdateDoc {
-            #[serde(skip_serializing_if = "Option::is_none")]
-            username: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            display_name: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            hash_pass: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            role: Option<RecordId>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            is_active: Option<bool>,
-        }
-
         let hash_pass = if let Some(ref password) = data.password {
             Some(
                 Employee::hash_password(password)
@@ -166,19 +148,25 @@ impl EmployeeRepository {
             None
         };
 
-        let update_doc = UpdateDoc {
-            username: data.username,
-            display_name: data.display_name,
-            hash_pass,
-            role: data.role,
-            is_active: data.is_active,
-        };
-
         let mut result = self.base
             .db()
-            .query("UPDATE $thing MERGE $data RETURN AFTER")
+            .query(
+                r#"UPDATE $thing SET
+                    username = $username OR username,
+                    display_name = $display_name OR display_name,
+                    hash_pass = $hash_pass OR hash_pass,
+                    role = IF $has_role THEN $role ELSE role END,
+                    is_active = IF $has_is_active THEN $is_active ELSE is_active END
+                RETURN AFTER"#,
+            )
             .bind(("thing", thing))
-            .bind(("data", update_doc))
+            .bind(("username", data.username))
+            .bind(("display_name", data.display_name))
+            .bind(("hash_pass", hash_pass))
+            .bind(("has_role", data.role.is_some()))
+            .bind(("role", data.role))
+            .bind(("has_is_active", data.is_active.is_some()))
+            .bind(("is_active", data.is_active))
             .await?;
 
         result.take::<Option<Employee>>(0)?

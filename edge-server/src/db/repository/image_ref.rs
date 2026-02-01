@@ -149,16 +149,30 @@ impl ImageRefRepository {
             return Ok(vec![]);
         }
 
-        let mut orphans = Vec::new();
-
-        for hash in hashes {
-            let count = self.count_refs(hash).await?;
-            if count == 0 {
-                orphans.push(hash.clone());
-            }
+        // Batch query: find hashes that still have references
+        #[derive(serde::Deserialize)]
+        struct HashCount {
+            hash: String,
         }
 
-        Ok(orphans)
+        let referenced: Vec<HashCount> = self
+            .base
+            .db()
+            .query(
+                "SELECT hash FROM image_ref WHERE hash IN $hashes GROUP BY hash",
+            )
+            .bind(("hashes", hashes.to_vec()))
+            .await?
+            .take(0)?;
+
+        let referenced_set: HashSet<String> = referenced.into_iter().map(|r| r.hash).collect();
+
+        // Hashes not in the referenced set are orphans
+        Ok(hashes
+            .iter()
+            .filter(|h| !referenced_set.contains(*h))
+            .cloned()
+            .collect())
     }
 
     /// 获取实体的所有图片引用

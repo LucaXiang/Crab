@@ -31,37 +31,37 @@ DEFINE FIELD OVERWRITE void_orders ON daily_report TYPE int
 -- === 金额统计 ===
 
 -- 总营业额 (completed orders)
-DEFINE FIELD OVERWRITE total_sales ON daily_report TYPE float
+DEFINE FIELD OVERWRITE total_sales ON daily_report TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
 -- 已支付金额
-DEFINE FIELD OVERWRITE total_paid ON daily_report TYPE float
+DEFINE FIELD OVERWRITE total_paid ON daily_report TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
 -- 未支付金额
-DEFINE FIELD OVERWRITE total_unpaid ON daily_report TYPE float
+DEFINE FIELD OVERWRITE total_unpaid ON daily_report TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
 -- 作废订单金额
-DEFINE FIELD OVERWRITE void_amount ON daily_report TYPE float
+DEFINE FIELD OVERWRITE void_amount ON daily_report TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
 -- 税额总计
-DEFINE FIELD OVERWRITE total_tax ON daily_report TYPE float
+DEFINE FIELD OVERWRITE total_tax ON daily_report TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
 -- 折扣总计
-DEFINE FIELD OVERWRITE total_discount ON daily_report TYPE float
+DEFINE FIELD OVERWRITE total_discount ON daily_report TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
 -- 附加费总计
-DEFINE FIELD OVERWRITE total_surcharge ON daily_report TYPE float
+DEFINE FIELD OVERWRITE total_surcharge ON daily_report TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
@@ -71,9 +71,9 @@ DEFINE FIELD OVERWRITE tax_breakdowns ON daily_report TYPE array<object>
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE tax_breakdowns.*.tax_rate ON daily_report TYPE int PERMISSIONS FULL;
-DEFINE FIELD OVERWRITE tax_breakdowns.*.net_amount ON daily_report TYPE float DEFAULT 0 PERMISSIONS FULL;
-DEFINE FIELD OVERWRITE tax_breakdowns.*.tax_amount ON daily_report TYPE float DEFAULT 0 PERMISSIONS FULL;
-DEFINE FIELD OVERWRITE tax_breakdowns.*.gross_amount ON daily_report TYPE float DEFAULT 0 PERMISSIONS FULL;
+DEFINE FIELD OVERWRITE tax_breakdowns.*.net_amount ON daily_report TYPE decimal DEFAULT 0 PERMISSIONS FULL;
+DEFINE FIELD OVERWRITE tax_breakdowns.*.tax_amount ON daily_report TYPE decimal DEFAULT 0 PERMISSIONS FULL;
+DEFINE FIELD OVERWRITE tax_breakdowns.*.gross_amount ON daily_report TYPE decimal DEFAULT 0 PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE tax_breakdowns.*.order_count ON daily_report TYPE int DEFAULT 0 PERMISSIONS FULL;
 
 -- === 支付方式分类 ===
@@ -82,7 +82,7 @@ DEFINE FIELD OVERWRITE payment_breakdowns ON daily_report TYPE array<object>
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE payment_breakdowns.*.method ON daily_report TYPE string PERMISSIONS FULL;
-DEFINE FIELD OVERWRITE payment_breakdowns.*.amount ON daily_report TYPE float DEFAULT 0 PERMISSIONS FULL;
+DEFINE FIELD OVERWRITE payment_breakdowns.*.amount ON daily_report TYPE decimal DEFAULT 0 PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE payment_breakdowns.*.count ON daily_report TYPE int DEFAULT 0 PERMISSIONS FULL;
 
 -- === 生成信息 ===

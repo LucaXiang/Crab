@@ -1,11 +1,9 @@
 //! Price Rule Repository
 
 use super::{BaseRepository, RepoError, RepoResult};
-use crate::db::models::{serde_helpers, PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
+use crate::db::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
 use surrealdb::engine::local::Db;
 use surrealdb::{RecordId, Surreal};
-
-const TABLE: &str = "price_rule";
 
 #[derive(Clone)]
 pub struct PriceRuleRepository {
@@ -53,7 +51,7 @@ impl PriceRuleRepository {
                 LET $prod = type::thing("product", $pid);
                 LET $product = (SELECT * FROM product WHERE id = $prod)[0];
                 LET $cat = $product.category;
-                LET $tags = (SELECT tags FROM product_specification WHERE product = $prod).tags;
+                LET $tags = $product.tags;
 
                 SELECT * FROM price_rule
                 WHERE is_active = true AND (
@@ -106,69 +104,57 @@ impl PriceRuleRepository {
         // Convert target string to RecordId if provided
         let target_thing: Option<RecordId> = data.target.as_ref().and_then(|t| t.parse().ok());
 
-        // Internal struct with native RecordId type
-        #[derive(serde::Serialize)]
-        struct InternalCreate {
-            name: String,
-            display_name: String,
-            receipt_name: String,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            description: Option<String>,
-            rule_type: crate::db::models::RuleType,
-            product_scope: ProductScope,
-            #[serde(
-                skip_serializing_if = "Option::is_none",
-                with = "serde_helpers::option_record_id"
-            )]
-            target: Option<RecordId>,
-            zone_scope: String,
-            adjustment_type: crate::db::models::AdjustmentType,
-            adjustment_value: f64,
-            priority: i32,
-            is_stackable: bool,
-            is_exclusive: bool,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            valid_from: Option<i64>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            valid_until: Option<i64>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            active_days: Option<Vec<u8>>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            active_start_time: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            active_end_time: Option<String>,
-            is_active: bool,
-            #[serde(
-                skip_serializing_if = "Option::is_none",
-                with = "serde_helpers::option_record_id"
-            )]
-            created_by: Option<RecordId>,
-        }
+        let mut result = self
+            .base
+            .db()
+            .query(
+                r#"CREATE price_rule SET
+                    name = $name,
+                    display_name = $display_name,
+                    receipt_name = $receipt_name,
+                    description = $description,
+                    rule_type = $rule_type,
+                    product_scope = $product_scope,
+                    target = $target,
+                    zone_scope = $zone_scope,
+                    adjustment_type = $adjustment_type,
+                    adjustment_value = $adjustment_value,
+                    priority = $priority,
+                    is_stackable = $is_stackable,
+                    is_exclusive = $is_exclusive,
+                    valid_from = $valid_from,
+                    valid_until = $valid_until,
+                    active_days = $active_days,
+                    active_start_time = $active_start_time,
+                    active_end_time = $active_end_time,
+                    is_active = true,
+                    created_by = $created_by,
+                    created_at = $now
+                RETURN AFTER"#,
+            )
+            .bind(("name", data.name))
+            .bind(("display_name", data.display_name))
+            .bind(("receipt_name", data.receipt_name))
+            .bind(("description", data.description))
+            .bind(("rule_type", data.rule_type))
+            .bind(("product_scope", data.product_scope))
+            .bind(("target", target_thing))
+            .bind(("zone_scope", data.zone_scope.unwrap_or_else(|| crate::db::models::ZONE_SCOPE_ALL.to_string())))
+            .bind(("adjustment_type", data.adjustment_type))
+            .bind(("adjustment_value", data.adjustment_value))
+            .bind(("priority", data.priority.unwrap_or(0)))
+            .bind(("is_stackable", data.is_stackable.unwrap_or(true)))
+            .bind(("is_exclusive", data.is_exclusive.unwrap_or(false)))
+            .bind(("valid_from", data.valid_from))
+            .bind(("valid_until", data.valid_until))
+            .bind(("active_days", data.active_days))
+            .bind(("active_start_time", data.active_start_time))
+            .bind(("active_end_time", data.active_end_time))
+            .bind(("created_by", data.created_by))
+            .bind(("now", shared::util::now_millis()))
+            .await?;
 
-        let internal = InternalCreate {
-            name: data.name,
-            display_name: data.display_name,
-            receipt_name: data.receipt_name,
-            description: data.description,
-            rule_type: data.rule_type,
-            product_scope: data.product_scope,
-            target: target_thing,
-            zone_scope: data.zone_scope.unwrap_or_else(|| crate::db::models::ZONE_SCOPE_ALL.to_string()),
-            adjustment_type: data.adjustment_type,
-            adjustment_value: data.adjustment_value,
-            priority: data.priority.unwrap_or(0),
-            is_stackable: data.is_stackable.unwrap_or(true),
-            is_exclusive: data.is_exclusive.unwrap_or(false),
-            valid_from: data.valid_from,
-            valid_until: data.valid_until,
-            active_days: data.active_days,
-            active_start_time: data.active_start_time,
-            active_end_time: data.active_end_time,
-            is_active: true,
-            created_by: data.created_by,
-        };
-
-        let created: Option<PriceRule> = self.base.db().create(TABLE).content(internal).await?;
+        let created: Option<PriceRule> = result.take(0)?;
         created.ok_or_else(|| RepoError::Database("Failed to create price rule".to_string()))
     }
 
@@ -196,79 +182,59 @@ impl PriceRuleRepository {
         // Convert target string to RecordId if provided
         let target_thing: Option<RecordId> = data.target.as_ref().and_then(|t| t.parse().ok());
 
-        // Create internal update struct with RecordId type for target
-        #[derive(serde::Serialize)]
-        struct InternalUpdate {
-            #[serde(skip_serializing_if = "Option::is_none")]
-            name: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            display_name: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            receipt_name: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            description: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            rule_type: Option<crate::db::models::RuleType>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            product_scope: Option<ProductScope>,
-            #[serde(
-                skip_serializing_if = "Option::is_none",
-                with = "serde_helpers::option_record_id"
-            )]
-            target: Option<RecordId>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            zone_scope: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            adjustment_type: Option<crate::db::models::AdjustmentType>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            adjustment_value: Option<f64>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            priority: Option<i32>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            is_stackable: Option<bool>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            is_exclusive: Option<bool>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            valid_from: Option<i64>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            valid_until: Option<i64>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            active_days: Option<Vec<u8>>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            active_start_time: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            active_end_time: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            is_active: Option<bool>,
-        }
-
-        let internal = InternalUpdate {
-            name: data.name,
-            display_name: data.display_name,
-            receipt_name: data.receipt_name,
-            description: data.description,
-            rule_type: data.rule_type,
-            product_scope: data.product_scope,
-            target: target_thing,
-            zone_scope: data.zone_scope,
-            adjustment_type: data.adjustment_type,
-            adjustment_value: data.adjustment_value,
-            priority: data.priority,
-            is_stackable: data.is_stackable,
-            is_exclusive: data.is_exclusive,
-            valid_from: data.valid_from,
-            valid_until: data.valid_until,
-            active_days: data.active_days,
-            active_start_time: data.active_start_time,
-            active_end_time: data.active_end_time,
-            is_active: data.is_active,
-        };
-
         let mut result = self.base
             .db()
-            .query("UPDATE $thing MERGE $data RETURN AFTER")
+            .query(
+                r#"UPDATE $thing SET
+                    name = $name OR name,
+                    display_name = $display_name OR display_name,
+                    receipt_name = $receipt_name OR receipt_name,
+                    description = $description OR description,
+                    rule_type = $rule_type OR rule_type,
+                    product_scope = $product_scope OR product_scope,
+                    target = IF $has_target THEN $target ELSE target END,
+                    zone_scope = $zone_scope OR zone_scope,
+                    adjustment_type = $adjustment_type OR adjustment_type,
+                    adjustment_value = IF $has_adj_value THEN $adjustment_value ELSE adjustment_value END,
+                    priority = $priority OR priority,
+                    is_stackable = IF $has_stackable THEN $is_stackable ELSE is_stackable END,
+                    is_exclusive = IF $has_exclusive THEN $is_exclusive ELSE is_exclusive END,
+                    valid_from = IF $has_valid_from THEN $valid_from ELSE valid_from END,
+                    valid_until = IF $has_valid_until THEN $valid_until ELSE valid_until END,
+                    active_days = IF $has_active_days THEN $active_days ELSE active_days END,
+                    active_start_time = $active_start_time OR active_start_time,
+                    active_end_time = $active_end_time OR active_end_time,
+                    is_active = IF $has_is_active THEN $is_active ELSE is_active END
+                RETURN AFTER"#,
+            )
             .bind(("thing", thing))
-            .bind(("data", internal))
+            .bind(("name", data.name))
+            .bind(("display_name", data.display_name))
+            .bind(("receipt_name", data.receipt_name))
+            .bind(("description", data.description))
+            .bind(("rule_type", data.rule_type))
+            .bind(("product_scope", data.product_scope))
+            .bind(("has_target", data.target.is_some()))
+            .bind(("target", target_thing))
+            .bind(("zone_scope", data.zone_scope))
+            .bind(("adjustment_type", data.adjustment_type))
+            .bind(("has_adj_value", data.adjustment_value.is_some()))
+            .bind(("adjustment_value", data.adjustment_value))
+            .bind(("priority", data.priority))
+            .bind(("has_stackable", data.is_stackable.is_some()))
+            .bind(("is_stackable", data.is_stackable))
+            .bind(("has_exclusive", data.is_exclusive.is_some()))
+            .bind(("is_exclusive", data.is_exclusive))
+            .bind(("has_valid_from", data.valid_from.is_some()))
+            .bind(("valid_from", data.valid_from))
+            .bind(("has_valid_until", data.valid_until.is_some()))
+            .bind(("valid_until", data.valid_until))
+            .bind(("has_active_days", data.active_days.is_some()))
+            .bind(("active_days", data.active_days))
+            .bind(("active_start_time", data.active_start_time))
+            .bind(("active_end_time", data.active_end_time))
+            .bind(("has_is_active", data.is_active.is_some()))
+            .bind(("is_active", data.is_active))
             .await?;
 
         result.take::<Option<PriceRule>>(0)?

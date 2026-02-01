@@ -50,18 +50,18 @@ impl StoreInfoRepository {
         // Ensure singleton exists
         self.get_or_create().await?;
 
-        // Update timestamp first
         let singleton_id = RecordId::from_table_key(TABLE, SINGLETON_ID);
-        let _ = self
+        let mut result = self
             .base
             .db()
-            .query("UPDATE $id SET updated_at = $now")
-            .bind(("id", singleton_id.clone()))
+            .query("UPDATE $id MERGE $data SET updated_at = $now RETURN AFTER")
+            .bind(("id", singleton_id))
+            .bind(("data", data))
             .bind(("now", shared::util::now_millis()))
             .await?;
 
-        // Merge update data
-        let updated: Option<StoreInfo> = self.base.db().update(singleton_id).merge(data).await?;
-        updated.ok_or_else(|| RepoError::Database("Failed to update store info".to_string()))
+        result
+            .take::<Option<StoreInfo>>(0)?
+            .ok_or_else(|| RepoError::Database("Failed to update store info".to_string()))
     }
 }

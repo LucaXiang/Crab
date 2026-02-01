@@ -44,7 +44,7 @@ DEFINE FIELD OVERWRITE adjustment_type ON price_rule TYPE string
     PERMISSIONS FULL;
 
 -- 调整值 (百分比如30=30%, 固定金额如0.5)
-DEFINE FIELD OVERWRITE adjustment_value ON price_rule TYPE float
+DEFINE FIELD OVERWRITE adjustment_value ON price_rule TYPE decimal
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE priority ON price_rule TYPE int

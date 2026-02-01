@@ -71,7 +71,7 @@ DEFINE FIELD OVERWRITE specs ON product TYPE array<object>
 
 -- 规格对象字段定义
 DEFINE FIELD OVERWRITE specs.*.name ON product TYPE string PERMISSIONS FULL;
-DEFINE FIELD OVERWRITE specs.*.price ON product TYPE float DEFAULT 0 PERMISSIONS FULL;
+DEFINE FIELD OVERWRITE specs.*.price ON product TYPE decimal DEFAULT 0 PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE specs.*.display_order ON product TYPE int DEFAULT 0 PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE specs.*.is_default ON product TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE specs.*.is_active ON product TYPE bool DEFAULT true PERMISSIONS FULL;

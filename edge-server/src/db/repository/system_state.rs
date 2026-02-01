@@ -62,24 +62,19 @@ impl SystemStateRepository {
         // Ensure singleton exists
         self.get_or_create().await?;
 
-        // Update timestamp first
         let singleton_id = RecordId::from_table_key(TABLE, SINGLETON_ID);
-        let _ = self
+        let mut result = self
             .base
             .db()
-            .query("UPDATE system_state SET updated_at = $now WHERE id = $id RETURN AFTER")
+            .query("UPDATE $id MERGE $data SET updated_at = $now RETURN AFTER")
             .bind(("id", singleton_id))
+            .bind(("data", data))
             .bind(("now", shared::util::now_millis()))
             .await?;
 
-        // Merge the actual data
-        let updated: Option<SystemState> = self
-            .base
-            .db()
-            .update((TABLE, SINGLETON_ID))
-            .merge(data)
-            .await?;
-        updated.ok_or_else(|| RepoError::Database("Failed to update system state".to_string()))
+        result
+            .take::<Option<SystemState>>(0)?
+            .ok_or_else(|| RepoError::Database("Failed to update system state".to_string()))
     }
 
     /// Initialize genesis hash
@@ -176,25 +171,33 @@ impl SystemStateRepository {
     pub async fn get_pending_sync_orders(&self) -> RepoResult<Vec<crate::db::models::Order>> {
         let state = self.get_or_create().await?;
 
-        let query = match state.synced_up_to {
+        match state.synced_up_to {
             Some(synced_order) => {
                 // Get all orders created after the synced order
-                format!(
-                    r#"
-                    LET $synced_time = (SELECT created_at FROM order WHERE id = {})[0].created_at;
-                    SELECT * FROM order WHERE created_at > $synced_time ORDER BY created_at;
-                    "#,
-                    synced_order
-                )
+                let mut result = self
+                    .base
+                    .db()
+                    .query(
+                        r#"
+                        LET $synced_time = (SELECT created_at FROM order WHERE id = $synced_id)[0].created_at;
+                        SELECT * FROM order WHERE created_at > $synced_time ORDER BY created_at;
+                        "#,
+                    )
+                    .bind(("synced_id", synced_order))
+                    .await?;
+                let orders: Vec<crate::db::models::Order> = result.take(1)?;
+                Ok(orders)
             }
             None => {
                 // No sync yet, return all orders
-                "SELECT * FROM order ORDER BY created_at".to_string()
+                let mut result = self
+                    .base
+                    .db()
+                    .query("SELECT * FROM order ORDER BY created_at")
+                    .await?;
+                let orders: Vec<crate::db::models::Order> = result.take(0)?;
+                Ok(orders)
             }
-        };
-
-        let mut result = self.base.db().query(&query).await?;
-        let orders: Vec<crate::db::models::Order> = result.take(0)?;
-        Ok(orders)
+        }
     }
 }
