@@ -378,7 +378,10 @@ export const POSScreen: React.FC = () => {
             if (!binding.is_required) return true;
             const defaults = binding.default_option_indices
               ?? binding.attribute?.default_option_indices;
-            return defaults && defaults.length > 0;
+            if (!defaults || defaults.length === 0) return false;
+            // 确保至少有一个默认选项是活跃的
+            const attrOpts = optionsMap.get(String(binding.attribute?.id)) || [];
+            return defaults.some(idx => attrOpts[idx]?.is_active);
           });
 
           if (canQuickAdd && (!hasMultiSpec || selectedDefaultSpec)) {

@@ -282,34 +282,48 @@ impl AttributeRepository {
         Ok(true)
     }
 
-    /// Get attributes for a product (Graph traversal)
+    /// Get attributes for a product
     pub async fn find_by_product(&self, product_id: &str) -> RepoResult<Vec<Attribute>> {
         let product_thing: RecordId = product_id
             .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
-        let attrs: Vec<Attribute> = self
+
+        #[derive(Debug, serde::Deserialize)]
+        struct Row {
+            #[serde(rename = "out")]
+            attribute: Attribute,
+        }
+
+        let rows: Vec<Row> = self
             .base
             .db()
-            .query("SELECT ->has_attribute->attribute.* FROM $prod")
+            .query("SELECT out FROM has_attribute WHERE in = $prod AND out.is_active = true FETCH out")
             .bind(("prod", product_thing))
             .await?
             .take(0)?;
-        Ok(attrs)
+        Ok(rows.into_iter().map(|r| r.attribute).collect())
     }
 
-    /// Get attributes for a category (Graph traversal)
+    /// Get attributes for a category
     pub async fn find_by_category(&self, category_id: &str) -> RepoResult<Vec<Attribute>> {
         let category_thing: RecordId = category_id
             .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid category ID: {}", category_id)))?;
-        let attrs: Vec<Attribute> = self
+
+        #[derive(Debug, serde::Deserialize)]
+        struct Row {
+            #[serde(rename = "out")]
+            attribute: Attribute,
+        }
+
+        let rows: Vec<Row> = self
             .base
             .db()
-            .query("SELECT ->has_attribute->attribute.* FROM $cat")
+            .query("SELECT out FROM has_attribute WHERE in = $cat AND out.is_active = true FETCH out")
             .bind(("cat", category_thing))
             .await?
             .take(0)?;
-        Ok(attrs)
+        Ok(rows.into_iter().map(|r| r.attribute).collect())
     }
 
     /// Get product attribute bindings with full attribute data
@@ -368,33 +382,4 @@ impl AttributeRepository {
             .collect())
     }
 
-    /// Get all attributes for a product (including inherited from category)
-    pub async fn find_effective_for_product(&self, product_id: &str) -> RepoResult<Vec<Attribute>> {
-        // Get product's category
-        let prod_thing: RecordId = product_id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
-        let mut result = self
-            .base
-            .db()
-            .query(
-                r#"
-                LET $cat = (SELECT category FROM product WHERE id = $prod)[0].category;
-
-                -- Product direct attributes
-                LET $prod_attrs = SELECT ->has_attribute->attribute.* FROM $prod;
-
-                -- Category attributes
-                LET $cat_attrs = SELECT ->has_attribute->attribute.* FROM $cat;
-
-                -- Combine and deduplicate
-                RETURN array::distinct(array::concat($prod_attrs, $cat_attrs));
-                "#
-            )
-            .bind(("prod", prod_thing))
-            .await?;
-
-        let attrs: Vec<Attribute> = result.take(0)?;
-        Ok(attrs)
-    }
 }
