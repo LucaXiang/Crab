@@ -385,7 +385,7 @@ export const POSScreen: React.FC = () => {
           });
 
           if (canQuickAdd && (!hasMultiSpec || selectedDefaultSpec)) {
-            // Build ItemOption[] from defaults
+            // Build ItemOption[] from defaults (respecting max_selections)
             const quickOptions: ItemOption[] = [];
             allBindings.forEach(binding => {
               const attr = binding.attribute;
@@ -394,7 +394,10 @@ export const POSScreen: React.FC = () => {
                 ?? attr.default_option_indices;
               if (!defaults || defaults.length === 0) return;
               const attrOpts = optionsMap.get(String(attr.id)) || [];
+              let count = 0;
               defaults.forEach(idx => {
+                // Enforce max_selections for multi-select
+                if (attr.is_multi_select && attr.max_selections && count >= attr.max_selections) return;
                 const opt = attrOpts[idx];
                 if (opt && opt.is_active) {
                   quickOptions.push({
@@ -404,6 +407,7 @@ export const POSScreen: React.FC = () => {
                     option_name: opt.name,
                     price_modifier: opt.price_modifier ?? null,
                   });
+                  count++;
                 }
               });
             });

@@ -90,6 +90,11 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
            initialIds = [initialIds[0]];
         }
 
+        // Enforce max_selections for multi-select
+        if (attr.is_multi_select && attr.max_selections && initialIds.length > attr.max_selections) {
+           initialIds = initialIds.slice(0, attr.max_selections);
+        }
+
         initialSelections.set(String(attr.id), initialIds);
       });
 

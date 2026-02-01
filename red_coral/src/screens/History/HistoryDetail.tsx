@@ -303,13 +303,13 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-medium text-gray-800 flex items-center gap-2 flex-wrap">
+              <span className="text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200">
+                #{item.instance_id.slice(-5)}
+              </span>
               <span>{item.name}</span>
               {item.spec_name && (
                 <span className="text-xs text-gray-500">({item.spec_name})</span>
               )}
-              <span className="text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded">
-                #{item.instance_id.slice(-5)}
-              </span>
               {hasDiscount && (
                 <span className="text-[0.625rem] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">
                   -{formatCurrency(item.discount_amount)}
@@ -336,25 +336,38 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
         <div className="font-bold text-gray-800 pl-4">{formatCurrency(item.line_total)}</div>
       </div>
 
-      {isExpanded && hasOptions && (
-        <div className="px-16 pb-4 pt-0 animate-in slide-in-from-top-2 duration-200">
-          <div className="p-3 bg-white rounded-lg border border-gray-100 space-y-1 shadow-sm">
-            {item.selected_options.map((opt, idx) => (
-              <div key={idx} className="flex justify-between items-center text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500 font-medium">{opt.attribute_name}:</span>
-                  <span className="text-gray-800">{opt.option_name}</span>
-                </div>
-                {opt.price_modifier !== 0 && (
-                  <span className={`text-xs font-bold ${opt.price_modifier > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                    {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
+      {isExpanded && hasOptions && (() => {
+        const grouped = new Map<string, typeof item.selected_options>();
+        for (const opt of item.selected_options) {
+          const key = opt.attribute_name;
+          if (!grouped.has(key)) grouped.set(key, []);
+          grouped.get(key)!.push(opt);
+        }
+        return (
+          <div className="px-16 pb-4 pt-0 animate-in slide-in-from-top-2 duration-200">
+            <div className="p-3 bg-white rounded-lg border border-gray-100 space-y-1 shadow-sm">
+              {[...grouped.entries()].map(([attrName, opts]) => (
+                <div key={attrName} className="text-sm">
+                  <span className="text-gray-500 font-medium">{attrName}: </span>
+                  <span className="text-gray-800">
+                    {opts!.map((opt, i) => (
+                      <React.Fragment key={i}>
+                        {i > 0 && ', '}
+                        {opt.option_name}
+                        {opt.price_modifier != null && opt.price_modifier !== 0 && (
+                          <span className={`text-xs font-bold ml-0.5 ${opt.price_modifier > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                            {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
+                          </span>
+                        )}
+                      </React.Fragment>
+                    ))}
                   </span>
-                )}
-              </div>
-            ))}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 });
@@ -452,10 +465,10 @@ const PaymentRow: React.FC<PaymentRowProps> = React.memo(({ payment, t }) => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-gray-800 flex items-center gap-2 flex-wrap">
-                    <span>{item.name}</span>
-                    <span className="text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded">
+                    <span className="text-[0.625rem] text-blue-600 bg-blue-100 font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200">
                       #{item.instance_id.slice(-5)}
                     </span>
+                    <span>{item.name}</span>
                   </div>
                   <div className="text-xs text-gray-400">
                     {formatCurrency(item.unit_price)} / {t('checkout.amount.unit_price')}

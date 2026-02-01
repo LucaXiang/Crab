@@ -117,7 +117,7 @@ const ItemsAddedRenderer: EventRenderer<ItemsAddedPayload> = {
       const modifiers: string[] = [];
       if (item.manual_discount_percent) modifiers.push(`-${item.manual_discount_percent}%`);
       if (item.surcharge) modifiers.push(`+${formatCurrency(item.surcharge)}`);
-      return `${item.name} ${instanceId} x${item.quantity}${modifiers.length ? ` (${modifiers.join(', ')})` : ''}`;
+      return `${instanceId} ${item.name} x${item.quantity}${modifiers.length ? ` (${modifiers.join(', ')})` : ''}`;
     });
 
     return {
@@ -137,16 +137,7 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
     const previousValues = payload.previous_values || {};
     const details: string[] = [];
 
-    // Show operation description
-    if (payload.operation) {
-      details.push(payload.operation);
-    }
-
-    // Show affected quantity
-    if (payload.affected_quantity != null && payload.affected_quantity > 0) {
-      details.push(`${t('timeline.labels.affected_quantity')}: ${payload.affected_quantity}`);
-    }
-
+    // Only show key field changes (old → new)
     const formatChange = (
       key: keyof typeof changes,
       labelKey: string,
@@ -168,20 +159,75 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
     formatChange('manual_discount_percent', 'timeline.labels.discount', v => `${v}%`);
     formatChange('surcharge', 'timeline.labels.surcharge', v => formatCurrency(v || 0));
 
-    // Show authorizer
-    if (payload.authorizer_name) {
+    // Show specification change
+    if (changes.selected_specification) {
+      const oldSpec = previousValues.selected_specification;
+      const oldName = oldSpec && typeof oldSpec === 'object' && 'name' in oldSpec ? (oldSpec as any).name : '-';
+      details.push(`${t('pos.cart.spec')}: ${oldName} → ${changes.selected_specification.name}`);
+    }
+
+    // Show options change (diff by attribute: added/removed)
+    if (changes.selected_options) {
+      const oldOpts = (previousValues.selected_options as any[] | undefined) || [];
+      const newOpts = changes.selected_options;
+
+      const groupByAttr = (opts: any[]) => {
+        const map = new Map<string, Set<string>>();
+        for (const o of opts) {
+          const attr = o.attribute_name || '';
+          if (!map.has(attr)) map.set(attr, new Set());
+          map.get(attr)!.add(o.option_name);
+        }
+        return map;
+      };
+
+      const oldByAttr = groupByAttr(oldOpts);
+      const newByAttr = groupByAttr(newOpts);
+      const allAttrs = new Set([...oldByAttr.keys(), ...newByAttr.keys()]);
+
+      for (const attr of allAttrs) {
+        const oldSet = oldByAttr.get(attr) || new Set();
+        const newSet = newByAttr.get(attr) || new Set();
+        for (const name of newSet) {
+          if (!oldSet.has(name)) {
+            details.push(`${attr} ${t('timeline.option_added')} ${name}`);
+          }
+        }
+        for (const name of oldSet) {
+          if (!newSet.has(name)) {
+            details.push(`${attr} ${t('timeline.option_removed')} ${name}`);
+          }
+        }
+      }
+    }
+
+    // Show authorizer only if different from operator
+    if (payload.authorizer_name && payload.authorizer_name !== event.operator_name) {
       details.push(`${t('timeline.labels.authorizer')}: ${payload.authorizer_name}`);
     }
 
     const source = payload.source;
+
+    // Build tags: old instance_id → new instance_id (if changed)
+    const tags: TimelineTag[] = [];
+    if (source?.instance_id) {
+      tags.push({ text: `#${source.instance_id.slice(-5)}`, type: 'item' as const });
+    }
+    const updatedResult = payload.results?.find(r => r.action === 'UPDATED' || r.action === 'CREATED');
+    if (updatedResult && updatedResult.instance_id !== source?.instance_id) {
+      tags.push({ text: `→ #${updatedResult.instance_id.slice(-5)}`, type: 'item' as const });
+    }
+
+    const summary = source?.name || '';
+
     return {
       title: t('timeline.item_modified'),
-      summary: source?.name || '',
+      summary,
       details,
       icon: Edit3,
       colorClass: 'bg-yellow-500',
       timestamp: event.timestamp,
-      tags: source?.instance_id ? [{ text: `#${source.instance_id.slice(-5)}`, type: 'item' as const }] : [],
+      tags,
     };
   }
 };
@@ -317,7 +363,7 @@ const ItemSplitRenderer: EventRenderer<ItemSplitPayload> = {
     const items = payload.items || [];
     const details = items.map(item => {
       const instanceId = item.instance_id ? `#${item.instance_id.slice(-5)}` : '';
-      return `${item.name} ${instanceId} x${item.quantity}`;
+      return `${instanceId} ${item.name} x${item.quantity}`;
     });
 
     const methodDisplay = formatPaymentMethod(payload.payment_method || '', t);

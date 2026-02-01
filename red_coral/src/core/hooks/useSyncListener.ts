@@ -183,6 +183,15 @@ export function useSyncListener() {
       } else {
         console.warn(`[SyncListener] No store found for resource: ${resource}`);
       }
+
+      // 属性/分类变更时级联刷新 product store（ProductFull 嵌入了完整属性数据）
+      if ((resource === 'attribute' || resource === 'category') && storeRegistry.product) {
+        const productStore = storeRegistry.product.getState();
+        if (productStore.isLoaded) {
+          console.log(`[SyncListener] ${resource} changed, refreshing product store`);
+          productStore.fetchAll(true);
+        }
+      }
     }).then((fn) => {
       if (isMounted) {
         unlisten = fn;

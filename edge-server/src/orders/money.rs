@@ -38,10 +38,20 @@ pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
     // Use original_price as the base for discount calculation (before any discounts)
     let base_price = to_decimal(item.original_price.unwrap_or(item.price));
 
-    // Manual discount is percentage-based on the base price
+    // Options modifier: sum of all selected option price modifiers
+    let options_modifier: Decimal = item
+        .selected_options
+        .as_ref()
+        .map(|opts| opts.iter().filter_map(|o| o.price_modifier.map(to_decimal)).sum())
+        .unwrap_or(Decimal::ZERO);
+
+    // Base with options = spec price + options
+    let base_with_options = base_price + options_modifier;
+
+    // Manual discount is percentage-based on the full base (including options)
     let manual_discount = item
         .manual_discount_percent
-        .map(|d| base_price * to_decimal(d) / Decimal::ONE_HUNDRED)
+        .map(|d| base_with_options * to_decimal(d) / Decimal::ONE_HUNDRED)
         .unwrap_or(Decimal::ZERO);
 
     // Rule discount is already calculated as a per-unit amount
@@ -51,8 +61,8 @@ pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
     let surcharge = item.surcharge.map(to_decimal).unwrap_or(Decimal::ZERO);
     let rule_surcharge = item.rule_surcharge_amount.map(to_decimal).unwrap_or(Decimal::ZERO);
 
-    // Final unit price = base - discounts + surcharges
-    let unit_price = base_price - manual_discount - rule_discount + surcharge + rule_surcharge;
+    // Final unit price = base_with_options - discounts + surcharges
+    let unit_price = base_with_options - manual_discount - rule_discount + surcharge + rule_surcharge;
 
     unit_price
         .max(Decimal::ZERO) // Ensure non-negative
@@ -101,14 +111,20 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
             .unwrap_or(0);
         item.unpaid_quantity = (item.quantity - paid_qty).max(0);
 
-        // Calculate original price (base price before any adjustments)
-        let base_price = item.original_price.unwrap_or(item.price);
-        original_total += to_decimal(base_price) * quantity;
+        // Calculate original price (base price before any adjustments) + options modifier
+        let base_price = to_decimal(item.original_price.unwrap_or(item.price));
+        let options_modifier: Decimal = item
+            .selected_options
+            .as_ref()
+            .map(|opts| opts.iter().filter_map(|o| o.price_modifier.map(to_decimal)).sum())
+            .unwrap_or(Decimal::ZERO);
+        let base_with_options = base_price + options_modifier;
+        original_total += base_with_options * quantity;
 
-        // Calculate item-level discount
+        // Calculate item-level discount (based on full base including options)
         let manual_discount = item
             .manual_discount_percent
-            .map(|d| to_decimal(base_price) * to_decimal(d) / Decimal::ONE_HUNDRED)
+            .map(|d| base_with_options * to_decimal(d) / Decimal::ONE_HUNDRED)
             .unwrap_or(Decimal::ZERO);
         let rule_discount = item.rule_discount_amount.map(to_decimal).unwrap_or(Decimal::ZERO);
         item_discount_total += (manual_discount + rule_discount) * quantity;

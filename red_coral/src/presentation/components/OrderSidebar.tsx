@@ -56,6 +56,8 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       manual_discount_percent: updates.manual_discount_percent ?? undefined,
       surcharge: updates.surcharge ?? undefined,
       note: updates.note ?? undefined,
+      selected_options: updates.selected_options ?? undefined,
+      selected_specification: updates.selected_specification ?? undefined,
     }, authorizer);
 
     setEditingItem(null);
@@ -302,7 +304,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           onRemove={(instanceId, options) => {
             handleDeleteItem(editingItem.index, options);
           }}
-          readOnlyAttributes={true}
+          readOnlyAttributes={false}
         />
       )}
     </div>

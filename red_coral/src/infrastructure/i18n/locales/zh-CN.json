@@ -302,6 +302,7 @@
       "checkout": "结账"
     },
     "cart": {
+      "spec": "规格",
       "empty": "购物车为空",
       "uncategorized": "未分类",
       "unknown_category": "未知分类",
@@ -679,10 +680,21 @@
       "affected_quantity": "影响数量",
       "items": "商品"
     },
+    "operation": {
+      "APPLY_DISCOUNT": "应用折扣",
+      "MODIFY_PRICE": "修改价格",
+      "MODIFY_QUANTITY": "修改数量",
+      "APPLY_SURCHARGE": "应用附加费",
+      "MODIFY_OPTIONS": "修改属性",
+      "MODIFY_NOTE": "修改备注",
+      "MODIFY_ITEM": "修改项目"
+    },
     "retail_mode": "零售模式",
     "rule_toggled": "价格规则切换",
     "rule_skipped": "已跳过",
-    "rule_applied": "已应用"
+    "rule_applied": "已应用",
+    "option_added": "增加了",
+    "option_removed": "移除了"
   },
   "draft": {
     "action": {
@@ -1138,6 +1150,9 @@
       "scope": {
         "global": "全局",
         "inherited": "继承自分类"
+      },
+      "error": {
+        "max_defaults": "最多只能设置 {n} 个默认选项"
       }
     },
     "table": {

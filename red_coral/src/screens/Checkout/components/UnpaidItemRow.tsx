@@ -2,6 +2,7 @@ import React from 'react';
 import { CartItem, CheckoutMode } from '@/core/domain/types';
 import { useLongPress } from '@/hooks/useLongPress';
 import { formatCurrency } from '@/utils/currency';
+import { t } from '@/infrastructure/i18n';
 
 interface UnpaidItemRowProps {
   item: CartItem;
@@ -74,28 +75,38 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
           {/* Line 2: Specification (if multi-spec) */}
           {hasMultiSpec && (
             <div className="text-sm text-gray-600 mt-0.5">
-              {item.selected_specification!.name}
+              {t('pos.cart.spec')}: {item.selected_specification!.name}
             </div>
           )}
 
-          {/* Line 3: Attribute Tags */}
-          {hasOptions && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {item.selected_options!.map((opt, idx) => (
-                <span
-                  key={idx}
-                  className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded"
-                >
-                  {opt.attribute_name}:{opt.option_name}
-                  {opt.price_modifier != null && opt.price_modifier !== 0 && (
-                    <span className={opt.price_modifier > 0 ? 'text-orange-600 ml-0.5' : 'text-green-600 ml-0.5'}>
-                      {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
-                    </span>
-                  )}
-                </span>
-              ))}
-            </div>
-          )}
+          {/* Line 3: Attribute Tags (grouped by attribute, one per line) */}
+          {hasOptions && (() => {
+            const grouped = new Map<string, typeof item.selected_options>();
+            for (const opt of item.selected_options!) {
+              const key = opt.attribute_name;
+              if (!grouped.has(key)) grouped.set(key, []);
+              grouped.get(key)!.push(opt);
+            }
+            return (
+              <div className="flex flex-col gap-0.5 mt-1">
+                {[...grouped.entries()].map(([attrName, opts]) => (
+                  <span key={attrName} className="text-xs text-gray-600">
+                    {attrName}: {opts!.map((opt, i) => (
+                      <React.Fragment key={i}>
+                        {i > 0 && ', '}
+                        {opt.option_name}
+                        {opt.price_modifier != null && opt.price_modifier !== 0 && (
+                          <span className={opt.price_modifier > 0 ? 'text-orange-600 ml-0.5' : 'text-green-600 ml-0.5'}>
+                            {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
+                          </span>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Line 4: Note */}
           {hasNote && (
@@ -105,8 +116,13 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
             </div>
           )}
 
-          {/* Line 5: Quantity × Unit Price */}
+          {/* Line 5: Instance ID + Quantity × Unit Price */}
           <div className="flex items-center gap-2 mt-2 text-sm text-gray-500 tabular-nums">
+            {item.instance_id && (
+              <span className="px-1.5 py-0.5 rounded text-[0.625rem] font-bold font-mono border bg-blue-100 text-blue-600 border-blue-200">
+                #{item.instance_id.slice(-5)}
+              </span>
+            )}
             <span className="font-medium">x{remainingQty}</span>
             <span className="w-1 h-1 bg-gray-300 rounded-full" />
             {hasDiscount ? (
@@ -121,7 +137,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
         </div>
 
         {/* Right: Total + Controls */}
-        <div className="flex flex-col items-end gap-2 shrink-0">
+        <div className="flex flex-col items-end justify-between shrink-0 self-stretch">
           {/* Line Total + Badges */}
           <div className="flex items-center gap-2">
             {discountPercent > 0 && (

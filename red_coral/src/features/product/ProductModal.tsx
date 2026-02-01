@@ -214,7 +214,7 @@ export const ProductModal: React.FC = React.memo(() => {
         filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
       });
       if (!file || Array.isArray(file)) return;
-      const hash = await invoke<string>('save_image', { source_path: file });
+      const hash = await invoke<string>('save_image', { sourcePath: file });
       setFormField('image', hash);
     } catch (e) {
       toast.error(getErrorMessage(e));

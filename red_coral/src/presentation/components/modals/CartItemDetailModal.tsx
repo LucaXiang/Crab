@@ -103,12 +103,13 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                          const binding = allBindings.find(b => b.out === attrId);
                          const defaults = binding?.default_option_indices ?? attr.default_option_indices;
                          if (defaults && defaults.length > 0) {
-                             const defaultStrs = defaults.map(String);
+                             let defaultStrs = defaults.map(String);
                              if (!attr.is_multi_select) {
-                                 initialSelections.set(attrId, [defaultStrs[0]]);
-                             } else {
-                                 initialSelections.set(attrId, defaultStrs);
+                                 defaultStrs = [defaultStrs[0]];
+                             } else if (attr.max_selections && defaultStrs.length > attr.max_selections) {
+                                 defaultStrs = defaultStrs.slice(0, attr.max_selections);
                              }
+                             initialSelections.set(attrId, defaultStrs);
                          }
                      }
                  });

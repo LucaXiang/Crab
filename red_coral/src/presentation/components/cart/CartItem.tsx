@@ -4,6 +4,7 @@ import { CartItem as CartItemType } from '@/core/domain/types';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { formatCurrency, Currency } from '@/utils/currency';
 import { useLongPress } from '@/hooks/useLongPress';
+import { t } from '@/infrastructure/i18n';
 
 interface CartItemProps {
   item: CartItemType;
@@ -83,28 +84,38 @@ export const CartItem = React.memo<CartItemProps>(({
           {/* Line 2: Specification (if multi-spec) */}
           {hasMultiSpec && (
             <div className="text-sm text-gray-600 mt-0.5">
-              {item.selected_specification!.name}
+              {t('pos.cart.spec')}: {item.selected_specification!.name}
             </div>
           )}
 
-          {/* Line 3: Attribute Tags */}
-          {hasOptions && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {item.selected_options!.map((opt, idx) => (
-                <span
-                  key={idx}
-                  className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded"
-                >
-                  {opt.attribute_name}:{opt.option_name}
-                  {opt.price_modifier != null && opt.price_modifier !== 0 && (
-                    <span className={opt.price_modifier > 0 ? 'text-orange-600 ml-0.5' : 'text-green-600 ml-0.5'}>
-                      {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
-                    </span>
-                  )}
-                </span>
-              ))}
-            </div>
-          )}
+          {/* Line 3: Attribute Tags (grouped by attribute, one per line) */}
+          {hasOptions && (() => {
+            const grouped = new Map<string, typeof item.selected_options>();
+            for (const opt of item.selected_options!) {
+              const key = opt.attribute_name;
+              if (!grouped.has(key)) grouped.set(key, []);
+              grouped.get(key)!.push(opt);
+            }
+            return (
+              <div className="flex flex-col gap-0.5 mt-1">
+                {[...grouped.entries()].map(([attrName, opts]) => (
+                  <span key={attrName} className="text-xs text-gray-600">
+                    {attrName}: {opts!.map((opt, i) => (
+                      <React.Fragment key={i}>
+                        {i > 0 && ', '}
+                        {opt.option_name}
+                        {opt.price_modifier != null && opt.price_modifier !== 0 && (
+                          <span className={opt.price_modifier > 0 ? 'text-orange-600 ml-0.5' : 'text-green-600 ml-0.5'}>
+                            {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
+                          </span>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Line 4: Note */}
           {hasNote && (

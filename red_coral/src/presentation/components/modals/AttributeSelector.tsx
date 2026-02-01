@@ -42,6 +42,10 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
     if (selectedOptionIds.includes(optionId)) {
       onSelect(selectedOptionIds.filter(id => id !== optionId));
     } else {
+      // Enforce max_selections limit
+      if (attribute.max_selections && selectedOptionIds.length >= attribute.max_selections) {
+        return;
+      }
       onSelect([...selectedOptionIds, optionId]);
     }
   };

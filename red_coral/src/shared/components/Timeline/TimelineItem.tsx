@@ -27,13 +27,13 @@ const getTagStyle = (text: string) => {
 };
 
 const renderDetailText = (text: string) => {
-    const parts = text.split(/(#\d{5})/g);
+    const parts = text.split(/(#[a-f0-9]{5})/gi);
     return (
         <span>
             {parts.map((part, i) => {
-                if (/^#\d{5}$/.test(part)) {
+                if (/^#[a-f0-9]{5}$/i.test(part)) {
                     return (
-                        <span key={i} className="mx-1 px-1 py-0.5 rounded text-[0.625rem] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                        <span key={i} className="mx-1 px-1.5 py-0.5 rounded text-[0.625rem] font-bold font-mono bg-blue-100 text-blue-600 border border-blue-200">
                             {part}
                         </span>
                     );

@@ -230,7 +230,7 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
 
       for (const field of fieldsWithPendingImages) {
         try {
-          const hash = await invoke<string>('save_image', { source_path: field._pending_image_path });
+          const hash = await invoke<string>('save_image', { sourcePath: field._pending_image_path });
           // Update the field with the hash and clear pending path
           updatedFields = updatedFields.map(f =>
             f.id === field.id

@@ -177,9 +177,16 @@ export const AttributeManagement: React.FC = React.memo(() => {
     let newDefaults: number[];
     if (attr.is_multi_select) {
       // Multi-select: toggle this index in/out of the array
-      newDefaults = isCurrentlyDefault
-        ? current.filter(i => i !== optionIndex)
-        : [...current, optionIndex];
+      if (isCurrentlyDefault) {
+        newDefaults = current.filter(i => i !== optionIndex);
+      } else {
+        // Enforce max_selections limit
+        if (attr.max_selections && current.length >= attr.max_selections) {
+          toast.error(t('settings.attribute.error.max_defaults', { n: attr.max_selections }));
+          return;
+        }
+        newDefaults = [...current, optionIndex];
+      }
     } else {
       // Single-select: set or clear
       newDefaults = isCurrentlyDefault ? [] : [optionIndex];

@@ -20,6 +20,8 @@ import type {
   CommandResponse,
   CartItemInput,
   ServiceType,
+  ItemOption,
+  SpecificationInfo,
 } from '@/core/domain/types/orderEvent';
 
 async function sendCommand(command: OrderCommand): Promise<CommandResponse> {
@@ -524,6 +526,8 @@ export const modifyItem = async (
     manual_discount_percent?: number;
     surcharge?: number;
     note?: string;
+    selected_options?: ItemOption[];
+    selected_specification?: SpecificationInfo;
   },
   authorizer?: { id: string; name: string },
 ): Promise<void> => {
@@ -537,6 +541,8 @@ export const modifyItem = async (
       manual_discount_percent: changes.manual_discount_percent ?? null,
       surcharge: changes.surcharge ?? null,
       note: changes.note ?? null,
+      selected_options: changes.selected_options ?? null,
+      selected_specification: changes.selected_specification ?? null,
     },
     authorizer_id: authorizer?.id ?? null,
     authorizer_name: authorizer?.name ?? null,
