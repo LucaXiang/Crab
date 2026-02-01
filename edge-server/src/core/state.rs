@@ -380,9 +380,20 @@ impl ServerState {
 
     /// 预热活跃订单的价格规则缓存
     ///
-    /// 服务器启动时调用，确保所有活跃订单都有规则缓存。
-    /// 这样 AddItems 命令可以立即使用缓存的规则。
+    /// 优先从 redb 恢复规则快照（开台时定格的版本），
+    /// 确保重启后活跃订单使用的规则与开台时一致。
     pub async fn warmup_active_order_rules(&self) {
+        // 从 redb 恢复规则快照到内存
+        let restored = self.orders_manager.restore_rule_snapshots_from_redb();
+
+        if restored > 0 {
+            tracing::info!(
+                "从 redb 恢复了 {} 个订单的规则快照",
+                restored,
+            );
+        }
+
+        // 检查是否有活跃订单缺少规则快照（可能是旧数据，redb 中没有）
         let active_orders = match self.orders_manager.get_active_orders() {
             Ok(orders) => orders,
             Err(e) => {
@@ -391,36 +402,37 @@ impl ServerState {
             }
         };
 
-        if active_orders.is_empty() {
-            tracing::debug!("No active orders, skipping rule warmup");
-            return;
-        }
-
-        tracing::info!(
-            "🔥 Warming up price rules for {} active orders",
-            active_orders.len()
-        );
-
-        let mut loaded_count = 0;
+        let mut fallback_count = 0;
         for order in &active_orders {
-            let rules = load_matching_rules(
-                &self.db,
-                order.zone_id.as_deref(),
-                order.is_retail,
-                self.config.timezone,
-            )
-            .await;
+            if self.orders_manager.get_cached_rules(&order.order_id).is_none() {
+                // redb 中没有快照，从数据库回退加载
+                let rules = load_matching_rules(
+                    &self.db,
+                    order.zone_id.as_deref(),
+                    order.is_retail,
+                    self.config.timezone,
+                )
+                .await;
 
-            if !rules.is_empty() {
-                self.orders_manager.cache_rules(&order.order_id, rules);
-                loaded_count += 1;
+                if !rules.is_empty() {
+                    self.orders_manager.cache_rules(&order.order_id, rules);
+                    fallback_count += 1;
+                }
             }
         }
 
+        if fallback_count > 0 {
+            tracing::warn!(
+                "{} 个订单从数据库回退加载规则（redb 无快照）",
+                fallback_count,
+            );
+        }
+
         tracing::info!(
-            "✅ Rule warmup complete: {}/{} orders have cached rules",
-            loaded_count,
-            active_orders.len()
+            "规则预热完成: {} 个活跃订单, {} 从 redb 恢复, {} 从数据库回退",
+            active_orders.len(),
+            restored,
+            fallback_count,
         );
     }
 

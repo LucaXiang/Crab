@@ -194,6 +194,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
         snapshot.items.push(item);
         storage.store_snapshot(&txn, &snapshot).unwrap();

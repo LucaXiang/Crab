@@ -42,6 +42,7 @@ impl EventApplier for TableReassignedApplier {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shared::order::types::ServiceType;
     use shared::order::{OrderEventType, OrderStatus};
 
     fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
@@ -252,6 +253,7 @@ mod tests {
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
                 receipt_number: "R-001".to_string(),
+                service_type: Some(ServiceType::DineIn),
                 final_total: 100.0,
                 payment_summary: vec![],
             },

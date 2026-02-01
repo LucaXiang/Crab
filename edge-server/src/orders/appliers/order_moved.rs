@@ -40,6 +40,7 @@ impl EventApplier for OrderMovedApplier {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shared::order::types::ServiceType;
     use shared::order::{CartItemSnapshot, OrderEventType, OrderStatus};
 
     fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
@@ -285,6 +286,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
         snapshot.items.push(item.clone());
 
@@ -344,6 +346,7 @@ mod tests {
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
                 receipt_number: "R-001".to_string(),
+                service_type: Some(ServiceType::DineIn),
                 final_total: 100.0,
                 payment_summary: vec![],
             },

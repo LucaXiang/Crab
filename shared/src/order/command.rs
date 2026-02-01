@@ -39,13 +39,15 @@ pub enum OrderCommandPayload {
         guest_count: i32,
         #[serde(default)]
         is_retail: bool,
-        /// 服务类型（堂食/外卖，零售订单使用）
-        #[serde(skip_serializing_if = "Option::is_none")]
-        service_type: Option<ServiceType>,
     },
 
     /// Complete an order (receipt_number from snapshot)
-    CompleteOrder { order_id: String },
+    CompleteOrder {
+        order_id: String,
+        /// 服务类型（零售订单结单时确认：堂食/外带）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        service_type: Option<ServiceType>,
+    },
 
     /// Void an order
     VoidOrder {
@@ -218,6 +220,72 @@ pub enum OrderCommandPayload {
         rule_id: String,
         skipped: bool,
     },
+
+    // ========== Order-level Adjustments ==========
+    /// Apply order-level manual discount (percent or fixed, mutually exclusive)
+    ApplyOrderDiscount {
+        order_id: String,
+        /// 百分比折扣 (0-100)，None = 清除
+        #[serde(skip_serializing_if = "Option::is_none")]
+        discount_percent: Option<f64>,
+        /// 固定金额折扣，None = 清除
+        #[serde(skip_serializing_if = "Option::is_none")]
+        discount_fixed: Option<f64>,
+        /// 都为 None = 取消折扣；percent 和 fixed 互斥
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_name: Option<String>,
+    },
+
+    /// Comp (gift) an item - mark as free with reason and authorizer
+    CompItem {
+        order_id: String,
+        instance_id: String,
+        /// Number of items to comp (can be partial)
+        quantity: i32,
+        /// Reason for comp (required for audit)
+        reason: String,
+        /// Authorizer ID (required)
+        authorizer_id: String,
+        /// Authorizer name (required)
+        authorizer_name: String,
+    },
+
+    /// Uncomp (reverse comp) an item - restore original price
+    UncompItem {
+        order_id: String,
+        /// The comped item's instance_id
+        instance_id: String,
+        /// Authorizer ID (required)
+        authorizer_id: String,
+        /// Authorizer name (required)
+        authorizer_name: String,
+    },
+
+    /// Apply order-level surcharge (fixed amount)
+    ApplyOrderSurcharge {
+        order_id: String,
+        /// 固定附加费金额，None = 清除
+        #[serde(skip_serializing_if = "Option::is_none")]
+        surcharge_amount: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_name: Option<String>,
+    },
+
+    // ========== Order Note ==========
+    /// Add or clear order-level note (覆盖式，空字符串 = 清除)
+    AddOrderNote {
+        order_id: String,
+        /// 备注内容，空字符串 = 清除备注
+        note: String,
+    },
 }
 
 fn default_guest_count() -> i32 {
@@ -258,6 +326,11 @@ impl OrderCommand {
             } => Some(source_order_id),
             OrderCommandPayload::UpdateOrderInfo { order_id, .. } => Some(order_id),
             OrderCommandPayload::ToggleRuleSkip { order_id, .. } => Some(order_id),
+            OrderCommandPayload::CompItem { order_id, .. } => Some(order_id),
+            OrderCommandPayload::UncompItem { order_id, .. } => Some(order_id),
+            OrderCommandPayload::ApplyOrderDiscount { order_id, .. } => Some(order_id),
+            OrderCommandPayload::ApplyOrderSurcharge { order_id, .. } => Some(order_id),
+            OrderCommandPayload::AddOrderNote { order_id, .. } => Some(order_id),
         }
     }
 }

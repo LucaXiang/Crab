@@ -16,6 +16,8 @@ import type {
   ItemModifiedPayload,
   ItemRemovedPayload,
   ItemRestoredPayload,
+  ItemCompedPayload,
+  ItemUncompedPayload,
   PaymentAddedPayload,
   PaymentCancelledPayload,
   OrderCompletedPayload,
@@ -32,6 +34,9 @@ import type {
   TableReassignedPayload,
   OrderInfoUpdatedPayload,
   RuleSkipToggledPayload,
+  OrderDiscountAppliedPayload,
+  OrderSurchargeAppliedPayload,
+  OrderNoteAddedPayload,
 } from '@/core/domain/types/orderEvent';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 import {
@@ -268,6 +273,68 @@ const ItemRestoredRenderer: EventRenderer<ItemRestoredPayload> = {
       details: [],
       icon: Utensils,
       colorClass: 'bg-green-400',
+      timestamp: event.timestamp,
+      tags: payload.instance_id ? [{ text: `#${payload.instance_id.slice(-5)}`, type: 'item' as const }] : [],
+    };
+  }
+};
+
+const ItemCompedRenderer: EventRenderer<ItemCompedPayload> = {
+  render(event, payload, t) {
+    const details: string[] = [];
+
+    // Show quantity
+    if (payload.quantity != null && payload.quantity > 0) {
+      details.push(`${t('timeline.labels.quantity')}: ${payload.quantity}`);
+    }
+
+    // Show reason
+    if (payload.reason) {
+      details.push(`${t('timeline.labels.reason')}: ${payload.reason}`);
+    }
+
+    // Show authorizer
+    if (payload.authorizer_name) {
+      details.push(`${t('timeline.labels.authorizer')}: ${payload.authorizer_name}`);
+    }
+
+    return {
+      title: t('timeline.item_comped'),
+      summary: payload.item_name || '',
+      details,
+      icon: Tag,
+      colorClass: 'bg-emerald-500',
+      timestamp: event.timestamp,
+      tags: payload.instance_id ? [{ text: `#${payload.instance_id.slice(-5)}`, type: 'item' as const }] : [],
+    };
+  }
+};
+
+const ItemUncompedRenderer: EventRenderer<ItemUncompedPayload> = {
+  render(event, payload, t) {
+    const details: string[] = [];
+
+    // Show restored price
+    if (payload.restored_price != null) {
+      details.push(`${t('timeline.labels.price')}: ${formatCurrency(payload.restored_price)}`);
+    }
+
+    // Show merge info
+    if (payload.merged_into) {
+      details.push(`${t('timeline.merged_back')}: #${payload.merged_into.slice(-5)}`);
+    }
+
+    // Show authorizer
+    if (payload.authorizer_name) {
+      details.push(`${t('timeline.labels.authorizer')}: ${payload.authorizer_name}`);
+    }
+
+    return {
+      title: t('timeline.item_uncomped'),
+      summary: payload.item_name || '',
+      details,
+      icon: Tag,
+      colorClass: 'bg-amber-500',
       timestamp: event.timestamp,
       tags: payload.instance_id ? [{ text: `#${payload.instance_id.slice(-5)}`, type: 'item' as const }] : [],
     };
@@ -693,6 +760,81 @@ const RuleSkipToggledRenderer: EventRenderer<RuleSkipToggledPayload> = {
   }
 };
 
+const OrderDiscountAppliedRenderer: EventRenderer<OrderDiscountAppliedPayload> = {
+  render(event, payload, t) {
+    const details: string[] = [];
+    const isClearing = !payload.discount_percent && !payload.discount_fixed;
+
+    if (payload.discount_percent != null) {
+      details.push(`${t('timeline.labels.discount')}: ${payload.discount_percent}%`);
+    }
+    if (payload.discount_fixed != null) {
+      details.push(`${t('timeline.labels.discount')}: ${formatCurrency(payload.discount_fixed)}`);
+    }
+    details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
+    if (payload.discount !== 0) {
+      details.push(`${t('timeline.labels.discount')}: -${formatCurrency(payload.discount)}`);
+    }
+    details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`);
+
+    return {
+      title: isClearing ? t('timeline.discount_cleared') : t('timeline.discount_applied'),
+      summary: payload.reason ?? undefined,
+      details,
+      icon: Tag,
+      colorClass: isClearing ? 'bg-gray-400' : 'bg-blue-400',
+      timestamp: event.timestamp,
+    };
+  }
+};
+
+const OrderSurchargeAppliedRenderer: EventRenderer<OrderSurchargeAppliedPayload> = {
+  render(event, payload, t) {
+    const details: string[] = [];
+    const isClearing = payload.surcharge_amount == null;
+
+    if (payload.surcharge_amount != null) {
+      details.push(`${t('timeline.labels.surcharge')}: +${formatCurrency(payload.surcharge_amount)}`);
+    }
+    details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
+    if (payload.surcharge !== 0) {
+      details.push(`${t('timeline.labels.surcharge')}: +${formatCurrency(payload.surcharge)}`);
+    }
+    details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`);
+
+    return {
+      title: isClearing ? t('timeline.surcharge_cleared') : t('timeline.surcharge_applied'),
+      summary: payload.reason ?? undefined,
+      details,
+      icon: Tag,
+      colorClass: isClearing ? 'bg-gray-400' : 'bg-yellow-400',
+      timestamp: event.timestamp,
+    };
+  }
+};
+
+const OrderNoteAddedRenderer: EventRenderer<OrderNoteAddedPayload> = {
+  render(event, payload, t) {
+    const isClearing = payload.note === '';
+    const details: string[] = [];
+
+    if (!isClearing) {
+      details.push(payload.note);
+    }
+    if (payload.previous_note) {
+      details.push(`${t('timeline.labels.previous')}: ${payload.previous_note}`);
+    }
+
+    return {
+      title: isClearing ? t('timeline.note_cleared') : t('timeline.note_added'),
+      details,
+      icon: Edit3,
+      colorClass: 'bg-blue-400',
+      timestamp: event.timestamp,
+    };
+  }
+};
+
 // ============================================================================
 // Renderer Registry (类似 Rust trait object dispatch)
 // ============================================================================
@@ -709,6 +851,8 @@ export const EVENT_RENDERERS: Record<OrderEventType, EventRenderer<any>> = {
   ITEM_MODIFIED: ItemModifiedRenderer,
   ITEM_REMOVED: ItemRemovedRenderer,
   ITEM_RESTORED: ItemRestoredRenderer,
+  ITEM_COMPED: ItemCompedRenderer,
+  ITEM_UNCOMPED: ItemUncompedRenderer,
   PAYMENT_ADDED: PaymentAddedRenderer,
   PAYMENT_CANCELLED: PaymentCancelledRenderer,
   ITEM_SPLIT: ItemSplitRenderer,
@@ -725,6 +869,9 @@ export const EVENT_RENDERERS: Record<OrderEventType, EventRenderer<any>> = {
   TABLE_REASSIGNED: TableReassignedRenderer,
   ORDER_INFO_UPDATED: OrderInfoUpdatedRenderer,
   RULE_SKIP_TOGGLED: RuleSkipToggledRenderer,
+  ORDER_DISCOUNT_APPLIED: OrderDiscountAppliedRenderer,
+  ORDER_SURCHARGE_APPLIED: OrderSurchargeAppliedRenderer,
+  ORDER_NOTE_ADDED: OrderNoteAddedRenderer,
 };
 
 /**

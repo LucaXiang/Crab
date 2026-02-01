@@ -203,6 +203,7 @@ pub fn input_to_snapshot_with_rules(
         authorizer_id: input.authorizer_id.clone(),
         authorizer_name: input.authorizer_name.clone(),
         category_name: None,
+        is_comped: false,
     }
 }
 
@@ -365,7 +366,6 @@ mod tests {
             zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
-            priority: 0,
             is_stackable: true,
             is_exclusive: false,
             valid_from: None,
@@ -436,7 +436,6 @@ mod tests {
             zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
-            priority: 0,
             is_stackable: true,
             is_exclusive: false,
             valid_from: None,
@@ -491,7 +490,6 @@ mod tests {
             zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
-            priority: 0,
             is_stackable: true,
             is_exclusive: false,
             valid_from: None,
@@ -551,7 +549,6 @@ mod tests {
             zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
-            priority: 0,
             is_stackable: true,
             is_exclusive: false,
             valid_from: None,
@@ -613,7 +610,6 @@ mod tests {
             zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
-            priority: 0,
             is_stackable: true,
             is_exclusive: false,
             valid_from: None,
@@ -639,7 +635,6 @@ mod tests {
             zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::FixedAmount,
             adjustment_value: 5.0,
-            priority: 0,
             is_stackable: true,
             is_exclusive: false,
             valid_from: None,
@@ -665,7 +660,6 @@ mod tests {
             zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::FixedAmount,
             adjustment_value: 50.0, // Large discount that should NOT apply
-            priority: 0,
             is_stackable: true,
             is_exclusive: false,
             valid_from: None,

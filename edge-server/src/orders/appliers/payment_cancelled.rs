@@ -452,6 +452,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
         snapshot.items.push(item);
         snapshot.total = 100.0;
@@ -518,6 +519,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
         snapshot.items.push(item.clone());
 
@@ -590,6 +592,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
         snapshot.items.push(modified_item);
 
@@ -616,6 +619,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
 
         let mut payment = create_payment_record("split-pay-1", "CASH", 20.0);
@@ -696,6 +700,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
         snapshot.items.push(modified_item);
 
@@ -722,6 +727,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
 
         let mut payment = create_payment_record("split-pay-1", "CASH", 20.0);
@@ -808,6 +814,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
         snapshot.items.push(modified_item);
 
@@ -834,6 +841,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
         snapshot.items.push(re_added_item);
 
@@ -860,6 +868,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
 
         let mut payment = create_payment_record("split-pay-1", "CASH", 20.0);
@@ -930,6 +939,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
         snapshot.items.push(item);
 

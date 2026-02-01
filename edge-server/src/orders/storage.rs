@@ -10,6 +10,7 @@
 //! | `processed_commands` | `command_id` | `()` | Idempotency check |
 //! | `sequence_counter` | `()` | `u64` | Global sequence |
 //! | `pending_archive` | `order_id` | `PendingArchive` | Archive queue |
+//! | `rule_snapshots` | `order_id` | `Vec<PriceRule>` | 开台定格的价格规则快照 |
 //!
 //! # Durability
 //!
@@ -26,6 +27,7 @@ use redb::{
     Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition,
     WriteTransaction,
 };
+use crate::db::models::PriceRule;
 use shared::order::{OrderEvent, OrderSnapshot};
 use std::path::Path;
 use std::sync::Arc;
@@ -52,6 +54,10 @@ const PENDING_ARCHIVE_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new
 
 /// Table for dead letter queue: key = order_id, value = JSON-serialized DeadLetterEntry
 const DEAD_LETTER_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("dead_letter");
+
+/// Table for price rule snapshots: key = order_id, value = JSON-serialized Vec<PriceRule>
+/// 开台时定格的价格规则快照，订单生命周期内规则不变
+const RULE_SNAPSHOTS_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("rule_snapshots");
 
 const SEQUENCE_KEY: &str = "seq";
 const ORDER_COUNT_KEY: &str = "order_count";
@@ -138,6 +144,7 @@ impl OrderStorage {
             let _ = write_txn.open_table(PROCESSED_COMMANDS_TABLE)?;
             let _ = write_txn.open_table(PENDING_ARCHIVE_TABLE)?;
             let _ = write_txn.open_table(DEAD_LETTER_TABLE)?;
+            let _ = write_txn.open_table(RULE_SNAPSHOTS_TABLE)?;
 
             // Initialize sequence counter if not exists
             let mut seq_table = write_txn.open_table(SEQUENCE_TABLE)?;
@@ -164,6 +171,7 @@ impl OrderStorage {
             let _ = write_txn.open_table(PROCESSED_COMMANDS_TABLE)?;
             let _ = write_txn.open_table(PENDING_ARCHIVE_TABLE)?;
             let _ = write_txn.open_table(DEAD_LETTER_TABLE)?;
+            let _ = write_txn.open_table(RULE_SNAPSHOTS_TABLE)?;
             let mut seq_table = write_txn.open_table(SEQUENCE_TABLE)?;
             seq_table.insert(SEQUENCE_KEY, 0u64)?;
         }
@@ -566,6 +574,62 @@ impl OrderStorage {
         Ok(None)
     }
 
+    // ========== Rule Snapshot Operations ==========
+    // 开台时定格的价格规则快照，订单生命周期内规则不变
+
+    /// 存储订单的价格规则快照
+    pub fn store_rule_snapshot(&self, order_id: &str, rules: &[PriceRule]) -> StorageResult<()> {
+        let txn = self.db.begin_write()?;
+        {
+            let mut table = txn.open_table(RULE_SNAPSHOTS_TABLE)?;
+            let value = serde_json::to_vec(rules)?;
+            table.insert(order_id, value.as_slice())?;
+        }
+        txn.commit()?;
+        Ok(())
+    }
+
+    /// 获取订单的价格规则快照
+    pub fn get_rule_snapshot(&self, order_id: &str) -> StorageResult<Option<Vec<PriceRule>>> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(RULE_SNAPSHOTS_TABLE)?;
+
+        match table.get(order_id)? {
+            Some(value) => {
+                let rules: Vec<PriceRule> = serde_json::from_slice(value.value())?;
+                Ok(Some(rules))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// 删除订单的价格规则快照
+    pub fn remove_rule_snapshot(&self, order_id: &str) -> StorageResult<()> {
+        let txn = self.db.begin_write()?;
+        {
+            let mut table = txn.open_table(RULE_SNAPSHOTS_TABLE)?;
+            table.remove(order_id)?;
+        }
+        txn.commit()?;
+        Ok(())
+    }
+
+    /// 获取所有订单的价格规则快照 (用于启动预热)
+    pub fn get_all_rule_snapshots(&self) -> StorageResult<Vec<(String, Vec<PriceRule>)>> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(RULE_SNAPSHOTS_TABLE)?;
+
+        let mut snapshots = Vec::new();
+        for result in table.iter()? {
+            let (key, value) = result?;
+            let order_id = key.value().to_string();
+            let rules: Vec<PriceRule> = serde_json::from_slice(value.value())?;
+            snapshots.push((order_id, rules));
+        }
+
+        Ok(snapshots)
+    }
+
     // ========== Cleanup Operations ==========
 
     /// Remove events for an order (for archival)
@@ -681,6 +745,12 @@ impl OrderStorage {
             for (oid, seq) in &keys_to_remove {
                 table.remove((oid.as_str(), *seq))?;
             }
+        }
+
+        // 4. Remove rule snapshot
+        {
+            let mut table = txn.open_table(RULE_SNAPSHOTS_TABLE)?;
+            table.remove(order_id)?;
         }
 
         txn.commit()?;
@@ -881,7 +951,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 2,
                 is_retail: false,
-                service_type: None,
                 queue_number: None,
                 receipt_number: "RCP-TEST".to_string(),
             },
@@ -901,6 +970,7 @@ mod tests {
             queue_number: None,
             status: OrderStatus::Active,
             items: vec![],
+            comps: vec![],
             payments: vec![],
             original_total: 0.0,
             subtotal: 0.0,
@@ -914,11 +984,13 @@ mod tests {
             paid_item_quantities: std::collections::HashMap::new(),
             receipt_number: String::new(),
             is_pre_payment: false,
+            note: None,
             order_rule_discount_amount: None,
             order_rule_surcharge_amount: None,
             order_applied_rules: None,
             order_manual_discount_percent: None,
             order_manual_discount_fixed: None,
+            order_manual_surcharge_fixed: None,
             start_time: shared::util::now_millis(),
             end_time: None,
             created_at: shared::util::now_millis(),
@@ -1166,5 +1238,155 @@ mod tests {
         assert!(storage.get_snapshot(order_id).unwrap().is_none());
         assert!(storage.get_events_for_order(order_id).unwrap().is_empty());
         assert!(storage.get_pending_archives().unwrap().is_empty());
+    }
+
+    // ========== Rule Snapshot Tests ==========
+
+    fn create_test_rule(name: &str) -> PriceRule {
+        use crate::db::models::price_rule::{AdjustmentType, ProductScope, RuleType};
+        PriceRule {
+            id: None,
+            name: name.to_string(),
+            display_name: name.to_string(),
+            receipt_name: name.to_string(),
+            description: None,
+            rule_type: RuleType::Discount,
+            product_scope: ProductScope::Global,
+            target: None,
+            zone_scope: "zone:all".to_string(),
+            adjustment_type: AdjustmentType::Percentage,
+            adjustment_value: 10.0,
+            is_stackable: false,
+            is_exclusive: false,
+            valid_from: None,
+            valid_until: None,
+            active_days: None,
+            active_start_time: None,
+            active_end_time: None,
+            is_active: true,
+            created_by: None,
+            created_at: 0,
+        }
+    }
+
+    #[test]
+    fn test_rule_snapshot_store_and_get() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let order_id = "order-rule-1";
+
+        // 初始无快照
+        assert!(storage.get_rule_snapshot(order_id).unwrap().is_none());
+
+        // 存储规则快照
+        let rules = vec![
+            create_test_rule("Happy Hour"),
+            create_test_rule("VIP Discount"),
+        ];
+        storage.store_rule_snapshot(order_id, &rules).unwrap();
+
+        // 读取快照
+        let retrieved = storage.get_rule_snapshot(order_id).unwrap();
+        assert!(retrieved.is_some());
+        let retrieved = retrieved.unwrap();
+        assert_eq!(retrieved.len(), 2);
+        assert_eq!(retrieved[0].name, "Happy Hour");
+        assert_eq!(retrieved[1].name, "VIP Discount");
+    }
+
+    #[test]
+    fn test_rule_snapshot_overwrite() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let order_id = "order-rule-2";
+
+        // 第一次存储
+        let rules1 = vec![create_test_rule("Rule A")];
+        storage.store_rule_snapshot(order_id, &rules1).unwrap();
+
+        // 覆盖存储
+        let rules2 = vec![create_test_rule("Rule B"), create_test_rule("Rule C")];
+        storage.store_rule_snapshot(order_id, &rules2).unwrap();
+
+        let retrieved = storage.get_rule_snapshot(order_id).unwrap().unwrap();
+        assert_eq!(retrieved.len(), 2);
+        assert_eq!(retrieved[0].name, "Rule B");
+    }
+
+    #[test]
+    fn test_rule_snapshot_remove() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let order_id = "order-rule-3";
+
+        let rules = vec![create_test_rule("Test Rule")];
+        storage.store_rule_snapshot(order_id, &rules).unwrap();
+        assert!(storage.get_rule_snapshot(order_id).unwrap().is_some());
+
+        // 删除快照
+        storage.remove_rule_snapshot(order_id).unwrap();
+        assert!(storage.get_rule_snapshot(order_id).unwrap().is_none());
+
+        // 删除不存在的快照不应报错
+        storage.remove_rule_snapshot("nonexistent").unwrap();
+    }
+
+    #[test]
+    fn test_rule_snapshot_get_all() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+
+        // 初始为空
+        let all = storage.get_all_rule_snapshots().unwrap();
+        assert!(all.is_empty());
+
+        // 存储多个订单的快照
+        storage.store_rule_snapshot("order-a", &vec![create_test_rule("Rule A")]).unwrap();
+        storage.store_rule_snapshot("order-b", &vec![create_test_rule("Rule B1"), create_test_rule("Rule B2")]).unwrap();
+
+        let all = storage.get_all_rule_snapshots().unwrap();
+        assert_eq!(all.len(), 2);
+
+        // 验证内容（redb 按 key 排序）
+        let order_ids: Vec<&str> = all.iter().map(|(id, _)| id.as_str()).collect();
+        assert!(order_ids.contains(&"order-a"));
+        assert!(order_ids.contains(&"order-b"));
+    }
+
+    #[test]
+    fn test_rule_snapshot_empty_rules() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let order_id = "order-empty-rules";
+
+        // 存储空规则列表
+        storage.store_rule_snapshot(order_id, &[]).unwrap();
+
+        let retrieved = storage.get_rule_snapshot(order_id).unwrap();
+        assert!(retrieved.is_some());
+        assert!(retrieved.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_complete_archive_cleans_rule_snapshot() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let order_id = "order-archive-rule";
+
+        // 创建订单数据 + 规则快照
+        let snapshot = create_test_snapshot(order_id);
+        let event = create_test_event(order_id, 0);
+        let rules = vec![create_test_rule("Archive Rule")];
+
+        let txn = storage.begin_write().unwrap();
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+        storage.store_event(&txn, &event).unwrap();
+        storage.queue_for_archive(&txn, order_id).unwrap();
+        txn.commit().unwrap();
+
+        storage.store_rule_snapshot(order_id, &rules).unwrap();
+
+        // 确认规则快照存在
+        assert!(storage.get_rule_snapshot(order_id).unwrap().is_some());
+
+        // 执行归档清理
+        storage.complete_archive(order_id).unwrap();
+
+        // 规则快照也应被清理
+        assert!(storage.get_rule_snapshot(order_id).unwrap().is_none());
     }
 }

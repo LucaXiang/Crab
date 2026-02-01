@@ -49,7 +49,6 @@ export interface WizardState {
   receipt_name: string;
   description: string;
   // Step 6
-  priority: number;
   is_stackable: boolean;
   is_exclusive: boolean;
 }
@@ -81,7 +80,6 @@ const getInitialState = (rule?: PriceRule | null): WizardState => {
       display_name: rule.display_name,
       receipt_name: rule.receipt_name,
       description: rule.description || '',
-      priority: rule.priority,
       is_stackable: rule.is_stackable,
       is_exclusive: rule.is_exclusive,
     };
@@ -103,7 +101,6 @@ const getInitialState = (rule?: PriceRule | null): WizardState => {
     display_name: '',
     receipt_name: '',
     description: '',
-    priority: 0,
     is_stackable: true,
     is_exclusive: false,
   };
@@ -183,7 +180,6 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({
       zone_scope: state.zone_scope,
       adjustment_type: state.adjustment_type,
       adjustment_value: state.adjustment_value,
-      priority: state.priority,
       is_stackable: state.is_stackable,
       is_exclusive: state.is_exclusive,
     };

@@ -101,7 +101,6 @@ mod tests {
             zone_scope: "zone:all".to_string(),
             adjustment_value: 10.0,
             calculated_amount: 5.0,
-            priority: 0,
             is_stackable: true,
             is_exclusive: false,
             skipped: false,
@@ -131,6 +130,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         }
     }
 
@@ -329,6 +329,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         }];
         storage.store_snapshot(&txn, &snapshot).unwrap();
 

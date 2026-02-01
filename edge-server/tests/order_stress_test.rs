@@ -6,6 +6,7 @@
 
 use edge_server::{Config, ServerState};
 use rand::Rng;
+use shared::order::types::ServiceType;
 use shared::order::{CartItemInput, OrderCommand, OrderCommandPayload, PaymentInput};
 use std::fs;
 use std::path::PathBuf;
@@ -97,7 +98,6 @@ fn execute_phase(
                     zone_name: None,
                     guest_count: rng.gen_range(1..=4),
                     is_retail: true,
-                    service_type: None,
                 },
             );
             let resp = manager.execute_command(open_cmd);
@@ -164,6 +164,7 @@ fn execute_phase(
                 op_name,
                 OrderCommandPayload::CompleteOrder {
                     order_id: order_id.clone(),
+                    service_type: Some(ServiceType::DineIn),
                 },
             );
             let resp = manager.execute_command(complete_cmd);

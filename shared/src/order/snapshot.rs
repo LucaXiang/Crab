@@ -4,7 +4,7 @@
 //! Clients can compare their locally computed checksum with the server's
 //! to detect if the reducer logic has diverged.
 
-use super::types::{CartItemSnapshot, LossReason, PaymentRecord, ServiceType, VoidType};
+use super::types::{CartItemSnapshot, CompRecord, LossReason, PaymentRecord, ServiceType, VoidType};
 use super::AppliedRule;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
@@ -67,6 +67,9 @@ pub struct OrderSnapshot {
     pub void_note: Option<String>,
     /// Items in the order
     pub items: Vec<CartItemSnapshot>,
+    /// Comp records (audit trail for comped items)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub comps: Vec<CompRecord>,
     /// Payment records
     pub payments: Vec<PaymentRecord>,
     // === Financial Totals (all computed by server) ===
@@ -115,6 +118,9 @@ pub struct OrderSnapshot {
     /// Whether this is a pre-payment order
     #[serde(default)]
     pub is_pre_payment: bool,
+    /// Order-level note (覆盖式，None = 无备注)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
 
     // === Order-level Rule Adjustments ===
     /// Order-level rule discount amount
@@ -134,6 +140,9 @@ pub struct OrderSnapshot {
     /// Order-level manual discount fixed amount
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_manual_discount_fixed: Option<f64>,
+    /// Order-level manual surcharge fixed amount
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order_manual_surcharge_fixed: Option<f64>,
 
     /// Order start time
     pub start_time: i64,
@@ -174,6 +183,7 @@ impl OrderSnapshot {
             loss_amount: None,
             void_note: None,
             items: Vec::new(),
+            comps: Vec::new(),
             payments: Vec::new(),
             original_total: 0.0,
             subtotal: 0.0,
@@ -190,11 +200,13 @@ impl OrderSnapshot {
             aa_paid_shares: 0,
             receipt_number: String::new(),
             is_pre_payment: false,
+            note: None,
             order_rule_discount_amount: None,
             order_rule_surcharge_amount: None,
             order_applied_rules: None,
             order_manual_discount_percent: None,
             order_manual_discount_fixed: None,
+            order_manual_surcharge_fixed: None,
             start_time: now,
             end_time: None,
             created_at: now,

@@ -127,7 +127,6 @@ mod tests {
         rule_type: RuleType,
         adjustment_type: AdjustmentType,
         value: f64,
-        priority: i32,
         stackable: bool,
         exclusive: bool,
     ) -> PriceRule {
@@ -143,7 +142,6 @@ mod tests {
             zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type,
             adjustment_value: value,
-            priority,
             is_stackable: stackable,
             is_exclusive: exclusive,
             valid_from: None,
@@ -166,7 +164,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             10.0,
-            0,
             true,
             false,
         );
@@ -239,7 +236,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             10.0,
-            0,
             true,
             false,
         );
@@ -247,7 +243,6 @@ mod tests {
             RuleType::Surcharge,
             AdjustmentType::Percentage,
             5.0,
-            0,
             true,
             false,
         );
@@ -284,7 +279,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             150.0,
-            0,
             true,
             false,
         );
@@ -313,7 +307,6 @@ mod tests {
             RuleType::Surcharge,
             AdjustmentType::Percentage,
             8.0,
-            0,
             true,
             false,
         );
@@ -336,7 +329,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::FixedAmount,
             15.0,
-            0,
             true,
             false,
         );

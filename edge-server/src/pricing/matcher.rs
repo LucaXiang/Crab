@@ -220,7 +220,6 @@ mod tests {
             zone_scope: ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
-            priority: 0,
             is_stackable: false,
             is_exclusive: false,
             valid_from: None,

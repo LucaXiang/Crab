@@ -277,6 +277,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         }
     }
 

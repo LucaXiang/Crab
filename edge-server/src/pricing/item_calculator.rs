@@ -72,15 +72,14 @@ pub fn to_f64(value: Decimal) -> f64 {
 
 /// Calculate effective priority for a rule
 ///
-/// Priority formula: (zone_weight * 10 + product_weight) * 1000 + user_priority
+/// Priority formula: zone_weight * 10 + product_weight
 ///
 /// This ensures more specific rules (specific zone, specific product) have higher priority
 /// than general rules (global zone, global product scope).
 ///
 /// Zone weights:
-/// - -1 (Global): 0
-/// - 0 (Retail): 1
-/// - >0 (Specific zone): 2
+/// - zone:all: 0
+/// - all others (including zone:retail): 1
 ///
 /// Product weights:
 /// - Global: 0
@@ -89,9 +88,8 @@ pub fn to_f64(value: Decimal) -> f64 {
 /// - Product: 3
 pub fn calculate_effective_priority(rule: &PriceRule) -> i32 {
     let zone_weight = match rule.zone_scope.as_str() {
-        crate::db::models::ZONE_SCOPE_ALL => 0,     // Global
-        crate::db::models::ZONE_SCOPE_RETAIL => 1,  // Retail
-        _ => 2,                                      // Specific zone
+        crate::db::models::ZONE_SCOPE_ALL => 0,
+        _ => 1,
     };
 
     let product_weight = match rule.product_scope {
@@ -101,7 +99,7 @@ pub fn calculate_effective_priority(rule: &PriceRule) -> i32 {
         ProductScope::Product => 3,
     };
 
-    (zone_weight * 10 + product_weight) * 1000 + rule.priority
+    zone_weight * 10 + product_weight
 }
 
 // ==================== Rule Selection ====================
@@ -501,7 +499,6 @@ fn to_shared_rule(rule: &PriceRule) -> shared::models::price_rule::PriceRule {
             AdjustmentType::FixedAmount => shared::models::price_rule::AdjustmentType::FixedAmount,
         },
         adjustment_value: rule.adjustment_value,
-        priority: rule.priority,
         is_stackable: rule.is_stackable,
         is_exclusive: rule.is_exclusive,
         valid_from: rule.valid_from,
@@ -557,7 +554,6 @@ pub fn calculate_item_price(
             adjustment_value = rule.adjustment_value,
             is_stackable = rule.is_stackable,
             is_exclusive = rule.is_exclusive,
-            priority = rule.priority,
             effective_priority = calculate_effective_priority(rule),
             "[ItemCalc] Matched rule"
         );
@@ -646,7 +642,6 @@ mod tests {
         rule_type: RuleType,
         adjustment_type: AdjustmentType,
         value: f64,
-        priority: i32,
         stackable: bool,
         exclusive: bool,
     ) -> PriceRule {
@@ -662,7 +657,6 @@ mod tests {
             zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type,
             adjustment_value: value,
-            priority,
             is_stackable: stackable,
             is_exclusive: exclusive,
             valid_from: None,
@@ -680,13 +674,12 @@ mod tests {
         rule_type: RuleType,
         adjustment_type: AdjustmentType,
         value: f64,
-        priority: i32,
         stackable: bool,
         exclusive: bool,
         zone_scope: &str,
         product_scope: ProductScope,
     ) -> PriceRule {
-        let mut rule = make_rule(rule_type, adjustment_type, value, priority, stackable, exclusive);
+        let mut rule = make_rule(rule_type, adjustment_type, value, stackable, exclusive);
         rule.zone_scope = zone_scope.to_string();
         rule.product_scope = product_scope;
         rule
@@ -701,7 +694,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             10.0,
-            0,
             true,
             false,
         );
@@ -728,7 +720,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             10.0,
-            0,
             true,
             false,
         );
@@ -751,7 +742,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             20.0,
-            0,
             false,
             true,
         );
@@ -759,7 +749,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             30.0,
-            0,
             true,
             false,
         );
@@ -783,7 +772,6 @@ mod tests {
             RuleType::Surcharge,
             AdjustmentType::Percentage,
             10.0,
-            0,
             true,
             false,
         );
@@ -808,7 +796,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             10.0,
-            0,
             true,
             false,
         );
@@ -832,7 +819,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             10.0,
-            0,
             true,
             false,
         );
@@ -840,7 +826,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             10.0,
-            0,
             true,
             false,
         );
@@ -860,7 +845,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::FixedAmount,
             5.0,
-            0,
             true,
             false,
         );
@@ -868,7 +852,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::FixedAmount,
             3.0,
-            0,
             true,
             false,
         );
@@ -882,28 +865,28 @@ mod tests {
 
     #[test]
     fn test_non_stackable_winner() {
-        // Two non-stackable rules, higher priority wins
-        let winner = make_rule(
+        // Two non-stackable rules with same effective_priority, newer created_at wins
+        let mut winner = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
             15.0,
-            10, // Higher priority
             false,
             false,
         );
-        let loser = make_rule(
+        winner.created_at = 2000; // Newer
+        let mut loser = make_rule(
             RuleType::Discount,
             AdjustmentType::Percentage,
             25.0,
-            5, // Lower priority
             false,
             false,
         );
+        loser.created_at = 1000; // Older
         let rules: Vec<&PriceRule> = vec![&winner, &loser];
 
         let result = calculate_item_price(100.0, 0.0, 0.0, &rules);
 
-        assert_eq!(result.rule_discount_amount, 15.0); // 15% wins
+        assert_eq!(result.rule_discount_amount, 15.0); // 15% wins (newer)
         assert_eq!(result.item_final, 85.0);
         assert_eq!(result.applied_rules.len(), 1);
     }
@@ -916,7 +899,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             10.0,
-            0,
             false,
             false,
         );
@@ -924,7 +906,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             5.0,
-            0,
             true,
             false,
         );
@@ -944,45 +925,45 @@ mod tests {
     // ==================== Priority Tests ====================
 
     #[test]
-    fn test_effective_priority_calculation() {
-        // Global zone, global product -> (0*10 + 0) * 1000 + priority
-        let global_rule = make_rule_with_scope(
-            RuleType::Discount,
-            AdjustmentType::Percentage,
-            10.0,
-            5,
-            true,
-            false,
-            crate::db::models::ZONE_SCOPE_ALL,
-            ProductScope::Global,
-        );
-        assert_eq!(calculate_effective_priority(&global_rule), 5);
+    fn test_effective_priority_full_matrix() {
+        // Full 2x4 matrix: zone_weight(0|1) * 10 + product_weight(0|1|2|3)
+        let cases: Vec<(&str, ProductScope, i32)> = vec![
+            // zone:all (weight=0)
+            (crate::db::models::ZONE_SCOPE_ALL, ProductScope::Global, 0),
+            (crate::db::models::ZONE_SCOPE_ALL, ProductScope::Category, 1),
+            (crate::db::models::ZONE_SCOPE_ALL, ProductScope::Tag, 2),
+            (crate::db::models::ZONE_SCOPE_ALL, ProductScope::Product, 3),
+            // zone:retail (weight=1)
+            (crate::db::models::ZONE_SCOPE_RETAIL, ProductScope::Global, 10),
+            (crate::db::models::ZONE_SCOPE_RETAIL, ProductScope::Category, 11),
+            (crate::db::models::ZONE_SCOPE_RETAIL, ProductScope::Tag, 12),
+            (crate::db::models::ZONE_SCOPE_RETAIL, ProductScope::Product, 13),
+            // specific zone (weight=1, same as retail)
+            ("zone:dining-room", ProductScope::Global, 10),
+            ("zone:dining-room", ProductScope::Category, 11),
+            ("zone:dining-room", ProductScope::Tag, 12),
+            ("zone:dining-room", ProductScope::Product, 13),
+        ];
 
-        // Specific zone, specific product -> (2*10 + 3) * 1000 + priority
-        let specific_rule = make_rule_with_scope(
-            RuleType::Discount,
-            AdjustmentType::Percentage,
-            10.0,
-            5,
-            true,
-            false,
-            "zone:1", // Specific zone
-            ProductScope::Product,
-        );
-        assert_eq!(calculate_effective_priority(&specific_rule), 23005);
-
-        // Retail zone, category -> (1*10 + 1) * 1000 + priority
-        let retail_rule = make_rule_with_scope(
-            RuleType::Discount,
-            AdjustmentType::Percentage,
-            10.0,
-            5,
-            true,
-            false,
-            crate::db::models::ZONE_SCOPE_RETAIL,
-            ProductScope::Category,
-        );
-        assert_eq!(calculate_effective_priority(&retail_rule), 11005);
+        for (zone, scope, expected) in cases {
+            let rule = make_rule_with_scope(
+                RuleType::Discount,
+                AdjustmentType::Percentage,
+                10.0,
+                true,
+                false,
+                zone,
+                scope.clone(),
+            );
+            assert_eq!(
+                calculate_effective_priority(&rule),
+                expected,
+                "zone={}, scope={:?} should be {}",
+                zone,
+                scope,
+                expected
+            );
+        }
     }
 
     #[test]
@@ -992,7 +973,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             30.0, // Higher discount
-            100, // Higher user priority
             false,
             false,
             crate::db::models::ZONE_SCOPE_ALL,
@@ -1002,7 +982,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             10.0, // Lower discount
-            0,  // Lower user priority
             false,
             false,
             "zone:1", // Specific zone
@@ -1012,9 +991,78 @@ mod tests {
 
         let result = calculate_item_price(100.0, 0.0, 0.0, &rules);
 
-        // Specific should win due to higher effective priority
+        // Specific should win due to higher effective priority (13 > 0)
         assert_eq!(result.rule_discount_amount, 10.0);
         assert_eq!(result.item_final, 90.0);
+    }
+
+    #[test]
+    fn test_non_stackable_higher_priority_wins_regardless_of_created_at() {
+        // A rule with higher effective_priority wins even if it was created earlier
+        let mut global = make_rule_with_scope(
+            RuleType::Discount,
+            AdjustmentType::Percentage,
+            30.0, // Higher discount amount
+            false,
+            false,
+            crate::db::models::ZONE_SCOPE_ALL,
+            ProductScope::Global, // priority = 0
+        );
+        global.created_at = 9999; // Very new — but low priority
+
+        let mut category_specific = make_rule_with_scope(
+            RuleType::Discount,
+            AdjustmentType::Percentage,
+            5.0, // Lower discount amount
+            false,
+            false,
+            "zone:retail",
+            ProductScope::Category, // priority = 11
+        );
+        category_specific.created_at = 1000; // Old — but high priority
+
+        let rules: Vec<&PriceRule> = vec![&global, &category_specific];
+        let result = calculate_item_price(100.0, 0.0, 0.0, &rules);
+
+        // Category-specific (priority 11) wins over global (priority 0)
+        // even though global has newer created_at
+        assert_eq!(result.rule_discount_amount, 5.0);
+        assert_eq!(result.item_final, 95.0);
+        assert_eq!(result.applied_rules.len(), 1);
+    }
+
+    #[test]
+    fn test_non_stackable_same_priority_created_at_tiebreak() {
+        // Two non-stackable rules with same effective_priority → newer created_at wins
+        let mut newer = make_rule_with_scope(
+            RuleType::Discount,
+            AdjustmentType::Percentage,
+            10.0,
+            false,
+            false,
+            "zone:retail",
+            ProductScope::Category, // priority = 11
+        );
+        newer.created_at = 5000;
+
+        let mut older = make_rule_with_scope(
+            RuleType::Discount,
+            AdjustmentType::Percentage,
+            20.0,
+            false,
+            false,
+            "zone:bar",
+            ProductScope::Category, // priority = 11 (same)
+        );
+        older.created_at = 1000;
+
+        let rules: Vec<&PriceRule> = vec![&older, &newer];
+        let result = calculate_item_price(100.0, 0.0, 0.0, &rules);
+
+        // Newer (10%) wins over older (20%) at same priority level
+        assert_eq!(result.rule_discount_amount, 10.0);
+        assert_eq!(result.item_final, 90.0);
+        assert_eq!(result.applied_rules.len(), 1);
     }
 
     // ==================== Surcharge Tests ====================
@@ -1026,7 +1074,6 @@ mod tests {
             RuleType::Surcharge,
             AdjustmentType::Percentage,
             15.0,
-            0,
             false,
             true,
         );
@@ -1034,7 +1081,6 @@ mod tests {
             RuleType::Surcharge,
             AdjustmentType::Percentage,
             5.0,
-            0,
             true,
             false,
         );
@@ -1053,7 +1099,6 @@ mod tests {
             RuleType::Surcharge,
             AdjustmentType::Percentage,
             5.0,
-            0,
             true,
             false,
         );
@@ -1061,7 +1106,6 @@ mod tests {
             RuleType::Surcharge,
             AdjustmentType::Percentage,
             5.0,
-            0,
             true,
             false,
         );
@@ -1085,7 +1129,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             10.0,
-            0,
             true,
             false,
         );
@@ -1093,7 +1136,6 @@ mod tests {
             RuleType::Surcharge,
             AdjustmentType::Percentage,
             5.0,
-            0,
             true,
             false,
         );
@@ -1118,7 +1160,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             10.0,
-            0,
             true,
             false,
         );
@@ -1126,7 +1167,6 @@ mod tests {
             RuleType::Surcharge,
             AdjustmentType::Percentage,
             5.0,
-            0,
             true,
             false,
         );
@@ -1162,7 +1202,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             150.0,
-            0,
             true,
             false,
         );
@@ -1181,7 +1220,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::FixedAmount,
             5.5,
-            0,
             true,
             false,
         );
@@ -1201,7 +1239,6 @@ mod tests {
             RuleType::Discount,
             AdjustmentType::Percentage,
             33.0,
-            0,
             true,
             false,
         );

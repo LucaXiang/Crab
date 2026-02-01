@@ -26,7 +26,6 @@ pub struct AppliedRule {
     pub adjustment_value: f64,
     /// Calculated amount after applying rule
     pub calculated_amount: f64,
-    pub priority: i32,
     pub is_stackable: bool,
     pub is_exclusive: bool,
 
@@ -53,7 +52,6 @@ impl AppliedRule {
             zone_scope: rule.zone_scope.clone(),
             adjustment_value: rule.adjustment_value,
             calculated_amount,
-            priority: rule.priority,
             is_stackable: rule.is_stackable,
             is_exclusive: rule.is_exclusive,
             skipped: false,
@@ -80,7 +78,6 @@ mod tests {
             zone_scope: "zone:all".to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
-            priority: 0,
             is_stackable: true,
             is_exclusive: false,
             valid_from: None,
@@ -105,7 +102,6 @@ mod tests {
         assert_eq!(applied.zone_scope, "zone:all");
         assert_eq!(applied.adjustment_value, 10.0);
         assert_eq!(applied.calculated_amount, 5.0);
-        assert_eq!(applied.priority, 0);
         assert!(applied.is_stackable);
         assert!(!applied.is_exclusive);
         assert!(!applied.skipped);
@@ -124,7 +120,6 @@ mod tests {
             zone_scope: "zone:all".to_string(),
             adjustment_value: 10.0,
             calculated_amount: 5.0,
-            priority: 0,
             is_stackable: true,
             is_exclusive: false,
             skipped: false,
@@ -150,7 +145,6 @@ mod tests {
             "zone_scope": "zone:all",
             "adjustment_value": 10.0,
             "calculated_amount": 5.0,
-            "priority": 0,
             "is_stackable": true,
             "is_exclusive": false
         }"#;

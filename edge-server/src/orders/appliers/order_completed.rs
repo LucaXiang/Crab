@@ -12,6 +12,7 @@ impl EventApplier for OrderCompletedApplier {
     fn apply(&self, snapshot: &mut OrderSnapshot, event: &OrderEvent) {
         if let EventPayload::OrderCompleted {
             receipt_number,
+            service_type,
             final_total: _,
             payment_summary: _,
         } = &event.payload
@@ -21,6 +22,9 @@ impl EventApplier for OrderCompletedApplier {
 
             // Set receipt number (overwrite with event value for audit trail)
             snapshot.receipt_number = receipt_number.clone();
+
+            // 结单时设置服务类型（零售订单才有值）
+            snapshot.service_type = *service_type;
 
             // Set end time
             snapshot.end_time = Some(event.timestamp);
@@ -45,6 +49,7 @@ impl EventApplier for OrderCompletedApplier {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shared::order::types::ServiceType;
     use shared::order::{OrderEventType, PaymentSummaryItem};
 
     fn create_order_completed_event(
@@ -64,6 +69,7 @@ mod tests {
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
                 receipt_number: receipt_number.to_string(),
+                service_type: Some(ServiceType::DineIn),
                 final_total,
                 payment_summary,
             },
@@ -254,5 +260,58 @@ mod tests {
 
         assert_eq!(snapshot1.receipt_number, "RCP-001".to_string());
         assert_eq!(snapshot2.receipt_number, "RCP-002".to_string());
+    }
+
+    #[test]
+    fn test_order_completed_sets_service_type() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        // service_type 开台时为 None
+        assert_eq!(snapshot.service_type, None);
+
+        let event = create_order_completed_event("order-1", 1, "RCP-001", 100.0, vec![]);
+
+        let applier = OrderCompletedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // 结单后 service_type 应设置为 DineIn（测试 helper 中的默认值）
+        assert_eq!(snapshot.service_type, Some(ServiceType::DineIn));
+    }
+
+    #[test]
+    fn test_order_completed_sets_takeout_service_type() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        assert_eq!(snapshot.service_type, None);
+
+        // 手动创建 Takeout 事件
+        let event = OrderEvent::new(
+            1,
+            "order-1".to_string(),
+            "user-1".to_string(),
+            "Test User".to_string(),
+            "cmd-1".to_string(),
+            Some(1234567890),
+            OrderEventType::OrderCompleted,
+            EventPayload::OrderCompleted {
+                receipt_number: "RCP-TAKEOUT".to_string(),
+                service_type: Some(ServiceType::Takeout),
+                final_total: 50.0,
+                payment_summary: vec![],
+            },
+        );
+
+        let applier = OrderCompletedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        assert_eq!(snapshot.service_type, Some(ServiceType::Takeout));
+        assert_eq!(snapshot.receipt_number, "RCP-TAKEOUT");
+    }
+
+    #[test]
+    fn test_snapshot_service_type_none_before_completion() {
+        // 验证新建的 snapshot 在结单前 service_type 为 None
+        let snapshot = OrderSnapshot::new("order-1".to_string());
+        assert_eq!(snapshot.service_type, None);
     }
 }

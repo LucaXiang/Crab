@@ -266,8 +266,16 @@ impl OrdersManager {
         &self.epoch
     }
 
-    /// Cache rules for an order
+    /// 缓存并持久化订单的价格规则快照
+    ///
+    /// 开台时调用，将规则同时写入内存缓存和 redb，
+    /// 确保重启后能从 redb 恢复而非重新查询数据库。
     pub fn cache_rules(&self, order_id: &str, rules: Vec<PriceRule>) {
+        // 持久化到 redb
+        if let Err(e) = self.storage.store_rule_snapshot(order_id, &rules) {
+            tracing::error!(order_id = %order_id, error = %e, "持久化规则快照失败，该订单的规则定格保证降级");
+        }
+        // 写入内存缓存
         let mut cache = self.rule_cache.write();
         cache.insert(order_id.to_string(), rules);
     }
@@ -278,10 +286,64 @@ impl OrdersManager {
         cache.get(order_id).cloned()
     }
 
-    /// Remove cached rules for an order
+    /// 清除订单的规则缓存和 redb 快照
+    ///
+    /// 订单终结时 (Complete/Void/Move/Merge) 调用。
     pub fn remove_cached_rules(&self, order_id: &str) {
+        // 清除内存缓存
+        {
+            let mut cache = self.rule_cache.write();
+            cache.remove(order_id);
+        }
+        // 清除 redb 快照
+        if let Err(e) = self.storage.remove_rule_snapshot(order_id) {
+            tracing::error!(order_id = %order_id, error = %e, "清除规则快照失败");
+        }
+    }
+
+    /// 从 redb 恢复所有规则快照到内存缓存 (启动预热用)
+    ///
+    /// 自动清理孤儿快照（订单已终结但规则快照未清除的情况）。
+    /// 返回恢复的订单数量。
+    pub fn restore_rule_snapshots_from_redb(&self) -> usize {
+        let snapshots = match self.storage.get_all_rule_snapshots() {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!(error = %e, "从 redb 恢复规则快照失败");
+                return 0;
+            }
+        };
+
+        // 获取活跃订单 ID 集合，用于清理孤儿快照
+        let active_ids: std::collections::HashSet<String> = self
+            .storage
+            .get_active_order_ids()
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+
+        let mut restored = 0;
+        let mut orphaned = 0;
         let mut cache = self.rule_cache.write();
-        cache.remove(order_id);
+
+        for (order_id, rules) in snapshots {
+            if active_ids.contains(&order_id) {
+                cache.insert(order_id, rules);
+                restored += 1;
+            } else {
+                // 孤儿快照：订单已终结但规则未清除（可能是崩溃导致）
+                if let Err(e) = self.storage.remove_rule_snapshot(&order_id) {
+                    tracing::warn!(order_id = %order_id, error = %e, "清理孤儿规则快照失败");
+                }
+                orphaned += 1;
+            }
+        }
+
+        if orphaned > 0 {
+            tracing::info!(orphaned, "清理了孤儿规则快照");
+        }
+
+        restored
     }
 
     /// Subscribe to event broadcasts
@@ -435,7 +497,6 @@ impl OrdersManager {
                 zone_name,
                 guest_count,
                 is_retail,
-                service_type,
             } => {
                 tracing::info!(table_id = ?table_id, table_name = ?table_name, "Processing OpenTable command");
                 // Use pre-generated receipt_number (generated before transaction)
@@ -447,7 +508,6 @@ impl OrdersManager {
                     zone_name: zone_name.clone(),
                     guest_count: *guest_count,
                     is_retail: *is_retail,
-                    service_type: *service_type,
                     queue_number: pre_generated_queue,
                     receipt_number,
                 })
@@ -525,11 +585,15 @@ impl OrdersManager {
         // 11. Commit transaction
         txn.commit().map_err(StorageError::from)?;
 
-        // 12. Clean up rule cache for completed/voided orders
+        // 12. Clean up rule cache for terminal orders (Complete/Void/Move/Merge)
         match &cmd.payload {
             shared::order::OrderCommandPayload::CompleteOrder { order_id, .. }
-            | shared::order::OrderCommandPayload::VoidOrder { order_id, .. } => {
+            | shared::order::OrderCommandPayload::VoidOrder { order_id, .. }
+            | shared::order::OrderCommandPayload::MoveOrder { order_id, .. } => {
                 self.remove_cached_rules(order_id);
+            }
+            shared::order::OrderCommandPayload::MergeOrders { source_order_id, .. } => {
+                self.remove_cached_rules(source_order_id);
             }
             _ => {}
         }
@@ -623,6 +687,7 @@ impl Clone for OrdersManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shared::order::types::ServiceType;
     use shared::order::{CartItemInput, OrderCommandPayload, OrderEventType, PaymentInput, VoidType};
 
     fn create_test_manager() -> OrdersManager {
@@ -641,7 +706,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 2,
                 is_retail: false,
-                service_type: None,
             },
         )
     }
@@ -784,6 +848,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let complete_response = manager.execute_command(complete_cmd);
@@ -861,7 +926,6 @@ mod tests {
                 zone_name: Some("Zone A".to_string()),
                 guest_count: 2,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -1185,6 +1249,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp = manager.execute_command(complete_cmd);
@@ -1208,6 +1273,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp = manager.execute_command(complete_cmd);
@@ -1277,7 +1343,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 2,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp1 = manager.execute_command(cmd1);
@@ -1293,7 +1358,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 3,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp2 = manager.execute_command(cmd2);
@@ -1391,6 +1455,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp = manager.execute_command(complete_cmd);
@@ -1464,6 +1529,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp = manager.execute_command(complete_cmd);
@@ -1544,6 +1610,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp = manager.execute_command(complete_cmd);
@@ -1571,7 +1638,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: true,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(cmd);
@@ -1707,6 +1773,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: "nonexistent".to_string(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp = manager.execute_command(complete_cmd);
@@ -1762,6 +1829,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         manager.execute_command(complete_cmd);
@@ -1809,6 +1877,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp = manager.execute_command(complete_cmd);
@@ -1833,7 +1902,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -1869,7 +1937,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -1905,7 +1972,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -1960,7 +2026,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -1996,7 +2061,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -2032,7 +2096,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -2068,7 +2131,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -2120,7 +2182,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -2169,7 +2230,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -2307,7 +2367,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -2354,6 +2413,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp = manager.execute_command(complete_cmd);
@@ -2382,7 +2442,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -2451,7 +2510,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -2542,7 +2600,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -2622,6 +2679,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp = manager.execute_command(complete_cmd);
@@ -2646,7 +2704,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -2694,7 +2751,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -2845,6 +2901,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp = manager.execute_command(complete_cmd);
@@ -2881,6 +2938,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp = manager.execute_command(complete_cmd);
@@ -2905,7 +2963,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -2984,7 +3041,6 @@ mod tests {
                 zone_name: None,
                 guest_count: 1,
                 is_retail: false,
-                service_type: None,
             },
         );
         let resp = manager.execute_command(open_cmd);
@@ -3177,6 +3233,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp = manager.execute_command(complete_cmd);
@@ -3217,6 +3274,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         manager.execute_command(complete_cmd);
@@ -3268,6 +3326,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp1 = manager.execute_command(complete_cmd);
@@ -3278,6 +3337,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         let resp2 = manager.execute_command(complete_cmd2);
@@ -3480,7 +3540,7 @@ mod tests {
                 items: vec![], // Empty array
             },
         );
-        let resp = manager.execute_command(add_cmd);
+        let _resp = manager.execute_command(add_cmd);
         // 即使 AddItems 允许空数组（当前行为），订单不应进入不一致状态
         // 记录当前行为，不管成功与否，订单仍可继续操作
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -3845,6 +3905,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
             },
         );
         manager.execute_command(complete_cmd);
@@ -3929,4 +3990,299 @@ mod tests {
         assert!(!resp.success, "Zero payment amount should be rejected");
     }
 
+    // ========================================================================
+    // 规则快照持久化测试
+    // ========================================================================
+
+    fn create_test_rule(name: &str) -> PriceRule {
+        use crate::db::models::price_rule::{AdjustmentType, ProductScope, RuleType};
+        PriceRule {
+            id: None,
+            name: name.to_string(),
+            display_name: name.to_string(),
+            receipt_name: name.to_string(),
+            description: None,
+            rule_type: RuleType::Discount,
+            product_scope: ProductScope::Global,
+            target: None,
+            zone_scope: "zone:all".to_string(),
+            adjustment_type: AdjustmentType::Percentage,
+            adjustment_value: 10.0,
+            is_stackable: false,
+            is_exclusive: false,
+            valid_from: None,
+            valid_until: None,
+            active_days: None,
+            active_start_time: None,
+            active_end_time: None,
+            is_active: true,
+            created_by: None,
+            created_at: 0,
+        }
+    }
+
+    #[test]
+    fn test_cache_rules_persists_to_redb() {
+        let manager = create_test_manager();
+        let order_id = "order-persist-1";
+
+        let rules = vec![create_test_rule("Lunch Special"), create_test_rule("VIP")];
+        manager.cache_rules(order_id, rules);
+
+        // 内存缓存应该有
+        let cached = manager.get_cached_rules(order_id);
+        assert!(cached.is_some());
+        assert_eq!(cached.unwrap().len(), 2);
+
+        // redb 也应该有
+        let persisted = manager.storage().get_rule_snapshot(order_id).unwrap();
+        assert!(persisted.is_some());
+        assert_eq!(persisted.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_remove_cached_rules_cleans_redb() {
+        let manager = create_test_manager();
+        let order_id = "order-remove-1";
+
+        manager.cache_rules(order_id, vec![create_test_rule("Rule")]);
+        assert!(manager.get_cached_rules(order_id).is_some());
+        assert!(manager.storage().get_rule_snapshot(order_id).unwrap().is_some());
+
+        // 清除
+        manager.remove_cached_rules(order_id);
+
+        // 内存和 redb 都应该被清除
+        assert!(manager.get_cached_rules(order_id).is_none());
+        assert!(manager.storage().get_rule_snapshot(order_id).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_restore_rule_snapshots_from_redb() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+
+        // 注册为活跃订单（模拟正常开台后的状态）
+        {
+            let txn = storage.begin_write().unwrap();
+            storage.mark_order_active(&txn, "order-a").unwrap();
+            storage.mark_order_active(&txn, "order-b").unwrap();
+            txn.commit().unwrap();
+        }
+
+        // 写入规则快照（模拟上次运行遗留的快照）
+        storage.store_rule_snapshot("order-a", &vec![create_test_rule("Rule A")]).unwrap();
+        storage.store_rule_snapshot("order-b", &vec![create_test_rule("Rule B1"), create_test_rule("Rule B2")]).unwrap();
+
+        // 创建新 manager（模拟重启，内存缓存为空）
+        let manager = OrdersManager::with_storage(storage);
+        assert!(manager.get_cached_rules("order-a").is_none());
+        assert!(manager.get_cached_rules("order-b").is_none());
+
+        // 恢复
+        let count = manager.restore_rule_snapshots_from_redb();
+        assert_eq!(count, 2);
+
+        // 内存缓存应该有了
+        let rules_a = manager.get_cached_rules("order-a").unwrap();
+        assert_eq!(rules_a.len(), 1);
+        assert_eq!(rules_a[0].name, "Rule A");
+
+        let rules_b = manager.get_cached_rules("order-b").unwrap();
+        assert_eq!(rules_b.len(), 2);
+    }
+
+    #[test]
+    fn test_restore_rule_snapshots_cleans_orphans() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+
+        // 只注册 order-a 为活跃，order-orphan 不注册（模拟崩溃后的孤儿快照）
+        {
+            let txn = storage.begin_write().unwrap();
+            storage.mark_order_active(&txn, "order-a").unwrap();
+            txn.commit().unwrap();
+        }
+
+        storage.store_rule_snapshot("order-a", &vec![create_test_rule("Rule A")]).unwrap();
+        storage.store_rule_snapshot("order-orphan", &vec![create_test_rule("Orphan Rule")]).unwrap();
+
+        let manager = OrdersManager::with_storage(storage);
+        let count = manager.restore_rule_snapshots_from_redb();
+
+        // 只恢复了活跃订单的规则
+        assert_eq!(count, 1);
+        assert!(manager.get_cached_rules("order-a").is_some());
+        assert!(manager.get_cached_rules("order-orphan").is_none());
+
+        // 孤儿快照应该已从 redb 中清除
+        assert!(manager.storage().get_rule_snapshot("order-orphan").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_complete_order_cleans_rules() {
+        let manager = create_test_manager();
+
+        // 开台
+        let open_cmd = create_open_table_cmd("op-1");
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        // 缓存规则
+        manager.cache_rules(&order_id, vec![create_test_rule("Rule")]);
+        assert!(manager.get_cached_rules(&order_id).is_some());
+
+        // 加菜
+        let add_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddItems {
+                order_id: order_id.clone(),
+                items: vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            },
+        );
+        manager.execute_command(add_cmd);
+
+        // 支付
+        let pay_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::AddPayment {
+                order_id: order_id.clone(),
+                payment: PaymentInput {
+                    method: "CASH".to_string(),
+                    amount: 10.0,
+                    tendered: Some(10.0),
+                    note: None,
+                },
+            },
+        );
+        manager.execute_command(pay_cmd);
+
+        // 完成订单
+        let complete_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::CompleteOrder {
+                order_id: order_id.clone(),
+                service_type: Some(ServiceType::DineIn),
+            },
+        );
+        manager.execute_command(complete_cmd);
+
+        // 规则缓存和 redb 快照都应该被清除
+        assert!(manager.get_cached_rules(&order_id).is_none());
+        assert!(manager.storage().get_rule_snapshot(&order_id).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_void_order_cleans_rules() {
+        let manager = create_test_manager();
+
+        // 开台
+        let open_cmd = create_open_table_cmd("op-1");
+        let resp = manager.execute_command(open_cmd);
+        let order_id = resp.order_id.unwrap();
+
+        // 缓存规则
+        manager.cache_rules(&order_id, vec![create_test_rule("Rule")]);
+        assert!(manager.get_cached_rules(&order_id).is_some());
+
+        // 作废订单
+        let void_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::VoidOrder {
+                order_id: order_id.clone(),
+                void_type: VoidType::Cancelled,
+                loss_reason: None,
+                loss_amount: None,
+                note: None,
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        manager.execute_command(void_cmd);
+
+        // 规则缓存和 redb 快照都应该被清除
+        assert!(manager.get_cached_rules(&order_id).is_none());
+        assert!(manager.storage().get_rule_snapshot(&order_id).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_move_order_cleans_rules() {
+        let manager = create_test_manager();
+
+        let order_id = open_table_with_items(
+            &manager,
+            "T-rule-move",
+            vec![simple_item("product:p1", "Coffee", 5.0, 1)],
+        );
+
+        // 缓存规则
+        manager.cache_rules(&order_id, vec![create_test_rule("Rule")]);
+        assert!(manager.get_cached_rules(&order_id).is_some());
+        assert!(manager.storage().get_rule_snapshot(&order_id).unwrap().is_some());
+
+        // 换桌
+        let move_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::MoveOrder {
+                order_id: order_id.clone(),
+                target_table_id: "T-rule-move-2".to_string(),
+                target_table_name: "Table T-rule-move-2".to_string(),
+                target_zone_id: Some("zone:z2".to_string()),
+                target_zone_name: Some("Zone B".to_string()),
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(move_cmd);
+        assert!(resp.success);
+
+        // 源订单的规则缓存和 redb 快照都应该被清除
+        assert!(manager.get_cached_rules(&order_id).is_none());
+        assert!(manager.storage().get_rule_snapshot(&order_id).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_merge_orders_cleans_source_rules() {
+        let manager = create_test_manager();
+
+        // 源订单
+        let source_id = open_table_with_items(
+            &manager,
+            "T-rule-merge-src",
+            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+        );
+
+        // 目标订单
+        let target_id = open_table_with_items(
+            &manager,
+            "T-rule-merge-tgt",
+            vec![simple_item("product:p2", "Tea", 8.0, 1)],
+        );
+
+        // 给源订单缓存规则
+        manager.cache_rules(&source_id, vec![create_test_rule("SourceRule")]);
+        assert!(manager.get_cached_rules(&source_id).is_some());
+        assert!(manager.storage().get_rule_snapshot(&source_id).unwrap().is_some());
+
+        // 合并 source → target
+        let merge_cmd = OrderCommand::new(
+            "op-1".to_string(),
+            "Test Operator".to_string(),
+            OrderCommandPayload::MergeOrders {
+                source_order_id: source_id.clone(),
+                target_order_id: target_id.clone(),
+                authorizer_id: None,
+                authorizer_name: None,
+            },
+        );
+        let resp = manager.execute_command(merge_cmd);
+        assert!(resp.success);
+
+        // 源订单的规则缓存和 redb 快照都应该被清除
+        assert!(manager.get_cached_rules(&source_id).is_none());
+        assert!(manager.storage().get_rule_snapshot(&source_id).unwrap().is_none());
+    }
 }

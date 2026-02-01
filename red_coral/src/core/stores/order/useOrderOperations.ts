@@ -153,13 +153,13 @@ const handleCreateNewOrder = async (
  */
 export const createRetailOrder = async (
   cart: CartItem[],
-  serviceType?: ServiceType,
 ): Promise<string> => {
   if (cart.length === 0) {
     throw new Error('Cannot create retail order with empty cart');
   }
 
   // 1. Create retail order (no table_id, is_retail = true)
+  // service_type 在结单时设置，不在开台时传入
   const openCommand = createCommand({
     type: 'OPEN_TABLE',
     table_id: null,
@@ -168,7 +168,6 @@ export const createRetailOrder = async (
     zone_name: null,
     guest_count: 1,
     is_retail: true,
-    service_type: serviceType ?? null,
   });
 
   const openResponse = await sendCommand(openCommand);
@@ -235,6 +234,7 @@ export const handleTableSelect = async (
 export const completeOrder = async (
   orderId: string,
   newPayments: PaymentRecord[],
+  serviceType?: ServiceType | null,
 ): Promise<void> => {
   // Add payments
   for (const payment of newPayments) {
@@ -256,6 +256,7 @@ export const completeOrder = async (
   const completeCommand = createCommand({
     type: 'COMPLETE_ORDER',
     order_id: orderId,
+    service_type: serviceType ?? null,
   });
   const completeResponse = await sendCommand(completeCommand);
   ensureSuccess(completeResponse, 'Complete order');
@@ -593,4 +594,134 @@ export const toggleRuleSkip = async (
 
   const response = await sendCommand(command);
   ensureSuccess(response, 'Toggle rule skip');
+};
+
+// ============================================================================
+// Comp Operations
+// ============================================================================
+
+/**
+ * Comp (赠送) an item - splits quantity and marks as free
+ * Fire & forget - UI updates via WebSocket event
+ */
+export const compItem = async (
+  orderId: string,
+  instanceId: string,
+  quantity: number,
+  reason: string,
+  authorizer: { id: string; name: string },
+): Promise<void> => {
+  const command = createCommand({
+    type: 'COMP_ITEM',
+    order_id: orderId,
+    instance_id: instanceId,
+    quantity,
+    reason,
+    authorizer_id: authorizer.id,
+    authorizer_name: authorizer.name,
+  });
+
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Comp item');
+};
+
+/**
+ * Uncomp (撤销赠送) an item - restore original price
+ * Fire & forget - UI updates via WebSocket event
+ */
+export const uncompItem = async (
+  orderId: string,
+  instanceId: string,
+  authorizer: { id: string; name: string },
+): Promise<void> => {
+  const command = createCommand({
+    type: 'UNCOMP_ITEM',
+    order_id: orderId,
+    instance_id: instanceId,
+    authorizer_id: authorizer.id,
+    authorizer_name: authorizer.name,
+  });
+
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Uncomp item');
+};
+
+// ============================================================================
+// Order Note
+// ============================================================================
+
+/**
+ * Add or clear order-level note (空字符串 = 清除备注)
+ * Fire & forget - UI updates via WebSocket event
+ */
+export const addOrderNote = async (
+  orderId: string,
+  note: string,
+): Promise<void> => {
+  const command = createCommand({
+    type: 'ADD_ORDER_NOTE',
+    order_id: orderId,
+    note,
+  });
+
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Add order note');
+};
+
+// ============================================================================
+// Order-level Adjustments
+// ============================================================================
+
+/**
+ * Apply order-level manual discount (percent or fixed, mutually exclusive)
+ * Both null = clear discount
+ * Fire & forget - UI updates via WebSocket event
+ */
+export const applyOrderDiscount = async (
+  orderId: string,
+  options?: {
+    discountPercent?: number;
+    discountFixed?: number;
+    reason?: string;
+    authorizer?: { id: string; name: string };
+  },
+): Promise<void> => {
+  const command = createCommand({
+    type: 'APPLY_ORDER_DISCOUNT',
+    order_id: orderId,
+    discount_percent: options?.discountPercent ?? null,
+    discount_fixed: options?.discountFixed ?? null,
+    reason: options?.reason ?? null,
+    authorizer_id: options?.authorizer?.id ?? null,
+    authorizer_name: options?.authorizer?.name ?? null,
+  });
+
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Apply order discount');
+};
+
+/**
+ * Apply order-level surcharge (fixed amount)
+ * null = clear surcharge
+ * Fire & forget - UI updates via WebSocket event
+ */
+export const applyOrderSurcharge = async (
+  orderId: string,
+  options?: {
+    surchargeAmount?: number;
+    reason?: string;
+    authorizer?: { id: string; name: string };
+  },
+): Promise<void> => {
+  const command = createCommand({
+    type: 'APPLY_ORDER_SURCHARGE',
+    order_id: orderId,
+    surcharge_amount: options?.surchargeAmount ?? null,
+    reason: options?.reason ?? null,
+    authorizer_id: options?.authorizer?.id ?? null,
+    authorizer_name: options?.authorizer?.name ?? null,
+  });
+
+  const response = await sendCommand(command);
+  ensureSuccess(response, 'Apply order surcharge');
 };

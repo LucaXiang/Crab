@@ -1957,6 +1957,21 @@ impl ClientBridge {
                             shared::order::OrderCommandPayload::ToggleRuleSkip { .. } => {
                                 "order.toggle_rule_skip"
                             }
+                            shared::order::OrderCommandPayload::ApplyOrderDiscount { .. } => {
+                                "order.apply_order_discount"
+                            }
+                            shared::order::OrderCommandPayload::ApplyOrderSurcharge { .. } => {
+                                "order.apply_order_surcharge"
+                            }
+                            shared::order::OrderCommandPayload::CompItem { .. } => {
+                                "order.comp_item"
+                            }
+                            shared::order::OrderCommandPayload::UncompItem { .. } => {
+                                "order.uncomp_item"
+                            }
+                            shared::order::OrderCommandPayload::AddOrderNote { .. } => {
+                                "order.add_order_note"
+                            }
                         };
 
                         // Build RequestCommand message with full command (preserves command_id, operator info)

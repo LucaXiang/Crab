@@ -47,10 +47,6 @@ DEFINE FIELD OVERWRITE adjustment_type ON price_rule TYPE string
 DEFINE FIELD OVERWRITE adjustment_value ON price_rule TYPE decimal
     PERMISSIONS FULL;
 
-DEFINE FIELD OVERWRITE priority ON price_rule TYPE int
-    DEFAULT 0
-    PERMISSIONS FULL;
-
 DEFINE FIELD OVERWRITE is_stackable ON price_rule TYPE bool
     DEFAULT false
     PERMISSIONS FULL;

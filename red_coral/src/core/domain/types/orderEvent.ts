@@ -31,6 +31,8 @@ export type OrderEventType =
   | 'ITEM_MODIFIED'
   | 'ITEM_REMOVED'
   | 'ITEM_RESTORED'
+  | 'ITEM_COMPED'
+  | 'ITEM_UNCOMPED'
   | 'PAYMENT_ADDED'
   | 'PAYMENT_CANCELLED'
   | 'ITEM_SPLIT'
@@ -44,7 +46,10 @@ export type OrderEventType =
   | 'ORDER_MERGED_OUT'
   | 'TABLE_REASSIGNED'
   | 'ORDER_INFO_UPDATED'
-  | 'RULE_SKIP_TOGGLED';
+  | 'RULE_SKIP_TOGGLED'
+  | 'ORDER_DISCOUNT_APPLIED'
+  | 'ORDER_SURCHARGE_APPLIED'
+  | 'ORDER_NOTE_ADDED';
 
 /**
  * Order event structure (matches Rust OrderEvent)
@@ -89,6 +94,8 @@ export type EventPayload =
   | ItemModifiedPayload
   | ItemRemovedPayload
   | ItemRestoredPayload
+  | ItemCompedPayload
+  | ItemUncompedPayload
   | PaymentAddedPayload
   | PaymentCancelledPayload
   | ItemSplitPayload
@@ -102,7 +109,10 @@ export type EventPayload =
   | OrderMergedOutPayload
   | TableReassignedPayload
   | OrderInfoUpdatedPayload
-  | RuleSkipToggledPayload;
+  | RuleSkipToggledPayload
+  | OrderDiscountAppliedPayload
+  | OrderSurchargeAppliedPayload
+  | OrderNoteAddedPayload;
 
 export interface TableOpenedPayload {
   type: 'TABLE_OPENED';
@@ -112,8 +122,6 @@ export interface TableOpenedPayload {
   zone_name: string | null;
   guest_count: number;
   is_retail: boolean;
-  /** 服务类型（堂食/外卖，零售订单使用） */
-  service_type?: ServiceType | null;
   /** 叫号（服务器生成，零售订单使用） */
   queue_number?: number | null;
   /** Server-generated receipt number (always present) */
@@ -123,6 +131,8 @@ export interface TableOpenedPayload {
 export interface OrderCompletedPayload {
   type: 'ORDER_COMPLETED';
   receipt_number: string;
+  /** 服务类型（堂食/外卖，结单时确认，仅零售订单） */
+  service_type: ServiceType | null;
   final_total: number;
   payment_summary: PaymentSummaryItem[];
 }
@@ -194,6 +204,35 @@ export interface ItemRestoredPayload {
   type: 'ITEM_RESTORED';
   instance_id: string;
   item_name: string;
+}
+
+/** Item comped (gifted) - marked as free with audit trail */
+export interface ItemCompedPayload {
+  type: 'ITEM_COMPED';
+  /** Derived instance_id (full comp: same as source, partial: {source}::comp::{uuid}) */
+  instance_id: string;
+  /** Source item's instance_id (for deterministic replay) */
+  source_instance_id: string;
+  item_name: string;
+  quantity: number;
+  /** Original price before comp (captured from item before zeroing) */
+  original_price: number;
+  reason: string;
+  authorizer_id: string;
+  authorizer_name: string;
+}
+
+/** Item uncomped - comp reversed, price restored */
+export interface ItemUncompedPayload {
+  type: 'ITEM_UNCOMPED';
+  instance_id: string;
+  item_name: string;
+  /** Price to restore */
+  restored_price: number;
+  /** If set, merge comped qty back into this source item */
+  merged_into?: string | null;
+  authorizer_id: string;
+  authorizer_name: string;
 }
 
 export interface PaymentAddedPayload {
@@ -335,6 +374,43 @@ export interface RuleSkipToggledPayload {
   total: number;
 }
 
+/** 订单级手动折扣已应用 */
+export interface OrderDiscountAppliedPayload {
+  type: 'ORDER_DISCOUNT_APPLIED';
+  discount_percent?: number | null;
+  discount_fixed?: number | null;
+  previous_discount_percent?: number | null;
+  previous_discount_fixed?: number | null;
+  reason?: string | null;
+  authorizer_id?: string | null;
+  authorizer_name?: string | null;
+  subtotal: number;
+  discount: number;
+  total: number;
+}
+
+/** 订单级附加费已应用 */
+export interface OrderSurchargeAppliedPayload {
+  type: 'ORDER_SURCHARGE_APPLIED';
+  surcharge_amount?: number | null;
+  previous_surcharge_amount?: number | null;
+  reason?: string | null;
+  authorizer_id?: string | null;
+  authorizer_name?: string | null;
+  subtotal: number;
+  surcharge: number;
+  total: number;
+}
+
+/** 订单备注已添加/更新 */
+export interface OrderNoteAddedPayload {
+  type: 'ORDER_NOTE_ADDED';
+  /** 新备注内容 */
+  note: string;
+  /** 之前的备注（用于审计） */
+  previous_note?: string | null;
+}
+
 // ============================================================================
 // Command Types
 // ============================================================================
@@ -372,7 +448,12 @@ export type OrderCommandPayload =
   | MoveOrderCommand
   | MergeOrdersCommand
   | UpdateOrderInfoCommand
-  | ToggleRuleSkipCommand;
+  | ToggleRuleSkipCommand
+  | CompItemCommand
+  | UncompItemCommand
+  | ApplyOrderDiscountCommand
+  | ApplyOrderSurchargeCommand
+  | AddOrderNoteCommand;
 
 export interface OpenTableCommand {
   type: 'OPEN_TABLE';
@@ -382,14 +463,13 @@ export interface OpenTableCommand {
   zone_name?: string | null;
   guest_count?: number;
   is_retail: boolean;
-  /** 服务类型（堂食/外卖，零售订单使用） */
-  service_type?: ServiceType | null;
 }
 
 export interface CompleteOrderCommand {
   type: 'COMPLETE_ORDER';
   order_id: string;
-  // receipt_number removed - server uses snapshot's receipt_number
+  /** 服务类型（堂食/外卖，结单时确认，仅零售订单） */
+  service_type?: ServiceType | null;
 }
 
 export interface VoidOrderCommand {
@@ -439,6 +519,33 @@ export interface RestoreItemCommand {
   type: 'RESTORE_ITEM';
   order_id: string;
   instance_id: string;
+}
+
+/** Comp (gift) an item - mark as free with reason and authorizer */
+export interface CompItemCommand {
+  type: 'COMP_ITEM';
+  order_id: string;
+  instance_id: string;
+  /** Number of items to comp (can be partial) */
+  quantity: number;
+  /** Reason for comp (required for audit) */
+  reason: string;
+  /** Authorizer ID (required) */
+  authorizer_id: string;
+  /** Authorizer name (required) */
+  authorizer_name: string;
+}
+
+/** Uncomp (reverse gift) an item - restore original price */
+export interface UncompItemCommand {
+  type: 'UNCOMP_ITEM';
+  order_id: string;
+  /** Instance ID of the comped item to uncomp */
+  instance_id: string;
+  /** Authorizer ID (required) */
+  authorizer_id: string;
+  /** Authorizer name (required) */
+  authorizer_name: string;
 }
 
 /** Payment input for AddPayment command (matches Rust PaymentInput) */
@@ -534,6 +641,38 @@ export interface ToggleRuleSkipCommand {
   order_id: string;
   rule_id: string;
   skipped: boolean;
+}
+
+/** 应用订单级手动折扣 */
+export interface ApplyOrderDiscountCommand {
+  type: 'APPLY_ORDER_DISCOUNT';
+  order_id: string;
+  /** 百分比折扣 (0-100)，null = 清除 */
+  discount_percent?: number | null;
+  /** 固定金额折扣，null = 清除 */
+  discount_fixed?: number | null;
+  reason?: string | null;
+  authorizer_id?: string | null;
+  authorizer_name?: string | null;
+}
+
+/** 应用订单级附加费 */
+export interface ApplyOrderSurchargeCommand {
+  type: 'APPLY_ORDER_SURCHARGE';
+  order_id: string;
+  /** 固定附加费金额，null = 清除 */
+  surcharge_amount?: number | null;
+  reason?: string | null;
+  authorizer_id?: string | null;
+  authorizer_name?: string | null;
+}
+
+/** 添加/清除订单备注 */
+export interface AddOrderNoteCommand {
+  type: 'ADD_ORDER_NOTE';
+  order_id: string;
+  /** 备注内容，空字符串 = 清除备注 */
+  note: string;
 }
 
 // ============================================================================
@@ -643,6 +782,8 @@ export interface OrderSnapshot {
   void_note?: string;
 
   items: CartItemSnapshot[];
+  /** Comp records (audit trail for comped items) */
+  comps?: CompRecord[];
   payments: PaymentRecord[];
 
   // === Financial Totals (all computed by server) ===
@@ -674,6 +815,8 @@ export interface OrderSnapshot {
   /** Server-generated receipt number (always present from OpenTable) */
   receipt_number: string;
   is_pre_payment?: boolean;
+  /** 订单备注 */
+  note?: string | null;
 
   // === Order-level Rule Adjustments ===
   /** Order-level rule discount amount */
@@ -688,6 +831,8 @@ export interface OrderSnapshot {
   order_manual_discount_percent?: number | null;
   /** Order-level manual discount fixed amount */
   order_manual_discount_fixed?: number | null;
+  /** Order-level manual surcharge fixed amount */
+  order_manual_surcharge_fixed?: number | null;
 
   start_time: number;
   end_time: number | null;
@@ -754,6 +899,8 @@ export interface CartItemSnapshot {
   authorizer_name?: string | null;
   /** Category name snapshot (for statistics) */
   category_name?: string | null;
+  /** Whether this item has been comped (gifted) */
+  is_comped?: boolean;
   /** Internal: marks item as removed for soft delete */
   _removed?: boolean;
 }
@@ -855,6 +1002,22 @@ export interface PaymentRecord {
   aa_shares?: number | null;
   /** Split type: which split mode produced this payment */
   split_type?: SplitType | null;
+}
+
+/**
+ * Comp record (audit trail for comped items, matches Rust CompRecord)
+ */
+export interface CompRecord {
+  comp_id: string;
+  instance_id: string;
+  source_instance_id: string;
+  item_name: string;
+  quantity: number;
+  original_price: number;
+  reason: string;
+  authorizer_id: string;
+  authorizer_name: string;
+  timestamp: number;
 }
 
 // ============================================================================

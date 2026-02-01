@@ -12,7 +12,6 @@ use crate::db::models::PriceRule;
 use crate::db::repository::PriceRuleRepository;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use crate::pricing::matcher::is_time_valid;
-use shared::order::types::ServiceType;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
 /// 加载匹配的价格规则
@@ -176,8 +175,6 @@ pub struct OpenTableAction {
     pub zone_name: Option<String>,
     pub guest_count: i32,
     pub is_retail: bool,
-    /// 服务类型（堂食/外卖，零售订单使用）
-    pub service_type: Option<ServiceType>,
     /// 叫号（服务器预生成，零售订单使用）
     pub queue_number: Option<u32>,
     /// Server-generated receipt number
@@ -224,7 +221,6 @@ impl CommandHandler for OpenTableAction {
         snapshot.zone_name = self.zone_name.clone();
         snapshot.guest_count = self.guest_count;
         snapshot.is_retail = self.is_retail;
-        snapshot.service_type = self.service_type;
         snapshot.queue_number = self.queue_number;
         snapshot.receipt_number = self.receipt_number.clone();
         snapshot.status = OrderStatus::Active;
@@ -255,7 +251,6 @@ impl CommandHandler for OpenTableAction {
                 zone_name: self.zone_name.clone(),
                 guest_count: self.guest_count,
                 is_retail: self.is_retail,
-                service_type: self.service_type,
                 queue_number: self.queue_number,
                 receipt_number: self.receipt_number.clone(),
             },
@@ -302,7 +297,6 @@ mod tests {
             zone_name: Some("Zone A".to_string()),
             guest_count: 4,
             is_retail: false,
-            service_type: None,
             queue_number: None,
             receipt_number: "FAC2026012410001".to_string(),
         };
@@ -338,7 +332,6 @@ mod tests {
             zone_name: None,
             guest_count: 2,
             is_retail: false,
-            service_type: None,
             queue_number: None,
             receipt_number: "FAC2026012410002".to_string(),
         };
@@ -357,7 +350,7 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        // Open a retail order (no table_id)
+        // Open a retail order (no table_id, service_type 在结单时设置)
         let action = OpenTableAction {
             table_id: None,
             table_name: Some("Retail".to_string()),
@@ -365,7 +358,6 @@ mod tests {
             zone_name: None,
             guest_count: 1,
             is_retail: true,
-            service_type: Some(shared::order::types::ServiceType::DineIn),
             queue_number: Some(42),
             receipt_number: "FAC2026012410003".to_string(),
         };

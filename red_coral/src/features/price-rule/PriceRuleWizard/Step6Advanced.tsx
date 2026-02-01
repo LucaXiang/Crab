@@ -19,18 +19,6 @@ export const Step6Advanced: React.FC<Step6AdvancedProps> = ({ state, updateState
       </p>
 
       <div className="space-y-5">
-        <FormField label={t('settings.price_rule.form.priority')}>
-          <input
-            type="number"
-            value={state.priority}
-            onChange={(e) => updateState({ priority: parseInt(e.target.value) || 0 })}
-            className={inputClass}
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            {t('settings.price_rule.wizard.priority_hint')}
-          </p>
-        </FormField>
-
         <CheckboxField
           id="is_stackable"
           label={t('settings.price_rule.form.is_stackable')}

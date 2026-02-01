@@ -34,7 +34,7 @@ pub enum LossReason {
 // Service Type
 // ============================================================================
 
-/// 服务类型（零售订单使用）
+/// 服务类型（结单时确认：堂食 / 外带）
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ServiceType {
@@ -117,6 +117,10 @@ pub struct CartItemSnapshot {
     /// Category name snapshot (for statistics)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category_name: Option<String>,
+
+    /// Whether this item has been comped (gifted)
+    #[serde(default)]
+    pub is_comped: bool,
 }
 
 /// Cart item input - for adding items (without instance_id)
@@ -369,6 +373,24 @@ pub struct SyncResponse {
     pub requires_full_sync: bool,
 }
 
+/// Comp record - audit trail for comped (gifted) items
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CompRecord {
+    pub comp_id: String,
+    /// The comped item's instance_id (the split-off item)
+    pub instance_id: String,
+    /// The original item this was split from
+    pub source_instance_id: String,
+    pub item_name: String,
+    pub quantity: i32,
+    /// Unit price before comp (for uncomp restore)
+    pub original_price: f64,
+    pub reason: String,
+    pub authorizer_id: String,
+    pub authorizer_name: String,
+    pub timestamp: i64,
+}
+
 /// Item modification result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ItemModificationResult {
@@ -409,6 +431,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
         };
 
         assert_eq!(item.manual_discount_percent, Some(10.0));

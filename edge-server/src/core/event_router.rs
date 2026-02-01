@@ -149,6 +149,7 @@ impl EventRouter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shared::order::types::ServiceType;
     use shared::order::EventPayload;
 
     fn make_test_event(event_type: OrderEventType, sequence: u64) -> OrderEvent {
@@ -156,6 +157,7 @@ mod tests {
             OrderEventType::ItemsAdded => EventPayload::ItemsAdded { items: vec![] },
             OrderEventType::OrderCompleted => EventPayload::OrderCompleted {
                 receipt_number: "TEST-001".to_string(),
+                service_type: Some(ServiceType::DineIn),
                 final_total: 100.0,
                 payment_summary: vec![],
             },

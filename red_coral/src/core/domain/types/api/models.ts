@@ -379,7 +379,6 @@ export interface PriceRule {
   zone_scope: string;
   adjustment_type: AdjustmentType;
   adjustment_value: number;
-  priority: number;
   is_stackable: boolean;
   is_exclusive: boolean;
   // Time fields
@@ -405,7 +404,6 @@ export interface PriceRuleCreate {
   zone_scope?: string;
   adjustment_type: AdjustmentType;
   adjustment_value: number;
-  priority?: number;
   is_stackable?: boolean;
   is_exclusive?: boolean;
   // Time fields
@@ -429,7 +427,6 @@ export interface PriceRuleUpdate {
   zone_scope?: string;
   adjustment_type?: AdjustmentType;
   adjustment_value?: number;
-  priority?: number;
   is_stackable?: boolean;
   is_exclusive?: boolean;
   // Time fields

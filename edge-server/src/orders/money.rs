@@ -214,6 +214,11 @@ pub fn to_f64(value: Decimal) -> f64 {
 ///
 /// This is the final per-unit price shown to customers
 pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
+    // Comped items are always free — skip all calculations
+    if item.is_comped {
+        return Decimal::ZERO;
+    }
+
     // Use original_price as the base for discount calculation (before any discounts)
     let base_price = to_decimal(item.original_price.unwrap_or(item.price));
 
@@ -340,7 +345,8 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         + snapshot.order_manual_discount_percent
             .map(|p| subtotal * to_decimal(p) / Decimal::ONE_HUNDRED)
             .unwrap_or(Decimal::ZERO);
-    let order_surcharge = snapshot.order_rule_surcharge_amount.map(to_decimal).unwrap_or(Decimal::ZERO);
+    let order_surcharge = snapshot.order_rule_surcharge_amount.map(to_decimal).unwrap_or(Decimal::ZERO)
+        + snapshot.order_manual_surcharge_fixed.map(to_decimal).unwrap_or(Decimal::ZERO);
 
     // Total discount and surcharge (item-level + order-level)
     let total_discount = item_discount_total + order_discount;
@@ -442,6 +448,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -472,6 +479,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -503,6 +511,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -563,6 +572,7 @@ mod tests {
                 authorizer_id: None,
                 authorizer_name: None,
                 category_name: None,
+                is_comped: false,
                 unit_price: None,
                 line_total: None,
             tax: None,
@@ -597,6 +607,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -633,6 +644,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -667,6 +679,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -756,6 +769,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -787,6 +801,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -818,6 +833,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -848,6 +864,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -878,6 +895,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -913,6 +931,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -944,6 +963,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -975,6 +995,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -1015,6 +1036,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -1040,6 +1062,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -1076,6 +1099,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+            is_comped: false,
             unit_price: None,
             line_total: None,
             tax: None,
@@ -1158,6 +1182,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
 
         let unit_price = calculate_unit_price(&item);
@@ -1200,6 +1225,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
 
         let unit_price = calculate_unit_price(&item);
@@ -1240,6 +1266,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
+        is_comped: false,
         };
 
         let unit_price = calculate_unit_price(&item);
@@ -1247,5 +1274,310 @@ mod tests {
         // rule_discount = 15.0 > 10.0
         // unit_price = max(0, 10.0 - 15.0) = 0
         assert_eq!(unit_price, Decimal::ZERO);
+    }
+
+    // ========================================================================
+    // validate_item_changes 隔离测试
+    // ========================================================================
+
+    #[test]
+    fn test_validate_item_changes_valid() {
+        let changes = ItemChanges {
+            price: Some(25.0),
+            quantity: Some(3),
+            manual_discount_percent: Some(15.0),
+            note: Some("test".to_string()),
+            selected_options: None,
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_ok());
+    }
+
+    #[test]
+    fn test_validate_item_changes_all_none() {
+        let changes = ItemChanges {
+            price: None,
+            quantity: None,
+            manual_discount_percent: None,
+            note: None,
+            selected_options: None,
+            selected_specification: None,
+        };
+        // All-None is technically valid (no-op)
+        assert!(validate_item_changes(&changes).is_ok());
+    }
+
+    #[test]
+    fn test_validate_item_changes_nan_price() {
+        let changes = ItemChanges {
+            price: Some(f64::NAN),
+            quantity: None,
+            manual_discount_percent: None,
+            note: None,
+            selected_options: None,
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_err(), "NaN price should be rejected");
+    }
+
+    #[test]
+    fn test_validate_item_changes_infinity_price() {
+        let changes = ItemChanges {
+            price: Some(f64::INFINITY),
+            quantity: None,
+            manual_discount_percent: None,
+            note: None,
+            selected_options: None,
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_err(), "Infinity price should be rejected");
+    }
+
+    #[test]
+    fn test_validate_item_changes_negative_price() {
+        let changes = ItemChanges {
+            price: Some(-5.0),
+            quantity: None,
+            manual_discount_percent: None,
+            note: None,
+            selected_options: None,
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_err(), "Negative price should be rejected");
+    }
+
+    #[test]
+    fn test_validate_item_changes_exceeds_max_price() {
+        let changes = ItemChanges {
+            price: Some(MAX_PRICE + 1.0),
+            quantity: None,
+            manual_discount_percent: None,
+            note: None,
+            selected_options: None,
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_err(), "Price > MAX_PRICE should be rejected");
+    }
+
+    #[test]
+    fn test_validate_item_changes_zero_quantity() {
+        let changes = ItemChanges {
+            price: None,
+            quantity: Some(0),
+            manual_discount_percent: None,
+            note: None,
+            selected_options: None,
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_err(), "Zero quantity should be rejected");
+    }
+
+    #[test]
+    fn test_validate_item_changes_negative_quantity() {
+        let changes = ItemChanges {
+            price: None,
+            quantity: Some(-1),
+            manual_discount_percent: None,
+            note: None,
+            selected_options: None,
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_err(), "Negative quantity should be rejected");
+    }
+
+    #[test]
+    fn test_validate_item_changes_exceeds_max_quantity() {
+        let changes = ItemChanges {
+            price: None,
+            quantity: Some(MAX_QUANTITY + 1),
+            manual_discount_percent: None,
+            note: None,
+            selected_options: None,
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_err(), "Quantity > MAX should be rejected");
+    }
+
+    #[test]
+    fn test_validate_item_changes_discount_nan() {
+        let changes = ItemChanges {
+            price: None,
+            quantity: None,
+            manual_discount_percent: Some(f64::NAN),
+            note: None,
+            selected_options: None,
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_err(), "NaN discount should be rejected");
+    }
+
+    #[test]
+    fn test_validate_item_changes_discount_negative() {
+        let changes = ItemChanges {
+            price: None,
+            quantity: None,
+            manual_discount_percent: Some(-10.0),
+            note: None,
+            selected_options: None,
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_err(), "Negative discount should be rejected");
+    }
+
+    #[test]
+    fn test_validate_item_changes_discount_over_100() {
+        let changes = ItemChanges {
+            price: None,
+            quantity: None,
+            manual_discount_percent: Some(101.0),
+            note: None,
+            selected_options: None,
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_err(), "Discount > 100% should be rejected");
+    }
+
+    #[test]
+    fn test_validate_item_changes_option_nan_modifier() {
+        let changes = ItemChanges {
+            price: None,
+            quantity: None,
+            manual_discount_percent: None,
+            note: None,
+            selected_options: Some(vec![shared::order::ItemOption {
+                attribute_id: "attr:1".to_string(),
+                attribute_name: "Size".to_string(),
+                option_idx: 0,
+                option_name: "Large".to_string(),
+                price_modifier: Some(f64::NAN),
+            }]),
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_err(), "NaN option modifier should be rejected");
+    }
+
+    #[test]
+    fn test_validate_item_changes_option_exceeds_max_modifier() {
+        let changes = ItemChanges {
+            price: None,
+            quantity: None,
+            manual_discount_percent: None,
+            note: None,
+            selected_options: Some(vec![shared::order::ItemOption {
+                attribute_id: "attr:1".to_string(),
+                attribute_name: "Size".to_string(),
+                option_idx: 0,
+                option_name: "Large".to_string(),
+                price_modifier: Some(MAX_PRICE + 1.0),
+            }]),
+            selected_specification: None,
+        };
+        assert!(validate_item_changes(&changes).is_err(), "Option modifier > MAX_PRICE should be rejected");
+    }
+
+    // ========================================================================
+    // sum_payments 隔离测试
+    // ========================================================================
+
+    #[test]
+    fn test_sum_payments_empty() {
+        assert_eq!(sum_payments(&[]), 0.0);
+    }
+
+    #[test]
+    fn test_sum_payments_single() {
+        let payments = vec![shared::order::PaymentRecord {
+            payment_id: "p1".to_string(),
+            method: "CASH".to_string(),
+            amount: 25.50,
+            tendered: None,
+            change: None,
+            note: None,
+            cancelled: false,
+            cancel_reason: None,
+            split_items: None,
+            aa_shares: None,
+            split_type: None,
+            timestamp: 1000,
+        }];
+        assert_eq!(sum_payments(&payments), 25.50);
+    }
+
+    #[test]
+    fn test_sum_payments_with_cancelled() {
+        let payments = vec![
+            shared::order::PaymentRecord {
+                payment_id: "p1".to_string(),
+                method: "CASH".to_string(),
+                amount: 30.0,
+                tendered: None,
+                change: None,
+                note: None,
+                cancelled: true, // cancelled — should be excluded
+                cancel_reason: Some("wrong".to_string()),
+                split_items: None,
+                aa_shares: None,
+                split_type: None,
+                timestamp: 1000,
+            },
+            shared::order::PaymentRecord {
+                payment_id: "p2".to_string(),
+                method: "CARD".to_string(),
+                amount: 15.0,
+                tendered: None,
+                change: None,
+                note: None,
+                cancelled: false,
+                cancel_reason: None,
+                split_items: None,
+                aa_shares: None,
+                split_type: None,
+                timestamp: 2000,
+            },
+        ];
+        assert_eq!(sum_payments(&payments), 15.0, "Cancelled payment should be excluded");
+    }
+
+    #[test]
+    fn test_sum_payments_all_cancelled() {
+        let payments = vec![
+            shared::order::PaymentRecord {
+                payment_id: "p1".to_string(),
+                method: "CASH".to_string(),
+                amount: 50.0,
+                tendered: None,
+                change: None,
+                note: None,
+                cancelled: true,
+                cancel_reason: None,
+                split_items: None,
+                aa_shares: None,
+                split_type: None,
+                timestamp: 1000,
+            },
+        ];
+        assert_eq!(sum_payments(&payments), 0.0, "All cancelled = 0");
+    }
+
+    #[test]
+    fn test_sum_payments_precision() {
+        // 10 payments of 0.1 each should sum to exactly 1.0
+        let payments: Vec<shared::order::PaymentRecord> = (0..10)
+            .map(|i| shared::order::PaymentRecord {
+                payment_id: format!("p{}", i),
+                method: "CASH".to_string(),
+                amount: 0.1,
+                tendered: None,
+                change: None,
+                note: None,
+                cancelled: false,
+                cancel_reason: None,
+                split_items: None,
+                aa_shares: None,
+                split_type: None,
+                timestamp: 1000 + i,
+            })
+            .collect();
+        assert_eq!(sum_payments(&payments), 1.0, "0.1 * 10 = 1.0 with Decimal precision");
     }
 }

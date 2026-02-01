@@ -8,12 +8,15 @@ use std::collections::HashMap;
 
 use crate::orders::money::{is_payment_sufficient, to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use shared::order::types::ServiceType;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus, PaymentSummaryItem};
 
 /// CompleteOrder action
 #[derive(Debug, Clone)]
 pub struct CompleteOrderAction {
     pub order_id: String,
+    /// 服务类型（零售订单结单时确认：堂食/外带）
+    pub service_type: Option<ServiceType>,
 }
 
 #[async_trait]
@@ -88,6 +91,7 @@ impl CommandHandler for CompleteOrderAction {
             OrderEventType::OrderCompleted,
             EventPayload::OrderCompleted {
                 receipt_number: snapshot.receipt_number.clone(),
+                service_type: self.service_type,
                 final_total: snapshot.total,
                 payment_summary,
             },
@@ -102,6 +106,7 @@ mod tests {
     use super::*;
     use crate::orders::storage::OrderStorage;
     use crate::orders::traits::CommandContext;
+    use shared::order::types::ServiceType;
     use shared::order::{OrderSnapshot, PaymentRecord};
 
     fn create_test_metadata() -> CommandMetadata {
@@ -153,6 +158,7 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
+            service_type: Some(ServiceType::DineIn),
         };
 
         let metadata = create_test_metadata();
@@ -165,11 +171,13 @@ mod tests {
 
         if let EventPayload::OrderCompleted {
             receipt_number,
+            service_type,
             final_total,
             payment_summary,
         } = &event.payload
         {
             assert_eq!(receipt_number, "RCP-001");
+            assert_eq!(*service_type, Some(ServiceType::DineIn));
             assert_eq!(*final_total, 100.0);
             assert_eq!(payment_summary.len(), 1);
             assert_eq!(payment_summary[0].method, "CASH");
@@ -196,6 +204,7 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
+            service_type: Some(ServiceType::DineIn),
         };
 
         let metadata = create_test_metadata();
@@ -241,6 +250,7 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
+            service_type: Some(ServiceType::DineIn),
         };
 
         let metadata = create_test_metadata();
@@ -273,6 +283,7 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
+            service_type: Some(ServiceType::DineIn),
         };
 
         let metadata = create_test_metadata();
@@ -299,6 +310,7 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
+            service_type: Some(ServiceType::DineIn),
         };
 
         let metadata = create_test_metadata();
@@ -321,6 +333,7 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
+            service_type: Some(ServiceType::DineIn),
         };
 
         let metadata = create_test_metadata();
@@ -343,6 +356,7 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
+            service_type: Some(ServiceType::DineIn),
         };
 
         let metadata = create_test_metadata();
@@ -360,6 +374,7 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "nonexistent".to_string(),
+            service_type: Some(ServiceType::DineIn),
         };
 
         let metadata = create_test_metadata();
@@ -382,6 +397,7 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
+            service_type: Some(ServiceType::DineIn),
         };
 
         let metadata = create_test_metadata();
@@ -415,6 +431,7 @@ mod tests {
 
         let action = CompleteOrderAction {
             order_id: "order-1".to_string(),
+            service_type: Some(ServiceType::DineIn),
         };
 
         let metadata = create_test_metadata();
@@ -426,6 +443,70 @@ mod tests {
         } = &events[0].payload
         {
             assert!(payment_summary.is_empty());
+        } else {
+            panic!("Expected OrderCompleted payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_complete_order_with_dine_in_service_type() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = create_active_snapshot("order-1", "RCP-011");
+        snapshot.total = 50.0;
+        snapshot.payments.push(create_payment_record("CASH", 50.0));
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = CompleteOrderAction {
+            order_id: "order-1".to_string(),
+            service_type: Some(ServiceType::DineIn),
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        assert_eq!(events.len(), 1);
+        if let EventPayload::OrderCompleted {
+            service_type, ..
+        } = &events[0].payload
+        {
+            assert_eq!(*service_type, Some(ServiceType::DineIn));
+        } else {
+            panic!("Expected OrderCompleted payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_complete_order_with_takeout_service_type() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = create_active_snapshot("order-1", "RCP-012");
+        snapshot.total = 30.0;
+        snapshot.payments.push(create_payment_record("CARD", 30.0));
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = CompleteOrderAction {
+            order_id: "order-1".to_string(),
+            service_type: Some(ServiceType::Takeout),
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        assert_eq!(events.len(), 1);
+        if let EventPayload::OrderCompleted {
+            service_type, ..
+        } = &events[0].payload
+        {
+            assert_eq!(*service_type, Some(ServiceType::Takeout));
         } else {
             panic!("Expected OrderCompleted payload");
         }

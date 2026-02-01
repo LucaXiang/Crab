@@ -1,38 +1,63 @@
-//! RemoveItem command handler
+//! CompItem command handler
 //!
-//! Removes an item from an order by marking it as voided.
-//! Supports both full removal and partial removal (by quantity).
+//! Comps (gifts) an item in an order, marking it as free.
+//! Supports both full comp and partial comp (splits item).
 //!
-//! Note: Items are NOT physically deleted - they are marked as voided
-//! for audit trail purposes.
+//! Key differences from discount:
+//! - Comp = free gift (price becomes 0, is_comped = true)
+//! - Discount = price reduction
+//! - Comp requires authorizer and reason (audit trail)
+//!
+//! Derived instance_id format for partial comp: {source_id}::comp::{uuid}
 
 use async_trait::async_trait;
 
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
-/// RemoveItem action
+/// CompItem action
 #[derive(Debug, Clone)]
-pub struct RemoveItemAction {
+pub struct CompItemAction {
     pub order_id: String,
     pub instance_id: String,
-    pub quantity: Option<i32>,
-    pub reason: Option<String>,
-    pub authorizer_id: Option<String>,
-    pub authorizer_name: Option<String>,
+    pub quantity: i32,
+    pub reason: String,
+    pub authorizer_id: String,
+    pub authorizer_name: String,
 }
 
 #[async_trait]
-impl CommandHandler for RemoveItemAction {
+impl CommandHandler for CompItemAction {
     async fn execute(
         &self,
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
-        // 1. Load existing snapshot
+        // 1. Validate reason is non-empty
+        if self.reason.trim().is_empty() {
+            return Err(OrderError::InvalidOperation(
+                "comp reason must not be empty".to_string(),
+            ));
+        }
+
+        // 2. Validate authorizer is non-empty
+        if self.authorizer_id.trim().is_empty() {
+            return Err(OrderError::InvalidOperation(
+                "authorizer_id must not be empty".to_string(),
+            ));
+        }
+
+        // 3. Validate quantity
+        if self.quantity <= 0 {
+            return Err(OrderError::InvalidOperation(
+                "quantity must be positive".to_string(),
+            ));
+        }
+
+        // 4. Load existing snapshot
         let snapshot = ctx.load_snapshot(&self.order_id)?;
 
-        // 2. Validate order status (must be Active)
+        // 5. Validate order status
         match snapshot.status {
             OrderStatus::Active => {}
             OrderStatus::Completed => {
@@ -43,35 +68,48 @@ impl CommandHandler for RemoveItemAction {
             }
             _ => {
                 return Err(OrderError::InvalidOperation(format!(
-                    "Cannot remove item from order with status: {:?}",
+                    "Cannot comp item on order with status: {:?}",
                     snapshot.status
                 )));
             }
         }
 
-        // 3. Find the item
+        // 6. Find the item
         let item = snapshot
             .items
             .iter()
             .find(|i| i.instance_id == self.instance_id)
             .ok_or_else(|| OrderError::ItemNotFound(self.instance_id.clone()))?;
 
-        // 4. Validate quantity (if specified)
-        if let Some(qty) = self.quantity {
-            if qty <= 0 {
-                return Err(OrderError::InvalidOperation(
-                    "quantity must be positive".to_string(),
-                ));
-            }
-            if qty > item.quantity {
-                return Err(OrderError::InsufficientQuantity);
-            }
+        // 7. Cannot comp an already comped item
+        if item.is_comped {
+            return Err(OrderError::InvalidOperation(
+                "Item is already comped".to_string(),
+            ));
         }
 
-        // 5. Allocate sequence number
-        let seq = ctx.next_sequence();
+        // 8. Validate quantity against unpaid quantity
+        if self.quantity > item.unpaid_quantity {
+            return Err(OrderError::InsufficientQuantity);
+        }
 
-        // 6. Create event
+        // 9. Capture original price BEFORE zeroing
+        let original_price = item.original_price.unwrap_or(item.price);
+
+        // 10. Determine full vs partial comp
+        let is_full_comp = self.quantity == item.quantity;
+
+        let (event_instance_id, source_instance_id) = if is_full_comp {
+            // Full comp: instance_id stays the same, source == instance
+            (self.instance_id.clone(), self.instance_id.clone())
+        } else {
+            // Partial comp: derived instance_id
+            let derived_id = format!("{}::comp::{}", self.instance_id, uuid::Uuid::new_v4());
+            (derived_id, self.instance_id.clone())
+        };
+
+        // 11. Generate event
+        let seq = ctx.next_sequence();
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -79,11 +117,13 @@ impl CommandHandler for RemoveItemAction {
             metadata.operator_name.clone(),
             metadata.command_id.clone(),
             Some(metadata.timestamp),
-            OrderEventType::ItemRemoved,
-            EventPayload::ItemRemoved {
-                instance_id: self.instance_id.clone(),
+            OrderEventType::ItemComped,
+            EventPayload::ItemComped {
+                instance_id: event_instance_id,
+                source_instance_id,
                 item_name: item.name.clone(),
                 quantity: self.quantity,
+                original_price,
                 reason: self.reason.clone(),
                 authorizer_id: self.authorizer_id.clone(),
                 authorizer_name: self.authorizer_name.clone(),
@@ -139,7 +179,7 @@ mod tests {
             authorizer_id: None,
             authorizer_name: None,
             category_name: None,
-        is_comped: false,
+            is_comped: false,
         }
     }
 
@@ -151,11 +191,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_remove_item_full() {
+    async fn test_comp_item_full() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        // Create order with item
         let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 2);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -163,13 +202,13 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = RemoveItemAction {
+        let action = CompItemAction {
             order_id: "order-1".to_string(),
             instance_id: "item-1".to_string(),
-            quantity: None, // Full removal
-            reason: Some("Customer changed mind".to_string()),
-            authorizer_id: None,
-            authorizer_name: None,
+            quantity: 2,
+            reason: "VIP customer".to_string(),
+            authorizer_id: "manager-1".to_string(),
+            authorizer_name: "Manager".to_string(),
         };
 
         let metadata = create_test_metadata();
@@ -178,31 +217,71 @@ mod tests {
         assert_eq!(events.len(), 1);
         let event = &events[0];
         assert_eq!(event.order_id, "order-1");
-        assert_eq!(event.event_type, OrderEventType::ItemRemoved);
+        assert_eq!(event.event_type, OrderEventType::ItemComped);
 
-        if let EventPayload::ItemRemoved {
+        if let EventPayload::ItemComped {
             instance_id,
+            source_instance_id,
             item_name,
             quantity,
+            original_price,
             reason,
-            ..
+            authorizer_id,
+            authorizer_name,
         } = &event.payload
         {
+            // Full comp: instance_id == source_instance_id
             assert_eq!(instance_id, "item-1");
+            assert_eq!(source_instance_id, "item-1");
             assert_eq!(item_name, "Test Product");
-            assert_eq!(*quantity, None);
-            assert_eq!(reason.as_deref(), Some("Customer changed mind"));
+            assert_eq!(*quantity, 2);
+            assert_eq!(*original_price, 10.0);
+            assert_eq!(reason, "VIP customer");
+            assert_eq!(authorizer_id, "manager-1");
+            assert_eq!(authorizer_name, "Manager");
         } else {
-            panic!("Expected ItemRemoved payload");
+            panic!("Expected ItemComped payload");
         }
     }
 
     #[tokio::test]
-    async fn test_remove_item_partial() {
+    async fn test_comp_item_full_with_original_price() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        // Create order with item quantity=5
+        let mut item = create_test_item("item-1", "product:p1", "Test Product", 8.0, 1);
+        item.original_price = Some(12.0);
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = CompItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: 1,
+            reason: "VIP".to_string(),
+            authorizer_id: "manager-1".to_string(),
+            authorizer_name: "Manager".to_string(),
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::ItemComped { original_price, .. } = &events[0].payload {
+            // Should capture original_price (12.0), not price (8.0)
+            assert_eq!(*original_price, 12.0);
+        } else {
+            panic!("Expected ItemComped payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_comp_item_partial() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
         let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 5);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -210,38 +289,41 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = RemoveItemAction {
+        let action = CompItemAction {
             order_id: "order-1".to_string(),
             instance_id: "item-1".to_string(),
-            quantity: Some(2), // Partial: only remove 2 of 5
-            reason: None,
-            authorizer_id: Some("manager-1".to_string()),
-            authorizer_name: Some("Manager".to_string()),
+            quantity: 2, // Partial: only 2 of 5
+            reason: "Promotion".to_string(),
+            authorizer_id: "manager-1".to_string(),
+            authorizer_name: "Manager".to_string(),
         };
 
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
         assert_eq!(events.len(), 1);
-        if let EventPayload::ItemRemoved {
+        if let EventPayload::ItemComped {
             instance_id,
+            source_instance_id,
             quantity,
-            authorizer_id,
-            authorizer_name,
+            original_price,
+            reason,
             ..
         } = &events[0].payload
         {
-            assert_eq!(instance_id, "item-1");
-            assert_eq!(*quantity, Some(2));
-            assert_eq!(authorizer_id.as_deref(), Some("manager-1"));
-            assert_eq!(authorizer_name.as_deref(), Some("Manager"));
+            // Partial comp generates derived instance_id
+            assert!(instance_id.starts_with("item-1::comp::"));
+            assert_eq!(source_instance_id, "item-1");
+            assert_eq!(*quantity, 2);
+            assert_eq!(*original_price, 10.0);
+            assert_eq!(reason, "Promotion");
         } else {
-            panic!("Expected ItemRemoved payload");
+            panic!("Expected ItemComped payload");
         }
     }
 
     #[tokio::test]
-    async fn test_remove_item_not_found() {
+    async fn test_comp_item_not_found() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -252,104 +334,22 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = RemoveItemAction {
+        let action = CompItemAction {
             order_id: "order-1".to_string(),
             instance_id: "nonexistent".to_string(),
-            quantity: None,
-            reason: None,
-            authorizer_id: None,
-            authorizer_name: None,
+            quantity: 1,
+            reason: "Test".to_string(),
+            authorizer_id: "manager-1".to_string(),
+            authorizer_name: "Manager".to_string(),
         };
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-
         assert!(matches!(result, Err(OrderError::ItemNotFound(_))));
     }
 
     #[tokio::test]
-    async fn test_remove_item_insufficient_quantity() {
-        let storage = OrderStorage::open_in_memory().unwrap();
-        let txn = storage.begin_write().unwrap();
-
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
-        let snapshot = create_active_order_with_item("order-1", item);
-        storage.store_snapshot(&txn, &snapshot).unwrap();
-
-        let current_seq = storage.get_next_sequence(&txn).unwrap();
-        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
-
-        let action = RemoveItemAction {
-            order_id: "order-1".to_string(),
-            instance_id: "item-1".to_string(),
-            quantity: Some(5), // More than available (3)
-            reason: None,
-            authorizer_id: None,
-            authorizer_name: None,
-        };
-
-        let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
-
-        assert!(matches!(result, Err(OrderError::InsufficientQuantity)));
-    }
-
-    #[tokio::test]
-    async fn test_remove_item_zero_quantity_fails() {
-        let storage = OrderStorage::open_in_memory().unwrap();
-        let txn = storage.begin_write().unwrap();
-
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
-        let snapshot = create_active_order_with_item("order-1", item);
-        storage.store_snapshot(&txn, &snapshot).unwrap();
-
-        let current_seq = storage.get_next_sequence(&txn).unwrap();
-        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
-
-        let action = RemoveItemAction {
-            order_id: "order-1".to_string(),
-            instance_id: "item-1".to_string(),
-            quantity: Some(0),
-            reason: None,
-            authorizer_id: None,
-            authorizer_name: None,
-        };
-
-        let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
-
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-    }
-
-    #[tokio::test]
-    async fn test_remove_item_negative_quantity_fails() {
-        let storage = OrderStorage::open_in_memory().unwrap();
-        let txn = storage.begin_write().unwrap();
-
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
-        let snapshot = create_active_order_with_item("order-1", item);
-        storage.store_snapshot(&txn, &snapshot).unwrap();
-
-        let current_seq = storage.get_next_sequence(&txn).unwrap();
-        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
-
-        let action = RemoveItemAction {
-            order_id: "order-1".to_string(),
-            instance_id: "item-1".to_string(),
-            quantity: Some(-1),
-            reason: None,
-            authorizer_id: None,
-            authorizer_name: None,
-        };
-
-        let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
-
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-    }
-
-    #[tokio::test]
-    async fn test_remove_item_completed_order_fails() {
+    async fn test_comp_item_completed_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -362,23 +362,22 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = RemoveItemAction {
+        let action = CompItemAction {
             order_id: "order-1".to_string(),
             instance_id: "item-1".to_string(),
-            quantity: None,
-            reason: None,
-            authorizer_id: None,
-            authorizer_name: None,
+            quantity: 1,
+            reason: "Test".to_string(),
+            authorizer_id: "manager-1".to_string(),
+            authorizer_name: "Manager".to_string(),
         };
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-
         assert!(matches!(result, Err(OrderError::OrderAlreadyCompleted(_))));
     }
 
     #[tokio::test]
-    async fn test_remove_item_voided_order_fails() {
+    async fn test_comp_item_voided_order_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
@@ -391,85 +390,175 @@ mod tests {
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = RemoveItemAction {
+        let action = CompItemAction {
             order_id: "order-1".to_string(),
             instance_id: "item-1".to_string(),
-            quantity: None,
-            reason: None,
-            authorizer_id: None,
-            authorizer_name: None,
+            quantity: 1,
+            reason: "Test".to_string(),
+            authorizer_id: "manager-1".to_string(),
+            authorizer_name: "Manager".to_string(),
         };
 
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
-
         assert!(matches!(result, Err(OrderError::OrderAlreadyVoided(_))));
     }
 
     #[tokio::test]
-    async fn test_remove_item_order_not_found() {
+    async fn test_comp_item_zero_quantity_fails() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let current_seq = storage.get_next_sequence(&txn).unwrap();
-        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
-
-        let action = RemoveItemAction {
-            order_id: "nonexistent-order".to_string(),
-            instance_id: "item-1".to_string(),
-            quantity: None,
-            reason: None,
-            authorizer_id: None,
-            authorizer_name: None,
-        };
-
-        let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
-
-        assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
-    }
-
-    #[tokio::test]
-    async fn test_remove_item_with_all_fields() {
-        let storage = OrderStorage::open_in_memory().unwrap();
-        let txn = storage.begin_write().unwrap();
-
-        let item = create_test_item("item-1", "product:p1", "Expensive Wine", 150.0, 1);
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
-        let action = RemoveItemAction {
+        let action = CompItemAction {
             order_id: "order-1".to_string(),
             instance_id: "item-1".to_string(),
-            quantity: None,
-            reason: Some("Wrong order".to_string()),
-            authorizer_id: Some("manager-1".to_string()),
-            authorizer_name: Some("Floor Manager".to_string()),
+            quantity: 0,
+            reason: "Test".to_string(),
+            authorizer_id: "manager-1".to_string(),
+            authorizer_name: "Manager".to_string(),
         };
 
         let metadata = create_test_metadata();
-        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
 
-        if let EventPayload::ItemRemoved {
-            instance_id,
-            item_name,
-            quantity,
-            reason,
-            authorizer_id,
-            authorizer_name,
-        } = &events[0].payload
-        {
-            assert_eq!(instance_id, "item-1");
-            assert_eq!(item_name, "Expensive Wine");
-            assert_eq!(*quantity, None);
-            assert_eq!(reason.as_deref(), Some("Wrong order"));
-            assert_eq!(authorizer_id.as_deref(), Some("manager-1"));
-            assert_eq!(authorizer_name.as_deref(), Some("Floor Manager"));
-        } else {
-            panic!("Expected ItemRemoved payload");
-        }
+    #[tokio::test]
+    async fn test_comp_item_empty_reason_fails() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = CompItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: 1,
+            reason: "".to_string(),
+            authorizer_id: "manager-1".to_string(),
+            authorizer_name: "Manager".to_string(),
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
+
+    #[tokio::test]
+    async fn test_comp_item_empty_authorizer_fails() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = CompItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: 1,
+            reason: "VIP".to_string(),
+            authorizer_id: "  ".to_string(),
+            authorizer_name: "Manager".to_string(),
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
+
+    #[tokio::test]
+    async fn test_comp_item_insufficient_quantity() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = CompItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: 5, // More than available (3)
+            reason: "VIP".to_string(),
+            authorizer_id: "manager-1".to_string(),
+            authorizer_name: "Manager".to_string(),
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InsufficientQuantity)));
+    }
+
+    #[tokio::test]
+    async fn test_comp_already_comped_item_fails() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        item.is_comped = true;
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = CompItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: 1,
+            reason: "VIP".to_string(),
+            authorizer_id: "manager-1".to_string(),
+            authorizer_name: "Manager".to_string(),
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
+
+    #[tokio::test]
+    async fn test_comp_item_partially_paid_fails() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
+        item.unpaid_quantity = 1; // Only 1 unpaid out of 3
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = CompItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: 2, // Want to comp 2, but only 1 unpaid
+            reason: "VIP".to_string(),
+            authorizer_id: "manager-1".to_string(),
+            authorizer_name: "Manager".to_string(),
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InsufficientQuantity)));
     }
 }

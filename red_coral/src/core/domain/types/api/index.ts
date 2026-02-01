@@ -235,7 +235,6 @@ export interface PriceAdjustmentData {
   zone_scope: string;
   adjustment_type: string;
   adjustment_value: number;
-  priority: number;
   is_stackable: boolean;
   time_mode: string;
   start_time?: number;
@@ -262,7 +261,6 @@ export interface CreatePriceAdjustmentRequest {
   zone_scope: string;          // 0=RETAIL, -1=ALL, >0=ZONE_ID
   adjustment_type: string;     // "PERCENTAGE" | "FIXED_AMOUNT"
   adjustment_value: number;    // i64 - 金额(分) 或 百分比值
-  priority?: number;           // i64, default 0
   is_stackable?: boolean;      // default false
   time_mode?: string;          // "ALWAYS" | "SCHEDULE" | "ONETIME"
   start_time?: number;         // i64, Unix timestamp
@@ -282,7 +280,6 @@ export interface UpdatePriceAdjustmentRequest {
   zone_scope?: string;
   adjustment_type?: string;
   adjustment_value?: number;
-  priority?: number;
   is_stackable?: boolean;
   time_mode?: string;
   start_time?: number;

@@ -144,6 +144,7 @@ describe('TimelineList Integration Tests', () => {
           final_total: 10000,
           receipt_number: 'FAC-2026-001',
           payment_summary: [],
+          service_type: 'DINE_IN',
         }),
       ];
 
@@ -198,6 +199,7 @@ describe('TimelineList Integration Tests', () => {
           final_total: 1000,
           receipt_number: 'FAC-001',
           payment_summary: [],
+          service_type: 'DINE_IN',
         }, { event_id: 'evt-4', sequence: 4 }),
       ];
 

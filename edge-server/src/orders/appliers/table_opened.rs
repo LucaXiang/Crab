@@ -17,7 +17,6 @@ impl EventApplier for TableOpenedApplier {
             zone_name,
             guest_count,
             is_retail,
-            service_type,
             queue_number,
             receipt_number,
         } = &event.payload
@@ -30,7 +29,6 @@ impl EventApplier for TableOpenedApplier {
             snapshot.zone_name = zone_name.clone();
             snapshot.guest_count = *guest_count;
             snapshot.is_retail = *is_retail;
-            snapshot.service_type = *service_type;
             snapshot.queue_number = *queue_number;
             snapshot.receipt_number = receipt_number.clone();
             snapshot.status = OrderStatus::Active;
@@ -68,7 +66,6 @@ mod tests {
                 zone_name: Some("Zone 1".to_string()),
                 guest_count: 4,
                 is_retail: false,
-                service_type: None,
                 queue_number: None,
                 receipt_number: "RCP-TEST-001".to_string(),
             },

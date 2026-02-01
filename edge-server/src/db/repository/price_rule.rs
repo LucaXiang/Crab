@@ -22,7 +22,7 @@ impl PriceRuleRepository {
         let rules: Vec<PriceRule> = self
             .base
             .db()
-            .query("SELECT * FROM price_rule WHERE is_active = true ORDER BY priority DESC")
+            .query("SELECT * FROM price_rule WHERE is_active = true ORDER BY created_at DESC")
             .await?
             .take(0)?;
         Ok(rules)
@@ -33,7 +33,7 @@ impl PriceRuleRepository {
         let rules: Vec<PriceRule> = self
             .base
             .db()
-            .query("SELECT * FROM price_rule WHERE is_active = true AND product_scope = $scope ORDER BY priority DESC")
+            .query("SELECT * FROM price_rule WHERE is_active = true AND product_scope = $scope ORDER BY created_at DESC")
             .bind(("scope", scope))
             .await?
             .take(0)?;
@@ -60,7 +60,7 @@ impl PriceRuleRepository {
                     (product_scope = "CATEGORY" AND target = $cat) OR
                     (product_scope = "TAG" AND target IN $tags)
                 )
-                ORDER BY priority DESC;
+                ORDER BY created_at DESC;
                 "#,
             )
             .bind(("pid", pid_owned))
@@ -119,7 +119,6 @@ impl PriceRuleRepository {
                     zone_scope = $zone_scope,
                     adjustment_type = $adjustment_type,
                     adjustment_value = $adjustment_value,
-                    priority = $priority,
                     is_stackable = $is_stackable,
                     is_exclusive = $is_exclusive,
                     valid_from = $valid_from,
@@ -142,7 +141,6 @@ impl PriceRuleRepository {
             .bind(("zone_scope", data.zone_scope.unwrap_or_else(|| crate::db::models::ZONE_SCOPE_ALL.to_string())))
             .bind(("adjustment_type", data.adjustment_type))
             .bind(("adjustment_value", data.adjustment_value))
-            .bind(("priority", data.priority.unwrap_or(0)))
             .bind(("is_stackable", data.is_stackable.unwrap_or(true)))
             .bind(("is_exclusive", data.is_exclusive.unwrap_or(false)))
             .bind(("valid_from", data.valid_from))
@@ -196,7 +194,6 @@ impl PriceRuleRepository {
                     zone_scope = $zone_scope OR zone_scope,
                     adjustment_type = $adjustment_type OR adjustment_type,
                     adjustment_value = IF $has_adj_value THEN $adjustment_value ELSE adjustment_value END,
-                    priority = $priority OR priority,
                     is_stackable = IF $has_stackable THEN $is_stackable ELSE is_stackable END,
                     is_exclusive = IF $has_exclusive THEN $is_exclusive ELSE is_exclusive END,
                     valid_from = IF $has_valid_from THEN $valid_from ELSE valid_from END,
@@ -220,7 +217,6 @@ impl PriceRuleRepository {
             .bind(("adjustment_type", data.adjustment_type))
             .bind(("has_adj_value", data.adjustment_value.is_some()))
             .bind(("adjustment_value", data.adjustment_value))
-            .bind(("priority", data.priority))
             .bind(("has_stackable", data.is_stackable.is_some()))
             .bind(("is_stackable", data.is_stackable))
             .bind(("has_exclusive", data.is_exclusive.is_some()))

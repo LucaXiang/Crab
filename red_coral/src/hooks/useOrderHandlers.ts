@@ -5,7 +5,7 @@ import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { useCartStore } from '@/core/stores/cart/useCartStore';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
 import type { VoidOrderOptions } from '@/core/stores/order/useOrderOperations';
-import { getRetailServiceType, toBackendServiceType } from '@/core/stores/order/useCheckoutStore';
+
 import { toast } from '@/presentation/components/Toast';
 import {
   savePendingRetailOrder,
@@ -106,8 +106,8 @@ export function useOrderHandlers(params: UseOrderHandlersParams) {
 
       try {
         // Create retail order and get order_id directly (no waiting for WebSocket)
-        const serviceType = toBackendServiceType(getRetailServiceType());
-        const orderId = await orderOps.createRetailOrder(cart, serviceType);
+        // service_type 在结单时设置，不在开台时传入
+        const orderId = await orderOps.createRetailOrder(cart);
 
         // Save to local storage for recovery after crash/power outage
         savePendingRetailOrder(orderId);

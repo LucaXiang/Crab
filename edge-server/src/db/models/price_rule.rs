@@ -54,8 +54,6 @@ pub struct PriceRule {
     pub adjustment_type: AdjustmentType,
     /// Adjustment value (percentage: 30=30%, fixed: amount in currency unit e.g. 5.00)
     pub adjustment_value: f64,
-    #[serde(default)]
-    pub priority: i32,
     #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_stackable: bool,
     /// Whether this rule is exclusive (cannot be combined with other rules)
@@ -106,7 +104,6 @@ pub struct PriceRuleCreate {
     pub zone_scope: Option<String>,
     pub adjustment_type: AdjustmentType,
     pub adjustment_value: f64,
-    pub priority: Option<i32>,
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
     pub is_exclusive: Option<bool>,
@@ -149,8 +146,6 @@ pub struct PriceRuleUpdate {
     pub adjustment_type: Option<AdjustmentType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub adjustment_value: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub priority: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)

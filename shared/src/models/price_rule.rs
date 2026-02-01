@@ -50,8 +50,6 @@ pub struct PriceRule {
     /// Adjustment value (percentage: 30=30%, fixed: currency unit e.g. 5.00 = ¥5.00)
     pub adjustment_value: f64,
     #[serde(default)]
-    pub priority: i32,
-    #[serde(default)]
     pub is_stackable: bool,
     /// Whether this rule is exclusive (cannot be combined with other rules)
     #[serde(default)]
@@ -97,7 +95,6 @@ pub struct PriceRuleCreate {
     pub adjustment_type: AdjustmentType,
     /// Adjustment value (percentage: 30=30%, fixed: currency unit e.g. 5.00 = ¥5.00)
     pub adjustment_value: f64,
-    pub priority: Option<i32>,
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
     pub is_exclusive: Option<bool>,
@@ -129,7 +126,6 @@ pub struct PriceRuleUpdate {
     pub adjustment_type: Option<AdjustmentType>,
     /// Adjustment value (percentage: 30=30%, fixed: currency unit e.g. 5.00 = ¥5.00)
     pub adjustment_value: Option<f64>,
-    pub priority: Option<i32>,
     pub is_stackable: Option<bool>,
     /// Whether this rule is exclusive (cannot be combined with other rules)
     pub is_exclusive: Option<bool>,

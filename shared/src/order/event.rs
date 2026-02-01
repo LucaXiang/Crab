@@ -49,6 +49,8 @@ pub enum OrderEventType {
     ItemModified,
     ItemRemoved,
     ItemRestored,
+    ItemComped,
+    ItemUncomped,
 
     // Payments
     PaymentAdded,
@@ -73,6 +75,13 @@ pub enum OrderEventType {
 
     // Price Rules
     RuleSkipToggled,
+
+    // Order-level Adjustments
+    OrderDiscountApplied,
+    OrderSurchargeApplied,
+
+    // Order Note
+    OrderNoteAdded,
 }
 
 impl std::fmt::Display for OrderEventType {
@@ -85,6 +94,8 @@ impl std::fmt::Display for OrderEventType {
             OrderEventType::ItemModified => write!(f, "ITEM_MODIFIED"),
             OrderEventType::ItemRemoved => write!(f, "ITEM_REMOVED"),
             OrderEventType::ItemRestored => write!(f, "ITEM_RESTORED"),
+            OrderEventType::ItemComped => write!(f, "ITEM_COMPED"),
+            OrderEventType::ItemUncomped => write!(f, "ITEM_UNCOMPED"),
             OrderEventType::PaymentAdded => write!(f, "PAYMENT_ADDED"),
             OrderEventType::PaymentCancelled => write!(f, "PAYMENT_CANCELLED"),
             OrderEventType::ItemSplit => write!(f, "ITEM_SPLIT"),
@@ -99,6 +110,9 @@ impl std::fmt::Display for OrderEventType {
             OrderEventType::TableReassigned => write!(f, "TABLE_REASSIGNED"),
             OrderEventType::OrderInfoUpdated => write!(f, "ORDER_INFO_UPDATED"),
             OrderEventType::RuleSkipToggled => write!(f, "RULE_SKIP_TOGGLED"),
+            OrderEventType::OrderDiscountApplied => write!(f, "ORDER_DISCOUNT_APPLIED"),
+            OrderEventType::OrderSurchargeApplied => write!(f, "ORDER_SURCHARGE_APPLIED"),
+            OrderEventType::OrderNoteAdded => write!(f, "ORDER_NOTE_ADDED"),
         }
     }
 }
@@ -119,9 +133,6 @@ pub enum EventPayload {
         zone_name: Option<String>,
         guest_count: i32,
         is_retail: bool,
-        /// 服务类型（堂食/外卖，零售订单使用）
-        #[serde(skip_serializing_if = "Option::is_none")]
-        service_type: Option<ServiceType>,
         /// 叫号（服务器生成，零售订单使用）
         #[serde(skip_serializing_if = "Option::is_none")]
         queue_number: Option<u32>,
@@ -131,6 +142,9 @@ pub enum EventPayload {
 
     OrderCompleted {
         receipt_number: String,
+        /// 服务类型（零售订单结单时确认：堂食/外带）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        service_type: Option<ServiceType>,
         final_total: f64,
         payment_summary: Vec<PaymentSummaryItem>,
     },
@@ -196,6 +210,35 @@ pub enum EventPayload {
     ItemRestored {
         instance_id: String,
         item_name: String,
+    },
+
+    /// Item comped (gifted) - marked as free with audit trail
+    ItemComped {
+        /// The new comped item's instance_id (derived: {source}::comp::{uuid})
+        instance_id: String,
+        /// The source item's instance_id (for deterministic split)
+        source_instance_id: String,
+        item_name: String,
+        quantity: i32,
+        /// Unit price before comp (for restore on uncomp)
+        original_price: f64,
+        reason: String,
+        authorizer_id: String,
+        authorizer_name: String,
+    },
+
+    /// Item uncomped - comp reversed, price restored
+    ItemUncomped {
+        /// The comped item being uncomped
+        instance_id: String,
+        item_name: String,
+        /// Price restored to
+        restored_price: f64,
+        /// Whether the item was merged back into source
+        #[serde(skip_serializing_if = "Option::is_none")]
+        merged_into: Option<String>,
+        authorizer_id: String,
+        authorizer_name: String,
     },
 
     // ========== Payments ==========
@@ -359,6 +402,57 @@ pub enum EventPayload {
         discount: f64,
         surcharge: f64,
         total: f64,
+    },
+
+    // ========== Order-level Adjustments ==========
+    /// 订单级手动折扣已应用
+    OrderDiscountApplied {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        discount_percent: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        discount_fixed: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        previous_discount_percent: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        previous_discount_fixed: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_name: Option<String>,
+        /// 重新计算后的金额
+        subtotal: f64,
+        discount: f64,
+        total: f64,
+    },
+
+    /// 订单级附加费已应用
+    OrderSurchargeApplied {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        surcharge_amount: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        previous_surcharge_amount: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        authorizer_name: Option<String>,
+        /// 重新计算后的金额
+        subtotal: f64,
+        surcharge: f64,
+        total: f64,
+    },
+
+    // ========== Order Note ==========
+    /// 订单备注已添加/更新
+    OrderNoteAdded {
+        /// 新备注内容
+        note: String,
+        /// 之前的备注（用于审计）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        previous_note: Option<String>,
     },
 }
 

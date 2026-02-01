@@ -28,6 +28,7 @@ import type {
   ItemChanges,
   SplitItem,
   PaymentMethod,
+  ServiceType,
 } from '@/core/domain/types/orderEvent';
 
 // ============================================================================
@@ -128,10 +129,11 @@ export function useOrderCommands() {
    * Note: receipt_number is server-generated at OpenTable, no need to pass
    */
   const completeOrder = useCallback(
-    async (orderId: string): Promise<CommandResponse> => {
+    async (orderId: string, serviceType?: ServiceType | null): Promise<CommandResponse> => {
       const command = createCommand({
         type: 'COMPLETE_ORDER',
         order_id: orderId,
+        service_type: serviceType ?? null,
       });
 
       return sendCommand(command);
@@ -477,6 +479,132 @@ export function useOrderCommands() {
     []
   );
 
+  // ==================== Comp Operations ====================
+
+  /**
+   * Comp (赠送) an item - splits quantity and marks as free
+   */
+  const compItem = useCallback(
+    async (
+      orderId: string,
+      instanceId: string,
+      quantity: number,
+      reason: string,
+      authorizer: { id: string; name: string },
+    ): Promise<CommandResponse> => {
+      const command = createCommand({
+        type: 'COMP_ITEM',
+        order_id: orderId,
+        instance_id: instanceId,
+        quantity,
+        reason,
+        authorizer_id: authorizer.id,
+        authorizer_name: authorizer.name,
+      });
+
+      return sendCommand(command);
+    },
+    []
+  );
+
+  /**
+   * Uncomp (撤销赠送) an item - restore original price
+   */
+  const uncompItem = useCallback(
+    async (
+      orderId: string,
+      instanceId: string,
+      authorizer: { id: string; name: string },
+    ): Promise<CommandResponse> => {
+      const command = createCommand({
+        type: 'UNCOMP_ITEM',
+        order_id: orderId,
+        instance_id: instanceId,
+        authorizer_id: authorizer.id,
+        authorizer_name: authorizer.name,
+      });
+
+      return sendCommand(command);
+    },
+    []
+  );
+
+  // ==================== Order Note ====================
+
+  /**
+   * Add or clear order-level note (空字符串 = 清除)
+   */
+  const addOrderNote = useCallback(
+    async (orderId: string, note: string): Promise<CommandResponse> => {
+      const command = createCommand({
+        type: 'ADD_ORDER_NOTE',
+        order_id: orderId,
+        note,
+      });
+
+      return sendCommand(command);
+    },
+    []
+  );
+
+  // ==================== Order-level Adjustments ====================
+
+  /**
+   * Apply order-level manual discount (percent or fixed, mutually exclusive)
+   * Both null = clear discount
+   */
+  const applyOrderDiscount = useCallback(
+    async (
+      orderId: string,
+      options?: {
+        discountPercent?: number;
+        discountFixed?: number;
+        reason?: string;
+        authorizer?: { id: string; name: string };
+      },
+    ): Promise<CommandResponse> => {
+      const command = createCommand({
+        type: 'APPLY_ORDER_DISCOUNT',
+        order_id: orderId,
+        discount_percent: options?.discountPercent ?? null,
+        discount_fixed: options?.discountFixed ?? null,
+        reason: options?.reason ?? null,
+        authorizer_id: options?.authorizer?.id ?? null,
+        authorizer_name: options?.authorizer?.name ?? null,
+      });
+
+      return sendCommand(command);
+    },
+    []
+  );
+
+  /**
+   * Apply order-level surcharge (fixed amount)
+   * null = clear surcharge
+   */
+  const applyOrderSurcharge = useCallback(
+    async (
+      orderId: string,
+      options?: {
+        surchargeAmount?: number;
+        reason?: string;
+        authorizer?: { id: string; name: string };
+      },
+    ): Promise<CommandResponse> => {
+      const command = createCommand({
+        type: 'APPLY_ORDER_SURCHARGE',
+        order_id: orderId,
+        surcharge_amount: options?.surchargeAmount ?? null,
+        reason: options?.reason ?? null,
+        authorizer_id: options?.authorizer?.id ?? null,
+        authorizer_name: options?.authorizer?.name ?? null,
+      });
+
+      return sendCommand(command);
+    },
+    []
+  );
+
   return {
     // Order Lifecycle
     openTable,
@@ -502,6 +630,17 @@ export function useOrderCommands() {
 
     // Order Settings
     updateOrderInfo,
+
+    // Comp Operations
+    compItem,
+    uncompItem,
+
+    // Order Note
+    addOrderNote,
+
+    // Order-level Adjustments
+    applyOrderDiscount,
+    applyOrderSurcharge,
   };
 }
 
