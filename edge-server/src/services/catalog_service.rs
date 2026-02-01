@@ -349,6 +349,34 @@ impl CatalogService {
         Ok(())
     }
 
+    /// Refresh cached products that reference a given attribute (direct or inherited)
+    pub async fn refresh_products_with_attribute(&self, attribute_id: &str) -> RepoResult<()> {
+        let product_ids: Vec<String> = {
+            let cache = self.products.read();
+            cache
+                .iter()
+                .filter(|(_, p)| {
+                    p.attributes.iter().any(|b| {
+                        b.attribute
+                            .id
+                            .as_ref()
+                            .map(|id| id.to_string() == attribute_id)
+                            .unwrap_or(false)
+                    })
+                })
+                .map(|(id, _)| id.clone())
+                .collect()
+        };
+
+        for product_id in product_ids {
+            let full = self.fetch_product_full(&product_id).await?;
+            let mut cache = self.products.write();
+            cache.insert(product_id, full);
+        }
+
+        Ok(())
+    }
+
     // =========================================================================
     // Product - Write (DB first, then cache)
     // =========================================================================

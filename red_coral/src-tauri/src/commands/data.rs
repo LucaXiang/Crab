@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 
 use crate::core::{
     ApiResponse, AttributeData, AttributeListData, CategoryData, CategoryListData, ClientBridge,
-    DeleteData, PrintDestinationData, PrintDestinationListData, ProductData, ProductFullData,
+    DeleteData, PrintDestinationData, PrintDestinationListData, ProductData,
     ProductListData, TagListData,
 };
 use shared::models::{
@@ -213,13 +213,13 @@ pub async fn get_product(
 pub async fn get_product_full(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
     id: String,
-) -> Result<ApiResponse<ProductFullData>, String> {
+) -> Result<ApiResponse<ProductData>, String> {
     let bridge = bridge.read().await;
     match bridge
         .get::<ProductFull>(&format!("/api/products/{}/full", encode(&id)))
         .await
     {
-        Ok(product) => Ok(ApiResponse::success(ProductFullData { product })),
+        Ok(product) => Ok(ApiResponse::success(ProductData { product })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }

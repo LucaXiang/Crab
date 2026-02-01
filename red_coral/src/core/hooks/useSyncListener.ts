@@ -113,6 +113,7 @@ export function useSyncListener() {
   useEffect(() => {
     let unlisten: UnlistenFn | undefined;
     let isMounted = true;
+    let productRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     // 监听 sequence gap 检测事件
     const handleGapEvent = () => {
@@ -185,12 +186,17 @@ export function useSyncListener() {
       }
 
       // 属性/分类变更时级联刷新 product store（ProductFull 嵌入了完整属性数据）
+      // 防抖：批量变更时合并为一次刷新
       if ((resource === 'attribute' || resource === 'category') && storeRegistry.product) {
-        const productStore = storeRegistry.product.getState();
-        if (productStore.isLoaded) {
-          console.log(`[SyncListener] ${resource} changed, refreshing product store`);
-          productStore.fetchAll(true);
-        }
+        if (productRefreshTimer) clearTimeout(productRefreshTimer);
+        productRefreshTimer = setTimeout(() => {
+          productRefreshTimer = null;
+          const productStore = storeRegistry.product?.getState();
+          if (productStore?.isLoaded) {
+            console.log(`[SyncListener] ${resource} changed, refreshing product store (debounced)`);
+            productStore.fetchAll(true);
+          }
+        }, 500);
       }
     }).then((fn) => {
       if (isMounted) {
@@ -204,6 +210,7 @@ export function useSyncListener() {
     return () => {
       isMounted = false;
       unlisten?.();
+      if (productRefreshTimer) clearTimeout(productRefreshTimer);
       window.removeEventListener('order-sync-gap-detected', handleGapEvent);
     };
   }, []);

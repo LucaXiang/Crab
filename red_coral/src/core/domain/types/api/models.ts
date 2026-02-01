@@ -173,7 +173,7 @@ export interface ProductUpdate {
 /** Attribute binding with full attribute data */
 export interface AttributeBindingFull {
   /** Relation ID (has_attribute edge) */
-  id: string;
+  id: string | null;
   /** Full attribute object */
   attribute: Attribute;
   is_required: boolean;

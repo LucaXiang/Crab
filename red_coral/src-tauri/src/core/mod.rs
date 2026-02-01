@@ -22,7 +22,7 @@ pub use response::{
     ApiResponse, AppConfigResponse, AttributeData, AttributeListData, AuthData, CategoryData,
     CategoryListData, DeleteData, EmployeeListData, OrderEventListData, OrderSnapshotListData,
     PriceRuleListData, PrintDestinationData, PrintDestinationListData, ProductAttributeListData,
-    ProductData, ProductFullData, ProductListData, Role, RoleListData, RolePermission,
+    ProductData, ProductListData, Role, RoleListData, RolePermission,
     ActivationResultData, RolePermissionListData, TableListData, TagListData, TenantListData, ZoneListData,
 };
 pub use session_cache::{EmployeeSession, LoginMode, SessionCache, SessionCacheError};

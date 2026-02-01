@@ -3,6 +3,7 @@ import { CartItem, CheckoutMode } from '@/core/domain/types';
 import { useLongPress } from '@/hooks/useLongPress';
 import { formatCurrency } from '@/utils/currency';
 import { t } from '@/infrastructure/i18n';
+import { GroupedOptionsList } from '@/shared/components';
 
 interface UnpaidItemRowProps {
   item: CartItem;
@@ -80,33 +81,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
           )}
 
           {/* Line 3: Attribute Tags (grouped by attribute, one per line) */}
-          {hasOptions && (() => {
-            const grouped = new Map<string, typeof item.selected_options>();
-            for (const opt of item.selected_options!) {
-              const key = opt.attribute_name;
-              if (!grouped.has(key)) grouped.set(key, []);
-              grouped.get(key)!.push(opt);
-            }
-            return (
-              <div className="flex flex-col gap-0.5 mt-1">
-                {[...grouped.entries()].map(([attrName, opts]) => (
-                  <span key={attrName} className="text-xs text-gray-600">
-                    {attrName}: {opts!.map((opt, i) => (
-                      <React.Fragment key={i}>
-                        {i > 0 && ', '}
-                        {opt.option_name}
-                        {opt.price_modifier != null && opt.price_modifier !== 0 && (
-                          <span className={opt.price_modifier > 0 ? 'text-orange-600 ml-0.5' : 'text-green-600 ml-0.5'}>
-                            {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
-                          </span>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </span>
-                ))}
-              </div>
-            );
-          })()}
+          {hasOptions && <GroupedOptionsList options={item.selected_options!} />}
 
           {/* Line 4: Note */}
           {hasNote && (

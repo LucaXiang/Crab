@@ -10,15 +10,9 @@
 import { create } from 'zustand';
 import { createTauriClient } from '@/infrastructure/api';
 import type { StoreInfo, StoreInfoUpdate } from '@/core/domain/types/api';
+import type { SyncPayload } from '../factory/createResourceStore';
 
 const getApi = () => createTauriClient();
-
-interface SyncPayload {
-  id: string;
-  version: number;
-  action: 'created' | 'updated' | 'deleted';
-  data: unknown | null;
-}
 
 interface StoreInfoState {
   // State
@@ -26,12 +20,13 @@ interface StoreInfoState {
   isLoading: boolean;
   isLoaded: boolean;
   error: string | null;
+  lastVersion: number;
 
   // Actions
   fetchAll: (force?: boolean) => Promise<void>;
   updateStoreInfo: (data: StoreInfoUpdate) => Promise<StoreInfo>;
   clear: () => void;
-  applySync: (payload?: SyncPayload) => void;
+  applySync: (payload: SyncPayload<StoreInfo>) => void;
 }
 
 const defaultStoreInfo: StoreInfo = {
@@ -54,6 +49,7 @@ export const useStoreInfoStore = create<StoreInfoState>((set, get) => ({
   isLoading: false,
   isLoaded: false,
   error: null,
+  lastVersion: 0,
 
   // Actions
   fetchAll: async (force = false) => {
@@ -86,16 +82,23 @@ export const useStoreInfoStore = create<StoreInfoState>((set, get) => ({
     }
   },
 
-  clear: () => set({ info: defaultStoreInfo, isLoaded: false, error: null }),
+  clear: () => set({ info: defaultStoreInfo, isLoaded: false, error: null, lastVersion: 0 }),
 
-  /**
-   * Apply sync from server broadcast
-   * store_info is a singleton, so we just refetch on any sync signal
-   */
-  applySync: (payload?: SyncPayload) => {
-    console.log('[Store] store_info: received sync signal', payload?.action);
-    // Refetch to get latest data
-    get().fetchAll(true);
+  applySync: (payload: SyncPayload<StoreInfo>) => {
+    const state = get();
+    if (!state.isLoaded) return;
+
+    const { version, action, data } = payload;
+
+    if (state.lastVersion > 0 && version <= state.lastVersion) return;
+
+    if (action === 'updated' || action === 'created') {
+      if (data) {
+        set({ info: data, lastVersion: version });
+      } else if (!state.isLoading) {
+        get().fetchAll(true);
+      }
+    }
   },
 }));
 

@@ -227,7 +227,7 @@ pub async fn list_category_attributes(
 ) -> AppResult<Json<Vec<Attribute>>> {
     let repo = AttributeRepository::new(state.db.clone());
     let attributes = repo
-        .find_by_category(&category_id)
+        .find_active_by_category(&category_id)
         .await
         ?;
     Ok(Json(attributes))

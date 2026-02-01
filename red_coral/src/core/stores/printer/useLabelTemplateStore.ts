@@ -65,19 +65,13 @@ function toUpdatePayload(template: Partial<LabelTemplate>): LabelTemplateUpdate 
   return update;
 }
 
-interface SyncPayload {
-  id: string;
-  version: number;
-  action: 'created' | 'updated' | 'deleted';
-  data: unknown | null;
-}
-
 interface LabelTemplateStore {
   // State
   templates: LabelTemplate[];
   isLoading: boolean;
   isLoaded: boolean;
   error: string | null;
+  lastVersion: number;
 
   // Actions
   fetchAll: (force?: boolean) => Promise<void>;
@@ -87,10 +81,17 @@ interface LabelTemplateStore {
   duplicateTemplate: (template: LabelTemplate) => Promise<LabelTemplate>;
   getById: (id: string) => LabelTemplate | undefined;
   clear: () => void;
-  applySync: (payload?: SyncPayload) => void;
+  applySync: (payload: SyncPayload) => void;
 
   // Initialize with default template if empty
   ensureDefaultTemplate: () => Promise<void>;
+}
+
+interface SyncPayload {
+  id: string;
+  version: number;
+  action: 'created' | 'updated' | 'deleted';
+  data: unknown | null;
 }
 
 export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
@@ -99,6 +100,7 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
   isLoading: false,
   isLoaded: false,
   error: null,
+  lastVersion: 0,
 
   // Actions
   fetchAll: async (force = false) => {
@@ -183,43 +185,55 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
 
   getById: (id) => get().templates.find((t) => t.id === id),
 
-  clear: () => set({ templates: [], isLoaded: false, error: null }),
+  clear: () => set({ templates: [], isLoaded: false, error: null, lastVersion: 0 }),
 
-  /**
-   * Apply sync from server broadcast
-   */
-  applySync: (payload?: SyncPayload) => {
-    console.log('[Store] label_template: received sync signal', payload?.action, payload?.id);
+  applySync: (payload: SyncPayload) => {
     const state = get();
     if (!state.isLoaded) return;
 
-    if (!payload) {
-      state.fetchAll(true);
+    const { id, version, action, data } = payload;
+
+    if (state.lastVersion > 0 && version <= state.lastVersion) return;
+
+    if (state.lastVersion > 0 && version > state.lastVersion + 1) {
+      if (!state.isLoading) get().fetchAll(true);
       return;
     }
 
-    const { id, action, data } = payload;
     const actualId = id.includes(':') ? id.split(':')[1] : id;
 
     switch (action) {
       case 'created':
+        if (data) {
+          const template = mapApiToFrontend(data as Record<string, unknown>);
+          const exists = state.templates.some((t) => t.id === actualId || t.id === template.id);
+          if (exists) {
+            set((s) => ({
+              templates: s.templates.map((t) => (t.id === actualId || t.id === template.id ? template : t)),
+              lastVersion: version,
+            }));
+          } else {
+            set((s) => ({
+              templates: [...s.templates, template],
+              lastVersion: version,
+            }));
+          }
+        }
+        break;
       case 'updated':
         if (data) {
           const template = mapApiToFrontend(data as Record<string, unknown>);
-          set((s) => {
-            const exists = s.templates.some((t) => t.id === actualId || t.id === template.id);
-            if (exists) {
-              return { templates: s.templates.map((t) => (t.id === actualId || t.id === template.id ? template : t)) };
-            } else {
-              return { templates: [...s.templates, template] };
-            }
-          });
-        } else {
-          state.fetchAll(true);
+          set((s) => ({
+            templates: s.templates.map((t) => (t.id === actualId || t.id === template.id ? template : t)),
+            lastVersion: version,
+          }));
         }
         break;
       case 'deleted':
-        set((s) => ({ templates: s.templates.filter((t) => t.id !== actualId) }));
+        set((s) => ({
+          templates: s.templates.filter((t) => t.id !== actualId),
+          lastVersion: version,
+        }));
         break;
     }
   },

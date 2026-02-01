@@ -22,6 +22,8 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
   // Specification State
   const [specifications, setSpecifications] = useState<EmbeddedSpec[]>([]);
   const [selectedSpecId, setSelectedSpecId] = useState<string | undefined>(item.selected_specification?.id);
+  // Local override for base price (null = use spec/default price)
+  const [localBasePrice, setLocalBasePrice] = useState<number | null>(null);
 
   // Attribute State
   const [isLoadingAttributes, setIsLoadingAttributes] = useState(false);
@@ -128,6 +130,12 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     return () => { mounted = false; };
   }, [item.id, item.instance_id]); 
 
+  // Handle specification selection (reset price override when changing spec)
+  const handleSpecificationSelect = (specId: string) => {
+    setSelectedSpecId(specId);
+    setLocalBasePrice(null);
+  };
+
   const handleAttributeSelect = (attributeId: string, optionIds: string[]) => {
       const newSelections = new Map(selections);
       newSelections.set(attributeId, optionIds);
@@ -178,7 +186,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                 id: String(specIdx),
                 name: spec.is_default && !spec.name ? t('settings.product.specification.label.default') : spec.name,
                 external_id: spec.external_id,
-                price: spec.price,
+                price: currentPrice,
             };
         }
     }
@@ -199,7 +207,12 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
   };
 
   // --- Calculations ---
-  const basePrice = item.original_price ?? item.price;
+  // Dynamic price: local override > selected spec price > item original price
+  const itemBasePrice = item.original_price ?? item.price;
+  const specPrice = selectedSpecId !== undefined && specifications.length > 0
+    ? specifications[parseInt(selectedSpecId, 10)]?.price ?? itemBasePrice
+    : itemBasePrice;
+  const currentPrice = localBasePrice !== null ? localBasePrice : specPrice;
   
   return (
     <ItemConfiguratorModal
@@ -213,7 +226,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
       bindings={bindings}
       selections={selections}
       onAttributeSelect={handleAttributeSelect}
-      basePrice={basePrice}
+      basePrice={currentPrice}
       quantity={quantity}
       discount={discount}
       onQuantityChange={setQuantity}
@@ -221,6 +234,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
         setDiscount(val);
         setDiscountAuthorizer(auth);
       }}
+      onBasePriceChange={setLocalBasePrice}
       onConfirm={handleSave}
       confirmLabel={t('common.action.save')}
       onDelete={handleRemove}
@@ -229,7 +243,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
       specifications={specifications}
       hasMultiSpec={specifications.length > 1}
       selectedSpecId={selectedSpecId}
-      onSpecificationSelect={setSelectedSpecId}
+      onSpecificationSelect={handleSpecificationSelect}
     />
   );
 });

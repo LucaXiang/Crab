@@ -152,12 +152,6 @@ pub struct ProductData {
     pub product: shared::models::ProductFull,
 }
 
-/// 完整 Product (含 specs, attributes, tags)
-#[derive(Debug, Clone, Serialize)]
-pub struct ProductFullData {
-    pub product: shared::models::ProductFull,
-}
-
 /// Attributes 列表
 #[derive(Debug, Clone, Serialize)]
 pub struct AttributeListData {

@@ -6,3 +6,4 @@ export { FilterBar } from './FilterBar';
 export { DeleteConfirmation } from './DeleteConfirmation';
 export { TimelineList } from './TimelineList';
 export * from './Timeline';
+export { GroupedOptionsList } from './GroupedOptionsList';

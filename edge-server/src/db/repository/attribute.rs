@@ -283,7 +283,7 @@ impl AttributeRepository {
     }
 
     /// Get attributes for a product
-    pub async fn find_by_product(&self, product_id: &str) -> RepoResult<Vec<Attribute>> {
+    pub async fn find_active_by_product(&self, product_id: &str) -> RepoResult<Vec<Attribute>> {
         let product_thing: RecordId = product_id
             .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
@@ -305,7 +305,7 @@ impl AttributeRepository {
     }
 
     /// Get attributes for a category
-    pub async fn find_by_category(&self, category_id: &str) -> RepoResult<Vec<Attribute>> {
+    pub async fn find_active_by_category(&self, category_id: &str) -> RepoResult<Vec<Attribute>> {
         let category_thing: RecordId = category_id
             .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid category ID: {}", category_id)))?;

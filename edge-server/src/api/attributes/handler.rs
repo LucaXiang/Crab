@@ -95,6 +95,11 @@ pub async fn update(
         .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
         .await;
 
+    // 刷新引用此属性的产品缓存
+    if let Err(e) = state.catalog_service.refresh_products_with_attribute(&id).await {
+        tracing::warn!("Failed to refresh product cache after attribute update: {e}");
+    }
+
     Ok(Json(attr))
 }
 
@@ -125,6 +130,11 @@ pub async fn delete(
         state
             .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
             .await;
+
+        // 刷新引用此属性的产品缓存
+        if let Err(e) = state.catalog_service.refresh_products_with_attribute(&id).await {
+            tracing::warn!("Failed to refresh product cache after attribute delete: {e}");
+        }
     }
 
     Ok(Json(result))
@@ -147,6 +157,11 @@ pub async fn add_option(
         .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
         .await;
 
+    // 刷新引用此属性的产品缓存
+    if let Err(e) = state.catalog_service.refresh_products_with_attribute(&id).await {
+        tracing::warn!("Failed to refresh product cache after option add: {e}");
+    }
+
     Ok(Json(attr))
 }
 
@@ -167,6 +182,11 @@ pub async fn update_option(
         .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
         .await;
 
+    // 刷新引用此属性的产品缓存
+    if let Err(e) = state.catalog_service.refresh_products_with_attribute(&id).await {
+        tracing::warn!("Failed to refresh product cache after option update: {e}");
+    }
+
     Ok(Json(attr))
 }
 
@@ -185,6 +205,11 @@ pub async fn remove_option(
     state
         .broadcast_sync(RESOURCE, "updated", &id, Some(&attr))
         .await;
+
+    // 刷新引用此属性的产品缓存
+    if let Err(e) = state.catalog_service.refresh_products_with_attribute(&id).await {
+        tracing::warn!("Failed to refresh product cache after option remove: {e}");
+    }
 
     Ok(Json(attr))
 }

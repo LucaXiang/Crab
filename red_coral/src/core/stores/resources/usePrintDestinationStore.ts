@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createTauriClient } from '@/infrastructure/api';
 import type { PrintDestination, PrintDestinationCreate, PrintDestinationUpdate } from '@/core/domain/types/api';
+import type { SyncPayload } from '../factory/createResourceStore';
 
 const getApi = () => createTauriClient();
 
@@ -12,10 +13,11 @@ interface PrintDestinationStore {
   isLoading: boolean;
   isLoaded: boolean;
   error: string | null;
+  lastVersion: number;
 
-  // Core actions (new architecture)
+  // Core actions
   fetchAll: (force?: boolean) => Promise<void>;
-  applySync: () => void;
+  applySync: (payload: SyncPayload<PrintDestinationEntity>) => void;
   getById: (id: string) => PrintDestinationEntity | undefined;
   clear: () => void;
 
@@ -28,7 +30,6 @@ interface PrintDestinationStore {
   optimisticAdd: (item: PrintDestinationEntity) => void;
   optimisticUpdate: (id: string, updater: (item: PrintDestinationEntity) => PrintDestinationEntity) => void;
   optimisticRemove: (id: string) => void;
-
 }
 
 export const usePrintDestinationStore = create<PrintDestinationStore>((set, get) => ({
@@ -37,6 +38,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
   isLoading: false,
   isLoaded: false,
   error: null,
+  lastVersion: 0,
 
   // Core actions
   fetchAll: async (force = false) => {
@@ -57,23 +59,72 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
     }
   },
 
-  applySync: () => {
-    if (get().isLoaded) {
-      get().fetchAll(true);
+  applySync: (payload: SyncPayload<PrintDestinationEntity>) => {
+    const state = get();
+    const { id, version, action, data } = payload;
+
+    // Skip duplicate
+    if (state.lastVersion > 0 && version <= state.lastVersion) {
+      return;
+    }
+
+    // Gap detected: full refresh
+    if (state.lastVersion > 0 && version > state.lastVersion + 1) {
+      if (state.isLoaded && !state.isLoading) {
+        get().fetchAll(true);
+      }
+      return;
+    }
+
+    switch (action) {
+      case 'created':
+        if (data) {
+          const exists = state.items.some((item) => item.id === id);
+          if (exists) {
+            set((s) => ({
+              items: s.items.map((item) => (item.id === id ? data : item)),
+              lastVersion: version,
+            }));
+          } else {
+            set((s) => ({
+              items: [...s.items, data],
+              lastVersion: version,
+            }));
+          }
+        }
+        break;
+      case 'updated':
+        if (data) {
+          set((s) => ({
+            items: s.items.map((item) => (item.id === id ? data : item)),
+            lastVersion: version,
+          }));
+        }
+        break;
+      case 'deleted':
+        set((s) => ({
+          items: s.items.filter((item) => item.id !== id),
+          lastVersion: version,
+        }));
+        break;
     }
   },
 
   getById: (id) => get().items.find((item) => item.id === id),
 
-  clear: () => set({ items: [], isLoaded: false, error: null }),
+  clear: () => set({ items: [], isLoaded: false, error: null, lastVersion: 0 }),
 
   // CRUD actions
   create: async (data) => {
     set({ isLoading: true, error: null });
     try {
       const newDestination = await getApi().createPrintDestination(data) as PrintDestinationEntity;
-      await get().fetchAll(true);
-      return newDestination || get().items[get().items.length - 1];
+      // 直接更新 items，不依赖 fetchAll（避免 isLoading 互锁）
+      set((state) => ({
+        items: [...state.items, newDestination],
+        isLoading: false,
+      }));
+      return newDestination;
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to create print destination';
       set({ error: errorMsg, isLoading: false });
@@ -85,12 +136,12 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
   update: async (id, data) => {
     set({ isLoading: true, error: null });
     try {
-      await getApi().updatePrintDestination(id, data);
-      await get().fetchAll(true);
-      const updated = get().items.find((p) => p.id === id);
-      if (!updated) {
-        throw new Error(`PrintDestination ${id} not found after update`);
-      }
+      const updated = await getApi().updatePrintDestination(id, data) as PrintDestinationEntity;
+      // 直接替换 items 中对应项
+      set((state) => ({
+        items: state.items.map((item) => (item.id === id ? updated : item)),
+        isLoading: false,
+      }));
       return updated;
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to update print destination';

@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/currency';
 import { t } from '@/infrastructure/i18n';
 import DefaultImage from '@/assets/reshot.svg';
 import { ImageOff } from 'lucide-react';
+import { GroupedOptionsList } from '@/shared/components';
 
 interface SplitItemRowProps {
   item: CartItemSnapshot;
@@ -45,33 +46,9 @@ export const SplitItemRow: React.FC<SplitItemRowProps> = ({ item }) => {
         {item.selected_specification?.is_multi_spec && (
           <div className="text-xs text-gray-500">{t('pos.cart.spec')}: {item.selected_specification.name}</div>
         )}
-        {item.selected_options && item.selected_options.length > 0 && (() => {
-          const grouped = new Map<string, typeof item.selected_options>();
-          for (const opt of item.selected_options!) {
-            const key = opt.attribute_name;
-            if (!grouped.has(key)) grouped.set(key, []);
-            grouped.get(key)!.push(opt);
-          }
-          return (
-            <div className="flex flex-col gap-0.5 mt-0.5">
-              {[...grouped.entries()].map(([attrName, opts]) => (
-                <span key={attrName} className="text-xs text-gray-500">
-                  {attrName}: {opts!.map((opt, i) => (
-                    <React.Fragment key={i}>
-                      {i > 0 && ', '}
-                      {opt.option_name}
-                      {opt.price_modifier != null && opt.price_modifier !== 0 && (
-                        <span className={opt.price_modifier > 0 ? 'text-orange-600 ml-0.5' : 'text-green-600 ml-0.5'}>
-                          {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
-                        </span>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </span>
-              ))}
-            </div>
-          );
-        })()}
+        {item.selected_options && item.selected_options.length > 0 && (
+          <GroupedOptionsList options={item.selected_options} className="flex flex-col gap-0.5 mt-0.5" itemClassName="text-xs text-gray-500" />
+        )}
         {item.manual_discount_percent != null && item.manual_discount_percent > 0 && (
           <span className="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded">
             -{item.manual_discount_percent}%

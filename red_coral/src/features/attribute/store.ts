@@ -2,8 +2,18 @@ import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { createTauriClient } from '@/infrastructure/api';
 import type { Attribute, AttributeOption } from '@/core/domain/types/api';
+import type { SyncPayload } from '@/core/stores/factory/createResourceStore';
+import { useProductStore } from '@/features/product';
 
 const getApi = () => createTauriClient();
+
+/** 属性变更后级联刷新 product store（ProductFull 内嵌了完整属性数据） */
+function cascadeRefreshProducts() {
+  const productStore = useProductStore.getState();
+  if (productStore.isLoaded) {
+    productStore.fetchAll(true);
+  }
+}
 
 // Extended option type with index for UI purposes
 interface AttributeOptionWithIndex extends AttributeOption {
@@ -14,19 +24,20 @@ interface AttributeOptionWithIndex extends AttributeOption {
 type AttributeEntity = Attribute & { id: string };
 
 interface AttributeStore {
-  // State (new architecture)
+  // State
   items: AttributeEntity[];
   isLoading: boolean;
   isLoaded: boolean;
   error: string | null;
+  lastVersion: number;
 
   // Options state
   options: Map<string, AttributeOptionWithIndex[]>;
   selectedAttributeId: string | null;
 
-  // Core actions (new architecture)
+  // Core actions
   fetchAll: (force?: boolean) => Promise<void>;
-  applySync: () => void;
+  applySync: (payload: SyncPayload<AttributeEntity>) => void;
   getById: (id: string) => AttributeEntity | undefined;
   clear: () => void;
 
@@ -103,12 +114,12 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   isLoading: false,
   isLoaded: false,
   error: null,
+  lastVersion: 0,
   options: new Map(),
   selectedAttributeId: null,
 
   // Core actions
   fetchAll: async (force = false) => {
-    // Guard: skip if already loading, or already loaded (unless forced)
     const state = get();
     if (state.isLoading) return;
     if (state.isLoaded && !force) return;
@@ -124,15 +135,74 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     }
   },
 
-  applySync: () => {
-    if (get().isLoaded) {
-      get().fetchAll(true);  // Force refresh on sync
+  applySync: (payload: SyncPayload<AttributeEntity>) => {
+    const state = get();
+    if (!state.isLoaded) return;
+
+    const { id, version, action, data } = payload;
+
+    if (state.lastVersion > 0 && version <= state.lastVersion) return;
+
+    if (state.lastVersion > 0 && version > state.lastVersion + 1) {
+      if (!state.isLoading) get().fetchAll(true);
+      return;
+    }
+
+    switch (action) {
+      case 'created':
+        if (data) {
+          const exists = state.items.some((item) => item.id === id);
+          if (exists) {
+            set((s) => ({
+              items: s.items.map((item) => (item.id === id ? data : item)),
+              lastVersion: version,
+            }));
+          } else {
+            set((s) => ({
+              items: [...s.items, data],
+              lastVersion: version,
+            }));
+          }
+        }
+        break;
+      case 'updated':
+        if (data) {
+          set((s) => ({
+            items: s.items.map((item) => (item.id === id ? data : item)),
+            lastVersion: version,
+          }));
+          // 同步更新 options 缓存（attribute 内嵌 options）
+          if (data.options) {
+            const opts: AttributeOptionWithIndex[] = data.options.map((opt, index) => ({
+              ...opt,
+              index,
+              attributeId: id,
+            }));
+            set((s) => {
+              const newOptions = new Map(s.options);
+              newOptions.set(id, opts);
+              return { options: newOptions };
+            });
+          }
+        }
+        break;
+      case 'deleted':
+        set((s) => {
+          const newOptions = new Map(s.options);
+          newOptions.delete(id);
+          return {
+            items: s.items.filter((item) => item.id !== id),
+            options: newOptions,
+            lastVersion: version,
+          };
+        });
+        break;
     }
   },
 
   getById: (id) => get().items.find((item) => item.id === id),
 
-  clear: () => set({ items: [], isLoaded: false, error: null, options: new Map() }),
+  clear: () => set({ items: [], isLoaded: false, error: null, lastVersion: 0, options: new Map() }),
 
   // UI actions
   setSelectedAttributeId: (id) => set({ selectedAttributeId: id }),
@@ -170,6 +240,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     try {
       await getApi().createAttribute(params);
       await get().fetchAll(true);
+      cascadeRefreshProducts();
     } catch (e: unknown) {
       console.error('[Store] createAttribute failed:', e);
       throw e;
@@ -180,6 +251,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       const { id, ...data } = params;
       await getApi().updateAttribute(id, data);
       await get().fetchAll(true);
+      cascadeRefreshProducts();
     } catch (e: unknown) {
       console.error('[Store] updateAttribute failed:', e);
       throw e;
@@ -189,6 +261,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
     try {
       await getApi().deleteAttribute(id);
       await get().fetchAll(true);
+      cascadeRefreshProducts();
     } catch (e: unknown) {
       console.error('[Store] deleteAttribute failed:', e);
       throw e;
@@ -210,6 +283,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         return { options: newOptions };
       });
       await get().fetchAll(true);
+      cascadeRefreshProducts();
     } catch (e: unknown) {
       console.error('[Store] createOption failed:', e);
       throw e;
@@ -231,6 +305,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         return { options: newOptions };
       });
       await get().fetchAll(true);
+      cascadeRefreshProducts();
     } catch (e: unknown) {
       console.error('[Store] updateOption failed:', e);
       throw e;
@@ -251,6 +326,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         return { options: newOptions };
       });
       await get().fetchAll(true);
+      cascadeRefreshProducts();
     } catch (e: unknown) {
       console.error('[Store] deleteOption failed:', e);
       throw e;
@@ -285,6 +361,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
         })));
         return { items: newItems, options: newOptionsMap };
       });
+      cascadeRefreshProducts();
     } catch (e: unknown) {
       console.error('[Store] reorderOptions failed:', e);
       throw e;
@@ -292,13 +369,13 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   },
   bindProductAttribute: async (params) => {
     try {
-      // Note: default_option_indices is on the Attribute itself and can be overridden on the binding
       await getApi().bindProductAttribute({
         product_id: params.product_id,
         attribute_id: params.attribute_id,
         is_required: params.is_required,
         display_order: params.display_order,
       });
+      cascadeRefreshProducts();
     } catch (e: unknown) {
       console.error('[Store] bindProductAttribute failed:', e);
       throw e;
@@ -307,6 +384,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   unbindProductAttribute: async (bindingId) => {
     try {
       await getApi().unbindProductAttribute(bindingId);
+      cascadeRefreshProducts();
     } catch (e: unknown) {
       console.error('[Store] unbindProductAttribute failed:', e);
       throw e;
