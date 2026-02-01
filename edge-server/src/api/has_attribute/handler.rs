@@ -21,7 +21,7 @@ pub struct CreateBindingRequest {
     pub is_required: bool,
     #[serde(default)]
     pub display_order: i32,
-    pub default_option_idx: Option<i32>,
+    pub default_option_indices: Option<Vec<i32>>,
 }
 
 /// 更新绑定的请求体
@@ -29,7 +29,7 @@ pub struct CreateBindingRequest {
 pub struct UpdateBindingRequest {
     pub is_required: Option<bool>,
     pub display_order: Option<i32>,
-    pub default_option_idx: Option<i32>,
+    pub default_option_indices: Option<Vec<i32>>,
 }
 
 /// 绑定响应 (包含属性详情)
@@ -101,7 +101,7 @@ pub async fn create(
             &payload.attribute_id,
             payload.is_required,
             payload.display_order,
-            payload.default_option_idx,
+            payload.default_option_indices,
         )
         .await?;
 

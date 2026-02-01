@@ -183,7 +183,7 @@ impl CatalogService {
             is_required: bool,
             #[serde(default)]
             display_order: i32,
-            default_option_idx: Option<i32>,
+            default_option_indices: Option<Vec<i32>>,
         }
 
         let bindings: Vec<BindingRow> = self
@@ -202,7 +202,7 @@ impl CatalogService {
                 attribute: binding.to,
                 is_required: binding.is_required,
                 display_order: binding.display_order,
-                default_option_idx: binding.default_option_idx,
+                default_option_indices: binding.default_option_indices,
                 is_inherited: false, // will be set correctly below
             };
             if from_id.starts_with("product:") {
@@ -664,7 +664,7 @@ impl CatalogService {
             is_required: bool,
             #[serde(default)]
             display_order: i32,
-            default_option_idx: Option<i32>,
+            default_option_indices: Option<Vec<i32>>,
         }
 
         // Fetch product's direct attribute bindings
@@ -682,7 +682,7 @@ impl CatalogService {
                 attribute: b.to,
                 is_required: b.is_required,
                 display_order: b.display_order,
-                default_option_idx: b.default_option_idx,
+                default_option_indices: b.default_option_indices,
                 is_inherited: false,
             })
             .collect();
@@ -708,7 +708,7 @@ impl CatalogService {
                     attribute: cb.to,
                     is_required: cb.is_required,
                     display_order: cb.display_order,
-                    default_option_idx: cb.default_option_idx,
+                    default_option_indices: cb.default_option_indices,
                     is_inherited: true,
                 });
             }

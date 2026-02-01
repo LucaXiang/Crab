@@ -187,9 +187,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                     const binding = bindings?.find(b => b.out === attr.id);
 
                     // Logic to find defaults for display (visual cues in AttributeSelector)
-                    // default_option_idx is stored at the attribute level
-                    const attrDefaultIdx = attr.default_option_idx;
-                    let defaultOptionIds = (attrDefaultIdx !== null && attrDefaultIdx !== undefined && attrDefaultIdx >= 0) ? [String(attrDefaultIdx)] : [];
+                    const defaultOptionIds = attr.default_option_indices?.map(String) ?? [];
 
                     return (
                       <div key={attrId} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">

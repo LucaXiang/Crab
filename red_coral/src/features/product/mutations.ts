@@ -78,7 +78,9 @@ export async function createProduct(
     const defaultOptionIds = Array.isArray(rawDefaults)
       ? rawDefaults
       : (rawDefaults ? [rawDefaults] : []);
-    const defaultOptionIdx = defaultOptionIds.length > 0 ? parseInt(defaultOptionIds[0], 10) : undefined;
+    const defaultIndices = defaultOptionIds
+      .map((id: string) => parseInt(id, 10))
+      .filter((n: number) => !isNaN(n));
 
     try {
       await getApi().bindProductAttribute({
@@ -86,7 +88,7 @@ export async function createProduct(
         attribute_id: attributeId,
         is_required: false,
         display_order: i,
-        default_option_idx: !isNaN(defaultOptionIdx as number) ? defaultOptionIdx : undefined,
+        default_option_indices: defaultIndices.length > 0 ? defaultIndices : undefined,
       });
     } catch (error) {
       console.error('Failed to bind attribute:', attributeId, error);
@@ -185,7 +187,7 @@ export async function updateProduct(
       .map((pa) => ({
         attributeId: pa.attribute.id,
         id: pa.id as string,
-        defaultOptionIds: pa.default_option_idx != null ? [String(pa.default_option_idx)] : [],
+        defaultOptionIds: pa.default_option_indices?.map(String) ?? [],
       }));
   } catch (error) {
     console.error('Failed to fetch existing attributes:', error);
@@ -198,13 +200,15 @@ export async function updateProduct(
     existingBindings,
     async (attrId) => getApi().unbindProductAttribute(String(attrId)),
     async (attrId, defaultOptionIds, index) => {
-      const defaultOptionIdx = defaultOptionIds.length > 0 ? parseInt(defaultOptionIds[0], 10) : undefined;
+      const defaultIndices = defaultOptionIds
+        .map((id: string) => parseInt(id, 10))
+        .filter((n: number) => !isNaN(n));
       await getApi().bindProductAttribute({
         product_id: id,
         attribute_id: attrId,
         is_required: false,
         display_order: index,
-        default_option_idx: !isNaN(defaultOptionIdx as number) ? defaultOptionIdx : undefined,
+        default_option_indices: defaultIndices.length > 0 ? defaultIndices : undefined,
       });
     }
   );
@@ -247,9 +251,9 @@ export async function loadProductFullData(productId: string) {
   const defaultOptions: Record<string, string[]> = {};
   directAttributes.forEach((binding) => {
     const attrId = binding.attribute.id;
-    const defaultIdx = binding.default_option_idx ?? binding.attribute.default_option_idx;
-    if (attrId && defaultIdx !== null && defaultIdx !== undefined) {
-      defaultOptions[attrId] = [String(defaultIdx)];
+    const indices = binding.default_option_indices ?? binding.attribute.default_option_indices;
+    if (attrId && indices && indices.length > 0) {
+      defaultOptions[attrId] = indices.map(String);
     }
   });
 

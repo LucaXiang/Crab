@@ -19,8 +19,8 @@ DEFINE FIELD OVERWRITE is_multi_select ON attribute TYPE bool
 DEFINE FIELD OVERWRITE max_selections ON attribute TYPE option<int>
     PERMISSIONS FULL;
 
--- 默认选项索引
-DEFINE FIELD OVERWRITE default_option_idx ON attribute TYPE option<int>
+-- 默认选项索引 (支持多选)
+DEFINE FIELD OVERWRITE default_option_indices ON attribute TYPE option<array<int>>
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE display_order ON attribute TYPE int
@@ -97,8 +97,8 @@ DEFINE FIELD OVERWRITE display_order ON has_attribute TYPE int
     DEFAULT 0
     PERMISSIONS FULL;
 
--- 覆盖属性的默认选项索引
-DEFINE FIELD OVERWRITE default_option_idx ON has_attribute TYPE option<int>
+-- 覆盖属性的默认选项索引 (支持多选)
+DEFINE FIELD OVERWRITE default_option_indices ON has_attribute TYPE option<array<int>>
     PERMISSIONS FULL;
 
 DEFINE INDEX OVERWRITE has_attr_unique ON has_attribute FIELDS in, out UNIQUE;

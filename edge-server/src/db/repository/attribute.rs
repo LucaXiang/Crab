@@ -54,7 +54,7 @@ impl AttributeRepository {
             name: data.name,
             is_multi_select: data.is_multi_select.unwrap_or(false),
             max_selections: data.max_selections,
-            default_option_idx: data.default_option_idx,
+            default_option_indices: data.default_option_indices,
             display_order: data.display_order.unwrap_or(0),
             is_active: true,
             show_on_receipt: data.show_on_receipt.unwrap_or(false),
@@ -187,7 +187,7 @@ impl AttributeRepository {
         attr_id: &str,
         is_required: bool,
         display_order: i32,
-        default_option_idx: Option<i32>,
+        default_option_indices: Option<Vec<i32>>,
     ) -> RepoResult<AttributeBinding> {
         let product_thing: RecordId = product_id
             .parse()
@@ -199,13 +199,13 @@ impl AttributeRepository {
             .base
             .db()
             .query(
-                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order, default_option_idx = $default_idx",
+                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order, default_option_indices = $default_indices",
             )
             .bind(("from", product_thing))
             .bind(("to", attr_thing))
             .bind(("req", is_required))
             .bind(("order", display_order))
-            .bind(("default_idx", default_option_idx))
+            .bind(("default_indices", default_option_indices))
             .await?;
         let edges: Vec<AttributeBinding> = result.take(0)?;
         edges
@@ -221,7 +221,7 @@ impl AttributeRepository {
         attr_id: &str,
         is_required: bool,
         display_order: i32,
-        default_option_idx: Option<i32>,
+        default_option_indices: Option<Vec<i32>>,
     ) -> RepoResult<AttributeBinding> {
         let category_thing: RecordId = category_id
             .parse()
@@ -233,13 +233,13 @@ impl AttributeRepository {
             .base
             .db()
             .query(
-                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order, default_option_idx = $default_idx",
+                "RELATE $from->has_attribute->$to SET is_required = $req, display_order = $order, default_option_indices = $default_indices",
             )
             .bind(("from", category_thing))
             .bind(("to", attr_thing))
             .bind(("req", is_required))
             .bind(("order", display_order))
-            .bind(("default_idx", default_option_idx))
+            .bind(("default_indices", default_option_indices))
             .await?;
         let edges: Vec<AttributeBinding> = result.take(0)?;
         edges
@@ -346,7 +346,7 @@ impl AttributeRepository {
             out: RecordId,
             is_required: bool,
             display_order: i32,
-            default_option_idx: Option<i32>,
+            default_option_indices: Option<Vec<i32>>,
             attr_data: Attribute,
         }
 
@@ -361,7 +361,7 @@ impl AttributeRepository {
                     to: row.out,
                     is_required: row.is_required,
                     display_order: row.display_order,
-                    default_option_idx: row.default_option_idx,
+                    default_option_indices: row.default_option_indices,
                 };
                 (binding, row.attr_data)
             })

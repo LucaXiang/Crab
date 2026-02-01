@@ -259,7 +259,7 @@ impl From<ProductFull> for shared::models::ProductFull {
                     name: b.attribute.name,
                     is_multi_select: b.attribute.is_multi_select,
                     max_selections: b.attribute.max_selections,
-                    default_option_idx: b.attribute.default_option_idx,
+                    default_option_indices: b.attribute.default_option_indices,
                     display_order: b.attribute.display_order,
                     is_active: b.attribute.is_active,
                     show_on_receipt: b.attribute.show_on_receipt,
@@ -277,7 +277,7 @@ impl From<ProductFull> for shared::models::ProductFull {
                 },
                 is_required: b.is_required,
                 display_order: b.display_order,
-                default_option_idx: b.default_option_idx,
+                default_option_indices: b.default_option_indices,
                 is_inherited: b.is_inherited,
             }).collect(),
             tags: p.tags.into_iter().map(|t| shared::models::Tag {

@@ -57,8 +57,8 @@ pub struct Attribute {
     /// Max selections (null = unlimited)
     pub max_selections: Option<i32>,
 
-    // 默认值
-    pub default_option_idx: Option<i32>,
+    // 默认值 (支持多选属性的多个默认)
+    pub default_option_indices: Option<Vec<i32>>,
 
     // 显示
     #[serde(default)]
@@ -91,7 +91,7 @@ impl Attribute {
             name,
             is_multi_select: false,
             max_selections: None,
-            default_option_idx: None,
+            default_option_indices: None,
             display_order: 0,
             is_active: true,
             show_on_receipt: false,
@@ -108,7 +108,7 @@ pub struct AttributeCreate {
     pub name: String,
     pub is_multi_select: Option<bool>,
     pub max_selections: Option<i32>,
-    pub default_option_idx: Option<i32>,
+    pub default_option_indices: Option<Vec<i32>>,
     pub display_order: Option<i32>,
     pub show_on_receipt: Option<bool>,
     pub receipt_name: Option<String>,
@@ -126,7 +126,7 @@ pub struct AttributeUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_selections: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub default_option_idx: Option<i32>,
+    pub default_option_indices: Option<Vec<i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_order: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -156,8 +156,8 @@ pub struct AttributeBinding {
     pub is_required: bool,
     #[serde(default)]
     pub display_order: i32,
-    /// Override attribute's default option
-    pub default_option_idx: Option<i32>,
+    /// Override attribute's default options (supports multi-select)
+    pub default_option_indices: Option<Vec<i32>>,
 }
 
 /// Attribute binding with full attribute data (for API responses)
@@ -170,8 +170,8 @@ pub struct AttributeBindingFull {
     pub attribute: Attribute,
     pub is_required: bool,
     pub display_order: i32,
-    /// Override attribute's default option
-    pub default_option_idx: Option<i32>,
+    /// Override attribute's default options (supports multi-select)
+    pub default_option_indices: Option<Vec<i32>>,
     /// Whether this binding is inherited from the product's category
     #[serde(default)]
     pub is_inherited: bool,

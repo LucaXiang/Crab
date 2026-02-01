@@ -76,13 +76,11 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
 
         let initialIds: string[] = [];
 
-        // Use attribute-level default_option_idx
-        const attrDefaultIdx = attr.default_option_idx;
-        if (attrDefaultIdx !== null && attrDefaultIdx !== undefined && attrDefaultIdx >= 0) {
-           const opt = options[attrDefaultIdx];
-           if (opt && opt.is_active) {
-             initialIds = [String(attrDefaultIdx)];
-           }
+        // Use attribute-level default_option_indices
+        if (attr.default_option_indices && attr.default_option_indices.length > 0) {
+           initialIds = attr.default_option_indices
+             .filter(idx => options[idx] && options[idx].is_active)
+             .map(String);
         }
 
         // Enforce Single Choice constraints (is_multi_select=false means single)

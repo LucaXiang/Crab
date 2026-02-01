@@ -492,7 +492,7 @@ pub struct BindCategoryAttributeData {
     pub attribute_id: String,
     pub is_required: Option<bool>,
     pub display_order: Option<i32>,
-    pub default_option_id: Option<i32>,
+    pub default_option_indices: Option<Vec<i32>>,
 }
 
 /// Bind attribute to category
@@ -506,7 +506,7 @@ pub async fn bind_category_attribute(
     let payload = serde_json::json!({
         "is_required": data.is_required,
         "display_order": data.display_order,
-        "default_option_idx": data.default_option_id,
+        "default_option_indices": data.default_option_indices,
     });
     match bridge
         .post::<AttributeBinding, _>(

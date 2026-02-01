@@ -140,14 +140,13 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                  attributeList.forEach(attr => {
                      const attrId = String(attr.id);
                      if (!initialSelections.has(attrId)) {
-                         // Check default from attribute's default_option_idx
-                         if (attr.default_option_idx != null) {
-                             // Single choice constraint
-                             const isMulti = attr.is_multi_select;
-                             if (!isMulti) {
-                                 initialSelections.set(attrId, [String(attr.default_option_idx)]);
+                         // Check defaults from attribute's default_option_indices
+                         if (attr.default_option_indices && attr.default_option_indices.length > 0) {
+                             const defaults = attr.default_option_indices.map(String);
+                             if (!attr.is_multi_select) {
+                                 initialSelections.set(attrId, [defaults[0]]);
                              } else {
-                                 initialSelections.set(attrId, [String(attr.default_option_idx)]);
+                                 initialSelections.set(attrId, defaults);
                              }
                          }
                      }

@@ -316,8 +316,8 @@ export const AttributeManagement: React.FC = React.memo(() => {
                       ) : (
                         <div className="divide-y divide-gray-100/50">
                           {options.map((option) => {
-                            // Check if this option is the default by comparing index with attr.default_option_idx
-                            const isDefault = attr.default_option_idx === option.index;
+                            // Check if this option is one of the defaults
+                            const isDefault = attr.default_option_indices?.includes(option.index) ?? false;
                             return (
                             <div
                               key={option.index}

@@ -291,7 +291,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
   },
   bindProductAttribute: async (params) => {
     try {
-      // Note: default_option_idx is now on the Attribute itself, not on the binding
+      // Note: default_option_indices is on the Attribute itself and can be overridden on the binding
       await getApi().bindProductAttribute({
         product_id: params.product_id,
         attribute_id: params.attribute_id,

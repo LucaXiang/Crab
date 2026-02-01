@@ -60,7 +60,9 @@ async function syncAttributeBindings(
           attribute_id: attributeId,
           is_required: false,
           display_order: i,
-          default_option_idx: newDefaultOptionIds?.[0] ? Number(newDefaultOptionIds[0]) : undefined
+          default_option_indices: newDefaultOptionIds?.length
+            ? newDefaultOptionIds.map(Number).filter((n: number) => !isNaN(n))
+            : undefined
         });
       } catch (error) {
         console.error('Failed to bind attribute:', attributeId, error);
@@ -198,7 +200,7 @@ export async function loadCategoryAttributes(categoryId: string): Promise<{
   // Load default options from category attributes
   const defaultOptions: Record<string, string[]> = {};
   safeAttrs.forEach((ca) => {
-    const defaults = ca.default_option_idx != null ? [String(ca.default_option_idx)] : [];
+    const defaults = ca.default_option_indices?.map(String) ?? [];
     if (defaults.length > 0 && ca.id) {
       defaultOptions[ca.id] = defaults;
     }

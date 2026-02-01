@@ -308,7 +308,7 @@ export interface CreateAttributeRequest {
   excluded_categories?: string[];
   is_multi_select?: boolean;
   max_selections?: number;
-  default_option_idx?: number;
+  default_option_indices?: number[];
   display_order?: number;
   is_active?: boolean;
   show_on_receipt?: boolean;
@@ -323,7 +323,7 @@ export interface UpdateAttributeRequest {
   excluded_categories?: string[];
   is_multi_select?: boolean;
   max_selections?: number;
-  default_option_idx?: number;
+  default_option_indices?: number[];
   display_order?: number;
   is_active?: boolean;
   show_on_receipt?: boolean;
@@ -483,13 +483,13 @@ export interface CreateCategoryAttributeRequest {
   attribute_id: string | number;
   is_required?: boolean;
   display_order?: number;
-  default_option_idx?: number;
+  default_option_indices?: number[];
 }
 
 export interface UpdateCategoryAttributeRequest {
   is_required?: boolean;
   display_order?: number;
-  default_option_id?: number;
+  default_option_indices?: number[];
 }
 
 // Product Attribute types (binding between Product and Attribute)
@@ -508,7 +508,7 @@ export interface CreateProductAttributeRequest {
   attribute_id: string;
   is_required?: boolean;
   display_order?: number;
-  default_option_idx?: number;
+  default_option_indices?: number[];
 }
 
 export interface UpdateProductAttributeRequest {

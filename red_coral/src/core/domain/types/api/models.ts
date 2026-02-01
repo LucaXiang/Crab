@@ -178,7 +178,7 @@ export interface AttributeBindingFull {
   attribute: Attribute;
   is_required: boolean;
   display_order: number;
-  default_option_idx?: number;
+  default_option_indices?: number[];
   /** Whether this binding is inherited from the product's category */
   is_inherited?: boolean;
 }
@@ -228,7 +228,7 @@ export interface Attribute {
   name: string;
   is_multi_select: boolean;
   max_selections: number | null;
-  default_option_idx: number | null;
+  default_option_indices: number[] | null;
   display_order: number;
   is_active: boolean;
   show_on_receipt: boolean;
@@ -242,7 +242,7 @@ export interface AttributeCreate {
   name: string;
   is_multi_select?: boolean;
   max_selections?: number | null;
-  default_option_idx?: number;
+  default_option_indices?: number[];
   display_order?: number;
   show_on_receipt?: boolean;
   receipt_name?: string;
@@ -255,7 +255,7 @@ export interface AttributeUpdate {
   name?: string;
   is_multi_select?: boolean;
   max_selections?: number | null;
-  default_option_idx?: number;
+  default_option_indices?: number[];
   display_order?: number;
   is_active?: boolean;
   show_on_receipt?: boolean;
@@ -273,7 +273,7 @@ export interface AttributeBinding {
   out: string;
   is_required: boolean;
   display_order: number;
-  default_option_idx?: number;
+  default_option_indices?: number[];
 }
 
 
