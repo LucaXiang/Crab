@@ -28,7 +28,6 @@ use shared::models::{
     PrintDestinationCreate,
     PrintDestinationUpdate,
     // Products
-    Product,
     ProductCreate,
     ProductFull,
     ProductUpdate,
@@ -188,7 +187,7 @@ pub async fn list_products(
     bridge: State<'_, Arc<RwLock<ClientBridge>>>,
 ) -> Result<ApiResponse<ProductListData>, String> {
     let bridge = bridge.read().await;
-    match bridge.get::<Vec<Product>>("/api/products").await {
+    match bridge.get::<Vec<ProductFull>>("/api/products").await {
         Ok(products) => Ok(ApiResponse::success(ProductListData { products })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
@@ -201,7 +200,7 @@ pub async fn get_product(
 ) -> Result<ApiResponse<ProductData>, String> {
     let bridge = bridge.read().await;
     match bridge
-        .get::<Product>(&format!("/api/products/{}", encode(&id)))
+        .get::<ProductFull>(&format!("/api/products/{}", encode(&id)))
         .await
     {
         Ok(prod) => Ok(ApiResponse::success(ProductData { product: prod })),
@@ -231,7 +230,7 @@ pub async fn create_product(
     data: ProductCreate,
 ) -> Result<ApiResponse<ProductData>, String> {
     let bridge = bridge.read().await;
-    match bridge.post::<Product, _>("/api/products", &data).await {
+    match bridge.post::<ProductFull, _>("/api/products", &data).await {
         Ok(prod) => Ok(ApiResponse::success(ProductData { product: prod })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
@@ -245,7 +244,7 @@ pub async fn update_product(
 ) -> Result<ApiResponse<ProductData>, String> {
     let bridge = bridge.read().await;
     match bridge
-        .put::<Product, _>(&format!("/api/products/{}", encode(&id)), &data)
+        .put::<ProductFull, _>(&format!("/api/products/{}", encode(&id)), &data)
         .await
     {
         Ok(prod) => Ok(ApiResponse::success(ProductData { product: prod })),

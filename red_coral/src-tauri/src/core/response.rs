@@ -140,16 +140,16 @@ pub struct CategoryData {
     pub category: shared::models::Category,
 }
 
-/// Products 列表
+/// Products 列表 (完整数据，含属性和标签)
 #[derive(Debug, Clone, Serialize)]
 pub struct ProductListData {
-    pub products: Vec<shared::models::Product>,
+    pub products: Vec<shared::models::ProductFull>,
 }
 
-/// 单个 Product
+/// 单个 Product (完整数据，含属性和标签)
 #[derive(Debug, Clone, Serialize)]
 pub struct ProductData {
-    pub product: shared::models::Product,
+    pub product: shared::models::ProductFull,
 }
 
 /// 完整 Product (含 specs, attributes, tags)
