@@ -50,10 +50,17 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
     }
   };
 
+  const maxSel = attribute.max_selections;
+  const isAtLimit = !!(maxSel && selectedOptionIds.length >= maxSel);
+
   const getAttributeTypeLabel = () => {
-    return attribute.is_multi_select
+    const base = attribute.is_multi_select
       ? t('settings.attribute.type.multi_optional')
       : t('settings.attribute.type.single_optional');
+    if (attribute.is_multi_select && maxSel) {
+      return `${base} (${selectedOptionIds.length}/${maxSel})`;
+    }
+    return base;
   };
 
   if (activeOptions.length === 0) {
@@ -72,7 +79,7 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
             </span>
           )}
         </h3>
-        <span className="text-xs text-gray-400">
+        <span className={`text-xs ${isAtLimit ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
           {getAttributeTypeLabel()}
         </span>
       </div>
@@ -84,18 +91,22 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
           const optionIdStr = String(optionIdx);
           const isSelected = selectedOptionIds.includes(optionIdStr);
           const isDefault = defaultOptionIds.includes(optionIdStr);
+          const isDisabled = isAtLimit && !isSelected && !isSingleChoice;
 
           return (
             <button
               key={`${option.name}-${optionIdx}`}
               onClick={() => {
+                if (isDisabled) return;
                 isSingleChoice ? handleSingleSelect(optionIdStr) : handleMultiSelect(optionIdStr);
               }}
               className={`
                 relative p-2 rounded-xl border-2 transition-all text-left flex flex-col items-start min-h-[3.75rem] justify-center
                 ${isSelected 
                   ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200' 
-                  : 'bg-white text-gray-700 border-gray-200 hover:border-orange-300 hover:bg-orange-50/30'
+                  : isDisabled
+                    ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-orange-300 hover:bg-orange-50/30'
                 }
               `}
             >

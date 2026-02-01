@@ -175,6 +175,8 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
             const defaultOptions = getDefaultOptions(attrId);
             const options = optionsMap.get(attrId) || [];
             const isInherited = inheritedAttributeIds.includes(attrId);
+            const maxSel = attr.max_selections;
+            const isAtLimit = !!(isMulti && maxSel && defaultOptions.length >= maxSel);
 
             return (
               <div key={attrId} className="bg-white rounded-xl border border-gray-100 overflow-hidden group">
@@ -185,6 +187,11 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                     <span className="text-[0.6rem] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 shrink-0">
                       {isMulti ? t('settings.attribute.type.multi_select') : t('settings.attribute.type.single_select')}
                     </span>
+                    {isMulti && maxSel && (
+                      <span className={`text-[0.6rem] px-1.5 py-0.5 rounded shrink-0 ${isAtLimit ? 'bg-orange-50 text-orange-500 font-medium' : 'bg-gray-50 text-gray-400'}`}>
+                        {defaultOptions.length}/{maxSel}
+                      </span>
+                    )}
                   </div>
                   {isInherited ? (
                     <div className="text-gray-300 p-0.5" title={t('settings.product.attribute.inherited')}>
@@ -210,16 +217,23 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                       {options.map((opt) => {
                         const optionKey = String(opt.index);
                         const isDefault = defaultOptions.includes(optionKey);
+                        const isOptionDisabled = isAtLimit && !isDefault;
                         return (
                           <button
                             key={optionKey}
                             onClick={() => {
+                              if (isOptionDisabled) return;
                               if (!onDefaultOptionChange) return;
                               let newDefaults: string[];
                               if (isMulti) {
-                                newDefaults = isDefault
-                                  ? defaultOptions.filter(id => id !== optionKey)
-                                  : [...defaultOptions, optionKey];
+                                if (isDefault) {
+                                  newDefaults = defaultOptions.filter(id => id !== optionKey);
+                                } else {
+                                  if (attr.max_selections && defaultOptions.length >= attr.max_selections) {
+                                    return;
+                                  }
+                                  newDefaults = [...defaultOptions, optionKey];
+                                }
                               } else {
                                 newDefaults = isDefault ? [] : [optionKey];
                               }
@@ -229,7 +243,9 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                               px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1
                               ${isDefault
                                 ? 'bg-teal-50 text-teal-700 border border-teal-300 ring-1 ring-teal-100'
-                                : 'bg-gray-50 text-gray-600 border border-gray-200 hover:border-teal-200 hover:bg-teal-50/50'
+                                : isOptionDisabled
+                                  ? 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'
+                                  : 'bg-gray-50 text-gray-600 border border-gray-200 hover:border-teal-200 hover:bg-teal-50/50'
                               }
                             `}
                           >
