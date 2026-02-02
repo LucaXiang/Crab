@@ -1,6 +1,6 @@
 import React, { useState, lazy, Suspense, useMemo } from 'react';
 import { HeldOrder, CartItem } from '@/core/domain/types';
-import { Clock, List, Settings, ShoppingBag, Percent } from 'lucide-react';
+import { Clock, List, Settings, ShoppingBag, Percent, Gift, TrendingUp } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { OrderItemsSummary } from '@/screens/Checkout/OrderItemsSummary';
 import { CartItemDetailModal } from '@/presentation/components/modals/CartItemDetailModal';
@@ -206,39 +206,84 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
 
       {/* Footer */}
       <div className="p-5 bg-gray-50 border-t border-gray-200 space-y-2">
-        {/* 1. Original Price (Subtotal) */}
+        {/* 1. Original Price */}
         <div className="flex justify-between items-end">
           <span className="text-gray-500 font-medium text-sm">{t('pos.cart.original')}</span>
           <span className="text-sm font-medium text-gray-900">{formatCurrency(displayOriginalPrice)}</span>
         </div>
 
-        {/* 2. Total Discount (If any) */}
+        {/* 2. Comp reduction (赠送减免) */}
+        {order.comp_total_amount > 0 && (
+          <div className="flex justify-between items-center">
+            <span className="text-emerald-600 font-medium text-sm flex items-center gap-1">
+              <Gift size={12} />
+              {t('checkout.breakdown.comp')}
+            </span>
+            <span className="text-sm font-medium text-emerald-600">
+              -{formatCurrency(order.comp_total_amount)}
+            </span>
+          </div>
+        )}
+
+        {/* 3. Item-level discount (商品折扣, excluding comp and order-level) */}
         {displayTotalDiscount > 0 && (
           <div className="flex justify-between items-end">
             <span className="text-orange-500 font-medium text-sm">
               {t('checkout.cart.discount')}
             </span>
             <span className="text-sm font-medium text-orange-500">
-                -{formatCurrency(displayTotalDiscount)}
-              </span>
+              -{formatCurrency(displayTotalDiscount)}
+            </span>
           </div>
         )}
 
-        {/* 3. Total Surcharge (If any, from Price Rules) */}
+        {/* 4. Item-level surcharge (商品附加费) */}
         {displayTotalSurcharge > 0 && (
           <div className="flex justify-between items-end">
             <span className="text-purple-500 font-medium text-sm">
               {t('pos.cart.surcharge')}
             </span>
             <span className="text-sm font-medium text-purple-500">
-	              +{formatCurrency(displayTotalSurcharge)}
-	            </span>
+              +{formatCurrency(displayTotalSurcharge)}
+            </span>
           </div>
         )}
 
-        {/* 3.5 Order-level Applied Rules (if any) */}
+        {/* 5. Order manual discount (整单手动折扣) */}
+        {order.order_manual_discount_amount > 0 && (
+          <div className="flex justify-between items-center">
+            <span className="text-indigo-600 font-medium text-sm flex items-center gap-1">
+              <Percent size={12} />
+              {t('checkout.breakdown.order_discount')}
+              {order.order_manual_discount_percent != null && (
+                <span className="text-xs opacity-75">({order.order_manual_discount_percent}%)</span>
+              )}
+            </span>
+            <span className="text-sm font-medium text-indigo-600">
+              -{formatCurrency(order.order_manual_discount_amount)}
+            </span>
+          </div>
+        )}
+
+        {/* 6. Order manual surcharge (整单手动附加费) */}
+        {order.order_manual_surcharge_amount > 0 && (
+          <div className="flex justify-between items-center">
+            <span className="text-amber-600 font-medium text-sm flex items-center gap-1">
+              <TrendingUp size={12} />
+              {t('checkout.breakdown.order_surcharge')}
+              {order.order_manual_surcharge_percent != null && (
+                <span className="text-xs opacity-75">({order.order_manual_surcharge_percent}%)</span>
+              )}
+            </span>
+            <span className="text-sm font-medium text-amber-600">
+              +{formatCurrency(order.order_manual_surcharge_amount)}
+            </span>
+          </div>
+        )}
+
+        {/* 7. Order-level applied rules (逐条) */}
         {orderActiveRules.length > 0 && (
-          <div className="pt-1 space-y-1">
+          <div className="space-y-1">
             {orderActiveRules.map((rule) => (
               <div
                 key={rule.rule_id}
@@ -259,23 +304,23 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           </div>
         )}
 
-        {/* 4. Final Price (Total) */}
+        {/* 8. Final Price (Total) */}
         <div className="flex justify-between items-end pt-3 mt-1 border-t border-gray-200">
           <span className="text-gray-800 font-bold text-base">{t('checkout.amount.total')}</span>
           <span className="text-2xl font-bold text-gray-900">{formatCurrency(displayFinalTotal)}</span>
         </div>
 
-        {/* Paid & Remaining (If partial payment exists) */}
+        {/* Paid & Remaining */}
         {order.paid_amount > 0 && (
           <div className="pt-2 border-t border-gray-200 space-y-1">
-	            <div className="flex justify-between items-end">
-	              <span className="text-blue-600 font-medium text-xs">{t('checkout.amount.paid')}</span>
-	              <span className="text-sm text-blue-600 font-semibold">{formatCurrency(order.paid_amount)}</span>
-	            </div>
-	            <div className="flex justify-between items-end">
-	              <span className="text-red-600 font-medium text-xs">{t('checkout.amount.remaining')}</span>
-	              <span className="text-xl font-bold text-red-600">{formatCurrency(displayRemainingAmount)}</span>
-	            </div>
+            <div className="flex justify-between items-end">
+              <span className="text-blue-600 font-medium text-xs">{t('checkout.amount.paid')}</span>
+              <span className="text-sm text-blue-600 font-semibold">{formatCurrency(order.paid_amount)}</span>
+            </div>
+            <div className="flex justify-between items-end">
+              <span className="text-red-600 font-medium text-xs">{t('checkout.amount.remaining')}</span>
+              <span className="text-xl font-bold text-red-600">{formatCurrency(displayRemainingAmount)}</span>
+            </div>
           </div>
         )}
       </div>

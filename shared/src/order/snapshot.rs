@@ -88,9 +88,18 @@ pub struct OrderSnapshot {
     /// Tax amount
     #[serde(default)]
     pub tax: f64,
-    /// Total discount amount
+    /// Total discount amount (order-level only)
     #[serde(default)]
     pub discount: f64,
+    /// Comp total amount (赠送减免总额 = Σ(original_price × qty) for comped items)
+    #[serde(default)]
+    pub comp_total_amount: f64,
+    /// Order-level manual discount computed amount (整单手动折扣实际金额)
+    #[serde(default)]
+    pub order_manual_discount_amount: f64,
+    /// Order-level manual surcharge computed amount (整单手动附加费实际金额)
+    #[serde(default)]
+    pub order_manual_surcharge_amount: f64,
     /// Total amount to pay
     pub total: f64,
     /// Amount already paid
@@ -194,6 +203,9 @@ impl OrderSnapshot {
             total_surcharge: 0.0,
             tax: 0.0,
             discount: 0.0,
+            comp_total_amount: 0.0,
+            order_manual_discount_amount: 0.0,
+            order_manual_surcharge_amount: 0.0,
             total: 0.0,
             paid_amount: 0.0,
             remaining_amount: 0.0,

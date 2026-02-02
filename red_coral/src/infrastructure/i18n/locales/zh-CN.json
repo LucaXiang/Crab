@@ -537,6 +537,11 @@
       "current": "当前附加费: {value}",
       "current_percent": "当前附加费: {value}%",
       "auth_required": "整单附加费需要授权"
+    },
+    "breakdown": {
+      "comp": "赠送减免",
+      "order_discount": "整单折扣",
+      "order_surcharge": "整单附加费"
     }
   },
   "table": {

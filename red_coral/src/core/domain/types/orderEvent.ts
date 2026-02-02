@@ -792,8 +792,14 @@ export interface OrderSnapshot {
   /** Total surcharge amount (item-level + order-level) */
   total_surcharge: number;
   tax: number;
-  /** Total discount amount */
+  /** Total discount amount (order-level) */
   discount: number;
+  /** Comp total amount (赠送减免总额) */
+  comp_total_amount: number;
+  /** Order-level manual discount computed amount (整单手动折扣实际金额) */
+  order_manual_discount_amount: number;
+  /** Order-level manual surcharge computed amount (整单手动附加费实际金额) */
+  order_manual_surcharge_amount: number;
   /** Total amount to pay */
   total: number;
   /** Amount already paid */

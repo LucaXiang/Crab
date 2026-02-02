@@ -344,6 +344,7 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     let mut subtotal = Decimal::ZERO;
     let mut item_discount_total = Decimal::ZERO;
     let mut item_surcharge_total = Decimal::ZERO;
+    let mut comp_total = Decimal::ZERO;
     let mut total_tax = Decimal::ZERO;
 
     for item in &mut snapshot.items {
@@ -398,21 +399,32 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         item.tax = Some(to_f64(item_tax));
         total_tax += item_tax;
 
+        // Accumulate comp total (original value of comped items)
+        if item.is_comped {
+            comp_total += base_with_options * quantity;
+        }
+
         // Accumulate subtotal
         subtotal += item_total;
     }
 
-    // Order-level adjustments (rule amounts respect skipped flag)
-    let order_discount = effective_order_rule_discount(snapshot)
-        + snapshot.order_manual_discount_fixed.map(to_decimal).unwrap_or(Decimal::ZERO)
+    // Order-level manual discount (computed amount)
+    let order_manual_discount =
+        snapshot.order_manual_discount_fixed.map(to_decimal).unwrap_or(Decimal::ZERO)
         + snapshot.order_manual_discount_percent
             .map(|p| subtotal * to_decimal(p) / Decimal::ONE_HUNDRED)
             .unwrap_or(Decimal::ZERO);
-    let order_surcharge = effective_order_rule_surcharge(snapshot)
-        + snapshot.order_manual_surcharge_fixed.map(to_decimal).unwrap_or(Decimal::ZERO)
+
+    // Order-level manual surcharge (computed amount)
+    let order_manual_surcharge =
+        snapshot.order_manual_surcharge_fixed.map(to_decimal).unwrap_or(Decimal::ZERO)
         + snapshot.order_manual_surcharge_percent
             .map(|p| subtotal * to_decimal(p) / Decimal::ONE_HUNDRED)
             .unwrap_or(Decimal::ZERO);
+
+    // Order-level adjustments (rule amounts respect skipped flag)
+    let order_discount = effective_order_rule_discount(snapshot) + order_manual_discount;
+    let order_surcharge = effective_order_rule_surcharge(snapshot) + order_manual_surcharge;
 
     // Total discount and surcharge (item-level + order-level)
     let total_discount = item_discount_total + order_discount;
@@ -430,6 +442,9 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     snapshot.total_surcharge = to_f64(total_surcharge);
     snapshot.tax = to_f64(total_tax);
     snapshot.discount = to_f64(order_discount);
+    snapshot.comp_total_amount = to_f64(comp_total);
+    snapshot.order_manual_discount_amount = to_f64(order_manual_discount);
+    snapshot.order_manual_surcharge_amount = to_f64(order_manual_surcharge);
     snapshot.total = to_f64(total);
     snapshot.remaining_amount = to_f64(remaining);
 
