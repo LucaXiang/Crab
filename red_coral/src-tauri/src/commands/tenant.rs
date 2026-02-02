@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::RwLock;
 
 use crate::core::response::{ActivationResultData, ApiResponse, ErrorCode, TenantListData};
 use crate::core::{AppState, ClientBridge};
@@ -11,9 +10,8 @@ use crate::core::DeleteData;
 /// 获取已激活的租户列表
 #[tauri::command]
 pub async fn list_tenants(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<TenantListData>, String> {
-    let bridge = bridge.read().await;
     let tenant_manager = bridge.tenant_manager().read().await;
     Ok(ApiResponse::success(TenantListData {
         tenants: tenant_manager.list_tenants(),
@@ -25,12 +23,11 @@ pub async fn list_tenants(
 /// 同时预激活 edge-server，为 Server 模式做准备
 #[tauri::command]
 pub async fn activate_tenant(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     auth_url: String,
     username: String,
     password: String,
 ) -> Result<ApiResponse<ActivationResultData>, String> {
-    let bridge = bridge.read().await;
 
     match bridge
         .handle_activation(&auth_url, &username, &password)
@@ -50,10 +47,9 @@ pub async fn activate_tenant(
 /// 切换当前租户
 #[tauri::command]
 pub async fn switch_tenant(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     tenant_id: String,
 ) -> Result<ApiResponse<()>, String> {
-    let bridge = bridge.read().await;
 
     // 使用 ClientBridge 的 switch_tenant 方法
     // 它会自动更新 TenantManager 和 Config
@@ -69,10 +65,9 @@ pub async fn switch_tenant(
 /// 移除租户
 #[tauri::command]
 pub async fn remove_tenant(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     tenant_id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
-    let bridge = bridge.read().await;
     let mut tenant_manager = bridge.tenant_manager().write().await;
 
     match tenant_manager.remove_tenant(&tenant_id) {
@@ -87,9 +82,8 @@ pub async fn remove_tenant(
 /// 退出当前租户（停止服务器 + 移除租户数据）
 #[tauri::command]
 pub async fn exit_tenant(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<()>, String> {
-    let bridge = bridge.read().await;
     match bridge.exit_tenant().await {
         Ok(_) => Ok(ApiResponse::success(())),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -102,9 +96,8 @@ pub async fn exit_tenant(
 /// 获取当前租户ID
 #[tauri::command]
 pub async fn get_current_tenant(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<Option<String>>, String> {
-    let bridge = bridge.read().await;
     let tenant_manager = bridge.tenant_manager().read().await;
     Ok(ApiResponse::success(
         tenant_manager.current_tenant_id().map(|s| s.to_string()),
@@ -117,9 +110,8 @@ pub async fn get_current_tenant(
 /// 用于 SubscriptionBlockedScreen 的"重新检查"按钮。
 #[tauri::command]
 pub async fn check_subscription(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<AppState>, String> {
-    let bridge = bridge.read().await;
     match bridge.check_subscription().await {
         Ok(state) => Ok(ApiResponse::success(state)),
         Err(e) => Ok(ApiResponse::error_with_code(

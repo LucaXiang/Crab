@@ -4,7 +4,6 @@
 
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::RwLock;
 
 use crate::core::response::{ApiResponse, ErrorCode};
 use crate::core::ClientBridge;
@@ -19,9 +18,9 @@ pub struct SyncStatusResponse {
 /// 获取同步状态
 #[tauri::command]
 pub async fn get_sync_status(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<SyncStatusResponse>, String> {
-    let bridge = bridge.read().await;
+
     match bridge.get::<SyncStatusResponse>("/api/sync/status").await {
         Ok(data) => Ok(ApiResponse::success(data)),
         Err(e) => Ok(ApiResponse::error_with_code(

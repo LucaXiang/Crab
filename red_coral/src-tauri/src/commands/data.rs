@@ -5,7 +5,6 @@
 
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::RwLock;
 
 use crate::core::{
     ApiResponse, AttributeData, AttributeListData, CategoryData, CategoryListData, ClientBridge,
@@ -42,9 +41,8 @@ use urlencoding::encode;
 
 #[tauri::command]
 pub async fn list_tags(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<TagListData>, String> {
-    let bridge = bridge.read().await;
     match bridge.get::<Vec<Tag>>("/api/tags").await {
         Ok(tags) => Ok(ApiResponse::success(TagListData { tags })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
@@ -53,10 +51,9 @@ pub async fn list_tags(
 
 #[tauri::command]
 pub async fn get_tag(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<Tag>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<Tag>(&format!("/api/tags/{}", encode(&id)))
         .await
@@ -68,10 +65,9 @@ pub async fn get_tag(
 
 #[tauri::command]
 pub async fn create_tag(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     data: TagCreate,
 ) -> Result<ApiResponse<Tag>, String> {
-    let bridge = bridge.read().await;
     match bridge.post::<Tag, _>("/api/tags", &data).await {
         Ok(tag) => Ok(ApiResponse::success(tag)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
@@ -80,11 +76,10 @@ pub async fn create_tag(
 
 #[tauri::command]
 pub async fn update_tag(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
     data: TagUpdate,
 ) -> Result<ApiResponse<Tag>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .put::<Tag, _>(&format!("/api/tags/{}", encode(&id)), &data)
         .await
@@ -96,10 +91,9 @@ pub async fn update_tag(
 
 #[tauri::command]
 pub async fn delete_tag(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .delete::<bool>(&format!("/api/tags/{}", encode(&id)))
         .await
@@ -113,9 +107,8 @@ pub async fn delete_tag(
 
 #[tauri::command]
 pub async fn list_categories(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<CategoryListData>, String> {
-    let bridge = bridge.read().await;
     match bridge.get::<Vec<Category>>("/api/categories").await {
         Ok(categories) => Ok(ApiResponse::success(CategoryListData { categories })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
@@ -124,10 +117,9 @@ pub async fn list_categories(
 
 #[tauri::command]
 pub async fn get_category(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<CategoryData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<Category>(&format!("/api/categories/{}", encode(&id)))
         .await
@@ -139,10 +131,9 @@ pub async fn get_category(
 
 #[tauri::command]
 pub async fn create_category(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     data: CategoryCreate,
 ) -> Result<ApiResponse<CategoryData>, String> {
-    let bridge = bridge.read().await;
     match bridge.post::<Category, _>("/api/categories", &data).await {
         Ok(cat) => Ok(ApiResponse::success(CategoryData { category: cat })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
@@ -151,11 +142,10 @@ pub async fn create_category(
 
 #[tauri::command]
 pub async fn update_category(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
     data: CategoryUpdate,
 ) -> Result<ApiResponse<CategoryData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .put::<Category, _>(&format!("/api/categories/{}", encode(&id)), &data)
         .await
@@ -167,10 +157,9 @@ pub async fn update_category(
 
 #[tauri::command]
 pub async fn delete_category(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .delete::<bool>(&format!("/api/categories/{}", encode(&id)))
         .await
@@ -184,9 +173,8 @@ pub async fn delete_category(
 
 #[tauri::command]
 pub async fn list_products(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<ProductListData>, String> {
-    let bridge = bridge.read().await;
     match bridge.get::<Vec<ProductFull>>("/api/products").await {
         Ok(products) => Ok(ApiResponse::success(ProductListData { products })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
@@ -195,10 +183,9 @@ pub async fn list_products(
 
 #[tauri::command]
 pub async fn get_product(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<ProductData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<ProductFull>(&format!("/api/products/{}", encode(&id)))
         .await
@@ -211,10 +198,9 @@ pub async fn get_product(
 /// 获取商品完整信息 (含规格、属性、标签)
 #[tauri::command]
 pub async fn get_product_full(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<ProductData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<ProductFull>(&format!("/api/products/{}/full", encode(&id)))
         .await
@@ -226,10 +212,9 @@ pub async fn get_product_full(
 
 #[tauri::command]
 pub async fn create_product(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     data: ProductCreate,
 ) -> Result<ApiResponse<ProductData>, String> {
-    let bridge = bridge.read().await;
     match bridge.post::<ProductFull, _>("/api/products", &data).await {
         Ok(prod) => Ok(ApiResponse::success(ProductData { product: prod })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
@@ -238,11 +223,10 @@ pub async fn create_product(
 
 #[tauri::command]
 pub async fn update_product(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
     data: ProductUpdate,
 ) -> Result<ApiResponse<ProductData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .put::<ProductFull, _>(&format!("/api/products/{}", encode(&id)), &data)
         .await
@@ -254,10 +238,9 @@ pub async fn update_product(
 
 #[tauri::command]
 pub async fn delete_product(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .delete::<bool>(&format!("/api/products/{}", encode(&id)))
         .await
@@ -271,9 +254,8 @@ pub async fn delete_product(
 
 #[tauri::command]
 pub async fn list_attributes(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<AttributeListData>, String> {
-    let bridge = bridge.read().await;
     match bridge.get::<Vec<Attribute>>("/api/attributes").await {
         Ok(templates) => Ok(ApiResponse::success(AttributeListData { templates })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
@@ -282,10 +264,9 @@ pub async fn list_attributes(
 
 #[tauri::command]
 pub async fn get_attribute(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<AttributeData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<Attribute>(&format!("/api/attributes/{}", encode(&id)))
         .await
@@ -297,10 +278,9 @@ pub async fn get_attribute(
 
 #[tauri::command]
 pub async fn create_attribute(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     data: AttributeCreate,
 ) -> Result<ApiResponse<AttributeData>, String> {
-    let bridge = bridge.read().await;
     match bridge.post::<Attribute, _>("/api/attributes", &data).await {
         Ok(template) => Ok(ApiResponse::success(AttributeData { template })),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
@@ -309,11 +289,10 @@ pub async fn create_attribute(
 
 #[tauri::command]
 pub async fn update_attribute(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
     data: AttributeUpdate,
 ) -> Result<ApiResponse<AttributeData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .put::<Attribute, _>(&format!("/api/attributes/{}", encode(&id)), &data)
         .await
@@ -325,10 +304,9 @@ pub async fn update_attribute(
 
 #[tauri::command]
 pub async fn delete_attribute(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .delete::<bool>(&format!("/api/attributes/{}", encode(&id)))
         .await
@@ -342,11 +320,10 @@ pub async fn delete_attribute(
 
 #[tauri::command]
 pub async fn add_attribute_option(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     attribute_id: String,
     data: AttributeOption,
 ) -> Result<ApiResponse<AttributeData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .post::<Attribute, _>(
             &format!("/api/attributes/{}/options", encode(&attribute_id)),
@@ -361,12 +338,11 @@ pub async fn add_attribute_option(
 
 #[tauri::command]
 pub async fn update_attribute_option(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     attribute_id: String,
     index: usize,
     data: AttributeOption,
 ) -> Result<ApiResponse<AttributeData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .put::<Attribute, _>(
             &format!(
@@ -385,11 +361,10 @@ pub async fn update_attribute_option(
 
 #[tauri::command]
 pub async fn delete_attribute_option(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     attribute_id: String,
     index: usize,
 ) -> Result<ApiResponse<AttributeData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .delete::<Attribute>(&format!(
             "/api/attributes/{}/options/{}",
@@ -407,10 +382,9 @@ pub async fn delete_attribute_option(
 
 #[tauri::command]
 pub async fn list_product_attributes(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     product_id: String,
 ) -> Result<ApiResponse<serde_json::Value>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<serde_json::Value>(&format!("/api/products/{}/attributes", encode(&product_id)))
         .await
@@ -422,10 +396,9 @@ pub async fn list_product_attributes(
 
 #[tauri::command]
 pub async fn bind_product_attribute(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     data: serde_json::Value,
 ) -> Result<ApiResponse<serde_json::Value>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .post::<serde_json::Value, _>("/api/has-attribute", &data)
         .await
@@ -437,10 +410,9 @@ pub async fn bind_product_attribute(
 
 #[tauri::command]
 pub async fn unbind_product_attribute(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .delete::<bool>(&format!("/api/has-attribute/{}", id))
         .await
@@ -452,11 +424,10 @@ pub async fn unbind_product_attribute(
 
 #[tauri::command]
 pub async fn update_product_attribute_binding(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
     data: serde_json::Value,
 ) -> Result<ApiResponse<serde_json::Value>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .put::<serde_json::Value, _>(&format!("/api/has-attribute/{}", id), &data)
         .await
@@ -471,10 +442,9 @@ pub async fn update_product_attribute_binding(
 /// List attributes for a category
 #[tauri::command]
 pub async fn list_category_attributes(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     category_id: String,
 ) -> Result<ApiResponse<AttributeListData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<Vec<Attribute>>(&format!("/api/categories/{}/attributes", category_id))
         .await
@@ -497,10 +467,9 @@ pub struct BindCategoryAttributeData {
 /// Bind attribute to category
 #[tauri::command]
 pub async fn bind_category_attribute(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     data: BindCategoryAttributeData,
 ) -> Result<ApiResponse<AttributeBinding>, String> {
-    let bridge = bridge.read().await;
     // Build payload for API
     let payload = serde_json::json!({
         "is_required": data.is_required,
@@ -525,11 +494,10 @@ pub async fn bind_category_attribute(
 /// Unbind attribute from category
 #[tauri::command]
 pub async fn unbind_category_attribute(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     category_id: String,
     attribute_id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .delete::<bool>(&format!(
             "/api/categories/{}/attributes/{}",
@@ -558,10 +526,9 @@ pub struct BatchUpdateResponse {
 /// Batch update category sort order
 #[tauri::command]
 pub async fn batch_update_category_sort_order(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     updates: Vec<CategorySortOrderUpdate>,
 ) -> Result<ApiResponse<BatchUpdateResponse>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .put::<BatchUpdateResponse, _>("/api/categories/sort-order", &updates)
         .await
@@ -581,10 +548,9 @@ pub struct ProductSortOrderUpdate {
 /// Batch update product sort order
 #[tauri::command]
 pub async fn batch_update_product_sort_order(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     updates: Vec<ProductSortOrderUpdate>,
 ) -> Result<ApiResponse<BatchUpdateResponse>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .put::<BatchUpdateResponse, _>("/api/products/sort-order", &updates)
         .await
@@ -598,9 +564,8 @@ pub async fn batch_update_product_sort_order(
 
 #[tauri::command]
 pub async fn list_print_destinations(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<PrintDestinationListData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<Vec<PrintDestination>>("/api/print-destinations")
         .await
@@ -614,10 +579,9 @@ pub async fn list_print_destinations(
 
 #[tauri::command]
 pub async fn get_print_destination(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<PrintDestinationData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<PrintDestination>(&format!("/api/print-destinations/{}", encode(&id)))
         .await
@@ -631,10 +595,9 @@ pub async fn get_print_destination(
 
 #[tauri::command]
 pub async fn create_print_destination(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     data: PrintDestinationCreate,
 ) -> Result<ApiResponse<PrintDestinationData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .post::<PrintDestination, _>("/api/print-destinations", &data)
         .await
@@ -648,11 +611,10 @@ pub async fn create_print_destination(
 
 #[tauri::command]
 pub async fn update_print_destination(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
     data: PrintDestinationUpdate,
 ) -> Result<ApiResponse<PrintDestinationData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .put::<PrintDestination, _>(&format!("/api/print-destinations/{}", encode(&id)), &data)
         .await
@@ -666,10 +628,9 @@ pub async fn update_print_destination(
 
 #[tauri::command]
 pub async fn delete_print_destination(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<DeleteData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .delete::<bool>(&format!("/api/print-destinations/{}", encode(&id)))
         .await

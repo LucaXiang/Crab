@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::RwLock;
 
 use crate::core::response::ErrorCode;
 use crate::core::session_cache::EmployeeSession;
@@ -15,12 +14,10 @@ use crate::core::{ApiResponse, AuthData, ClientBridge};
 /// - Client 模式: 使用 mTLS HTTP 登录到远程 Edge Server
 #[tauri::command]
 pub async fn login_employee(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     username: String,
     password: String,
 ) -> Result<ApiResponse<AuthData>, String> {
-    let bridge = bridge.read().await;
-
     match bridge.login_employee(&username, &password).await {
         Ok(session) => Ok(ApiResponse::success(AuthData {
             mode: session.login_mode,
@@ -36,9 +33,8 @@ pub async fn login_employee(
 /// 登出 (使用 ClientBridge)
 #[tauri::command]
 pub async fn logout_employee(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<()>, String> {
-    let bridge = bridge.read().await;
     match bridge.logout_employee().await {
         Ok(_) => Ok(ApiResponse::success(())),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -53,8 +49,7 @@ pub async fn logout_employee(
 /// 返回从磁盘恢复的会话，如果没有缓存会话则返回 null
 #[tauri::command]
 pub async fn get_current_session(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<Option<EmployeeSession>>, String> {
-    let bridge = bridge.read().await;
     Ok(ApiResponse::success(bridge.get_current_session().await))
 }

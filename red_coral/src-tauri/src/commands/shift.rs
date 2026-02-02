@@ -4,7 +4,6 @@
 
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::RwLock;
 use urlencoding::encode;
 
 use crate::core::{ApiResponse, ClientBridge};
@@ -16,13 +15,12 @@ use shared::models::{
 
 #[tauri::command]
 pub async fn list_shifts(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     limit: Option<i32>,
     offset: Option<i32>,
     start_date: Option<String>,
     end_date: Option<String>,
 ) -> Result<ApiResponse<Vec<Shift>>, String> {
-    let bridge = bridge.read().await;
 
     let mut query_params = vec![];
     if let Some(l) = limit {
@@ -52,10 +50,9 @@ pub async fn list_shifts(
 
 #[tauri::command]
 pub async fn get_shift(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<Shift>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<Shift>(&format!("/api/shifts/{}", encode(&id)))
         .await
@@ -67,10 +64,9 @@ pub async fn get_shift(
 
 #[tauri::command]
 pub async fn get_current_shift(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     operator_id: Option<String>,
 ) -> Result<ApiResponse<Option<Shift>>, String> {
-    let bridge = bridge.read().await;
 
     let path = match operator_id {
         Some(id) => format!("/api/shifts/current?operator_id={}", encode(&id)),
@@ -85,10 +81,9 @@ pub async fn get_current_shift(
 
 #[tauri::command]
 pub async fn open_shift(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     data: ShiftCreate,
 ) -> Result<ApiResponse<Shift>, String> {
-    let bridge = bridge.read().await;
     match bridge.post::<Shift, _>("/api/shifts", &data).await {
         Ok(shift) => Ok(ApiResponse::success(shift)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
@@ -97,11 +92,10 @@ pub async fn open_shift(
 
 #[tauri::command]
 pub async fn update_shift(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
     data: ShiftUpdate,
 ) -> Result<ApiResponse<Shift>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .put::<Shift, _>(&format!("/api/shifts/{}", encode(&id)), &data)
         .await
@@ -113,11 +107,10 @@ pub async fn update_shift(
 
 #[tauri::command]
 pub async fn close_shift(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
     data: ShiftClose,
 ) -> Result<ApiResponse<Shift>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .post::<Shift, _>(&format!("/api/shifts/{}/close", encode(&id)), &data)
         .await
@@ -129,11 +122,10 @@ pub async fn close_shift(
 
 #[tauri::command]
 pub async fn force_close_shift(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
     data: ShiftForceClose,
 ) -> Result<ApiResponse<Shift>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .post::<Shift, _>(&format!("/api/shifts/{}/force-close", encode(&id)), &data)
         .await
@@ -145,10 +137,9 @@ pub async fn force_close_shift(
 
 #[tauri::command]
 pub async fn heartbeat_shift(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<bool>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .post::<bool, _>(&format!("/api/shifts/{}/heartbeat", encode(&id)), &())
         .await
@@ -160,9 +151,8 @@ pub async fn heartbeat_shift(
 
 #[tauri::command]
 pub async fn recover_stale_shifts(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<Vec<Shift>>, String> {
-    let bridge = bridge.read().await;
     match bridge.post::<Vec<Shift>, _>("/api/shifts/recover", &()).await {
         Ok(shifts) => Ok(ApiResponse::success(shifts)),
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
@@ -172,9 +162,8 @@ pub async fn recover_stale_shifts(
 /// @TEST 上线前删除
 #[tauri::command]
 pub async fn debug_simulate_shift_auto_close(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<Vec<Shift>>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .post::<Vec<Shift>, _>("/api/shifts/debug/simulate-auto-close", &())
         .await
@@ -188,13 +177,12 @@ pub async fn debug_simulate_shift_auto_close(
 
 #[tauri::command]
 pub async fn list_daily_reports(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     limit: Option<i32>,
     offset: Option<i32>,
     start_date: Option<String>,
     end_date: Option<String>,
 ) -> Result<ApiResponse<Vec<DailyReport>>, String> {
-    let bridge = bridge.read().await;
 
     let mut query_params = vec![];
     if let Some(l) = limit {
@@ -224,10 +212,9 @@ pub async fn list_daily_reports(
 
 #[tauri::command]
 pub async fn get_daily_report(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<DailyReport>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<DailyReport>(&format!("/api/daily-reports/{}", encode(&id)))
         .await
@@ -239,10 +226,9 @@ pub async fn get_daily_report(
 
 #[tauri::command]
 pub async fn get_daily_report_by_date(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     date: String,
 ) -> Result<ApiResponse<DailyReport>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<DailyReport>(&format!("/api/daily-reports/date/{}", encode(&date)))
         .await
@@ -254,10 +240,9 @@ pub async fn get_daily_report_by_date(
 
 #[tauri::command]
 pub async fn generate_daily_report(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     data: DailyReportGenerate,
 ) -> Result<ApiResponse<DailyReport>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .post::<DailyReport, _>("/api/daily-reports/generate", &data)
         .await

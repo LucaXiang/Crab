@@ -4,7 +4,6 @@
 
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::core::response::ApiResponse;
@@ -84,12 +83,12 @@ pub struct SalesReportResponse {
 /// 获取统计数据
 #[tauri::command]
 pub async fn get_statistics(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     time_range: String,
     start_date: Option<String>,
     end_date: Option<String>,
 ) -> Result<ApiResponse<StatisticsResponse>, String> {
-    let bridge = bridge.read().await;
+
 
     // Build query string
     let mut path = format!("/api/statistics?timeRange={}", urlencoding::encode(&time_range));
@@ -109,13 +108,13 @@ pub async fn get_statistics(
 /// 获取销售报告（分页）
 #[tauri::command]
 pub async fn get_sales_report(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     time_range: String,
     page: Option<i32>,
     start_date: Option<String>,
     end_date: Option<String>,
 ) -> Result<ApiResponse<SalesReportResponse>, String> {
-    let bridge = bridge.read().await;
+
 
     // Build query string
     let page = page.unwrap_or(1);

@@ -4,7 +4,6 @@
 
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::RwLock;
 use urlencoding::encode;
 
 use crate::core::{ApiResponse, ClientBridge};
@@ -57,10 +56,10 @@ pub struct FetchOrderListSummaryResponse {
 
 #[tauri::command]
 pub async fn fetch_order_list(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     params: FetchOrderListParams,
 ) -> Result<ApiResponse<FetchOrderListSummaryResponse>, String> {
-    let bridge = bridge.read().await;
+
 
     // Calculate time range in UTC millis (default: last 7 days)
     let now_millis = chrono::Utc::now().timestamp_millis();
@@ -102,10 +101,10 @@ pub async fn fetch_order_list(
 /// Uses serde_json::Value to transparently pass through all fields from edge-server
 #[tauri::command]
 pub async fn fetch_order_detail(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     order_id: String,
 ) -> Result<ApiResponse<serde_json::Value>, String> {
-    let bridge = bridge.read().await;
+
     match bridge
         .get::<serde_json::Value>(&format!("/api/orders/{}", encode(&order_id)))
         .await

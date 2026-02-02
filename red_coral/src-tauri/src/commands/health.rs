@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::RwLock;
 
 use crate::core::bridge::ClientBridge;
 use crate::core::response::ApiResponse;
@@ -13,9 +12,8 @@ use shared::app_state::{
 /// 获取系统健康状态
 #[tauri::command]
 pub async fn get_health_status(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<HealthStatus>, String> {
-    let bridge = bridge.read().await;
     let tenant_manager = bridge.tenant_manager().read().await;
 
     // 获取设备信息

@@ -4,7 +4,6 @@
 
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::RwLock;
 use urlencoding::encode;
 
 use crate::core::response::{ApiResponse, ErrorCode, TableListData, ZoneListData};
@@ -17,9 +16,8 @@ use shared::models::{
 
 #[tauri::command]
 pub async fn list_zones(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<ZoneListData>, String> {
-    let bridge = bridge.read().await;
     match bridge.get::<Vec<Zone>>("/api/zones").await {
         Ok(zones) => Ok(ApiResponse::success(ZoneListData { zones })),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -31,10 +29,9 @@ pub async fn list_zones(
 
 #[tauri::command]
 pub async fn get_zone(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<Zone>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<Zone>(&format!("/api/zones/{}", encode(&id)))
         .await
@@ -49,10 +46,9 @@ pub async fn get_zone(
 
 #[tauri::command]
 pub async fn create_zone(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     data: ZoneCreate,
 ) -> Result<ApiResponse<Zone>, String> {
-    let bridge = bridge.read().await;
     match bridge.post::<Zone, _>("/api/zones", &data).await {
         Ok(zone) => Ok(ApiResponse::success(zone)),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -64,11 +60,10 @@ pub async fn create_zone(
 
 #[tauri::command]
 pub async fn update_zone(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
     data: ZoneUpdate,
 ) -> Result<ApiResponse<Zone>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .put::<Zone, _>(&format!("/api/zones/{}", encode(&id)), &data)
         .await
@@ -83,10 +78,9 @@ pub async fn update_zone(
 
 #[tauri::command]
 pub async fn delete_zone(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<crate::core::DeleteData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .delete::<bool>(&format!("/api/zones/{}", encode(&id)))
         .await
@@ -105,9 +99,8 @@ pub async fn delete_zone(
 
 #[tauri::command]
 pub async fn list_tables(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<TableListData>, String> {
-    let bridge = bridge.read().await;
     match bridge.get::<Vec<DiningTable>>("/api/tables").await {
         Ok(tables) => Ok(ApiResponse::success(TableListData { tables })),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -119,10 +112,9 @@ pub async fn list_tables(
 
 #[tauri::command]
 pub async fn list_tables_by_zone(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     zone_id: String,
 ) -> Result<ApiResponse<TableListData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<Vec<DiningTable>>(&format!("/api/tables/zone/{}", encode(&zone_id)))
         .await
@@ -137,10 +129,9 @@ pub async fn list_tables_by_zone(
 
 #[tauri::command]
 pub async fn get_table(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<DiningTable>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .get::<DiningTable>(&format!("/api/tables/{}", encode(&id)))
         .await
@@ -155,10 +146,9 @@ pub async fn get_table(
 
 #[tauri::command]
 pub async fn create_table(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     data: DiningTableCreate,
 ) -> Result<ApiResponse<DiningTable>, String> {
-    let bridge = bridge.read().await;
     match bridge.post::<DiningTable, _>("/api/tables", &data).await {
         Ok(table) => Ok(ApiResponse::success(table)),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -170,11 +160,10 @@ pub async fn create_table(
 
 #[tauri::command]
 pub async fn update_table(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
     data: DiningTableUpdate,
 ) -> Result<ApiResponse<DiningTable>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .put::<DiningTable, _>(&format!("/api/tables/{}", encode(&id)), &data)
         .await
@@ -189,10 +178,9 @@ pub async fn update_table(
 
 #[tauri::command]
 pub async fn delete_table(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     id: String,
 ) -> Result<ApiResponse<crate::core::DeleteData>, String> {
-    let bridge = bridge.read().await;
     match bridge
         .delete::<bool>(&format!("/api/tables/{}", encode(&id)))
         .await

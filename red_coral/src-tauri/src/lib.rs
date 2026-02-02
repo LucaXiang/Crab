@@ -7,7 +7,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
-use tokio::sync::RwLock;
 use tracing_appender::rolling;
 use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -107,18 +106,12 @@ pub async fn run() {
             let bridge = ClientBridge::with_app_handle(&work_dir, &client_name, Some(app.handle().clone()))
                 .map_err(|e| format!("Failed to initialize ClientBridge: {}", e))?;
 
-            let bridge = Arc::new(RwLock::new(bridge));
+            let bridge = Arc::new(bridge);
 
             // Auto-restore session in background
             let bridge_for_task = bridge.clone();
             tauri::async_runtime::spawn(async move {
-                // 设置自身引用（用于 reconnect listener 触发重建）
-                {
-                    let mut b = bridge_for_task.write().await;
-                    b.set_self_ref(Arc::downgrade(&bridge_for_task));
-                }
-                let bridge = bridge_for_task.read().await;
-                if let Err(e) = bridge.restore_last_session().await {
+                if let Err(e) = bridge_for_task.restore_last_session().await {
                     tracing::error!("Failed to restore session: {}", e);
                 }
             });

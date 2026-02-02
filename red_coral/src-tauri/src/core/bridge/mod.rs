@@ -39,8 +39,6 @@ pub struct ClientBridge {
     config_path: PathBuf,
     /// Tauri AppHandle for emitting events (optional for testing)
     app_handle: Option<tauri::AppHandle>,
-    /// 自身引用 (用于 reconnect listener 中触发重建)
-    self_ref: Option<std::sync::Weak<RwLock<Self>>>,
 }
 
 impl ClientBridge {
@@ -71,18 +69,12 @@ impl ClientBridge {
             config: RwLock::new(config),
             config_path,
             app_handle,
-            self_ref: None,
         })
     }
 
     /// Set the app handle after initialization
     pub fn set_app_handle(&mut self, handle: tauri::AppHandle) {
         self.app_handle = Some(handle);
-    }
-
-    /// 设置自身引用 (在 Arc<RwLock<ClientBridge>> 创建后调用)
-    pub fn set_self_ref(&mut self, weak: std::sync::Weak<RwLock<Self>>) {
-        self.self_ref = Some(weak);
     }
 
     /// 保存当前配置
@@ -169,7 +161,7 @@ impl ClientBridge {
     // ============ 模式管理 ============
 
     /// 恢复上次的会话状态 (启动时调用)
-    pub async fn restore_last_session(&self) -> Result<(), BridgeError> {
+    pub async fn restore_last_session(self: &Arc<Self>) -> Result<(), BridgeError> {
         let config = self.config.read().await;
         let mode = config.current_mode;
         let client_config = config.client_config.clone();
@@ -977,7 +969,7 @@ impl ClientBridge {
 
     /// 以 Client 模式连接
     pub async fn start_client_mode(
-        &self,
+        self: &Arc<Self>,
         edge_url: &str,
         message_addr: &str,
     ) -> Result<(), BridgeError> {
@@ -1121,10 +1113,7 @@ impl ClientBridge {
                 let token = client_shutdown_token.clone();
 
                 // 获取 bridge 自身引用（用于 ReconnectFailed 时触发重建）
-                let bridge_for_rebuild = self
-                    .self_ref
-                    .as_ref()
-                    .and_then(|w| w.upgrade());
+                let bridge_for_rebuild = Arc::clone(self);
 
                 tokio::spawn(async move {
                     loop {
@@ -1157,15 +1146,11 @@ impl ClientBridge {
                                                 }
 
                                                 // 在独立 task 中执行重建
-                                                if let Some(ref bridge_arc) = bridge_for_rebuild {
-                                                    let bridge_arc = Arc::clone(bridge_arc);
-                                                    let rebuild_handle = handle_reconnect.clone();
-                                                    tauri::async_runtime::spawn(async move {
-                                                        do_rebuild_connection(bridge_arc, rebuild_handle).await;
-                                                    });
-                                                } else {
-                                                    tracing::warn!("No bridge self_ref available, cannot trigger rebuild");
-                                                }
+                                                let bridge_arc = Arc::clone(&bridge_for_rebuild);
+                                                let rebuild_handle = handle_reconnect.clone();
+                                                tauri::async_runtime::spawn(async move {
+                                                    do_rebuild_connection(bridge_arc, rebuild_handle).await;
+                                                });
 
                                                 // 退出此监听器（start_client_mode 会创建新的监听器）
                                                 break;
@@ -1328,11 +1313,11 @@ impl ClientBridge {
     /// 从当前 `ClientMode::Client` 读取连接参数，销毁旧 client 并重新连接。
     ///
     /// 仅在 Client 模式下有效，复用 `start_client_mode` 的逻辑。
-    /// 返回 boxed future 而非 `async fn`，显式标注 `Send`，
+    /// 返回 boxed future 显式标注 `Send`，
     /// 打破 start_client_mode → spawn(do_rebuild_connection) → rebuild_client_connection → start_client_mode
     /// 的递归 opaque type 循环。
     pub fn rebuild_client_connection(
-        &self,
+        self: &Arc<Self>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), BridgeError>> + Send + '_>>
     {
         Box::pin(async move {
@@ -2273,10 +2258,7 @@ impl ClientBridge {
 /// - 最多 3 次重建，每次间隔指数退避 (5s → 10s → 20s)
 /// - 每次重建内部 CrabClient 会再尝试 20 次网络重连
 /// - 全部失败后切换到 `ClientMode::Disconnected`，通知前端
-async fn do_rebuild_connection(
-    bridge_arc: Arc<RwLock<ClientBridge>>,
-    app_handle: tauri::AppHandle,
-) {
+async fn do_rebuild_connection(bridge: Arc<ClientBridge>, app_handle: tauri::AppHandle) {
     const MAX_REBUILDS: u32 = 3;
     let base_delay = std::time::Duration::from_secs(5);
     let mut delay = base_delay;
@@ -2291,10 +2273,7 @@ async fn do_rebuild_connection(
 
         tokio::time::sleep(delay).await;
 
-        let result = {
-            let bridge = bridge_arc.read().await;
-            bridge.rebuild_client_connection().await
-        };
+        let result = bridge.rebuild_client_connection().await;
 
         match result {
             Ok(()) => {
@@ -2315,7 +2294,6 @@ async fn do_rebuild_connection(
         "All bridge rebuild attempts exhausted, switching to Disconnected"
     );
     {
-        let bridge = bridge_arc.read().await;
         let mut guard = bridge.mode.write().await;
         if let ClientMode::Client { shutdown_token, .. } = &*guard {
             shutdown_token.cancel();

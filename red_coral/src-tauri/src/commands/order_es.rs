@@ -8,7 +8,6 @@ use shared::order::{
 };
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::RwLock;
 
 use crate::core::response::ErrorCode;
 use crate::core::{ApiResponse, ClientBridge, OrderEventListData, OrderSnapshotListData};
@@ -22,10 +21,10 @@ use crate::core::{ApiResponse, ClientBridge, OrderEventListData, OrderSnapshotLi
 /// and broadcasts them via MessageBus.
 #[tauri::command]
 pub async fn order_execute_command(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     command: OrderCommand,
 ) -> Result<ApiResponse<CommandResponse>, String> {
-    let bridge = bridge.read().await;
+
     match bridge.execute_order_command(command).await {
         Ok(response) => Ok(ApiResponse::success(response)),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -40,12 +39,12 @@ pub async fn order_execute_command(
 /// Convenience wrapper that constructs the OrderCommand from parts.
 #[tauri::command]
 pub async fn order_execute(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     operator_id: String,
     operator_name: String,
     payload: OrderCommandPayload,
 ) -> Result<ApiResponse<CommandResponse>, String> {
-    let bridge = bridge.read().await;
+
     let command = OrderCommand::new(operator_id, operator_name, payload);
     match bridge.execute_order_command(command).await {
         Ok(response) => Ok(ApiResponse::success(response)),
@@ -63,9 +62,9 @@ pub async fn order_execute(
 /// Returns the current state of all active (non-completed, non-voided) orders.
 #[tauri::command]
 pub async fn order_get_active_orders(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
 ) -> Result<ApiResponse<OrderSnapshotListData>, String> {
-    let bridge = bridge.read().await;
+
     match bridge.get_active_orders().await {
         Ok(snapshots) => Ok(ApiResponse::success(OrderSnapshotListData { snapshots })),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -78,10 +77,10 @@ pub async fn order_get_active_orders(
 /// Get a single order snapshot by ID
 #[tauri::command]
 pub async fn order_get_snapshot(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     order_id: String,
 ) -> Result<ApiResponse<Option<OrderSnapshot>>, String> {
-    let bridge = bridge.read().await;
+
     match bridge.get_order_snapshot(&order_id).await {
         Ok(snapshot) => Ok(ApiResponse::success(snapshot)),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -98,10 +97,10 @@ pub async fn order_get_snapshot(
 /// Used for reconnection to get missed events and current state.
 #[tauri::command]
 pub async fn order_sync_since(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     since_sequence: u64,
 ) -> Result<ApiResponse<SyncResponse>, String> {
-    let bridge = bridge.read().await;
+
     match bridge.sync_orders_since(since_sequence).await {
         Ok(response) => Ok(ApiResponse::success(response)),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -116,10 +115,10 @@ pub async fn order_sync_since(
 /// More efficient than full sync when only recent events are needed.
 #[tauri::command]
 pub async fn order_get_events_since(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     since_sequence: u64,
 ) -> Result<ApiResponse<OrderEventListData>, String> {
-    let bridge = bridge.read().await;
+
     match bridge.get_active_events_since(since_sequence).await {
         Ok(events) => Ok(ApiResponse::success(OrderEventListData { events })),
         Err(e) => Ok(ApiResponse::error_with_code(
@@ -134,10 +133,10 @@ pub async fn order_get_events_since(
 /// Used to reconstruct full order history including timeline for history details view.
 #[tauri::command]
 pub async fn order_get_events_for_order(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     order_id: String,
 ) -> Result<ApiResponse<OrderEventListData>, String> {
-    let bridge = bridge.read().await;
+
     match bridge.get_events_for_order(&order_id).await {
         Ok(events) => Ok(ApiResponse::success(OrderEventListData { events })),
         Err(e) => Ok(ApiResponse::error_with_code(

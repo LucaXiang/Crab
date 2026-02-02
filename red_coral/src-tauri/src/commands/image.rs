@@ -7,7 +7,6 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::RwLock;
 
 use crate::core::bridge::{ClientBridge, ModeType};
 use crate::core::image_cache::{
@@ -76,10 +75,9 @@ enum ImageContext {
 /// 如果是 Client 模式且图片未缓存，会自动下载。
 #[tauri::command]
 pub async fn get_image_path(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     hash: String,
 ) -> Result<String, String> {
-    let bridge = bridge.read().await;
     let ctx = get_image_context(&bridge).await?;
 
     match ctx {
@@ -117,10 +115,9 @@ pub async fn get_image_path(
 /// - `failed`: 解析失败的 hash 列表
 #[tauri::command]
 pub async fn resolve_image_paths(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     hashes: Vec<String>,
 ) -> Result<ResolveResult, String> {
-    let bridge = bridge.read().await;
     let ctx = get_image_context(&bridge).await?;
 
     match ctx {
@@ -150,10 +147,9 @@ pub async fn resolve_image_paths(
 /// Server 模式下直接返回成功（无需预加载）。
 #[tauri::command]
 pub async fn prefetch_images(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     hashes: Vec<String>,
 ) -> Result<PrefetchResult, String> {
-    let bridge = bridge.read().await;
     let ctx = get_image_context(&bridge).await?;
 
     match ctx {
@@ -185,10 +181,9 @@ pub async fn prefetch_images(
 /// Server 模式下直接返回成功（EdgeServer 自行管理）。
 #[tauri::command]
 pub async fn cleanup_image_cache(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     active_hashes: Vec<String>,
 ) -> Result<CacheCleanupResult, String> {
-    let bridge = bridge.read().await;
     let ctx = get_image_context(&bridge).await?;
 
     match ctx {
@@ -219,10 +214,9 @@ pub async fn cleanup_image_cache(
 /// 返回图片的 content hash (SHA256)，用于后续引用。
 #[tauri::command]
 pub async fn save_image(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
+    bridge: State<'_, Arc<ClientBridge>>,
     source_path: String,
 ) -> Result<String, String> {
-    let bridge = bridge.read().await;
     let mode_info = bridge.get_mode_info().await;
     let tenant_manager = bridge.tenant_manager().read().await;
 
