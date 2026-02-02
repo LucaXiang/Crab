@@ -2,15 +2,8 @@
 
 use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
-use chrono::NaiveDate;
 use surrealdb::engine::local::Db;
 use surrealdb::{RecordId, Surreal};
-
-/// Validate date format (YYYY-MM-DD)
-fn validate_date(date: &str) -> RepoResult<NaiveDate> {
-    NaiveDate::parse_from_str(date, "%Y-%m-%d")
-        .map_err(|_| RepoError::Validation(format!("Invalid date format: {}", date)))
-}
 
 /// Validate cash amount is non-negative
 fn validate_cash_amount(amount: f64, field_name: &str) -> RepoResult<()> {
@@ -139,19 +132,12 @@ impl ShiftRepository {
         Ok(shifts)
     }
 
-    /// Find shifts by date range
+    /// Find shifts by date range (Unix millis)
     pub async fn find_by_date_range(
         &self,
-        start_date: &str,
-        end_date: &str,
+        start_millis: i64,
+        end_millis: i64,
     ) -> RepoResult<Vec<Shift>> {
-        // Validate date formats
-        let start_parsed = validate_date(start_date)?;
-        let end_parsed = validate_date(end_date)?;
-
-        let start_millis = start_parsed.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis();
-        let end_millis = end_parsed.and_hms_opt(23, 59, 59).unwrap().and_utc().timestamp_millis();
-
         let mut result = self
             .base
             .db()

@@ -9,6 +9,7 @@
 pub mod error;
 pub mod logger;
 pub mod result;
+pub mod time;
 pub mod types;
 
 // Re-export error types from the error module (which re-exports from shared)

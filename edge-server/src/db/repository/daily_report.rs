@@ -2,54 +2,32 @@
 
 use super::{BaseRepository, RepoError, RepoResult};
 use crate::db::models::{DailyReport, DailyReportGenerate};
-use chrono::NaiveDate;
 use surrealdb::engine::local::Db;
 use surrealdb::{RecordId, Surreal};
-
-/// Validate date format (YYYY-MM-DD)
-fn validate_date(date: &str) -> RepoResult<NaiveDate> {
-    NaiveDate::parse_from_str(date, "%Y-%m-%d")
-        .map_err(|_| RepoError::Validation(format!("Invalid date format: {}", date)))
-}
-
-/// Validate date is not in the future
-fn validate_not_future_date(date: &str, tz: chrono_tz::Tz) -> RepoResult<()> {
-    let parsed_date = validate_date(date)?;
-    let today = chrono::Utc::now().with_timezone(&tz).date_naive();
-
-    if parsed_date > today {
-        return Err(RepoError::Validation(format!(
-            "Cannot generate report for future date: {}",
-            date
-        )));
-    }
-    Ok(())
-}
 
 #[derive(Clone)]
 pub struct DailyReportRepository {
     base: BaseRepository,
-    tz: chrono_tz::Tz,
 }
 
 impl DailyReportRepository {
-    pub fn new(db: Surreal<Db>, tz: chrono_tz::Tz) -> Self {
+    pub fn new(db: Surreal<Db>) -> Self {
         Self {
             base: BaseRepository::new(db),
-            tz,
         }
     }
 
     /// Generate daily report for a specific date
+    ///
+    /// `start_millis`/`end_millis`: 营业日时间范围 (Unix millis)，由 handler 层根据时区计算。
     pub async fn generate(
         &self,
         data: DailyReportGenerate,
+        start_millis: i64,
+        end_millis: i64,
         operator_id: Option<String>,
         operator_name: Option<String>,
     ) -> RepoResult<DailyReport> {
-        // Validate date format and ensure not future
-        validate_not_future_date(&data.business_date, self.tz)?;
-
         // Check if report already exists
         if self.find_by_date(&data.business_date).await?.is_some() {
             return Err(RepoError::Duplicate(format!(
@@ -57,11 +35,6 @@ impl DailyReportRepository {
                 data.business_date
             )));
         }
-
-        let parsed_date = validate_date(&data.business_date)?;
-        let start_millis = parsed_date.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis();
-        let next_day = parsed_date.succ_opt().unwrap_or(parsed_date);
-        let end_millis = next_day.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis();
 
         // Complex aggregation query for daily report
         let mut result = self
@@ -168,7 +141,7 @@ impl DailyReportRepository {
             .ok_or_else(|| RepoError::Database("Failed to generate daily report".to_string()))
     }
 
-    /// Find report by date
+    /// Find report by date (business_date is stored as string "YYYY-MM-DD")
     pub async fn find_by_date(&self, date: &str) -> RepoResult<Option<DailyReport>> {
         let mut result = self
             .base
@@ -206,16 +179,12 @@ impl DailyReportRepository {
         Ok(reports)
     }
 
-    /// Find reports by date range
+    /// Find reports by date range (business_date is stored as string "YYYY-MM-DD")
     pub async fn find_by_date_range(
         &self,
         start_date: &str,
         end_date: &str,
     ) -> RepoResult<Vec<DailyReport>> {
-        // Validate date formats
-        validate_date(start_date)?;
-        validate_date(end_date)?;
-
         let mut result = self
             .base
             .db()

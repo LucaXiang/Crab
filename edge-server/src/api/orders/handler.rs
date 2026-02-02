@@ -12,6 +12,7 @@ use crate::core::ServerState;
 use crate::db::models::OrderSummary;
 use crate::db::repository::OrderRepository;
 use crate::utils::AppResult;
+use crate::utils::time;
 
 // =========================================================================
 // Order Detail (Archived)
@@ -215,16 +216,17 @@ pub async fn fetch_order_list(
     Query(params): Query<OrderHistoryQuery>,
 ) -> AppResult<Json<OrderListResponse>> {
     // Resolve start/end millis: prefer direct millis, fallback to date string
+    let tz = state.config.timezone;
     let start_millis = params.start_time.unwrap_or_else(|| {
         params.start_date.as_deref()
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
-            .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis())
+            .map(|d| time::day_start_millis(d, tz))
             .unwrap_or(0)
     });
     let end_millis = params.end_time.unwrap_or_else(|| {
         params.end_date.as_deref()
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
-            .map(|d| d.and_hms_opt(23, 59, 59).unwrap().and_utc().timestamp_millis())
+            .map(|d| time::day_end_millis(d, tz))
             .unwrap_or(0)
     });
     let limit = params.limit.unwrap_or(100);

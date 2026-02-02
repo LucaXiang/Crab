@@ -11,6 +11,7 @@ use crate::core::ServerState;
 use crate::db::models::{DailyReport, DailyReportGenerate};
 use crate::db::repository::DailyReportRepository;
 use crate::utils::{AppError, AppResult};
+use crate::utils::time;
 
 const RESOURCE: &str = "daily_report";
 
@@ -34,7 +35,7 @@ pub async fn list(
     State(state): State<ServerState>,
     Query(query): Query<ListQuery>,
 ) -> AppResult<Json<Vec<DailyReport>>> {
-    let repo = DailyReportRepository::new(state.db.clone(), state.config.timezone);
+    let repo = DailyReportRepository::new(state.db.clone());
 
     let reports = if let (Some(start), Some(end)) = (query.start_date, query.end_date) {
         repo.find_by_date_range(&start, &end).await
@@ -51,7 +52,7 @@ pub async fn get_by_id(
     State(state): State<ServerState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<DailyReport>> {
-    let repo = DailyReportRepository::new(state.db.clone(), state.config.timezone);
+    let repo = DailyReportRepository::new(state.db.clone());
     let report = repo
         .find_by_id(&id)
         .await
@@ -65,7 +66,7 @@ pub async fn get_by_date(
     State(state): State<ServerState>,
     Path(date): Path<String>,
 ) -> AppResult<Json<DailyReport>> {
-    let repo = DailyReportRepository::new(state.db.clone(), state.config.timezone);
+    let repo = DailyReportRepository::new(state.db.clone());
     let report = repo
         .find_by_date(&date)
         .await
@@ -86,12 +87,20 @@ pub async fn generate(
         "Generating daily report"
     );
 
+    // 日期验证 + 时区转换 (handler 层职责)
+    let tz = state.config.timezone;
+    let date = time::parse_date(&payload.business_date)?;
+    time::validate_not_future(date, tz)?;
+    let start_millis = time::day_start_millis(date, tz);
+    let next_day = date.succ_opt().unwrap_or(date);
+    let end_millis = time::day_start_millis(next_day, tz);
+
     let operator_id = Some(current_user.id);
     let operator_name = Some(current_user.display_name);
 
-    let repo = DailyReportRepository::new(state.db.clone(), state.config.timezone);
+    let repo = DailyReportRepository::new(state.db.clone());
     let report = repo
-        .generate(payload, operator_id, operator_name)
+        .generate(payload, start_millis, end_millis, operator_id, operator_name)
         .await
         ?;
 
@@ -112,7 +121,7 @@ pub async fn delete(
     State(state): State<ServerState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
-    let repo = DailyReportRepository::new(state.db.clone(), state.config.timezone);
+    let repo = DailyReportRepository::new(state.db.clone());
     let result = repo
         .delete(&id)
         .await

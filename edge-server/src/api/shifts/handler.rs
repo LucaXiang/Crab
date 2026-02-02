@@ -4,7 +4,6 @@ use axum::{
     Json,
     extract::{Extension, Path, Query, State},
 };
-use chrono::NaiveTime;
 use serde::Deserialize;
 
 use crate::audit::AuditAction;
@@ -14,6 +13,7 @@ use crate::core::ServerState;
 use crate::db::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
 use crate::db::repository::{ShiftRepository, StoreInfoRepository};
 use crate::utils::{AppError, AppResult};
+use crate::utils::time;
 
 const RESOURCE: &str = "shift";
 
@@ -39,8 +39,11 @@ pub async fn list(
 ) -> AppResult<Json<Vec<Shift>>> {
     let repo = ShiftRepository::new(state.db.clone());
 
+    let tz = state.config.timezone;
     let shifts = if let (Some(start), Some(end)) = (query.start_date, query.end_date) {
-        repo.find_by_date_range(&start, &end).await
+        let start_date = time::parse_date(&start)?;
+        let end_date = time::parse_date(&end)?;
+        repo.find_by_date_range(time::day_start_millis(start_date, tz), time::day_end_millis(end_date, tz)).await
     } else {
         repo.find_all(query.limit, query.offset).await
     }
@@ -226,8 +229,9 @@ pub async fn recover_stale(
     State(state): State<ServerState>,
 ) -> AppResult<Json<Vec<Shift>>> {
     // 读取营业日分界时间
+    let tz = state.config.timezone;
     let store_repo = StoreInfoRepository::new(state.db.clone());
-    let cutoff = store_repo
+    let cutoff_str = store_repo
         .get()
         .await
         .ok()
@@ -235,19 +239,9 @@ pub async fn recover_stale(
         .map(|s| s.business_day_cutoff)
         .unwrap_or_else(|| "00:00".to_string());
 
-    let cutoff_time = NaiveTime::parse_from_str(&cutoff, "%H:%M")
-        .unwrap_or(NaiveTime::MIN);
-
-    // 计算当前营业日起始时间
-    // 如果当前时间 < cutoff，说明还在"昨天"的营业日
-    let tz = state.config.timezone;
-    let now = chrono::Utc::now().with_timezone(&tz);
-    let today_business_date = if now.time() < cutoff_time {
-        (now - chrono::Duration::days(1)).date_naive()
-    } else {
-        now.date_naive()
-    };
-    let business_day_start = today_business_date.and_time(cutoff_time).and_utc().timestamp_millis();
+    let cutoff = time::parse_cutoff(&cutoff_str);
+    let today = time::current_business_date(cutoff, tz);
+    let business_day_start = time::date_cutoff_millis(today, cutoff, tz);
 
     let repo = ShiftRepository::new(state.db.clone());
     let recovered = repo

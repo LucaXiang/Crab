@@ -9,6 +9,7 @@ use crate::core::ServerState;
 use crate::db::repository::StoreInfoRepository;
 use crate::orders::archive::{DailyChainVerification, OrderVerification};
 use crate::utils::{AppError, AppResult};
+use crate::utils::time;
 
 /// GET /api/archive/verify/order/:receipt_number
 /// 验证单个订单的事件哈希链完整性
@@ -52,14 +53,13 @@ pub async fn verify_daily_chain(
         .unwrap_or_else(|| "00:00".to_string());
 
     // 营业日结束 = 下一天的 cutoff
-    let parsed_date = chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d")
-        .map_err(|e| AppError::validation(format!("Invalid date format: {}", e)))?;
+    let parsed_date = time::parse_date(&date)?;
     let end_date = parsed_date + chrono::Duration::days(1);
 
-    let cutoff_time = chrono::NaiveTime::parse_from_str(&format!("{}:00", cutoff), "%H:%M:%S")
-        .unwrap_or(chrono::NaiveTime::MIN);
-    let start = parsed_date.and_time(cutoff_time).and_utc().timestamp_millis();
-    let end = end_date.and_time(cutoff_time).and_utc().timestamp_millis();
+    let cutoff_time = time::parse_cutoff(&cutoff);
+    let tz = state.config.timezone;
+    let start = time::date_cutoff_millis(parsed_date, cutoff_time, tz);
+    let end = time::date_cutoff_millis(end_date, cutoff_time, tz);
 
     let verification = archive_service
         .verify_daily_chain(&date, start, end)

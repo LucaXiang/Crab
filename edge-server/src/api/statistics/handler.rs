@@ -4,12 +4,13 @@ use axum::{
     Json,
     extract::{Query, State},
 };
-use chrono::{NaiveTime, Duration, Datelike};
+use chrono::{Duration, Datelike};
 use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
 use crate::db::repository::StoreInfoRepository;
 use crate::utils::AppResult;
+use crate::utils::time;
 
 // ============================================================================
 // Response Types
@@ -128,37 +129,16 @@ fn calculate_time_range(
     custom_end: Option<&str>,
     tz: chrono_tz::Tz,
 ) -> (i64, i64) {
-    let now = chrono::Utc::now().with_timezone(&tz);
+    let cutoff_time = time::parse_cutoff(cutoff);
+    let today = time::current_business_date(cutoff_time, tz);
 
-    // Parse cutoff time (e.g., "06:00")
-    let cutoff_time = NaiveTime::parse_from_str(cutoff, "%H:%M")
-        .unwrap_or(NaiveTime::MIN);
+    let cutoff_millis = |date| time::date_cutoff_millis(date, cutoff_time, tz);
 
-    // Determine business day start for "today"
-    // If current time < cutoff, we're still in "yesterday's" business day
-    let today_business_start = if now.time() < cutoff_time {
-        // Still in previous business day
-        (now - Duration::days(1)).date_naive()
-    } else {
-        now.date_naive()
-    };
-
-    /// Helper: convert date + cutoff time string to millis
-    fn date_cutoff_to_millis(date: chrono::NaiveDate, cutoff: &str) -> i64 {
-        let time = NaiveTime::parse_from_str(&format!("{}:00", cutoff), "%H:%M:%S")
-            .unwrap_or(NaiveTime::MIN);
-        let dt = date.and_time(time);
-        dt.and_utc().timestamp_millis()
-    }
-
-    /// Helper: parse datetime string to millis
-    fn datetime_str_to_millis(s: &str, cutoff: &str) -> i64 {
+    let parse_datetime = |s: &str| -> i64 {
         if s.contains('T') {
-            // datetime-local format: YYYY-MM-DDTHH:mm or YYYY-MM-DDTHH:mm:ssZ
             let normalized = if s.ends_with('Z') || s.contains('+') {
                 s.to_string()
             } else if s.len() == 16 {
-                // YYYY-MM-DDTHH:mm
                 format!("{}:00Z", s)
             } else {
                 format!("{}Z", s)
@@ -168,51 +148,34 @@ fn calculate_time_range(
                 .map(|dt| dt.timestamp_millis())
                 .unwrap_or(0)
         } else {
-            // Date only: YYYY-MM-DD
             chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                .map(|d| date_cutoff_to_millis(d, cutoff))
+                .map(|d| cutoff_millis(d))
                 .unwrap_or(0)
         }
-    }
+    };
 
     match time_range {
         "today" => {
-            let start = date_cutoff_to_millis(today_business_start, cutoff);
-            let end = date_cutoff_to_millis(today_business_start + Duration::days(1), cutoff);
-            (start, end)
+            (cutoff_millis(today), cutoff_millis(today + Duration::days(1)))
         }
         "week" => {
-            // Get Monday of current week (based on business day)
-            let weekday = today_business_start.weekday().num_days_from_monday();
-            let week_start = today_business_start - Duration::days(weekday as i64);
-            let start = date_cutoff_to_millis(week_start, cutoff);
-            let end = date_cutoff_to_millis(today_business_start + Duration::days(1), cutoff);
-            (start, end)
+            let weekday = today.weekday().num_days_from_monday();
+            let week_start = today - Duration::days(weekday as i64);
+            (cutoff_millis(week_start), cutoff_millis(today + Duration::days(1)))
         }
         "month" => {
-            // First day of current month
-            let month_start = today_business_start.with_day(1).unwrap_or(today_business_start);
-            let start = date_cutoff_to_millis(month_start, cutoff);
-            let end = date_cutoff_to_millis(today_business_start + Duration::days(1), cutoff);
-            (start, end)
+            let month_start = today.with_day(1).unwrap_or(today);
+            (cutoff_millis(month_start), cutoff_millis(today + Duration::days(1)))
         }
         "custom" => {
             if let (Some(s), Some(e)) = (custom_start, custom_end) {
-                let start = datetime_str_to_millis(s, cutoff);
-                let end = datetime_str_to_millis(e, cutoff);
-                (start, end)
+                (parse_datetime(s), parse_datetime(e))
             } else {
-                // Fallback to today
-                let start = date_cutoff_to_millis(today_business_start, cutoff);
-                let end = date_cutoff_to_millis(today_business_start + Duration::days(1), cutoff);
-                (start, end)
+                (cutoff_millis(today), cutoff_millis(today + Duration::days(1)))
             }
         }
         _ => {
-            // Default to today
-            let start = date_cutoff_to_millis(today_business_start, cutoff);
-            let end = date_cutoff_to_millis(today_business_start + Duration::days(1), cutoff);
-            (start, end)
+            (cutoff_millis(today), cutoff_millis(today + Duration::days(1)))
         }
     }
 }

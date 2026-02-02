@@ -50,8 +50,9 @@ export const ShiftGuard: React.FC<ShiftGuardProps> = ({ children }) => {
       const shift = await fetchCurrentShift(user.id);
       setIsChecking(false);
 
-      // 如果没有班次，显示开班弹窗
-      if (!shift) {
+      // 如果没有班次且没有异常关闭通知待展示，直接显示开班弹窗
+      // 如果有异常关闭通知，由 forceClosedMessage 的 useEffect 处理流程
+      if (!shift && !useShiftStore.getState().forceClosedMessage) {
         setShowOpenModal(true);
       }
     };
@@ -152,9 +153,9 @@ export const ShiftGuard: React.FC<ShiftGuardProps> = ({ children }) => {
         </div>
       )}
 
-      {/* 开班弹窗 - 登录后自动显示 */}
+      {/* 开班弹窗 - 登录后自动显示 (与异常关闭对话框互斥) */}
       <ShiftActionModal
-        open={showOpenModal}
+        open={showOpenModal && !showForceClosedDialog}
         action="open"
         shift={null}
         onClose={handleCloseModal}

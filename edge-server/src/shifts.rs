@@ -9,6 +9,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::core::ServerState;
 use crate::db::repository::{ShiftRepository, StoreInfoRepository};
+use crate::utils::time;
 
 const RESOURCE: &str = "shift";
 
@@ -100,28 +101,13 @@ impl ShiftAutoCloseScheduler {
             .map(|s| s.business_day_cutoff)
             .unwrap_or_else(|| "00:00".to_string());
 
-        match NaiveTime::parse_from_str(&cutoff_str, "%H:%M") {
-            Ok(t) => t,
-            Err(e) => {
-                tracing::warn!(
-                    "Failed to parse business_day_cutoff '{}': {}, falling back to 00:00",
-                    cutoff_str,
-                    e
-                );
-                NaiveTime::MIN
-            }
-        }
+        time::parse_cutoff(&cutoff_str)
     }
 
     /// 计算当前营业日起始时间（Unix millis）
     fn business_day_start(cutoff_time: NaiveTime, tz: Tz) -> i64 {
-        let now = chrono::Utc::now().with_timezone(&tz);
-        let today_business_date = if now.time() < cutoff_time {
-            (now - chrono::Duration::days(1)).date_naive()
-        } else {
-            now.date_naive()
-        };
-        today_business_date.and_time(cutoff_time).and_utc().timestamp_millis()
+        let today = time::current_business_date(cutoff_time, tz);
+        time::date_cutoff_millis(today, cutoff_time, tz)
     }
 
     /// 计算距离下一次 cutoff 的 Duration

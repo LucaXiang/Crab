@@ -13,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::db::repository::StoreInfoRepository;
 use crate::orders::archive::OrderArchiveService;
+use crate::utils::time;
 
 // ============================================================================
 // Verification Record (持久化到 SurrealDB)
@@ -95,16 +96,16 @@ impl VerifyScheduler {
 
     /// 启动时补扫未验证的营业日
     async fn catch_up(&self) -> Result<(), String> {
-        let (cutoff_str, cutoff_time) = self.get_cutoff().await;
+        let cutoff_time = self.get_cutoff().await;
         let yesterday = Self::yesterday_business_date(cutoff_time, self.tz);
-        self.catch_up_daily(&cutoff_str, yesterday).await?;
+        self.catch_up_daily(cutoff_time, yesterday).await?;
         Ok(())
     }
 
     /// 补扫缺失的每日验证
     async fn catch_up_daily(
         &self,
-        cutoff: &str,
+        cutoff_time: NaiveTime,
         yesterday: NaiveDate,
     ) -> Result<(), String> {
         let last_date = self.last_daily_date().await?;
@@ -151,8 +152,8 @@ impl VerifyScheduler {
 
             let date_str = date.format("%Y-%m-%d").to_string();
             let next = date + chrono::Duration::days(1);
-            let start = Self::date_cutoff_to_millis(date, cutoff);
-            let end = Self::date_cutoff_to_millis(next, cutoff);
+            let start = time::date_cutoff_millis(date, cutoff_time, self.tz);
+            let end = time::date_cutoff_millis(next, cutoff_time, self.tz);
 
             match self.archive_service.verify_daily_chain(&date_str, start, end).await {
                 Ok(result) => {
@@ -191,7 +192,7 @@ impl VerifyScheduler {
     /// 周期循环：每天在 business_day_cutoff 时间触发
     async fn periodic_loop(&self) {
         loop {
-            let (cutoff_str, cutoff_time) = self.get_cutoff().await;
+            let cutoff_time = self.get_cutoff().await;
 
             // 计算下一次触发时间
             let sleep_duration = Self::duration_until_next_cutoff(cutoff_time, self.tz);
@@ -213,8 +214,8 @@ impl VerifyScheduler {
             let yesterday = Self::yesterday_business_date(cutoff_time, self.tz);
             let date_str = yesterday.format("%Y-%m-%d").to_string();
             let next = yesterday + chrono::Duration::days(1);
-            let start = Self::date_cutoff_to_millis(yesterday, &cutoff_str);
-            let end = Self::date_cutoff_to_millis(next, &cutoff_str);
+            let start = time::date_cutoff_millis(yesterday, cutoff_time, self.tz);
+            let end = time::date_cutoff_millis(next, cutoff_time, self.tz);
 
             tracing::info!("🔍 Running daily verification for {}", date_str);
             match self.archive_service.verify_daily_chain(&date_str, start, end).await {
@@ -359,8 +360,8 @@ impl VerifyScheduler {
     // Time Helpers
     // ========================================================================
 
-    /// 获取 business_day_cutoff（字符串 + NaiveTime）
-    async fn get_cutoff(&self) -> (String, NaiveTime) {
+    /// 获取 business_day_cutoff (NaiveTime)
+    async fn get_cutoff(&self) -> NaiveTime {
         let store_repo = StoreInfoRepository::new(self.db.clone());
         let cutoff_str = store_repo
             .get()
@@ -369,19 +370,7 @@ impl VerifyScheduler {
             .flatten()
             .map(|s| s.business_day_cutoff)
             .unwrap_or_else(|| "00:00".to_string());
-        // Fix #6: 解析失败增加 warn 日志
-        let cutoff_time = match NaiveTime::parse_from_str(&cutoff_str, "%H:%M") {
-            Ok(t) => t,
-            Err(e) => {
-                tracing::warn!(
-                    "Failed to parse business_day_cutoff '{}': {}, falling back to 00:00",
-                    cutoff_str,
-                    e
-                );
-                NaiveTime::MIN
-            }
-        };
-        (cutoff_str, cutoff_time)
+        time::parse_cutoff(&cutoff_str)
     }
 
     /// 计算"昨天"的营业日
@@ -389,21 +378,7 @@ impl VerifyScheduler {
     /// 当前时间 >= cutoff → 当前营业日 = 今天 → 昨天 = today - 1
     /// 当前时间 < cutoff → 当前营业日 = 昨天 → 昨天 = today - 2
     fn yesterday_business_date(cutoff_time: NaiveTime, tz: Tz) -> NaiveDate {
-        let now = chrono::Utc::now().with_timezone(&tz);
-        let today_business = if now.time() < cutoff_time {
-            now.date_naive() - chrono::Duration::days(1)
-        } else {
-            now.date_naive()
-        };
-        today_business - chrono::Duration::days(1)
-    }
-
-    /// 将日期 + cutoff 时间字符串转为 Unix millis (UTC)
-    fn date_cutoff_to_millis(date: NaiveDate, cutoff: &str) -> i64 {
-        let time = NaiveTime::parse_from_str(&format!("{}:00", cutoff), "%H:%M:%S")
-            .unwrap_or(NaiveTime::MIN);
-        let dt = date.and_time(time);
-        dt.and_utc().timestamp_millis()
+        time::current_business_date(cutoff_time, tz) - chrono::Duration::days(1)
     }
 
     /// 计算距离下一次 cutoff 的 Duration
