@@ -85,8 +85,13 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
 
   // Use server-provided financial totals (authoritative)
   const displayOriginalPrice = order.original_total;
-  const displayTotalDiscount = order.total_discount;
-  const displayTotalSurcharge = order.total_surcharge;
+  // Item-level only: subtract order-level components (shown separately below)
+  const displayItemDiscount = order.total_discount
+    - (order.order_rule_discount_amount ?? 0)
+    - order.order_manual_discount_amount;
+  const displayItemSurcharge = order.total_surcharge
+    - (order.order_rule_surcharge_amount ?? 0)
+    - order.order_manual_surcharge_amount;
   const displayFinalTotal = order.total;
   const displayRemainingAmount = order.remaining_amount;
 
@@ -226,25 +231,25 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         )}
 
         {/* 3. Item-level discount (商品折扣, excluding comp and order-level) */}
-        {displayTotalDiscount > 0 && (
+        {displayItemDiscount > 0 && (
           <div className="flex justify-between items-end">
             <span className="text-orange-500 font-medium text-sm">
               {t('checkout.cart.discount')}
             </span>
             <span className="text-sm font-medium text-orange-500">
-              -{formatCurrency(displayTotalDiscount)}
+              -{formatCurrency(displayItemDiscount)}
             </span>
           </div>
         )}
 
         {/* 4. Item-level surcharge (商品附加费) */}
-        {displayTotalSurcharge > 0 && (
+        {displayItemSurcharge > 0 && (
           <div className="flex justify-between items-end">
             <span className="text-purple-500 font-medium text-sm">
               {t('pos.cart.surcharge')}
             </span>
             <span className="text-sm font-medium text-purple-500">
-              +{formatCurrency(displayTotalSurcharge)}
+              +{formatCurrency(displayItemSurcharge)}
             </span>
           </div>
         )}
