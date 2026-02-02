@@ -5,6 +5,8 @@
  * Matches backend Rust types exactly.
  */
 
+import type { AppliedRule } from './orderEvent';
+
 // ============================================================================
 // List View Types
 // ============================================================================
@@ -68,7 +70,9 @@ export interface ArchivedOrderItem {
   surcharge_amount: number;
   rule_discount_amount: number;
   rule_surcharge_amount: number;
+  applied_rules: AppliedRule[] | null;
   note: string | null;
+  is_comped: boolean;
   selected_options: ArchivedItemOption[];
 }
 

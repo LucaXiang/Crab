@@ -442,13 +442,15 @@ impl OrderArchiveService {
                     surcharge_amount = $item{}_surcharge_amount,
                     rule_discount_amount = $item{}_rule_discount_amount,
                     rule_surcharge_amount = $item{}_rule_surcharge_amount,
+                    applied_rules = $item{}_applied_rules,
                     tax = $item{}_tax,
                     tax_rate = $item{}_tax_rate,
-                    note = $item{}_note;
+                    note = $item{}_note,
+                    is_comped = $item{}_is_comped;
                 RELATE ($order[0].id)->has_item->({}[0].id);
                 "#,
                 var_name,
-                i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i,
+                i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i,
                 var_name
             ));
 
@@ -596,9 +598,11 @@ impl OrderArchiveService {
                 .bind((format!("item{}_surcharge_amount", i), total_surcharge))
                 .bind((format!("item{}_rule_discount_amount", i), rule_discount_per_unit * item.quantity as f64))
                 .bind((format!("item{}_rule_surcharge_amount", i), surcharge_per_unit * item.quantity as f64))
+                .bind((format!("item{}_applied_rules", i), item.applied_rules.as_ref().and_then(|rules| serde_json::to_string(rules).ok())))
                 .bind((format!("item{}_tax", i), item.tax.unwrap_or(0.0)))
                 .bind((format!("item{}_tax_rate", i), item.tax_rate.unwrap_or(0)))
-                .bind((format!("item{}_note", i), item.note.clone()));
+                .bind((format!("item{}_note", i), item.note.clone()))
+                .bind((format!("item{}_is_comped", i), item.is_comped));
 
             // Bind option fields
             if let Some(options) = &item.selected_options {

@@ -70,7 +70,9 @@ impl OrderRepository {
                             surcharge_amount,
                             rule_discount_amount,
                             rule_surcharge_amount,
+                            applied_rules,
                             note,
+                            is_comped,
                             (
                                 SELECT
                                     attribute_name,

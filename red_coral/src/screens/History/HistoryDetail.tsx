@@ -3,7 +3,7 @@ import type { ArchivedOrderDetail, ArchivedOrderItem, ArchivedPayment, ArchivedE
 import type { OrderEvent, OrderEventType, EventPayload } from '@/core/domain/types/orderEvent';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency, Currency } from '@/utils/currency';
-import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban } from 'lucide-react';
+import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift } from 'lucide-react';
 import { Permission } from '@/core/domain/types';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { TimelineList } from '@/shared/components/TimelineList';
@@ -319,8 +319,14 @@ interface OrderItemRowProps {
 
 const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isExpanded, onToggle, t }) => {
   const hasOptions = item.selected_options && item.selected_options.length > 0;
-  const hasDiscount = item.discount_amount > 0;
-  const hasSurcharge = item.surcharge_amount > 0;
+  const activeRules = (item.applied_rules ?? []).filter(r => !r.skipped);
+  const totalRuleDiscount = activeRules
+    .filter(r => r.rule_type === 'DISCOUNT')
+    .reduce((sum, r) => sum + r.calculated_amount, 0);
+  const totalRuleSurcharge = activeRules
+    .filter(r => r.rule_type === 'SURCHARGE')
+    .reduce((sum, r) => sum + r.calculated_amount, 0);
+  const manualDiscount = Currency.sub(item.discount_amount, item.rule_discount_amount).toNumber();
   const isFullyPaid = item.unpaid_quantity === 0;
 
   return (
@@ -344,14 +350,25 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
               {item.spec_name && (
                 <span className="text-xs text-gray-500">({item.spec_name})</span>
               )}
-              {hasDiscount && (
-                <span className="text-[0.625rem] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
-                  -{formatCurrency(item.discount_amount)}
+              {item.is_comped && (
+                <span className="text-[0.625rem] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                  <Gift size={10} />
+                  {t('checkout.comp.badge')}
                 </span>
               )}
-              {hasSurcharge && (
+              {manualDiscount > 0 && (
+                <span className="text-[0.625rem] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
+                  -{formatCurrency(manualDiscount)}
+                </span>
+              )}
+              {totalRuleDiscount > 0 && (
+                <span className="text-[0.625rem] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                  -{formatCurrency(totalRuleDiscount)}
+                </span>
+              )}
+              {totalRuleSurcharge > 0 && (
                 <span className="text-[0.625rem] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
-                  +{formatCurrency(item.surcharge_amount)}
+                  +{formatCurrency(totalRuleSurcharge)}
                 </span>
               )}
             </div>

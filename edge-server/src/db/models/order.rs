@@ -143,7 +143,11 @@ pub struct OrderItemDetail {
     pub surcharge_amount: f64,
     pub rule_discount_amount: f64,
     pub rule_surcharge_amount: f64,
+    #[serde(default, deserialize_with = "deserialize_applied_rules")]
+    pub applied_rules: Option<Vec<shared::order::AppliedRule>>,
     pub note: Option<String>,
+    #[serde(default)]
+    pub is_comped: bool,
     #[serde(default)]
     pub selected_options: Vec<OrderItemOptionDetail>,
 }
@@ -180,6 +184,20 @@ where
             serde_json::from_str(&s).map_err(serde::de::Error::custom)
         }
         _ => Ok(Vec::new()),
+    }
+}
+
+/// Deserialize JSON string to Option<Vec<AppliedRule>>
+fn deserialize_applied_rules<'de, D>(deserializer: D) -> Result<Option<Vec<shared::order::AppliedRule>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    match opt {
+        Some(s) if !s.is_empty() => {
+            serde_json::from_str(&s).map(Some).map_err(serde::de::Error::custom)
+        }
+        _ => Ok(None),
     }
 }
 
