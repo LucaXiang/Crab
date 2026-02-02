@@ -1,12 +1,15 @@
 //! AttributeBinding API Handlers - 产品属性绑定
 
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Path, State},
 };
 use serde::{Deserialize, Serialize};
 use surrealdb::RecordId;
 
+use crate::audit::AuditAction;
+use crate::audit_log;
+use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{Attribute, AttributeBinding};
 use crate::db::repository::AttributeRepository;
@@ -42,6 +45,7 @@ pub struct BindingWithAttribute {
 /// POST /api/has-attribute - 创建产品属性绑定
 pub async fn create(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<CreateBindingRequest>,
 ) -> AppResult<Json<AttributeBinding>> {
     let repo = AttributeRepository::new(state.db.clone());
@@ -105,6 +109,20 @@ pub async fn create(
         )
         .await?;
 
+    let binding_id = binding.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+    audit_log!(
+        state.audit_service,
+        AuditAction::ProductUpdated,
+        "attribute_binding", &binding_id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({
+            "op": "bind_attribute",
+            "product_id": &payload.product_id,
+            "attribute_id": &payload.attribute_id,
+        })
+    );
+
     // Refresh product cache (attribute bindings changed)
     if let Err(e) = state.catalog_service.refresh_product_cache(&payload.product_id).await {
         tracing::warn!("Failed to refresh product cache for {}: {}", payload.product_id, e);
@@ -143,6 +161,7 @@ pub async fn get_by_id(
 /// PUT /api/has-attribute/{id} - 更新绑定
 pub async fn update(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(payload): Json<UpdateBindingRequest>,
 ) -> AppResult<Json<AttributeBinding>> {
@@ -162,16 +181,27 @@ pub async fn update(
         .take(0)
         .map_err(crate::db::repository::surreal_err_to_app)?;
 
-    bindings
+    let binding = bindings
         .into_iter()
         .next()
-        .map(Json)
-        .ok_or_else(|| AppError::not_found(format!("Binding {} not found", id)))
+        .ok_or_else(|| AppError::not_found(format!("Binding {} not found", id)))?;
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::ProductUpdated,
+        "attribute_binding", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"op": "update_binding"})
+    );
+
+    Ok(Json(binding))
 }
 
 /// DELETE /api/has-attribute/{id} - 删除绑定
 pub async fn delete(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
 ) -> AppResult<Json<bool>> {
     let thing: RecordId = id
@@ -202,6 +232,18 @@ pub async fn delete(
         .bind(("thing", thing))
         .await
         .map_err(crate::db::repository::surreal_err_to_app)?;
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::ProductUpdated,
+        "attribute_binding", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({
+            "op": "unbind_attribute",
+            "product_id": &product_id,
+        })
+    );
 
     // Refresh product cache if the binding was for a product
     if let Some(pid) = product_id

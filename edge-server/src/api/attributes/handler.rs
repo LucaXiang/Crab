@@ -143,14 +143,24 @@ pub async fn delete(
 /// POST /api/attributes/:id/options - 添加选项
 pub async fn add_option(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path(id): Path<String>,
     Json(option): Json<AttributeOption>,
 ) -> AppResult<Json<Attribute>> {
     let repo = AttributeRepository::new(state.db.clone());
     let attr = repo
-        .add_option(&id, option)
+        .add_option(&id, option.clone())
         .await
         ?;
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::AttributeUpdated,
+        "attribute", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"op": "add_option", "option_name": &option.name})
+    );
 
     // 广播同步通知
     state
@@ -168,14 +178,25 @@ pub async fn add_option(
 /// PUT /api/attributes/:id/options/:idx - 更新选项
 pub async fn update_option(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path((id, idx)): Path<(String, usize)>,
     Json(option): Json<AttributeOption>,
 ) -> AppResult<Json<Attribute>> {
     let repo = AttributeRepository::new(state.db.clone());
+    let option_name = option.name.clone();
     let attr = repo
         .update_option(&id, idx, option)
         .await
         ?;
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::AttributeUpdated,
+        "attribute", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"op": "update_option", "index": idx, "option_name": option_name})
+    );
 
     // 广播同步通知
     state
@@ -193,6 +214,7 @@ pub async fn update_option(
 /// DELETE /api/attributes/:id/options/:idx - 删除选项
 pub async fn remove_option(
     State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
     Path((id, idx)): Path<(String, usize)>,
 ) -> AppResult<Json<Attribute>> {
     let repo = AttributeRepository::new(state.db.clone());
@@ -200,6 +222,15 @@ pub async fn remove_option(
         .remove_option(&id, idx)
         .await
         ?;
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::AttributeUpdated,
+        "attribute", &id,
+        operator_id = Some(current_user.id.clone()),
+        operator_name = Some(current_user.display_name.clone()),
+        details = serde_json::json!({"op": "remove_option", "index": idx})
+    );
 
     // 广播同步通知
     state
