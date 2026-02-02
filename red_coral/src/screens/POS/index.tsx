@@ -35,8 +35,8 @@ import {
   useProductsLoading,
   useCategories,
   useProductStore,
-  useCategoryStore,
 } from '@/core/stores/resources';
+import { usePreloadCoreData } from '@/core/hooks/usePreloadCoreData';
 import {
   useCart,
   useCartActions,
@@ -164,14 +164,8 @@ export const POSScreen: React.FC = () => {
       .map(mapProductWithSpec);
   }, [products, categories, selectedCategory]);
 
-  // Only load data on first mount (new architecture auto-handles sync)
-  useEffect(() => {
-    const initializeData = async () => {
-      await useCategoryStore.getState().fetchAll();
-      await useProductStore.getState().fetchAll();
-    };
-    initializeData();
-  }, []); // Empty dependency array - only run on mount
+  // Preload core resources on first mount (zones, tables, categories, products)
+  usePreloadCoreData();
 
   // Cart Store
   const cart = useCart();

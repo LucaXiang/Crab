@@ -8,8 +8,7 @@ import { ZoneSidebar } from './ZoneSidebar';
 import { TableFilters } from './TableFilters';
 import { GuestInputPanel } from './GuestInputPanel';
 import { TableManagementModal } from './components';
-import { useZones } from '@/core/stores/resources';
-import { useTables } from '@/core/stores/resources';
+import { useZones, useTables } from '@/core/stores/resources';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 
