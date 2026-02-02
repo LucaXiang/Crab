@@ -40,6 +40,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [compQty, setCompQty] = useState(1);
   const [reason, setReason] = useState('');
+  const [reasonKey, setReasonKey] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Product data for images
@@ -121,13 +122,16 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
     setSelectedInstanceId(instanceId);
     setCompQty(1);
     setReason('');
+    setReasonKey(null);
   };
 
   const handlePresetReason = (key: string) => {
-    setReason(t(`checkout.comp.preset.${key}`));
+    setReasonKey(key);
+    setReason('');
   };
 
-  const canConfirm = reason.trim().length > 0 && compQty > 0 && selectedItem && !isProcessing;
+  const effectiveReason = reasonKey || reason.trim();
+  const canConfirm = effectiveReason.length > 0 && compQty > 0 && selectedItem && !isProcessing;
 
   const handleConfirmComp = async (authorizer: { id: string; name: string }) => {
     if (!selectedItem || !canConfirm) return;
@@ -137,7 +141,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
         order.order_id,
         selectedItem.instance_id,
         compQty,
-        reason.trim(),
+        effectiveReason,
         authorizer,
       );
       toast.success(t('checkout.comp.badge'));
@@ -239,23 +243,26 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                             </div>
                           )}
 
-                          <div className="p-4 flex gap-4 items-center">
-                            <div className="w-16 h-16 rounded-xl bg-gray-100 shrink-0 overflow-hidden relative">
+                          <div className="p-3">
+                            <div className="w-full aspect-square rounded-xl bg-gray-100 overflow-hidden relative mb-3">
                               {imageRef ? (
                                 <img src={imageSrc} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageOff size={20} /></div>
+                                <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageOff size={28} /></div>
                               )}
+                              <span className="absolute top-2 left-2 text-[0.6rem] text-blue-600 bg-white/90 backdrop-blur-sm font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200/50">
+                                #{item.instance_id.slice(-5)}
+                              </span>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-bold text-gray-800 truncate" title={item.name}>{item.name}</div>
-                              {item.selected_specification?.is_multi_spec && (
-                                <div className="text-xs text-gray-500">{t('pos.cart.spec')}: {item.selected_specification.name}</div>
-                              )}
-                              <div className="text-sm text-gray-500 mt-0.5">{formatCurrency(unitPrice)}</div>
-                              <div className="text-xs font-medium text-gray-400 mt-1">
-                                x{unpaidQty}
-                              </div>
+                            <div className="font-bold text-sm text-gray-800 leading-snug line-clamp-2" title={item.name}>
+                              {item.name}
+                            </div>
+                            {item.selected_specification?.is_multi_spec && (
+                              <div className="text-xs text-gray-400 mt-0.5 truncate">{item.selected_specification.name}</div>
+                            )}
+                            <div className="flex items-center justify-between mt-2">
+                              <span className="text-sm font-medium text-gray-500">{formatCurrency(unitPrice)}</span>
+                              <span className="text-xs text-gray-400">x{unpaidQty}</span>
                             </div>
                           </div>
                         </div>
@@ -286,35 +293,42 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                             {t('checkout.comp.badge')}
                           </div>
 
-                          <div className="p-4 flex gap-4 items-center">
-                            <div className="w-16 h-16 rounded-xl bg-gray-100 shrink-0 overflow-hidden relative opacity-60">
+                          <div className="p-3">
+                            <div className="w-full aspect-square rounded-xl bg-gray-100 overflow-hidden relative mb-3 opacity-60">
                               {imageRef ? (
                                 <img src={imageSrc} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageOff size={20} /></div>
+                                <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageOff size={28} /></div>
                               )}
+                              <span className="absolute top-2 left-2 text-[0.6rem] text-blue-600 bg-white/90 backdrop-blur-sm font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200/50">
+                                #{item.instance_id.slice(-5)}
+                              </span>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-bold text-gray-600 truncate">{item.name}</div>
-                              <div className="text-sm text-emerald-600 font-medium mt-0.5">{formatCurrency(0)}</div>
-                              {item.original_price != null && (
-                                <div className="text-xs text-gray-400 line-through">{formatCurrency(item.original_price)}</div>
-                              )}
+                            <div className="font-bold text-sm text-gray-600 leading-snug line-clamp-2" title={item.name}>
+                              {item.name}
                             </div>
-                            <EscalatableGate
-                              permission={Permission.ORDERS_COMP}
-                              mode="intercept"
-                              description={t('checkout.comp.uncomp_auth_required')}
-                              onAuthorized={(user) => handleUncomp(item.instance_id, { id: user.id, name: user.display_name })}
-                            >
-                              <button
-                                disabled={isProcessing}
-                                className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
-                                title={t('checkout.comp.uncomp')}
+                            <div className="flex items-center justify-between mt-2">
+                              <div>
+                                <div className="text-sm text-emerald-600 font-medium">{formatCurrency(0)}</div>
+                                {item.original_price != null && (
+                                  <div className="text-xs text-gray-400 line-through">{formatCurrency(item.original_price)}</div>
+                                )}
+                              </div>
+                              <EscalatableGate
+                                permission={Permission.ORDERS_COMP}
+                                mode="intercept"
+                                description={t('checkout.comp.uncomp_auth_required')}
+                                onAuthorized={(user) => handleUncomp(item.instance_id, { id: user.id, name: user.display_name })}
                               >
-                                <Undo2 size={18} />
-                              </button>
-                            </EscalatableGate>
+                                <button
+                                  disabled={isProcessing}
+                                  className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
+                                  title={t('checkout.comp.uncomp')}
+                                >
+                                  <Undo2 size={18} />
+                                </button>
+                              </EscalatableGate>
+                            </div>
                           </div>
                         </div>
                       );
@@ -385,8 +399,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                     <label className="text-sm font-bold text-gray-600">{t('checkout.comp.reason_label')}</label>
                     <div className="grid grid-cols-2 gap-2">
                       {PRESET_REASONS.map((key) => {
-                        const label = t(`checkout.comp.preset.${key}`);
-                        const isActive = reason === label;
+                        const isActive = reasonKey === key;
                         return (
                           <button
                             key={key}
@@ -397,15 +410,15 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                                 : 'border-gray-100 hover:border-emerald-200 hover:bg-gray-50 text-gray-600'
                             }`}
                           >
-                            {label}
+                            {t(`checkout.comp.preset.${key}`)}
                           </button>
                         );
                       })}
                     </div>
                     <textarea
                       value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder={t('checkout.comp.reason_placeholder')}
+                      onChange={(e) => { setReason(e.target.value); setReasonKey(null); }}
+                      placeholder={reasonKey ? t(`checkout.comp.preset.${reasonKey}`) : t('checkout.comp.reason_placeholder')}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none text-sm"
                       rows={2}
                     />

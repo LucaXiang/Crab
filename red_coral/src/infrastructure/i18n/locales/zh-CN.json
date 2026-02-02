@@ -61,6 +61,7 @@
       "to": "至",
       "quantity": "数量",
       "items": "项",
+      "all": "全部",
       "unknown_item": "未知项目",
       "none": "N/A",
       "system": "系统",
@@ -370,6 +371,7 @@
       "pay_card": "刷卡支付",
       "desc": "拆分订单分别支付",
       "available": "可选",
+      "remaining": "剩余",
       "new_order": "分单明细"
     },
     "aa_split": {

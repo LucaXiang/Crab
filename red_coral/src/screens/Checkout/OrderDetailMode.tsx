@@ -82,33 +82,39 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
   const manualItemDiscount = Currency.sub(displayItemDiscount, totalRuleDiscount).toNumber();
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex bg-gray-50/50 backdrop-blur-xl">
       <OrderSidebar
         order={order}
         totalPaid={totalPaid}
         remaining={remaining}
         onManage={onManageTable}
       />
-      <div className="flex-1 flex flex-col bg-gray-50">
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+        {/* Background Decor */}
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-orange-100/50 rounded-full mix-blend-multiply filter blur-[100px] opacity-50 pointer-events-none" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-amber-100/50 rounded-full mix-blend-multiply filter blur-[100px] opacity-50 pointer-events-none" />
+
         {/* Header */}
-        <div className="p-6 bg-white border-b border-gray-200 shadow-sm flex justify-between items-center">
-          <h3 className="font-bold text-gray-800 text-xl flex items-center gap-2">
-            <Receipt size={24} className="text-gray-600" />
+        <div className="p-6 bg-white/80 backdrop-blur-md border-b border-gray-200/50 shadow-sm flex justify-between items-center z-10 shrink-0">
+          <h3 className="font-bold text-gray-800 text-2xl flex items-center gap-3">
+            <div className="p-2 bg-amber-500 rounded-xl text-white shadow-lg shadow-amber-500/30">
+              <Receipt size={24} />
+            </div>
             {t('checkout.order_detail.title')}
           </h3>
           <button
             onClick={onBack}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium flex items-center gap-2 transition-all"
+            className="px-5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 rounded-xl font-medium flex items-center gap-2 transition-all shadow-sm"
           >
             <ArrowLeft size={20} /> {t('common.action.back')}
           </button>
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 z-10">
           {/* Order Items Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between font-bold text-gray-700">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60 overflow-hidden">
+            <div className="p-4 border-b border-gray-100/80 bg-gray-50/80 flex items-center justify-between font-bold text-gray-700">
               <div className="flex items-center gap-2">
                 <Receipt size={18} />
                 <span>{t('history.info.order_items')}</span>
@@ -134,7 +140,7 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
               ))}
             </div>
             {/* Price Breakdown Footer */}
-            <div className="p-5 bg-gray-50 border-t border-gray-200 space-y-2">
+            <div className="p-5 bg-gray-50/80 border-t border-gray-200/60 space-y-2">
               {order.comp_total_amount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-emerald-600">{t('checkout.breakdown.comp')}</span>
@@ -179,8 +185,8 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
           </div>
 
           {/* Payment Records Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2 font-bold text-gray-700">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/60 overflow-hidden">
+            <div className="p-4 border-b border-gray-100/80 bg-gray-50/80 flex items-center gap-2 font-bold text-gray-700">
               <CreditCard size={18} />
               <span>{t('history.payment.details')}</span>
             </div>

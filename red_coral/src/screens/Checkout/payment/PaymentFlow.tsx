@@ -695,13 +695,13 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         
         <div className="flex-1 flex flex-col h-full overflow-hidden relative">
            {/* Background Decor */}
-           <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-purple-100/50 rounded-full mix-blend-multiply filter blur-[100px] opacity-50 pointer-events-none"></div>
+           <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-indigo-100/50 rounded-full mix-blend-multiply filter blur-[100px] opacity-50 pointer-events-none"></div>
            <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-blue-100/50 rounded-full mix-blend-multiply filter blur-[100px] opacity-50 pointer-events-none"></div>
 
           {/* Header */}
           <div className="p-6 bg-white/80 backdrop-blur-md border-b border-gray-200/50 shadow-sm flex justify-between items-center z-10 shrink-0">
             <h3 className="font-bold text-gray-800 text-2xl flex items-center gap-3">
-              <div className="p-2 bg-purple-600 rounded-xl text-white shadow-lg shadow-purple-500/30">
+              <div className="p-2 bg-indigo-500 rounded-xl text-white shadow-lg shadow-indigo-500/30">
                 <Split size={24} />
               </div>
               {t('checkout.split.title')}
@@ -732,8 +732,8 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
                                 className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all ${
-                                    selectedCategory === cat 
-                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' 
+                                    selectedCategory === cat
+                                    ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
                                     : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
                                 }`}
                               >
@@ -769,64 +769,38 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                                             }}
                                             className={`
                                                 relative group cursor-pointer rounded-2xl border transition-all duration-200 overflow-hidden
-                                                ${isSelected 
-                                                    ? 'border-purple-500 ring-2 ring-purple-500/20 bg-purple-50/50' 
-                                                    : 'border-gray-200 bg-white hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/10'
+                                                ${isSelected
+                                                    ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/50'
+                                                    : 'border-gray-200 bg-white hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-500/10'
                                                 }
                                             `}
                                           >
-                                              {/* Selection Badge */}
-                                              {isSelected && (
-                                                  <div className="absolute top-3 right-3 z-10 bg-purple-600 text-white w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm shadow-lg animate-in zoom-in duration-200">
-                                                      {currentSplitQty}
-                                                  </div>
-                                              )}
-
-                                              <div className="p-4 flex gap-4 items-center">
-                                                  <div className="w-16 h-16 rounded-xl bg-gray-100 shrink-0 overflow-hidden relative">
+                                              <div className="p-3">
+                                                  <div className="w-full aspect-square rounded-xl bg-gray-100 overflow-hidden relative mb-3">
                                                       {imageRef ? (
                                                         <img src={imageSrc} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
                                                       ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageOff size={20} /></div>
+                                                        <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageOff size={28} /></div>
                                                       )}
                                                       {isFullySelected && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><div className="text-white text-xs font-bold">ALL</div></div>}
+                                                      <span className="absolute top-2 left-2 text-[0.6rem] text-blue-600 bg-white/90 backdrop-blur-sm font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200/50">
+                                                        #{item.instance_id.slice(-5)}
+                                                      </span>
                                                   </div>
-                                                  <div className="flex-1 min-w-0">
-                                                      <div className="font-bold text-gray-800 truncate" title={item.name}>{item.name}</div>
-                                                      {item.selected_specification?.is_multi_spec && (
-                                                        <div className="text-xs text-gray-500">{t('pos.cart.spec')}: {item.selected_specification.name}</div>
-                                                      )}
-                                                      <div className="text-sm text-gray-500 mt-0.5">{formatCurrency(unitPrice)}</div>
-                                                      <div className="text-xs font-medium text-gray-400 mt-2">
-                                                          {t('checkout.split.available')}: <span className="text-gray-700">{maxQty}</span>
-                                                      </div>
+                                                  <div className="font-bold text-sm text-gray-800 leading-snug line-clamp-2" title={item.name}>
+                                                      {item.name}
+                                                  </div>
+                                                  {item.selected_specification?.is_multi_spec && (
+                                                    <div className="text-xs text-gray-400 mt-0.5 truncate">{item.selected_specification.name}</div>
+                                                  )}
+                                                  <div className="flex items-center justify-between mt-2">
+                                                      <span className="text-sm font-medium text-gray-500">{formatCurrency(unitPrice)}</span>
+                                                      <span className="text-xs text-gray-400">
+                                                          {t('checkout.split.remaining')} <span className="text-gray-700 font-bold">{maxQty - currentSplitQty}</span>/{maxQty}
+                                                      </span>
                                                   </div>
                                               </div>
-                                              
-                                              {/* Hover Overlay Controls */}
-                                              <div className="absolute inset-0 bg-white/90 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
-                                                  <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSplitItems(prev => ({ ...prev, [item.instance_id]: Math.max(0, (prev[item.instance_id] || 0) - 1) }));
-                                                    }}
-                                                    disabled={currentSplitQty <= 0}
-                                                    className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center disabled:opacity-30 text-gray-600 transition-colors"
-                                                  >
-                                                      <Minus size={20} />
-                                                  </button>
-                                                  <div className="font-bold text-lg w-6 text-center">{currentSplitQty}</div>
-                                                  <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSplitItems(prev => ({ ...prev, [item.instance_id]: Math.min(maxQty, (prev[item.instance_id] || 0) + 1) }));
-                                                    }}
-                                                    disabled={currentSplitQty >= maxQty}
-                                                    className="w-10 h-10 rounded-full bg-purple-100 hover:bg-purple-200 flex items-center justify-center disabled:opacity-30 text-purple-700 transition-colors"
-                                                  >
-                                                      <Plus size={20} />
-                                                  </button>
-                                              </div>
+
                                           </div>
                                       );
                                   })}
@@ -980,13 +954,13 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         
         <div className="flex-1 flex flex-col relative overflow-hidden">
            {/* Background Decor */}
-           <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-           <div className="absolute bottom-[-10%] left-[20%] w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+           <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-cyan-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+           <div className="absolute bottom-[-10%] left-[20%] w-80 h-80 bg-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
 
           {/* Header */}
           <div className="p-6 bg-white/80 backdrop-blur-md border-b border-gray-200/50 shadow-sm flex justify-between items-center z-10 shrink-0">
             <h3 className="font-bold text-gray-800 text-2xl flex items-center gap-3">
-              <div className="p-2 bg-orange-500 rounded-xl text-white shadow-lg shadow-orange-500/30">
+              <div className="p-2 bg-cyan-600 rounded-xl text-white shadow-lg shadow-cyan-500/30">
                 <Banknote size={24} />
               </div>
               {isAALocked ? t('checkout.aa_split.title') : t('checkout.amount_split.title')}
@@ -1333,7 +1307,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                 <div className="text-2xl font-bold">{t('checkout.method.card')}</div>
                 <div className="text-sm opacity-90">{t('checkout.method.card_desc')}</div>
               </button>
-              <button onClick={() => setMode('ITEM_SPLIT')} disabled={isPaidInFull || isProcessing || order.has_amount_split || isAALocked} className="h-40 bg-purple-500 hover:bg-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+              <button onClick={() => setMode('ITEM_SPLIT')} disabled={isPaidInFull || isProcessing || order.has_amount_split || isAALocked} className="h-40 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
                 <Split size={48} />
                 <div className="text-2xl font-bold">{t('checkout.split.title')}</div>
                 <div className="text-sm opacity-90">{isAALocked ? t('checkout.aa_split.locked') : order.has_amount_split ? t('checkout.amount_split.item_split_disabled') : t('checkout.split.desc')}</div>
@@ -1342,7 +1316,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
             {/* Amount Split & Payment Records Buttons */}
             <div className="grid grid-cols-3 gap-6">
-              <button onClick={() => setMode('AMOUNT_SPLIT')} disabled={isPaidInFull || isProcessing} className="h-40 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
+              <button onClick={() => setMode('AMOUNT_SPLIT')} disabled={isPaidInFull || isProcessing} className="h-40 bg-cyan-600 hover:bg-cyan-700 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4">
                 <Banknote size={48} />
                 <div className="text-2xl font-bold">{isAALocked ? t('checkout.aa_split.title') : t('checkout.amount_split.title')}</div>
                 <div className="text-sm opacity-90">{isAALocked ? t('checkout.aa_split.desc') : t('checkout.amount_split.desc')}</div>
@@ -1359,7 +1333,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
               </button>
               <button
                 onClick={() => setMode('ORDER_DETAIL')}
-                className="h-40 bg-pink-600 hover:bg-pink-700 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-4"
+                className="h-40 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-4"
               >
                 <ClipboardList size={48} />
                 <div className="text-2xl font-bold">{t('checkout.order_detail.title')}</div>
