@@ -542,6 +542,10 @@
       "comp": "赠送减免",
       "order_discount": "整单折扣",
       "order_surcharge": "整单附加费"
+    },
+    "order_detail": {
+      "title": "订单详情",
+      "desc": "查看完整订单信息"
     }
   },
   "table": {

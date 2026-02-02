@@ -1,12 +1,13 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { HeldOrder, PaymentRecord } from '@/core/domain/types';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag, Receipt, ImageOff, Users, Calculator, PieChart, X, Lock as LockIcon, Check, Clock, Gift, Percent, TrendingUp } from 'lucide-react';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag, Receipt, ImageOff, Users, Calculator, PieChart, X, Lock as LockIcon, Check, Clock, Gift, Percent, TrendingUp, ClipboardList } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { Permission } from '@/core/domain/types';
 import { useRetailServiceType, setRetailServiceType } from '@/core/stores/order/useCheckoutStore';
 import { CompItemMode } from '../CompItemMode';
+import { OrderDetailMode } from '../OrderDetailMode';
 import { OrderDiscountModal } from '../OrderDiscountModal';
 import { OrderSurchargeModal } from '../OrderSurchargeModal';
 import { formatCurrency } from '@/utils/currency';
@@ -37,7 +38,7 @@ interface PaymentFlowProps {
   onManageTable?: () => void;
 }
 
-type PaymentMode = 'SELECT' | 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS' | 'COMP';
+type PaymentMode = 'SELECT' | 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS' | 'COMP' | 'ORDER_DETAIL';
 
 export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onCancel, onVoid, onManageTable }) => {
   const { t } = useI18n();
@@ -1357,6 +1358,14 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                   <div className="text-sm opacity-90">{activePayments.length} {t('checkout.payment.record_count')} · {formatCurrency(totalPaid)}</div>
                 </button>
               )}
+              <button
+                onClick={() => setMode('ORDER_DETAIL')}
+                className="h-40 bg-gray-500 hover:bg-gray-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-4"
+              >
+                <ClipboardList size={48} />
+                <div className="text-2xl font-bold">{t('checkout.order_detail.title')}</div>
+                <div className="text-sm opacity-90">{t('checkout.order_detail.desc')}</div>
+              </button>
             </div>
 
             {/* Order Adjustments: Comp, Discount, Surcharge */}
@@ -1545,6 +1554,16 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
       case 'COMP':
         return (
           <CompItemMode
+            order={order}
+            totalPaid={totalPaid}
+            remaining={remaining}
+            onBack={() => setMode('SELECT')}
+            onManageTable={onManageTable}
+          />
+        );
+      case 'ORDER_DETAIL':
+        return (
+          <OrderDetailMode
             order={order}
             totalPaid={totalPaid}
             remaining={remaining}
