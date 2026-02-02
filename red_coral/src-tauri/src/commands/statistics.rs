@@ -15,9 +15,9 @@ use crate::core::ClientBridge;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OverviewStats {
-    pub today_revenue: f64,
-    pub today_orders: i32,
-    pub today_customers: i32,
+    pub revenue: f64,
+    pub orders: i32,
+    pub customers: i32,
     pub average_order_value: f64,
     pub cash_revenue: f64,
     pub card_revenue: f64,

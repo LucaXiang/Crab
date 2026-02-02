@@ -32,13 +32,13 @@ export const Overview: React.FC<OverviewProps> = ({
   onCustomEndDateChange,
 }) => {
   const { t } = useI18n();
-  const hasData = overview.today_orders > 0 || revenue_trend.length > 0;
+  const hasData = overview.orders > 0 || revenue_trend.length > 0;
 
   return (
     <div className="space-y-6 min-w-0">
 
 
-      <StatsCards overview={overview} timeRange={timeRange} />
+      <StatsCards overview={overview} />
 
       {/* Main Charts Area */}
       {hasData ? (

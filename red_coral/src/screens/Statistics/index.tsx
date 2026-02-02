@@ -25,9 +25,9 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
 
   const [data, setData] = useState<StatisticsResponse>({
     overview: {
-      today_revenue: 0,
-      today_orders: 0,
-      today_customers: 0,
+      revenue: 0,
+      orders: 0,
+      customers: 0,
       average_order_value: 0,
       cash_revenue: 0,
       card_revenue: 0,

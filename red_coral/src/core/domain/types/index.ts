@@ -199,9 +199,9 @@ export type TimeRange = 'today' | 'week' | 'month' | 'year' | 'custom';
 export type ActiveTab = 'overview' | 'sales' | 'products' | 'categories' | 'daily_report' | 'audit_log';
 
 export interface OverviewStats {
-  today_revenue: number;
-  today_orders: number;
-  today_customers: number;
+  revenue: number;
+  orders: number;
+  customers: number;
   average_order_value: number;
   cash_revenue: number;
   card_revenue: number;

@@ -662,7 +662,10 @@
       "audit_log": "审计日志"
     },
     "time": {
-      "today": "今天"
+      "today": "今天",
+      "week": "本周",
+      "month": "本月",
+      "custom": "自定义"
     },
     "date_range": "日期范围",
     "top_products": "热销商品",
@@ -688,7 +691,9 @@
       "avg_dining_time": "平均用餐时间",
       "voided_orders": "作废订单数",
       "total_discount": "总折扣",
-      "orders": "订单"
+      "orders": "订单",
+      "revenue": "营业额",
+      "customers": "客数"
     },
     "status": {
       "completed": "已完成",

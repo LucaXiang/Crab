@@ -1,20 +1,15 @@
 import React from 'react';
 import { Euro, ShoppingCart, Users, CreditCard, Banknote, TrendingUp, Ban, Tag, Clock, UserCheck } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { OverviewStats, TimeRange } from '@/core/domain/types';
+import { OverviewStats } from '@/core/domain/types';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface StatsCardsProps {
   overview: OverviewStats;
-  timeRange: TimeRange;
 }
 
-export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) => {
+export const StatsCards: React.FC<StatsCardsProps> = ({ overview }) => {
   const { t } = useI18n();
-
-  const getLabel = (key: string) => {
-    return t(`statistics.${key}.${timeRange}`);
-  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -26,9 +21,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {formatCurrency(overview.today_revenue)}
+          {formatCurrency(overview.revenue)}
         </div>
-        <div className="text-sm text-gray-500">{getLabel('revenue')}</div>
+        <div className="text-sm text-gray-500">{t('statistics.metric.revenue')}</div>
       </div>
 
       {/* 2. Orders */}
@@ -39,9 +34,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {overview.today_orders}
+          {overview.orders}
         </div>
-        <div className="text-sm text-gray-500">{getLabel('orders')}</div>
+        <div className="text-sm text-gray-500">{t('statistics.metric.orders')}</div>
       </div>
 
       {/* 3. Customers */}
@@ -52,9 +47,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ overview, timeRange }) =
           </div>
         </div>
         <div className="text-2xl font-bold text-gray-800 mb-1">
-          {overview.today_customers}
+          {overview.customers}
         </div>
-        <div className="text-sm text-gray-500">{getLabel('customers')}</div>
+        <div className="text-sm text-gray-500">{t('statistics.metric.customers')}</div>
       </div>
 
       {/* 4. Avg Order Value */}

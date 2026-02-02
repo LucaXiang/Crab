@@ -19,9 +19,9 @@ use crate::utils::time;
 /// Overview statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OverviewStats {
-    pub today_revenue: f64,
-    pub today_orders: i32,
-    pub today_customers: i32,
+    pub revenue: f64,
+    pub orders: i32,
+    pub customers: i32,
     pub average_order_value: f64,
     pub cash_revenue: f64,
     pub card_revenue: f64,
@@ -266,9 +266,9 @@ pub async fn get_statistics(
             LET $avg_dining_time = math::mean($dining_times.minutes);
 
             RETURN {
-                today_revenue: $total_revenue,
-                today_orders: $total_orders,
-                today_customers: $total_customers,
+                revenue: $total_revenue,
+                orders: $total_orders,
+                customers: $total_customers,
                 average_order_value: $avg_order,
                 cash_revenue: $cash,
                 card_revenue: $card,
@@ -285,12 +285,12 @@ pub async fn get_statistics(
         .await
         .map_err(crate::db::repository::surreal_err_to_app)?;
 
-    let overview: OverviewStats = result.take::<Option<OverviewStats>>(0)
+    let overview: OverviewStats = result.take::<Option<OverviewStats>>(18)
         .map_err(crate::db::repository::surreal_err_to_app)?
         .unwrap_or(OverviewStats {
-            today_revenue: 0.0,
-            today_orders: 0,
-            today_customers: 0,
+            revenue: 0.0,
+            orders: 0,
+            customers: 0,
             average_order_value: 0.0,
             cash_revenue: 0.0,
             card_revenue: 0.0,
@@ -307,7 +307,7 @@ pub async fn get_statistics(
         // Hourly trend: group by hour bucket
         r#"
             SELECT
-                time::format(<datetime>(end_time / 1000), '%H:00') AS time,
+                time::format(time::from::unix(end_time / 1000), '%H:00') AS time,
                 math::sum(total_amount) AS value
             FROM order
             WHERE status = 'COMPLETED'
@@ -320,7 +320,7 @@ pub async fn get_statistics(
         // Daily trend: group by date bucket
         r#"
             SELECT
-                time::format(<datetime>(end_time / 1000), '%m-%d') AS time,
+                time::format(time::from::unix(end_time / 1000), '%m-%d') AS time,
                 math::sum(total_amount) AS value
             FROM order
             WHERE status = 'COMPLETED'
@@ -456,7 +456,7 @@ pub async fn get_sales_report(
             SELECT
                 <string>id AS order_id,
                 receipt_number,
-                time::format(<datetime>(end_time / 1000), '%Y-%m-%d %H:%M') AS date,
+                time::format(time::from::unix(end_time / 1000), '%Y-%m-%d %H:%M') AS date,
                 total_amount AS total,
                 string::uppercase(status) AS status,
                 end_time
