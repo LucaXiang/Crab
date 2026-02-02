@@ -211,16 +211,34 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
               ))}
             </div>
             <div className="p-5 bg-gray-50 border-t border-gray-200 space-y-2">
-              {order.total_discount > 0 && (
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>{t('checkout.amount.discount')}</span>
-                  <span className="text-red-600">-{formatCurrency(order.total_discount)}</span>
+              {order.comp_total_amount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-emerald-600">{t('checkout.breakdown.comp')}</span>
+                  <span className="text-emerald-600">-{formatCurrency(order.comp_total_amount)}</span>
                 </div>
               )}
-              {order.total_surcharge > 0 && (
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>{t('checkout.amount.surcharge')}</span>
-                  <span className="text-purple-600">+{formatCurrency(order.total_surcharge)}</span>
+              {(order.total_discount - order.order_manual_discount_amount) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-orange-500">{t('checkout.cart.discount')}</span>
+                  <span className="text-orange-500">-{formatCurrency(order.total_discount - order.order_manual_discount_amount)}</span>
+                </div>
+              )}
+              {(order.total_surcharge - order.order_manual_surcharge_amount) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-purple-500">{t('pos.cart.surcharge')}</span>
+                  <span className="text-purple-500">+{formatCurrency(order.total_surcharge - order.order_manual_surcharge_amount)}</span>
+                </div>
+              )}
+              {order.order_manual_discount_amount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-indigo-600">{t('checkout.breakdown.order_discount')}</span>
+                  <span className="text-indigo-600">-{formatCurrency(order.order_manual_discount_amount)}</span>
+                </div>
+              )}
+              {order.order_manual_surcharge_amount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-amber-600">{t('checkout.breakdown.order_surcharge')}</span>
+                  <span className="text-amber-600">+{formatCurrency(order.order_manual_surcharge_amount)}</span>
                 </div>
               )}
               <div className="flex justify-between items-end pt-3 mt-1 border-t border-gray-200">

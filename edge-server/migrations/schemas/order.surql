@@ -55,6 +55,18 @@ DEFINE FIELD OVERWRITE surcharge_amount ON order TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
+DEFINE FIELD OVERWRITE comp_total_amount ON order TYPE decimal
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE order_manual_discount_amount ON order TYPE decimal
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE order_manual_surcharge_amount ON order TYPE decimal
+    DEFAULT 0
+    PERMISSIONS FULL;
+
 DEFINE FIELD OVERWRITE tax ON order TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;

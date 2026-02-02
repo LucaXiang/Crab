@@ -38,6 +38,9 @@ pub struct Order {
     pub paid_amount: f64,
     pub discount_amount: f64,
     pub surcharge_amount: f64,
+    pub comp_total_amount: f64,
+    pub order_manual_discount_amount: f64,
+    pub order_manual_surcharge_amount: f64,
     pub tax: f64,
     pub start_time: i64,
     pub end_time: Option<i64>,
@@ -220,6 +223,12 @@ pub struct OrderDetail {
     pub total_discount: f64,
     #[serde(default)]
     pub total_surcharge: f64,
+    #[serde(default)]
+    pub comp_total_amount: f64,
+    #[serde(default)]
+    pub order_manual_discount_amount: f64,
+    #[serde(default)]
+    pub order_manual_surcharge_amount: f64,
     #[serde(default)]
     pub start_time: i64,
     pub end_time: Option<i64>,

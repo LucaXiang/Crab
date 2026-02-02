@@ -92,13 +92,10 @@ pub struct OrderSnapshot {
     #[serde(default)]
     pub discount: f64,
     /// Comp total amount (赠送减免总额 = Σ(original_price × qty) for comped items)
-    #[serde(default)]
     pub comp_total_amount: f64,
     /// Order-level manual discount computed amount (整单手动折扣实际金额)
-    #[serde(default)]
     pub order_manual_discount_amount: f64,
     /// Order-level manual surcharge computed amount (整单手动附加费实际金额)
-    #[serde(default)]
     pub order_manual_surcharge_amount: f64,
     /// Total amount to pay
     pub total: f64,

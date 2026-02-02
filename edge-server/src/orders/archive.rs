@@ -402,6 +402,9 @@ impl OrderArchiveService {
                 paid_amount = $paid_amount,
                 discount_amount = $discount_amount,
                 surcharge_amount = $surcharge_amount,
+                comp_total_amount = $comp_total_amount,
+                order_manual_discount_amount = $order_manual_discount_amount,
+                order_manual_surcharge_amount = $order_manual_surcharge_amount,
                 tax = $tax,
                 start_time = $start_time,
                 end_time = $end_time,
@@ -537,6 +540,9 @@ impl OrderArchiveService {
             .bind(("paid_amount", order.paid_amount))
             .bind(("discount_amount", order.discount_amount))
             .bind(("surcharge_amount", order.surcharge_amount))
+            .bind(("comp_total_amount", order.comp_total_amount))
+            .bind(("order_manual_discount_amount", order.order_manual_discount_amount))
+            .bind(("order_manual_surcharge_amount", order.order_manual_surcharge_amount))
             .bind(("tax", order.tax))
             .bind(("start_time", order.start_time))
             .bind(("end_time", order.end_time))
@@ -955,6 +961,9 @@ impl OrderArchiveService {
             paid_amount: snapshot.paid_amount,
             discount_amount: snapshot.total_discount,
             surcharge_amount: snapshot.total_surcharge,
+            comp_total_amount: snapshot.comp_total_amount,
+            order_manual_discount_amount: snapshot.order_manual_discount_amount,
+            order_manual_surcharge_amount: snapshot.order_manual_surcharge_amount,
             tax: snapshot.tax,
             start_time: snapshot.start_time,
             end_time: snapshot.end_time,

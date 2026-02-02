@@ -113,6 +113,9 @@ export interface ArchivedOrderDetail {
   paid_amount: number;
   total_discount: number;
   total_surcharge: number;
+  comp_total_amount: number;
+  order_manual_discount_amount: number;
+  order_manual_surcharge_amount: number;
   start_time: number; // milliseconds
   end_time: number | null; // milliseconds
   operator_name: string | null;
