@@ -218,6 +218,21 @@ features/<name>/
 | **错误处理** | 关键加载失败使用 dialog 阻断，禁止静默错误 |
 | **时间戳** | `number` 类型 (i64 Unix 毫秒)，禁止 string 格式 |
 
+## 颜色语言 (价格明细)
+
+全局统一的颜色分配，所有涉及价格明细的组件必须遵守:
+
+| 类型 | 文字颜色 | 徽标颜色 | 按钮颜色 |
+|------|----------|----------|----------|
+| **赠送 (comp)** | `text-emerald-600` | - | `bg-emerald-500` |
+| **手动折扣 (manual discount)** | `text-orange-500` | `bg-orange-100 text-orange-700` | `bg-orange-500` |
+| **规则折扣 (rule discount)** | `text-amber-600` | `bg-amber-100 text-amber-700` | - |
+| **规则附加费 (rule surcharge)** | `text-purple-500` | `bg-purple-100 text-purple-700` | - |
+| **整单折扣 (order discount)** | `text-orange-500` | - | `bg-orange-500` |
+| **整单附加费 (order surcharge)** | `text-purple-500` | - | `bg-purple-500` |
+
+**适用组件**: OrderSidebar, OrderDetailMode, HistoryDetail, PaymentFlow, CartItem, UnpaidItemRow, PriceRuleManagement, ItemActionPanel
+
 ## 响应语言
 
 使用中文回答。

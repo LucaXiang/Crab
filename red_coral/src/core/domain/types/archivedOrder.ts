@@ -66,6 +66,8 @@ export interface ArchivedOrderItem {
   line_total: number;
   discount_amount: number;
   surcharge_amount: number;
+  rule_discount_amount: number;
+  rule_surcharge_amount: number;
   note: string | null;
   selected_options: ArchivedItemOption[];
 }
@@ -116,6 +118,8 @@ export interface ArchivedOrderDetail {
   comp_total_amount: number;
   order_manual_discount_amount: number;
   order_manual_surcharge_amount: number;
+  order_rule_discount_amount: number;
+  order_rule_surcharge_amount: number;
   start_time: number; // milliseconds
   end_time: number | null; // milliseconds
   operator_name: string | null;

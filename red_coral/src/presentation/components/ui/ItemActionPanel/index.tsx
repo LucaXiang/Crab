@@ -265,7 +265,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                       }}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-semibold transition-all ${
                         discount > 0
-                          ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                          ? 'bg-orange-100 text-orange-600 hover:bg-orange-200'
                           : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                       }`}
                     >

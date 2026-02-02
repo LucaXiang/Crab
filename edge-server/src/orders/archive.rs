@@ -405,6 +405,8 @@ impl OrderArchiveService {
                 comp_total_amount = $comp_total_amount,
                 order_manual_discount_amount = $order_manual_discount_amount,
                 order_manual_surcharge_amount = $order_manual_surcharge_amount,
+                order_rule_discount_amount = $order_rule_discount_amount,
+                order_rule_surcharge_amount = $order_rule_surcharge_amount,
                 tax = $tax,
                 start_time = $start_time,
                 end_time = $end_time,
@@ -438,13 +440,15 @@ impl OrderArchiveService {
                     line_total = $item{}_line_total,
                     discount_amount = $item{}_discount_amount,
                     surcharge_amount = $item{}_surcharge_amount,
+                    rule_discount_amount = $item{}_rule_discount_amount,
+                    rule_surcharge_amount = $item{}_rule_surcharge_amount,
                     tax = $item{}_tax,
                     tax_rate = $item{}_tax_rate,
                     note = $item{}_note;
                 RELATE ($order[0].id)->has_item->({}[0].id);
                 "#,
                 var_name,
-                i, i, i, i, i, i, i, i, i, i, i, i, i, i, i,
+                i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i,
                 var_name
             ));
 
@@ -543,6 +547,8 @@ impl OrderArchiveService {
             .bind(("comp_total_amount", order.comp_total_amount))
             .bind(("order_manual_discount_amount", order.order_manual_discount_amount))
             .bind(("order_manual_surcharge_amount", order.order_manual_surcharge_amount))
+            .bind(("order_rule_discount_amount", order.order_rule_discount_amount))
+            .bind(("order_rule_surcharge_amount", order.order_rule_surcharge_amount))
             .bind(("tax", order.tax))
             .bind(("start_time", order.start_time))
             .bind(("end_time", order.end_time))
@@ -588,6 +594,8 @@ impl OrderArchiveService {
                 .bind((format!("item{}_line_total", i), line_total))
                 .bind((format!("item{}_discount_amount", i), total_discount))
                 .bind((format!("item{}_surcharge_amount", i), total_surcharge))
+                .bind((format!("item{}_rule_discount_amount", i), rule_discount_per_unit * item.quantity as f64))
+                .bind((format!("item{}_rule_surcharge_amount", i), surcharge_per_unit * item.quantity as f64))
                 .bind((format!("item{}_tax", i), item.tax.unwrap_or(0.0)))
                 .bind((format!("item{}_tax_rate", i), item.tax_rate.unwrap_or(0)))
                 .bind((format!("item{}_note", i), item.note.clone()));
@@ -972,6 +980,8 @@ impl OrderArchiveService {
             comp_total_amount: snapshot.comp_total_amount,
             order_manual_discount_amount: snapshot.order_manual_discount_amount,
             order_manual_surcharge_amount: snapshot.order_manual_surcharge_amount,
+            order_rule_discount_amount: snapshot.order_rule_discount_amount.unwrap_or(0.0),
+            order_rule_surcharge_amount: snapshot.order_rule_surcharge_amount.unwrap_or(0.0),
             tax: snapshot.tax,
             start_time: snapshot.start_time,
             end_time: snapshot.end_time,

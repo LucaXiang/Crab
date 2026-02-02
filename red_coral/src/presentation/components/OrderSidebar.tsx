@@ -8,7 +8,7 @@ import { QuickAddModal } from '@/presentation/components/modals/QuickAddModal';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useOrderTimeline } from '@/core/stores/order/useActiveOrdersStore';
-import { formatCurrency } from '@/utils/currency';
+import { formatCurrency, Currency } from '@/utils/currency';
 
 // Lazy load TimelineList - only loads when user clicks Timeline tab
 const TimelineList = lazy(() =>
@@ -85,10 +85,22 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
 
   // Use server-provided financial totals (authoritative)
   const displayOriginalPrice = order.original_total;
-  // Discount/surcharge excluding manual order-level (shown separately below)
-  // Rules are included here together with item-level amounts
+  // Combined item+orderRule discount/surcharge (excluding order manual)
   const displayItemDiscount = order.total_discount - order.order_manual_discount_amount;
   const displayItemSurcharge = order.total_surcharge - order.order_manual_surcharge_amount;
+
+  // Split: rule discount/surcharge (item-level + order-level rules)
+  const itemRuleDiscount = order.items
+    .filter(i => !i._removed)
+    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_discount_amount ?? 0, item.quantity)).toNumber(), 0);
+  const itemRuleSurcharge = order.items
+    .filter(i => !i._removed)
+    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_surcharge_amount ?? 0, item.quantity)).toNumber(), 0);
+  const totalRuleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount ?? 0).toNumber();
+  const totalRuleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount ?? 0).toNumber();
+  // Manual item discount = total item discount - rule discount
+  const manualItemDiscount = Currency.sub(displayItemDiscount, totalRuleDiscount).toNumber();
+
   const displayFinalTotal = order.total;
   const displayRemainingAmount = order.remaining_amount;
 
@@ -222,31 +234,43 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           </div>
         )}
 
-        {/* 3. Item-level discount (商品折扣, excluding comp and order-level) */}
-        {displayItemDiscount > 0 && (
+        {/* 3. Manual item discount (手动折扣) */}
+        {manualItemDiscount > 0 && (
           <div className="flex justify-between items-end">
             <span className="text-orange-500 font-medium text-sm">
-              {t('checkout.cart.discount')}
+              {t('checkout.breakdown.manual_discount')}
             </span>
             <span className="text-sm font-medium text-orange-500">
-              -{formatCurrency(displayItemDiscount)}
+              -{formatCurrency(manualItemDiscount)}
             </span>
           </div>
         )}
 
-        {/* 4. Item-level surcharge (商品附加费) */}
-        {displayItemSurcharge > 0 && (
+        {/* 4. Rule discount (规则折扣) */}
+        {totalRuleDiscount > 0 && (
+          <div className="flex justify-between items-end">
+            <span className="text-amber-600 font-medium text-sm">
+              {t('checkout.breakdown.rule_discount')}
+            </span>
+            <span className="text-sm font-medium text-amber-600">
+              -{formatCurrency(totalRuleDiscount)}
+            </span>
+          </div>
+        )}
+
+        {/* 5. Rule surcharge (规则附加费) */}
+        {totalRuleSurcharge > 0 && (
           <div className="flex justify-between items-end">
             <span className="text-purple-500 font-medium text-sm">
-              {t('pos.cart.surcharge')}
+              {t('checkout.breakdown.rule_surcharge')}
             </span>
             <span className="text-sm font-medium text-purple-500">
-              +{formatCurrency(displayItemSurcharge)}
+              +{formatCurrency(totalRuleSurcharge)}
             </span>
           </div>
         )}
 
-        {/* 5. Order manual discount (整单手动折扣) */}
+        {/* 6. Order manual discount (整单手动折扣) */}
         {order.order_manual_discount_amount > 0 && (
           <div className="flex justify-between items-center">
             <span className="text-orange-500 font-medium text-sm flex items-center gap-1">
@@ -262,7 +286,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           </div>
         )}
 
-        {/* 6. Order manual surcharge (整单手动附加费) */}
+        {/* 7. Order manual surcharge (整单手动附加费) */}
         {order.order_manual_surcharge_amount > 0 && (
           <div className="flex justify-between items-center">
             <span className="text-purple-500 font-medium text-sm flex items-center gap-1">
@@ -278,7 +302,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           </div>
         )}
 
-        {/* 7. Final Price (Total) */}
+        {/* 8. Final Price (Total) */}
         <div className="flex justify-between items-end pt-3 mt-1 border-t border-gray-200">
           <span className="text-gray-800 font-bold text-base">{t('checkout.amount.total')}</span>
           <span className="text-2xl font-bold text-gray-900">{formatCurrency(displayFinalTotal)}</span>

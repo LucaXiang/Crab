@@ -217,18 +217,36 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                   <span className="text-emerald-600">-{formatCurrency(order.comp_total_amount)}</span>
                 </div>
               )}
-              {(order.total_discount - order.order_manual_discount_amount) > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-orange-500">{t('checkout.cart.discount')}</span>
-                  <span className="text-orange-500">-{formatCurrency(order.total_discount - order.order_manual_discount_amount)}</span>
-                </div>
-              )}
-              {(order.total_surcharge - order.order_manual_surcharge_amount) > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-purple-500">{t('pos.cart.surcharge')}</span>
-                  <span className="text-purple-500">+{formatCurrency(order.total_surcharge - order.order_manual_surcharge_amount)}</span>
-                </div>
-              )}
+              {(() => {
+                const displayItemDiscount = order.total_discount - order.order_manual_discount_amount;
+                const itemRuleDiscount = order.items.reduce((sum, item) => Currency.add(sum, item.rule_discount_amount).toNumber(), 0);
+                const itemRuleSurcharge = order.items.reduce((sum, item) => Currency.add(sum, item.rule_surcharge_amount).toNumber(), 0);
+                const totalRuleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount).toNumber();
+                const totalRuleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount).toNumber();
+                const manualItemDiscount = Currency.sub(displayItemDiscount, totalRuleDiscount).toNumber();
+                return (
+                  <>
+                    {manualItemDiscount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-orange-500">{t('checkout.breakdown.manual_discount')}</span>
+                        <span className="text-orange-500">-{formatCurrency(manualItemDiscount)}</span>
+                      </div>
+                    )}
+                    {totalRuleDiscount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-amber-600">{t('checkout.breakdown.rule_discount')}</span>
+                        <span className="text-amber-600">-{formatCurrency(totalRuleDiscount)}</span>
+                      </div>
+                    )}
+                    {totalRuleSurcharge > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-purple-500">{t('checkout.breakdown.rule_surcharge')}</span>
+                        <span className="text-purple-500">+{formatCurrency(totalRuleSurcharge)}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               {order.order_manual_discount_amount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-orange-500">{t('checkout.breakdown.order_discount')}</span>
@@ -327,12 +345,12 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
                 <span className="text-xs text-gray-500">({item.spec_name})</span>
               )}
               {hasDiscount && (
-                <span className="text-[0.625rem] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">
+                <span className="text-[0.625rem] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
                   -{formatCurrency(item.discount_amount)}
                 </span>
               )}
               {hasSurcharge && (
-                <span className="text-[0.625rem] font-bold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">
+                <span className="text-[0.625rem] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
                   +{formatCurrency(item.surcharge_amount)}
                 </span>
               )}

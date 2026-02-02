@@ -69,7 +69,17 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
 
   // Price breakdown (same logic as OrderSidebar)
   const displayItemDiscount = order.total_discount - order.order_manual_discount_amount;
-  const displayItemSurcharge = order.total_surcharge - order.order_manual_surcharge_amount;
+
+  // Split: rule vs manual
+  const itemRuleDiscount = order.items
+    .filter(i => !i._removed)
+    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_discount_amount ?? 0, item.quantity)).toNumber(), 0);
+  const itemRuleSurcharge = order.items
+    .filter(i => !i._removed)
+    .reduce((sum, item) => Currency.add(sum, Currency.mul(item.rule_surcharge_amount ?? 0, item.quantity)).toNumber(), 0);
+  const totalRuleDiscount = Currency.add(itemRuleDiscount, order.order_rule_discount_amount ?? 0).toNumber();
+  const totalRuleSurcharge = Currency.add(itemRuleSurcharge, order.order_rule_surcharge_amount ?? 0).toNumber();
+  const manualItemDiscount = Currency.sub(displayItemDiscount, totalRuleDiscount).toNumber();
 
   return (
     <div className="h-full flex">
@@ -131,16 +141,22 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
                   <span className="text-emerald-600">-{formatCurrency(order.comp_total_amount)}</span>
                 </div>
               )}
-              {displayItemDiscount > 0 && (
+              {manualItemDiscount > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-orange-500">{t('checkout.cart.discount')}</span>
-                  <span className="text-orange-500">-{formatCurrency(displayItemDiscount)}</span>
+                  <span className="text-orange-500">{t('checkout.breakdown.manual_discount')}</span>
+                  <span className="text-orange-500">-{formatCurrency(manualItemDiscount)}</span>
                 </div>
               )}
-              {displayItemSurcharge > 0 && (
+              {totalRuleDiscount > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-purple-500">{t('pos.cart.surcharge')}</span>
-                  <span className="text-purple-500">+{formatCurrency(displayItemSurcharge)}</span>
+                  <span className="text-amber-600">{t('checkout.breakdown.rule_discount')}</span>
+                  <span className="text-amber-600">-{formatCurrency(totalRuleDiscount)}</span>
+                </div>
+              )}
+              {totalRuleSurcharge > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-purple-500">{t('checkout.breakdown.rule_surcharge')}</span>
+                  <span className="text-purple-500">+{formatCurrency(totalRuleSurcharge)}</span>
                 </div>
               )}
               {order.order_manual_discount_amount > 0 && (
@@ -232,12 +248,12 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
                 </span>
               )}
               {hasDiscount && (
-                <span className="text-[0.625rem] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">
+                <span className="text-[0.625rem] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
                   {item.manual_discount_percent ? `-${item.manual_discount_percent}%` : `-${formatCurrency(discountAmount)}`}
                 </span>
               )}
               {hasSurcharge && (
-                <span className="text-[0.625rem] font-bold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">
+                <span className="text-[0.625rem] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
                   +{formatCurrency(surchargeAmount)}
                 </span>
               )}

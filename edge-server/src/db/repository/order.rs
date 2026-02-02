@@ -46,6 +46,8 @@ impl OrderRepository {
                     comp_total_amount,
                     order_manual_discount_amount,
                     order_manual_surcharge_amount,
+                    order_rule_discount_amount,
+                    order_rule_surcharge_amount,
                     start_time,
                     end_time,
                     operator_name,
@@ -66,6 +68,8 @@ impl OrderRepository {
                             line_total,
                             discount_amount,
                             surcharge_amount,
+                            rule_discount_amount,
+                            rule_surcharge_amount,
                             note,
                             (
                                 SELECT

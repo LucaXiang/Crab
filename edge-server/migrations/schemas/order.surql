@@ -67,6 +67,14 @@ DEFINE FIELD OVERWRITE order_manual_surcharge_amount ON order TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 
+DEFINE FIELD OVERWRITE order_rule_discount_amount ON order TYPE decimal
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE order_rule_surcharge_amount ON order TYPE decimal
+    DEFAULT 0
+    PERMISSIONS FULL;
+
 DEFINE FIELD OVERWRITE tax ON order TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
@@ -160,6 +168,14 @@ DEFINE FIELD OVERWRITE discount_amount ON order_item TYPE decimal
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE surcharge_amount ON order_item TYPE decimal
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE rule_discount_amount ON order_item TYPE decimal
+    DEFAULT 0
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE rule_surcharge_amount ON order_item TYPE decimal
     DEFAULT 0
     PERMISSIONS FULL;
 

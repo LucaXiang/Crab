@@ -540,6 +540,9 @@
     },
     "breakdown": {
       "comp": "赠送减免",
+      "manual_discount": "手动折扣",
+      "rule_discount": "规则折扣",
+      "rule_surcharge": "规则附加费",
       "order_discount": "整单折扣",
       "order_surcharge": "整单附加费"
     },

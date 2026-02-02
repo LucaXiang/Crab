@@ -423,8 +423,10 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
             .unwrap_or(Decimal::ZERO);
 
     // Order-level adjustments (rule amounts respect skipped flag)
-    let order_discount = effective_order_rule_discount(snapshot) + order_manual_discount;
-    let order_surcharge = effective_order_rule_surcharge(snapshot) + order_manual_surcharge;
+    let eff_order_rule_discount = effective_order_rule_discount(snapshot);
+    let eff_order_rule_surcharge = effective_order_rule_surcharge(snapshot);
+    let order_discount = eff_order_rule_discount + order_manual_discount;
+    let order_surcharge = eff_order_rule_surcharge + order_manual_surcharge;
 
     // Total discount and surcharge (item-level + order-level)
     let total_discount = item_discount_total + order_discount;
@@ -445,6 +447,8 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     snapshot.comp_total_amount = to_f64(comp_total);
     snapshot.order_manual_discount_amount = to_f64(order_manual_discount);
     snapshot.order_manual_surcharge_amount = to_f64(order_manual_surcharge);
+    snapshot.order_rule_discount_amount = Some(to_f64(eff_order_rule_discount));
+    snapshot.order_rule_surcharge_amount = Some(to_f64(eff_order_rule_surcharge));
     snapshot.total = to_f64(total);
     snapshot.remaining_amount = to_f64(remaining);
 
