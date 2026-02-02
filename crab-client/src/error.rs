@@ -172,6 +172,54 @@ impl From<tokio::sync::broadcast::error::RecvError> for ClientError {
 }
 
 // ============================================================================
+// HTTP Response Handling (shared by NetworkHttpClient and Remote mode)
+// ============================================================================
+
+/// 服务端返回的错误响应格式
+#[derive(serde::Deserialize)]
+pub(crate) struct ApiErrorResponse {
+    pub code: i32,
+    pub message: String,
+    #[serde(default)]
+    pub details: Option<serde_json::Value>,
+}
+
+/// 处理 reqwest::Response，统一错误映射。
+///
+/// NetworkHttpClient 和 CrabClient<Remote, Authenticated> 共用此函数，
+/// 确保两种模式的错误类型完全一致。
+pub(crate) async fn handle_reqwest_response<T: serde::de::DeserializeOwned>(
+    response: reqwest::Response,
+) -> ClientResult<T> {
+    let status = response.status();
+    if !status.is_success() {
+        let text = response.text().await?;
+        // 尝试解析为 API 错误响应
+        if let Ok(api_err) = serde_json::from_str::<ApiErrorResponse>(&text) {
+            return Err(ClientError::Api {
+                code: api_err.code,
+                message: api_err.message,
+                details: api_err.details,
+            });
+        }
+        // 降级到 HTTP 状态码映射
+        return match status {
+            reqwest::StatusCode::UNAUTHORIZED => {
+                Err(ClientError::Unauthorized("Unauthorized".into()))
+            }
+            reqwest::StatusCode::FORBIDDEN => Err(ClientError::Forbidden(text)),
+            reqwest::StatusCode::NOT_FOUND => Err(ClientError::NotFound(text)),
+            reqwest::StatusCode::BAD_REQUEST => Err(ClientError::Validation(text)),
+            _ => Err(ClientError::Internal(text)),
+        };
+    }
+    response
+        .json()
+        .await
+        .map_err(|e| ClientError::InvalidResponse(format!("JSON parse error: {}", e)))
+}
+
+// ============================================================================
 // Result type aliases
 // ============================================================================
 

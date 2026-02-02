@@ -3,8 +3,9 @@
 //! This module implements the Remote mode functionality, which uses
 //! mTLS certificates to connect to Edge Servers.
 
-use crate::error::ClientError;
+use crate::error::{handle_reqwest_response, ClientError, ClientResult};
 use crate::types::{Authenticated, Connected, Disconnected, Remote};
+use serde::de::DeserializeOwned;
 use shared::message::BusMessage;
 
 use super::http::HttpClient;
@@ -26,7 +27,7 @@ impl CrabClient<Remote, Disconnected> {
     /// 3. Saves certificates locally for future use
     /// 4. Connects to the Edge Server message bus
     ///
-    /// After calling this method, you can use `reconnect()` for subsequent connections.
+    /// After calling this method, you can use `connect_with_credentials()` for subsequent connections.
     ///
     /// # Arguments
     ///
@@ -122,10 +123,13 @@ impl CrabClient<Remote, Disconnected> {
         Ok(self.transition())
     }
 
-    /// Reconnects using cached certificates.
+    /// 使用本地缓存的证书和密钥连接到 Edge Server。
     ///
-    /// This method requires that `setup()` was called previously and certificates
-    /// are cached locally. Use `has_cached_credentials()` to check availability.
+    /// 要求之前已调用 `setup()` 下载并缓存了证书。
+    /// 可用 `has_cached_credentials()` 检查是否有缓存凭据。
+    ///
+    /// 连接前会自动执行自检（证书链验证、硬件绑定、时钟篡改检测），
+    /// 并尝试从 Auth Server 刷新时间戳（离线时不阻止连接）。
     ///
     /// # Arguments
     ///
@@ -143,12 +147,12 @@ impl CrabClient<Remote, Disconnected> {
     ///     .build()?;
     ///
     /// if client.has_cached_credentials() {
-    ///     let client = client.reconnect("edge.local:8081").await?;
+    ///     let client = client.connect_with_credentials("edge.local:8081").await?;
     /// }
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn reconnect(
+    pub async fn connect_with_credentials(
         mut self,
         message_addr: &str,
     ) -> Result<CrabClient<Remote, Connected>, ClientError> {
@@ -190,7 +194,7 @@ impl CrabClient<Remote, Disconnected> {
             .unwrap_or_default();
 
         // 3. Connect to message server
-        tracing::info!("Reconnecting to message server: {}", message_addr);
+        tracing::info!("Connecting to message server with cached credentials: {}", message_addr);
         let message_client = crate::client::message::NetworkMessageClient::connect_mtls(
             message_addr,
             ca_cert_pem.as_bytes(),
@@ -215,7 +219,7 @@ impl CrabClient<Remote, Disconnected> {
             tracing::info!("🔐 mTLS HTTP client created for Edge Server");
         }
 
-        tracing::info!("Reconnected using cached certificates.");
+        tracing::info!("Connected using cached certificates.");
         Ok(self.transition())
     }
 }
@@ -240,7 +244,7 @@ impl CrabClient<Remote, Connected> {
     /// #     .cert_path("./certs")
     /// #     .client_name("pos-01")
     /// #     .build()?
-    /// #     .reconnect("edge:8081").await?;
+    /// #     .connect_with_credentials("edge:8081").await?;
     /// let request = BusMessage::request_command(&shared::message::RequestCommandPayload {
     ///     action: "ping".to_string(),
     ///     params: None,
@@ -406,6 +410,103 @@ impl CrabClient<Remote, Connected> {
 // ============================================================================
 
 impl CrabClient<Remote, Authenticated> {
+    // ============ Edge Server HTTP API ============
+
+    /// 获取 Edge Server 请求上下文 (http_client, base_url, token)
+    fn edge_context(&self) -> ClientResult<(&reqwest::Client, &str, &str)> {
+        let http = self
+            .edge_http
+            .as_ref()
+            .ok_or_else(|| ClientError::Connection("mTLS HTTP client not available".into()))?;
+        let edge_url = self
+            .config
+            .edge_url
+            .as_deref()
+            .ok_or_else(|| ClientError::Config("Edge Server URL not configured".into()))?;
+        let token = self
+            .session
+            .token()
+            .ok_or_else(|| ClientError::InvalidState("Not authenticated".into()))?;
+        Ok((http, edge_url, token))
+    }
+
+    /// GET 请求到 Edge Server
+    pub async fn get<T: DeserializeOwned>(&self, path: &str) -> ClientResult<T> {
+        let (http, edge_url, token) = self.edge_context()?;
+        let url = format!("{}{}", edge_url, path);
+        let resp = http
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await?;
+        handle_reqwest_response(resp).await
+    }
+
+    /// POST 请求到 Edge Server
+    pub async fn post<T: DeserializeOwned, B: serde::Serialize + Sync>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> ClientResult<T> {
+        let (http, edge_url, token) = self.edge_context()?;
+        let url = format!("{}{}", edge_url, path);
+        let resp = http
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .json(body)
+            .send()
+            .await?;
+        handle_reqwest_response(resp).await
+    }
+
+    /// PUT 请求到 Edge Server
+    pub async fn put<T: DeserializeOwned, B: serde::Serialize + Sync>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> ClientResult<T> {
+        let (http, edge_url, token) = self.edge_context()?;
+        let url = format!("{}{}", edge_url, path);
+        let resp = http
+            .put(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .json(body)
+            .send()
+            .await?;
+        handle_reqwest_response(resp).await
+    }
+
+    /// DELETE 请求到 Edge Server
+    pub async fn delete<T: DeserializeOwned>(&self, path: &str) -> ClientResult<T> {
+        let (http, edge_url, token) = self.edge_context()?;
+        let url = format!("{}{}", edge_url, path);
+        let resp = http
+            .delete(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await?;
+        handle_reqwest_response(resp).await
+    }
+
+    /// DELETE 请求到 Edge Server (带 body)
+    pub async fn delete_with_body<T: DeserializeOwned, B: serde::Serialize + Sync>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> ClientResult<T> {
+        let (http, edge_url, token) = self.edge_context()?;
+        let url = format!("{}{}", edge_url, path);
+        let resp = http
+            .delete(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .json(body)
+            .send()
+            .await?;
+        handle_reqwest_response(resp).await
+    }
+
+    // ============ Message Bus RPC ============
+
     /// Sends an RPC request with the default timeout (5 seconds).
     ///
     /// # Example

@@ -28,9 +28,6 @@ pub enum BridgeError {
     #[error("Server error: {0}")]
     Server(String),
 
-    #[error("HTTP error {0}: {1}")]
-    Http(u16, String),
-
     #[error("Configuration error: {0}")]
     Config(String),
 

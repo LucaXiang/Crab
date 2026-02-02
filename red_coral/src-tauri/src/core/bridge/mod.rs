@@ -18,7 +18,7 @@ pub(crate) use types::{ClientMode, LocalClientState, RemoteClientState};
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
 
 use crab_client::CrabClient;
@@ -37,11 +37,10 @@ pub struct ClientBridge {
     config: RwLock<AppConfig>,
     /// 配置文件路径
     config_path: PathBuf,
-    /// 基础数据目录
-    #[allow(dead_code)]
-    base_path: PathBuf,
     /// Tauri AppHandle for emitting events (optional for testing)
     app_handle: Option<tauri::AppHandle>,
+    /// 自身引用 (用于 reconnect listener 中触发重建)
+    self_ref: Option<std::sync::Weak<RwLock<Self>>>,
 }
 
 impl ClientBridge {
@@ -71,14 +70,19 @@ impl ClientBridge {
             mode: RwLock::new(ClientMode::Disconnected),
             config: RwLock::new(config),
             config_path,
-            base_path,
             app_handle,
+            self_ref: None,
         })
     }
 
     /// Set the app handle after initialization
     pub fn set_app_handle(&mut self, handle: tauri::AppHandle) {
         self.app_handle = Some(handle);
+    }
+
+    /// 设置自身引用 (在 Arc<RwLock<ClientBridge>> 创建后调用)
+    pub fn set_self_ref(&mut self, weak: std::sync::Weak<RwLock<Self>>) {
+        self.self_ref = Some(weak);
     }
 
     /// 保存当前配置
@@ -1055,7 +1059,7 @@ impl ClientBridge {
             .client_name("") // 空字符串使 CertManager 直接使用 certs_dir
             .build()?;
 
-        let connected_client = client.reconnect(message_addr).await?;
+        let connected_client = client.connect_with_credentials(message_addr).await?;
 
         tracing::info!(edge_url = %edge_url, message_addr = %message_addr, "Client mode connected");
 
@@ -1116,6 +1120,12 @@ impl ClientBridge {
                 let handle_reconnect = handle.clone();
                 let token = client_shutdown_token.clone();
 
+                // 获取 bridge 自身引用（用于 ReconnectFailed 时触发重建）
+                let bridge_for_rebuild = self
+                    .self_ref
+                    .as_ref()
+                    .and_then(|w| w.upgrade());
+
                 tokio::spawn(async move {
                     loop {
                         tokio::select! {
@@ -1141,10 +1151,24 @@ impl ClientBridge {
                                                 }
                                             }
                                             ReconnectEvent::ReconnectFailed { attempts } => {
-                                                tracing::error!("Client reconnection failed after {} attempts", attempts);
+                                                tracing::error!("Client reconnection failed after {} attempts, triggering bridge rebuild", attempts);
                                                 if let Err(e) = handle_reconnect.emit("connection-state-changed", false) {
                                                     tracing::warn!("Failed to emit connection state: {}", e);
                                                 }
+
+                                                // 在独立 task 中执行重建
+                                                if let Some(ref bridge_arc) = bridge_for_rebuild {
+                                                    let bridge_arc = Arc::clone(bridge_arc);
+                                                    let rebuild_handle = handle_reconnect.clone();
+                                                    tauri::async_runtime::spawn(async move {
+                                                        do_rebuild_connection(bridge_arc, rebuild_handle).await;
+                                                    });
+                                                } else {
+                                                    tracing::warn!("No bridge self_ref available, cannot trigger rebuild");
+                                                }
+
+                                                // 退出此监听器（start_client_mode 会创建新的监听器）
+                                                break;
                                             }
                                         }
                                     }
@@ -1297,6 +1321,33 @@ impl ClientBridge {
         tracing::info!("Mode stopped, now disconnected");
 
         Ok(())
+    }
+
+    // ============ Client 模式连接重建 ============
+
+    /// 从当前 `ClientMode::Client` 读取连接参数，销毁旧 client 并重新连接。
+    ///
+    /// 仅在 Client 模式下有效，复用 `start_client_mode` 的逻辑。
+    pub async fn rebuild_client_connection(&self) -> Result<(), BridgeError> {
+        let (edge_url, message_addr) = {
+            let guard = self.mode.read().await;
+            match &*guard {
+                ClientMode::Client {
+                    edge_url,
+                    message_addr,
+                    ..
+                } => (edge_url.clone(), message_addr.clone()),
+                _ => return Err(BridgeError::NotInitialized),
+            }
+        };
+
+        tracing::info!(
+            edge_url = %edge_url,
+            message_addr = %message_addr,
+            "Rebuilding client connection..."
+        );
+
+        self.start_client_mode(&edge_url, &message_addr).await
     }
 
     /// 退出当前租户：停止服务器 → 清除当前租户选择（保留文件）
@@ -1641,40 +1692,6 @@ impl ClientBridge {
 
     // ============ 统一业务 API ============
 
-    /// 处理 HTTP 响应，尝试解析 JSON 错误
-    async fn handle_http_response<T>(resp: reqwest::Response) -> Result<T, BridgeError>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let text = resp.text().await.unwrap_or_default();
-
-            // 尝试解析为 JSON 错误信息
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
-                if let Some(msg) = json.get("message").and_then(|v| v.as_str()) {
-                    return Err(BridgeError::Http(status.as_u16(), msg.to_string()));
-                }
-                if let Some(error) = json.get("error").and_then(|v| v.as_str()) {
-                    return Err(BridgeError::Http(status.as_u16(), error.to_string()));
-                }
-            }
-
-            return Err(BridgeError::Http(
-                status.as_u16(),
-                if text.is_empty() {
-                    format!("HTTP Error: {}", status)
-                } else {
-                    text
-                },
-            ));
-        }
-
-        resp.json::<T>()
-            .await
-            .map_err(|e| BridgeError::Server(e.to_string()))
-    }
-
     /// 通用 GET 请求 (使用 CrabClient)
     pub async fn get<T>(&self, path: &str) -> Result<T, BridgeError>
     where
@@ -1689,22 +1706,9 @@ impl ClientBridge {
                 }
                 _ => Err(BridgeError::NotAuthenticated),
             },
-            ClientMode::Client {
-                client, edge_url, ..
-            } => match client {
+            ClientMode::Client { client, .. } => match client {
                 Some(RemoteClientState::Authenticated(auth)) => {
-                    let http = auth.edge_http_client().ok_or(BridgeError::NotInitialized)?;
-                    let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
-                    let url = format!("{}{}", edge_url, path);
-
-                    let resp = http
-                        .get(&url)
-                        .header("Authorization", format!("Bearer {}", token))
-                        .send()
-                        .await
-                        .map_err(|e| BridgeError::Server(e.to_string()))?;
-
-                    Self::handle_http_response(resp).await
+                    auth.get(path).await.map_err(BridgeError::Client)
                 }
                 _ => Err(BridgeError::NotAuthenticated),
             },
@@ -1727,23 +1731,9 @@ impl ClientBridge {
                 }
                 _ => Err(BridgeError::NotAuthenticated),
             },
-            ClientMode::Client {
-                client, edge_url, ..
-            } => match client {
+            ClientMode::Client { client, .. } => match client {
                 Some(RemoteClientState::Authenticated(auth)) => {
-                    let http = auth.edge_http_client().ok_or(BridgeError::NotInitialized)?;
-                    let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
-                    let url = format!("{}{}", edge_url, path);
-
-                    let resp = http
-                        .post(&url)
-                        .header("Authorization", format!("Bearer {}", token))
-                        .json(body)
-                        .send()
-                        .await
-                        .map_err(|e| BridgeError::Server(e.to_string()))?;
-
-                    Self::handle_http_response(resp).await
+                    auth.post(path, body).await.map_err(BridgeError::Client)
                 }
                 _ => Err(BridgeError::NotAuthenticated),
             },
@@ -1766,30 +1756,9 @@ impl ClientBridge {
                 }
                 _ => Err(BridgeError::NotAuthenticated),
             },
-            ClientMode::Client {
-                client, edge_url, ..
-            } => match client {
+            ClientMode::Client { client, .. } => match client {
                 Some(RemoteClientState::Authenticated(auth)) => {
-                    let http = auth.edge_http_client().ok_or(BridgeError::NotInitialized)?;
-                    let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
-                    let url = format!("{}{}", edge_url, path);
-
-                    let resp = http
-                        .put(&url)
-                        .header("Authorization", format!("Bearer {}", token))
-                        .json(body)
-                        .send()
-                        .await
-                        .map_err(|e| BridgeError::Server(e.to_string()))?;
-
-                    if !resp.status().is_success() {
-                        let text = resp.text().await.unwrap_or_default();
-                        return Err(BridgeError::Server(text));
-                    }
-
-                    resp.json::<T>()
-                        .await
-                        .map_err(|e| BridgeError::Server(e.to_string()))
+                    auth.put(path, body).await.map_err(BridgeError::Client)
                 }
                 _ => Err(BridgeError::NotAuthenticated),
             },
@@ -1811,29 +1780,9 @@ impl ClientBridge {
                 }
                 _ => Err(BridgeError::NotAuthenticated),
             },
-            ClientMode::Client {
-                client, edge_url, ..
-            } => match client {
+            ClientMode::Client { client, .. } => match client {
                 Some(RemoteClientState::Authenticated(auth)) => {
-                    let http = auth.edge_http_client().ok_or(BridgeError::NotInitialized)?;
-                    let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
-                    let url = format!("{}{}", edge_url, path);
-
-                    let resp = http
-                        .delete(&url)
-                        .header("Authorization", format!("Bearer {}", token))
-                        .send()
-                        .await
-                        .map_err(|e| BridgeError::Server(e.to_string()))?;
-
-                    if !resp.status().is_success() {
-                        let text = resp.text().await.unwrap_or_default();
-                        return Err(BridgeError::Server(text));
-                    }
-
-                    resp.json::<T>()
-                        .await
-                        .map_err(|e| BridgeError::Server(e.to_string()))
+                    auth.delete(path).await.map_err(BridgeError::Client)
                 }
                 _ => Err(BridgeError::NotAuthenticated),
             },
@@ -1857,24 +1806,11 @@ impl ClientBridge {
                     .map_err(BridgeError::Client),
                 _ => Err(BridgeError::NotAuthenticated),
             },
-            ClientMode::Client {
-                client, edge_url, ..
-            } => match client {
-                Some(RemoteClientState::Authenticated(auth)) => {
-                    let http = auth.edge_http_client().ok_or(BridgeError::NotInitialized)?;
-                    let token = auth.token().ok_or(BridgeError::NotAuthenticated)?;
-                    let url = format!("{}{}", edge_url, path);
-
-                    let resp = http
-                        .delete(&url)
-                        .header("Authorization", format!("Bearer {}", token))
-                        .json(body)
-                        .send()
-                        .await
-                        .map_err(|e| BridgeError::Server(e.to_string()))?;
-
-                    Self::handle_http_response(resp).await
-                }
+            ClientMode::Client { client, .. } => match client {
+                Some(RemoteClientState::Authenticated(auth)) => auth
+                    .delete_with_body(path, body)
+                    .await
+                    .map_err(BridgeError::Client),
                 _ => Err(BridgeError::NotAuthenticated),
             },
             ClientMode::Disconnected => Err(BridgeError::NotInitialized),
@@ -2314,4 +2250,71 @@ impl ClientBridge {
             ClientMode::Disconnected => Err(BridgeError::NotInitialized),
         }
     }
+}
+
+// ============================================================================
+// 独立重建函数（在 tokio::spawn 中使用，避免 Send 问题）
+// ============================================================================
+
+/// Client 模式连接重建（限次 + 指数退避）。
+///
+/// 当 `NetworkMessageClient` 的 `reconnect_loop` 耗尽所有重连尝试后，
+/// bridge 层会调用此函数进行更高层级的重建：销毁旧 client，重新执行
+/// `start_client_mode` 建立全新连接。
+///
+/// - 最多 3 次重建，每次间隔指数退避 (5s → 10s → 20s)
+/// - 每次重建内部 CrabClient 会再尝试 20 次网络重连
+/// - 全部失败后切换到 `ClientMode::Disconnected`，通知前端
+async fn do_rebuild_connection(
+    bridge_arc: Arc<RwLock<ClientBridge>>,
+    app_handle: tauri::AppHandle,
+) {
+    const MAX_REBUILDS: u32 = 3;
+    let base_delay = std::time::Duration::from_secs(5);
+    let mut delay = base_delay;
+
+    for attempt in 1..=MAX_REBUILDS {
+        tracing::info!(
+            attempt,
+            MAX_REBUILDS,
+            delay_secs = delay.as_secs(),
+            "Bridge rebuild attempt"
+        );
+
+        tokio::time::sleep(delay).await;
+
+        let result = {
+            let bridge = bridge_arc.read().await;
+            bridge.rebuild_client_connection().await
+        };
+
+        match result {
+            Ok(()) => {
+                tracing::info!(attempt, "Bridge rebuild succeeded");
+                return;
+            }
+            Err(e) => {
+                tracing::warn!(attempt, MAX_REBUILDS, error = %e, "Bridge rebuild failed");
+            }
+        }
+
+        delay *= 2;
+    }
+
+    // 全部失败：切换到 Disconnected
+    tracing::error!(
+        MAX_REBUILDS,
+        "All bridge rebuild attempts exhausted, switching to Disconnected"
+    );
+    {
+        let bridge = bridge_arc.read().await;
+        let mut guard = bridge.mode.write().await;
+        if let ClientMode::Client { shutdown_token, .. } = &*guard {
+            shutdown_token.cancel();
+        }
+        *guard = ClientMode::Disconnected;
+    }
+
+    let _ = app_handle.emit("connection-state-changed", false);
+    let _ = app_handle.emit("connection-permanently-lost", true);
 }

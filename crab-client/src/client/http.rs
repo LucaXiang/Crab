@@ -3,17 +3,8 @@
 
 use crate::{ClientError, ClientResult, CurrentUserResponse, LoginResponse};
 use async_trait::async_trait;
-use reqwest::{Client, StatusCode};
+use reqwest::Client;
 use serde::de::DeserializeOwned;
-
-/// 服务端返回的错误响应格式
-#[derive(serde::Deserialize)]
-struct ApiErrorResponse {
-    pub code: i32,
-    pub message: String,
-    #[serde(default)]
-    pub details: Option<serde_json::Value>,
-}
 
 /// HTTP 客户端 trait
 #[async_trait]
@@ -75,27 +66,7 @@ impl NetworkHttpClient {
         &self,
         response: reqwest::Response,
     ) -> ClientResult<T> {
-        let status = response.status();
-        if !status.is_success() {
-            let text = response.text().await?;
-            // 尝试解析为 API 错误响应
-            if let Ok(api_err) = serde_json::from_str::<ApiErrorResponse>(&text) {
-                return Err(ClientError::Api {
-                    code: api_err.code,
-                    message: api_err.message,
-                    details: api_err.details,
-                });
-            }
-            // 降级到原来的处理方式
-            return match status {
-                StatusCode::UNAUTHORIZED => Err(ClientError::Unauthorized("Unauthorized".into())),
-                StatusCode::FORBIDDEN => Err(ClientError::Forbidden(text)),
-                StatusCode::NOT_FOUND => Err(ClientError::NotFound(text)),
-                StatusCode::BAD_REQUEST => Err(ClientError::Validation(text)),
-                _ => Err(ClientError::Internal(text)),
-            };
-        }
-        Ok(response.json().await?)
+        crate::error::handle_reqwest_response(response).await
     }
 }
 
