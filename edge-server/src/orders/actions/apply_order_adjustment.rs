@@ -107,6 +107,7 @@ impl CommandHandler for ApplyOrderDiscountAction {
 #[derive(Debug, Clone)]
 pub struct ApplyOrderSurchargeAction {
     pub order_id: String,
+    pub surcharge_percent: Option<f64>,
     pub surcharge_amount: Option<f64>,
     pub reason: Option<String>,
     pub authorizer_id: Option<String>,
@@ -130,7 +131,24 @@ impl CommandHandler for ApplyOrderSurchargeAction {
             ));
         }
 
-        // 3. Validate: surcharge_amount 必须为正（如果有值）
+        // 3. Validate: percent 和 fixed 互斥
+        if self.surcharge_percent.is_some() && self.surcharge_amount.is_some() {
+            return Err(OrderError::InvalidOperation(
+                "surcharge_percent and surcharge_amount are mutually exclusive".to_string(),
+            ));
+        }
+
+        // 4. Validate: percent 范围 0-100
+        if let Some(pct) = self.surcharge_percent {
+            if !pct.is_finite() || pct <= 0.0 || pct > 100.0 {
+                return Err(OrderError::InvalidOperation(format!(
+                    "surcharge_percent must be between 0 and 100, got {}",
+                    pct
+                )));
+            }
+        }
+
+        // 5. Validate: surcharge_amount 必须为正（如果有值）
         if let Some(amount) = self.surcharge_amount {
             if !amount.is_finite() || amount <= 0.0 {
                 return Err(OrderError::InvalidOperation(format!(
@@ -140,16 +158,18 @@ impl CommandHandler for ApplyOrderSurchargeAction {
             }
         }
 
-        // 4. Record previous value
+        // 6. Record previous values
+        let previous_surcharge_percent = snapshot.order_manual_surcharge_percent;
         let previous_surcharge_amount = snapshot.order_manual_surcharge_fixed;
 
-        // 5. Apply new surcharge to snapshot (for recalculate_totals)
+        // 7. Apply new surcharge to snapshot (for recalculate_totals)
+        snapshot.order_manual_surcharge_percent = self.surcharge_percent;
         snapshot.order_manual_surcharge_fixed = self.surcharge_amount;
 
-        // 6. Recalculate totals
+        // 8. Recalculate totals
         recalculate_totals(&mut snapshot);
 
-        // 7. Generate event
+        // 9. Generate event
         let seq = ctx.next_sequence();
         let event = OrderEvent::new(
             seq,
@@ -160,7 +180,9 @@ impl CommandHandler for ApplyOrderSurchargeAction {
             Some(metadata.timestamp),
             OrderEventType::OrderSurchargeApplied,
             EventPayload::OrderSurchargeApplied {
+                surcharge_percent: self.surcharge_percent,
                 surcharge_amount: self.surcharge_amount,
+                previous_surcharge_percent,
                 previous_surcharge_amount,
                 reason: self.reason.clone(),
                 authorizer_id: self.authorizer_id.clone(),
@@ -168,6 +190,9 @@ impl CommandHandler for ApplyOrderSurchargeAction {
                 subtotal: snapshot.subtotal,
                 surcharge: to_f64(
                     snapshot.order_rule_surcharge_amount.map(to_decimal).unwrap_or(Decimal::ZERO)
+                        + snapshot.order_manual_surcharge_percent
+                            .map(|p| to_decimal(snapshot.subtotal) * to_decimal(p) / Decimal::ONE_HUNDRED)
+                            .unwrap_or(Decimal::ZERO)
                         + snapshot.order_manual_surcharge_fixed.map(to_decimal).unwrap_or(Decimal::ZERO),
                 ),
                 total: snapshot.total,
@@ -517,6 +542,7 @@ mod tests {
 
         let action = ApplyOrderSurchargeAction {
             order_id: "order-1".to_string(),
+            surcharge_percent: None,
             surcharge_amount: Some(15.0),
             reason: Some("Large party".to_string()),
             authorizer_id: Some("mgr-1".to_string()),
@@ -565,6 +591,7 @@ mod tests {
 
         let action = ApplyOrderSurchargeAction {
             order_id: "order-1".to_string(),
+            surcharge_percent: None,
             surcharge_amount: None, // 清除
             reason: None,
             authorizer_id: None,
@@ -603,6 +630,7 @@ mod tests {
 
         let action = ApplyOrderSurchargeAction {
             order_id: "order-1".to_string(),
+            surcharge_percent: None,
             surcharge_amount: Some(-5.0),
             reason: None,
             authorizer_id: None,
@@ -629,6 +657,7 @@ mod tests {
 
         let action = ApplyOrderSurchargeAction {
             order_id: "order-1".to_string(),
+            surcharge_percent: None,
             surcharge_amount: Some(10.0),
             reason: None,
             authorizer_id: None,
@@ -648,6 +677,7 @@ mod tests {
 
         let action = ApplyOrderSurchargeAction {
             order_id: "nonexistent".to_string(),
+            surcharge_percent: None,
             surcharge_amount: Some(10.0),
             reason: None,
             authorizer_id: None,
@@ -741,6 +771,7 @@ mod tests {
 
         let action = ApplyOrderSurchargeAction {
             order_id: "order-1".to_string(),
+            surcharge_percent: None,
             surcharge_amount: Some(f64::NAN),
             reason: None,
             authorizer_id: None,

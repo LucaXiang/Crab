@@ -102,15 +102,20 @@ function handleAuthError(code: number) {
   }
 }
 
-/** 根据错误码查找本地化消息 */
-function localizeErrorCode(code: number): string {
+/** 根据错误码 + 原始消息生成用户友好的错误提示 */
+function localizeErrorCode(code: number, rawMessage?: string): string {
+  // 优先用错误码查 i18n
   const key = `errors.${code}`;
   const localized = t(key);
-  if (localized === key) {
-    console.warn(`[invokeApi] Missing i18n for error code ${code}, add to zh-CN.json`);
-    return `${t('error.friendly.unknown')} (${code})`;
+  if (localized !== key) {
+    return localized;
   }
-  return localized;
+  // i18n 没有对应 key，用 rawMessage 做关键词匹配作为 fallback
+  console.warn(`[invokeApi] Missing i18n for error code ${code}, add to zh-CN.json`);
+  if (rawMessage) {
+    return friendlyError(rawMessage);
+  }
+  return `${t('error.friendly.unknown')} (${code})`;
 }
 
 export async function invokeApi<T>(command: string, args?: Record<string, unknown>): Promise<T> {
@@ -118,7 +123,7 @@ export async function invokeApi<T>(command: string, args?: Record<string, unknow
     const response = await invoke<ApiResponse<T>>(command, args);
     if (response.code && response.code > 0) {
       handleAuthError(response.code);
-      throw new ApiError(response.code, localizeErrorCode(response.code), response.details ?? undefined);
+      throw new ApiError(response.code, localizeErrorCode(response.code, response.message), response.details ?? undefined);
     }
     return response.data as T;
   } catch (error) {

@@ -420,6 +420,13 @@
         "loss_settled": "损失结算",
         "loss_settled_desc": "部分付款，剩余计入损失"
       },
+      "cancel_reason": {
+        "title": "选择取消原因",
+        "customer_cancelled": "客户取消",
+        "system_test": "系统测试",
+        "duplicate_order": "重复下单",
+        "other": "其他原因"
+      },
       "loss_reason": {
         "title": "选择损失原因",
         "customer_fled": "顾客逃单",
@@ -481,6 +488,55 @@
     "timeline": {
       "label": "标签",
       "title": "操作记录"
+    },
+    "comp": {
+      "title": "赠送菜品",
+      "desc": "选择要赠送的菜品",
+      "reason_label": "赠送原因",
+      "reason_placeholder": "请输入赠送原因",
+      "preset": {
+        "customer_complaint": "顾客投诉",
+        "item_defect": "菜品瑕疵",
+        "promotion": "促销活动",
+        "staff_error": "员工错误"
+      },
+      "quantity_label": "赠送数量",
+      "confirm": "确认赠送",
+      "auth_required": "赠送菜品需要授权",
+      "badge": "赠送",
+      "no_items": "没有可赠送的菜品",
+      "select_item": "请选择要赠送的菜品",
+      "uncomp": "撤销赠送",
+      "uncomp_confirm": "确定撤销此菜品的赠送？价格将恢复为原价。",
+      "uncomp_auth_required": "撤销赠送需要授权"
+    },
+    "order_discount": {
+      "title": "整单折扣",
+      "desc": "为整单应用折扣",
+      "type_percent": "百分比折扣",
+      "type_fixed": "固定金额",
+      "percent_placeholder": "输入折扣百分比",
+      "fixed_placeholder": "输入折扣金额",
+      "reason_placeholder": "输入折扣原因（可选）",
+      "confirm": "应用折扣",
+      "clear": "清除折扣",
+      "current_percent": "当前折扣: {value}%",
+      "current_fixed": "当前折扣: {value}",
+      "auth_required": "整单折扣需要授权"
+    },
+    "order_surcharge": {
+      "title": "整单附加费",
+      "desc": "为整单应用附加费",
+      "type_percent": "百分比",
+      "type_fixed": "固定金额",
+      "percent_placeholder": "输入附加费百分比",
+      "amount_placeholder": "输入附加费金额",
+      "reason_placeholder": "输入附加费原因（可选）",
+      "confirm": "应用附加费",
+      "clear": "清除附加费",
+      "current": "当前附加费: {value}",
+      "current_percent": "当前附加费: {value}%",
+      "auth_required": "整单附加费需要授权"
     }
   },
   "table": {
@@ -653,6 +709,12 @@
     "order_merged_out": "转出合并",
     "pre_payment_printed": "预付小票",
     "pre_payment_note": "预付备注",
+    "item_comped": "赠送菜品",
+    "item_uncomped": "撤销赠送",
+    "discount_applied": "应用整单折扣",
+    "discount_cleared": "清除整单折扣",
+    "surcharge_applied": "应用整单附加费",
+    "surcharge_cleared": "清除整单附加费",
     "surcharge_exempt": "免除附加费",
     "from": "从",
     "to": "至",
@@ -1406,6 +1468,7 @@
       "orders_write": "创建订单",
       "void_order": "作废订单",
       "apply_discount": "应用折扣",
+      "comp_item": "赠送菜品",
       "refund_order": "退款订单",
       "cancel_item": "取消单品",
       "users_read": "查看用户",

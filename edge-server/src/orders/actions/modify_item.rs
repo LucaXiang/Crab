@@ -57,7 +57,21 @@ impl CommandHandler for ModifyItemAction {
             .find(|i| i.instance_id == self.instance_id)
             .ok_or_else(|| OrderError::ItemNotFound(self.instance_id.clone()))?;
 
-        // 5. Validate affected quantity
+        // 5. Reject modifications to comped items (locked)
+        if item.is_comped {
+            return Err(OrderError::InvalidOperation(
+                "Cannot modify a comped item".to_string(),
+            ));
+        }
+
+        // 6. Reject no-op modifications (all specified changes match current state)
+        if !has_actual_changes(item, &self.changes) {
+            return Err(OrderError::InvalidOperation(
+                "No actual changes detected".to_string(),
+            ));
+        }
+
+        // 7. Validate affected quantity
         let affected_qty = self.affected_quantity.unwrap_or(item.quantity);
         if affected_qty <= 0 {
             return Err(OrderError::InvalidOperation(
@@ -68,7 +82,7 @@ impl CommandHandler for ModifyItemAction {
             return Err(OrderError::InsufficientQuantity);
         }
 
-        // 6. Calculate previous values for audit trail
+        // 8. Calculate previous values for audit trail
         let previous_values = ItemChanges {
             price: if self.changes.price.is_some() {
                 Some(item.price)
@@ -102,16 +116,16 @@ impl CommandHandler for ModifyItemAction {
             },
         };
 
-        // 7. Determine operation type for audit
+        // 9. Determine operation type for audit
         let operation = determine_operation(&self.changes);
 
-        // 8. Calculate modification results (handle split scenario)
+        // 10. Calculate modification results (handle split scenario)
         let results = calculate_modification_results(item, affected_qty, &self.changes);
 
-        // 9. Allocate sequence number
+        // 11. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 10. Create event
+        // 12. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -134,6 +148,72 @@ impl CommandHandler for ModifyItemAction {
 
         Ok(vec![event])
     }
+}
+
+/// Check if the changes contain any actual difference from the current item state.
+///
+/// Returns `false` (no-op) when all specified fields match current values.
+/// Treats `None` and `Some(0.0)` as equivalent for discount.
+fn has_actual_changes(item: &CartItemSnapshot, changes: &ItemChanges) -> bool {
+    if let Some(price) = changes.price {
+        if (price - item.price).abs() > f64::EPSILON {
+            return true;
+        }
+    }
+    if let Some(qty) = changes.quantity {
+        if qty != item.quantity {
+            return true;
+        }
+    }
+    if let Some(discount) = changes.manual_discount_percent {
+        let current = item.manual_discount_percent.unwrap_or(0.0);
+        if (discount - current).abs() > f64::EPSILON {
+            return true;
+        }
+    }
+    if let Some(ref note) = changes.note {
+        if item.note.as_ref() != Some(note) {
+            return true;
+        }
+    }
+    if let Some(ref new_opts) = changes.selected_options {
+        let current = item.selected_options.as_deref().unwrap_or(&[]);
+        if new_opts.len() != current.len() {
+            return true;
+        }
+        // Compare by (attribute_id, option_idx) pairs
+        let mut new_keys: Vec<_> = new_opts
+            .iter()
+            .map(|o| (&o.attribute_id, o.option_idx))
+            .collect();
+        let mut cur_keys: Vec<_> = current
+            .iter()
+            .map(|o| (&o.attribute_id, o.option_idx))
+            .collect();
+        new_keys.sort();
+        cur_keys.sort();
+        if new_keys != cur_keys {
+            return true;
+        }
+    }
+    if let Some(ref new_spec) = changes.selected_specification {
+        match &item.selected_specification {
+            None => return true, // adding a spec is a change
+            Some(curr) => {
+                if new_spec.id != curr.id {
+                    return true;
+                }
+                // Compare price (both optional)
+                let new_p = new_spec.price.unwrap_or(0.0);
+                let cur_p = curr.price.unwrap_or(0.0);
+                if (new_p - cur_p).abs() > f64::EPSILON {
+                    return true;
+                }
+            }
+        }
+    }
+    // All specified fields match current state, or no fields specified
+    false
 }
 
 /// Determine the operation type based on changes
@@ -809,6 +889,262 @@ mod tests {
             assert!(previous_values.selected_specification.is_none());
         } else {
             panic!("Expected ItemModified payload");
+        }
+    }
+
+    // ---- No-op detection tests ----
+
+    #[tokio::test]
+    async fn test_modify_item_no_op_empty_changes_rejected() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 2);
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        // Send empty changes
+        let action = ModifyItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            affected_quantity: None,
+            changes: ItemChanges::default(),
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
+
+    #[tokio::test]
+    async fn test_modify_item_no_op_same_price_rejected() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        // Send same price as current
+        let action = ModifyItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            affected_quantity: None,
+            changes: ItemChanges {
+                price: Some(10.0),
+                ..Default::default()
+            },
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
+
+    #[tokio::test]
+    async fn test_modify_item_no_op_discount_none_vs_zero_rejected() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        // Item has manual_discount_percent = None
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        // Send discount = 0 (should be treated as same as None)
+        let action = ModifyItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            affected_quantity: None,
+            changes: ItemChanges {
+                manual_discount_percent: Some(0.0),
+                ..Default::default()
+            },
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
+
+    #[tokio::test]
+    async fn test_modify_item_no_op_same_options_rejected() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let opts = vec![shared::order::ItemOption {
+            attribute_id: "attribute:a1".to_string(),
+            attribute_name: "Size".to_string(),
+            option_idx: 1,
+            option_name: "Large".to_string(),
+            price_modifier: Some(2.0),
+        }];
+
+        let mut item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        item.selected_options = Some(opts.clone());
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        // Send same options
+        let action = ModifyItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            affected_quantity: None,
+            changes: ItemChanges {
+                selected_options: Some(opts),
+                ..Default::default()
+            },
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
+
+    #[tokio::test]
+    async fn test_modify_item_no_op_same_spec_rejected() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let spec = shared::order::SpecificationInfo {
+            id: "0".to_string(),
+            name: "CCC".to_string(),
+            external_id: None,
+            receipt_name: None,
+            price: Some(10.0),
+        };
+
+        let mut item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        item.selected_specification = Some(spec.clone());
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        // Send same spec
+        let action = ModifyItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            affected_quantity: None,
+            changes: ItemChanges {
+                selected_specification: Some(spec),
+                ..Default::default()
+            },
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
+
+    #[test]
+    fn test_has_actual_changes_detects_real_changes() {
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 2);
+
+        // Different price → true
+        assert!(has_actual_changes(
+            &item,
+            &ItemChanges { price: Some(15.0), ..Default::default() }
+        ));
+
+        // Different quantity → true
+        assert!(has_actual_changes(
+            &item,
+            &ItemChanges { quantity: Some(5), ..Default::default() }
+        ));
+
+        // Different discount → true
+        assert!(has_actual_changes(
+            &item,
+            &ItemChanges { manual_discount_percent: Some(10.0), ..Default::default() }
+        ));
+
+        // Adding options → true
+        assert!(has_actual_changes(
+            &item,
+            &ItemChanges {
+                selected_options: Some(vec![shared::order::ItemOption {
+                    attribute_id: "a1".to_string(),
+                    attribute_name: "Size".to_string(),
+                    option_idx: 1,
+                    option_name: "Large".to_string(),
+                    price_modifier: None,
+                }]),
+                ..Default::default()
+            }
+        ));
+
+        // Adding spec → true
+        assert!(has_actual_changes(
+            &item,
+            &ItemChanges {
+                selected_specification: Some(shared::order::SpecificationInfo {
+                    id: "0".to_string(),
+                    name: "Large".to_string(),
+                    external_id: None,
+                    receipt_name: None,
+                    price: Some(15.0),
+                }),
+                ..Default::default()
+            }
+        ));
+    }
+
+    // ---- Comped item protection tests ----
+
+    #[tokio::test]
+    async fn test_modify_comped_item_rejected() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut item = create_test_item("item-1", "product:p1", "Comp Beer", 5.0, 1);
+        item.is_comped = true;
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = ModifyItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            affected_quantity: None,
+            changes: ItemChanges {
+                price: Some(10.0),
+                ..Default::default()
+            },
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        if let Err(OrderError::InvalidOperation(msg)) = result {
+            assert!(msg.contains("comped"), "Error message should mention comped: {msg}");
         }
     }
 }

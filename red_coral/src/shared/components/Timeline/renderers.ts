@@ -56,10 +56,17 @@ export interface TimelineTag {
   type: 'item' | 'payment';
 }
 
+export interface DetailTag {
+  label: string;
+  value: string;
+  colorClass: string;
+}
+
 export interface TimelineDisplayData {
   title: string;
   summary?: string;
   details: string[];
+  detailTags?: DetailTag[];
   icon: LucideIcon | React.FC<any>;
   colorClass: string;
   customColor?: string;
@@ -747,24 +754,31 @@ const RuleSkipToggledRenderer: EventRenderer<RuleSkipToggledPayload> = {
 const OrderDiscountAppliedRenderer: EventRenderer<OrderDiscountAppliedPayload> = {
   render(event, payload, t) {
     const details: string[] = [];
+    const detailTags: DetailTag[] = [];
     const isClearing = !payload.discount_percent && !payload.discount_fixed;
 
     if (payload.discount_percent != null) {
-      details.push(`${t('timeline.labels.discount')}: ${payload.discount_percent}%`);
-    }
-    if (payload.discount_fixed != null) {
-      details.push(`${t('timeline.labels.discount')}: ${formatCurrency(payload.discount_fixed)}`);
+      const computed = payload.discount !== 0 ? ` (-${formatCurrency(payload.discount)})` : '';
+      detailTags.push({
+        label: t('timeline.labels.discount'),
+        value: `${payload.discount_percent}%${computed}`,
+        colorClass: 'bg-blue-100 text-blue-700 border-blue-200',
+      });
+    } else if (payload.discount_fixed != null) {
+      detailTags.push({
+        label: t('timeline.labels.discount'),
+        value: `-${formatCurrency(payload.discount_fixed)}`,
+        colorClass: 'bg-blue-100 text-blue-700 border-blue-200',
+      });
     }
     details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
-    if (payload.discount !== 0) {
-      details.push(`${t('timeline.labels.discount')}: -${formatCurrency(payload.discount)}`);
-    }
     details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`);
 
     return {
       title: isClearing ? t('timeline.discount_cleared') : t('timeline.discount_applied'),
       summary: payload.reason ?? undefined,
       details,
+      detailTags,
       icon: Tag,
       colorClass: isClearing ? 'bg-gray-400' : 'bg-blue-400',
       timestamp: event.timestamp,
@@ -775,21 +789,31 @@ const OrderDiscountAppliedRenderer: EventRenderer<OrderDiscountAppliedPayload> =
 const OrderSurchargeAppliedRenderer: EventRenderer<OrderSurchargeAppliedPayload> = {
   render(event, payload, t) {
     const details: string[] = [];
-    const isClearing = payload.surcharge_amount == null;
+    const detailTags: DetailTag[] = [];
+    const isClearing = !payload.surcharge_amount && !payload.surcharge_percent;
 
-    if (payload.surcharge_amount != null) {
-      details.push(`${t('timeline.labels.surcharge')}: +${formatCurrency(payload.surcharge_amount)}`);
+    if (payload.surcharge_percent != null) {
+      const computed = payload.surcharge !== 0 ? ` (+${formatCurrency(payload.surcharge)})` : '';
+      detailTags.push({
+        label: t('timeline.labels.surcharge'),
+        value: `${payload.surcharge_percent}%${computed}`,
+        colorClass: 'bg-purple-100 text-purple-700 border-purple-200',
+      });
+    } else if (payload.surcharge_amount != null) {
+      detailTags.push({
+        label: t('timeline.labels.surcharge'),
+        value: `+${formatCurrency(payload.surcharge_amount)}`,
+        colorClass: 'bg-purple-100 text-purple-700 border-purple-200',
+      });
     }
     details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
-    if (payload.surcharge !== 0) {
-      details.push(`${t('timeline.labels.surcharge')}: +${formatCurrency(payload.surcharge)}`);
-    }
     details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`);
 
     return {
       title: isClearing ? t('timeline.surcharge_cleared') : t('timeline.surcharge_applied'),
       summary: payload.reason ?? undefined,
       details,
+      detailTags,
       icon: Tag,
       colorClass: isClearing ? 'bg-gray-400' : 'bg-yellow-400',
       timestamp: event.timestamp,

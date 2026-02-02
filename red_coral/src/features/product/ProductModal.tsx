@@ -59,8 +59,9 @@ export const ProductModal: React.FC = React.memo(() => {
         categoryStore.fetchAll();
       }
       // Auto-select first category if none selected and creating a new product
+      // 使用 setAsyncFormData 同时更新 formData 和 formInitialData，避免误判 dirty
       if (categories.length > 0 && modal.action === 'CREATE' && !formData.category && !defaultCategorySet.current) {
-        setFormData({ category: categories[0].id ?? '' });
+        setAsyncFormData({ category: categories[0].id ?? '' });
         defaultCategorySet.current = true;
       }
     }
@@ -154,6 +155,7 @@ export const ProductModal: React.FC = React.memo(() => {
 
   const handleSave = async () => {
     if (isSaving) return;
+    if (!isFormDirty) return;
 
     const hasError = Object.values(formErrors).some(Boolean);
     if (hasError) {

@@ -162,6 +162,7 @@ export const Permission = {
   ORDERS_WRITE: 'orders:write' as Permission,
   ORDERS_VOID: 'orders:void' as Permission,
   ORDERS_DISCOUNT: 'orders:discount' as Permission,
+  ORDERS_COMP: 'orders:comp' as Permission,
   ORDERS_REFUND: 'orders:refund' as Permission,
   ORDERS_CANCEL_ITEM: 'orders:cancel_item' as Permission,
   // Zone & Table permissions

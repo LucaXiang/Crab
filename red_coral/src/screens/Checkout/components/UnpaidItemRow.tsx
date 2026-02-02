@@ -4,6 +4,7 @@ import { useLongPress } from '@/hooks/useLongPress';
 import { formatCurrency } from '@/utils/currency';
 import { t } from '@/infrastructure/i18n';
 import { GroupedOptionsList } from '@/shared/components';
+import { Gift } from 'lucide-react';
 
 interface UnpaidItemRowProps {
   item: CartItem;
@@ -35,6 +36,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
   const hasDiscount = discountPercent > 0 || basePrice !== unitPrice;
   const isSelectMode = mode === 'SELECT';
 
+  const isComped = !!item.is_comped;
   const hasMultiSpec = item.selected_specification?.is_multi_spec;
   const hasOptions = item.selected_options && item.selected_options.length > 0;
   const hasNote = item.note && item.note.trim().length > 0;
@@ -42,7 +44,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
   const clickHandlers = useLongPress(
     () => {},
     () => {
-      if (isSelectMode) {
+      if (isSelectMode && !isComped) {
         onEditItem(item);
       }
     },
@@ -53,10 +55,12 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
     <div
       {...clickHandlers}
       className={`
-        group relative bg-white border rounded-xl p-4 transition-all duration-200 select-none
-        ${isSelected
-          ? 'border-blue-500 ring-1 ring-blue-500 shadow-md bg-blue-50/5'
-          : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
+        group relative border rounded-xl p-4 transition-all duration-200 select-none
+        ${isComped
+          ? 'bg-emerald-50/50 border-emerald-200'
+          : isSelected
+            ? 'bg-white border-blue-500 ring-1 ring-blue-500 shadow-md bg-blue-50/5'
+            : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-md'
         }
         ${isSelectMode ? 'cursor-pointer hover:bg-gray-50' : ''}
       `}
@@ -87,16 +91,16 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
             </div>
           )}
 
-          {/* Line 5: Instance ID + Quantity × Unit Price */}
+          {/* Line 5: Quantity × Unit Price */}
           <div className="flex items-center gap-2 mt-2 text-sm text-gray-500 tabular-nums">
-            {item.instance_id && (
-              <span className="px-1.5 py-0.5 rounded text-[0.625rem] font-bold font-mono border bg-blue-100 text-blue-600 border-blue-200">
-                #{item.instance_id.slice(-5)}
-              </span>
-            )}
             <span className="font-medium">x{remainingQty}</span>
             <span className="w-1 h-1 bg-gray-300 rounded-full" />
-            {hasDiscount ? (
+            {isComped ? (
+              <>
+                <span className="line-through text-gray-400">{formatCurrency(item.original_price ?? basePrice)}</span>
+                <span className="font-semibold text-emerald-600">{formatCurrency(0)}</span>
+              </>
+            ) : hasDiscount ? (
               <>
                 <span className="line-through text-gray-400">{formatCurrency(basePrice)}</span>
                 <span className="font-semibold text-gray-700">{formatCurrency(unitPrice)}</span>
@@ -111,24 +115,35 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
         <div className="flex flex-col items-end justify-between shrink-0 self-stretch">
           {/* Line Total + Badges */}
           <div className="flex items-center gap-2">
+            {isComped && (
+              <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <Gift size={10} />
+                {t('checkout.comp.badge')}
+              </span>
+            )}
             {discountPercent > 0 && (
               <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
                 -{discountPercent}%
               </span>
             )}
-            <div className={`font-bold text-xl tabular-nums ${isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
+            <div className={`font-bold text-xl tabular-nums ${isComped ? 'text-emerald-600' : isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
               {formatCurrency(unitPrice * remainingQty)}
             </div>
           </div>
 
-          {/* External ID + Quantity Selector */}
+          {/* Instance ID + External ID + Quantity Selector */}
           <div className="flex items-center gap-2">
+            {item.instance_id && (
+              <span className="px-1.5 py-0.5 rounded text-[0.625rem] font-bold font-mono border bg-blue-100 text-blue-600 border-blue-200">
+                #{item.instance_id.slice(-5)}
+              </span>
+            )}
             {item.selected_specification?.external_id && (
               <div className="text-xs text-white bg-gray-900/85 font-bold font-mono px-2 py-0.5 rounded">
                 {item.selected_specification.external_id}
               </div>
             )}
-            {!isSelectMode && (
+            {!isSelectMode && !isComped && (
               <div
                 className={`
                   flex items-center bg-gray-50 rounded-lg p-1 border transition-colors

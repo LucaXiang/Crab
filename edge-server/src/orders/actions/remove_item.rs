@@ -56,7 +56,14 @@ impl CommandHandler for RemoveItemAction {
             .find(|i| i.instance_id == self.instance_id)
             .ok_or_else(|| OrderError::ItemNotFound(self.instance_id.clone()))?;
 
-        // 4. Validate quantity (if specified)
+        // 4. Reject removal of comped items (locked)
+        if item.is_comped {
+            return Err(OrderError::InvalidOperation(
+                "Cannot remove a comped item".to_string(),
+            ));
+        }
+
+        // 5. Validate quantity (if specified)
         if let Some(qty) = self.quantity {
             if qty <= 0 {
                 return Err(OrderError::InvalidOperation(
@@ -68,10 +75,10 @@ impl CommandHandler for RemoveItemAction {
             }
         }
 
-        // 5. Allocate sequence number
+        // 6. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 6. Create event
+        // 7. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -470,6 +477,38 @@ mod tests {
             assert_eq!(authorizer_name.as_deref(), Some("Floor Manager"));
         } else {
             panic!("Expected ItemRemoved payload");
+        }
+    }
+
+    // ---- Comped item protection tests ----
+
+    #[tokio::test]
+    async fn test_remove_comped_item_rejected() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut item = create_test_item("item-1", "product:p1", "Comp Dessert", 8.0, 1);
+        item.is_comped = true;
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = RemoveItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: None,
+            reason: Some("Test removal".to_string()),
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        if let Err(OrderError::InvalidOperation(msg)) = result {
+            assert!(msg.contains("comped"), "Error message should mention comped: {msg}");
         }
     }
 }

@@ -143,11 +143,6 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
   };
 
   const handleSave = () => {
-    // Validate required attributes
-    // Note: With new model, required is determined by binding.is_required, not attr_type
-    // For now, skip validation as required info is in bindings
-    // TODO: Check bindings for is_required if validation needed
-
     // Build selected options array
     const selectedOptions: ItemOption[] = [];
     selections.forEach((optionIdxs, attributeId) => {
@@ -171,12 +166,10 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
         }
     });
 
-    // Final safety check
     const finalQty = Math.max(1, quantity);
     const finalDisc = Math.min(100, Math.max(0, discount));
 
-    // Resolve specification object (using index since EmbeddedSpec doesn't have ID)
-    // If spec was changed, use new one; otherwise keep original
+    // Resolve specification
     let selectedSpecification = item.selected_specification;
     if (selectedSpecId !== undefined && specifications.length > 0) {
         const specIdx = parseInt(selectedSpecId, 10);
@@ -191,13 +184,41 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
         }
     }
 
-    onUpdate(item.instance_id, {
-      quantity: finalQty,
-      manual_discount_percent: finalDisc,
-      selected_options: selectedOptions,
-      selected_specification: selectedSpecification
-    }, discountAuthorizer);
-    
+    // --- Diff: only include actually changed fields ---
+    const changes: Partial<CartItem> = {};
+
+    if (finalQty !== item.quantity) {
+      changes.quantity = finalQty;
+    }
+
+    const origDiscount = item.manual_discount_percent || 0;
+    if (finalDisc !== origDiscount) {
+      changes.manual_discount_percent = finalDisc;
+    }
+
+    // Compare options by (attribute_id, option_idx) pairs
+    const origOpts = item.selected_options || [];
+    const toKey = (o: ItemOption) => `${o.attribute_id}:${o.option_idx}`;
+    const origKeys = origOpts.map(toKey).sort().join(',');
+    const newKeys = selectedOptions.map(toKey).sort().join(',');
+    if (newKeys !== origKeys) {
+      changes.selected_options = selectedOptions;
+    }
+
+    // Compare specification by id + price
+    const specChanged = selectedSpecification?.id !== item.selected_specification?.id
+      || selectedSpecification?.price !== item.selected_specification?.price;
+    if (specChanged) {
+      changes.selected_specification = selectedSpecification;
+    }
+
+    // No actual changes — just close
+    if (Object.keys(changes).length === 0) {
+      onClose();
+      return;
+    }
+
+    onUpdate(item.instance_id, changes, discountAuthorizer);
     onClose();
   };
 

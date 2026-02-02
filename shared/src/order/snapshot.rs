@@ -140,6 +140,9 @@ pub struct OrderSnapshot {
     /// Order-level manual discount fixed amount
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_manual_discount_fixed: Option<f64>,
+    /// Order-level manual surcharge percentage
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order_manual_surcharge_percent: Option<f64>,
     /// Order-level manual surcharge fixed amount
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_manual_surcharge_fixed: Option<f64>,
@@ -206,6 +209,7 @@ impl OrderSnapshot {
             order_applied_rules: None,
             order_manual_discount_percent: None,
             order_manual_discount_fixed: None,
+            order_manual_surcharge_percent: None,
             order_manual_surcharge_fixed: None,
             start_time: now,
             end_time: None,

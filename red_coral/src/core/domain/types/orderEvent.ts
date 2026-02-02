@@ -384,7 +384,9 @@ export interface OrderDiscountAppliedPayload {
 /** 订单级附加费已应用 */
 export interface OrderSurchargeAppliedPayload {
   type: 'ORDER_SURCHARGE_APPLIED';
+  surcharge_percent?: number | null;
   surcharge_amount?: number | null;
+  previous_surcharge_percent?: number | null;
   previous_surcharge_amount?: number | null;
   reason?: string | null;
   authorizer_id?: string | null;
@@ -652,7 +654,9 @@ export interface ApplyOrderDiscountCommand {
 export interface ApplyOrderSurchargeCommand {
   type: 'APPLY_ORDER_SURCHARGE';
   order_id: string;
-  /** 固定附加费金额，null = 清除 */
+  /** 百分比附加费，与 surcharge_amount 互斥 */
+  surcharge_percent?: number | null;
+  /** 固定附加费金额，与 surcharge_percent 互斥；两者都为 null = 清除 */
   surcharge_amount?: number | null;
   reason?: string | null;
   authorizer_id?: string | null;
@@ -823,6 +827,8 @@ export interface OrderSnapshot {
   order_manual_discount_percent?: number | null;
   /** Order-level manual discount fixed amount */
   order_manual_discount_fixed?: number | null;
+  /** Order-level manual surcharge percentage */
+  order_manual_surcharge_percent?: number | null;
   /** Order-level manual surcharge fixed amount */
   order_manual_surcharge_fixed?: number | null;
 

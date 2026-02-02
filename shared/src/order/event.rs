@@ -425,7 +425,11 @@ pub enum EventPayload {
     /// 订单级附加费已应用
     OrderSurchargeApplied {
         #[serde(skip_serializing_if = "Option::is_none")]
+        surcharge_percent: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         surcharge_amount: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        previous_surcharge_percent: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         previous_surcharge_amount: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]

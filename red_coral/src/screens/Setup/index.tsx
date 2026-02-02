@@ -4,7 +4,6 @@ import { Server, Wifi, AlertCircle, ChevronRight, Settings, Power } from 'lucide
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
 import { useI18n } from '@/hooks/useI18n';
-import { friendlyError } from '@/utils/error/friendlyError';
 
 type SetupStep = 'mode' | 'configure' | 'complete';
 type ModeChoice = 'server' | 'client' | null;
@@ -62,8 +61,9 @@ export const SetupScreen: React.FC = () => {
       }
       setStep('complete');
     } catch (err: unknown) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setConfigError(friendlyError(raw));
+      // ApiError 已经在 invokeApi 中做过 friendlyError 处理，直接使用 message
+      const msg = err instanceof Error ? err.message : String(err);
+      setConfigError(msg);
     }
   };
 

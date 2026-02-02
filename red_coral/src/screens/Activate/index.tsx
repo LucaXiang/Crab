@@ -4,7 +4,6 @@ import { AlertCircle, ChevronRight, Shield, Power } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useBridgeStore } from '@/core/stores/bridge';
 import { useI18n } from '@/hooks/useI18n';
-import { friendlyError } from '@/utils/error/friendlyError';
 
 // 订阅被阻止的状态
 const BLOCKED_STATUSES = ['inactive', 'expired', 'canceled', 'unpaid'];
@@ -45,8 +44,9 @@ export const ActivateScreen: React.FC = () => {
       // 订阅正常，进入模式选择（Setup 页面）
       navigate('/setup', { replace: true });
     } catch (err: unknown) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setActivationError(friendlyError(raw));
+      // ApiError 已经在 invokeApi 中做过 friendlyError 处理，直接使用 message
+      const msg = err instanceof Error ? err.message : String(err);
+      setActivationError(msg);
     }
   };
 

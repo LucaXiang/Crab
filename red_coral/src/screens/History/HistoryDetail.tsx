@@ -152,24 +152,22 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
           </div>
 
           {/* Void Information */}
-          {isVoid && (order.void_type || order.loss_reason || order.loss_amount !== null) && (
+          {isVoid && order.void_type && (
             <div className="mt-4 pt-3 border-t border-red-100 flex flex-wrap gap-6 text-sm">
-              {order.void_type && (
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs text-red-400 font-medium uppercase">{t('common.status.void')}</span>
-                  <span className="text-red-700 font-medium">{t(`history.void_type.${order.void_type}`)}</span>
-                </div>
-              )}
-              {order.loss_reason && (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-red-400 font-medium uppercase">{t('common.status.void')}</span>
+                <span className="text-red-700 font-medium">{t(`history.void_type.${order.void_type}`)}</span>
+              </div>
+              {order.void_type === 'LOSS_SETTLED' && order.loss_reason && (
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs text-gray-400 font-medium uppercase">{t('common.label.description')}</span>
                   <span className="text-gray-700 font-medium">{t(`history.loss_reason.${order.loss_reason}`)}</span>
                 </div>
               )}
-              {order.loss_amount !== null && order.loss_amount !== undefined && (
+              {order.void_type === 'LOSS_SETTLED' && order.loss_amount !== null && order.loss_amount !== undefined && (
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-xs text-red-400 font-medium uppercase">{t('common.label.loss_amount')}</span>
-                  <span className="text-red-700 font-bold">{formatCurrency(order.loss_amount)}</span>
+                  <span className="text-xs text-orange-400 font-medium uppercase">{t('common.label.loss_amount')}</span>
+                  <span className="text-orange-600 font-bold">{formatCurrency(order.loss_amount)}</span>
                 </div>
               )}
             </div>

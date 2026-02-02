@@ -3,6 +3,7 @@ import { Lock } from 'lucide-react';
 import { Permission, User } from '@/core/domain/types';
 import { usePermission } from '@/hooks/usePermission';
 import { usePermissionEscalationStore } from '@/core/stores/auth/usePermissionEscalationStore';
+import { useCurrentUser } from '@/core/stores/auth/useAuthStore';
 import { useI18n } from '@/hooks/useI18n';
 
 interface EscalatableGateProps {
@@ -33,9 +34,23 @@ export const EscalatableGate: React.FC<EscalatableGateProps> = ({
   const { hasPermission } = usePermission();
   const { t } = useI18n();
   const openEscalation = usePermissionEscalationStore((state) => state.openEscalation);
+  const currentUser = useCurrentUser();
 
-  // 如果已经有权限，直接渲染内容
+  // 如果已经有权限
   if (hasPermission(permission)) {
+    // intercept 模式 + 有 onAuthorized 回调：注入 onClick 以当前用户身份调用
+    if (mode === 'intercept' && onAuthorized && currentUser) {
+      const child = React.Children.only(children) as React.ReactElement<any>;
+      return React.cloneElement(child, {
+        onClick: (e: React.MouseEvent) => {
+          // 尊重 disabled 状态
+          if (child.props.disabled) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onAuthorized(currentUser);
+        },
+      });
+    }
     return <>{children}</>;
   }
 

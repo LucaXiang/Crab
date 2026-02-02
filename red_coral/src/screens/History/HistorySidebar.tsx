@@ -96,13 +96,13 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                     </div>
                     <div className="flex gap-2 text-[0.625rem] items-center mb-1">
                       {order.is_retail ? (
-                        <span className="text-gray-500 bg-gray-100 px-1 rounded">{t('common.label.retail')}</span>
+                        <span className="text-blue-600 bg-blue-100 px-1 rounded">{t('common.label.retail')}</span>
                       ) : (
                         order.table_name && (
-                          <span className="text-gray-500 bg-gray-100 px-1 rounded">{order.table_name}</span>
+                          <span className="text-blue-600 bg-blue-100 px-1 rounded">{order.table_name}</span>
                         )
                       )}
-                      <span className={`px-1.5 py-0.5 rounded-full font-bold ${isVoid ? 'bg-gray-200 text-gray-600' : (isMoved || isMerged) ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                      <span className={`px-1.5 py-0.5 rounded-full font-bold ${isVoid ? 'bg-red-100 text-red-600' : (isMoved || isMerged) ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                         {isVoid
                           ? t('history.status.voided').toUpperCase()
                           : isMoved
@@ -111,31 +111,27 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                           ? t('history.status.merged').toUpperCase()
                           : t('checkout.amount.paid_status').toUpperCase()}
                       </span>
+                      {isVoid && order.void_type && (
+                        <span className={`px-1.5 py-0.5 rounded-full font-bold ${order.void_type === 'LOSS_SETTLED' ? 'bg-orange-100 text-orange-600' : 'bg-gray-200 text-gray-600'}`}>
+                          {t(`history.void_type.${order.void_type}`)}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-gray-400 font-mono">
                       {new Date(order.end_time || order.start_time).toLocaleString([], { hour12: false })}
                     </div>
-                    {isVoid && (order.void_type || order.loss_reason || (order.loss_amount ?? 0) > 0) && (
-                      <div className="mt-2 text-xs bg-red-50 p-2 rounded border border-red-100 flex flex-col gap-1">
-                        <div className="flex items-center gap-2 flex-wrap text-red-700 font-medium">
-                          {order.void_type && <span>{t(`history.void_type.${order.void_type}`)}</span>}
-                          {order.loss_reason && (
-                            <>
-                              <span className="w-1 h-1 rounded-full bg-red-300"></span>
-                              <span>{t(`history.loss_reason.${order.loss_reason}`)}</span>
-                            </>
-                          )}
-                        </div>
-                        {(order.loss_amount ?? 0) > 0 && (
-                          <div className="text-red-600 font-semibold">
-                            {t('common.label.loss_amount')}: {formatCurrency(order.loss_amount || 0)}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                     <div className="text-right">
-	                    <div className={`font-bold ${isVoid || isMoved || isMerged ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{formatCurrency(order.total)}</div>
+                      {order.void_type === 'CANCELLED' ? (
+                        <div className="font-bold text-gray-400 line-through">{formatCurrency(order.total)}</div>
+                      ) : order.void_type === 'LOSS_SETTLED' ? (
+                        <>
+                          <div className="font-bold text-gray-800">{formatCurrency(order.total - (order.loss_amount || 0))}</div>
+                          <div className="text-xs text-orange-500">{t('common.label.loss_amount')}: {formatCurrency(order.loss_amount || 0)}</div>
+                        </>
+                      ) : (
+                        <div className={`font-bold ${isVoid || isMoved || isMerged ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{formatCurrency(order.total)}</div>
+                      )}
                     <ChevronRight size={16} className={`ml-auto mt-1 transition-opacity ${isSelected ? 'text-primary-400 opacity-100' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`} />
                   </div>
                 </button>

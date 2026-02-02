@@ -1,11 +1,14 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { HeldOrder, PaymentRecord } from '@/core/domain/types';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag, Receipt, ImageOff, Users, Calculator, PieChart, X, Lock as LockIcon, Check, Clock } from 'lucide-react';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag, Receipt, ImageOff, Users, Calculator, PieChart, X, Lock as LockIcon, Check, Clock, Gift, Percent, TrendingUp } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { Permission } from '@/core/domain/types';
 import { useRetailServiceType, setRetailServiceType } from '@/core/stores/order/useCheckoutStore';
+import { CompItemMode } from '../CompItemMode';
+import { OrderDiscountModal } from '../OrderDiscountModal';
+import { OrderSurchargeModal } from '../OrderSurchargeModal';
 import { formatCurrency } from '@/utils/currency';
 import { Currency } from '@/utils/currency';
 
@@ -34,7 +37,7 @@ interface PaymentFlowProps {
   onManageTable?: () => void;
 }
 
-type PaymentMode = 'SELECT' | 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS';
+type PaymentMode = 'SELECT' | 'ITEM_SPLIT' | 'AMOUNT_SPLIT' | 'PAYMENT_RECORDS' | 'COMP';
 
 export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onCancel, onVoid, onManageTable }) => {
   const { t } = useI18n();
@@ -44,7 +47,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   // Calculate payment state from order (server state)
   const totalPaid = order.paid_amount;
   const remaining = Math.max(0, Currency.sub(order.total, totalPaid).toNumber());
-  const isPaidInFull = remaining <= 0.01;
+  const isPaidInFull = remaining === 0;
 
   // Get active (non-cancelled) payments
   const activePayments = useMemo(() => {
@@ -206,6 +209,10 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
   // Retail order cancel confirmation
   const [showRetailCancelConfirm, setShowRetailCancelConfirm] = useState(false);
+
+  // Order adjustment modals
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [showSurchargeModal, setShowSurchargeModal] = useState(false);
 
   // Defer completion to avoid "update during render" errors
   const handleComplete = useCallback(() => {
@@ -605,6 +612,8 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     const uncategorized: typeof order.items = [];
 
     order.items.forEach(item => {
+      // Skip comped items (they are free, cannot be split)
+      if (item.is_comped) return;
       // Skip fully paid items
       const paidQty = (order.paid_item_quantities && order.paid_item_quantities[item.instance_id]) || 0;
       if (item.quantity - paidQty <= 0) return;
@@ -1349,6 +1358,37 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                 </button>
               )}
             </div>
+
+            {/* Order Adjustments: Comp, Discount, Surcharge */}
+            <div className="grid grid-cols-3 gap-6">
+              <button
+                onClick={() => setMode('COMP')}
+                disabled={isPaidInFull || isProcessing}
+                className="h-40 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+              >
+                <Gift size={48} />
+                <div className="text-2xl font-bold">{t('checkout.comp.title')}</div>
+                <div className="text-sm opacity-90">{t('checkout.comp.desc')}</div>
+              </button>
+              <button
+                onClick={() => setShowDiscountModal(true)}
+                disabled={isProcessing}
+                className="h-40 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+              >
+                <Percent size={48} />
+                <div className="text-2xl font-bold">{t('checkout.order_discount.title')}</div>
+                <div className="text-sm opacity-90">{t('checkout.order_discount.desc')}</div>
+              </button>
+              <button
+                onClick={() => setShowSurchargeModal(true)}
+                disabled={isProcessing}
+                className="h-40 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+              >
+                <TrendingUp size={48} />
+                <div className="text-2xl font-bold">{t('checkout.order_surcharge.title')}</div>
+                <div className="text-sm opacity-90">{t('checkout.order_surcharge.desc')}</div>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1502,6 +1542,16 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         return renderAmountSplitMode();
       case 'PAYMENT_RECORDS':
         return renderPaymentRecordsMode();
+      case 'COMP':
+        return (
+          <CompItemMode
+            order={order}
+            totalPaid={totalPaid}
+            remaining={remaining}
+            onBack={() => setMode('SELECT')}
+            onManageTable={onManageTable}
+          />
+        );
       default:
         return renderSelectMode();
     }
@@ -1546,6 +1596,18 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         isProcessing={isProcessing || isProcessingSplit || isProcessingAmountSplit}
         onConfirm={handleCashModalConfirm}
         onCancel={() => setShowCashModal(false)}
+      />
+
+      <OrderDiscountModal
+        isOpen={showDiscountModal}
+        order={order}
+        onClose={() => setShowDiscountModal(false)}
+      />
+
+      <OrderSurchargeModal
+        isOpen={showSurchargeModal}
+        order={order}
+        onClose={() => setShowSurchargeModal(false)}
       />
     </>
   );

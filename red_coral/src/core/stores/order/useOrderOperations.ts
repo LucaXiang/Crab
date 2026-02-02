@@ -708,6 +708,7 @@ export const applyOrderDiscount = async (
 export const applyOrderSurcharge = async (
   orderId: string,
   options?: {
+    surchargePercent?: number;
     surchargeAmount?: number;
     reason?: string;
     authorizer?: { id: string; name: string };
@@ -716,6 +717,7 @@ export const applyOrderSurcharge = async (
   const command = createCommand({
     type: 'APPLY_ORDER_SURCHARGE',
     order_id: orderId,
+    surcharge_percent: options?.surchargePercent ?? null,
     surcharge_amount: options?.surchargeAmount ?? null,
     reason: options?.reason ?? null,
     authorizer_id: options?.authorizer?.id ?? null,

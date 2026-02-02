@@ -270,6 +270,16 @@ export async function loadProductFullData(productId: string) {
   const inheritedAttributeIds = inheritedAttributes.map((binding) => binding.attribute.id).filter(Boolean) as string[];
 
   return {
+    // 必须返回所有 computeIsDirty 跟踪的字段，
+    // 确保 setAsyncFormData 完整覆盖 formData 和 formInitialData，
+    // 避免 openModal 与 setAsyncFormData 之间的中间状态导致误判 dirty
+    name: productFull.name,
+    category: productFull.category,
+    image: productFull.image,
+    tax_rate: productFull.tax_rate,
+    receipt_name: productFull.receipt_name ?? '',
+    sort_order: productFull.sort_order,
+    is_active: productFull.is_active,
     selected_attribute_ids: attributeIds,
     attribute_default_options: defaultOptions,
     inherited_attribute_ids: inheritedAttributeIds,
@@ -280,7 +290,7 @@ export async function loadProductFullData(productId: string) {
     is_label_print_enabled: productFull.is_label_print_enabled,
     print_destinations: productFull.kitchen_print_destinations,
     label_print_destinations: productFull.label_print_destinations,
-    kitchen_print_name: productFull.kitchen_print_name,
+    kitchen_print_name: productFull.kitchen_print_name ?? '',
     price,
     externalId,
   };

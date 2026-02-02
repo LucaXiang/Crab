@@ -990,6 +990,7 @@ mod tests {
             order_applied_rules: None,
             order_manual_discount_percent: None,
             order_manual_discount_fixed: None,
+            order_manual_surcharge_percent: None,
             order_manual_surcharge_fixed: None,
             start_time: shared::util::now_millis(),
             end_time: None,

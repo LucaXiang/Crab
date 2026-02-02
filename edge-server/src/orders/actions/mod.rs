@@ -343,12 +343,14 @@ impl From<&OrderCommand> for CommandAction {
             }),
             OrderCommandPayload::ApplyOrderSurcharge {
                 order_id,
+                surcharge_percent,
                 surcharge_amount,
                 reason,
                 authorizer_id,
                 authorizer_name,
             } => CommandAction::ApplyOrderSurcharge(ApplyOrderSurchargeAction {
                 order_id: order_id.clone(),
+                surcharge_percent: *surcharge_percent,
                 surcharge_amount: *surcharge_amount,
                 reason: reason.clone(),
                 authorizer_id: authorizer_id.clone(),

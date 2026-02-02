@@ -40,11 +40,13 @@ pub struct OrderSurchargeAppliedApplier;
 impl EventApplier for OrderSurchargeAppliedApplier {
     fn apply(&self, snapshot: &mut OrderSnapshot, event: &OrderEvent) {
         if let EventPayload::OrderSurchargeApplied {
+            surcharge_percent,
             surcharge_amount,
             ..
         } = &event.payload
         {
-            // 1. Update manual surcharge field
+            // 1. Update manual surcharge fields
+            snapshot.order_manual_surcharge_percent = *surcharge_percent;
             snapshot.order_manual_surcharge_fixed = *surcharge_amount;
 
             // 2. Recalculate all totals
@@ -146,7 +148,9 @@ mod tests {
             Some(1234567890),
             OrderEventType::OrderSurchargeApplied,
             EventPayload::OrderSurchargeApplied {
+                surcharge_percent: None,
                 surcharge_amount,
+                previous_surcharge_percent: None,
                 previous_surcharge_amount,
                 reason: None,
                 authorizer_id: None,

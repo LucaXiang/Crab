@@ -81,6 +81,14 @@ fn validate_items_and_calculate(
             .find(|i| i.instance_id == split_item.instance_id)
             .ok_or_else(|| OrderError::ItemNotFound(split_item.instance_id.clone()))?;
 
+        // Reject comped items — they are free and cannot be split
+        if order_item.is_comped {
+            return Err(OrderError::InvalidOperation(format!(
+                "Cannot split comped item '{}'",
+                order_item.name
+            )));
+        }
+
         let paid_qty = snapshot
             .paid_item_quantities
             .get(&split_item.instance_id)

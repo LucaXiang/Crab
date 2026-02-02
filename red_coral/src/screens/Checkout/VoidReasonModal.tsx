@@ -42,6 +42,7 @@ export const VoidReasonModal: React.FC<VoidReasonModalProps> = ({
 
   const [voidType, setVoidType] = useState<VoidType>(defaultVoidType);
   const [lossReason, setLossReason] = useState<LossReason | null>(null);
+  const [cancelReason, setCancelReason] = useState<string | null>(null);
   const [note, setNote] = useState('');
 
   // 重置状态当 modal 打开时
@@ -49,9 +50,17 @@ export const VoidReasonModal: React.FC<VoidReasonModalProps> = ({
     if (isOpen) {
       setVoidType(paidAmount > 0 ? 'LOSS_SETTLED' : 'CANCELLED');
       setLossReason(null);
+      setCancelReason(null);
       setNote('');
     }
   }, [isOpen, paidAmount]);
+
+  const cancelReasons = useMemo(() => [
+    { key: 'CUSTOMER_CANCELLED', label: t('checkout.void.cancel_reason.customer_cancelled') },
+    { key: 'SYSTEM_TEST', label: t('checkout.void.cancel_reason.system_test') },
+    { key: 'DUPLICATE_ORDER', label: t('checkout.void.cancel_reason.duplicate_order') },
+    { key: 'OTHER', label: t('checkout.void.cancel_reason.other') },
+  ], [t]);
 
   const lossReasons = useMemo(() => [
     { key: 'CUSTOMER_FLED' as LossReason, label: t('checkout.void.loss_reason.customer_fled') },
@@ -61,19 +70,26 @@ export const VoidReasonModal: React.FC<VoidReasonModalProps> = ({
 
   // 确认按钮是否可用
   const canConfirm = useMemo(() => {
-    if (voidType === 'CANCELLED') return true;
+    if (voidType === 'CANCELLED') return cancelReason !== null;
     if (voidType === 'LOSS_SETTLED') return lossReason !== null;
     return false;
-  }, [voidType, lossReason]);
+  }, [voidType, cancelReason, lossReason]);
 
   const handleConfirm = () => {
     if (!canConfirm) return;
+
+    // Build note: cancel reason label + optional user note
+    const reasonLabel = voidType === 'CANCELLED' && cancelReason
+      ? cancelReasons.find(r => r.key === cancelReason)?.label
+      : undefined;
+    const parts = [reasonLabel, note.trim()].filter(Boolean);
+    const finalNote = parts.length > 0 ? parts.join(' - ') : undefined;
 
     const options: VoidOrderOptions = {
       voidType,
       lossReason: voidType === 'LOSS_SETTLED' ? lossReason! : undefined,
       lossAmount: voidType === 'LOSS_SETTLED' ? unpaidAmount : undefined,
-      note: note.trim() || undefined,
+      note: finalNote,
     };
 
     onConfirm(options);
@@ -166,6 +182,30 @@ export const VoidReasonModal: React.FC<VoidReasonModalProps> = ({
               </button>
             )}
           </div>
+
+          {/* 取消原因 - 仅在取消订单时显示 */}
+          {voidType === 'CANCELLED' && (
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-gray-700">
+                {t('checkout.void.cancel_reason.title')}
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {cancelReasons.map((reason) => (
+                  <button
+                    key={reason.key}
+                    onClick={() => setCancelReason(reason.key)}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      cancelReason === reason.key
+                        ? 'border-red-500 bg-red-50 text-red-700'
+                        : 'border-gray-100 hover:border-red-200 hover:bg-gray-50 text-gray-600'
+                    }`}
+                  >
+                    <span className="font-medium text-sm">{reason.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 损失原因 - 仅在损失结算时显示 */}
           {voidType === 'LOSS_SETTLED' && (

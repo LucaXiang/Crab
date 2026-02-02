@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TimelineDisplayData, TimelineTag } from './renderers';
+import type { TimelineDisplayData, TimelineTag, DetailTag } from './renderers';
 
 const TAG_TYPE_STYLES: Record<TimelineTag['type'], string> = {
     item: 'bg-blue-100 text-blue-600 border-blue-200',
@@ -68,7 +68,7 @@ interface TimelineItemProps {
 }
 
 export const TimelineItem: React.FC<TimelineItemProps> = ({ data, showNoteTags = true }) => {
-    const { title, summary, details, icon: Icon, colorClass, customColor, timestamp, isHidden, tags } = data;
+    const { title, summary, details, detailTags, icon: Icon, colorClass, customColor, timestamp, isHidden, tags } = data;
 
     if (isHidden) return null;
 
@@ -103,8 +103,16 @@ export const TimelineItem: React.FC<TimelineItemProps> = ({ data, showNoteTags =
             </div>
             {summary && <div className="text-sm leading-6 font-medium text-gray-700 mt-0.5">{summary}</div>}
             
-            {details && details.length > 0 && (
+            {((details && details.length > 0) || (detailTags && detailTags.length > 0)) && (
                 <div className="mt-1 bg-gray-50 p-2 rounded text-xs text-gray-600 space-y-0.5">
+                    {detailTags?.map((tag, i) => (
+                        <div key={`tag-${i}`} className="flex items-center gap-2 text-sm">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border shadow-sm ${tag.colorClass}`}>
+                                {tag.label}
+                            </span>
+                            <span className="text-gray-500 text-xs">{tag.value}</span>
+                        </div>
+                    ))}
                     {details.map((detail, i) => (
                         <div key={`${timestamp}-${detail}-${i}`}>
                             {/* Check if it looks like a note tag (e.g. "Name: Note") */}

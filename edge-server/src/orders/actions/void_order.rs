@@ -46,10 +46,18 @@ impl CommandHandler for VoidOrderAction {
             }
         }
 
-        // 3. Allocate sequence number
+        // 3. Sanitize loss fields based on void_type:
+        //    - CANCELLED: 正常取消，无损失，强制清空 loss 字段
+        //    - LOSS_SETTLED: 损失结算，保留 loss 字段
+        let (loss_reason, loss_amount) = match self.void_type {
+            VoidType::Cancelled => (None, None),
+            VoidType::LossSettled => (self.loss_reason.clone(), self.loss_amount),
+        };
+
+        // 4. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 4. Create event
+        // 5. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -60,8 +68,8 @@ impl CommandHandler for VoidOrderAction {
             OrderEventType::OrderVoided,
             EventPayload::OrderVoided {
                 void_type: self.void_type.clone(),
-                loss_reason: self.loss_reason.clone(),
-                loss_amount: self.loss_amount,
+                loss_reason,
+                loss_amount,
                 note: self.note.clone(),
                 authorizer_id: self.authorizer_id.clone(),
                 authorizer_name: self.authorizer_name.clone(),
@@ -318,5 +326,88 @@ mod tests {
         assert_eq!(event.operator_name, "Manager");
         // Note: event.timestamp is server-generated (now), client_timestamp is from metadata
         assert_eq!(event.client_timestamp, Some(9999999999));
+    }
+
+    #[tokio::test]
+    async fn test_cancelled_void_strips_loss_fields() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        // Intentionally pass loss fields with CANCELLED — backend should strip them
+        let action = VoidOrderAction {
+            order_id: "order-1".to_string(),
+            void_type: VoidType::Cancelled,
+            loss_reason: Some(LossReason::CustomerFled),
+            loss_amount: Some(50.0),
+            note: Some("test".to_string()),
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::OrderVoided {
+            void_type,
+            loss_reason,
+            loss_amount,
+            ..
+        } = &events[0].payload
+        {
+            assert_eq!(*void_type, VoidType::Cancelled);
+            assert_eq!(*loss_reason, None, "CANCELLED should have no loss_reason");
+            assert_eq!(*loss_amount, None, "CANCELLED should have no loss_amount");
+        } else {
+            panic!("Expected OrderVoided payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_loss_settled_preserves_loss_fields() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.total = 100.0;
+        snapshot.paid_amount = 60.0;
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = VoidOrderAction {
+            order_id: "order-1".to_string(),
+            void_type: VoidType::LossSettled,
+            loss_reason: Some(LossReason::CustomerFled),
+            loss_amount: Some(40.0),
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::OrderVoided {
+            void_type,
+            loss_reason,
+            loss_amount,
+            ..
+        } = &events[0].payload
+        {
+            assert_eq!(*void_type, VoidType::LossSettled);
+            assert_eq!(*loss_reason, Some(LossReason::CustomerFled));
+            assert_eq!(*loss_amount, Some(40.0));
+        } else {
+            panic!("Expected OrderVoided payload");
+        }
     }
 }

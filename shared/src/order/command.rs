@@ -268,7 +268,10 @@ pub enum OrderCommandPayload {
     /// Apply order-level surcharge (fixed amount)
     ApplyOrderSurcharge {
         order_id: String,
-        /// 固定附加费金额，None = 清除
+        /// 百分比附加费，与 surcharge_amount 互斥
+        #[serde(skip_serializing_if = "Option::is_none")]
+        surcharge_percent: Option<f64>,
+        /// 固定附加费金额，与 surcharge_percent 互斥；两者都为 None = 清除
         #[serde(skip_serializing_if = "Option::is_none")]
         surcharge_amount: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]

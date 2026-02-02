@@ -409,7 +409,10 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
             .map(|p| subtotal * to_decimal(p) / Decimal::ONE_HUNDRED)
             .unwrap_or(Decimal::ZERO);
     let order_surcharge = effective_order_rule_surcharge(snapshot)
-        + snapshot.order_manual_surcharge_fixed.map(to_decimal).unwrap_or(Decimal::ZERO);
+        + snapshot.order_manual_surcharge_fixed.map(to_decimal).unwrap_or(Decimal::ZERO)
+        + snapshot.order_manual_surcharge_percent
+            .map(|p| subtotal * to_decimal(p) / Decimal::ONE_HUNDRED)
+            .unwrap_or(Decimal::ZERO);
 
     // Total discount and surcharge (item-level + order-level)
     let total_discount = item_discount_total + order_discount;

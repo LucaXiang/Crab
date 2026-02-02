@@ -20,6 +20,7 @@ pub const ALL_PERMISSIONS: &[&str] = &[
     "orders:write",
     "orders:void",
     "orders:discount",
+    "orders:comp",
     "orders:refund",
     "orders:cancel_item",
     // User management permissions
@@ -85,6 +86,7 @@ pub const DEFAULT_MANAGER_PERMISSIONS: &[&str] = &[
     "orders:write",
     "orders:void",
     "orders:discount",
+    "orders:comp",
     "orders:refund",
     "orders:cancel_item",
     "users:read",

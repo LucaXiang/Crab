@@ -36,8 +36,8 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
   const timeline = useOrderTimeline(order.order_id);
 
   const handleEditItem = React.useCallback((item: CartItem) => {
-    // Find index of item in order.items
-    const index = order.items.findIndex((i) => 
+    if (item.is_comped) return; // Comped items are locked
+    const index = order.items.findIndex((i) =>
       i.instance_id ? i.instance_id === item.instance_id : i.id === item.id
     );
     if (index !== -1) {

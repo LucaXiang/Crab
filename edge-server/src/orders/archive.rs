@@ -1023,6 +1023,7 @@ mod tests {
             order_applied_rules: None,
             order_manual_discount_percent: None,
             order_manual_discount_fixed: None,
+            order_manual_surcharge_percent: None,
             order_manual_surcharge_fixed: None,
             start_time: 1704067200000,
             end_time: Some(1704070800000),
