@@ -33,8 +33,8 @@ async fn get_image_context(bridge: &ClientBridge) -> Result<ImageContext, String
 
     match mode_info.mode {
         ModeType::Server => {
-            // Server mode uses tenant path as work_dir
-            let work_dir = tenant_path.clone();
+            // Server work_dir is {tenant}/server/ (same as edge-server's work_dir)
+            let work_dir = tenant_path.join("server");
             Ok(ImageContext::Server {
                 tenant_path,
                 work_dir,
@@ -257,8 +257,9 @@ pub async fn save_image(
 
     match mode_info.mode {
         ModeType::Server => {
-            // Server 模式：直接处理并保存
-            save_image_server(&data, &tenant_path).await
+            // Server 模式：直接处理并保存到 {tenant}/server/images/
+            let server_dir = tenant_path.join("server");
+            save_image_server(&data, &server_dir).await
         }
         ModeType::Client => {
             // Client 模式：上传到 EdgeServer (使用 mTLS)
@@ -290,8 +291,8 @@ async fn save_image_server(data: &[u8], work_dir: &Path) -> Result<String, Strin
     hasher.update(&buffer);
     let hash = hex::encode(hasher.finalize());
 
-    // 4. 保存到 uploads/images/
-    let images_dir = work_dir.join("uploads/images");
+    // 4. 保存到 images/ (与 edge-server 一致)
+    let images_dir = work_dir.join("images");
     tokio::fs::create_dir_all(&images_dir)
         .await
         .map_err(|e| format!("Failed to create images directory: {}", e))?;
