@@ -6,6 +6,8 @@ use axum::{
 };
 use serde::Deserialize;
 
+use crate::audit::AuditAction;
+use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
 use crate::db::models::{DailyReport, DailyReportGenerate};
@@ -89,11 +91,15 @@ pub async fn generate(
 
     // 日期验证 + 时区转换 (handler 层职责)
     let tz = state.config.timezone;
-    let date = time::parse_date(&payload.business_date)?;
+    let business_date = payload.business_date.clone();
+    let date = time::parse_date(&business_date)?;
     time::validate_not_future(date, tz)?;
     let start_millis = time::day_start_millis(date, tz);
     let next_day = date.succ_opt().unwrap_or(date);
     let end_millis = time::day_start_millis(next_day, tz);
+
+    let audit_operator_id = current_user.id.clone();
+    let audit_operator_name = current_user.display_name.clone();
 
     let operator_id = Some(current_user.id);
     let operator_name = Some(current_user.display_name);
@@ -109,29 +115,21 @@ pub async fn generate(
         .as_ref()
         .map(|id| id.to_string())
         .unwrap_or_default();
+
+    audit_log!(
+        state.audit_service,
+        AuditAction::DailyReportGenerated,
+        "daily_report", &id,
+        operator_id = Some(audit_operator_id),
+        operator_name = Some(audit_operator_name),
+        details = serde_json::json!({
+            "business_date": &business_date,
+        })
+    );
+
     state
         .broadcast_sync(RESOURCE, "generated", &id, Some(&report))
         .await;
 
     Ok(Json(report))
-}
-
-/// DELETE /api/daily-reports/:id - 删除日结报告 (管理员)
-pub async fn delete(
-    State(state): State<ServerState>,
-    Path(id): Path<String>,
-) -> AppResult<Json<bool>> {
-    let repo = DailyReportRepository::new(state.db.clone());
-    let result = repo
-        .delete(&id)
-        .await
-        ?;
-
-    if result {
-        state
-            .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
-            .await;
-    }
-
-    Ok(Json(result))
 }

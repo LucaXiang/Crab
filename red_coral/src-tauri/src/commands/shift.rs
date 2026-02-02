@@ -266,18 +266,3 @@ pub async fn generate_daily_report(
         Err(e) => Ok(ApiResponse::from_bridge_error(e)),
     }
 }
-
-#[tauri::command]
-pub async fn delete_daily_report(
-    bridge: State<'_, Arc<RwLock<ClientBridge>>>,
-    id: String,
-) -> Result<ApiResponse<bool>, String> {
-    let bridge = bridge.read().await;
-    match bridge
-        .delete::<bool>(&format!("/api/daily-reports/{}", encode(&id)))
-        .await
-    {
-        Ok(result) => Ok(ApiResponse::success(result)),
-        Err(e) => Ok(ApiResponse::from_bridge_error(e)),
-    }
-}

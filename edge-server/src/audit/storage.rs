@@ -9,7 +9,7 @@ use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
 use thiserror::Error;
 
-use super::types::{AuditAction, AuditChainBreak, AuditChainVerification, AuditEntry, AuditQuery, ChainBreakKind};
+use super::types::{AuditAction, AuditEntry, AuditQuery};
 
 /// 存储错误
 #[derive(Debug, Error)]
@@ -153,7 +153,7 @@ impl AuditStorage {
             None => (1, "genesis".to_string()),
         };
 
-        // 2. 计算哈希
+        // 2. 计算哈希（所有存储字段参与）
         let timestamp = shared::util::now_millis();
         let curr_hash = compute_audit_hash(
             &prev_hash,
@@ -163,7 +163,9 @@ impl AuditStorage {
             &resource_type,
             &resource_id,
             operator_id.as_deref(),
+            operator_name.as_deref(),
             &details,
+            target.as_deref(),
         );
 
         // 3. 先构造返回值（clone 字段），再构造插入数据（consume 字段）
@@ -275,94 +277,6 @@ impl AuditStorage {
         Ok((entries, total))
     }
 
-    /// 验证审计链完整性
-    pub async fn verify_chain(
-        &self,
-        from: Option<i64>,
-        to: Option<i64>,
-    ) -> AuditStorageResult<AuditChainVerification> {
-        let records: Vec<AuditRecord> = self
-            .db
-            .query("SELECT * FROM audit_log ORDER BY sequence")
-            .await?
-            .take(0)?;
-
-        let mut breaks = Vec::new();
-        let mut expected_prev_hash = "genesis".to_string();
-        let mut expected_sequence: Option<u64> = None;
-        let mut checked_count = 0u64;
-
-        for record in records {
-            let entry = AuditEntry::from(record);
-
-            // 时间范围过滤
-            if let Some(from_ts) = from
-                && entry.timestamp < from_ts
-            {
-                expected_prev_hash = entry.curr_hash.clone();
-                expected_sequence = Some(entry.id + 1);
-                continue;
-            }
-            if let Some(to_ts) = to
-                && entry.timestamp > to_ts
-            {
-                break;
-            }
-
-            // 验证序列号连续性（检测删除）
-            if let Some(expected_seq) = expected_sequence
-                && entry.id != expected_seq
-            {
-                breaks.push(AuditChainBreak {
-                    entry_id: entry.id,
-                    kind: ChainBreakKind::SequenceGap,
-                    expected: expected_seq.to_string(),
-                    actual: entry.id.to_string(),
-                });
-            }
-
-            // 验证 prev_hash
-            if entry.prev_hash != expected_prev_hash {
-                breaks.push(AuditChainBreak {
-                    entry_id: entry.id,
-                    kind: ChainBreakKind::HashMismatch,
-                    expected: expected_prev_hash.clone(),
-                    actual: entry.prev_hash.clone(),
-                });
-            }
-
-            // 验证 curr_hash 是否与重新计算的值一致
-            let recomputed = compute_audit_hash(
-                &entry.prev_hash,
-                entry.id,
-                entry.timestamp,
-                &entry.action,
-                &entry.resource_type,
-                &entry.resource_id,
-                entry.operator_id.as_deref(),
-                &entry.details,
-            );
-            if entry.curr_hash != recomputed {
-                breaks.push(AuditChainBreak {
-                    entry_id: entry.id,
-                    kind: ChainBreakKind::HashRecompute,
-                    expected: recomputed,
-                    actual: entry.curr_hash.clone(),
-                });
-            }
-
-            expected_prev_hash = entry.curr_hash.clone();
-            expected_sequence = Some(entry.id + 1);
-            checked_count += 1;
-        }
-
-        Ok(AuditChainVerification {
-            total_entries: checked_count,
-            chain_intact: breaks.is_empty(),
-            breaks,
-        })
-    }
-
     /// 查询最后 N 条审计日志（倒序）
     pub async fn query_last(&self, count: usize) -> AuditStorageResult<(Vec<AuditEntry>, u64)> {
         let sql = format!(
@@ -386,14 +300,20 @@ impl AuditStorage {
 ///
 /// SurrealDB 内部将所有数字存为 float，读出后 `5` 变成 `5.0`。
 /// 此函数确保 `5.0` → `5`（无小数部分时），使序列化结果在写入和读出时一致。
+///
+/// 安全范围：f64 尾数 52 bit，仅 |value| ≤ 2^53 的整数可无损转换。
 fn normalize_json(value: &serde_json::Value) -> serde_json::Value {
+    /// f64 可精确表示的最大整数绝对值 (2^53)
+    const MAX_SAFE_INT: f64 = (1_i64 << 53) as f64;
+
     match value {
         serde_json::Value::Number(n) => {
-            // 如果是浮点且无小数部分，转为整数
             if let Some(f) = n.as_f64()
-                && f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 {
-                    return serde_json::Value::Number(serde_json::Number::from(f as i64));
-                }
+                && f.fract() == 0.0
+                && f.abs() <= MAX_SAFE_INT
+            {
+                return serde_json::Value::Number(serde_json::Number::from(f as i64));
+            }
             value.clone()
         }
         serde_json::Value::Object(map) => {
@@ -412,8 +332,14 @@ fn normalize_json(value: &serde_json::Value) -> serde_json::Value {
 
 /// 计算审计条目的 SHA256 哈希
 ///
-/// 包含所有关键字段，任何修改都会导致哈希不匹配。
-/// details 经过 normalize_json 规范化，消除 SurrealDB 数值精度漂移。
+/// 所有存储字段参与哈希，任何修改都会导致不匹配。
+///
+/// 设计要点：
+/// - 变长字段间用 `\x00` 分隔，防止 `("ab","cd")` 与 `("abc","d")` 碰撞
+/// - 定长字段（u64/i64）用 LE 字节序，无需分隔
+/// - Optional 字段用 `\x00`=None / `\x01`+bytes=Some 区分，避免 None 与 Some("") 碰撞
+/// - action 使用 serde 序列化（snake_case，跨版本稳定），而非 Debug trait
+/// - details 经过 normalize_json 规范化，消除 SurrealDB 数值精度漂移
 #[allow(clippy::too_many_arguments)]
 fn compute_audit_hash(
     prev_hash: &str,
@@ -423,18 +349,57 @@ fn compute_audit_hash(
     resource_type: &str,
     resource_id: &str,
     operator_id: Option<&str>,
+    operator_name: Option<&str>,
     details: &serde_json::Value,
+    target: Option<&str>,
 ) -> String {
     let mut hasher = Sha256::new();
+
+    // 链接前一条哈希
     hasher.update(prev_hash.as_bytes());
+    hasher.update(b"\x00");
+
+    // 定长字段
     hasher.update(id.to_le_bytes());
     hasher.update(timestamp.to_le_bytes());
-    hasher.update(format!("{:?}", action).as_bytes());
+
+    // action — serde snake_case (稳定格式，与 DB 存储一致)
+    let action_str = serde_json::to_string(action).unwrap_or_default();
+    hasher.update(action_str.as_bytes());
+    hasher.update(b"\x00");
+
+    // 变长字符串字段 — 分隔符隔离
     hasher.update(resource_type.as_bytes());
+    hasher.update(b"\x00");
     hasher.update(resource_id.as_bytes());
-    hasher.update(operator_id.unwrap_or("system").as_bytes());
+    hasher.update(b"\x00");
+
+    // Optional 字段 — tag byte 区分 None/Some
+    hash_optional(&mut hasher, operator_id);
+    hash_optional(&mut hasher, operator_name);
+
+    // details JSON (规范化)
     let normalized = normalize_json(details);
     let details_json = serde_json::to_string(&normalized).unwrap_or_default();
     hasher.update(details_json.as_bytes());
+    hasher.update(b"\x00");
+
+    // target
+    hash_optional(&mut hasher, target);
+
     format!("{:x}", hasher.finalize())
+}
+
+/// Optional 字段哈希：`\x00` = None, `\x01` + bytes + `\x00` = Some
+fn hash_optional(hasher: &mut Sha256, value: Option<&str>) {
+    match value {
+        Some(v) => {
+            hasher.update(b"\x01");
+            hasher.update(v.as_bytes());
+        }
+        None => {
+            hasher.update(b"\x00");
+        }
+    }
+    hasher.update(b"\x00");
 }

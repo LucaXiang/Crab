@@ -24,6 +24,7 @@ const RESOURCE_ACTIONS: Record<string, AuditAction[]> = {
   print_destination: ['print_destination_created', 'print_destination_updated', 'print_destination_deleted'],
   label_template: ['label_template_created', 'label_template_updated', 'label_template_deleted'],
   store_info: ['store_info_changed'],
+  daily_report: ['daily_report_generated'],
 };
 
 /**
@@ -35,7 +36,7 @@ const RESOURCE_CATEGORIES: { group: string; resources: string[] }[] = [
   { group: 'management', resources: ['employee', 'role'] },
   { group: 'catalog', resources: ['product', 'category', 'tag', 'attribute'] },
   { group: 'venue', resources: ['zone', 'dining_table'] },
-  { group: 'config', resources: ['price_rule', 'shift', 'print_config', 'print_destination', 'label_template', 'store_info'] },
+  { group: 'config', resources: ['price_rule', 'shift', 'print_config', 'print_destination', 'label_template', 'store_info', 'daily_report'] },
 ];
 
 interface AuditFilterModalProps {

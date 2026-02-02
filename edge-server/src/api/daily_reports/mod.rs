@@ -16,16 +16,10 @@ pub fn router() -> Router<ServerState> {
 }
 
 fn routes() -> Router<ServerState> {
-    let read_routes = Router::new()
+    Router::new()
         .route("/", get(handler::list))
         .route("/generate", post(handler::generate))
         .route("/{id}", get(handler::get_by_id))
         .route("/date/{date}", get(handler::get_by_date))
-        .layer(middleware::from_fn(require_permission("statistics:read")));
-
-    let delete_routes = Router::new()
-        .route("/{id}", axum::routing::delete(handler::delete))
-        .layer(middleware::from_fn(require_permission("system:write")));
-
-    read_routes.merge(delete_routes)
+        .layer(middleware::from_fn(require_permission("statistics:read")))
 }

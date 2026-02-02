@@ -1,4 +1,4 @@
-//! Audit Log API 模块 (审计日志查询、验证)
+//! Audit Log API 模块 (审计日志查询)
 
 mod handler;
 
@@ -14,6 +14,5 @@ pub fn router() -> Router<ServerState> {
 fn routes() -> Router<ServerState> {
     Router::new()
         .route("/", get(handler::list))
-        .route("/verify", get(handler::verify_chain))
         .route_layer(middleware::from_fn(require_permission("settings:manage")))
 }

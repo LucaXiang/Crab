@@ -915,6 +915,8 @@ export type AuditAction =
   // 班次
   | 'shift_opened'
   | 'shift_closed'
+  // 日结报告
+  | 'daily_report_generated'
   // 系统配置
   | 'print_config_changed'
   | 'store_info_changed';
@@ -949,24 +951,6 @@ export interface AuditEntry {
 export interface AuditListResponse {
   items: AuditEntry[];
   total: number;
-}
-
-/** 审计链断裂类型 */
-export type ChainBreakKind = 'hash_mismatch' | 'hash_recompute' | 'sequence_gap';
-
-/** 审计链断裂点 */
-export interface AuditChainBreak {
-  entry_id: number;
-  kind: ChainBreakKind;
-  expected: string;
-  actual: string;
-}
-
-/** 审计链验证结果 */
-export interface AuditChainVerification {
-  total_entries: number;
-  chain_intact: boolean;
-  breaks: AuditChainBreak[];
 }
 
 // ============ System Issues (系统问题) ============

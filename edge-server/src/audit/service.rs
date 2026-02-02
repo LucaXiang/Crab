@@ -3,7 +3,7 @@
 //! `AuditService` 是审计日志的核心服务，提供：
 //! - 日志写入（通过 mpsc 通道异步接收）
 //! - 日志查询（直接读取 SurrealDB）
-//! - 链验证
+//! - 链哈希生成（外部工具可导出验证）
 //! - 系统生命周期管理（LOCK 文件 + 24h 间隔检测）
 //! - 启动异常检测 → 写入 system_issue 表（前端通过 system-issues API 渲染对话框）
 
@@ -340,15 +340,6 @@ impl AuditService {
         q: &AuditQuery,
     ) -> Result<(Vec<AuditEntry>, u64), AuditStorageError> {
         self.storage.query(q).await
-    }
-
-    /// 验证审计链完整性
-    pub async fn verify_chain(
-        &self,
-        from: Option<i64>,
-        to: Option<i64>,
-    ) -> Result<AuditChainVerification, AuditStorageError> {
-        self.storage.verify_chain(from, to).await
     }
 
     /// 获取存储引用

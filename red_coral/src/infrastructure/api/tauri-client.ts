@@ -62,7 +62,6 @@ import type {
   DailyReport,
   DailyReportGenerate,
   AuditListResponse,
-  AuditChainVerification,
   SystemIssue,
   ResolveSystemIssueRequest,
 } from '@/core/domain/types/api';
@@ -538,10 +537,6 @@ export class TauriApiClient {
     return invokeAndUnwrap<DailyReport>('generate_daily_report', { data });
   }
 
-  async deleteDailyReport(id: string): Promise<boolean> {
-    return invokeAndUnwrap<boolean>('delete_daily_report', { id });
-  }
-
   // ============ Audit Log (审计日志) ============
 
   async listAuditLogs(query: {
@@ -562,15 +557,6 @@ export class TauriApiClient {
     const qs = params.toString();
     const path = qs ? `/api/audit-log?${qs}` : '/api/audit-log';
     return invokeAndUnwrap<AuditListResponse>('api_get', { path });
-  }
-
-  async verifyAuditChain(from?: number, to?: number): Promise<AuditChainVerification> {
-    const params = new URLSearchParams();
-    if (from !== undefined) params.set('from', String(from));
-    if (to !== undefined) params.set('to', String(to));
-    const qs = params.toString();
-    const path = qs ? `/api/audit-log/verify?${qs}` : '/api/audit-log/verify';
-    return invokeAndUnwrap<AuditChainVerification>('api_get', { path });
   }
 
   // ============ System Issues (系统问题) ============

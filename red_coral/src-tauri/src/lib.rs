@@ -112,6 +112,11 @@ pub async fn run() {
             // Auto-restore session in background
             let bridge_for_task = bridge.clone();
             tauri::async_runtime::spawn(async move {
+                // 设置自身引用（用于 reconnect listener 触发重建）
+                {
+                    let mut b = bridge_for_task.write().await;
+                    b.set_self_ref(Arc::downgrade(&bridge_for_task));
+                }
                 let bridge = bridge_for_task.read().await;
                 if let Err(e) = bridge.restore_last_session().await {
                     tracing::error!("Failed to restore session: {}", e);
@@ -295,7 +300,6 @@ pub async fn run() {
             commands::get_daily_report,
             commands::get_daily_report_by_date,
             commands::generate_daily_report,
-            commands::delete_daily_report,
             // Statistics commands (数据统计)
             commands::get_statistics,
             commands::get_sales_report,

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { createTauriClient } from '@/infrastructure/api/tauri-client';
-import type { AuditEntry, AuditChainVerification } from '@/core/domain/types/api';
+import type { AuditEntry } from '@/core/domain/types/api';
 import {
   Search,
   ChevronLeft,
@@ -12,8 +12,6 @@ import {
   Loader2,
   AlertCircle,
   FileText,
-  ShieldCheck,
-  ShieldAlert,
   Info,
   Calendar,
   X,
@@ -296,10 +294,6 @@ export const AuditLog: React.FC = () => {
     }
   }, [datePreset, customFrom, customTo]);
 
-  // Chain verification
-  const [verifying, setVerifying] = useState(false);
-  const [verification, setVerification] = useState<AuditChainVerification | null>(null);
-
   // Detail expansion
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -347,27 +341,6 @@ export const AuditLog: React.FC = () => {
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
-
-  const handleVerifyChain = async () => {
-    setVerifying(true);
-    setVerification(null);
-    try {
-      const from = dateRange ? dayStartMillis(dateRange.from) : undefined;
-      const to = dateRange ? dayEndMillis(dateRange.to) : undefined;
-      const result = await api.verifyAuditChain(from, to);
-      setVerification(result);
-      if (result.chain_intact) {
-        toast.success(t('audit.verify.intact'));
-      } else {
-        toast.error(t('audit.verify.broken'));
-      }
-    } catch (err) {
-      console.error('Failed to verify chain:', err);
-      toast.error(t('audit.verify.error'));
-    } finally {
-      setVerifying(false);
-    }
-  };
 
   const formatTimestamp = (ts: number) => {
     return new Date(ts).toLocaleString('zh-CN', {
@@ -511,54 +484,7 @@ export const AuditLog: React.FC = () => {
               {total} {t('audit.entries')}
             </p>
           </div>
-          <button
-            onClick={handleVerifyChain}
-            disabled={verifying}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors text-sm font-medium disabled:opacity-50"
-          >
-            {verifying ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
-            {t('audit.verify.button')}
-          </button>
         </div>
-
-        {/* Verification result */}
-        {verification && (
-          <div
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm ${
-              verification.chain_intact
-                ? 'bg-green-50 text-green-700 border border-green-200'
-                : 'bg-red-50 text-red-700 border border-red-200'
-            }`}
-          >
-            {verification.chain_intact ? <ShieldCheck size={18} /> : <ShieldAlert size={18} />}
-            <div>
-              <span className="font-medium">
-                {verification.chain_intact ? t('audit.verify.intact') : t('audit.verify.broken')}
-              </span>
-              <span className="ml-2 text-xs opacity-75">
-                ({t('audit.verify.checked')} {verification.total_entries} {t('audit.entries')})
-              </span>
-              {verification.breaks.length > 0 && (
-                <div className="mt-1 text-xs">
-                  {verification.breaks.slice(0, 3).map((b, i) => (
-                    <div key={i}>
-                      #{b.entry_id}: {b.kind} — {t('audit.verify.expected')}: {b.expected.substring(0, 16)}...
-                    </div>
-                  ))}
-                  {verification.breaks.length > 3 && (
-                    <div>{t('audit.verify.more_breaks', { count: verification.breaks.length - 3 })}</div>
-                  )}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => setVerification(null)}
-              className="ml-auto text-xs opacity-50 hover:opacity-100"
-            >
-              ✕
-            </button>
-          </div>
-        )}
 
         {/* Filters */}
         <div className="flex flex-wrap gap-2">

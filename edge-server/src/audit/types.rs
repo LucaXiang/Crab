@@ -123,6 +123,10 @@ pub enum AuditAction {
     /// 打印目的地删除
     PrintDestinationDeleted,
 
+    // ═══ 日结报告 ═══
+    /// 日结报告生成
+    DailyReportGenerated,
+
     // ═══ 系统配置 ═══
     /// 打印配置变更
     PrintConfigChanged,
@@ -200,39 +204,4 @@ pub struct AuditListResponse {
     pub total: u64,
 }
 
-/// 审计链验证结果
-#[derive(Debug, Serialize)]
-pub struct AuditChainVerification {
-    /// 验证的记录总数
-    pub total_entries: u64,
-    /// 链是否完整
-    pub chain_intact: bool,
-    /// 断裂点列表
-    pub breaks: Vec<AuditChainBreak>,
-}
-
-/// 审计链断裂点
-#[derive(Debug, Serialize)]
-pub struct AuditChainBreak {
-    /// 断裂处的序列号
-    pub entry_id: u64,
-    /// 断裂类型
-    pub kind: ChainBreakKind,
-    /// 期望值
-    pub expected: String,
-    /// 实际值
-    pub actual: String,
-}
-
-/// 审计链断裂类型
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ChainBreakKind {
-    /// prev_hash 不匹配
-    HashMismatch,
-    /// curr_hash 重新计算不一致
-    HashRecompute,
-    /// 序列号不连续（可能有条目被删除）
-    SequenceGap,
-}
 

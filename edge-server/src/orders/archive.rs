@@ -685,9 +685,14 @@ impl OrderArchiveService {
     ) -> String {
         let mut hasher = Sha256::new();
         hasher.update(prev_hash.as_bytes());
+        hasher.update(b"\x00");
         hasher.update(snapshot.order_id.as_bytes());
+        hasher.update(b"\x00");
         hasher.update(snapshot.receipt_number.as_bytes());
-        hasher.update(format!("{:?}", snapshot.status).as_bytes());
+        hasher.update(b"\x00");
+        let status_str = serde_json::to_string(&snapshot.status).unwrap_or_default();
+        hasher.update(status_str.as_bytes());
+        hasher.update(b"\x00");
         hasher.update(last_event_hash.as_bytes());
         format!("{:x}", hasher.finalize())
     }
@@ -696,10 +701,13 @@ impl OrderArchiveService {
     fn compute_event_hash(&self, event: &OrderEvent) -> String {
         let mut hasher = Sha256::new();
         hasher.update(event.event_id.as_bytes());
+        hasher.update(b"\x00");
         hasher.update(event.order_id.as_bytes());
-        hasher.update(format!("{}", event.sequence).as_bytes());
-        hasher.update(format!("{:?}", event.event_type).as_bytes());
-        // Include payload in hash for tamper-proofing
+        hasher.update(b"\x00");
+        hasher.update(event.sequence.to_le_bytes());
+        let event_type_str = serde_json::to_string(&event.event_type).unwrap_or_default();
+        hasher.update(event_type_str.as_bytes());
+        hasher.update(b"\x00");
         let payload_json = serde_json::to_string(&event.payload).unwrap_or_default();
         hasher.update(payload_json.as_bytes());
         format!("{:x}", hasher.finalize())
@@ -1136,9 +1144,14 @@ mod tests {
     ) -> String {
         let mut hasher = Sha256::new();
         hasher.update(prev_hash.as_bytes());
+        hasher.update(b"\x00");
         hasher.update(snapshot.order_id.as_bytes());
+        hasher.update(b"\x00");
         hasher.update(snapshot.receipt_number.as_bytes());
-        hasher.update(format!("{:?}", snapshot.status).as_bytes());
+        hasher.update(b"\x00");
+        let status_str = serde_json::to_string(&snapshot.status).unwrap_or_default();
+        hasher.update(status_str.as_bytes());
+        hasher.update(b"\x00");
         hasher.update(last_event_hash.as_bytes());
         format!("{:x}", hasher.finalize())
     }
@@ -1146,10 +1159,13 @@ mod tests {
     fn compute_event_hash_standalone(event: &shared::order::OrderEvent) -> String {
         let mut hasher = Sha256::new();
         hasher.update(event.event_id.as_bytes());
+        hasher.update(b"\x00");
         hasher.update(event.order_id.as_bytes());
-        hasher.update(format!("{}", event.sequence).as_bytes());
-        hasher.update(format!("{:?}", event.event_type).as_bytes());
-        // Include payload in hash for tamper-proofing
+        hasher.update(b"\x00");
+        hasher.update(event.sequence.to_le_bytes());
+        let event_type_str = serde_json::to_string(&event.event_type).unwrap_or_default();
+        hasher.update(event_type_str.as_bytes());
+        hasher.update(b"\x00");
         let payload_json = serde_json::to_string(&event.payload).unwrap_or_default();
         hasher.update(payload_json.as_bytes());
         format!("{:x}", hasher.finalize())

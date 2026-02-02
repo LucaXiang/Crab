@@ -2199,6 +2199,7 @@
       "shift_closed": "班次关闭",
       "print_config_changed": "打印配置变更",
       "store_info_changed": "门店信息变更",
+      "daily_report_generated": "生成日结报告",
       "product_created": "创建商品",
       "product_updated": "更新商品",
       "product_deleted": "删除商品",
@@ -2226,15 +2227,6 @@
       "print_destination_created": "创建打印目的地",
       "print_destination_updated": "更新打印目的地",
       "print_destination_deleted": "删除打印目的地"
-    },
-    "verify": {
-      "button": "验证完整性",
-      "intact": "审计链完整，未发现篡改",
-      "broken": "审计链异常！发现断裂点",
-      "error": "验证失败",
-      "checked": "已验证",
-      "expected": "期望",
-      "more_breaks": "...还有 {count} 处断裂"
     }
   }
 }

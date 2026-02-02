@@ -202,19 +202,4 @@ impl DailyReportRepository {
         let reports: Vec<DailyReport> = result.take(0)?;
         Ok(reports)
     }
-
-    /// Delete report (admin only)
-    pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let record_id: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-
-        self.base
-            .db()
-            .query("DELETE $id")
-            .bind(("id", record_id))
-            .await?;
-
-        Ok(true)
-    }
 }

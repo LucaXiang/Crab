@@ -15,7 +15,7 @@
 //! - **SHA256 哈希链**: 每条记录包含前一条的哈希
 //! - **Append-only**: 无删除/更新接口
 //! - **SurrealDB schema**: update/delete 权限为 NONE
-//! - **链验证 API**: 可随时验证完整性
+//! - **链验证**: 哈希链数据可导出供外部工具验证
 //!
 //! # 启动异常检测
 //!
@@ -32,6 +32,6 @@ pub mod worker;
 pub use service::{AuditLogRequest, AuditService};
 pub use storage::{AuditStorage, AuditStorageError};
 pub use types::{
-    AuditAction, AuditChainVerification, AuditEntry, AuditListResponse, AuditQuery,
+    AuditAction, AuditEntry, AuditListResponse, AuditQuery,
 };
 pub use worker::AuditWorker;
