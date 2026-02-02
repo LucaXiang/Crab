@@ -4,6 +4,7 @@
 //! - OrderMerged: Target order receives items, payments, and split state from source order
 //! - OrderMergedOut: Source order is marked as Merged status
 
+use crate::orders::money;
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot, OrderStatus};
 
@@ -42,7 +43,9 @@ impl EventApplier for OrderMergedApplier {
 
             // Accumulate paid amount
             snapshot.paid_amount += paid_amount;
-            snapshot.remaining_amount = snapshot.total - snapshot.paid_amount;
+
+            // Recalculate totals after merging items (updates subtotal, total, remaining, etc.)
+            money::recalculate_totals(snapshot);
 
             // Merge split state
             if *has_amount_split {
@@ -519,8 +522,10 @@ mod tests {
     #[test]
     fn test_order_merged_transfers_payments() {
         let mut snapshot = create_test_snapshot("target-1");
-        snapshot.total = 30.0;
-        snapshot.remaining_amount = 30.0;
+        // Add existing items so recalculate_totals produces correct total
+        let mut existing = create_test_item("existing-1", "Existing");
+        existing.price = 20.0; // existing item worth 20
+        snapshot.items.push(existing);
 
         let payment = shared::order::PaymentRecord {
             payment_id: "pay-1".to_string(),
@@ -545,7 +550,7 @@ mod tests {
             2,
             "dining_table:t2",
             "Table 2",
-            vec![create_test_item("item-src-1", "Coffee")],
+            vec![create_test_item("item-src-1", "Coffee")], // 10.0
             vec![payment],
             paid_item_quantities,
             5.0,
@@ -557,14 +562,16 @@ mod tests {
         let applier = OrderMergedApplier;
         applier.apply(&mut snapshot, &event);
 
-        // Items merged
-        assert_eq!(snapshot.items.len(), 1);
+        // Items merged (existing + merged)
+        assert_eq!(snapshot.items.len(), 2);
         // Payments merged
         assert_eq!(snapshot.payments.len(), 1);
         assert_eq!(snapshot.payments[0].payment_id, "pay-1");
         assert_eq!(snapshot.payments[0].amount, 5.0);
         // Paid amount accumulated
         assert_eq!(snapshot.paid_amount, 5.0);
+        // total = 20 + 10 = 30, remaining = 30 - 5 = 25
+        assert_eq!(snapshot.total, 30.0);
         assert_eq!(snapshot.remaining_amount, 25.0);
         // Paid item quantities merged
         assert_eq!(snapshot.paid_item_quantities.get("item-src-1"), Some(&1));
@@ -573,9 +580,11 @@ mod tests {
     #[test]
     fn test_order_merged_accumulates_existing_payments() {
         let mut snapshot = create_test_snapshot("target-1");
-        snapshot.total = 50.0;
+        // Add existing items so recalculate_totals produces correct total
+        let mut existing = create_test_item("existing-1", "Existing");
+        existing.price = 50.0; // item worth 50
+        snapshot.items.push(existing);
         snapshot.paid_amount = 10.0;
-        snapshot.remaining_amount = 40.0;
         snapshot.payments.push(shared::order::PaymentRecord {
             payment_id: "pay-target".to_string(),
             method: "CARD".to_string(),
@@ -625,6 +634,8 @@ mod tests {
 
         assert_eq!(snapshot.payments.len(), 2);
         assert_eq!(snapshot.paid_amount, 18.0);
+        // total = 50 (from item), remaining = 50 - 18 = 32
+        assert_eq!(snapshot.total, 50.0);
         assert_eq!(snapshot.remaining_amount, 32.0);
     }
 }

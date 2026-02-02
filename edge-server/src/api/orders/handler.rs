@@ -42,6 +42,7 @@ pub struct OrderItemDetail {
     pub surcharge_amount: f64,
     pub rule_discount_amount: f64,
     pub rule_surcharge_amount: f64,
+    pub applied_rules: Option<Vec<shared::order::AppliedRule>>,
     pub note: Option<String>,
     pub selected_options: Vec<OrderItemOptionDetail>,
 }
@@ -161,6 +162,7 @@ pub async fn get_by_id(
             surcharge_amount: i.surcharge_amount,
             rule_discount_amount: i.rule_discount_amount,
             rule_surcharge_amount: i.rule_surcharge_amount,
+            applied_rules: i.applied_rules,
             note: i.note,
             selected_options: i.selected_options.into_iter().map(|o| OrderItemOptionDetail {
                 attribute_name: o.attribute_name,

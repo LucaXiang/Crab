@@ -44,7 +44,14 @@ impl CommandHandler for MoveOrderAction {
             }
         }
 
-        // 3. Validate target table is not occupied by another order
+        // 3. Reject if order has any payments
+        if snapshot.paid_amount > 0.0 {
+            return Err(OrderError::InvalidOperation(
+                "存在支付记录的订单不能移动桌台".to_string(),
+            ));
+        }
+
+        // 4. Validate target table is not occupied by another order
         if let Some(existing_order_id) = ctx.find_active_order_for_table(&self.target_table_id)? {
             // Allow moving to the same table (no-op case)
             if existing_order_id != self.order_id {
@@ -55,14 +62,14 @@ impl CommandHandler for MoveOrderAction {
             }
         }
 
-        // 4. Get source table info from snapshot
+        // 5. Get source table info from snapshot
         let source_table_id = snapshot.table_id.clone().unwrap_or_default();
         let source_table_name = snapshot.table_name.clone().unwrap_or_default();
 
-        // 5. Allocate sequence number
+        // 6. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 6. Create event
+        // 7. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -478,5 +485,33 @@ mod tests {
         let result = action.execute(&mut ctx, &metadata).await;
 
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_move_order_with_payment_fails() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = create_active_order("order-1");
+        snapshot.paid_amount = 10.0;
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = MoveOrderAction {
+            order_id: "order-1".to_string(),
+            target_table_id: "dining_table:t2".to_string(),
+            target_table_name: "Table 2".to_string(),
+            target_zone_id: None,
+            target_zone_name: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
     }
 }

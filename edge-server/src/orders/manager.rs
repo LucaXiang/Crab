@@ -1063,11 +1063,11 @@ mod tests {
     }
 
     // ========================================================================
-    // 3. Merge 带支付的订单 — 支付信息正确转移
+    // 3. Merge 带支付的订单 — 存在支付记录时拒绝合并
     // ========================================================================
 
     #[test]
-    fn test_merge_orders_source_payments_are_transferred() {
+    fn test_merge_orders_source_with_payment_rejected() {
         let manager = create_test_manager();
 
         // Source order with items and partial payment
@@ -1103,7 +1103,7 @@ mod tests {
             vec![simple_item("product:p2", "Tea", 8.0, 1)],
         );
 
-        // Merge source → target
+        // Merge source → target should be rejected
         let merge_cmd = OrderCommand::new(
             "op-1".to_string(),
             "Test Operator".to_string(),
@@ -1115,21 +1115,16 @@ mod tests {
             },
         );
         let resp = manager.execute_command(merge_cmd);
-        assert!(resp.success);
+        assert!(!resp.success, "存在支付记录的订单不能合并");
+
+        // Source and target should remain unchanged
+        let source_after = manager.get_snapshot(&source_id).unwrap().unwrap();
+        assert_eq!(source_after.paid_amount, 5.0);
+        assert_eq!(source_after.status, OrderStatus::Active);
 
         let target_after = manager.get_snapshot(&target_id).unwrap().unwrap();
-        // Items should be merged (source had 2 items [qty 2] + target had 1)
-        assert!(target_after.items.len() > 1, "Target should have source items merged");
-
-        // Source's payments should be transferred to target
-        assert_eq!(
-            target_after.paid_amount, 5.0,
-            "Source order's payments should be transferred during merge"
-        );
-        assert_eq!(
-            target_after.payments.len(), 1,
-            "Source order's payment records should be transferred"
-        );
+        assert_eq!(target_after.items.len(), 1, "Target should be unchanged");
+        assert_eq!(target_after.paid_amount, 0.0);
     }
 
     // ========================================================================

@@ -550,15 +550,15 @@ mod tests {
         assert_eq!(snapshot.subtotal, 90.0);
         assert_eq!(snapshot.total, 81.0);
 
-        // Skip the item-level rule → subtotal goes up, order discount recalculated
+        // Skip the item-level rule → subtotal goes up, order discount dynamically recalculated
         let event = create_rule_skip_toggled_event("order-1", 2, "item-rule-1", true);
         let applier = RuleSkipToggledApplier;
         applier.apply(&mut snapshot, &event);
 
-        // subtotal = 100 (item rule skipped), order discount still 9.0 (calculated_amount fixed)
-        // total = 100 - 9 = 91
+        // subtotal = 100 (item rule skipped), order discount = 100 * 10% = 10
+        // total = 100 - 10 = 90
         assert_eq!(snapshot.subtotal, 100.0);
-        assert_eq!(snapshot.total, 91.0);
+        assert_eq!(snapshot.total, 90.0);
         // Order rule is NOT skipped
         assert!(!snapshot.order_applied_rules.as_ref().unwrap()[0].skipped);
     }

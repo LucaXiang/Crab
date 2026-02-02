@@ -214,10 +214,14 @@ interface OrderItemRowProps {
 
 const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isExpanded, onToggle, t }) => {
   const hasOptions = item.selected_options && item.selected_options.length > 0;
-  const discountAmount = (item.rule_discount_amount ?? 0);
-  const surchargeAmount = (item.rule_surcharge_amount ?? 0);
-  const hasDiscount = discountAmount > 0 || (item.manual_discount_percent != null && item.manual_discount_percent > 0);
-  const hasSurcharge = surchargeAmount > 0;
+  const activeRules = (item.applied_rules ?? []).filter(r => !r.skipped);
+  const totalRuleDiscount = activeRules
+    .filter(r => r.rule_type === 'DISCOUNT')
+    .reduce((sum, r) => sum + r.calculated_amount, 0);
+  const totalRuleSurcharge = activeRules
+    .filter(r => r.rule_type === 'SURCHARGE')
+    .reduce((sum, r) => sum + r.calculated_amount, 0);
+  const discountPercent = item.manual_discount_percent || 0;
   const isFullyPaid = (item.unpaid_quantity ?? item.quantity) === 0;
 
   return (
@@ -247,14 +251,19 @@ const OrderItemRow: React.FC<OrderItemRowProps> = React.memo(({ item, index, isE
                   {t('checkout.comp.badge')}
                 </span>
               )}
-              {hasDiscount && (
+              {discountPercent > 0 && (
                 <span className="text-[0.625rem] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
-                  {item.manual_discount_percent ? `-${item.manual_discount_percent}%` : `-${formatCurrency(discountAmount)}`}
+                  -{discountPercent}%
                 </span>
               )}
-              {hasSurcharge && (
+              {totalRuleDiscount > 0 && (
+                <span className="text-[0.625rem] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                  -{formatCurrency(totalRuleDiscount)}
+                </span>
+              )}
+              {totalRuleSurcharge > 0 && (
                 <span className="text-[0.625rem] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
-                  +{formatCurrency(surchargeAmount)}
+                  +{formatCurrency(totalRuleSurcharge)}
                 </span>
               )}
             </div>

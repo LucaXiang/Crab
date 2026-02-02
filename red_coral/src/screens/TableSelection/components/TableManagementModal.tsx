@@ -476,8 +476,8 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                                                     rule.rule_type === 'DISCOUNT'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : 'bg-amber-100 text-amber-700'
+                                                        ? 'bg-amber-100 text-amber-700'
+                                                        : 'bg-purple-100 text-purple-700'
                                                 }`}>
                                                     {rule.rule_type === 'DISCOUNT' ? t('settings.price_rule.type.discount') : t('settings.price_rule.type.surcharge')}
                                                 </span>
@@ -496,7 +496,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                                                 {t('table.price_rules.applied_to')}: {sources.join(', ')}
                                             </div>
                                             <div className={`text-sm font-bold mt-2 ${
-                                                rule.rule_type === 'DISCOUNT' ? 'text-green-600' : 'text-amber-600'
+                                                rule.rule_type === 'DISCOUNT' ? 'text-amber-600' : 'text-purple-500'
                                             }`}>
                                                 {rule.rule_type === 'DISCOUNT' ? '-' : '+'}
                                                 {formatCurrency(Math.abs(rule.calculated_amount))}

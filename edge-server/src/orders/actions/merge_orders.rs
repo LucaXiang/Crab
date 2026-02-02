@@ -83,17 +83,29 @@ impl CommandHandler for MergeOrdersAction {
             ));
         }
 
-        // 6. Extract table info
+        // 6. Reject if either order has payments
+        if source_snapshot.paid_amount > 0.0 {
+            return Err(OrderError::InvalidOperation(
+                "存在支付记录的订单不能合并".to_string(),
+            ));
+        }
+        if target_snapshot.paid_amount > 0.0 {
+            return Err(OrderError::InvalidOperation(
+                "目标订单存在支付记录，不能合并".to_string(),
+            ));
+        }
+
+        // 7. Extract table info
         let source_table_id = source_snapshot.table_id.clone().unwrap_or_default();
         let source_table_name = source_snapshot.table_name.clone().unwrap_or_default();
         let target_table_id = target_snapshot.table_id.clone().unwrap_or_default();
         let target_table_name = target_snapshot.table_name.clone().unwrap_or_default();
 
-        // 7. Allocate sequence numbers for both events
+        // 8. Allocate sequence numbers for both events
         let seq1 = ctx.next_sequence();
         let seq2 = ctx.next_sequence();
 
-        // 8. Create OrderMergedOut event for source order
+        // 9. Create OrderMergedOut event for source order
         let event1 = OrderEvent::new(
             seq1,
             self.source_order_id.clone(),
@@ -111,7 +123,7 @@ impl CommandHandler for MergeOrdersAction {
             },
         );
 
-        // 9. Create OrderMerged event for target order (includes source items)
+        // 10. Create OrderMerged event for target order (includes source items)
         let event2 = OrderEvent::new(
             seq2,
             self.target_order_id.clone(),
@@ -622,5 +634,59 @@ mod tests {
         } else {
             panic!("Expected OrderMerged payload");
         }
+    }
+
+    #[tokio::test]
+    async fn test_merge_orders_source_has_payment_fails() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        source.paid_amount = 5.0;
+        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        storage.store_snapshot(&txn, &source).unwrap();
+        storage.store_snapshot(&txn, &target).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = MergeOrdersAction {
+            source_order_id: "source-1".to_string(),
+            target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
+
+    #[tokio::test]
+    async fn test_merge_orders_target_has_payment_fails() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        let mut target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        target.paid_amount = 15.0;
+        storage.store_snapshot(&txn, &source).unwrap();
+        storage.store_snapshot(&txn, &target).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = MergeOrdersAction {
+            source_order_id: "source-1".to_string(),
+            target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
     }
 }
