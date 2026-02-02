@@ -286,7 +286,7 @@ async fn ensure_connected(state: &Arc<RwLock<ClientState>>) -> bool {
         }
     };
 
-    match new_client.reconnect(MESSAGE_ADDR).await {
+    match new_client.connect_with_credentials(MESSAGE_ADDR).await {
         Ok(connected) => {
             tracing::info!("Auto reconnected successfully!");
             *write_state = ClientState::Connected(connected);
@@ -382,7 +382,7 @@ async fn handle_command(
         "/help" => {
             tracing::info!("=== Connection Commands ===");
             tracing::info!("/setup <user> <pass>  - First-time setup (download certs)");
-            tracing::info!("/reconnect            - Reconnect using cached certs");
+            tracing::info!("/connect            - Reconnect using cached certs");
             tracing::info!("/disconnect           - Disconnect from server");
             tracing::info!("");
             tracing::info!("=== Authentication Commands ===");
@@ -451,7 +451,7 @@ async fn handle_command(
             }
         }
 
-        "/reconnect" => {
+        "/connect" => {
             tracing::info!("Reconnecting (with self-check & timestamp refresh)...");
 
             let client = match CrabClient::remote()
@@ -473,7 +473,7 @@ async fn handle_command(
                 return;
             }
 
-            match client.reconnect(MESSAGE_ADDR).await {
+            match client.connect_with_credentials(MESSAGE_ADDR).await {
                 Ok(connected) => {
                     tracing::info!("Reconnected successfully!");
                     app.phase = ClientPhase::Connected;
@@ -593,7 +593,7 @@ async fn handle_command(
             if let Some(mc) = msg_client {
                 send_rpc(app, "ping", None, mc).await;
             } else {
-                tracing::error!("Not connected. Use /reconnect first.");
+                tracing::error!("Not connected. Use /connect first.");
             }
         }
 
@@ -607,7 +607,7 @@ async fn handle_command(
             if let Some(mc) = msg_client {
                 send_rpc(app, "status", None, mc).await;
             } else {
-                tracing::error!("Not connected. Use /reconnect first.");
+                tracing::error!("Not connected. Use /connect first.");
             }
         }
 
@@ -627,7 +627,7 @@ async fn handle_command(
             if let Some(mc) = msg_client {
                 send_rpc(app, "echo", Some(serde_json::json!({ "message": msg })), mc).await;
             } else {
-                tracing::error!("Not connected. Use /reconnect first.");
+                tracing::error!("Not connected. Use /connect first.");
             }
         }
 
@@ -658,7 +658,7 @@ async fn handle_command(
                 }
             } else {
                 tracing::error!("mTLS HTTP client not available.");
-                tracing::error!("Connect first using /setup or /reconnect");
+                tracing::error!("Connect first using /setup or /connect");
                 app.status.last_rpc_result = "Error".to_string();
             }
         }

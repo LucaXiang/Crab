@@ -26,8 +26,8 @@
 //! // First-time setup (downloads certificates)
 //! let client = client.setup("tenant", "pass", "edge:8081").await?;
 //!
-//! // Or reconnect using cached certificates
-//! // let client = client.reconnect("edge:8081").await?;
+//! // Or connect using cached certificates
+//! // let client = client.connect_with_credentials("edge:8081").await?;
 //!
 //! // Employee login
 //! let client = client.login("cashier", "1234").await?;
@@ -95,4 +95,4 @@ pub use error::{ClientError, ClientResult};
 pub use message::{BusMessage, EventType};
 
 // Re-export shared types
-pub use shared::client::{ApiResponse, CurrentUserResponse, LoginRequest, LoginResponse, UserInfo};
+pub use shared::client::{CurrentUserResponse, LoginRequest, LoginResponse, UserInfo};

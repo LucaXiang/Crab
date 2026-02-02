@@ -16,8 +16,6 @@ pub enum KeyType {
 pub const OID_TENANT_ID: &[u64] = &[1, 3, 6, 1, 4, 1, 99999, 1];
 pub const OID_DEVICE_ID: &[u64] = &[1, 3, 6, 1, 4, 1, 99999, 2];
 pub const OID_CLIENT_NAME: &[u64] = &[1, 3, 6, 1, 4, 1, 99999, 5];
-#[allow(dead_code)]
-pub const OID_CRAB_PROTOCOL: &[u64] = &[1, 3, 6, 1, 4, 1, 99999, 3];
 
 #[derive(Clone, Debug)]
 pub struct CaProfile {

@@ -128,21 +128,18 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
 /// Server 模式的客户端状态
-#[allow(dead_code)]
 pub(crate) enum LocalClientState {
     Connected(CrabClient<Local, Connected>),
     Authenticated(CrabClient<Local, Authenticated>),
 }
 
 /// Client 模式的客户端状态 (参考 message_client 示例)
-#[allow(dead_code)]
 pub(crate) enum RemoteClientState {
     Connected(CrabClient<Remote, Connected>),
     Authenticated(CrabClient<Remote, Authenticated>),
 }
 
 /// 客户端模式枚举
-#[allow(dead_code)]
 pub(crate) enum ClientMode {
     /// Server 模式: 本地运行 edge-server
     Server {

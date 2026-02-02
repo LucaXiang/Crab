@@ -127,6 +127,7 @@ impl AuditStorage {
     /// 1. 查询当前最大序列号和 last_hash
     /// 2. 计算新条目的哈希
     /// 3. 写入条目
+    #[allow(clippy::too_many_arguments)]
     pub async fn append(
         &self,
         action: AuditAction,
@@ -389,11 +390,10 @@ fn normalize_json(value: &serde_json::Value) -> serde_json::Value {
     match value {
         serde_json::Value::Number(n) => {
             // 如果是浮点且无小数部分，转为整数
-            if let Some(f) = n.as_f64() {
-                if f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 {
+            if let Some(f) = n.as_f64()
+                && f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 {
                     return serde_json::Value::Number(serde_json::Number::from(f as i64));
                 }
-            }
             value.clone()
         }
         serde_json::Value::Object(map) => {

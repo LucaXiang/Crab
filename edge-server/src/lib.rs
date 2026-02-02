@@ -42,7 +42,6 @@ pub use auth::{CurrentUser, JwtService};
 pub use core::{Config, Server, ServerState};
 pub use message::{BusMessage, EventType};
 pub use orders::{OrderStorage, OrdersManager};
-pub use pricing::PriceRuleEngine;
 pub use utils::{AppError, AppResult};
 
 // Re-export unified error types from shared

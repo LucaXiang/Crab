@@ -5,9 +5,6 @@
 
 use serde::{Deserialize, Serialize};
 
-// Re-export ApiResponse from response module
-pub use crate::response::ApiResponse;
-
 // =============================================================================
 // Auth API DTOs
 // =============================================================================

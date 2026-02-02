@@ -45,24 +45,22 @@ impl CommandHandler for ApplyOrderDiscountAction {
         }
 
         // 4. Validate: percent 范围 0-100
-        if let Some(pct) = self.discount_percent {
-            if !pct.is_finite() || pct < 0.0 || pct > 100.0 {
+        if let Some(pct) = self.discount_percent
+            && (!pct.is_finite() || !(0.0..=100.0).contains(&pct)) {
                 return Err(OrderError::InvalidOperation(format!(
                     "discount_percent must be between 0 and 100, got {}",
                     pct
                 )));
             }
-        }
 
         // 5. Validate: fixed 必须为正
-        if let Some(fixed) = self.discount_fixed {
-            if !fixed.is_finite() || fixed <= 0.0 {
+        if let Some(fixed) = self.discount_fixed
+            && (!fixed.is_finite() || fixed <= 0.0) {
                 return Err(OrderError::InvalidOperation(format!(
                     "discount_fixed must be positive, got {}",
                     fixed
                 )));
             }
-        }
 
         // 6. Record previous values
         let previous_discount_percent = snapshot.order_manual_discount_percent;
@@ -139,24 +137,22 @@ impl CommandHandler for ApplyOrderSurchargeAction {
         }
 
         // 4. Validate: percent 范围 0-100
-        if let Some(pct) = self.surcharge_percent {
-            if !pct.is_finite() || pct <= 0.0 || pct > 100.0 {
+        if let Some(pct) = self.surcharge_percent
+            && (!pct.is_finite() || pct <= 0.0 || pct > 100.0) {
                 return Err(OrderError::InvalidOperation(format!(
                     "surcharge_percent must be between 0 and 100, got {}",
                     pct
                 )));
             }
-        }
 
         // 5. Validate: surcharge_amount 必须为正（如果有值）
-        if let Some(amount) = self.surcharge_amount {
-            if !amount.is_finite() || amount <= 0.0 {
+        if let Some(amount) = self.surcharge_amount
+            && (!amount.is_finite() || amount <= 0.0) {
                 return Err(OrderError::InvalidOperation(format!(
                     "surcharge_amount must be positive, got {}",
                     amount
                 )));
             }
-        }
 
         // 6. Record previous values
         let previous_surcharge_percent = snapshot.order_manual_surcharge_percent;

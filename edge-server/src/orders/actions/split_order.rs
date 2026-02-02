@@ -154,14 +154,13 @@ impl CommandHandler for SplitByItemsAction {
 
         let payment_id = uuid::Uuid::new_v4().to_string();
         let seq = ctx.next_sequence();
-        if let Some(t) = self.tendered {
-            if to_decimal(t) < to_decimal(amount_f64) - MONEY_TOLERANCE {
+        if let Some(t) = self.tendered
+            && to_decimal(t) < to_decimal(amount_f64) - MONEY_TOLERANCE {
                 return Err(OrderError::InvalidOperation(format!(
                     "Tendered {:.2} is less than required {:.2}",
                     t, amount_f64
                 )));
             }
-        }
         let change = self.tendered.map(|t| {
             let diff = to_decimal(t) - to_decimal(amount_f64);
             to_f64(diff.max(Decimal::ZERO))
@@ -228,14 +227,13 @@ impl CommandHandler for SplitByAmountAction {
 
         let payment_id = uuid::Uuid::new_v4().to_string();
         let seq = ctx.next_sequence();
-        if let Some(t) = self.tendered {
-            if to_decimal(t) < to_decimal(self.split_amount) - MONEY_TOLERANCE {
+        if let Some(t) = self.tendered
+            && to_decimal(t) < to_decimal(self.split_amount) - MONEY_TOLERANCE {
                 return Err(OrderError::InvalidOperation(format!(
                     "Tendered {:.2} is less than required {:.2}",
                     t, self.split_amount
                 )));
             }
-        }
         let change = self.tendered.map(|t| {
             let diff = to_decimal(t) - to_decimal(self.split_amount);
             to_f64(diff.max(Decimal::ZERO))
@@ -346,14 +344,13 @@ impl CommandHandler for StartAaSplitAction {
         // Event 2: AASplitPaid (first payment)
         let payment_id = uuid::Uuid::new_v4().to_string();
         let seq2 = ctx.next_sequence();
-        if let Some(t) = self.tendered {
-            if to_decimal(t) < to_decimal(amount_f64) - MONEY_TOLERANCE {
+        if let Some(t) = self.tendered
+            && to_decimal(t) < to_decimal(amount_f64) - MONEY_TOLERANCE {
                 return Err(OrderError::InvalidOperation(format!(
                     "Tendered {:.2} is less than required {:.2}",
                     t, amount_f64
                 )));
             }
-        }
         let change = self.tendered.map(|t| {
             let diff = to_decimal(t) - to_decimal(amount_f64);
             to_f64(diff.max(Decimal::ZERO))
@@ -441,14 +438,13 @@ impl CommandHandler for PayAaSplitAction {
 
         let payment_id = uuid::Uuid::new_v4().to_string();
         let seq = ctx.next_sequence();
-        if let Some(t) = self.tendered {
-            if to_decimal(t) < to_decimal(amount_f64) - MONEY_TOLERANCE {
+        if let Some(t) = self.tendered
+            && to_decimal(t) < to_decimal(amount_f64) - MONEY_TOLERANCE {
                 return Err(OrderError::InvalidOperation(format!(
                     "Tendered {:.2} is less than required {:.2}",
                     t, amount_f64
                 )));
             }
-        }
         let change = self.tendered.map(|t| {
             let diff = to_decimal(t) - to_decimal(amount_f64);
             to_f64(diff.max(Decimal::ZERO))

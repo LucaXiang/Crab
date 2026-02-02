@@ -149,7 +149,7 @@ fn calculate_time_range(
                 .unwrap_or(0)
         } else {
             chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                .map(|d| cutoff_millis(d))
+                .map(&cutoff_millis)
                 .unwrap_or(0)
         }
     };

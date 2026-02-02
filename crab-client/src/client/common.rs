@@ -39,7 +39,7 @@ use super::message::NetworkMessageClient;
 ///
 /// # States
 ///
-/// - **Disconnected**: Initial state. Can call `setup()`/`reconnect()` (Remote) or `connect()` (Local).
+/// - **Disconnected**: Initial state. Can call `setup()`/`connect_with_credentials()` (Remote) or `connect()` (Local).
 /// - **Connected**: Connected to server but not logged in. Can call `login()`.
 /// - **Authenticated**: Logged in and ready to make requests. Can call `request()`, `me()`, etc.
 ///
@@ -207,7 +207,7 @@ impl<S: ClientState> CrabClient<Remote, S> {
 
     /// Checks if cached certificates are available.
     ///
-    /// If this returns `true`, you can use `reconnect()` instead of `setup()`.
+    /// If this returns `true`, you can use `connect_with_credentials()` instead of `setup()`.
     pub fn has_cached_credentials(&self) -> bool {
         self.cert_manager
             .as_ref()

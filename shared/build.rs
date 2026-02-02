@@ -109,7 +109,6 @@ export const ErrorCode = {
   BridgeConnectionFailed: 9103,
   PrinterNotAvailable: 9201,
   PrintFailed: 9202,
-  LabelPrintingNotImplemented: 9203,
   ClientDisconnected: 9301,
 
   // 94xx: Storage

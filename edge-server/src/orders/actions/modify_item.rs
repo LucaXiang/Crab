@@ -155,27 +155,24 @@ impl CommandHandler for ModifyItemAction {
 /// Returns `false` (no-op) when all specified fields match current values.
 /// Treats `None` and `Some(0.0)` as equivalent for discount.
 fn has_actual_changes(item: &CartItemSnapshot, changes: &ItemChanges) -> bool {
-    if let Some(price) = changes.price {
-        if (price - item.price).abs() > f64::EPSILON {
+    if let Some(price) = changes.price
+        && (price - item.price).abs() > f64::EPSILON {
             return true;
         }
-    }
-    if let Some(qty) = changes.quantity {
-        if qty != item.quantity {
+    if let Some(qty) = changes.quantity
+        && qty != item.quantity {
             return true;
         }
-    }
     if let Some(discount) = changes.manual_discount_percent {
         let current = item.manual_discount_percent.unwrap_or(0.0);
         if (discount - current).abs() > f64::EPSILON {
             return true;
         }
     }
-    if let Some(ref note) = changes.note {
-        if item.note.as_ref() != Some(note) {
+    if let Some(ref note) = changes.note
+        && item.note.as_ref() != Some(note) {
             return true;
         }
-    }
     if let Some(ref new_opts) = changes.selected_options {
         let current = item.selected_options.as_deref().unwrap_or(&[]);
         if new_opts.len() != current.len() {

@@ -294,7 +294,7 @@ impl ArchiveWorker {
         // Common fields
         let mut details = serde_json::json!({
             "receipt_number": snapshot.receipt_number,
-            "status": serde_json::to_value(&snapshot.status).unwrap_or_default(),
+            "status": serde_json::to_value(snapshot.status).unwrap_or_default(),
             "total": snapshot.total,
             "item_count": snapshot.items.len(),
         });

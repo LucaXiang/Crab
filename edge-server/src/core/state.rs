@@ -14,7 +14,6 @@ use crate::core::Config;
 use crate::db::DbService;
 use crate::orders::{ArchiveWorker, OrdersManager};
 use crate::orders::actions::open_table::load_matching_rules;
-use crate::pricing::PriceRuleEngine;
 use crate::printing::{KitchenPrintService, PrintStorage};
 use crate::services::{
     ActivationService, CatalogService, CertService, HttpsService, MessageBusService,
@@ -119,8 +118,6 @@ pub struct ServerState {
     pub resource_versions: Arc<ResourceVersions>,
     /// 订单管理器 (事件溯源)
     pub orders_manager: Arc<OrdersManager>,
-    /// 价格规则引擎
-    pub price_rule_engine: PriceRuleEngine,
     /// 厨房/标签打印服务
     pub kitchen_print_service: Arc<KitchenPrintService>,
     /// 产品和分类统一管理 (含内存缓存)
@@ -147,7 +144,6 @@ impl ServerState {
         jwt_service: Arc<JwtService>,
         resource_versions: Arc<ResourceVersions>,
         orders_manager: Arc<OrdersManager>,
-        price_rule_engine: PriceRuleEngine,
         kitchen_print_service: Arc<KitchenPrintService>,
         catalog_service: Arc<CatalogService>,
         audit_service: Arc<AuditService>,
@@ -163,7 +159,6 @@ impl ServerState {
             jwt_service,
             resource_versions,
             orders_manager,
-            price_rule_engine,
             kitchen_print_service,
             catalog_service,
             audit_service,
@@ -207,7 +202,7 @@ impl ServerState {
         let jwt_service = Arc::new(JwtService::default());
         let resource_versions = Arc::new(ResourceVersions::new());
 
-        // 3. Initialize CatalogService first (OrdersManager and PriceRuleEngine depend on it)
+        // 3. Initialize CatalogService first (OrdersManager depends on it)
         let images_dir = config.images_dir();
         let catalog_service = Arc::new(CatalogService::new(db.clone(), images_dir));
 
@@ -222,10 +217,7 @@ impl ServerState {
 
         let orders_manager = Arc::new(orders_manager);
 
-        // 5. Initialize PriceRuleEngine
-        let price_rule_engine = PriceRuleEngine::new(db.clone(), catalog_service.clone(), config.timezone);
-
-        // 6. Initialize KitchenPrintService
+        // 5. Initialize KitchenPrintService
         let print_db_path = config.print_db_file();
         let print_storage =
             PrintStorage::open(&print_db_path).expect("Failed to initialize print storage");
@@ -257,7 +249,6 @@ impl ServerState {
             jwt_service,
             resource_versions,
             orders_manager,
-            price_rule_engine,
             kitchen_print_service,
             catalog_service,
             audit_service,

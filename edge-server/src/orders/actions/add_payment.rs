@@ -53,14 +53,13 @@ impl CommandHandler for AddPaymentAction {
         let payment_id = uuid::Uuid::new_v4().to_string();
 
         // 6. Validate tendered amount
-        if let Some(t) = self.payment.tendered {
-            if to_decimal(t) < to_decimal(self.payment.amount) - MONEY_TOLERANCE {
+        if let Some(t) = self.payment.tendered
+            && to_decimal(t) < to_decimal(self.payment.amount) - MONEY_TOLERANCE {
                 return Err(OrderError::InvalidOperation(format!(
                     "Tendered {:.2} is less than required {:.2}",
                     t, self.payment.amount
                 )));
             }
-        }
 
         // 7. Calculate change for cash payments (using rust_decimal)
         let change = self.payment.tendered.map(|t| {

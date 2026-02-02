@@ -9,17 +9,9 @@ use axum::body::Body;
 use http::{Request, StatusCode};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
-
-/// 服务端返回的错误响应格式
-#[derive(serde::Deserialize)]
-struct ApiErrorResponse {
-    pub code: i32,
-    pub message: String,
-    #[serde(default)]
-    pub details: Option<serde_json::Value>,
-}
-
 use tokio::sync::RwLock;
+
+use crate::error::ApiErrorResponse;
 use tower::ServiceExt;
 
 use crate::{ClientError, ClientResult, CurrentUserResponse, LoginResponse};
@@ -217,11 +209,6 @@ impl HttpClient for OneshotHttpClient {
         Ok(())
     }
 
-    fn token(&self) -> Option<&str> {
-        // 注意：这里返回 None，因为 token 存储在 RwLock 中
-        // 使用 get_token().await 获取实际值
-        None
-    }
 }
 
 #[cfg(test)]

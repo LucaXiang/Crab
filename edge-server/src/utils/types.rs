@@ -2,7 +2,7 @@
 //!
 //! Common types used across the application
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// Pagination query parameters
 #[derive(Debug, Clone, Deserialize)]
@@ -43,25 +43,3 @@ impl PaginationParams {
     }
 }
 
-/// Paginated response
-#[derive(Debug, Serialize)]
-pub struct PaginatedResponse<T> {
-    pub data: Vec<T>,
-    pub total: i64,
-    pub page: u32,
-    pub page_size: u32,
-    pub total_pages: u32,
-}
-
-impl<T> PaginatedResponse<T> {
-    pub fn new(data: Vec<T>, total: i64, page: u32, page_size: u32) -> Self {
-        let total_pages = ((total as f64) / (page_size as f64)).ceil() as u32;
-        Self {
-            data,
-            total,
-            page,
-            page_size,
-            total_pages,
-        }
-    }
-}

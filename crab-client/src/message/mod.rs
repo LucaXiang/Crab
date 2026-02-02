@@ -16,6 +16,8 @@ pub struct MessageClientConfig {
     pub reconnect_delay: Duration,
     /// 最大重连延迟 (指数退避上限)
     pub max_reconnect_delay: Duration,
+    /// 最大重连尝试次数 (0 表示无限重试)
+    pub max_reconnect_attempts: u32,
     /// 心跳间隔 (0 表示禁用)
     pub heartbeat_interval: Duration,
     /// 心跳超时 (超过此时间未收到 pong 则认为断连)
@@ -37,6 +39,7 @@ impl Default for MessageClientConfig {
             auto_reconnect: true,
             reconnect_delay: Duration::from_millis(500),  // 首次重连 500ms
             max_reconnect_delay: Duration::from_secs(10), // 最长 10 秒退避
+            max_reconnect_attempts: 20,                   // 最多 20 次重连
             heartbeat_interval: Duration::from_secs(5),   // 每 5 秒心跳
             heartbeat_timeout: Duration::from_secs(2),    // 2 秒超时
             reconnect_probe_interval: Duration::from_secs(1), // 每 1 秒探测
@@ -70,6 +73,7 @@ impl MessageClientConfig {
             auto_reconnect: true,
             reconnect_delay: Duration::from_secs(1),
             max_reconnect_delay: Duration::from_secs(60),
+            max_reconnect_attempts: 20,
             heartbeat_interval: Duration::from_secs(30),
             heartbeat_timeout: Duration::from_secs(5),
             reconnect_probe_interval: Duration::from_secs(5),
@@ -97,6 +101,12 @@ impl MessageClientConfig {
     /// 设置心跳超时
     pub fn with_heartbeat_timeout(mut self, timeout: Duration) -> Self {
         self.heartbeat_timeout = timeout;
+        self
+    }
+
+    /// 设置最大重连尝试次数 (0 表示无限重试)
+    pub fn with_max_reconnect_attempts(mut self, attempts: u32) -> Self {
+        self.max_reconnect_attempts = attempts;
         self
     }
 }

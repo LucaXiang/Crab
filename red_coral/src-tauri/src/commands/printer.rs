@@ -2,7 +2,7 @@
 //!
 //! 提供打印机列表、钱箱控制、收据打印等功能
 
-use crate::api::printers::{LabelData, ReceiptData};
+use crate::api::printers::ReceiptData;
 use crate::core::response::{ApiResponse, ErrorCode};
 use crate::utils::printing;
 
@@ -64,18 +64,3 @@ pub fn print_receipt(
     }
 }
 
-/// 打印标签
-#[tauri::command]
-pub fn print_label(
-    printer_name: Option<String>,
-    label: LabelData,
-    template_id: Option<String>,
-) -> Result<ApiResponse<()>, String> {
-    // TODO: 实现标签打印逻辑
-    // 目前返回未实现错误
-    let _ = (printer_name, label, template_id);
-    Ok(ApiResponse::error_with_code(
-        ErrorCode::LabelPrintingNotImplemented,
-        ErrorCode::LabelPrintingNotImplemented.message().to_string(),
-    ))
-}

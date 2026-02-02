@@ -210,6 +210,7 @@ impl JwtService {
     }
 
     /// 为用户生成新令牌
+    #[allow(clippy::too_many_arguments)]
     pub fn generate_token(
         &self,
         user_id: &str,

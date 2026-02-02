@@ -18,7 +18,7 @@ pub(crate) use types::{ClientMode, LocalClientState, RemoteClientState};
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use tokio::sync::RwLock;
 
 use crab_client::CrabClient;
@@ -1328,26 +1328,34 @@ impl ClientBridge {
     /// 从当前 `ClientMode::Client` 读取连接参数，销毁旧 client 并重新连接。
     ///
     /// 仅在 Client 模式下有效，复用 `start_client_mode` 的逻辑。
-    pub async fn rebuild_client_connection(&self) -> Result<(), BridgeError> {
-        let (edge_url, message_addr) = {
-            let guard = self.mode.read().await;
-            match &*guard {
-                ClientMode::Client {
-                    edge_url,
-                    message_addr,
-                    ..
-                } => (edge_url.clone(), message_addr.clone()),
-                _ => return Err(BridgeError::NotInitialized),
-            }
-        };
+    /// 返回 boxed future 而非 `async fn`，显式标注 `Send`，
+    /// 打破 start_client_mode → spawn(do_rebuild_connection) → rebuild_client_connection → start_client_mode
+    /// 的递归 opaque type 循环。
+    pub fn rebuild_client_connection(
+        &self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), BridgeError>> + Send + '_>>
+    {
+        Box::pin(async move {
+            let (edge_url, message_addr) = {
+                let guard = self.mode.read().await;
+                match &*guard {
+                    ClientMode::Client {
+                        edge_url,
+                        message_addr,
+                        ..
+                    } => (edge_url.clone(), message_addr.clone()),
+                    _ => return Err(BridgeError::NotInitialized),
+                }
+            };
 
-        tracing::info!(
-            edge_url = %edge_url,
-            message_addr = %message_addr,
-            "Rebuilding client connection..."
-        );
+            tracing::info!(
+                edge_url = %edge_url,
+                message_addr = %message_addr,
+                "Rebuilding client connection..."
+            );
 
-        self.start_client_mode(&edge_url, &message_addr).await
+            self.start_client_mode(&edge_url, &message_addr).await
+        })
     }
 
     /// 退出当前租户：停止服务器 → 清除当前租户选择（保留文件）
@@ -2318,3 +2326,4 @@ async fn do_rebuild_connection(
     let _ = app_handle.emit("connection-state-changed", false);
     let _ = app_handle.emit("connection-permanently-lost", true);
 }
+

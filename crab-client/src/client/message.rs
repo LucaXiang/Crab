@@ -439,11 +439,15 @@ impl NetworkMessageClient {
     }
 
     /// 重连循环
+    ///
+    /// 最多重试 `max_reconnect_attempts` 次（0 表示无限重试）。
+    /// 全部失败后发送 `ReconnectFailed` 事件并停止。
     async fn reconnect_loop(&self) {
         self.set_state(ConnectionState::Reconnecting);
 
         let mut delay = self.config.reconnect_delay;
         let max_delay = self.config.max_reconnect_delay;
+        let max_attempts = self.config.max_reconnect_attempts;
         let mut attempts = 0u32;
 
         // 获取连接参数
@@ -468,8 +472,30 @@ impl NetworkMessageClient {
                 break;
             }
 
+            // 检查是否达到最大重试次数
+            if max_attempts > 0 && attempts >= max_attempts {
+                tracing::error!(
+                    "Reconnection failed after {} attempts (max: {})",
+                    attempts,
+                    max_attempts
+                );
+                self.set_state(ConnectionState::Disconnected);
+                let _ = self
+                    .reconnect_tx
+                    .send(ReconnectEvent::ReconnectFailed { attempts });
+                return;
+            }
+
             attempts += 1;
-            tracing::info!("Reconnection attempt #{}", attempts);
+            tracing::info!(
+                "Reconnection attempt #{}/{}",
+                attempts,
+                if max_attempts > 0 {
+                    max_attempts.to_string()
+                } else {
+                    "∞".to_string()
+                }
+            );
 
             // 尝试重连
             match Self::establish_tls_connection(&params).await {
@@ -989,18 +1015,6 @@ impl InMemoryMessageClient {
         client_tx: broadcast::Sender<BusMessage>,
         server_tx: broadcast::Sender<BusMessage>,
     ) -> Self {
-        Self {
-            client_tx,
-            server_tx,
-        }
-    }
-
-    /// 创建内存消息客户端 (只需服务器 → 客户端通道)
-    ///
-    /// 适用于只需要接收广播的场景
-    #[allow(dead_code)]
-    pub fn new_receiver(server_tx: broadcast::Sender<BusMessage>) -> Self {
-        let (client_tx, _) = broadcast::channel(16);
         Self {
             client_tx,
             server_tx,

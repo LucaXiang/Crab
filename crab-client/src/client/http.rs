@@ -30,7 +30,6 @@ pub trait HttpClient: Send + Sync {
     async fn login(&self, username: &str, password: &str) -> ClientResult<LoginResponse>;
     async fn me(&self) -> ClientResult<CurrentUserResponse>;
     async fn logout(&mut self) -> Result<(), ClientError>;
-    fn token(&self) -> Option<&str>;
 }
 
 /// 网络 HTTP 客户端
@@ -163,7 +162,4 @@ impl HttpClient for NetworkHttpClient {
         Ok(())
     }
 
-    fn token(&self) -> Option<&str> {
-        self.token.as_deref()
-    }
 }

@@ -204,13 +204,11 @@ pub async fn delete(
         .map_err(crate::db::repository::surreal_err_to_app)?;
 
     // Refresh product cache if the binding was for a product
-    if let Some(pid) = product_id {
-        if pid.starts_with("product:") {
-            if let Err(e) = state.catalog_service.refresh_product_cache(&pid).await {
+    if let Some(pid) = product_id
+        && pid.starts_with("product:")
+            && let Err(e) = state.catalog_service.refresh_product_cache(&pid).await {
                 tracing::warn!("Failed to refresh product cache for {}: {}", pid, e);
             }
-        }
-    }
 
     Ok(Json(true))
 }

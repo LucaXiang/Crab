@@ -1,12 +1,12 @@
 //! Remote Message Client Example - 使用 CrabClient 进行 RPC 调用
 //!
 //! 认证说明：
-//! - mTLS (租户证书): 用于 Message Bus RPC 通信，setup/reconnect 后即可使用
+//! - mTLS (租户证书): 用于 Message Bus RPC 通信，setup/connect_with_credentials 后即可使用
 //! - Employee Token: 用于 HTTP API 请求，需要 login 获取
 //!
 //! 使用流程：
 //! 1. 首次运行: client.setup(username, password, addr) - 租户登录，下载证书
-//! 2. 后续运行: client.reconnect(addr) - 使用缓存证书直接连接
+//! 2. 后续运行: client.connect_with_credentials(addr) - 使用缓存证书直接连接
 //!    - 自动执行自检 (证书链验证、硬件绑定、时钟篡改检测)
 //!    - 尝试刷新时间戳 (调用 Auth Server，Tenant CA 签名)
 //! 3. RPC 通信: 连接后即可发送 RPC (不需要登录!)
@@ -42,11 +42,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // === 2. 连接消息服务器 ===
     let client = if client.has_cached_credentials() {
         // 使用缓存证书直接连接
-        // reconnect() 会自动：
+        // connect_with_credentials() 会自动：
         // 1. 执行自检 (证书链验证、硬件绑定、时钟篡改检测)
         // 2. 刷新时间戳 (调用 Auth Server，Tenant CA 签名)
         println!("Using cached certificates (with self-check & timestamp refresh)...");
-        client.reconnect("127.0.0.1:8081").await?
+        client.connect_with_credentials("127.0.0.1:8081").await?
     } else {
         // 首次运行，需要 setup
         println!("First-time setup...");

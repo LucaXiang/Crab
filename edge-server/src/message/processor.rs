@@ -187,8 +187,8 @@ impl RequestCommandProcessor {
         let response = self.state.orders_manager().execute_command(command);
 
         // 如果是 OpenTable 且成功执行，加载并缓存价格规则
-        if response.success {
-            if let Some((zone_id, is_retail)) = open_table_info
+        if response.success
+            && let Some((zone_id, is_retail)) = open_table_info
                 && let Some(ref order_id) = response.order_id
             {
                 // 加载匹配的价格规则
@@ -205,8 +205,6 @@ impl RequestCommandProcessor {
                     self.state.orders_manager().cache_rules(order_id, rules);
                 }
             }
-
-        }
 
         // Return result
         if response.success {

@@ -286,6 +286,7 @@ impl AuditService {
     }
 
     /// 写入审计日志（带关联目标）
+    #[allow(clippy::too_many_arguments)]
     pub async fn log_with_target(
         &self,
         action: AuditAction,
