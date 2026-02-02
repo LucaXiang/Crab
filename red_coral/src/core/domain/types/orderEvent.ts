@@ -363,6 +363,7 @@ export interface OrderInfoUpdatedPayload {
 export interface RuleSkipToggledPayload {
   type: 'RULE_SKIP_TOGGLED';
   rule_id: string;
+  rule_name: string;
   skipped: boolean;
 }
 

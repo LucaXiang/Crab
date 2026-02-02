@@ -742,7 +742,7 @@ const RuleSkipToggledRenderer: EventRenderer<RuleSkipToggledPayload> = {
 
     return {
       title: t('timeline.rule_toggled'),
-      summary: `${actionLabel}: ${payload.rule_id}`,
+      summary: `${actionLabel}: ${payload.rule_name}`,
       details: [],
       icon: Tag,
       colorClass: payload.skipped ? 'bg-orange-400' : 'bg-green-400',

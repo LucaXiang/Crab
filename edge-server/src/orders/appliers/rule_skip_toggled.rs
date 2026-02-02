@@ -15,6 +15,7 @@ impl EventApplier for RuleSkipToggledApplier {
         if let EventPayload::RuleSkipToggled {
             rule_id,
             skipped,
+            ..
         } = &event.payload
         {
             // 1. Update the skipped status on all items' applied_rules with matching rule_id
@@ -129,6 +130,7 @@ mod tests {
             OrderEventType::RuleSkipToggled,
             EventPayload::RuleSkipToggled {
                 rule_id: rule_id.to_string(),
+                rule_name: "Test Rule".to_string(),
                 skipped,
             },
         )

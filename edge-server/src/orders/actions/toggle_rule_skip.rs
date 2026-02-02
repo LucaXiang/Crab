@@ -30,22 +30,27 @@ impl CommandHandler for ToggleRuleSkipAction {
             ));
         }
 
-        // 3. Verify rule exists in the order
-        let rule_found = snapshot.items.iter().any(|item| {
-            item.applied_rules
-                .as_ref()
-                .is_some_and(|rules| rules.iter().any(|r| r.rule_id == self.rule_id))
-        }) || snapshot
-            .order_applied_rules
-            .as_ref()
-            .is_some_and(|rules| rules.iter().any(|r| r.rule_id == self.rule_id));
+        // 3. Find rule in the order and get its name
+        let rule_name = snapshot
+            .items
+            .iter()
+            .filter_map(|item| item.applied_rules.as_ref())
+            .flatten()
+            .find(|r| r.rule_id == self.rule_id)
+            .or_else(|| {
+                snapshot
+                    .order_applied_rules
+                    .as_ref()
+                    .and_then(|rules| rules.iter().find(|r| r.rule_id == self.rule_id))
+            })
+            .map(|r| r.display_name.clone());
 
-        if !rule_found {
+        let Some(rule_name) = rule_name else {
             return Err(OrderError::InvalidOperation(format!(
                 "Rule {} not found in order",
                 self.rule_id
             )));
-        }
+        };
 
         // 4. Generate event (actual toggle and recalculation will be done by applier)
         let seq = ctx.next_sequence();
@@ -59,6 +64,7 @@ impl CommandHandler for ToggleRuleSkipAction {
             OrderEventType::RuleSkipToggled,
             EventPayload::RuleSkipToggled {
                 rule_id: self.rule_id.clone(),
+                rule_name,
                 skipped: self.skipped,
             },
         );
@@ -492,7 +498,7 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
         assert_eq!(events.len(), 1);
 
-        if let EventPayload::RuleSkipToggled { rule_id, skipped } = &events[0].payload {
+        if let EventPayload::RuleSkipToggled { rule_id, skipped, .. } = &events[0].payload {
             assert_eq!(*rule_id, "rule-2");
             assert!(*skipped);
         } else {

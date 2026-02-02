@@ -1348,19 +1348,18 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                 <div className="text-sm opacity-90">{isAALocked ? t('checkout.aa_split.desc') : t('checkout.amount_split.desc')}</div>
               </button>
 
-              {activePayments.length > 0 && (
-                <button
-                  onClick={() => setMode('PAYMENT_RECORDS')}
-                  className="h-40 bg-teal-500 hover:bg-teal-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-4"
-                >
-                  <Receipt size={48} />
-                  <div className="text-2xl font-bold">{t('checkout.payment.records')}</div>
-                  <div className="text-sm opacity-90">{activePayments.length} {t('checkout.payment.record_count')} · {formatCurrency(totalPaid)}</div>
-                </button>
-              )}
+              <button
+                onClick={() => setMode('PAYMENT_RECORDS')}
+                disabled={activePayments.length === 0}
+                className="h-40 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+              >
+                <Receipt size={48} />
+                <div className="text-2xl font-bold">{t('checkout.payment.records')}</div>
+                <div className="text-sm opacity-90">{activePayments.length} {t('checkout.payment.record_count')} · {formatCurrency(totalPaid)}</div>
+              </button>
               <button
                 onClick={() => setMode('ORDER_DETAIL')}
-                className="h-40 bg-gray-500 hover:bg-gray-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-4"
+                className="h-40 bg-pink-600 hover:bg-pink-700 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-4"
               >
                 <ClipboardList size={48} />
                 <div className="text-2xl font-bold">{t('checkout.order_detail.title')}</div>
@@ -1382,7 +1381,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
               <button
                 onClick={() => setShowDiscountModal(true)}
                 disabled={isProcessing}
-                className="h-40 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                className="h-40 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
               >
                 <Percent size={48} />
                 <div className="text-2xl font-bold">{t('checkout.order_discount.title')}</div>
@@ -1391,7 +1390,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
               <button
                 onClick={() => setShowSurchargeModal(true)}
                 disabled={isProcessing}
-                className="h-40 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
+                className="h-40 bg-purple-500 hover:bg-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex flex-col items-center justify-center gap-4"
               >
                 <TrendingUp size={48} />
                 <div className="text-2xl font-bold">{t('checkout.order_surcharge.title')}</div>

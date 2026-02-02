@@ -249,14 +249,14 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         {/* 5. Order manual discount (整单手动折扣) */}
         {order.order_manual_discount_amount > 0 && (
           <div className="flex justify-between items-center">
-            <span className="text-indigo-600 font-medium text-sm flex items-center gap-1">
+            <span className="text-orange-500 font-medium text-sm flex items-center gap-1">
               <Percent size={12} />
               {t('checkout.breakdown.order_discount')}
               {order.order_manual_discount_percent != null && (
                 <span className="text-xs opacity-75">({order.order_manual_discount_percent}%)</span>
               )}
             </span>
-            <span className="text-sm font-medium text-indigo-600">
+            <span className="text-sm font-medium text-orange-500">
               -{formatCurrency(order.order_manual_discount_amount)}
             </span>
           </div>
@@ -265,14 +265,14 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         {/* 6. Order manual surcharge (整单手动附加费) */}
         {order.order_manual_surcharge_amount > 0 && (
           <div className="flex justify-between items-center">
-            <span className="text-amber-600 font-medium text-sm flex items-center gap-1">
+            <span className="text-purple-500 font-medium text-sm flex items-center gap-1">
               <TrendingUp size={12} />
               {t('checkout.breakdown.order_surcharge')}
               {order.order_manual_surcharge_percent != null && (
                 <span className="text-xs opacity-75">({order.order_manual_surcharge_percent}%)</span>
               )}
             </span>
-            <span className="text-sm font-medium text-amber-600">
+            <span className="text-sm font-medium text-purple-500">
               +{formatCurrency(order.order_manual_surcharge_amount)}
             </span>
           </div>

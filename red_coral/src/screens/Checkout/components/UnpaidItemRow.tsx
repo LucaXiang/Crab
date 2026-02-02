@@ -40,6 +40,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
   const hasMultiSpec = item.selected_specification?.is_multi_spec;
   const hasOptions = item.selected_options && item.selected_options.length > 0;
   const hasNote = item.note && item.note.trim().length > 0;
+  const activeRules = (item.applied_rules ?? []).filter(r => !r.skipped);
 
   const clickHandlers = useLongPress(
     () => {},
@@ -121,8 +122,24 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
                 {t('checkout.comp.badge')}
               </span>
             )}
+            {activeRules.map((rule) => (
+              <span
+                key={rule.rule_id}
+                className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                  rule.rule_type === 'DISCOUNT'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-purple-100 text-purple-700'
+                }`}
+                title={rule.display_name}
+              >
+                {rule.rule_type === 'DISCOUNT' ? '-' : '+'}
+                {rule.adjustment_type === 'PERCENTAGE'
+                  ? `${rule.adjustment_value}%`
+                  : formatCurrency(rule.adjustment_value)}
+              </span>
+            ))}
             {discountPercent > 0 && (
-              <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
+              <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">
                 -{discountPercent}%
               </span>
             )}

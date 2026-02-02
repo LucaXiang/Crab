@@ -24,7 +24,7 @@ use tokio::sync::RwLock;
 use crab_client::CrabClient;
 use edge_server::services::tenant_binding::SubscriptionStatus;
 use shared::app_state::{ActivationRequiredReason, ClockDirection};
-use shared::order::{CommandResponse, OrderCommand, OrderEvent, OrderSnapshot, SyncResponse};
+use shared::order::{CommandResponse, OrderCommand, OrderCommandPayload, OrderEvent, OrderSnapshot, SyncResponse};
 use super::tenant_manager::{TenantError, TenantManager};
 
 /// 客户端桥接层
@@ -1821,9 +1821,43 @@ impl ClientBridge {
 
         match &*mode_guard {
             ClientMode::Server { server_state, .. } => {
+                // 保存 OpenTable 信息用于后续规则加载
+                let open_table_info = if let OrderCommandPayload::OpenTable {
+                    zone_id, is_retail, ..
+                } = &command.payload
+                {
+                    Some((zone_id.clone(), *is_retail))
+                } else {
+                    None
+                };
+
                 let (response, events) = server_state
                     .orders_manager()
                     .execute_command_with_events(command);
+
+                // OpenTable 成功后加载并缓存价格规则
+                if response.success {
+                    if let Some((zone_id, is_retail)) = open_table_info {
+                        if let Some(ref order_id) = response.order_id {
+                            let rules = edge_server::orders::actions::open_table::load_matching_rules(
+                                &server_state.get_db(),
+                                zone_id.as_deref(),
+                                is_retail,
+                                server_state.config.timezone,
+                            )
+                            .await;
+
+                            if !rules.is_empty() {
+                                tracing::debug!(
+                                    order_id = %order_id,
+                                    rule_count = rules.len(),
+                                    "缓存订单价格规则 (Server 模式)"
+                                );
+                                server_state.orders_manager().cache_rules(order_id, rules);
+                            }
+                        }
+                    }
+                }
 
                 if let Some(handle) = &self.app_handle {
                     for event in events {

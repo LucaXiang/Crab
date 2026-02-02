@@ -108,8 +108,8 @@ export const CartItem = React.memo<CartItemProps>(({
                   key={rule.rule_id}
                   className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
                     rule.rule_type === 'DISCOUNT'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-amber-100 text-amber-700'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-purple-100 text-purple-700'
                   }`}
                   title={`${rule.display_name}: ${rule.adjustment_type === 'PERCENTAGE' ? `${rule.adjustment_value}%` : formatCurrency(rule.adjustment_value)}`}
                 >

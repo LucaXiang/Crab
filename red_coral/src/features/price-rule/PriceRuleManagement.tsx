@@ -137,8 +137,8 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
           <span
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
               item.rule_type === 'DISCOUNT'
-                ? 'bg-green-100 text-green-700'
-                : 'bg-red-100 text-red-700'
+                ? 'bg-amber-100 text-amber-700'
+                : 'bg-purple-100 text-purple-700'
             }`}
           >
             <Percent size={12} />

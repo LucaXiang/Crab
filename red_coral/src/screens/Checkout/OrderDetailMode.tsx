@@ -145,14 +145,14 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
               )}
               {order.order_manual_discount_amount > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-indigo-600">{t('checkout.breakdown.order_discount')}</span>
-                  <span className="text-indigo-600">-{formatCurrency(order.order_manual_discount_amount)}</span>
+                  <span className="text-orange-500">{t('checkout.breakdown.order_discount')}</span>
+                  <span className="text-orange-500">-{formatCurrency(order.order_manual_discount_amount)}</span>
                 </div>
               )}
               {order.order_manual_surcharge_amount > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-amber-600">{t('checkout.breakdown.order_surcharge')}</span>
-                  <span className="text-amber-600">+{formatCurrency(order.order_manual_surcharge_amount)}</span>
+                  <span className="text-purple-500">{t('checkout.breakdown.order_surcharge')}</span>
+                  <span className="text-purple-500">+{formatCurrency(order.order_manual_surcharge_amount)}</span>
                 </div>
               )}
               <div className="flex justify-between items-end pt-3 mt-1 border-t border-gray-200">
