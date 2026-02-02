@@ -9,6 +9,7 @@ import { createTauriClient } from '@/infrastructure/api';
 const getApi = () => createTauriClient();
 import { toast } from '@/presentation/components/Toast';
 import { Product } from '@/core/domain/types';
+import { useProducts } from '@/core/stores/resources';
 import DefaultImage from '@/assets/reshot.svg';
 import { useImageUrl } from '@/core/hooks';
 import { useSettingsStore } from '@/core/stores/settings';
@@ -118,8 +119,8 @@ interface ProductOrderModalProps {
 
 export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, category, onClose }) => {
   const { t } = useI18n();
+  const allStoreProducts = useProducts() as Product[];
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const refreshData = useSettingsStore((s) => s.refreshData);
@@ -127,7 +128,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Instant drag, just enough to prevent accidental clicks
+        distance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -135,26 +136,13 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
     })
   );
 
+  // Initialize local products from store (filtered by category)
   useEffect(() => {
     if (isOpen && category) {
-      loadProducts();
+      const filtered = allStoreProducts.filter(p => p.category === category);
+      setProducts(filtered);
     }
-  }, [isOpen, category]);
-
-  const loadProducts = async () => {
-    setLoading(true);
-    try {
-      const allProducts = await getApi().listProducts();
-      // Filter by category locally
-      const filteredProducts = allProducts.filter(p => p.category === category);
-      setProducts(filteredProducts);
-    } catch (e) {
-      console.error(e);
-      toast.error(t('common.message.load_failed'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [isOpen, category, allStoreProducts]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -226,11 +214,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 bg-gray-50/50 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
-          {loading ? (
-            <div className="flex items-center justify-center h-40">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600" />
-            </div>
-          ) : products.length === 0 ? (
+          {products.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               {t("settings.product.no_products")}
             </div>

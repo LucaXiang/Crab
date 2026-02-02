@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { LayoutGrid, X } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { createTauriClient } from '@/infrastructure/api';
-import { toast } from '@/presentation/components/Toast';
-import { getErrorMessage } from '@/utils/error';
-
-const getApi = () => createTauriClient();
 import { HeldOrder, Table, Zone } from '@/core/domain/types';
 import { TableFilter, TableSelectionScreenProps } from './types';
 import { TableCard } from './TableCard';
@@ -13,19 +8,18 @@ import { ZoneSidebar } from './ZoneSidebar';
 import { TableFilters } from './TableFilters';
 import { GuestInputPanel } from './GuestInputPanel';
 import { TableManagementModal } from './components';
-import { useDataVersion } from '@/core/stores/settings/useSettingsStore';
+import { useZones } from '@/core/stores/resources';
+import { useTables } from '@/core/stores/resources';
 import { useCheckoutStore } from '@/core/stores/order/useCheckoutStore';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 
 export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.memo(
   ({ heldOrders, onSelectTable, onClose, mode, cart = [], manageTableId }) => {
     const { t } = useI18n();
-    const dataVersion = useDataVersion();
-    const [zones, setZones] = useState<Zone[]>([]);
-    const [activeZoneId, setActiveZoneId] = useState<string>('');
+    const zones = useZones() as Zone[];
+    const allTables = useTables() as Table[];
+    const [activeZoneId, setActiveZoneId] = useState<string>('ALL');
     const [activeFilter, setActiveFilter] = useState<TableFilter>('ALL');
-    const [zoneTables, setZoneTables] = useState<Table[]>([]);
-    const [loading, setLoading] = useState(false);
 
     const [selectedTableForInput, setSelectedTableForInput] = useState<Table | null>(null);
     const [guestInput, setGuestInput] = useState<string>('');
@@ -67,48 +61,12 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
       return Date.now() - order.start_time > 2 * 60 * 60 * 1000;
     };
 
-    // Load zones on mount
-    useEffect(() => {
-      const init = async () => {
-        try {
-          const zs = await getApi().listZones();
-          setZones(zs);
-          setActiveZoneId((prev) => prev || 'ALL');
-          // If initializing to ALL, fetch all tables
-          if (!activeZoneId) {
-            const tables = await getApi().listTables();
-            setZoneTables(tables);
-          }
-        } catch (e) {
-          toast.error(getErrorMessage(e));
-        }
-      };
-      init();
-    }, [dataVersion]);
-
-    // Load tables when zone changes
-    useEffect(() => {
-      const loadTables = async () => {
-        if (!activeZoneId) return;
-        setLoading(true);
-        try {
-          const tables = await getApi().listTables();
-          setZoneTables(tables);
-        } catch (e) {
-          toast.error(getErrorMessage(e));
-        } finally {
-          setLoading(false);
-        }
-      };
-      loadTables();
-    }, [activeZoneId, dataVersion]);
-
     // Calculate stats based on zone-filtered tables
     const stats = useMemo(() => {
       // First filter by zone
       const zoneFiltered = activeZoneId && activeZoneId !== 'ALL'
-        ? zoneTables.filter((t) => t.zone === activeZoneId)
-        : zoneTables;
+        ? allTables.filter((t) => t.zone === activeZoneId)
+        : allTables;
 
       return {
         ALL: zoneFiltered.length,
@@ -123,11 +81,11 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
           return order && order.is_pre_payment;
         }).length,
       };
-    }, [zoneTables, activeZoneId, heldOrders]);
+    }, [allTables, activeZoneId, heldOrders]);
 
     // Filter tables by zone first, then by status
     const filteredTables = useMemo(() => {
-      const filtered = zoneTables.filter((table) => {
+      const filtered = allTables.filter((table) => {
         // Zone filter: if not "ALL", must match selected zone
         if (activeZoneId && activeZoneId !== 'ALL' && table.zone !== activeZoneId) {
           return false;
@@ -157,7 +115,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
         seen.add(t.id);
         return true;
       });
-    }, [zoneTables, activeZoneId, activeFilter, heldOrders]);
+    }, [allTables, activeZoneId, activeFilter, heldOrders]);
 
     // Handle table click
     const handleTableClick = (table: Table, isOccupied: boolean, order?: HeldOrder) => {
@@ -197,7 +155,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
 
     // Helper to get the table object for management
     const managementTable = selectedTableForInput ||
-      (manageTableId ? zoneTables.find((t) => t.id === manageTableId) : null) ||
+      (manageTableId ? allTables.find((t) => t.id === manageTableId) : null) ||
       null;
 
     if (isManageOnly) {
@@ -271,17 +229,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
                 />
 
                 <div className="relative flex-1 overflow-y-auto p-3 custom-scrollbar">
-                  {loading && zoneTables.length > 0 && (
-                    <div className="absolute inset-0 bg-gray-50/60 z-10 flex items-center justify-center backdrop-blur-[1px]">
-                      <div className="w-8 h-8 border-4 border-gray-200 border-t-primary-500 rounded-full animate-spin" />
-                    </div>
-                  )}
-
-                  {loading && zoneTables.length === 0 ? (
-                    <div className="text-center text-gray-400 text-sm py-8">
-                      {t('common.message.loading')}
-                    </div>
-                  ) : zoneTables.length === 0 ? (
+                  {allTables.length === 0 ? (
                     <div className="text-center text-gray-400 text-sm py-8">
                       {t('table.no_tables')}
                     </div>

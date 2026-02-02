@@ -1,10 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, ArrowLeftRight, Users, Check, ArrowLeft, LayoutGrid, Split, Minus, Plus, CreditCard, Banknote, Percent } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
-import { createTauriClient } from '@/infrastructure/api';
-
-const getApi = () => createTauriClient();
 import { Table, Zone, HeldOrder, Permission, AppliedRule } from '@/core/domain/types';
+import { useTables } from '@/core/stores/resources';
 import { Currency } from '@/utils/currency';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import * as orderOps from '@/core/stores/order/useOrderOperations';
@@ -13,7 +11,7 @@ import { ZoneSidebar } from '../ZoneSidebar';
 import { formatCurrency } from '@/utils/currency';
 import { TableCard } from '../TableCard';
 import { toast } from '@/presentation/components/Toast';
-import { getErrorMessage } from '@/utils/error';
+
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 
 interface TableManagementModalProps {
@@ -38,25 +36,12 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
     const [operationAuthorizer, setOperationAuthorizer] = useState<{ id: string; name: string } | null>(null);
 
     const [activeZoneId, setActiveZoneId] = useState<string>(zones[0]?.id || '');
-    const [zoneTables, setZoneTables] = useState<Table[]>([]);
+    const allTables = useTables() as Table[];
     const [selectedTargetTable, setSelectedTargetTable] = useState<Table | null>(null);
 
     // Split Bill State
     const [splitItems, setSplitItems] = useState<Record<string, number>>({});
     const [isProcessingSplit, setIsProcessingSplit] = useState(false);
-
-    useEffect(() => {
-        const loadTables = async () => {
-            if (!activeZoneId) return;
-            try {
-                const tables = await getApi().listTables();
-                setZoneTables(tables);
-            } catch (e) {
-                toast.error(getErrorMessage(e));
-            }
-        };
-        loadTables();
-    }, [activeZoneId]);
 
     // Ensure a valid initial zone when zones prop arrives or source order indicates a zone
     useEffect(() => {
@@ -168,7 +153,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
 
     // Filter tables based on mode
     const displayedTables = useMemo(() => {
-        return zoneTables.filter(table => {
+        return allTables.filter(table => {
             if (table.id === sourceTable.id) return false; // Don't show self
 
             const isOccupied = heldOrders.some(o => o.table_id === table.id);
@@ -181,7 +166,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
             }
             return false;
         });
-    }, [zoneTables, mode, heldOrders, sourceTable.id]);
+    }, [allTables, mode, heldOrders, sourceTable.id]);
 
     const renderSplit = () => {
         if (!sourceOrder) return null;

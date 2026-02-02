@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Users, Plus, Filter, Search, Shield, Calendar, Key, Lock, Check, Edit3, Trash2, Ban } from 'lucide-react';
-import { createTauriClient } from '@/infrastructure/api';
 import { useI18n } from '@/hooks/useI18n';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission, User, Role } from '@/core/domain/types';
+import { useRoles } from '@/core/stores/resources';
 import { useCanManageUsers } from '@/hooks/usePermission';
 import { DataTable, Column } from '@/shared/components/DataTable';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -30,7 +30,7 @@ export const UserManagement: React.FC = React.memo(() => {
   const [roleFilter, setRoleFilter] = useState<'all' | string>('all');
   const [showInactive, setShowInactive] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
-  const [roles, setRoles] = useState<Role[]>([]);
+  const roles = useRoles() as Role[];
   const [userFormOpen, setUserFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
@@ -42,7 +42,7 @@ export const UserManagement: React.FC = React.memo(() => {
     onConfirm: () => {},
   });
 
-  // Load users and roles on mount
+  // Load users on mount
   useEffect(() => {
     if (canManageUsers) {
       setIsLoading(true);
@@ -50,10 +50,6 @@ export const UserManagement: React.FC = React.memo(() => {
         .then(setUsers)
         .catch(console.error)
         .finally(() => setIsLoading(false));
-
-      createTauriClient().listRoles()
-        .then(data => setRoles(data.roles))
-        .catch(console.error);
     }
   }, [canManageUsers, fetchUsers]);
 
