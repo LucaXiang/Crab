@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense, useMemo } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { HeldOrder, CartItem } from '@/core/domain/types';
 import { Clock, List, Settings, ShoppingBag, Percent, Gift, TrendingUp } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
@@ -85,20 +85,12 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
 
   // Use server-provided financial totals (authoritative)
   const displayOriginalPrice = order.original_total;
-  // Item-level only: subtract order-level components (shown separately below)
-  const displayItemDiscount = order.total_discount
-    - (order.order_rule_discount_amount ?? 0)
-    - order.order_manual_discount_amount;
-  const displayItemSurcharge = order.total_surcharge
-    - (order.order_rule_surcharge_amount ?? 0)
-    - order.order_manual_surcharge_amount;
+  // Discount/surcharge excluding manual order-level (shown separately below)
+  // Rules are included here together with item-level amounts
+  const displayItemDiscount = order.total_discount - order.order_manual_discount_amount;
+  const displayItemSurcharge = order.total_surcharge - order.order_manual_surcharge_amount;
   const displayFinalTotal = order.total;
   const displayRemainingAmount = order.remaining_amount;
-
-  // Order-level applied rules (filter out skipped ones)
-  const orderActiveRules = useMemo(() => {
-    return (order.order_applied_rules ?? []).filter(r => !r.skipped);
-  }, [order.order_applied_rules]);
 
   // Use backend-provided unpaidQuantity for each item
   const unpaidItems = React.useMemo(() => {
@@ -286,30 +278,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
           </div>
         )}
 
-        {/* 7. Order-level applied rules (逐条) */}
-        {orderActiveRules.length > 0 && (
-          <div className="space-y-1">
-            {orderActiveRules.map((rule) => (
-              <div
-                key={rule.rule_id}
-                className={`flex justify-between items-center text-xs ${
-                  rule.rule_type === 'DISCOUNT' ? 'text-green-600' : 'text-amber-600'
-                }`}
-              >
-                <span className="flex items-center gap-1">
-                  <Percent size={10} />
-                  {rule.receipt_name || rule.display_name}
-                </span>
-                <span className="font-medium">
-                  {rule.rule_type === 'DISCOUNT' ? '-' : '+'}
-                  {formatCurrency(Math.abs(rule.calculated_amount))}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 8. Final Price (Total) */}
+        {/* 7. Final Price (Total) */}
         <div className="flex justify-between items-end pt-3 mt-1 border-t border-gray-200">
           <span className="text-gray-800 font-bold text-base">{t('checkout.amount.total')}</span>
           <span className="text-2xl font-bold text-gray-900">{formatCurrency(displayFinalTotal)}</span>
