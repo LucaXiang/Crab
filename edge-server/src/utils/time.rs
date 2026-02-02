@@ -43,9 +43,12 @@ pub fn day_start_millis(date: NaiveDate, tz: Tz) -> i64 {
     date_hms_to_millis(date, 0, 0, 0, tz)
 }
 
-/// 日期结束 (23:59:59) → Unix millis (业务时区)
+/// 日期结束 → 次日 00:00:00 的 Unix millis (业务时区)
+///
+/// 返回次日零点时间戳，调用方使用 `< end` (不含) 语义。
 pub fn day_end_millis(date: NaiveDate, tz: Tz) -> i64 {
-    date_hms_to_millis(date, 23, 59, 59, tz)
+    let next_day = date.succ_opt().unwrap_or(date);
+    date_hms_to_millis(next_day, 0, 0, 0, tz)
 }
 
 /// 日期 + cutoff 时间 → Unix millis (业务时区)
@@ -62,7 +65,14 @@ pub fn date_cutoff_millis(date: NaiveDate, cutoff: NaiveTime, tz: Tz) -> i64 {
 
 /// 解析 cutoff 时间字符串 (HH:MM)，失败返回 00:00
 pub fn parse_cutoff(cutoff: &str) -> NaiveTime {
-    NaiveTime::parse_from_str(cutoff, "%H:%M").unwrap_or(NaiveTime::MIN)
+    NaiveTime::parse_from_str(cutoff, "%H:%M").unwrap_or_else(|e| {
+        tracing::warn!(
+            "Failed to parse business_day_cutoff '{}': {}, falling back to 00:00",
+            cutoff,
+            e
+        );
+        NaiveTime::MIN
+    })
 }
 
 /// 计算当前营业日起始日期 (业务时区)

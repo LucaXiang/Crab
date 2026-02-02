@@ -144,7 +144,7 @@ impl ShiftRepository {
             .query(
                 r#"
                 SELECT * FROM shift
-                WHERE start_time >= $start AND start_time <= $end
+                WHERE start_time >= $start AND start_time < $end
                 ORDER BY start_time DESC
             "#,
             )

@@ -236,12 +236,12 @@ pub async fn fetch_order_list(
     // Build WHERE clause
     let (where_clause, search_bind) = if let Some(ref search) = params.search {
         (
-            "WHERE end_time >= $start AND end_time <= $end AND string::lowercase(receipt_number) CONTAINS $search",
+            "WHERE end_time >= $start AND end_time < $end AND string::lowercase(receipt_number) CONTAINS $search",
             Some(search.to_lowercase()),
         )
     } else {
         (
-            "WHERE end_time >= $start AND end_time <= $end",
+            "WHERE end_time >= $start AND end_time < $end",
             None,
         )
     };
