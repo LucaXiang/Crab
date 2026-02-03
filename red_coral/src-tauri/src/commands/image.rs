@@ -2,9 +2,12 @@
 //!
 //! 提供图片路径解析、缓存管理和图片保存功能。
 //! 支持批量操作以减少 IPC 开销。
+//!
+//! 所有路径通过 `TenantPaths` 和 `ImageCacheService` 统一管理。
 
 use std::io::Cursor;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::State;
 
@@ -12,6 +15,7 @@ use crate::core::bridge::{ClientBridge, ModeType};
 use crate::core::image_cache::{
     CacheCleanupResult, ImageCacheService, ImageDownloadContext, PrefetchResult, ResolveResult,
 };
+use crate::core::paths::TenantPaths;
 
 /// 支持的图片格式
 const SUPPORTED_FORMATS: &[&str] = &["png", "jpg", "jpeg", "webp"];
@@ -32,14 +36,7 @@ async fn get_image_context(bridge: &ClientBridge) -> Result<ImageContext, String
         .ok_or("No tenant selected")?;
 
     match mode_info.mode {
-        ModeType::Server => {
-            // Server work_dir is {tenant}/server/ (same as edge-server's work_dir)
-            let work_dir = tenant_path.join("server");
-            Ok(ImageContext::Server {
-                tenant_path,
-                work_dir,
-            })
-        }
+        ModeType::Server => Ok(ImageContext::Server { tenant_path }),
         ModeType::Client => {
             // 获取 mTLS HTTP client
             let (edge_url, http_client, _token) = bridge
@@ -62,7 +59,6 @@ async fn get_image_context(bridge: &ClientBridge) -> Result<ImageContext, String
 enum ImageContext {
     Server {
         tenant_path: PathBuf,
-        work_dir: PathBuf,
     },
     Client {
         tenant_path: PathBuf,
@@ -72,7 +68,8 @@ enum ImageContext {
 
 /// 获取单个图片的本地路径
 ///
-/// 如果是 Client 模式且图片未缓存，会自动下载。
+/// - Server 模式: 返回 `{tenant}/server/images/{hash}.jpg`
+/// - Client 模式: 返回 `{tenant}/cache/images/{hash}.jpg`，未缓存则自动下载
 #[tauri::command]
 pub async fn get_image_path(
     bridge: State<'_, Arc<ClientBridge>>,
@@ -81,13 +78,10 @@ pub async fn get_image_path(
     let ctx = get_image_context(&bridge).await?;
 
     match ctx {
-        ImageContext::Server {
-            tenant_path,
-            work_dir,
-        } => {
+        ImageContext::Server { tenant_path } => {
             let image_cache = ImageCacheService::new(&tenant_path);
             image_cache
-                .get_server_image_path(&hash, &work_dir)
+                .get_server_image_path(&hash)
                 .map(|p| p.to_string_lossy().to_string())
                 .map_err(|e| e.to_string())
         }
@@ -121,12 +115,9 @@ pub async fn resolve_image_paths(
     let ctx = get_image_context(&bridge).await?;
 
     match ctx {
-        ImageContext::Server {
-            tenant_path,
-            work_dir,
-        } => {
+        ImageContext::Server { tenant_path } => {
             let image_cache = ImageCacheService::new(&tenant_path);
-            Ok(image_cache.resolve_server_image_paths(&hashes, &work_dir))
+            Ok(image_cache.resolve_server_image_paths(&hashes))
         }
         ImageContext::Client {
             tenant_path,
@@ -208,7 +199,7 @@ pub async fn cleanup_image_cache(
 ///
 /// 从本地路径读取图片，处理后保存并返回 hash。
 ///
-/// - Server 模式：直接保存到本地 `uploads/images/` 目录
+/// - Server 模式：保存到 `{tenant}/server/images/{hash}.jpg`
 /// - Client 模式：上传到 EdgeServer
 ///
 /// 返回图片的 content hash (SHA256)，用于后续引用。
@@ -257,9 +248,8 @@ pub async fn save_image(
 
     match mode_info.mode {
         ModeType::Server => {
-            // Server 模式：直接处理并保存到 {tenant}/server/images/
-            let server_dir = tenant_path.join("server");
-            save_image_server(&data, &server_dir).await
+            let paths = TenantPaths::new(&tenant_path);
+            save_image_server(&data, &paths.server_images_dir()).await
         }
         ModeType::Client => {
             // Client 模式：上传到 EdgeServer (使用 mTLS)
@@ -270,7 +260,7 @@ pub async fn save_image(
 }
 
 /// Server 模式：本地处理并保存图片
-async fn save_image_server(data: &[u8], work_dir: &Path) -> Result<String, String> {
+async fn save_image_server(data: &[u8], images_dir: &Path) -> Result<String, String> {
     // 1. 加载并验证图片
     let img = image::load_from_memory(data).map_err(|e| format!("Invalid image: {}", e))?;
 
@@ -291,9 +281,8 @@ async fn save_image_server(data: &[u8], work_dir: &Path) -> Result<String, Strin
     hasher.update(&buffer);
     let hash = hex::encode(hasher.finalize());
 
-    // 4. 保存到 images/ (与 edge-server 一致)
-    let images_dir = work_dir.join("images");
-    tokio::fs::create_dir_all(&images_dir)
+    // 4. 保存到 images 目录
+    tokio::fs::create_dir_all(images_dir)
         .await
         .map_err(|e| format!("Failed to create images directory: {}", e))?;
 

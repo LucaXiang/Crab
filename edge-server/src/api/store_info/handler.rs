@@ -50,5 +50,8 @@ pub async fn update(
         .broadcast_sync(RESOURCE, "updated", "main", Some(&store_info))
         .await;
 
+    // 通知依赖配置的调度器（如班次检测器）立即重检
+    state.config_notify.notify_waiters();
+
     Ok(Json(store_info))
 }

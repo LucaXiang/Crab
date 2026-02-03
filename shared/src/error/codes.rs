@@ -127,8 +127,8 @@ pub enum ErrorCode {
     CategoryNameExists = 6103,
     /// Specification not found
     SpecNotFound = 6201,
-    /// Specification external_id already exists
-    SpecExternalIdExists = 6202,
+    /// Product external_id already exists
+    ProductExternalIdExists = 6202,
     /// Attribute not found
     AttributeNotFound = 6301,
     /// Attribute binding failed
@@ -273,7 +273,7 @@ impl ErrorCode {
             ErrorCode::CategoryHasProducts => "Category has associated products",
             ErrorCode::CategoryNameExists => "Category name already exists",
             ErrorCode::SpecNotFound => "Specification not found",
-            ErrorCode::SpecExternalIdExists => "Specification external_id already exists",
+            ErrorCode::ProductExternalIdExists => "Product external_id already exists",
             ErrorCode::AttributeNotFound => "Attribute not found",
             ErrorCode::AttributeBindFailed => "Failed to bind attribute",
 
@@ -398,7 +398,7 @@ impl TryFrom<u16> for ErrorCode {
             6102 => Ok(ErrorCode::CategoryHasProducts),
             6103 => Ok(ErrorCode::CategoryNameExists),
             6201 => Ok(ErrorCode::SpecNotFound),
-            6202 => Ok(ErrorCode::SpecExternalIdExists),
+            6202 => Ok(ErrorCode::ProductExternalIdExists),
             6301 => Ok(ErrorCode::AttributeNotFound),
             6302 => Ok(ErrorCode::AttributeBindFailed),
 

@@ -76,7 +76,6 @@ function toCartItemInput(item: CartItem): CartItemInput {
     selected_specification: item.selected_specification ? {
       id: item.selected_specification.id,
       name: item.selected_specification.name,
-      external_id: item.selected_specification.external_id ?? null,
       receipt_name: item.selected_specification.receipt_name ?? null,
       price: item.selected_specification.price ?? null,
     } : null,

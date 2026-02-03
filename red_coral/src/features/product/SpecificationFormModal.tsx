@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { X, Type, Hash, FileText, Star } from 'lucide-react';
+import { X, Type, FileText, Star } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { FormField, FormSection, inputClass } from '@/shared/components/FormField';
 import { useFormInitialization } from '@/hooks/useFormInitialization';
@@ -12,7 +12,6 @@ interface SpecFormData {
   name: string;
   receiptName: string;
   price: number;
-  externalId: number | null;
   isDefault: boolean;
 }
 
@@ -23,7 +22,6 @@ const mapToFormData = (spec: EmbeddedSpec | null): SpecFormData => {
       name: '',
       receiptName: '',
       price: empty.price ?? 0,
-      externalId: empty.external_id ?? null,
       isDefault: false,
     };
   }
@@ -31,7 +29,6 @@ const mapToFormData = (spec: EmbeddedSpec | null): SpecFormData => {
     name: spec.name,
     receiptName: spec.receipt_name || '',
     price: spec.price,
-    externalId: spec.external_id,
     isDefault: spec.is_default,
   };
 };
@@ -90,7 +87,6 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
     const specData: Partial<EmbeddedSpec> = {
       name: formData.name.trim(),
       price: formData.price,
-      external_id: formData.externalId,
     };
 
     const error = validateSpecData(specData, isRootSpec, t);
@@ -109,7 +105,6 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
         is_default: formData.isDefault,
         is_root: isRootSpec,
         is_active: true,
-        external_id: (isRootSpec && isEditing && spec) ? spec.external_id : formData.externalId,
       };
 
       await onSave(fullSpec, specIndex);
@@ -126,8 +121,7 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
 
   const canSubmit =
     formData.name.trim() &&
-    !isSubmitting &&
-    (isRootSpec || (formData.externalId !== null && formData.externalId !== undefined));
+    !isSubmitting;
 
   return (
     <div
@@ -210,24 +204,6 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
               )}
             </FormField>
 
-            <FormField label={t('settings.specification.form.external_id')} required={!isRootSpec}>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  <Hash size={14} />
-                </div>
-                <input
-                  type="number"
-                  value={formData.externalId ?? ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    handleFieldChange('externalId', val ? parseInt(val, 10) : null);
-                  }}
-                  placeholder={t('settings.specification.form.external_id_placeholder')}
-                  className={`${inputClass} pl-9 ${isRootSpec && isEditing ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
-                  disabled={isRootSpec && isEditing}
-                />
-              </div>
-            </FormField>
           </FormSection>
 
           {/* Default Toggle */}

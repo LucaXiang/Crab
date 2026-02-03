@@ -61,6 +61,7 @@ impl OrderRepository {
                             instance_id,
                             name,
                             spec_name,
+                            category_name,
                             price,
                             quantity,
                             unpaid_quantity,

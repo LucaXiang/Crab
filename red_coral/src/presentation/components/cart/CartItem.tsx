@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Minus, Plus, Percent } from 'lucide-react';
 import { CartItem as CartItemType } from '@/core/domain/types';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
+import { useProductStore } from '@/core/stores/resources';
 import { formatCurrency, Currency } from '@/utils/currency';
 import { useLongPress } from '@/hooks/useLongPress';
 import { t } from '@/infrastructure/i18n';
@@ -20,6 +21,7 @@ export const CartItem = React.memo<CartItemProps>(({
 }) => {
   const [isHoveringControl, setIsHoveringControl] = useState(false);
   const performanceMode = useSettingsStore(state => state.performanceMode);
+  const externalId = useProductStore(state => state.items.find(p => p.id === item.id)?.external_id);
   const discountPercent = item.manual_discount_percent || 0;
   
   // Calculate options modifier for display
@@ -159,9 +161,9 @@ export const CartItem = React.memo<CartItemProps>(({
 
         {/* External ID + Quantity Control */}
         <div className="flex items-end gap-2">
-          {item.selected_specification?.external_id && (
+          {externalId != null && (
             <div className="text-xs text-white bg-gray-900/85 font-bold font-mono px-2 py-0.5 rounded">
-              {item.selected_specification.external_id}
+              {externalId}
             </div>
           )}
           {/* Quantity Controls */}

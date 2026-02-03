@@ -262,36 +262,25 @@ impl ShiftRepository {
         })
     }
 
-    /// Recover stale shifts (启动时自动关闭跨营业日的班次)
+    /// 查询跨营业日的过期班次（只读，不修改）
     ///
     /// `business_day_start` - 当前营业日开始时间 (Unix millis)
-    /// 例如: 如果 cutoff 是 06:00，当前时间是 2024-01-15 10:00
-    ///       则 business_day_start = millis of 2024-01-15T06:00:00Z
-    ///       如果当前时间是 2024-01-15 03:00 (凌晨)
-    ///       则 business_day_start = millis of 2024-01-14T06:00:00Z (昨天的 06:00)
-    pub async fn recover_stale_shifts(&self, business_day_start: i64) -> RepoResult<Vec<Shift>> {
+    pub async fn find_stale_shifts(&self, business_day_start: i64) -> RepoResult<Vec<Shift>> {
         let mut result = self
             .base
             .db()
             .query(
                 r#"
-                UPDATE shift SET
-                    status = 'CLOSED',
-                    end_time = $now,
-                    abnormal_close = true,
-                    note = '跨营业日自动结算',
-                    updated_at = $now
+                SELECT * FROM shift
                 WHERE status = 'OPEN'
                 AND start_time < $business_day_start
-                RETURN AFTER
             "#,
             )
             .bind(("business_day_start", business_day_start))
-            .bind(("now", shared::util::now_millis()))
             .await?;
 
-        let recovered: Vec<Shift> = result.take(0)?;
-        Ok(recovered)
+        let stale: Vec<Shift> = result.take(0)?;
+        Ok(stale)
     }
 
     /// Update expected_cash when cash payment is added

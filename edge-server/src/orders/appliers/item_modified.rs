@@ -637,7 +637,6 @@ mod tests {
         let new_spec = shared::order::SpecificationInfo {
             id: "spec-1".to_string(),
             name: "Large".to_string(),
-            external_id: None,
             receipt_name: Some("L".to_string()),
             price: Some(15.0),
         };

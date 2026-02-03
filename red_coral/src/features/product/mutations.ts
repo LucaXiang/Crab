@@ -19,6 +19,8 @@ export interface ProductFormData {
   is_kitchen_print_enabled?: PrintState;
   is_label_print_enabled?: PrintState;
   is_active?: boolean;
+  /** 菜品编号 (POS 集成，全局唯一) */
+  externalId?: number;
   tags?: string[];
   specs?: EmbeddedSpec[];
   selected_attribute_ids?: string[];
@@ -32,10 +34,9 @@ export async function createProduct(
   formData: ProductFormData,
   categories: Category[]
 ): Promise<{ productId: string; success: boolean }> {
-  // Get price and externalId from root spec
+  // Get price from root spec
   const rootSpec = formData.specs?.find(s => s.is_root);
   const price = rootSpec?.price ?? 0;
-  const externalId = rootSpec?.external_id;
 
   const productPayload = {
     name: formData.name.trim(),
@@ -49,6 +50,7 @@ export async function createProduct(
     label_print_destinations: formData.label_print_destinations ?? [],
     is_kitchen_print_enabled: formData.is_kitchen_print_enabled ?? -1,
     is_label_print_enabled: formData.is_label_print_enabled ?? -1,
+    external_id: formData.externalId ?? null,
     tags: formData.tags ?? [],
     specs: [{
       name: formData.name.trim(),
@@ -57,7 +59,6 @@ export async function createProduct(
       is_default: true,
       is_active: true,
       is_root: true,
-      external_id: externalId ?? null,
       receipt_name: undefined,
     }],
   };
@@ -105,7 +106,6 @@ export async function createProduct(
         is_default: spec.is_default ?? false,
         is_active: true,
         is_root: spec.is_root,
-        external_id: spec.external_id ?? null,
       }));
 
       await getApi().updateProduct(productId, {
@@ -127,19 +127,13 @@ export async function updateProduct(
   id: string,
   formData: ProductFormData
 ): Promise<{ success: boolean }> {
-  // Get price and externalId from root spec
+  // Get price from root spec
   const rootSpec = formData.specs?.find(s => s.is_root);
   const price = rootSpec?.price ?? 0;
-  const externalId = rootSpec?.external_id;
 
   const existingSpecs = formData.specs ?? [];
   const updatedSpecs = existingSpecs.length > 0
-    ? existingSpecs.map(spec => spec.is_root ? {
-        ...spec,
-        name: spec.name,
-        price: spec.price,
-        external_id: spec.external_id,
-      } : spec)
+    ? existingSpecs
     : [{
         name: formData.name.trim(),
         price: Math.max(0.01, price),
@@ -147,7 +141,6 @@ export async function updateProduct(
         is_default: true,
         is_active: true,
         is_root: true,
-        external_id: externalId ?? null,
         receipt_name: undefined,
       }];
 
@@ -164,6 +157,7 @@ export async function updateProduct(
     is_kitchen_print_enabled: formData.is_kitchen_print_enabled ?? -1,
     is_label_print_enabled: formData.is_label_print_enabled ?? -1,
     is_active: formData.is_active ?? true,
+    external_id: formData.externalId ?? null,
     tags: formData.tags ?? [],
     specs: updatedSpecs,
   };
@@ -260,10 +254,10 @@ export async function loadProductFullData(productId: string) {
   // Extract tag IDs
   const tagIds = tags.map((tag) => tag.id).filter(Boolean) as string[];
 
-  // Get price and externalId from default spec
+  // Get price from default spec, externalId from product level
   const defaultSpec = specs.find((s) => s.is_default === true) ?? specs[0];
   const price = defaultSpec?.price ?? 0;
-  const externalId = defaultSpec?.external_id ?? undefined;
+  const externalId = productFull.external_id ?? undefined;
 
   // Extract inherited attribute IDs for UI (shown as locked/read-only)
   const inheritedAttributes = attributes.filter((binding) => binding.is_inherited);

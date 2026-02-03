@@ -21,7 +21,6 @@ pub struct EmbeddedSpec {
     pub is_default: bool,
     #[serde(default = "default_true")]
     pub is_active: bool,
-    pub external_id: Option<i64>,
     /// Receipt display name (e.g., "L", "M", "大杯")
     pub receipt_name: Option<String>,
     /// Root spec, cannot be deleted (each product must have at least one)
@@ -64,6 +63,8 @@ pub struct Product {
         deserialize_with = "serde_helpers::bool_true"
     )]
     pub is_active: bool,
+    /// 菜品编号 (POS 集成)
+    pub external_id: Option<i64>,
     /// Array of record links to tags
     #[serde(default, with = "serde_helpers::vec_record_id")]
     pub tags: Vec<RecordId>,
@@ -96,6 +97,7 @@ impl Product {
             is_kitchen_print_enabled: -1,
             is_label_print_enabled: -1,
             is_active: true,
+            external_id: None,
             tags: vec![],
             specs: vec![],
         }
@@ -124,6 +126,8 @@ pub struct ProductCreate {
     pub is_kitchen_print_enabled: Option<i32>,
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_label_print_enabled: Option<i32>,
+    /// 菜品编号 (POS 集成)
+    pub external_id: Option<i64>,
     #[serde(default, with = "serde_helpers::option_vec_record_id")]
     pub tags: Option<Vec<RecordId>>,
     /// 嵌入式规格 (必需，至少一个规格)
@@ -172,6 +176,9 @@ pub struct ProductUpdate {
     pub is_label_print_enabled: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_active: Option<bool>,
+    /// 菜品编号 (POS 集成)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external_id: Option<i64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -217,6 +224,8 @@ pub struct ProductFull {
         deserialize_with = "serde_helpers::bool_true"
     )]
     pub is_active: bool,
+    /// 菜品编号 (POS 集成)
+    pub external_id: Option<i64>,
     /// 嵌入式规格
     pub specs: Vec<EmbeddedSpec>,
     /// Attribute bindings with full attribute data
@@ -242,13 +251,13 @@ impl From<ProductFull> for shared::models::ProductFull {
             is_kitchen_print_enabled: p.is_kitchen_print_enabled,
             is_label_print_enabled: p.is_label_print_enabled,
             is_active: p.is_active,
+            external_id: p.external_id,
             specs: p.specs.into_iter().map(|s| shared::models::EmbeddedSpec {
                 name: s.name,
                 price: s.price,
                 display_order: s.display_order,
                 is_default: s.is_default,
                 is_active: s.is_active,
-                external_id: s.external_id,
                 receipt_name: s.receipt_name,
                 is_root: s.is_root,
             }).collect(),

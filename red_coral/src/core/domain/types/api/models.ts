@@ -119,7 +119,6 @@ export interface EmbeddedSpec {
   /** 根规格 */
   is_root: boolean;
   is_active: boolean;
-  external_id: number | null;
 }
 
 // NOTE: Product is now an alias for ProductFull
@@ -143,6 +142,8 @@ export interface ProductCreate {
   is_kitchen_print_enabled?: PrintState;
   /** 标签打印启用状态 (-1=继承, 0=禁用, 1=启用) */
   is_label_print_enabled?: PrintState;
+  /** 菜品编号 (POS 集成，全局唯一) */
+  external_id?: number | null;
   tags?: string[];
   /** 嵌入式规格 */
   specs: EmbeddedSpec[];
@@ -165,6 +166,8 @@ export interface ProductUpdate {
   /** 标签打印启用状态 (-1=继承, 0=禁用, 1=启用) */
   is_label_print_enabled?: PrintState;
   is_active?: boolean;
+  /** 菜品编号 (POS 集成，全局唯一) */
+  external_id?: number | null;
   tags?: string[];
   /** 嵌入式规格 */
   specs?: EmbeddedSpec[];
@@ -203,6 +206,8 @@ export interface ProductFull {
   /** 标签打印启用状态 (-1=继承, 0=禁用, 1=启用) */
   is_label_print_enabled: PrintState;
   is_active: boolean;
+  /** 菜品编号 (POS 集成，全局唯一) */
+  external_id: number | null;
   /** Embedded specifications */
   specs: EmbeddedSpec[];
   /** Attribute bindings with full attribute data */
@@ -567,7 +572,7 @@ export interface PrintItemContext {
 
   // 商品
   product_id: string;
-  external_id: number | null; // 商品编号 (root spec)
+  external_id: number | null; // 菜品编号
   kitchen_name: string; // 厨房打印名称
   product_name: string; // 原始商品名
 
@@ -659,7 +664,7 @@ export interface StoreInfo {
   /**
    * Business day cutoff time (HH:MM format, e.g., "06:00")
    * Used for shift cross-day detection and daily report calculation
-   * Default "00:00" (midnight), bars/nightclubs can set to "06:00"
+   * Default "02:00", bars/nightclubs can set to "06:00"
    */
   business_day_cutoff: string;
   created_at: number | null;

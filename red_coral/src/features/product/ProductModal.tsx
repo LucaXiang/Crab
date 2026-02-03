@@ -169,9 +169,7 @@ export const ProductModal: React.FC = React.memo(() => {
       return;
     }
 
-    const rootSpec = formData.specs?.find(s => s.is_root);
-    const externalId = rootSpec?.external_id;
-    if (externalId === undefined || externalId === null) {
+    if (formData.externalId === undefined || formData.externalId === null) {
       toast.error(t('settings.external_id_required'));
       return;
     }
@@ -244,7 +242,7 @@ export const ProductModal: React.FC = React.memo(() => {
           price: rootSpec?.price ?? 0,
           category: formData.category,
           image: formData.image ?? '',
-          externalId: rootSpec?.external_id ?? undefined,
+          externalId: formData.externalId,
           tax_rate: formData.tax_rate ?? 0,
           selected_attribute_ids: formData.selected_attribute_ids,
           attribute_default_options: formData.attribute_default_options,

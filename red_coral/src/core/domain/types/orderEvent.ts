@@ -959,7 +959,6 @@ export interface ItemOption {
 export interface SpecificationInfo {
   id: string;
   name: string;
-  external_id?: number | null;
   receipt_name?: string | null;
   price?: number | null;
   /** Whether product has multiple specs (for display purposes) */

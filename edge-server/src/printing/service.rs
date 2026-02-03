@@ -194,10 +194,8 @@ impl KitchenPrintService {
             .or_else(|| product.as_ref().map(|p| p.name.clone()))
             .unwrap_or_else(|| item.name.clone());
 
-        // Get root spec external_id
-        let external_id = product
-            .as_ref()
-            .and_then(|p| p.specs.iter().find(|s| s.is_root).and_then(|s| s.external_id));
+        // Get product external_id (now at product level)
+        let external_id = product.as_ref().and_then(|p| p.external_id);
 
         // Build options list
         let options: Vec<String> = item

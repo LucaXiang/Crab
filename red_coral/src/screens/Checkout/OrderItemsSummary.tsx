@@ -1,5 +1,6 @@
 import React from 'react';
 import { CartItem, CheckoutMode } from '@/core/domain/types';
+import { useProductStore } from '@/core/stores/resources';
 import { UnpaidItemRow } from './components';
 
 interface OrderItemsSummaryProps {
@@ -40,10 +41,15 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
     }
   });
 
-  // Sorting by external_id then name
+  // Build product ID → external_id map for O(1) lookup during sort
+  const externalIdMap = useProductStore(state => {
+    const map = new Map<string, number | null>();
+    for (const p of state.items) map.set(p.id, p.external_id);
+    return map;
+  });
   const sortItems = (aItem: CartItem, bItem: CartItem) => {
-    const extIdA = aItem.selected_specification?.external_id ? parseInt(String(aItem.selected_specification.external_id), 10) || 0 : 0;
-    const extIdB = bItem.selected_specification?.external_id ? parseInt(String(bItem.selected_specification.external_id), 10) || 0 : 0;
+    const extIdA = externalIdMap.get(aItem.id) ?? Number.MAX_SAFE_INTEGER;
+    const extIdB = externalIdMap.get(bItem.id) ?? Number.MAX_SAFE_INTEGER;
     if (extIdA !== extIdB) return extIdA - extIdB;
     return aItem.name.localeCompare(bItem.name);
   };

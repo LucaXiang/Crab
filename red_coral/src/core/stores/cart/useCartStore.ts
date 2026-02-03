@@ -41,8 +41,8 @@ function areOptionsEqual(
  * Compare two specifications for equality
  */
 function areSpecificationsEqual(
-  spec1: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number } | null | undefined,
-  spec2: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number } | null | undefined
+  spec1: { id: string; name: string; receiptName?: string; price?: number } | null | undefined,
+  spec2: { id: string; name: string; receiptName?: string; price?: number } | null | undefined
 ): boolean {
   if (!spec1 && !spec2) return true;
   if (!spec1 || !spec2) return false;
@@ -64,7 +64,7 @@ interface CartStore {
   itemCount: number;
 
   // Actions
-  addToCart: (product: ProductWithPrice, selectedOptions?: ItemOption[], quantity?: number, discount?: number, authorizer?: { id: string; name: string }, selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number }) => void;
+  addToCart: (product: ProductWithPrice, selectedOptions?: ItemOption[], quantity?: number, discount?: number, authorizer?: { id: string; name: string }, selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number }) => void;
   removeFromCart: (instanceId: string) => void;
   updateCartItem: (instanceId: string, updates: Partial<CartItem>) => void;
   incrementItemQuantity: (instanceId: string, delta: number) => void;
@@ -83,7 +83,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   itemCount: 0,
 
   // Actions
-  addToCart: (product: ProductWithPrice, selectedOptions?: ItemOption[], quantity: number = 1, discount: number = 0, authorizer?: { id: string; name: string }, selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number; is_multi_spec?: boolean }) => {
+  addToCart: (product: ProductWithPrice, selectedOptions?: ItemOption[], quantity: number = 1, discount: number = 0, authorizer?: { id: string; name: string }, selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number; is_multi_spec?: boolean }) => {
     set((state) => {
       // Get default spec from product if no selectedSpecification provided
       let effectiveSpec = selectedSpecification;
@@ -93,7 +93,6 @@ export const useCartStore = create<CartStore>((set, get) => ({
         effectiveSpec = {
           id: String(specIdx),
           name: defaultSpec.name,
-          external_id: defaultSpec.external_id,
           price: defaultSpec.price,
           is_multi_spec: (product.specs?.length ?? 0) > 1,
         };

@@ -102,14 +102,14 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
     <div className="fixed inset-0 z-80 bg-black/50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-amber-50">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-purple-50">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-full text-amber-600">
+            <div className="p-2 bg-purple-100 rounded-full text-purple-600">
               <TrendingUp size={24} />
             </div>
             <h2 className="text-xl font-bold text-gray-800">{t('checkout.order_surcharge.title')}</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-amber-100 rounded-full transition-colors text-gray-500">
+          <button onClick={onClose} className="p-2 hover:bg-purple-100 rounded-full transition-colors text-gray-500">
             <X size={20} />
           </button>
         </div>
@@ -131,14 +131,14 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
                 onClick={() => { setSurchargeType('percent'); setValue(''); }}
                 className={`p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
                   surchargeType === 'percent'
-                    ? 'border-amber-500 bg-amber-50'
-                    : 'border-gray-100 hover:border-amber-200 hover:bg-gray-50'
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-gray-100 hover:border-purple-200 hover:bg-gray-50'
                 }`}
               >
-                <div className={`p-2 rounded-lg ${surchargeType === 'percent' ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-500'}`}>
+                <div className={`p-2 rounded-lg ${surchargeType === 'percent' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-500'}`}>
                   <Percent size={20} />
                 </div>
-                <span className={`font-medium ${surchargeType === 'percent' ? 'text-amber-700' : 'text-gray-700'}`}>
+                <span className={`font-medium ${surchargeType === 'percent' ? 'text-purple-700' : 'text-gray-700'}`}>
                   {t('checkout.order_surcharge.type_percent')}
                 </span>
               </button>
@@ -146,14 +146,14 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
                 onClick={() => { setSurchargeType('fixed'); setValue(''); }}
                 className={`p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
                   surchargeType === 'fixed'
-                    ? 'border-amber-500 bg-amber-50'
-                    : 'border-gray-100 hover:border-amber-200 hover:bg-gray-50'
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-gray-100 hover:border-purple-200 hover:bg-gray-50'
                 }`}
               >
-                <div className={`p-2 rounded-lg ${surchargeType === 'fixed' ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-500'}`}>
+                <div className={`p-2 rounded-lg ${surchargeType === 'fixed' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-500'}`}>
                   <Tag size={20} />
                 </div>
-                <span className={`font-medium ${surchargeType === 'fixed' ? 'text-amber-700' : 'text-gray-700'}`}>
+                <span className={`font-medium ${surchargeType === 'fixed' ? 'text-purple-700' : 'text-gray-700'}`}>
                   {t('checkout.order_surcharge.type_fixed')}
                 </span>
               </button>
@@ -170,7 +170,7 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
                 ? t('checkout.order_surcharge.percent_placeholder')
                 : t('checkout.order_surcharge.amount_placeholder')
               }
-              className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent text-2xl font-bold text-center tabular-nums"
+              className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-2xl font-bold text-center tabular-nums"
               min="0"
               max={surchargeType === 'percent' ? '100' : undefined}
               step={surchargeType === 'percent' ? '1' : '0.01'}
@@ -187,7 +187,7 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={t('checkout.order_surcharge.reason_placeholder')}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none text-sm"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm"
               rows={2}
             />
           </div>
@@ -227,7 +227,7 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
                 disabled={!canConfirm}
                 className={`flex-1 py-3 px-4 rounded-xl font-bold text-white transition-all shadow-lg ${
                   canConfirm
-                    ? 'bg-amber-500 hover:bg-amber-600 hover:shadow-amber-500/30 hover:-translate-y-0.5'
+                    ? 'bg-purple-500 hover:bg-purple-600 hover:shadow-purple-500/30 hover:-translate-y-0.5'
                     : 'bg-gray-300 cursor-not-allowed'
                 }`}
               >

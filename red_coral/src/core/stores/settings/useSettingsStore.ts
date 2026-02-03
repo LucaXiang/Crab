@@ -93,7 +93,7 @@ interface FormData {
   specs?: EmbeddedSpec[];  // 嵌入式规格
   has_multi_spec?: boolean; // UI only: 是否多规格
   price?: number;          // UI only: derived from specs[root].price
-  externalId?: number;     // UI only: derived from specs[root].external_id
+  externalId?: number;     // UI only: product-level external_id
 
   // === Category & Product shared ===
   is_kitchen_print_enabled?: PrintState;  // Product: -1=继承, 0=禁用, 1=启用; Category: 0=禁用, 1=启用
@@ -433,9 +433,8 @@ function validateSettingsForm(entity: ModalEntity, formData: FormData): Record<s
   } else if (entity === 'PRODUCT') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.product.nameRequired';
     if (!formData.category) errors.category = 'settings.errors.product.categoryRequired';
-    // Check external_id in default spec
-    const defaultSpec = formData.specs?.find(s => s.is_default) ?? formData.specs?.[0];
-    if (defaultSpec?.external_id === undefined || defaultSpec?.external_id === null) {
+    // Check product-level external_id
+    if (formData.externalId === undefined || formData.externalId === null) {
       errors.externalId = 'settings.external_id_required';
     }
   } else if (entity === 'CATEGORY') {

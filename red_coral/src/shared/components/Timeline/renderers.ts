@@ -295,9 +295,12 @@ const ItemCompedRenderer: EventRenderer<ItemCompedPayload> = {
       details.push(`${t('timeline.labels.quantity')}: ${payload.quantity}`);
     }
 
-    // Show reason
+    // Show reason (resolve i18n key for preset reasons)
     if (payload.reason) {
-      details.push(`${t('timeline.labels.reason')}: ${payload.reason}`);
+      const reasonKey = `checkout.comp.preset.${payload.reason}`;
+      const resolved = t(reasonKey);
+      const displayReason = resolved !== reasonKey ? resolved : payload.reason;
+      details.push(`${t('timeline.labels.reason')}: ${displayReason}`);
     }
 
     // Show authorizer
@@ -576,9 +579,15 @@ const OrderVoidedRenderer: EventRenderer<OrderVoidedPayload> = {
       details.push(`${t('timeline.labels.loss_amount')}: ${formatCurrency(payload.loss_amount)}`);
     }
 
-    // Show note
+    // Show note (resolve i18n key for cancel reasons)
     if (payload.note) {
-      details.push(payload.note);
+      const parts = payload.note.split(' - ');
+      const cancelKey = `checkout.void.cancel_reason.${parts[0]}`;
+      const resolved = t(cancelKey);
+      if (resolved !== cancelKey) {
+        parts[0] = resolved;
+      }
+      details.push(parts.join(' - '));
     }
 
     // Show authorizer
@@ -762,13 +771,13 @@ const OrderDiscountAppliedRenderer: EventRenderer<OrderDiscountAppliedPayload> =
       detailTags.push({
         label: t('timeline.labels.discount'),
         value: `${payload.discount_percent}%${computed}`,
-        colorClass: 'bg-blue-100 text-blue-700 border-blue-200',
+        colorClass: 'bg-orange-100 text-orange-700 border-orange-200',
       });
     } else if (payload.discount_fixed != null) {
       detailTags.push({
         label: t('timeline.labels.discount'),
         value: `-${formatCurrency(payload.discount_fixed)}`,
-        colorClass: 'bg-blue-100 text-blue-700 border-blue-200',
+        colorClass: 'bg-orange-100 text-orange-700 border-orange-200',
       });
     }
     details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
@@ -780,7 +789,7 @@ const OrderDiscountAppliedRenderer: EventRenderer<OrderDiscountAppliedPayload> =
       details,
       detailTags,
       icon: Tag,
-      colorClass: isClearing ? 'bg-gray-400' : 'bg-blue-400',
+      colorClass: isClearing ? 'bg-gray-400' : 'bg-orange-400',
       timestamp: event.timestamp,
     };
   }
@@ -815,7 +824,7 @@ const OrderSurchargeAppliedRenderer: EventRenderer<OrderSurchargeAppliedPayload>
       details,
       detailTags,
       icon: Tag,
-      colorClass: isClearing ? 'bg-gray-400' : 'bg-yellow-400',
+      colorClass: isClearing ? 'bg-gray-400' : 'bg-purple-400',
       timestamp: event.timestamp,
     };
   }

@@ -221,14 +221,13 @@ pub async fn heartbeat(
     Ok(Json(true))
 }
 
-/// POST /api/shifts/recover - 恢复跨天的僵尸班次
+/// POST /api/shifts/recover - 检测并通知跨天的过期班次
 ///
 /// 根据 store_info.business_day_cutoff 计算当前营业日起始时间，
-/// 自动关闭所有在此之前开启的僵尸班次。
+/// 查询过期班次并广播 settlement_required 通知前端处理。
 pub async fn recover_stale(
     State(state): State<ServerState>,
 ) -> AppResult<Json<Vec<Shift>>> {
-    // 读取营业日分界时间
     let tz = state.config.timezone;
     let store_repo = StoreInfoRepository::new(state.db.clone());
     let cutoff_str = store_repo
@@ -244,80 +243,23 @@ pub async fn recover_stale(
     let business_day_start = time::date_cutoff_millis(today, cutoff, tz);
 
     let repo = ShiftRepository::new(state.db.clone());
-    let recovered = repo
-        .recover_stale_shifts(business_day_start)
+    let stale = repo
+        .find_stale_shifts(business_day_start)
         .await
         ?;
 
-    // 审计 + 广播每个恢复的班次
-    for shift in &recovered {
+    for shift in &stale {
         let id = shift
             .id
             .as_ref()
             .map(|id| id.to_string())
             .unwrap_or_default();
 
-        audit_log!(
-            state.audit_service,
-            AuditAction::ShiftClosed,
-            "shift", &id,
-            details = serde_json::json!({
-                "auto_close": true,
-                "starting_cash": shift.starting_cash,
-                "expected_cash": shift.expected_cash,
-                "operator_name": shift.operator_name,
-            })
-        );
-
         state
-            .broadcast_sync(RESOURCE, "recovered", &id, Some(shift))
+            .broadcast_sync(RESOURCE, "settlement_required", &id, Some(shift))
             .await;
     }
 
-    Ok(Json(recovered))
+    Ok(Json(stale))
 }
 
-/// POST /api/shifts/debug/simulate-auto-close
-/// Debug: 强制关闭所有 OPEN 班次并广播，模拟自动关闭调度器行为
-/// @TEST 上线前删除
-pub async fn debug_simulate_auto_close(
-    State(state): State<ServerState>,
-) -> AppResult<Json<Vec<Shift>>> {
-    // 关闭所有 OPEN 班次（不判断 business_day_start）
-    let mut result = state
-        .db
-        .query(
-            r#"
-            UPDATE shift SET
-                status = 'CLOSED',
-                end_time = $now,
-                abnormal_close = true,
-                note = 'Debug: 模拟自动关闭',
-                updated_at = $now
-            WHERE status = 'OPEN'
-            RETURN AFTER
-            "#,
-        )
-        .bind(("now", shared::util::now_millis()))
-        .await
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-
-    let closed: Vec<Shift> = result
-        .take(0)
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-
-    for shift in &closed {
-        let id = shift
-            .id
-            .as_ref()
-            .map(|id| id.to_string())
-            .unwrap_or_default();
-        state
-            .broadcast_sync(RESOURCE, "recovered", &id, Some(shift))
-            .await;
-    }
-
-    tracing::info!("🐛 Debug: simulated auto-close for {} shift(s)", closed.len());
-
-    Ok(Json(closed))
-}

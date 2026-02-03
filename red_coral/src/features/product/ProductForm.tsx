@@ -119,7 +119,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             display_order: 0,
             is_default: true,
             is_active: true,
-            external_id: formData.externalId ?? null,
             receipt_name: undefined,
             is_root: true,
           }]);
@@ -230,26 +229,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 value={formData.externalId ?? ''}
                 onChange={(e) => {
                   const val = e.target.value;
-                  const newExternalId = val ? parseInt(val, 10) : null;
-                  // Update external_id in root spec (specs is the source of truth)
-                  const currentSpecs = formData.specs || [];
-                  if (currentSpecs.length === 0) {
-                    onFieldChange('specs', [{
-                      name: formData.name,
-                      price: formData.price ?? 0,
-                      display_order: 0,
-                      is_default: true,
-                      is_active: true,
-                      external_id: newExternalId,
-                      receipt_name: undefined,
-                      is_root: true,
-                    }]);
-                  } else {
-                    const newSpecs = currentSpecs.map(s =>
-                      s.is_root ? { ...s, external_id: newExternalId } : s
-                    );
-                    onFieldChange('specs', newSpecs);
-                  }
+                  const newExternalId = val ? parseInt(val, 10) : undefined;
+                  onFieldChange('externalId', newExternalId);
                 }}
                 placeholder={t('settings.product.form.external_id_placeholder')}
                 className={`${inputClass} pl-9`}

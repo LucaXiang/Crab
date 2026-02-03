@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useStoreInfo, useStoreInfoStore } from '@/core/stores/settings';
 import { useI18n } from '@/hooks/useI18n';
-import { Save, Store, Building2, MapPin, Phone, Mail, Globe, CreditCard, ImageIcon, Loader2, Clock, Bug } from 'lucide-react';
+import { Save, Store, Building2, MapPin, Phone, Mail, Globe, CreditCard, ImageIcon, Loader2, Clock } from 'lucide-react';
 import { useDirtyForm } from '@/shared/hooks/useDirtyForm';
 import { toast } from '@/presentation/components/Toast';
-import { createTauriClient } from '@/infrastructure/api';
 
 export const StoreSettings: React.FC = () => {
   const info = useStoreInfo();
@@ -26,26 +25,10 @@ export const StoreSettings: React.FC = () => {
     phone: info.phone || '',
     email: info.email || '',
     website: info.website || '',
-    businessDayCutoff: info.business_day_cutoff || '00:00',
+    businessDayCutoff: info.business_day_cutoff || '02:00',
   };
 
   const { values: formData, handleChange, isDirty, reset } = useDirtyForm(formInfo);
-
-  // Re-sync form when data is loaded
-  useEffect(() => {
-    if (isLoaded) {
-      reset({
-        name: info.name,
-        address: info.address,
-        nif: info.nif,
-        logoUrl: info.logo_url || '',
-        phone: info.phone || '',
-        email: info.email || '',
-        website: info.website || '',
-        businessDayCutoff: info.business_day_cutoff || '00:00',
-      });
-    }
-  }, [isLoaded, info]);
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -311,38 +294,6 @@ export const StoreSettings: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="col-span-2 border-t border-gray-100 my-2"></div>
-
-            {/* @TEST 上线前删除 - Debug Tools */}
-            <div className="col-span-2">
-              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-6 flex items-center gap-2">
-                <Bug className="w-4 h-4 text-gray-400" />
-                Debug
-              </h3>
-
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const api = createTauriClient();
-                      const shifts = await api.debugSimulateShiftAutoClose();
-                      if (shifts.length > 0) {
-                        toast.success(`已模拟关闭 ${shifts.length} 个班次（已广播）`);
-                      } else {
-                        toast.warning('没有打开的班次');
-                      }
-                    } catch (err) {
-                      toast.error(`模拟失败: ${err}`);
-                    }
-                  }}
-                  className="px-4 py-2 text-sm bg-amber-50 border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors"
-                >
-                  模拟班次自动关闭（广播推送）
-                </button>
               </div>
             </div>
 

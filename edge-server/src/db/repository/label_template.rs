@@ -134,14 +134,18 @@ impl LabelTemplateRepository {
                 .await?;
         }
 
-        // Merge update data with timestamp in a single query
+        // Merge update data with timestamp
+        let mut merge_data = serde_json::to_value(&data)
+            .map_err(|e| RepoError::Database(format!("Serialize error: {}", e)))?;
+        if let Some(obj) = merge_data.as_object_mut() {
+            obj.insert("updated_at".to_string(), serde_json::json!(shared::util::now_millis()));
+        }
         let mut result = self
             .base
             .db()
-            .query("UPDATE $id MERGE $data SET updated_at = $now RETURN AFTER")
+            .query("UPDATE $id MERGE $data RETURN AFTER")
             .bind(("id", id.clone()))
-            .bind(("data", data))
-            .bind(("now", shared::util::now_millis()))
+            .bind(("data", merge_data))
             .await?;
 
         let updated: Option<LabelTemplate> = result.take(0)?;

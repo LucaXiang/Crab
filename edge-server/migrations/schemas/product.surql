@@ -59,6 +59,10 @@ DEFINE FIELD OVERWRITE is_active ON product TYPE bool
     DEFAULT true
     PERMISSIONS FULL;
 
+-- 菜品编号 (POS 集成，全局唯一)
+DEFINE FIELD OVERWRITE external_id ON product TYPE option<int>
+    PERMISSIONS FULL;
+
 -- 标签关联
 DEFINE FIELD OVERWRITE tags ON product TYPE array<record<tag>>
     DEFAULT []
@@ -75,10 +79,9 @@ DEFINE FIELD OVERWRITE specs.*.price ON product TYPE decimal DEFAULT 0 PERMISSIO
 DEFINE FIELD OVERWRITE specs.*.display_order ON product TYPE int DEFAULT 0 PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE specs.*.is_default ON product TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE specs.*.is_active ON product TYPE bool DEFAULT true PERMISSIONS FULL;
-DEFINE FIELD OVERWRITE specs.*.external_id ON product TYPE option<int> PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE specs.*.receipt_name ON product TYPE option<string> PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE specs.*.is_root ON product TYPE bool DEFAULT false PERMISSIONS FULL;
 
 DEFINE INDEX OVERWRITE product_category ON product FIELDS category;
 DEFINE INDEX OVERWRITE product_sort_order ON product FIELDS sort_order;
-DEFINE INDEX OVERWRITE product_external_id ON product FIELDS specs[*].external_id;
+DEFINE INDEX OVERWRITE product_external_id ON product FIELDS external_id UNIQUE;

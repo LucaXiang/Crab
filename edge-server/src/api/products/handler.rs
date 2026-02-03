@@ -5,8 +5,6 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use surrealdb::engine::local::Db;
-use surrealdb::Surreal;
 
 use crate::audit::AuditAction;
 use crate::audit_log;
@@ -18,41 +16,38 @@ use crate::utils::{AppError, AppResult, ErrorCode};
 
 const RESOURCE_PRODUCT: &str = "product";
 
-/// 检查 external_id 是否已存在，返回重复的 ID 列表
-async fn check_duplicate_external_ids(
-    db: &Surreal<Db>,
-    external_ids: &[i64],
+/// 检查 external_id 是否已被其他商品使用
+async fn check_duplicate_external_id(
+    state: &ServerState,
+    external_id: i64,
     exclude_product_id: Option<&str>,
-) -> AppResult<Option<Vec<i64>>> {
-    let mut query = if let Some(exclude_id) = exclude_product_id {
-        // Strip "product:" prefix if present, since type::thing() will add it
+) -> AppResult<bool> {
+    #[derive(serde::Deserialize)]
+    struct Found {
+        id: surrealdb::RecordId,
+    }
+
+    let found: Vec<Found> = if let Some(exclude_id) = exclude_product_id {
         let exclude_id = exclude_id
             .strip_prefix("product:")
             .unwrap_or(exclude_id)
             .to_string();
-        db.query("SELECT external_id FROM product_spec WHERE external_id IN $ids AND product != type::thing('product', $exclude)")
-            .bind(("ids", external_ids.to_vec()))
+        let mut result = state.db
+            .query("SELECT id FROM product WHERE external_id = $eid AND id != type::thing('product', $exclude) LIMIT 1")
+            .bind(("eid", external_id))
             .bind(("exclude", exclude_id))
             .await
-            .map_err(crate::db::repository::surreal_err_to_app)?
+            .map_err(crate::db::repository::surreal_err_to_app)?;
+        result.take(0).unwrap_or_default()
     } else {
-        db.query("SELECT external_id FROM product_spec WHERE external_id IN $ids")
-            .bind(("ids", external_ids.to_vec()))
+        let mut result = state.db
+            .query("SELECT id FROM product WHERE external_id = $eid LIMIT 1")
+            .bind(("eid", external_id))
             .await
-            .map_err(crate::db::repository::surreal_err_to_app)?
+            .map_err(crate::db::repository::surreal_err_to_app)?;
+        result.take(0).unwrap_or_default()
     };
-
-    #[derive(serde::Deserialize)]
-    struct Found {
-        external_id: i64,
-    }
-
-    let found: Vec<Found> = query.take(0).unwrap_or_default();
-    if found.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(found.into_iter().map(|f| f.external_id).collect()))
-    }
+    Ok(!found.is_empty())
 }
 
 // =============================================================================
@@ -105,13 +100,12 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<ProductCreate>,
 ) -> AppResult<Json<shared::models::ProductFull>> {
-    // 检查 external_id 是否已存在
-    let external_ids: Vec<i64> = payload.specs.iter().filter_map(|s| s.external_id).collect();
-    if !external_ids.is_empty()
-        && let Some(duplicates) = check_duplicate_external_ids(&state.db, &external_ids, None).await?
-    {
-        return Err(AppError::new(ErrorCode::SpecExternalIdExists)
-            .with_detail("external_ids", duplicates));
+    // 检查 external_id 是否已被其他商品使用
+    if let Some(eid) = payload.external_id {
+        if check_duplicate_external_id(&state, eid, None).await? {
+            return Err(AppError::new(ErrorCode::ProductExternalIdExists)
+                .with_detail("external_id", eid));
+        }
     }
 
     let product = state
@@ -153,15 +147,11 @@ pub async fn update(
         payload.is_kitchen_print_enabled
     );
 
-    // 检查 external_id 是否已存在 (排除当前产品)
-    if let Some(ref specs) = payload.specs {
-        let external_ids: Vec<i64> = specs.iter().filter_map(|s| s.external_id).collect();
-        if !external_ids.is_empty()
-            && let Some(duplicates) =
-                check_duplicate_external_ids(&state.db, &external_ids, Some(&id)).await?
-        {
-            return Err(AppError::new(ErrorCode::SpecExternalIdExists)
-                .with_detail("external_ids", duplicates));
+    // 检查 external_id 是否已被其他商品使用
+    if let Some(eid) = payload.external_id {
+        if check_duplicate_external_id(&state, eid, Some(&id)).await? {
+            return Err(AppError::new(ErrorCode::ProductExternalIdExists)
+                .with_detail("external_id", eid));
         }
     }
 
@@ -352,6 +342,7 @@ pub async fn batch_update_sort_order(
                     is_kitchen_print_enabled: None,
                     is_label_print_enabled: None,
                     is_active: None,
+                    external_id: None,
                     specs: None,
                     tags: None,
                 },

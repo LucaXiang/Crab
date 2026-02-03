@@ -83,13 +83,12 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
   // Helper to get default spec from product
   const getDefaultSpec = (p: Product) => p.specs?.find(s => s.is_default) ?? p.specs?.[0];
 
-  // Helper to map product with price and external_id from default spec
+  // Helper to map product with price from default spec
   const mapProductWithSpec = (p: Product): ProductWithPrice => {
     const defaultSpec = getDefaultSpec(p);
     return {
       ...p,
       price: defaultSpec?.price ?? 0,
-      external_id: defaultSpec?.external_id ?? undefined,
     };
   };
 
@@ -100,8 +99,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       return [...products]
         .filter((p) => p.is_active)
         .sort((a, b) => {
-          const aId = getDefaultSpec(a)?.external_id ?? Number.MAX_SAFE_INTEGER;
-          const bId = getDefaultSpec(b)?.external_id ?? Number.MAX_SAFE_INTEGER;
+          const aId = a.external_id ?? Number.MAX_SAFE_INTEGER;
+          const bId = b.external_id ?? Number.MAX_SAFE_INTEGER;
           return aId - bId;
         })
         .map(mapProductWithSpec);
@@ -237,7 +236,6 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       selected_specification: defaultSpec ? {
         id: String(defaultSpecIdx),
         name: defaultSpec.name,
-        external_id: defaultSpec.external_id,
         price: defaultSpec.price,
         is_multi_spec: (product.specs?.length ?? 0) > 1,
       } : undefined,
@@ -266,7 +264,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
       quantity: number,
       discount: number,
       authorizer?: { id: string; name: string },
-      selectedSpecification?: { id: string; name: string; external_id?: number | null; receiptName?: string; price?: number }
+      selectedSpecification?: { id: string; name: string; receiptName?: string; price?: number }
     ) => {
       if (!selectedProductForOptions) return;
 
@@ -291,14 +289,12 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
         selected_specification: selectedSpecification ? {
           id: selectedSpecification.id,
           name: selectedSpecification.name,
-          external_id: selectedSpecification.external_id,
           receipt_name: selectedSpecification.receiptName,
           price: selectedSpecification.price,
           is_multi_spec: (product.specs?.length ?? 0) > 1,
         } : defaultSpec ? {
           id: String(defaultSpecIdx),
           name: defaultSpec.name,
-          external_id: defaultSpec.external_id,
           price: defaultSpec.price,
           is_multi_spec: (product.specs?.length ?? 0) > 1,
         } : undefined,

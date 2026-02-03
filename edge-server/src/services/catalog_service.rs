@@ -51,6 +51,8 @@ struct ProductWithTags {
     pub is_label_print_enabled: i32,
     #[serde(default = "default_true")]
     pub is_active: bool,
+    /// 菜品编号 (POS 集成)
+    pub external_id: Option<i64>,
     /// Tags are fetched as full Tag objects
     #[serde(default)]
     pub tags: Vec<Tag>,
@@ -264,6 +266,7 @@ impl CatalogService {
                     is_kitchen_print_enabled: product.is_kitchen_print_enabled,
                     is_label_print_enabled: product.is_label_print_enabled,
                     is_active: product.is_active,
+                    external_id: product.external_id,
                     specs: product.specs,
                     attributes,
                     tags,
@@ -420,6 +423,7 @@ impl CatalogService {
             is_kitchen_print_enabled: i32,
             is_label_print_enabled: i32,
             is_active: bool,
+            external_id: Option<i64>,
             tags: Vec<RecordId>,
             specs: Vec<EmbeddedSpec>,
         }
@@ -437,6 +441,7 @@ impl CatalogService {
             is_kitchen_print_enabled: data.is_kitchen_print_enabled.unwrap_or(-1),
             is_label_print_enabled: data.is_label_print_enabled.unwrap_or(-1),
             is_active: true,
+            external_id: data.external_id,
             tags: data.tags.unwrap_or_default(),
             specs: data.specs,
         };
@@ -486,6 +491,7 @@ impl CatalogService {
         if data.is_kitchen_print_enabled.is_some() { set_parts.push("is_kitchen_print_enabled = $is_kitchen_print_enabled"); }
         if data.is_label_print_enabled.is_some() { set_parts.push("is_label_print_enabled = $is_label_print_enabled"); }
         if data.is_active.is_some() { set_parts.push("is_active = $is_active"); }
+        if data.external_id.is_some() { set_parts.push("external_id = $external_id"); }
         if data.tags.is_some() { set_parts.push("tags = $tags"); }
         if data.specs.is_some() { set_parts.push("specs = $specs"); }
 
@@ -523,6 +529,7 @@ impl CatalogService {
         if let Some(v) = data.is_kitchen_print_enabled { query = query.bind(("is_kitchen_print_enabled", v)); }
         if let Some(v) = data.is_label_print_enabled { query = query.bind(("is_label_print_enabled", v)); }
         if let Some(v) = data.is_active { query = query.bind(("is_active", v)); }
+        if let Some(v) = data.external_id { query = query.bind(("external_id", v)); }
         if let Some(v) = data.tags { query = query.bind(("tags", v)); }
         if let Some(v) = data.specs {
             query = query.bind(("specs", serde_json::to_value(&v).unwrap_or_default()));
@@ -759,6 +766,7 @@ impl CatalogService {
             is_kitchen_print_enabled: product.is_kitchen_print_enabled,
             is_label_print_enabled: product.is_label_print_enabled,
             is_active: product.is_active,
+            external_id: product.external_id,
             specs: product.specs,
             attributes,
             tags,

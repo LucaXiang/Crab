@@ -203,11 +203,10 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
           ) : (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               {/* Table Header */}
-              <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <div className="grid grid-cols-10 gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 <div className="col-span-3">{t('settings.specification.form.name')}</div>
                 <div className="col-span-2">{t('settings.specification.form.receipt_name')}</div>
                 <div className="col-span-2 text-right">{t('settings.specification.form.price')}</div>
-                <div className="col-span-2 text-center">{t('settings.specification.form.external_id')}</div>
                 <div className="col-span-1 text-center">{t('settings.specification.label.default')}</div>
                 <div className="col-span-2 text-right">{t('common.action.actions')}</div>
               </div>
@@ -217,7 +216,7 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
                 {specs.map((spec, index) => (
                   <div
                     key={index}
-                    className={`grid grid-cols-12 gap-2 px-4 py-3 items-center hover:bg-gray-50 transition-colors group ${
+                    className={`grid grid-cols-10 gap-2 px-4 py-3 items-center hover:bg-gray-50 transition-colors group ${
                       spec.is_root ? 'bg-amber-50/50' : ''
                     }`}
                   >
@@ -239,11 +238,6 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
                     {/* Price */}
                     <div className="col-span-2 text-right font-mono text-sm text-gray-700">
                       {formatCurrency(spec.price)}
-                    </div>
-
-                    {/* External ID */}
-                    <div className="col-span-2 text-center text-sm text-gray-600">
-                      {spec.external_id ?? '-'}
                     </div>
 
                     {/* Default Toggle */}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { CartItem, CheckoutMode } from '@/core/domain/types';
+import { useProductStore } from '@/core/stores/resources';
 import { useLongPress } from '@/hooks/useLongPress';
 import { formatCurrency } from '@/utils/currency';
 import { t } from '@/infrastructure/i18n';
@@ -27,6 +28,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
 }) => {
   const isSelected = selectedQuantities[originalIndex] > 0;
   const currentQty = selectedQuantities[originalIndex] || 0;
+  const externalId = useProductStore(state => state.items.find(p => p.id === item.id)?.external_id);
 
   // Price calculations
   const optionsModifier = (item.selected_options ?? []).reduce((sum, opt) => sum + (opt.price_modifier ?? 0), 0);
@@ -155,9 +157,9 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
                 #{item.instance_id.slice(-5)}
               </span>
             )}
-            {item.selected_specification?.external_id && (
+            {externalId != null && (
               <div className="text-xs text-white bg-gray-900/85 font-bold font-mono px-2 py-0.5 rounded">
-                {item.selected_specification.external_id}
+                {externalId}
               </div>
             )}
             {!isSelectMode && !isComped && (

@@ -17,12 +17,8 @@ export function validateSpecData(
     return t('settings.specification.form.name_required');
   }
 
-  // Non-root specs require external_id and valid price
+  // Non-root specs require valid price
   if (!isRoot) {
-    if (spec.external_id === null || spec.external_id === undefined) {
-      return t('settings.external_id_required');
-    }
-
     if (spec.price === undefined || spec.price === null || spec.price < 0) {
       return t('settings.specification.form.price_required');
     }
@@ -56,7 +52,6 @@ export function createEmptySpec(): Partial<EmbeddedSpec> {
     is_default: false,
     is_root: false,
     is_active: true,
-    external_id: null,
   };
 }
 

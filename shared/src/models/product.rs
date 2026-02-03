@@ -15,7 +15,6 @@ pub struct EmbeddedSpec {
     pub is_default: bool,
     #[serde(default = "default_true")]
     pub is_active: bool,
-    pub external_id: Option<i64>,
     /// 小票显示名称（如 "L", "M", "大杯"）
     pub receipt_name: Option<String>,
     /// 根规格，不可删除（每个商品至少保留一个）
@@ -51,6 +50,8 @@ pub struct Product {
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_label_print_enabled: i32,
     pub is_active: bool,
+    /// 菜品编号 (POS 集成)
+    pub external_id: Option<i64>,
     /// Tag references (String IDs)
     #[serde(default)]
     pub tags: Vec<String>,
@@ -77,6 +78,8 @@ pub struct ProductCreate {
     pub is_kitchen_print_enabled: Option<i32>,
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_label_print_enabled: Option<i32>,
+    /// 菜品编号 (POS 集成)
+    pub external_id: Option<i64>,
     pub tags: Option<Vec<String>>,
     /// 规格列表 (至少 1 个)
     pub specs: Vec<EmbeddedSpec>,
@@ -101,6 +104,8 @@ pub struct ProductUpdate {
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_label_print_enabled: Option<i32>,
     pub is_active: Option<bool>,
+    /// 菜品编号 (POS 集成)
+    pub external_id: Option<i64>,
     pub tags: Option<Vec<String>>,
     /// 规格列表 (更新时可选)
     pub specs: Option<Vec<EmbeddedSpec>>,
@@ -128,6 +133,8 @@ pub struct ProductFull {
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_label_print_enabled: i32,
     pub is_active: bool,
+    /// 菜品编号 (POS 集成)
+    pub external_id: Option<i64>,
     /// 嵌入式规格
     pub specs: Vec<EmbeddedSpec>,
     /// Attribute bindings with full attribute data

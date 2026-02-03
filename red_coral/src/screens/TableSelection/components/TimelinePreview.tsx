@@ -27,15 +27,13 @@ export const TimelinePreview: React.FC<TimelinePreviewProps> = ({
   });
 
   const groupedItems = React.useMemo(() => {
-    const map = new Map<string, { name: string; external_id?: number | null; quantity: number }>();
+    const map = new Map<string, { name: string; quantity: number }>();
 
     cart.forEach((item) => {
-        const extId = item.selected_specification?.external_id;
-        const key = extId ? `${extId}-${item.name}` : item.name;
+        const key = `${item.id}-${item.name}`;
         if (!map.has(key)) {
             map.set(key, {
                 name: item.name,
-                external_id: extId,
                 quantity: 0
             });
         }

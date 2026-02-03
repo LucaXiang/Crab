@@ -145,8 +145,6 @@ pub struct ProductSpecDto {
     pub is_default: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_root: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub external_id: Option<String>,
     /// 标签 ID 列表
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
@@ -165,8 +163,6 @@ pub struct ProductSpecUpdateDto {
     pub is_default: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_root: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub external_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]

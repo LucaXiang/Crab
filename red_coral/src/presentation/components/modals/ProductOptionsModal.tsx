@@ -156,7 +156,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
 
     // Get selected specification details (use index as ID)
     // Use currentPrice (which may be user-overridden) instead of spec.price
-    let selectedSpec: { id: string; name: string; external_id?: number | null; receipt_name?: string | null; price?: number; is_multi_spec?: boolean } | undefined;
+    let selectedSpec: { id: string; name: string; receipt_name?: string | null; price?: number; is_multi_spec?: boolean } | undefined;
     if (hasMultiSpec && selectedSpecId !== null && specifications) {
       const specIdx = parseInt(selectedSpecId, 10);
       const spec = specifications[specIdx];
@@ -164,7 +164,6 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
         selectedSpec = {
           id: String(specIdx),
           name: spec.is_default && !spec.name ? t('settings.product.specification.label.default') : spec.name,
-          external_id: spec.external_id,
           price: currentPrice, // Use possibly user-modified price
           is_multi_spec: hasMultiSpec,
         };
@@ -176,7 +175,6 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
       selectedSpec = {
         id: String(specIdx),
         name: defaultSpec.name,
-        external_id: defaultSpec.external_id,
         price: currentPrice, // Use possibly user-modified price
         is_multi_spec: hasMultiSpec,
       };

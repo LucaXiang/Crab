@@ -38,7 +38,7 @@ const defaultStoreInfo: StoreInfo = {
   phone: null,
   email: null,
   website: null,
-  business_day_cutoff: '00:00',
+  business_day_cutoff: '02:00',
   created_at: null,
   updated_at: null,
 };

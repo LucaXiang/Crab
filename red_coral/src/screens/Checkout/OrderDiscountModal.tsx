@@ -99,14 +99,14 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
     <div className="fixed inset-0 z-80 bg-black/50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-blue-50">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-orange-50">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-full text-blue-600">
+            <div className="p-2 bg-orange-100 rounded-full text-orange-600">
               <Percent size={24} />
             </div>
             <h2 className="text-xl font-bold text-gray-800">{t('checkout.order_discount.title')}</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-blue-100 rounded-full transition-colors text-gray-500">
+          <button onClick={onClose} className="p-2 hover:bg-orange-100 rounded-full transition-colors text-gray-500">
             <X size={20} />
           </button>
         </div>
@@ -128,14 +128,14 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
                 onClick={() => { setDiscountType('percent'); setValue(''); }}
                 className={`p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
                   discountType === 'percent'
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-100 hover:border-blue-200 hover:bg-gray-50'
+                    ? 'border-orange-500 bg-orange-50'
+                    : 'border-gray-100 hover:border-orange-200 hover:bg-gray-50'
                 }`}
               >
-                <div className={`p-2 rounded-lg ${discountType === 'percent' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                <div className={`p-2 rounded-lg ${discountType === 'percent' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}>
                   <Percent size={20} />
                 </div>
-                <span className={`font-medium ${discountType === 'percent' ? 'text-blue-700' : 'text-gray-700'}`}>
+                <span className={`font-medium ${discountType === 'percent' ? 'text-orange-700' : 'text-gray-700'}`}>
                   {t('checkout.order_discount.type_percent')}
                 </span>
               </button>
@@ -143,14 +143,14 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
                 onClick={() => { setDiscountType('fixed'); setValue(''); }}
                 className={`p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
                   discountType === 'fixed'
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-100 hover:border-blue-200 hover:bg-gray-50'
+                    ? 'border-orange-500 bg-orange-50'
+                    : 'border-gray-100 hover:border-orange-200 hover:bg-gray-50'
                 }`}
               >
-                <div className={`p-2 rounded-lg ${discountType === 'fixed' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                <div className={`p-2 rounded-lg ${discountType === 'fixed' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}>
                   <Tag size={20} />
                 </div>
-                <span className={`font-medium ${discountType === 'fixed' ? 'text-blue-700' : 'text-gray-700'}`}>
+                <span className={`font-medium ${discountType === 'fixed' ? 'text-orange-700' : 'text-gray-700'}`}>
                   {t('checkout.order_discount.type_fixed')}
                 </span>
               </button>
@@ -167,7 +167,7 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
                 ? t('checkout.order_discount.percent_placeholder')
                 : t('checkout.order_discount.fixed_placeholder')
               }
-              className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-2xl font-bold text-center tabular-nums"
+              className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-2xl font-bold text-center tabular-nums"
               min="0"
               max={discountType === 'percent' ? '100' : undefined}
               step={discountType === 'percent' ? '1' : '0.01'}
@@ -184,7 +184,7 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={t('checkout.order_discount.reason_placeholder')}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none text-sm"
               rows={2}
             />
           </div>
@@ -224,7 +224,7 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
                 disabled={!canConfirm}
                 className={`flex-1 py-3 px-4 rounded-xl font-bold text-white transition-all shadow-lg ${
                   canConfirm
-                    ? 'bg-blue-500 hover:bg-blue-600 hover:shadow-blue-500/30 hover:-translate-y-0.5'
+                    ? 'bg-orange-500 hover:bg-orange-600 hover:shadow-orange-500/30 hover:-translate-y-0.5'
                     : 'bg-gray-300 cursor-not-allowed'
                 }`}
               >

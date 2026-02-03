@@ -20,8 +20,8 @@ pub struct StoreInfo {
     /// 营业日分界时间 (HH:MM 格式，如 "06:00")
     #[serde(default = "default_cutoff")]
     pub business_day_cutoff: String,
-    pub created_at: Option<String>,
-    pub updated_at: Option<String>,
+    pub created_at: Option<i64>,
+    pub updated_at: Option<i64>,
 }
 
 fn default_cutoff() -> String {

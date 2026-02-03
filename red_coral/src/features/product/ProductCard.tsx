@@ -8,12 +8,10 @@ import { useLongPress } from '@/hooks/useLongPress';
 import { formatCurrency } from '@/utils/currency';
 
 /**
- * Extended Product type with computed fields from ProductSpecification
- * These fields are populated by the product store from the root spec
+ * Extended Product type with computed fields from root spec
  */
 export interface ProductWithPrice extends Product {
   price?: number;      // From root spec
-  external_id?: number; // From root spec external_id
 }
 
 interface ProductCardProps {

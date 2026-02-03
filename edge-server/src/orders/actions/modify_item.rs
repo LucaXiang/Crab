@@ -771,7 +771,7 @@ mod tests {
                 selected_specification: Some(shared::order::SpecificationInfo {
                     id: "spec-1".to_string(),
                     name: "Large".to_string(),
-                    external_id: None,
+
                     receipt_name: None,
                     price: None,
                 }),
@@ -850,7 +850,6 @@ mod tests {
         let new_spec = shared::order::SpecificationInfo {
             id: "spec-1".to_string(),
             name: "Large".to_string(),
-            external_id: None,
             receipt_name: Some("L".to_string()),
             price: Some(15.0),
         };
@@ -1026,7 +1025,6 @@ mod tests {
         let spec = shared::order::SpecificationInfo {
             id: "0".to_string(),
             name: "CCC".to_string(),
-            external_id: None,
             receipt_name: None,
             price: Some(10.0),
         };
@@ -1101,7 +1099,7 @@ mod tests {
                 selected_specification: Some(shared::order::SpecificationInfo {
                     id: "0".to_string(),
                     name: "Large".to_string(),
-                    external_id: None,
+
                     receipt_name: None,
                     price: Some(15.0),
                 }),

@@ -11,7 +11,7 @@ pub struct PrintItemContext {
 
     // 商品
     pub product_id: String,
-    pub external_id: Option<i64>,        // 商品编号 (root spec)
+    pub external_id: Option<i64>,        // 菜品编号
     pub kitchen_name: String,            // 厨房打印名称
     pub product_name: String,            // 原始商品名
 
@@ -72,7 +72,7 @@ pub struct ProductPrintConfig {
     pub label_print_destinations: Vec<String>,
     pub is_kitchen_print_enabled: i32,   // -1=继承, 0=禁用, 1=启用
     pub is_label_print_enabled: i32,     // -1=继承, 0=禁用, 1=启用
-    pub root_spec_external_id: Option<i64>,
+    pub external_id: Option<i64>,
     pub category_id: String,
 }
 

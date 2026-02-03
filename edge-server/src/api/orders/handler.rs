@@ -33,6 +33,7 @@ pub struct OrderItemDetail {
     pub instance_id: String,
     pub name: String,
     pub spec_name: Option<String>,
+    pub category_name: Option<String>,
     pub price: f64,
     pub quantity: i32,
     pub unpaid_quantity: i32,
@@ -44,6 +45,7 @@ pub struct OrderItemDetail {
     pub rule_surcharge_amount: f64,
     pub applied_rules: Option<Vec<shared::order::AppliedRule>>,
     pub note: Option<String>,
+    pub is_comped: bool,
     pub selected_options: Vec<OrderItemOptionDetail>,
 }
 
@@ -153,6 +155,7 @@ pub async fn get_by_id(
             instance_id: i.instance_id,
             name: i.name,
             spec_name: i.spec_name,
+            category_name: i.category_name,
             price: i.price,
             quantity: i.quantity,
             unpaid_quantity: i.unpaid_quantity,
@@ -164,6 +167,7 @@ pub async fn get_by_id(
             rule_surcharge_amount: i.rule_surcharge_amount,
             applied_rules: i.applied_rules,
             note: i.note,
+            is_comped: i.is_comped,
             selected_options: i.selected_options.into_iter().map(|o| OrderItemOptionDetail {
                 attribute_name: o.attribute_name,
                 option_name: o.option_name,

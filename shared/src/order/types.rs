@@ -174,8 +174,6 @@ pub struct SpecificationInfo {
     pub id: String,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub external_id: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub receipt_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub price: Option<f64>,

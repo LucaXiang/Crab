@@ -50,14 +50,20 @@ impl StoreInfoRepository {
         // Ensure singleton exists
         self.get_or_create().await?;
 
+        // 将 updated_at 合入 merge 数据（MERGE 和 SET 不能同时使用）
+        let mut merge_data = serde_json::to_value(&data)
+            .map_err(|e| RepoError::Database(format!("Serialize error: {}", e)))?;
+        if let Some(obj) = merge_data.as_object_mut() {
+            obj.insert("updated_at".to_string(), serde_json::json!(shared::util::now_millis()));
+        }
+
         let singleton_id = RecordId::from_table_key(TABLE, SINGLETON_ID);
         let mut result = self
             .base
             .db()
-            .query("UPDATE $id MERGE $data SET updated_at = $now RETURN AFTER")
+            .query("UPDATE $id MERGE $data RETURN AFTER")
             .bind(("id", singleton_id))
-            .bind(("data", data))
-            .bind(("now", shared::util::now_millis()))
+            .bind(("data", merge_data))
             .await?;
 
         result

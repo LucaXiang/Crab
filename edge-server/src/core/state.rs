@@ -124,6 +124,8 @@ pub struct ServerState {
     pub catalog_service: Arc<CatalogService>,
     /// 审计日志服务 (税务级防篡改)
     pub audit_service: Arc<AuditService>,
+    /// 配置变更通知 (store_info 更新时触发，唤醒依赖配置的调度器)
+    pub config_notify: Arc<tokio::sync::Notify>,
     /// 服务器实例 epoch (启动时生成的 UUID)
     /// 用于客户端检测服务器重启
     pub epoch: String,
@@ -147,6 +149,7 @@ impl ServerState {
         kitchen_print_service: Arc<KitchenPrintService>,
         catalog_service: Arc<CatalogService>,
         audit_service: Arc<AuditService>,
+        config_notify: Arc<tokio::sync::Notify>,
         epoch: String,
     ) -> Self {
         Self {
@@ -162,6 +165,7 @@ impl ServerState {
             kitchen_print_service,
             catalog_service,
             audit_service,
+            config_notify,
             epoch,
         }
     }
@@ -236,7 +240,10 @@ impl ServerState {
             audit_worker.run(audit_rx).await;
         });
 
-        // 8. Generate epoch (UUID for server restart detection)
+        // 8. Config change notifier (唤醒依赖配置的调度器)
+        let config_notify = Arc::new(tokio::sync::Notify::new());
+
+        // 9. Generate epoch (UUID for server restart detection)
         let epoch = uuid::Uuid::new_v4().to_string();
 
         let state = Self::new(
@@ -252,6 +259,7 @@ impl ServerState {
             kitchen_print_service,
             catalog_service,
             audit_service,
+            config_notify,
             epoch,
         );
 
