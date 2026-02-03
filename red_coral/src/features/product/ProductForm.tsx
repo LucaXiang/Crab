@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Image as ImageIcon, Tag, Hash, FileText, Layers, ImagePlus, Printer, List, Star, Check, Lock } from 'lucide-react';
-import { FormField, FormSection, inputClass, selectClass, SelectField, KitchenPrinterSelector, AttributeDisplayTag } from '@/shared/components/FormField';
+import { FormField, FormSection, inputClass, selectClass, SelectField, AttributeDisplayTag } from '@/shared/components/FormField';
 import { AttributeSelectionModal } from '@/features/attribute';
 import { TagSelectionModal, useTags } from '@/features/tag';
 import { ProductImage } from './ProductImage';
-import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions, usePrintDestinationStore } from '@/core/stores/resources';
+import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions } from '@/core/stores/resources';
 import { usePriceInput } from '@/hooks/usePriceInput';
 import { Category, EmbeddedSpec, PrintState } from '@/core/domain/types';
 
@@ -19,11 +19,9 @@ interface ProductFormData {
   tax_rate: number;
   selected_attribute_ids?: string[];
   attribute_default_options?: Record<string, string | string[]>; // Product-level default options (array for multi-select)
-  print_destinations?: string[];
   kitchen_print_name?: string;
   is_kitchen_print_enabled?: PrintState; // Kitchen print state: -1=inherit, 0=disabled, 1=enabled
   is_label_print_enabled?: PrintState;
-  label_print_destinations?: string[]; // Label printer destinations
   is_active?: boolean;
   specs?: EmbeddedSpec[]; // Embedded specifications
   tags?: string[]; // Tag IDs (user + system tags)
@@ -37,39 +35,6 @@ interface ProductFormProps {
   t: (key: string) => string;
   inheritedAttributeIds?: string[];
 }
-
-// Label Printer Selector component (similar to KitchenPrinterSelector but for label printers)
-const LabelPrinterSelector: React.FC<{
-  value: string | null;
-  onChange: (value: string | null) => void;
-  t: (key: string) => string;
-}> = ({ value, onChange, t }) => {
-  const items = usePrintDestinationStore((state) => state.items);
-
-  return (
-    <FormField label={t('settings.label_printer')}>
-      <div className="relative">
-        <select
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value || null)}
-          className={selectClass}
-        >
-          <option value="">{t('common.label.default')}</option>
-          {items.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3">
-          <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </div>
-    </FormField>
-  );
-};
 
 export const ProductForm: React.FC<ProductFormProps> = ({
   formData,
@@ -203,7 +168,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 onFocus={(e) => e.currentTarget.select()}
                 onKeyDown={handlePriceKeyDown}
                 placeholder={t('settings.form.placeholder.price')}
-                className={`${inputClass} pl-8 font-mono font-medium`}
+                className={`${inputClass} pl-8`}
               />
             </div>
           </FormField>
@@ -219,7 +184,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             required
           />
 
-          <FormField label={t('settings.product.form.external_id')}>
+          <FormField label={t('settings.product.form.external_id')} required>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 <Hash size={14} />
@@ -240,8 +205,74 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         </div>
       </FormSection>
 
+      {/* Image */}
+      <FormSection title={t('settings.product.form.image')} icon={ImagePlus}>
+        <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+          <div
+            className="w-16 h-16 shrink-0 bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden cursor-pointer hover:border-teal-300 transition-colors"
+            onClick={onSelectImage}
+          >
+            {formData.image ? (
+              <ProductImage
+                src={formData.image}
+                alt="preview"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <ImageIcon size={24} className="text-gray-300" />
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onSelectImage}
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                {formData.image ? t('common.action.change') : t('common.action.upload_image')}
+              </button>
+              {formData.image && (
+                <button
+                  type="button"
+                  onClick={() => onFieldChange('image', '')}
+                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded-lg hover:bg-red-100 transition-colors"
+                >
+                  {t('common.action.remove')}
+                </button>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-gray-400 truncate">
+              {t('settings.product.form.image_hint')}
+            </p>
+          </div>
+        </div>
+      </FormSection>
+
       {/* Print Settings */}
-      <FormSection title={t('settings.attribute.section.print')} icon={Printer}>
+      <FormSection title={t('settings.attribute.section.print')} icon={Printer} defaultCollapsed>
+        {/* Receipt Printing */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+            {t('settings.product.print.receipt_printing')}
+          </h4>
+          <FormField label={t('settings.product.print.receipt_name')}>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <FileText size={14} />
+              </div>
+              <input
+                value={formData.receipt_name || ''}
+                onChange={(e) => onFieldChange('receipt_name', e.target.value)}
+                placeholder={t('settings.product.print.receipt_name_placeholder')}
+                className={`${inputClass} pl-9`}
+              />
+            </div>
+          </FormField>
+        </div>
+
+        <div className="border-t border-gray-100 pt-3 mt-3" />
+
         {/* Kitchen Printing */}
         <div className="space-y-3">
           <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -275,7 +306,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       {t('settings.product.print.effective_state')}: {
                         (() => {
                           const cat = categories.find(c => String(c.id) === String(formData.category));
-                          const isEnabled = cat ? (cat.kitchen_print_destinations && cat.kitchen_print_destinations.length > 0) : false;
+                          const isEnabled = cat ? cat.is_kitchen_print_enabled : false;
                           return isEnabled ? t('common.status.enabled') : t('common.status.disabled');
                         })()
                       }
@@ -284,14 +315,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 )}
               </div>
             </FormField>
-
-            <KitchenPrinterSelector
-              value={formData.print_destinations?.[0] ?? null}
-              onChange={(value) => {
-                onFieldChange('print_destinations', value === null ? [] : [value]);
-              }}
-              t={t}
-            />
 
             <div className="col-span-1 md:col-span-2">
               <FormField label={t('settings.product.print.kitchen_print_name')}>
@@ -350,86 +373,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 )}
               </div>
             </FormField>
-
-            <LabelPrinterSelector
-              value={formData.label_print_destinations?.[0] ?? null}
-              onChange={(value) => {
-                onFieldChange('label_print_destinations', value === null ? [] : [value]);
-              }}
-              t={t}
-            />
-          </div>
-        </div>
-
-        <div className="border-t border-gray-100 pt-3 mt-3" />
-
-        {/* Receipt Printing */}
-        <div className="space-y-3">
-          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-            {t('settings.product.print.receipt_printing')}
-          </h4>
-          <FormField label={t('settings.product.print.receipt_name')}>
-            <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                <FileText size={14} />
-              </div>
-              <input
-                value={formData.receipt_name || ''}
-                onChange={(e) => onFieldChange('receipt_name', e.target.value)}
-                placeholder={t('settings.product.print.receipt_name_placeholder')}
-                className={`${inputClass} pl-9`}
-              />
-            </div>
-          </FormField>
-        </div>
-      </FormSection>
-
-      {/* Image */}
-      <FormSection title={t('settings.product.form.image')} icon={ImagePlus} defaultCollapsed>
-        <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-          <div
-            className="w-16 h-16 shrink-0 bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden cursor-pointer hover:border-teal-300 transition-colors"
-            onClick={onSelectImage}
-          >
-            {formData.image ? (
-              <ProductImage
-                src={formData.image}
-                alt="preview"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <ImageIcon size={24} className="text-gray-300" />
-            )}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onSelectImage}
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                {formData.image ? t('common.action.change') : t('common.action.upload_image')}
-              </button>
-              {formData.image && (
-                <button
-                  type="button"
-                  onClick={() => onFieldChange('image', '')}
-                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded-lg hover:bg-red-100 transition-colors"
-                >
-                  {t('common.action.remove')}
-                </button>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-gray-400 truncate">
-              {t('settings.product.form.image_hint')}
-            </p>
           </div>
         </div>
       </FormSection>
 
       {/* Attributes */}
-      <FormSection title={t('settings.product.attribute.title')} icon={Layers}>
+      <FormSection title={t('settings.product.attribute.title')} icon={Layers} defaultCollapsed>
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-gray-500">{t('settings.product.attribute.description')}</p>
           <button
@@ -485,7 +434,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       />
 
       {/* Tags */}
-      <FormSection title={t('settings.product.tags.title')} icon={Tag}>
+      <FormSection title={t('settings.product.tags.title')} icon={Tag} defaultCollapsed>
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-gray-500">{t('settings.product.tags.description')}</p>
           <button

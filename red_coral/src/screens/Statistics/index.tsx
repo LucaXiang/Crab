@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '@/hooks/useI18n';
-import { BarChart as BarChartIcon } from 'lucide-react';
 import { toast } from '@/presentation/components/Toast';
 import { Sidebar } from './components/Sidebar';
 import { Overview } from './components/Overview';
@@ -93,8 +92,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
               {activeTab === 'overview' && t('statistics.sidebar.overview')}
               {activeTab === 'sales' && t('statistics.report.sales')}
               {activeTab === 'daily_report' && t('statistics.sidebar.daily_report')}
-              {activeTab === 'products' && t('statistics.report.product')}
-              {activeTab === 'categories' && t('statistics.report.category')}
               {activeTab === 'audit_log' && t('statistics.sidebar.audit_log')}
             </h1>
 
@@ -160,13 +157,6 @@ export const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ isVisible, o
 
           {activeTab === 'audit_log' && (
             <AuditLog />
-          )}
-
-          {(activeTab === 'products' || activeTab === 'categories') && (
-            <div className="flex flex-col items-center justify-center h-96 text-gray-400">
-              <BarChartIcon size={48} className="mb-4 opacity-20" />
-              <p>{t("statistics.report.detailed_coming_soon")}</p>
-            </div>
           )}
         </div>
       </div>

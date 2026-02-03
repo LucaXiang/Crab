@@ -5,7 +5,7 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::AuditAction;
+use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
@@ -59,7 +59,7 @@ pub async fn create(
         "attribute", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &attr.name})
+        details = create_snapshot(&attr, "attribute")
     );
 
     state
@@ -77,10 +77,14 @@ pub async fn update(
     Json(payload): Json<AttributeUpdate>,
 ) -> AppResult<Json<Attribute>> {
     let repo = AttributeRepository::new(state.db.clone());
-    let attr = repo
-        .update(&id, payload)
-        .await
-        ?;
+
+    // 查询旧值（用于审计 diff）
+    let old_attr = repo
+        .find_by_id(&id)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("Attribute {}", id)))?;
+
+    let attr = repo.update(&id, payload).await?;
 
     audit_log!(
         state.audit_service,
@@ -88,7 +92,7 @@ pub async fn update(
         "attribute", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &attr.name})
+        details = create_diff(&old_attr, &attr, "attribute")
     );
 
     state

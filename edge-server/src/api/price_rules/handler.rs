@@ -5,7 +5,7 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::AuditAction;
+use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
@@ -93,7 +93,7 @@ pub async fn create(
         "price_rule", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &rule.name})
+        details = create_snapshot(&rule, "price_rule")
     );
 
     state
@@ -111,10 +111,14 @@ pub async fn update(
     Json(payload): Json<PriceRuleUpdate>,
 ) -> AppResult<Json<PriceRule>> {
     let repo = PriceRuleRepository::new(state.db.clone());
-    let rule = repo
-        .update(&id, payload)
-        .await
-        ?;
+
+    // 查询旧值（用于审计 diff）
+    let old_rule = repo
+        .find_by_id(&id)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("Price rule {}", id)))?;
+
+    let rule = repo.update(&id, payload).await?;
 
     audit_log!(
         state.audit_service,
@@ -122,7 +126,7 @@ pub async fn update(
         "price_rule", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &rule.name})
+        details = create_diff(&old_rule, &rule, "price_rule")
     );
 
     state

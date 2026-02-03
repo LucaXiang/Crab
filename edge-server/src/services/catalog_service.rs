@@ -41,10 +41,6 @@ struct ProductWithTags {
     pub tax_rate: i32,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    #[serde(default, with = "serde_helpers::vec_record_id")]
-    pub kitchen_print_destinations: Vec<RecordId>,
-    #[serde(default, with = "serde_helpers::vec_record_id")]
-    pub label_print_destinations: Vec<RecordId>,
     #[serde(default)]
     pub is_kitchen_print_enabled: i32,
     #[serde(default)]
@@ -261,8 +257,6 @@ impl CatalogService {
                     tax_rate: product.tax_rate,
                     receipt_name: product.receipt_name,
                     kitchen_print_name: product.kitchen_print_name,
-                    kitchen_print_destinations: product.kitchen_print_destinations,
-                    label_print_destinations: product.label_print_destinations,
                     is_kitchen_print_enabled: product.is_kitchen_print_enabled,
                     is_label_print_enabled: product.is_label_print_enabled,
                     is_active: product.is_active,
@@ -418,8 +412,6 @@ impl CatalogService {
             tax_rate: i32,
             receipt_name: Option<String>,
             kitchen_print_name: Option<String>,
-            kitchen_print_destinations: Vec<RecordId>,
-            label_print_destinations: Vec<RecordId>,
             is_kitchen_print_enabled: i32,
             is_label_print_enabled: i32,
             is_active: bool,
@@ -436,8 +428,6 @@ impl CatalogService {
             tax_rate: data.tax_rate.unwrap_or(0),
             receipt_name: data.receipt_name,
             kitchen_print_name: data.kitchen_print_name,
-            kitchen_print_destinations: data.kitchen_print_destinations.unwrap_or_default(),
-            label_print_destinations: data.label_print_destinations.unwrap_or_default(),
             is_kitchen_print_enabled: data.is_kitchen_print_enabled.unwrap_or(-1),
             is_label_print_enabled: data.is_label_print_enabled.unwrap_or(-1),
             is_active: true,
@@ -486,8 +476,6 @@ impl CatalogService {
         if data.tax_rate.is_some() { set_parts.push("tax_rate = $tax_rate"); }
         if data.receipt_name.is_some() { set_parts.push("receipt_name = $receipt_name"); }
         if data.kitchen_print_name.is_some() { set_parts.push("kitchen_print_name = $kitchen_print_name"); }
-        if data.kitchen_print_destinations.is_some() { set_parts.push("kitchen_print_destinations = $kitchen_print_destinations"); }
-        if data.label_print_destinations.is_some() { set_parts.push("label_print_destinations = $label_print_destinations"); }
         if data.is_kitchen_print_enabled.is_some() { set_parts.push("is_kitchen_print_enabled = $is_kitchen_print_enabled"); }
         if data.is_label_print_enabled.is_some() { set_parts.push("is_label_print_enabled = $is_label_print_enabled"); }
         if data.is_active.is_some() { set_parts.push("is_active = $is_active"); }
@@ -524,8 +512,6 @@ impl CatalogService {
         if let Some(v) = data.tax_rate { query = query.bind(("tax_rate", v)); }
         if let Some(v) = data.receipt_name { query = query.bind(("receipt_name", v)); }
         if let Some(v) = data.kitchen_print_name { query = query.bind(("kitchen_print_name", v)); }
-        if let Some(v) = data.kitchen_print_destinations { query = query.bind(("kitchen_print_destinations", v)); }
-        if let Some(v) = data.label_print_destinations { query = query.bind(("label_print_destinations", v)); }
         if let Some(v) = data.is_kitchen_print_enabled { query = query.bind(("is_kitchen_print_enabled", v)); }
         if let Some(v) = data.is_label_print_enabled { query = query.bind(("is_label_print_enabled", v)); }
         if let Some(v) = data.is_active { query = query.bind(("is_active", v)); }
@@ -761,8 +747,6 @@ impl CatalogService {
             tax_rate: product.tax_rate,
             receipt_name: product.receipt_name,
             kitchen_print_name: product.kitchen_print_name,
-            kitchen_print_destinations: product.kitchen_print_destinations,
-            label_print_destinations: product.label_print_destinations,
             is_kitchen_print_enabled: product.is_kitchen_print_enabled,
             is_label_print_enabled: product.is_label_print_enabled,
             is_active: product.is_active,
@@ -1100,10 +1084,8 @@ impl CatalogService {
             });
         }
 
-        // Determine destinations (product > category > global default)
-        let destinations = if !product.kitchen_print_destinations.is_empty() {
-            product.kitchen_print_destinations.iter().map(|t| t.to_string()).collect()
-        } else if let Some(cat) = category.filter(|c| !c.is_virtual) {
+        // Determine destinations (category > global default)
+        let destinations = if let Some(cat) = category.filter(|c| !c.is_virtual) {
             if !cat.kitchen_print_destinations.is_empty() {
                 cat.kitchen_print_destinations.iter().map(|t| t.to_string()).collect()
             } else {
@@ -1149,10 +1131,8 @@ impl CatalogService {
             });
         }
 
-        // Determine destinations
-        let destinations = if !product.label_print_destinations.is_empty() {
-            product.label_print_destinations.iter().map(|t| t.to_string()).collect()
-        } else if let Some(cat) = category.filter(|c| !c.is_virtual) {
+        // Determine destinations (category > global default)
+        let destinations = if let Some(cat) = category.filter(|c| !c.is_virtual) {
             if !cat.label_print_destinations.is_empty() {
                 cat.label_print_destinations.iter().map(|t| t.to_string()).collect()
             } else {

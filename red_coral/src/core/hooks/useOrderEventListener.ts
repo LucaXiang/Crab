@@ -17,6 +17,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { useShallow } from 'zustand/shallow';
 import { invokeApi } from '@/infrastructure/api';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
 import { useBridgeStore } from '@/core/stores/bridge/useBridgeStore';
@@ -198,9 +199,9 @@ export function useOrderTimelineSync() {
   const retryCountRef = useRef<Map<string, number>>(new Map());
   const mountedRef = useRef(true);
 
-  // 使用导出的 selector（带 useShallow）
+  // 使用 useShallow 防止 Array.from 创建的新数组导致无限重渲染
   const ordersNeedingSync = useActiveOrdersStore(
-    (state) => Array.from(state.ordersNeedingTimelineSync)
+    useShallow((state) => Array.from(state.ordersNeedingTimelineSync))
   );
 
   useEffect(() => {

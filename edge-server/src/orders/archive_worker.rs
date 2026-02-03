@@ -23,10 +23,10 @@ use tokio::sync::mpsc;
 type ArcOrderEvent = Arc<OrderEvent>;
 
 /// Terminal event types (用于 shift cash 判断)
+/// 注意: OrderMoved 不是终端事件，移桌只是换桌，订单仍然活跃
 const TERMINAL_EVENT_TYPES: &[OrderEventType] = &[
     OrderEventType::OrderCompleted,
     OrderEventType::OrderVoided,
-    OrderEventType::OrderMoved,
     OrderEventType::OrderMerged,
 ];
 

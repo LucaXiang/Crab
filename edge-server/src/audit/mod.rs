@@ -24,14 +24,14 @@
 //! - **system_issue 表**: 持久化待确认异常（SurrealDB）
 //! - **前端 system-issues API**: 渲染对话框要求用户回应
 
+pub mod diff;
 pub mod service;
 pub mod storage;
 pub mod types;
 pub mod worker;
 
+pub use diff::{create_delete_details, create_diff, create_snapshot};
 pub use service::{AuditLogRequest, AuditService};
 pub use storage::{AuditStorage, AuditStorageError};
-pub use types::{
-    AuditAction, AuditEntry, AuditListResponse, AuditQuery,
-};
+pub use types::{AuditAction, AuditEntry, AuditListResponse, AuditQuery};
 pub use worker::AuditWorker;

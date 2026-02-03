@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { CartItem, CheckoutMode } from '@/core/domain/types';
 import { useProductStore } from '@/core/stores/resources';
 import { UnpaidItemRow } from './components';
@@ -42,11 +42,12 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
   });
 
   // Build product ID → external_id map for O(1) lookup during sort
-  const externalIdMap = useProductStore(state => {
+  const products = useProductStore(state => state.items);
+  const externalIdMap = useMemo(() => {
     const map = new Map<string, number | null>();
-    for (const p of state.items) map.set(p.id, p.external_id);
+    for (const p of products) map.set(p.id, p.external_id);
     return map;
-  });
+  }, [products]);
   const sortItems = (aItem: CartItem, bItem: CartItem) => {
     const extIdA = externalIdMap.get(aItem.id) ?? Number.MAX_SAFE_INTEGER;
     const extIdB = externalIdMap.get(bItem.id) ?? Number.MAX_SAFE_INTEGER;

@@ -87,7 +87,6 @@ interface FormData {
   tax_rate?: number;
   receipt_name?: string;
   kitchen_print_name?: string;
-  print_destinations?: string[];  // PrintDestination IDs
   is_label_print_enabled?: PrintState;  // Product: -1=继承, 0=禁用, 1=启用
   tags?: string[];         // Tag IDs
   specs?: EmbeddedSpec[];  // 嵌入式规格
@@ -97,7 +96,8 @@ interface FormData {
 
   // === Category & Product shared ===
   is_kitchen_print_enabled?: PrintState;  // Product: -1=继承, 0=禁用, 1=启用; Category: 0=禁用, 1=启用
-  label_print_destinations?: string[];  // Label PrintDestination IDs
+  print_destinations?: string[];  // Kitchen PrintDestination IDs (Category only)
+  label_print_destinations?: string[];  // Label PrintDestination IDs (Category only)
   is_virtual?: boolean;
   is_display?: boolean;     // Virtual category display in menu
   tag_ids?: string[];      // Virtual category tag filter
@@ -243,8 +243,6 @@ export const useSettingsStore = create<SettingsStore>()(
             tax_rate: productData?.tax_rate ?? 10,
             receipt_name: productData?.receipt_name ?? '',
             kitchen_print_name: productData?.kitchen_print_name ?? '',
-            print_destinations: productData?.kitchen_print_destinations || [],  // Form uses print_destinations for kitchen
-            label_print_destinations: productData?.label_print_destinations || [],
             is_kitchen_print_enabled: productData?.is_kitchen_print_enabled ?? -1,  // 默认继承分类
             is_label_print_enabled: productData?.is_label_print_enabled ?? -1,  // 默认继承分类
             is_active: productData?.is_active ?? true,  // Default to active for new products
@@ -457,8 +455,7 @@ function computeIsDirty(entity: ModalEntity, next: FormData, initial: FormData):
   } else if (entity === 'PRODUCT') {
     const keys: (keyof FormData)[] = [
       'name', 'category', 'image', 'tax_rate', 'receipt_name',
-      'sort_order', 'print_destinations', 'label_print_destinations',
-      'kitchen_print_name', 'is_kitchen_print_enabled', 'is_label_print_enabled',
+      'sort_order', 'kitchen_print_name', 'is_kitchen_print_enabled', 'is_label_print_enabled',
       'is_active', 'has_multi_spec', 'tags', 'specs',
       'selected_attribute_ids', 'attribute_default_options',
     ];

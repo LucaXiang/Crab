@@ -6,7 +6,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::audit::AuditAction;
+use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
@@ -54,7 +54,7 @@ pub async fn create(
         "category", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &category.name})
+        details = create_snapshot(&category, "category")
     );
 
     state
@@ -71,11 +71,16 @@ pub async fn update(
     Path(id): Path<String>,
     Json(payload): Json<CategoryUpdate>,
 ) -> AppResult<Json<Category>> {
+    // 查询旧值（用于审计 diff）
+    let old_category = state
+        .catalog_service
+        .get_category(&id)
+        .ok_or_else(|| AppError::not_found(format!("Category {}", id)))?;
+
     let category = state
         .catalog_service
         .update_category(&id, payload)
-        .await
-        ?;
+        .await?;
 
     audit_log!(
         state.audit_service,
@@ -83,7 +88,7 @@ pub async fn update(
         "category", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &category.name})
+        details = create_diff(&old_category, &category, "category")
     );
 
     state

@@ -196,7 +196,7 @@ export const Permission = {
 
 // Statistics types
 export type TimeRange = 'today' | 'week' | 'month' | 'year' | 'custom';
-export type ActiveTab = 'overview' | 'sales' | 'products' | 'categories' | 'daily_report' | 'audit_log';
+export type ActiveTab = 'overview' | 'sales' | 'daily_report' | 'audit_log';
 
 export interface OverviewStats {
   revenue: number;

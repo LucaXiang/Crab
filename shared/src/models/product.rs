@@ -39,12 +39,6 @@ pub struct Product {
     pub tax_rate: i32,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    /// 厨房打印目的地
-    #[serde(default)]
-    pub kitchen_print_destinations: Vec<String>,
-    /// 标签打印目的地
-    #[serde(default)]
-    pub label_print_destinations: Vec<String>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_kitchen_print_enabled: i32,
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
@@ -70,10 +64,6 @@ pub struct ProductCreate {
     pub tax_rate: Option<i32>,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    /// 厨房打印目的地
-    pub kitchen_print_destinations: Option<Vec<String>>,
-    /// 标签打印目的地
-    pub label_print_destinations: Option<Vec<String>>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_kitchen_print_enabled: Option<i32>,
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
@@ -95,10 +85,6 @@ pub struct ProductUpdate {
     pub tax_rate: Option<i32>,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    /// 厨房打印目的地
-    pub kitchen_print_destinations: Option<Vec<String>>,
-    /// 标签打印目的地
-    pub label_print_destinations: Option<Vec<String>>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_kitchen_print_enabled: Option<i32>,
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
@@ -122,12 +108,6 @@ pub struct ProductFull {
     pub tax_rate: i32,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    /// 厨房打印目的地
-    #[serde(default)]
-    pub kitchen_print_destinations: Vec<String>,
-    /// 标签打印目的地
-    #[serde(default)]
-    pub label_print_destinations: Vec<String>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_kitchen_print_enabled: i32,
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)

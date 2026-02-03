@@ -14,8 +14,6 @@ export interface ProductFormData {
   tax_rate?: number;
   sort_order?: number;
   kitchen_print_name?: string;
-  print_destinations?: string[];
-  label_print_destinations?: string[];
   is_kitchen_print_enabled?: PrintState;
   is_label_print_enabled?: PrintState;
   is_active?: boolean;
@@ -46,8 +44,6 @@ export async function createProduct(
     tax_rate: formData.tax_rate ?? 0,
     receipt_name: formData.receipt_name?.trim() ?? undefined,
     kitchen_print_name: formData.kitchen_print_name?.trim() ?? undefined,
-    kitchen_print_destinations: formData.print_destinations ?? [],
-    label_print_destinations: formData.label_print_destinations ?? [],
     is_kitchen_print_enabled: formData.is_kitchen_print_enabled ?? -1,
     is_label_print_enabled: formData.is_label_print_enabled ?? -1,
     external_id: formData.externalId ?? null,
@@ -152,8 +148,6 @@ export async function updateProduct(
     sort_order: formData.sort_order ?? 0,
     receipt_name: formData.receipt_name?.trim() ?? undefined,
     kitchen_print_name: formData.kitchen_print_name?.trim() ?? undefined,
-    kitchen_print_destinations: formData.print_destinations ?? [],
-    label_print_destinations: formData.label_print_destinations ?? [],
     is_kitchen_print_enabled: formData.is_kitchen_print_enabled ?? -1,
     is_label_print_enabled: formData.is_label_print_enabled ?? -1,
     is_active: formData.is_active ?? true,
@@ -282,8 +276,6 @@ export async function loadProductFullData(productId: string) {
     has_multi_spec: specs.length > 1,
     is_kitchen_print_enabled: productFull.is_kitchen_print_enabled,
     is_label_print_enabled: productFull.is_label_print_enabled,
-    print_destinations: productFull.kitchen_print_destinations,
-    label_print_destinations: productFull.label_print_destinations,
     kitchen_print_name: productFull.kitchen_print_name ?? '',
     price,
     externalId,

@@ -129,6 +129,8 @@ pub enum ErrorCode {
     SpecNotFound = 6201,
     /// Product external_id already exists
     ProductExternalIdExists = 6202,
+    /// Product external_id is required
+    ProductExternalIdRequired = 6203,
     /// Attribute not found
     AttributeNotFound = 6301,
     /// Attribute binding failed
@@ -274,6 +276,7 @@ impl ErrorCode {
             ErrorCode::CategoryNameExists => "Category name already exists",
             ErrorCode::SpecNotFound => "Specification not found",
             ErrorCode::ProductExternalIdExists => "Product external_id already exists",
+            ErrorCode::ProductExternalIdRequired => "Product external_id is required",
             ErrorCode::AttributeNotFound => "Attribute not found",
             ErrorCode::AttributeBindFailed => "Failed to bind attribute",
 

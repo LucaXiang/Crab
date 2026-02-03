@@ -240,6 +240,7 @@ features/<name>/
 | **懒加载** | Tauri Client 使用懒加载，禁止模块作用域直接创建 |
 | **错误处理** | 关键加载失败使用 dialog 阻断，禁止静默错误 |
 | **时间戳** | `number` 类型 (i64 Unix 毫秒)，禁止 string 格式 |
+| **Zustand Selector** | selector 必须返回稳定引用；需要派生数据时先选原始数据再用 `useMemo`，禁止在 selector 内 `new Map()`/`.filter()`/`.map()` |
 
 ## 颜色语言 (价格明细)
 

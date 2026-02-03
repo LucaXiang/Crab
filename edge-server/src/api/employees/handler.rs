@@ -5,7 +5,7 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::AuditAction;
+use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
@@ -71,7 +71,7 @@ pub async fn create(
         "employee", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"username": &employee.username, "role": employee.role.to_string()})
+        details = create_snapshot(&employee, "employee")
     );
 
     state
@@ -89,10 +89,14 @@ pub async fn update(
     Json(payload): Json<EmployeeUpdate>,
 ) -> AppResult<Json<Employee>> {
     let repo = EmployeeRepository::new(state.db.clone());
-    let employee = repo
-        .update(&id, payload)
-        .await
-        ?;
+
+    // 查询旧值（用于审计 diff）
+    let old_employee = repo
+        .find_by_id_safe(&id)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("Employee {}", id)))?;
+
+    let employee = repo.update(&id, payload).await?;
 
     audit_log!(
         state.audit_service,
@@ -100,7 +104,7 @@ pub async fn update(
         "employee", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"username": &employee.username, "role": employee.role.to_string(), "is_active": employee.is_active})
+        details = create_diff(&old_employee, &employee, "employee")
     );
 
     state

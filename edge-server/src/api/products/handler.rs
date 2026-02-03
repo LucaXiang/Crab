@@ -6,7 +6,7 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::audit::AuditAction;
+use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
@@ -101,12 +101,15 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<ProductCreate>,
 ) -> AppResult<Json<shared::models::ProductFull>> {
+    // 检查 external_id 是否已提供 (必填)
+    let eid = payload.external_id.ok_or_else(|| {
+        AppError::new(ErrorCode::ProductExternalIdRequired)
+    })?;
+
     // 检查 external_id 是否已被其他商品使用
-    if let Some(eid) = payload.external_id {
-        if check_duplicate_external_id(&state, eid, None).await? {
-            return Err(AppError::new(ErrorCode::ProductExternalIdExists)
-                .with_detail("external_id", eid));
-        }
+    if check_duplicate_external_id(&state, eid, None).await? {
+        return Err(AppError::new(ErrorCode::ProductExternalIdExists)
+            .with_detail("external_id", eid));
     }
 
     let product = state
@@ -124,7 +127,7 @@ pub async fn create(
         "product", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &product_for_api.name})
+        details = create_snapshot(&product_for_api, "product")
     );
 
     state
@@ -148,6 +151,13 @@ pub async fn update(
         payload.is_kitchen_print_enabled
     );
 
+    // 查询旧值（用于审计 diff）
+    let old_product = state
+        .catalog_service
+        .get_product(&id)
+        .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
+    let old_for_audit: shared::models::ProductFull = old_product.into();
+
     // 检查 external_id 是否已被其他商品使用
     if let Some(eid) = payload.external_id {
         if check_duplicate_external_id(&state, eid, Some(&id)).await? {
@@ -159,8 +169,7 @@ pub async fn update(
     let product = state
         .catalog_service
         .update_product(&id, payload)
-        .await
-        ?;
+        .await?;
 
     tracing::debug!(
         "Product updated - is_kitchen_print_enabled: {}, is_label_print_enabled: {}",
@@ -176,7 +185,7 @@ pub async fn update(
         "product", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &product_for_api.name})
+        details = create_diff(&old_for_audit, &product_for_api, "product")
     );
 
     state
@@ -338,8 +347,6 @@ pub async fn batch_update_sort_order(
                     tax_rate: None,
                     receipt_name: None,
                     kitchen_print_name: None,
-                    kitchen_print_destinations: None,
-                    label_print_destinations: None,
                     is_kitchen_print_enabled: None,
                     is_label_print_enabled: None,
                     is_active: None,

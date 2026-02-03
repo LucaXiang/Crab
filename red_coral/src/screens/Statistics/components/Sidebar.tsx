@@ -4,8 +4,6 @@ import {
   Activity,
   TrendingUp,
   BarChart as BarChartIcon,
-  ShoppingCart,
-  PieChart as PieChartIcon,
   Calendar,
   FileText,
   ShieldCheck
@@ -69,8 +67,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'overview' as const, icon: TrendingUp, label: t('statistics.sidebar.overview') },
     { id: 'sales' as const, icon: BarChartIcon, label: t('statistics.report.sales') },
     { id: 'daily_report' as const, icon: FileText, label: t('statistics.sidebar.daily_report') },
-    { id: 'products' as const, icon: ShoppingCart, label: t('statistics.report.product') },
-    { id: 'categories' as const, icon: PieChartIcon, label: t('statistics.report.category') },
     { id: 'audit_log' as const, icon: ShieldCheck, label: t('statistics.sidebar.audit_log') },
   ];
 

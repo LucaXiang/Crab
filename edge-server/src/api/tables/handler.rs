@@ -5,7 +5,7 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::AuditAction;
+use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
@@ -59,7 +59,7 @@ pub async fn create(
         "dining_table", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &table.name})
+        details = create_snapshot(&table, "dining_table")
     );
 
     state
@@ -77,10 +77,14 @@ pub async fn update(
     Json(payload): Json<DiningTableUpdate>,
 ) -> AppResult<Json<DiningTable>> {
     let repo = DiningTableRepository::new(state.db.clone());
-    let table = repo
-        .update(&id, payload)
-        .await
-        ?;
+
+    // 查询旧值（用于审计 diff）
+    let old_table = repo
+        .find_by_id(&id)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("Table {}", id)))?;
+
+    let table = repo.update(&id, payload).await?;
 
     audit_log!(
         state.audit_service,
@@ -88,7 +92,7 @@ pub async fn update(
         "dining_table", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &table.name})
+        details = create_diff(&old_table, &table, "dining_table")
     );
 
     state

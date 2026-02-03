@@ -46,12 +46,6 @@ pub struct Product {
     pub tax_rate: i32,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    /// 厨房打印目的地
-    #[serde(default, with = "serde_helpers::vec_record_id")]
-    pub kitchen_print_destinations: Vec<RecordId>,
-    /// 标签打印目的地
-    #[serde(default, with = "serde_helpers::vec_record_id")]
-    pub label_print_destinations: Vec<RecordId>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
     #[serde(default = "default_inherit")]
     pub is_kitchen_print_enabled: i32,
@@ -92,8 +86,6 @@ impl Product {
             tax_rate: 0,
             receipt_name: None,
             kitchen_print_name: None,
-            kitchen_print_destinations: vec![],
-            label_print_destinations: vec![],
             is_kitchen_print_enabled: -1,
             is_label_print_enabled: -1,
             is_active: true,
@@ -114,12 +106,6 @@ pub struct ProductCreate {
     pub tax_rate: Option<i32>,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    /// 厨房打印目的地
-    #[serde(default, with = "serde_helpers::option_vec_record_id")]
-    pub kitchen_print_destinations: Option<Vec<RecordId>>,
-    /// 标签打印目的地
-    #[serde(default, with = "serde_helpers::option_vec_record_id")]
-    pub label_print_destinations: Option<Vec<RecordId>>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
     pub is_kitchen_print_enabled: Option<i32>,
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
@@ -152,20 +138,6 @@ pub struct ProductUpdate {
     pub receipt_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kitchen_print_name: Option<String>,
-    /// 厨房打印目的地
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "serde_helpers::option_vec_record_id"
-    )]
-    pub kitchen_print_destinations: Option<Vec<RecordId>>,
-    /// 标签打印目的地
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "serde_helpers::option_vec_record_id"
-    )]
-    pub label_print_destinations: Option<Vec<RecordId>>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_kitchen_print_enabled: Option<i32>,
@@ -205,12 +177,6 @@ pub struct ProductFull {
     pub tax_rate: i32,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-    /// 厨房打印目的地
-    #[serde(default, with = "serde_helpers::vec_record_id")]
-    pub kitchen_print_destinations: Vec<RecordId>,
-    /// 标签打印目的地
-    #[serde(default, with = "serde_helpers::vec_record_id")]
-    pub label_print_destinations: Vec<RecordId>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
     #[serde(default = "default_inherit")]
     pub is_kitchen_print_enabled: i32,
@@ -244,8 +210,6 @@ impl From<ProductFull> for shared::models::ProductFull {
             tax_rate: p.tax_rate,
             receipt_name: p.receipt_name,
             kitchen_print_name: p.kitchen_print_name,
-            kitchen_print_destinations: p.kitchen_print_destinations.into_iter().map(|id| id.to_string()).collect(),
-            label_print_destinations: p.label_print_destinations.into_iter().map(|id| id.to_string()).collect(),
             is_kitchen_print_enabled: p.is_kitchen_print_enabled,
             is_label_print_enabled: p.is_label_print_enabled,
             is_active: p.is_active,

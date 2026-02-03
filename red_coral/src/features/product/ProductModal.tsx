@@ -246,7 +246,6 @@ export const ProductModal: React.FC = React.memo(() => {
           tax_rate: formData.tax_rate ?? 0,
           selected_attribute_ids: formData.selected_attribute_ids,
           attribute_default_options: formData.attribute_default_options,
-          print_destinations: formData.print_destinations,
           kitchen_print_name: formData.kitchen_print_name,
           is_kitchen_print_enabled: formData.is_kitchen_print_enabled ?? -1,
           is_label_print_enabled: formData.is_label_print_enabled ?? -1,

@@ -134,10 +134,6 @@ export interface ProductCreate {
   tax_rate?: number;
   receipt_name?: string;
   kitchen_print_name?: string;
-  /** 厨房打印目的地 */
-  kitchen_print_destinations?: string[];
-  /** 标签打印目的地 */
-  label_print_destinations?: string[];
   /** 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用) */
   is_kitchen_print_enabled?: PrintState;
   /** 标签打印启用状态 (-1=继承, 0=禁用, 1=启用) */
@@ -157,10 +153,6 @@ export interface ProductUpdate {
   tax_rate?: number;
   receipt_name?: string;
   kitchen_print_name?: string;
-  /** 厨房打印目的地 */
-  kitchen_print_destinations?: string[];
-  /** 标签打印目的地 */
-  label_print_destinations?: string[];
   /** 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用) */
   is_kitchen_print_enabled?: PrintState;
   /** 标签打印启用状态 (-1=继承, 0=禁用, 1=启用) */
@@ -197,10 +189,6 @@ export interface ProductFull {
   tax_rate: number;
   receipt_name: string | null;
   kitchen_print_name: string | null;
-  /** 厨房打印目的地 */
-  kitchen_print_destinations: string[];
-  /** 标签打印目的地 */
-  label_print_destinations: string[];
   /** 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用) */
   is_kitchen_print_enabled: PrintState;
   /** 标签打印启用状态 (-1=继承, 0=禁用, 1=启用) */

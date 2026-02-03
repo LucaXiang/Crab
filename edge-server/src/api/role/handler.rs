@@ -5,7 +5,7 @@ use axum::extract::{Extension, Path, Query, State};
 use axum::response::IntoResponse;
 use serde::Deserialize;
 
-use crate::audit::AuditAction;
+use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::permissions::{is_valid_permission, ALL_PERMISSIONS};
 use crate::auth::CurrentUser;
@@ -111,7 +111,7 @@ pub async fn create(
         "role", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"role_name": &role.name, "permissions": &role.permissions})
+        details = create_snapshot(&role, "role")
     );
 
     Ok(Json(role))
@@ -137,10 +137,14 @@ pub async fn update(
     }
 
     let repo = RoleRepository::new(state.get_db());
-    let role = repo
-        .update(&id, payload)
-        .await
-        ?;
+
+    // 查询旧值（用于审计 diff）
+    let old_role = repo
+        .find_by_id(&id)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("Role {}", id)))?;
+
+    let role = repo.update(&id, payload).await?;
 
     audit_log!(
         state.audit_service,
@@ -148,7 +152,7 @@ pub async fn update(
         "role", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"role_name": &role.name})
+        details = create_diff(&old_role, &role, "role")
     );
 
     Ok(Json(role))
@@ -240,10 +244,13 @@ pub async fn update_role_permissions(
         is_active: None,
     };
 
-    let role = repo
-        .update(&id, update)
-        .await
-        ?;
+    // 查询旧值（用于审计 diff）
+    let old_role = repo
+        .find_by_id(&id)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("Role {}", id)))?;
+
+    let role = repo.update(&id, update).await?;
 
     audit_log!(
         state.audit_service,
@@ -251,7 +258,7 @@ pub async fn update_role_permissions(
         "role", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"role_name": &role.name, "permissions": &role.permissions})
+        details = create_diff(&old_role, &role, "role")
     );
 
     Ok(Json(role))

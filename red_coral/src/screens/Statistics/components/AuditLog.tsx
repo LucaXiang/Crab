@@ -12,11 +12,11 @@ import {
   Loader2,
   AlertCircle,
   FileText,
-  Info,
   Calendar,
   X,
 } from 'lucide-react';
 import { AuditFilterModal } from './AuditFilterModal';
+import { AuditDetailsView, renderAuditDetails } from './AuditLog/index';
 
 const PAGE_SIZE = 10;
 
@@ -69,43 +69,6 @@ function dayEndMillis(dateStr: string): number {
 
 
 
-/**
- * 枚举型字段 — 值本身是已知的系统枚举，尝试通过 audit.detail.value.{v} 翻译
- * 如果 i18n 没有对应 key，则原样显示
- */
-const ENUM_FIELDS = new Set([
-  'kind',       // abnormal_shutdown, long_downtime, ...
-  'source',     // local, remote
-  'status',     // ACTIVE, COMPLETED, VOID, MOVED, MERGED
-  'reason',     // invalid_credentials, user_not_found
-  'note',       // abnormal_shutdown_detected, ...
-  'response',   // power_outage, app_crash, device_failure, ...
-  'void_type',  // CANCELLED, LOSS_SETTLED
-  'loss_reason', // CUSTOMER_FLED, CUSTOMER_INSOLVENT, OTHER
-]);
-
-/**
- * 时间戳字段 — 值是 i64 Unix 毫秒，格式化为可读日期
- */
-const TIMESTAMP_FIELDS = new Set([
-  'last_start_timestamp',
-  'detected_at',
-  'last_activity_timestamp',
-]);
-
-/**
- * 货币字段 — 值是数字金额，格式化为 €x.xx
- */
-const CURRENCY_FIELDS = new Set([
-  'total',
-  'starting_cash',
-  'expected_cash',
-  'actual_cash',
-  'cash_variance',
-  'paid_amount',
-  'loss_amount',
-  'merged_paid_amount',
-]);
 
 /** action 的显示颜色 */
 function getActionColor(action: string): string {
@@ -129,125 +92,6 @@ function formatTs(v: number): string {
   });
 }
 
-/** 格式化文件大小 */
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/**
- * 格式化单个详情字段值
- *
- * 策略优先级：
- * 1. null/undefined → "无"
- * 2. boolean → "是"/"否"
- * 3. 枚举字段 (kind, source, status, reason, note, response) → i18n value 表翻译，无匹配则原样
- * 4. 时间戳字段 → 格式化为日期
- * 5. size → 文件大小格式化
- * 6. 货币字段 (total, starting_cash, expected_cash, actual_cash, cash_variance) → €格式化
- * 7. 数组 → 标签式排列
- * 8. 其他 → 原样显示
- */
-function formatDetailValue(
-  key: string,
-  value: unknown,
-  t: (key: string) => string,
-): React.ReactNode {
-  if (value === null || value === undefined) return t('audit.detail.value.none');
-
-  // boolean
-  if (typeof value === 'boolean') {
-    return t(`audit.detail.value.${value}`);
-  }
-
-  // 枚举字段 — kind, source, status, reason
-  if (ENUM_FIELDS.has(key) && typeof value === 'string') {
-    const translated = t(`audit.detail.value.${value}`);
-    // t() 找不到 key 时返回 key 本身，如果翻译结果和 key 不同说明有翻译
-    return translated !== `audit.detail.value.${value}` ? translated : value;
-  }
-
-  // 时间戳字段
-  if (TIMESTAMP_FIELDS.has(key) && typeof value === 'number') {
-    return formatTs(value);
-  }
-
-  // 文件大小
-  if (key === 'size' && typeof value === 'number') {
-    return formatFileSize(value);
-  }
-
-  // 货币字段
-  if (CURRENCY_FIELDS.has(key) && typeof value === 'number') {
-    return `€${value.toFixed(2)}`;
-  }
-
-  // 支付明细 (payment_summary: [{method, amount}])
-  if (key === 'payment_summary' && Array.isArray(value)) {
-    if (value.length === 0) return t('audit.detail.value.none');
-    return (
-      <span className="font-mono text-xs">
-        {(value as { method: string; amount: number }[]).map((p, i) => (
-          <span key={i} className="inline-block bg-gray-100 rounded px-1.5 py-0.5 mr-1 mb-0.5">
-            {p.method} €{p.amount.toFixed(2)}
-          </span>
-        ))}
-      </span>
-    );
-  }
-
-  // 数组 (permissions 等)
-  if (Array.isArray(value)) {
-    if (value.length === 0) return t('audit.detail.value.none');
-    return (
-      <span className="font-mono text-xs">
-        {value.map((v, i) => (
-          <span key={i} className="inline-block bg-gray-100 rounded px-1 py-0.5 mr-1 mb-0.5">
-            {String(v)}
-          </span>
-        ))}
-      </span>
-    );
-  }
-
-  return String(value);
-}
-
-/**
- * 渲染审计详情 — 策略模式
- *
- * 按字段逐行展示：字段名国际化，值按语义分类渲染。
- * 枚举值翻译、时间戳格式化、金额/文件大小格式化、用户输入保持原样。
- */
-function renderAuditDetails(
-  details: Record<string, unknown> | null | undefined,
-  t: (key: string) => string,
-): React.ReactNode {
-  if (!details || typeof details !== 'object') {
-    return <span className="text-gray-400 italic">{t('audit.detail.empty')}</span>;
-  }
-
-  const entries = Object.entries(details);
-  if (entries.length === 0) {
-    return <span className="text-gray-400 italic">{t('audit.detail.empty')}</span>;
-  }
-
-  return (
-    <div className="space-y-1.5">
-      {entries.map(([key, value]) => (
-        <div key={key} className="flex items-start gap-2">
-          <span className="font-medium text-gray-500 min-w-[5rem] shrink-0">
-            {t(`audit.detail.field.${key}`) || key}:
-          </span>
-          <span className="text-gray-700 break-all">
-            {formatDetailValue(key, value, t)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export const AuditLog: React.FC = () => {
   const { t } = useI18n();
@@ -438,7 +282,10 @@ export const AuditLog: React.FC = () => {
                         <div>
                           <span className="font-semibold text-gray-500 block mb-1">{t('audit.detail.details')}:</span>
                           <div className="mt-1 p-2 bg-white rounded border border-gray-200 text-gray-600 overflow-auto max-h-40">
-                            {renderAuditDetails(item.details as Record<string, unknown>, t)}
+                            <AuditDetailsView
+                              data={renderAuditDetails(item, t)}
+                              emptyLabel={t('audit.detail.empty')}
+                            />
                           </div>
                         </div>
                         <div className="space-y-2">
