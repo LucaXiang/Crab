@@ -291,6 +291,7 @@
     }
   },
   "pos": {
+    "loading_core_data": "正在加载核心数据...",
     "search_product": "搜索商品...",
     "all_categories": "全部分类",
     "sidebar": {

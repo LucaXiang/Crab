@@ -19,7 +19,7 @@ pub(crate) use types::{ClientMode, LocalClientState, RemoteClientState};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Emitter;
-use tokio::sync::RwLock;
+use tokio::sync::{watch, RwLock};
 
 use crab_client::CrabClient;
 use edge_server::services::tenant_binding::SubscriptionStatus;
@@ -39,6 +39,8 @@ pub struct ClientBridge {
     config_path: PathBuf,
     /// Tauri AppHandle for emitting events (optional for testing)
     app_handle: Option<tauri::AppHandle>,
+    /// 初始化就绪信号 (true = restore_last_session 已完成)
+    init_ready_tx: watch::Sender<bool>,
 }
 
 impl ClientBridge {
@@ -63,12 +65,17 @@ impl ClientBridge {
         let mut tenant_manager = TenantManager::new(&tenants_path, client_name);
         tenant_manager.load_existing_tenants()?;
 
+        // Disconnected 模式无需等待 restore，直接就绪
+        let needs_restore = config.current_mode != ModeType::Disconnected;
+        let (init_ready_tx, _) = watch::channel(!needs_restore);
+
         Ok(Self {
             tenant_manager: Arc::new(RwLock::new(tenant_manager)),
             mode: RwLock::new(ClientMode::Disconnected),
             config: RwLock::new(config),
             config_path,
             app_handle,
+            init_ready_tx,
         })
     }
 
@@ -177,12 +184,14 @@ impl ClientBridge {
             }
         }
 
-        match mode {
+        let result = match mode {
             ModeType::Server => {
                 tracing::info!("Restoring Server mode...");
                 if let Err(e) = self.start_server_mode().await {
                     tracing::error!("Failed to restore Server mode: {}", e);
-                    return Err(e);
+                    Err(e)
+                } else {
+                    Ok(())
                 }
             }
             ModeType::Client => {
@@ -193,17 +202,24 @@ impl ClientBridge {
                         .await
                     {
                         tracing::error!("Failed to restore Client mode: {}", e);
-                        return Err(e);
+                        Err(e)
+                    } else {
+                        Ok(())
                     }
                 } else {
                     tracing::warn!("Client mode configured but missing client_config");
+                    Ok(())
                 }
             }
             ModeType::Disconnected => {
                 tracing::info!("Starting in Disconnected mode");
+                Ok(())
             }
-        }
-        Ok(())
+        };
+
+        // 无论成功失败，标记初始化完成，解除 get_app_state 阻塞
+        let _ = self.init_ready_tx.send(true);
+        result
     }
 
     /// 获取当前模式信息
@@ -455,6 +471,18 @@ impl ClientBridge {
 
     /// 获取应用状态 (用于前端路由守卫)
     pub async fn get_app_state(&self) -> AppState {
+        // 等待 restore_last_session 完成 (带 30s 超时兜底)
+        let mut rx = self.init_ready_tx.subscribe();
+        if tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            rx.wait_for(|&ready| ready),
+        )
+        .await
+        .is_err()
+        {
+            tracing::warn!("get_app_state: 等待初始化超时 (30s)，将返回当前不完整状态");
+        }
+
         let mode_guard = self.mode.read().await;
         let tenant_manager = self.tenant_manager.read().await;
 

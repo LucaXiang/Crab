@@ -10,9 +10,6 @@ import type {
 } from '@/core/domain/types/appState';
 import { getActivationReasonMessage } from '@/core/domain/types/appState';
 
-// Import ConnectionStatus from the hook (canonical source)
-import type { ConnectionStatus } from '@/core/hooks/useConnectionStatus';
-
 // Types matching Rust definitions
 export type ModeType = 'Server' | 'Client' | 'Disconnected';
 export type LoginMode = 'Online' | 'Offline';
@@ -140,9 +137,6 @@ export const AppStateHelpers = {
   getActivationReasonMessage,
 };
 
-// Re-export for consumers who import from this file
-export type { ConnectionStatus };
-
 export interface ModeInfo {
   mode: ModeType;
   is_connected: boolean;
@@ -211,8 +205,6 @@ interface BridgeStore {
   isFirstRun: boolean;
   isLoading: boolean;
   error: string | null;
-  connectionStatus: ConnectionStatus;
-
   // App State Actions
   fetchAppState: () => Promise<AppState | null>;
   fetchHealthStatus: () => Promise<HealthStatus | null>;
@@ -240,8 +232,6 @@ interface BridgeStore {
   logoutEmployee: () => Promise<void>;
   fetchCurrentSession: () => Promise<EmployeeSession | null>;
 
-  // Connection Status Actions
-  setConnectionStatus: (status: ConnectionStatus) => void;
 }
 
 export const useBridgeStore = create<BridgeStore>()(
@@ -255,8 +245,6 @@ export const useBridgeStore = create<BridgeStore>()(
       isFirstRun: true,
       isLoading: false,
       error: null,
-      connectionStatus: { connected: true, reconnecting: false },
-
       // App State Actions
       fetchAppState: async () => {
         try {
@@ -481,11 +469,6 @@ export const useBridgeStore = create<BridgeStore>()(
         }
       },
 
-      // ==================== Connection Status ====================
-
-      setConnectionStatus: (status: ConnectionStatus) => {
-        set({ connectionStatus: status });
-      },
     }),
     {
       name: 'bridge-storage',
@@ -519,16 +502,3 @@ export const useCanAccessPOS = () =>
 export const useRecommendedRoute = () =>
   useBridgeStore((state) => AppStateHelpers.getRouteForState(state.appState));
 
-/**
- * Selector for connection status from the bridge store.
- *
- * Note: This differs from the `useConnectionStatus` hook in @/core/hooks:
- * - The hook (`useConnectionStatus`) listens directly to Tauri events and manages local state
- * - This selector (`useBridgeConnectionStatus`) reads from the global Zustand store
- *
- * Intended usage pattern:
- * - A top-level component (e.g., App.tsx or ConnectionStatusProvider) should use the hook
- *   to listen for events and call `setConnectionStatus` to update the global store
- * - Child components can then use this selector to access the connection status
- */
-export const useBridgeConnectionStatus = () => useBridgeStore((state) => state.connectionStatus);

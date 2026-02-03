@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react';
 import { useBridgeStore } from '@/core/stores/bridge';
 import { useShiftStore } from '@/core/stores/shift';
 import { createTauriClient } from '@/infrastructure/api';
+import { toast } from '@/presentation/components/Toast';
 
 export function useShiftRecovery() {
   const recovered = useRef(false);
@@ -35,6 +36,7 @@ export function useShiftRecovery() {
         }
       } catch (err) {
         console.warn('[ShiftRecovery] 恢复僵尸班次失败:', err);
+        toast.warning('僵尸班次恢复失败，请手动检查班次状态');
       }
     };
 

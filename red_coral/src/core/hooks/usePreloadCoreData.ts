@@ -15,13 +15,14 @@ import { useZoneStore } from '@/features/zone';
 import { useTableStore } from '@/features/table';
 import { useCategoryStore } from '@/features/category';
 import { useProductStore } from '@/features/product';
+import { toast } from '@/presentation/components/Toast';
 
-// 核心资源：启动时预加载
-const CORE_STORES = [
-  useZoneStore,
-  useTableStore,
-  useCategoryStore,
-  useProductStore,
+// 核心资源：启动时预加载（带名称以便报错）
+const CORE_STORES: { name: string; fetch: () => Promise<unknown> }[] = [
+  { name: '区域', fetch: () => useZoneStore.getState().fetchAll() },
+  { name: '桌台', fetch: () => useTableStore.getState().fetchAll() },
+  { name: '分类', fetch: () => useCategoryStore.getState().fetchAll() },
+  { name: '商品', fetch: () => useProductStore.getState().fetchAll() },
 ];
 
 /**
@@ -34,17 +35,19 @@ export function usePreloadCoreData(): boolean {
 
   useEffect(() => {
     const preload = async () => {
+      const results = await Promise.allSettled(
+        CORE_STORES.map((store) => store.fetch())
+      );
 
-      try {
-        await Promise.all(
-          CORE_STORES.map((store) => store.getState().fetchAll())
-        );
-        setReady(true);
-      } catch (error) {
-        console.error('[Preload] Failed to load core data:', error);
-        // Still mark as ready to allow app to render with error state
-        setReady(true);
+      const failed = results
+        .map((r, i) => (r.status === 'rejected' ? CORE_STORES[i].name : null))
+        .filter((name): name is string => name !== null);
+
+      if (failed.length > 0) {
+        toast.error(`核心数据加载失败: ${failed.join('、')}`);
       }
+
+      setReady(true);
     };
 
     preload();

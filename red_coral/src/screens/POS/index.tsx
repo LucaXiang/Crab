@@ -36,7 +36,7 @@ import {
   useCategories,
   useProductStore,
 } from '@/core/stores/resources';
-import { usePreloadCoreData } from '@/core/hooks/usePreloadCoreData';
+import { usePreloadCoreData, useHealthCheck } from '@/core/hooks';
 import {
   useCart,
   useCartActions,
@@ -63,10 +63,6 @@ import {
 } from '@/core/stores/settings';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 
-// Services
-import { createTauriClient } from '@/infrastructure/api';
-
-const getApi = () => createTauriClient();
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 
 // Hooks
@@ -164,7 +160,7 @@ export const POSScreen: React.FC = () => {
   }, [products, categories, selectedCategory]);
 
   // Preload core resources on first mount (zones, tables, categories, products)
-  usePreloadCoreData();
+  const coreDataReady = usePreloadCoreData();
 
   // Cart Store
   const cart = useCart();
@@ -216,31 +212,7 @@ export const POSScreen: React.FC = () => {
   const selectedPrinter = useReceiptPrinter();
 
   // DB Status
-  const [isDbOnline, setIsDbOnline] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    // Skip health check in dev mode to reduce console noise
-    if (import.meta.env.DEV) {
-      setIsDbOnline(true);
-      return;
-    }
-
-    let mounted = true;
-    const check = async () => {
-      try {
-        const ok = await getApi().isAvailable();
-        if (mounted) setIsDbOnline(ok);
-      } catch {
-        if (mounted) setIsDbOnline(false);
-      }
-    };
-    check();
-    const id = setInterval(check, 5000);
-    return () => {
-      mounted = false;
-      clearInterval(id);
-    };
-  }, []);
+  const isDbOnline = useHealthCheck();
 
 
   // Custom Hooks
@@ -626,6 +598,17 @@ export const POSScreen: React.FC = () => {
     }),
     [screen, viewMode, checkoutOrder, handleCheckoutCancel, handleCheckoutComplete]
   );
+
+  if (!coreDataReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary-500/30 border-t-primary-500 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-600">{t('pos.loading_core_data')}</p>
+        </div>
+      </div>
+    );
+  }
 
 	return (
 		<div className="relative h-full w-full overflow-hidden bg-gray-100 font-sans">

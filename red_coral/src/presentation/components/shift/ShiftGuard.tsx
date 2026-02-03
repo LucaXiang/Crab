@@ -38,15 +38,17 @@ export const ShiftGuard: React.FC<ShiftGuardProps> = ({ children }) => {
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [showForceClosedDialog, setShowForceClosedDialog] = useState(false);
 
-  // 登录后检查班次状态
-  useEffect(() => {
-    const checkShift = async () => {
-      if (!user) {
-        setIsChecking(false);
-        return;
-      }
+  const [checkError, setCheckError] = useState<string | null>(null);
 
-      setIsChecking(true);
+  const checkShift = async () => {
+    if (!user) {
+      setIsChecking(false);
+      return;
+    }
+
+    setCheckError(null);
+    setIsChecking(true);
+    try {
       const shift = await fetchCurrentShift(user.id);
       setIsChecking(false);
 
@@ -55,8 +57,15 @@ export const ShiftGuard: React.FC<ShiftGuardProps> = ({ children }) => {
       if (!shift && !useShiftStore.getState().forceClosedMessage) {
         setShowOpenModal(true);
       }
-    };
+    } catch (err) {
+      console.error('[ShiftGuard] 班次检查失败:', err);
+      setCheckError(err instanceof Error ? err.message : '班次状态检查失败');
+      setIsChecking(false);
+    }
+  };
 
+  // 登录后检查班次状态
+  useEffect(() => {
     checkShift();
   }, [user, fetchCurrentShift]);
 
@@ -103,6 +112,29 @@ export const ShiftGuard: React.FC<ShiftGuardProps> = ({ children }) => {
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-3" />
           <p className="text-gray-600">{t('settings.shift.checking')}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 检查失败显示重试
+  if (checkError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md px-6">
+          <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="text-red-500" size={24} />
+          </div>
+          <h3 className="text-lg font-bold text-gray-800 mb-2">
+            {t('settings.shift.checking')}
+          </h3>
+          <p className="text-sm text-gray-600 mb-6">{checkError}</p>
+          <button
+            onClick={() => checkShift()}
+            className="px-6 py-2.5 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-colors"
+          >
+            {t('common.action.retry')}
+          </button>
         </div>
       </div>
     );
