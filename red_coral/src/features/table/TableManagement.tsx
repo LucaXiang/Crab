@@ -185,7 +185,6 @@ interface TableItem {
   name: string;
   zone?: string;
   capacity?: number;
-  seats?: number;
 }
 
 interface TableManagementProps {

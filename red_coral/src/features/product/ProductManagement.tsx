@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Utensils, Plus, Filter, Search, ListChecks, Edit3, Trash2, Settings } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
-import { Permission, PrintState } from '@/core/domain/types';
+import { Permission, PrintState, EmbeddedSpec } from '@/core/domain/types';
 import { useCanDeleteProduct, useCanUpdateProduct } from '@/hooks/usePermission';
 import {
   useSettingsModal,
@@ -31,12 +31,12 @@ interface ProductItem {
   receipt_name?: string | null;
   sort_order?: number;
   tax_rate?: number;
-  kitchen_printer?: string | null;
   kitchen_print_name?: string | null;
   is_kitchen_print_enabled?: PrintState;
   is_label_print_enabled?: PrintState;
   is_active?: boolean;
-  has_multi_spec?: boolean;
+  external_id?: number | null;
+  specs?: EmbeddedSpec[];
 }
 
 export const ProductManagement: React.FC = React.memo(() => {
@@ -164,9 +164,60 @@ export const ProductManagement: React.FC = React.memo(() => {
       },
       // Note: Price is in ProductSpecification, not Product. Price column removed.
       {
+        key: 'external_id',
+        header: t('settings.product.form.external_id'),
+        width: '90px',
+        render: (item) => (
+          <span className="text-xs font-mono text-gray-500">
+            {item.external_id ?? '-'}
+          </span>
+        ),
+      },
+      {
+        key: 'price',
+        header: t('settings.product.form.price'),
+        width: '100px',
+        render: (item) => {
+          // 从 specs 中找到默认规格的价格
+          const defaultSpec = item.specs?.find(s => s.is_default || s.is_root) ?? item.specs?.[0];
+          const price = defaultSpec?.price ?? 0;
+          return (
+            <span className="text-sm font-medium text-gray-700">
+              {formatCurrency(price)}
+            </span>
+          );
+        },
+      },
+      {
+        key: 'tax_rate',
+        header: t('settings.product.form.tax_rate'),
+        width: '90px',
+        render: (item) => (
+          <span className="text-xs text-gray-600">
+            {item.tax_rate ?? 0}%
+          </span>
+        ),
+      },
+      {
+        key: 'is_active',
+        header: t('common.label.status'),
+        width: '90px',
+        render: (item) => (
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+              item.is_active !== false
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-gray-100 text-gray-500'
+            }`}
+          >
+            {item.is_active !== false ? t('common.status.enabled') : t('common.status.disabled')}
+          </span>
+        ),
+      },
+      {
         key: 'kitchenPrinting',
         header: t('settings.product.print.kitchen_printing'),
-        width: '120px',
+        width: '110px',
         render: (item) => {
           const isDefault =
             item.is_kitchen_print_enabled === undefined || item.is_kitchen_print_enabled === null || item.is_kitchen_print_enabled === -1;
@@ -195,7 +246,7 @@ export const ProductManagement: React.FC = React.memo(() => {
       {
         key: 'labelPrinting',
         header: t('settings.product.print.label_printing'),
-        width: '120px',
+        width: '110px',
         render: (item) => {
           const isDefault =
             item.is_label_print_enabled === undefined || item.is_label_print_enabled === null || item.is_label_print_enabled === -1;
@@ -224,7 +275,7 @@ export const ProductManagement: React.FC = React.memo(() => {
       {
         key: 'category',
         header: t('settings.product.header.category'),
-        width: '140px',
+        width: '120px',
         render: (item) => {
           const categoryName = categories.find(c => String(c.id) === String(item.category))?.name || item.category;
           return (
@@ -237,7 +288,7 @@ export const ProductManagement: React.FC = React.memo(() => {
       {
         key: 'actions',
         header: t('settings.common.actions'),
-        width: '140px',
+        width: '150px',
         align: 'right',
         render: (item) => (
           <div className="flex items-center justify-end gap-1">
