@@ -532,7 +532,7 @@ impl CatalogService {
         if let Some(v) = data.external_id { query = query.bind(("external_id", v)); }
         if let Some(v) = data.tags { query = query.bind(("tags", v)); }
         if let Some(v) = data.specs {
-            query = query.bind(("specs", serde_json::to_value(&v).unwrap_or_default()));
+            query = query.bind(("specs", serde_json::to_value(&v).map_err(|e| RepoError::Database(format!("Failed to serialize specs: {e}")))?));
         }
 
         let mut result = query.await?;

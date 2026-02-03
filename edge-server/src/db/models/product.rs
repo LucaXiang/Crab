@@ -110,8 +110,6 @@ pub struct ProductCreate {
     pub image: Option<String>,
     #[serde(with = "serde_helpers::record_id")]
     pub category: RecordId,
-    /// Price in currency unit (e.g., 10.50 = ¥10.50)
-    pub price: Option<f64>,
     pub sort_order: Option<i32>,
     pub tax_rate: Option<i32>,
     pub receipt_name: Option<String>,

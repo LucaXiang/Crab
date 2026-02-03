@@ -47,10 +47,6 @@ pub enum DataIntent {
     Tag(CrudAction<TagDto, TagUpdateDto>),
     /// 分类
     Category(CrudAction<CategoryDto, CategoryUpdateDto>),
-    /// 商品
-    Product(CrudAction<ProductDto, ProductUpdateDto>),
-    /// 商品规格
-    ProductSpecification(CrudAction<ProductSpecDto, ProductSpecUpdateDto>),
     /// 属性
     Attribute(CrudAction<AttributeDto, AttributeUpdateDto>),
 

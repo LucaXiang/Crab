@@ -24,6 +24,7 @@ async fn check_duplicate_external_id(
 ) -> AppResult<bool> {
     #[derive(serde::Deserialize)]
     struct Found {
+        #[allow(dead_code)]
         id: surrealdb::RecordId,
     }
 
