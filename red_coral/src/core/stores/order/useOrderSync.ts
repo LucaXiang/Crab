@@ -40,8 +40,8 @@ const BACKOFF_MULTIPLIER = 1.5;      // Multiply by 1.5 each attempt
 const BACKOFF_MAX_DELAY = 30000;     // Cap at 30 seconds
 const BACKOFF_JITTER = 0.1;          // Add 10% random jitter
 
-/** Maximum reconnection attempts */
-const MAX_RECONNECT_ATTEMPTS = 10;   // Increased due to exponential backoff
+/** Maximum reconnection attempts (0 = unlimited) */
+const MAX_RECONNECT_ATTEMPTS = 50;   // 局域网场景需足够长以覆盖路由器重启
 
 /**
  * Calculate exponential backoff delay with jitter

@@ -35,8 +35,8 @@ const MAX_RETRY_COUNT: u32 = 3;
 const RETRY_BASE_DELAY_SECS: u64 = 5;
 const RETRY_MAX_DELAY_SECS: u64 = 60; // 1 minute max
 const QUEUE_SCAN_INTERVAL_SECS: u64 = 60;
-/// 并发归档数量
-const ARCHIVE_CONCURRENCY: usize = 50;
+/// 并发归档数量（单店场景 10 即可，避免 SurrealDB 连接压力）
+const ARCHIVE_CONCURRENCY: usize = 10;
 
 /// Worker for processing archive queue (支持并发归档)
 ///

@@ -2317,11 +2317,11 @@ impl ClientBridge {
 /// bridge 层会调用此函数进行更高层级的重建：销毁旧 client，重新执行
 /// `start_client_mode` 建立全新连接。
 ///
-/// - 最多 3 次重建，每次间隔指数退避 (5s → 10s → 20s)
-/// - 每次重建内部 CrabClient 会再尝试 20 次网络重连
+/// - 最多 5 次重建，每次间隔指数退避 (5s → 10s → 20s → 40s → 80s)
+/// - 每次重建内部 CrabClient 会持续网络重连
 /// - 全部失败后切换到 `ClientMode::Disconnected`，通知前端
 async fn do_rebuild_connection(bridge: Arc<ClientBridge>, app_handle: tauri::AppHandle) {
-    const MAX_REBUILDS: u32 = 3;
+    const MAX_REBUILDS: u32 = 5;
     let base_delay = std::time::Duration::from_secs(5);
     let mut delay = base_delay;
 
