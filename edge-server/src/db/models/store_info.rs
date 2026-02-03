@@ -32,7 +32,7 @@ pub struct StoreInfo {
     pub website: Option<String>,
     /// 营业日分界时间 (HH:MM 格式，如 "06:00")
     /// 用于跨天班次判断和日结报告计算
-    /// 默认 "00:00" (午夜)，酒吧/夜店可设置为 "06:00"
+    /// 默认 "02:00" (凌晨两点)，酒吧/夜店可设置为 "06:00"
     #[serde(default = "default_business_day_cutoff", deserialize_with = "deserialize_business_day_cutoff")]
     pub business_day_cutoff: String,
     /// 创建时间
@@ -42,7 +42,7 @@ pub struct StoreInfo {
 }
 
 fn default_business_day_cutoff() -> String {
-    "00:00".to_string()
+    "02:00".to_string()
 }
 
 fn deserialize_business_day_cutoff<'de, D>(deserializer: D) -> Result<String, D::Error>

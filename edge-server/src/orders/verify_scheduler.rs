@@ -369,7 +369,7 @@ impl VerifyScheduler {
             .ok()
             .flatten()
             .map(|s| s.business_day_cutoff)
-            .unwrap_or_else(|| "00:00".to_string());
+            .unwrap_or_else(|| "02:00".to_string());
         time::parse_cutoff(&cutoff_str)
     }
 

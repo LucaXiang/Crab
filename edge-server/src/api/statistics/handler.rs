@@ -203,7 +203,7 @@ pub async fn get_statistics(
         .ok()
         .flatten()
         .map(|s| s.business_day_cutoff)
-        .unwrap_or_else(|| "00:00".to_string());
+        .unwrap_or_else(|| "02:00".to_string());
 
     let (start_dt, end_dt) = calculate_time_range(
         &query.time_range,
@@ -434,7 +434,7 @@ pub async fn get_sales_report(
         .ok()
         .flatten()
         .map(|s| s.business_day_cutoff)
-        .unwrap_or_else(|| "00:00".to_string());
+        .unwrap_or_else(|| "02:00".to_string());
 
     let (start_dt, end_dt) = calculate_time_range(
         &query.time_range,

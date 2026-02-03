@@ -50,7 +50,7 @@ pub async fn verify_daily_chain(
         .ok()
         .flatten()
         .map(|s| s.business_day_cutoff)
-        .unwrap_or_else(|| "00:00".to_string());
+        .unwrap_or_else(|| "02:00".to_string());
 
     // 营业日结束 = 下一天的 cutoff
     let parsed_date = time::parse_date(&date)?;

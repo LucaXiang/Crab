@@ -7,6 +7,8 @@ use chrono::NaiveTime;
 use chrono_tz::Tz;
 use tokio_util::sync::CancellationToken;
 
+use crate::audit::types::AuditAction;
+use crate::audit_log;
 use crate::core::ServerState;
 use crate::db::repository::{ShiftRepository, StoreInfoRepository};
 use crate::utils::time;
@@ -79,6 +81,19 @@ impl ShiftAutoCloseScheduler {
                         .as_ref()
                         .map(|id| id.to_string())
                         .unwrap_or_default();
+
+                    audit_log!(
+                        self.state.audit_service,
+                        AuditAction::ShiftClosed,
+                        "shift", &id,
+                        details = serde_json::json!({
+                            "auto_close": true,
+                            "starting_cash": shift.starting_cash,
+                            "expected_cash": shift.expected_cash,
+                            "operator_name": shift.operator_name,
+                        })
+                    );
+
                     self.state
                         .broadcast_sync(RESOURCE, "recovered", &id, Some(shift))
                         .await;
@@ -99,7 +114,7 @@ impl ShiftAutoCloseScheduler {
             .ok()
             .flatten()
             .map(|s| s.business_day_cutoff)
-            .unwrap_or_else(|| "00:00".to_string());
+            .unwrap_or_else(|| "02:00".to_string());
 
         time::parse_cutoff(&cutoff_str)
     }

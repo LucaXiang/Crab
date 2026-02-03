@@ -237,7 +237,7 @@ pub async fn recover_stale(
         .ok()
         .flatten()
         .map(|s| s.business_day_cutoff)
-        .unwrap_or_else(|| "00:00".to_string());
+        .unwrap_or_else(|| "02:00".to_string());
 
     let cutoff = time::parse_cutoff(&cutoff_str);
     let today = time::current_business_date(cutoff, tz);
@@ -249,13 +249,26 @@ pub async fn recover_stale(
         .await
         ?;
 
-    // 广播每个恢复的班次
+    // 审计 + 广播每个恢复的班次
     for shift in &recovered {
         let id = shift
             .id
             .as_ref()
             .map(|id| id.to_string())
             .unwrap_or_default();
+
+        audit_log!(
+            state.audit_service,
+            AuditAction::ShiftClosed,
+            "shift", &id,
+            details = serde_json::json!({
+                "auto_close": true,
+                "starting_cash": shift.starting_cash,
+                "expected_cash": shift.expected_cash,
+                "operator_name": shift.operator_name,
+            })
+        );
+
         state
             .broadcast_sync(RESOURCE, "recovered", &id, Some(shift))
             .await;
