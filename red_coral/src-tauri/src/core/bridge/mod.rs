@@ -19,7 +19,7 @@ pub(crate) use types::{ClientMode, LocalClientState, RemoteClientState};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Emitter;
-use tokio::sync::{watch, RwLock};
+use tokio::sync::RwLock;
 
 use crab_client::CrabClient;
 use edge_server::services::tenant_binding::SubscriptionStatus;
@@ -39,8 +39,6 @@ pub struct ClientBridge {
     config_path: PathBuf,
     /// Tauri AppHandle for emitting events (optional for testing)
     app_handle: Option<tauri::AppHandle>,
-    /// 初始化就绪信号 (true = restore_last_session 已完成)
-    init_ready_tx: watch::Sender<bool>,
 }
 
 impl ClientBridge {
@@ -65,17 +63,12 @@ impl ClientBridge {
         let mut tenant_manager = TenantManager::new(&tenants_path, client_name);
         tenant_manager.load_existing_tenants()?;
 
-        // Disconnected 模式无需等待 restore，直接就绪
-        let needs_restore = config.current_mode != ModeType::Disconnected;
-        let (init_ready_tx, _) = watch::channel(!needs_restore);
-
         Ok(Self {
             tenant_manager: Arc::new(RwLock::new(tenant_manager)),
             mode: RwLock::new(ClientMode::Disconnected),
             config: RwLock::new(config),
             config_path,
             app_handle,
-            init_ready_tx,
         })
     }
 
@@ -217,8 +210,6 @@ impl ClientBridge {
             }
         };
 
-        // 无论成功失败，标记初始化完成，解除 get_app_state 阻塞
-        let _ = self.init_ready_tx.send(true);
         result
     }
 
@@ -471,18 +462,6 @@ impl ClientBridge {
 
     /// 获取应用状态 (用于前端路由守卫)
     pub async fn get_app_state(&self) -> AppState {
-        // 等待 restore_last_session 完成 (带 30s 超时兜底)
-        let mut rx = self.init_ready_tx.subscribe();
-        if tokio::time::timeout(
-            std::time::Duration::from_secs(30),
-            rx.wait_for(|&ready| ready),
-        )
-        .await
-        .is_err()
-        {
-            tracing::warn!("get_app_state: 等待初始化超时 (30s)，将返回当前不完整状态");
-        }
-
         let mode_guard = self.mode.read().await;
         let tenant_manager = self.tenant_manager.read().await;
 
@@ -536,7 +515,8 @@ impl ClientBridge {
 
                 if let Some(_cred) = credential {
                     // 订阅阻止检查 (统一使用 edge-server 判断，包含签名陈旧检查)
-                    if let Some(info) = server_state.get_subscription_blocked_info().await {
+                    let blocked_info = server_state.get_subscription_blocked_info().await;
+                    if let Some(info) = blocked_info {
                         AppState::ServerSubscriptionBlocked { info }
                     } else {
                         // 2. 检查员工登录状态
@@ -808,7 +788,9 @@ impl ClientBridge {
     ///
     /// 如果已经在 Server 模式，直接返回成功（幂等操作）
     pub async fn start_server_mode(&self) -> Result<(), BridgeError> {
+        tracing::info!("[start_server_mode] Acquiring mode write lock...");
         let mut mode_guard = self.mode.write().await;
+        tracing::info!("[start_server_mode] Mode write lock acquired");
 
         // 如果已经在 Server 模式，直接返回成功
         if matches!(&*mode_guard, ClientMode::Server { .. }) {
@@ -846,7 +828,9 @@ impl ClientBridge {
             .message_tcp_port(server_config.message_port)
             .build();
 
+        tracing::info!("[start_server_mode] Initializing ServerState...");
         let server_state = edge_server::ServerState::initialize(&edge_config).await;
+        tracing::info!("[start_server_mode] ServerState initialized");
 
         let server_instance =
             edge_server::Server::with_state(edge_config.clone(), server_state.clone());
@@ -864,7 +848,10 @@ impl ClientBridge {
         let router = state_arc
             .https_service()
             .router()
-            .ok_or_else(|| BridgeError::Server("Router not initialized".to_string()))?;
+            .ok_or_else(|| {
+                tracing::error!("[start_server_mode] Router is None! This should not happen.");
+                BridgeError::Server("Router not initialized".to_string())
+            })?;
 
         let message_bus = state_arc.message_bus();
         let client_tx = message_bus.sender_to_server().clone();
@@ -925,11 +912,13 @@ impl ClientBridge {
             None
         };
 
+        tracing::info!("[start_server_mode] Building CrabClient...");
         let client = CrabClient::local()
             .with_router(router)
             .with_message_channels(client_tx, server_tx)
             .build()?;
 
+        tracing::info!("[start_server_mode] Connecting CrabClient...");
         let connected_client = client.connect().await?;
 
         tracing::info!(
@@ -938,11 +927,13 @@ impl ClientBridge {
         );
 
         // 尝试加载缓存的员工会话
+        tracing::info!("[start_server_mode] Loading cached session...");
         let tenant_manager_read = self.tenant_manager.read().await;
         let cached_session = tenant_manager_read.load_current_session().ok().flatten();
         drop(tenant_manager_read);
 
         let client_state = if let Some(session) = cached_session {
+            tracing::info!("[start_server_mode] Restoring session for user: {}", session.username);
             match connected_client
                 .restore_session(session.token.clone(), session.user_info.clone())
                 .await
@@ -992,6 +983,7 @@ impl ClientBridge {
         }
         self.save_config().await?;
 
+        tracing::info!("[start_server_mode] ✅ Server mode started successfully");
         Ok(())
     }
 

@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useBridgeStore, AppStateHelpers } from '@/core/stores/bridge';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
-import { useSyncListener, useOrderEventListener, useOrderTimelineSync, useSyncConnection, useShiftRecovery, useSystemIssueGuard } from '@/core/hooks';
+import { useSyncListener, useOrderEventListener, useOrderTimelineSync, useSyncConnection, useSystemIssueGuard } from '@/core/hooks';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
@@ -48,12 +48,7 @@ const InitialRoute: React.FC = () => {
       // 2. 获取当前应用状态
       await fetchAppState();
 
-      // 3. 如果状态是 Uninitialized 且有租户，说明后端已启动但模式未选择
-      // 不再自动启动 Server 模式，让用户通过 Setup 页面选择
-      // 后端的 restore_last_session 会根据 config.current_mode 自动恢复
-
-      // 4. 尝试恢复缓存的员工会话 (从后端获取)
-      // 并同步 auth store（以后端为唯一认证状态来源）
+      // 3. 尝试恢复缓存的员工会话 (从后端获取)
       const currentAppState = useBridgeStore.getState().appState;
       if (currentAppState?.type === 'ServerAuthenticated' || currentAppState?.type === 'ClientAuthenticated') {
         const session = await fetchCurrentSession();
@@ -137,8 +132,8 @@ const App: React.FC = () => {
   useOrderEventListener();
   useOrderTimelineSync();
 
-  // 启动时自动恢复跨营业日的僵尸班次
-  useShiftRecovery();
+  // 注意: 跨营业日僵尸班次恢复已移至 ShiftGuard 组件内部
+  // 确保在检查班次状态前先执行恢复，避免竞态条件
 
   // System issue guard (Server 模式: 登录后检查 pending issues)
   const { currentIssue, resolveIssue } = useSystemIssueGuard();
