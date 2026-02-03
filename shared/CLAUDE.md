@@ -47,15 +47,10 @@ src/
 ├── message/        # 消息总线协议
 │   ├── mod.rs          # Message<T>, EventType, BusMessage
 │   └── payload.rs      # Notification, ServerCommand, SyncPayload, Response
-├── intent/         # DataIntent 分发模式 (CRUD 操作)
-│   ├── mod.rs          # CrudAction<C,U>, DataIntent
-│   ├── query.rs        # 查询类型
-│   └── dto.rs          # DTO 类型
 ├── activation.rs   # 激活协议 (ActivationResponse, SignedBinding, SubscriptionInfo)
 ├── app_state.rs    # 应用状态 (HealthStatus, ActivationProgress, SubscriptionBlocked)
 ├── client.rs       # 客户端类型
 ├── request.rs      # 请求类型
-├── response.rs     # ApiResponse, PaginatedResponse
 ├── types.rs        # 通用类型 (UserRole, Permission, Timestamp=i64)
 └── util.rs         # 工具函数
 ```
@@ -81,11 +76,12 @@ src/
 
 **OrderCommand** → `OrderCommandPayload`:
 - 生命周期: OpenTable, CompleteOrder, VoidOrder
-- 商品: AddItems, ModifyItem, RemoveItem, RestoreItem
+- 商品: AddItems, ModifyItem, RemoveItem, RestoreItem, CompItem, UncompItem
 - 支付: AddPayment, CancelPayment
 - 拆分: SplitByItems, SplitByAmount, StartAaSplit, PayAaSplit
 - 桌台: MoveOrder, MergeOrders
-- 其他: UpdateOrderInfo, ToggleRuleSkip
+- 整单调价: ApplyOrderDiscount, ApplyOrderSurcharge
+- 其他: UpdateOrderInfo, AddOrderNote, ToggleRuleSkip
 
 **OrderEvent** → `OrderEventType` + `EventPayload`:
 - 每个事件有 `event_id`, `sequence` (服务端严格有序), `timestamp` (服务端权威)

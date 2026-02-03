@@ -7,7 +7,6 @@ pub mod activation;
 pub mod app_state;
 pub mod client;
 pub mod error;
-pub mod intent;
 pub mod message;
 pub mod models;
 pub mod order;
@@ -22,9 +21,6 @@ pub use serde::{Deserialize, Serialize};
 
 // Message bus re-exports (for convenient access)
 pub use message::{BusMessage, EventType};
-
-// Intent re-exports (for DataIntent dispatch pattern)
-pub use intent::{CrudAction, DataIntent, DataResult, PaginatedResponse, QueryRequest};
 
 // Unified error system re-exports
 pub use error::{ApiResponse as UnifiedApiResponse, AppError, AppResult, ErrorCategory, ErrorCode};

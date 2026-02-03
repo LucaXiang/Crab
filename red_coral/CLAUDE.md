@@ -69,6 +69,18 @@ src/
 │   └── services/               # 业务服务
 │       ├── order/paymentService.ts  # 支付处理
 │       └── imageCache.ts            # 图片缓存
+├── hooks/                  # 页面级 hooks
+│   ├── useConfirm.ts          # 确认弹窗
+│   ├── useDraftHandlers.ts    # 草稿操作
+│   ├── useFormInitialization.ts # 表单初始化
+│   ├── useHistoryOrderDetail.ts # 历史订单详情
+│   ├── useHistoryOrderList.ts   # 历史订单列表
+│   ├── useI18n.ts             # 国际化
+│   ├── useLongPress.ts        # 长按手势
+│   ├── useOrderHandlers.ts    # 订单操作
+│   ├── usePermission.ts       # 权限查询
+│   ├── usePriceInput.ts       # 价格输入
+│   └── useRetailOrderRecovery.ts # 零售订单恢复
 ├── features/               # 功能模块 (插件式组织)
 │   ├── product/            # 商品管理
 │   ├── category/           # 分类管理
@@ -90,7 +102,7 @@ src/
 │   ├── Settings/           # 管理设置 (商品、分类、打印机、语言等)
 │   ├── History/            # 订单历史 (归档查看 + Timeline)
 │   ├── TableSelection/     # 桌台/客数选择
-│   ├── Checkout/           # 结账支付 (多支付方式, 拆单)
+│   ├── Checkout/           # 结账支付 (多支付方式, 拆单, components/, payment/)
 │   ├── TenantSelect/       # 多租户选择
 │   ├── Status/             # 状态页 (ActivationRequired, SubscriptionBlocked)
 │   └── Debug/              # 调试页面
@@ -104,14 +116,18 @@ src/
 │       └── ui/             # 基础 UI (Numpad, IconBtn 等)
 ├── shared/                 # 共享组件
 │   └── components/
-│       ├── DataTable/      # 通用数据表格
-│       ├── FormField/      # 表单字段
-│       ├── Timeline/       # 订单事件时间线
-│       └── ConfirmDialog/  # 确认对话框
+│       ├── DataTable/          # 通用数据表格
+│       ├── FormField/          # 表单字段 (含 SelectField, KitchenPrinterSelector)
+│       ├── Timeline/           # 订单事件时间线
+│       ├── ConfirmDialog/      # 确认对话框
+│       ├── DeleteConfirmation/ # 删除确认
+│       ├── FilterBar/          # 过滤栏
+│       └── GroupedOptionsList.tsx # 分组选项列表
 ├── infrastructure/         # 基础设施
 │   ├── api/tauri-client.ts # Tauri 命令调用层
 │   ├── i18n/               # 国际化 (zh-CN)
-│   └── print/              # 打印服务
+│   ├── print/              # 打印服务
+│   └── label/              # 标签打印服务
 ├── utils/                  # 工具函数
 │   ├── currency/           # Currency 类 (decimal.js 封装)
 │   ├── error/              # friendlyError (错误码→用户消息)
@@ -129,13 +145,15 @@ src-tauri/src/
 │   │   ├── mod.rs          # 模式切换 + 生命周期
 │   │   ├── types.rs        # AppState 枚举
 │   │   └── config.rs       # Server/Client 配置
+│   ├── response.rs         # ApiResponse 类型定义
 │   ├── tenant_manager.rs   # 多租户证书/会话管理
 │   ├── session_cache.rs    # 员工会话缓存 (离线登录)
 │   ├── image_cache.rs      # 图片缓存
 │   └── paths.rs            # 数据路径工具
-├── commands/               # Tauri 命令处理器 (18 模块)
+├── commands/               # Tauri 命令处理器 (16 模块)
 │   ├── auth.rs             # 员工登录/登出
 │   ├── order_es.rs         # 事件溯源命令
+│   ├── orders.rs           # 订单查询 (归档历史)
 │   ├── sync.rs             # 实时同步订阅
 │   ├── shift.rs            # 班次操作
 │   ├── data.rs             # 资源 CRUD
@@ -143,6 +161,11 @@ src-tauri/src/
 │   ├── mode.rs             # Server/Client 模式切换
 │   ├── tenant.rs           # 租户管理
 │   ├── health.rs           # 健康检查
+│   ├── image.rs            # 图片上传/管理
+│   ├── printer.rs          # 打印机管理
+│   ├── location.rs         # 定位服务
+│   ├── backup.rs           # 备份/恢复
+│   ├── system.rs           # 系统操作
 │   └── api.rs              # 通用 API 透传
 └── utils/
     ├── receipt_renderer.rs # 收据渲染
