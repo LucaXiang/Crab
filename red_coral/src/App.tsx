@@ -25,22 +25,23 @@ import { ActivateScreen } from '@/screens/Activate';
 import { OrderDebug } from '@/screens/Debug';
 import { ActivationRequiredScreen, SubscriptionBlockedScreen } from '@/screens/Status';
 
-// Initial route component that handles first-run detection and mode auto-start
-// 使用新的 AppState 状态机进行路由决策
-// 参考设计文档: docs/plans/2026-01-18-application-state-machine.md
-const InitialRoute: React.FC = () => {
-  const {
-    appState,
-    fetchTenants,
-    fetchAppState,
-    fetchCurrentSession,
-  } = useBridgeStore();
-  const [isChecking, setIsChecking] = useState(true);
+/**
+ * 全局初始化状态 hook
+ *
+ * 在 App 级别运行，确保在渲染任何路由前完成：
+ * 1. 获取租户列表
+ * 2. 获取应用状态
+ * 3. 恢复员工会话 (如果已认证)
+ *
+ * 这样无论用户刷新哪个页面，session 都会被正确恢复。
+ */
+const useAppInitialization = () => {
+  const { fetchTenants, fetchAppState, fetchCurrentSession } = useBridgeStore();
+  const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const init = async () => {
     setError(null);
-    setIsChecking(true);
     try {
       // 1. 获取租户列表
       await fetchTenants();
@@ -74,11 +75,10 @@ const InitialRoute: React.FC = () => {
         useAuthStore.getState().logout();
       }
 
-      setIsChecking(false);
+      setIsInitialized(true);
     } catch (err) {
-      console.error('[InitialRoute] 初始化失败:', err);
+      console.error('[AppInit] 初始化失败:', err);
       setError(err instanceof Error ? err.message : '初始化失败，无法连接后端服务');
-      setIsChecking(false);
     }
   };
 
@@ -86,35 +86,14 @@ const InitialRoute: React.FC = () => {
     init();
   }, [fetchTenants, fetchAppState, fetchCurrentSession]);
 
-  if (isChecking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-4 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
-      </div>
-    );
-  }
+  return { isInitialized, error, retry: init };
+};
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center max-w-md px-6">
-          <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-bold text-gray-800 mb-2">初始化失败</h3>
-          <p className="text-sm text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={() => init()}
-            className="px-6 py-2.5 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-colors"
-          >
-            重试
-          </button>
-        </div>
-      </div>
-    );
-  }
+// Initial route component - 已初始化完成，只做路由决策
+// 使用新的 AppState 状态机进行路由决策
+// 参考设计文档: docs/plans/2026-01-18-application-state-machine.md
+const InitialRoute: React.FC = () => {
+  const appState = useBridgeStore((state) => state.appState);
 
   // 使用 AppStateHelpers 确定路由
   const targetRoute = AppStateHelpers.getRouteForState(appState);
@@ -124,6 +103,9 @@ const InitialRoute: React.FC = () => {
 const App: React.FC = () => {
   const performanceMode = useSettingsStore((state) => state.performanceMode);
 
+  // 全局初始化：在渲染路由前恢复 session
+  const { isInitialized, error, retry } = useAppInitialization();
+
   // 挂载同步相关 hooks
   useSyncListener();
   useSyncConnection();
@@ -131,9 +113,6 @@ const App: React.FC = () => {
   // 挂载订单事件监听 hook (Event Sourcing)
   useOrderEventListener();
   useOrderTimelineSync();
-
-  // 注意: 跨营业日僵尸班次恢复已移至 ShiftGuard 组件内部
-  // 确保在检查班次状态前先执行恢复，避免竞态条件
 
   // System issue guard (Server 模式: 登录后检查 pending issues)
   const { currentIssue, resolveIssue } = useSystemIssueGuard();
@@ -193,7 +172,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Disable browser default shortcuts and interactions
+  // Disable browser default shortcuts and interactions (生产环境)
   useEffect(() => {
     if (!import.meta.env.PROD) {
       return undefined;
@@ -290,6 +269,37 @@ const App: React.FC = () => {
         window.removeEventListener('contextmenu', handleContextMenu);
       };
   }, []);
+
+  // 初始化未完成时显示 loading
+  if (!isInitialized) {
+    if (error) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center max-w-md px-6">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">初始化失败</h3>
+            <p className="text-sm text-gray-600 mb-6">{error}</p>
+            <button
+              onClick={retry}
+              className="px-6 py-2.5 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-colors"
+            >
+              重试
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-4 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>

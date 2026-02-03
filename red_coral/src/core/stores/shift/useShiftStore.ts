@@ -25,6 +25,9 @@ interface ShiftStore {
   // 异常关闭通知消息 (显示后自动清除)
   forceClosedMessage: string | null;
 
+  // 过期班次 (跨营业日未结班次，需要先强制关闭)
+  staleShift: Shift | null;
+
   // Actions
   fetchCurrentShift: (operatorId: string) => Promise<Shift | null>;
   openShift: (data: ShiftCreate) => Promise<Shift>;
@@ -33,6 +36,7 @@ interface ShiftStore {
   clearShift: () => void;
   setNeedsOpenShift: (needs: boolean) => void;
   setForceClosedMessage: (message: string | null) => void;
+  setStaleShift: (shift: Shift | null) => void;
 }
 
 export const useShiftStore = create<ShiftStore>((set, get) => ({
@@ -42,6 +46,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
   error: null,
   needsOpenShift: false,
   forceClosedMessage: null,
+  staleShift: null,
 
   /**
    * Fetch current open shift for operator
@@ -134,7 +139,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
    * Clear shift state (on logout)
    */
   clearShift: () => {
-    set({ currentShift: null, needsOpenShift: false, forceClosedMessage: null, error: null });
+    set({ currentShift: null, needsOpenShift: false, forceClosedMessage: null, staleShift: null, error: null });
   },
 
   /**
@@ -149,6 +154,13 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
    */
   setForceClosedMessage: (message: string | null) => {
     set({ forceClosedMessage: message });
+  },
+
+  /**
+   * Set stale shift (跨营业日未结班次)
+   */
+  setStaleShift: (shift: Shift | null) => {
+    set({ staleShift: shift });
   },
 }));
 

@@ -13,11 +13,13 @@ import { useEffect } from 'react';
 import { invokeApi } from '@/infrastructure/api';
 import { storeRegistry } from '@/core/stores/resources/registry';
 import { useActiveOrdersStore } from '@/core/stores/order/useActiveOrdersStore';
+import { useShiftStore } from '@/core/stores/shift';
 import type { SyncResponse } from '@/core/domain/types/orderEvent';
+import type { Shift } from '@/core/domain/types/api';
 
 interface SyncPayload {
   resource: string;
-  action: 'created' | 'updated' | 'deleted';
+  action: 'created' | 'updated' | 'deleted' | 'settlement_required';
   id: string;
   version: number;
   data: unknown | null;
@@ -161,7 +163,19 @@ export function useSyncListener() {
       // 常规资源同步
       const payload = message.payload as SyncPayload;
       const { resource, id, version, action, data } = payload;
-      console.log(`[SyncListener] Received sync event: resource=${resource}, id=${id}, version=${version}`);
+      console.log(`[SyncListener] Received sync event: resource=${resource}, action=${action}, id=${id}`);
+
+      // 特殊处理: shift settlement_required - 跨营业日班次需要结算
+      // 此时班次还未关闭，需要用户手动强制关闭
+      if (resource === 'shift' && action === 'settlement_required') {
+        console.log('[SyncListener] Shift settlement required, notifying ShiftGuard');
+        const shiftData = data as Shift | null;
+        if (shiftData) {
+          // 保存过期班次信息，ShiftGuard 会显示强制关闭弹窗
+          useShiftStore.getState().setStaleShift(shiftData);
+        }
+        return;
+      }
 
       // 特殊处理: order_sync - 包含 event (时间线) + snapshot (状态)
       if (resource === 'order_sync') {
@@ -176,12 +190,12 @@ export function useSyncListener() {
         return;
       }
 
-      // 调用 resources store 的 applySync（传入完整 payload）
+      // 调用 resources store 的 applySync（只处理标准 CRUD 操作）
       const store = storeRegistry[resource];
-      if (store) {
+      if (store && (action === 'created' || action === 'updated' || action === 'deleted')) {
         console.log(`[SyncListener] Found store for ${resource}, calling applySync`);
         store.getState().applySync({ id, version, action, data });
-      } else {
+      } else if (!store) {
         console.warn(`[SyncListener] No store found for resource: ${resource}`);
       }
 

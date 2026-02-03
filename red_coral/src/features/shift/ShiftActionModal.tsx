@@ -117,7 +117,6 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
           operator_id: user.id,
           operator_name: user.display_name,
           starting_cash: cashAmount,
-          note: note || undefined,
         });
         toast.success(t('settings.shift.open_success'));
       } else if (action === 'close' && shift?.id) {
@@ -129,7 +128,6 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
         }
         await storeCloseShift(shift.id, {
           actual_cash: actual,
-          note: note || undefined,
         });
         const variance = Currency.sub(actual, shift.expected_cash);
         if (variance.isZero()) {
@@ -336,20 +334,6 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
               ))}
             </div>
           )}
-
-          {/* Note field */}
-          <div className="mt-auto">
-            <label className="block text-xs text-gray-500 uppercase font-bold mb-2">
-              {t('settings.shift.modal.note')}
-            </label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={t('settings.shift.modal.note_placeholder')}
-              rows={2}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-200 focus:border-green-400 resize-none text-sm"
-            />
-          </div>
 
           {/* Cancel button */}
           <button
