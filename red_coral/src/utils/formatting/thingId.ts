@@ -17,17 +17,6 @@ export function extractThingId(thingId: string | null | undefined): string {
 }
 
 /**
- * Extract the table name from a Thing ID string.
- * "product:abc123" -> "product"
- * "abc123" -> "" (no table prefix)
- */
-export function extractThingTable(thingId: string | null | undefined): string {
-  if (!thingId) return '';
-  const colonIndex = thingId.indexOf(':');
-  return colonIndex !== -1 ? thingId.slice(0, colonIndex) : '';
-}
-
-/**
  * Format a Thing ID for display (truncated).
  * "product:abc123def456" -> "abc123de" (first 8 chars of ID)
  * @param thingId - The full Thing ID
@@ -41,12 +30,3 @@ export function displayThingId(
   return rawId.slice(0, length);
 }
 
-/**
- * Check if a string is in Thing ID format.
- * "product:abc123" -> true
- * "abc123" -> false
- */
-export function isThingId(value: string | null | undefined): boolean {
-  if (!value) return false;
-  return value.includes(':');
-}

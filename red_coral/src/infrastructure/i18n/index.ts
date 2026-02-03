@@ -129,23 +129,6 @@ export function t(key: string, params?: Record<string, string | number>): string
 }
 
 /**
- * Get translation function for a specific locale
- */
-export function getTranslator(locale: Locale): (key: string) => string {
-  return (key: string): string => {
-    let result = flattenedTranslations[locale][key];
-    if (result === undefined && !key.startsWith('common.')) {
-      result = flattenedTranslations[locale][`common.${key}`];
-    }
-    if (result === undefined) {
-      console.warn(`[i18n] Missing translation for key: "${key}"`);
-      return key;
-    }
-    return result;
-  };
-}
-
-/**
  * Get all translations for the current locale
  */
 export function getAllTranslations(): Record<string, string> {

@@ -66,32 +66,6 @@ export function getErrorMessage(response: ApiResponse | unknown): string {
   return t('errors.1'); // Unknown error
 }
 
-/**
- * Extract error from unknown error type
- */
-export function extractError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === 'string') {
-    return error;
-  }
-  if (error && typeof error === 'object' && 'message' in error) {
-    return String((error as { message: unknown }).message);
-  }
-  return t('errors.1'); // Unknown error
-}
-
-/**
- * Create error handler callback
- */
-export function createErrorHandler(onError: (message: string) => void) {
-  return (error: unknown) => {
-    const message = extractError(error);
-    onError(message);
-  };
-}
-
 // Re-export for convenience
 export { ErrorCode, isError, isSuccess };
 export type { ApiResponse };
