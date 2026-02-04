@@ -5,7 +5,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency, Currency } from '@/utils/currency';
 import { Receipt, Calendar, Printer, CreditCard, Coins, Clock, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Ban, Gift } from 'lucide-react';
 import { Permission } from '@/core/domain/types';
-import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
+import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { TimelineList } from '@/shared/components/TimelineList';
 
 interface HistoryDetailProps {
@@ -116,7 +116,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                 {t('history.status.moved')}
               </span>
             )}
-            <ProtectedGate permission={Permission.RECEIPTS_REPRINT}>
+            <EscalatableGate permission={Permission.RECEIPTS_REPRINT}>
               <button
                 onClick={onReprint}
                 className="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
@@ -124,7 +124,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
                 <Printer size={16} />
                 <span>{t('history.action.reprint')}</span>
               </button>
-            </ProtectedGate>
+            </EscalatableGate>
           </div>
           <div className="flex gap-4 text-sm text-gray-500">
             {order.table_name && order.table_name !== 'RETAIL' && (

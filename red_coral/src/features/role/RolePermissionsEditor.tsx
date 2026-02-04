@@ -87,11 +87,11 @@ export const RolePermissionsEditor: React.FC = () => {
     const groups = {
       menu: {
         title: t('settings.permissions.group.menu'),
-        perms: ['products:read', 'products:write', 'products:delete', 'products:manage', 'categories:read', 'categories:manage', 'attributes:read', 'attributes:manage']
+        perms: ['products:read', 'products:write', 'products:delete', 'categories:read', 'categories:manage', 'attributes:read', 'attributes:manage']
       },
       pos: {
         title: t('settings.permissions.group.pos'),
-        perms: ['orders:read', 'orders:write', 'orders:void', 'orders:discount', 'orders:comp', 'orders:refund', 'orders:cancel_item', 'tables:merge_bill', 'tables:transfer', 'pos:cash_drawer', 'receipts:print', 'receipts:reprint', 'pricing:read', 'pricing:write']
+        perms: ['orders:read', 'orders:void', 'orders:discount', 'orders:comp', 'orders:refund', 'orders:cancel_item', 'tables:merge_bill', 'tables:transfer', 'pos:cash_drawer', 'receipts:reprint', 'pricing:read', 'pricing:write']
       },
       store: {
         title: t('settings.permissions.group.store'),

@@ -1461,7 +1461,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                           )}
                         </div>
                         <EscalatableGate
-                          permission={Permission.ORDERS_VOID}
+                          permission={Permission.ORDERS_REFUND}
                           mode="intercept"
                           description={t('checkout.payment.cancel')}
                           onAuthorized={(user) => {

@@ -1,11 +1,31 @@
 use crate::core::ServerState;
 use crate::db::repository::system_issue::{CreateSystemIssue, SystemIssueRepository};
+use crate::db::repository::{EmployeeRepository, RoleRepository};
 use crate::message::{BusMessage, EventType};
 use crate::orders::actions::open_table::load_matching_rules;
 use crate::utils::AppError;
 use async_trait::async_trait;
 use shared::order::{OrderCommand, OrderCommandPayload};
 use std::sync::Arc;
+
+/// 获取执行订单命令所需的权限
+fn get_required_permission(payload: &OrderCommandPayload) -> Option<&'static str> {
+    match payload {
+        // 敏感操作需要权限
+        OrderCommandPayload::VoidOrder { .. } => Some("orders:void"),
+        OrderCommandPayload::CompItem { .. } | OrderCommandPayload::UncompItem { .. } => {
+            Some("orders:comp")
+        }
+        OrderCommandPayload::ApplyOrderDiscount { .. }
+        | OrderCommandPayload::ApplyOrderSurcharge { .. } => Some("orders:discount"),
+        OrderCommandPayload::CancelPayment { .. } => Some("orders:refund"),
+        OrderCommandPayload::RemoveItem { .. } => Some("orders:cancel_item"),
+        OrderCommandPayload::MoveOrder { .. } => Some("tables:transfer"),
+        OrderCommandPayload::MergeOrders { .. } => Some("tables:merge_bill"),
+        // 基础操作无需特殊权限
+        _ => None,
+    }
+}
 
 /// 消息处理结果
 #[derive(Debug)]
@@ -156,6 +176,59 @@ impl RequestCommandProcessor {
         Self { state }
     }
 
+    /// 检查操作者是否拥有指定权限
+    async fn check_operator_permission(&self, operator_id: &str, permission: &str) -> bool {
+        // 查询员工信息
+        let employee_repo = EmployeeRepository::new(self.state.get_db());
+        let employee = match employee_repo.find_by_id(operator_id).await {
+            Ok(Some(emp)) => emp,
+            Ok(None) => {
+                tracing::warn!(operator_id = %operator_id, "操作者不存在");
+                return false;
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "查询操作者失败");
+                return false;
+            }
+        };
+
+        // 查询角色权限
+        let role_repo = RoleRepository::new(self.state.get_db());
+        let role_id_str = employee.role.to_string();
+        let role = match role_repo.find_by_id(&role_id_str).await {
+            Ok(Some(r)) => r,
+            Ok(None) => {
+                tracing::warn!(role_id = %employee.role, "角色不存在");
+                return false;
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "查询角色失败");
+                return false;
+            }
+        };
+
+        // 检查权限
+        // 1. admin 角色或拥有 "all" 权限的用户拥有所有权限
+        if role.name == "admin" || role.permissions.iter().any(|p| p == "all") {
+            return true;
+        }
+
+        // 2. 精确匹配
+        if role.permissions.iter().any(|p| p == permission) {
+            return true;
+        }
+
+        // 3. 通配符匹配 (e.g., "orders:*" matches "orders:void")
+        if let Some(prefix) = permission.split(':').next() {
+            let wildcard = format!("{}:*", prefix);
+            if role.permissions.iter().any(|p| p == &wildcard) {
+                return true;
+            }
+        }
+
+        false
+    }
+
     /// Handle order commands (order.open_table, order.add_items, etc.)
     async fn handle_order_command(
         &self,
@@ -172,6 +245,25 @@ impl RequestCommandProcessor {
         // Parse full command (sent by client with command_id, operator_id, etc.)
         let command: OrderCommand = serde_json::from_value(params_value.clone())
             .map_err(|e| AppError::invalid(format!("Invalid OrderCommand: {}", e)))?;
+
+        // 权限检查：敏感命令需要验证操作者权限
+        if let Some(required_permission) = get_required_permission(&command.payload) {
+            let has_permission =
+                self.check_operator_permission(&command.operator_id, required_permission)
+                    .await;
+            if !has_permission {
+                tracing::warn!(
+                    operator_id = %command.operator_id,
+                    operator_name = %command.operator_name,
+                    required_permission = required_permission,
+                    command = ?std::mem::discriminant(&command.payload),
+                    "权限拒绝：操作者无权执行此命令"
+                );
+                return Ok(ProcessResult::Failed {
+                    reason: format!("权限不足：需要 {} 权限", required_permission),
+                });
+            }
+        }
 
         // 保存 OpenTable 的信息用于后续规则加载
         let open_table_info = if let OrderCommandPayload::OpenTable {

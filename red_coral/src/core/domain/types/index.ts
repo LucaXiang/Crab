@@ -150,7 +150,6 @@ export const Permission = {
   PRODUCTS_READ: 'products:read' as Permission,
   PRODUCTS_WRITE: 'products:write' as Permission,
   PRODUCTS_DELETE: 'products:delete' as Permission,
-  PRODUCTS_MANAGE: 'products:manage' as Permission,
   // Category permissions
   CATEGORIES_READ: 'categories:read' as Permission,
   CATEGORIES_MANAGE: 'categories:manage' as Permission,
@@ -159,7 +158,6 @@ export const Permission = {
   ATTRIBUTES_MANAGE: 'attributes:manage' as Permission,
   // Order permissions
   ORDERS_READ: 'orders:read' as Permission,
-  ORDERS_WRITE: 'orders:write' as Permission,
   ORDERS_VOID: 'orders:void' as Permission,
   ORDERS_DISCOUNT: 'orders:discount' as Permission,
   ORDERS_COMP: 'orders:comp' as Permission,
@@ -181,7 +179,6 @@ export const Permission = {
   PRINTERS_READ: 'printers:read' as Permission,
   PRINTERS_MANAGE: 'printers:manage' as Permission,
   // Receipt permissions
-  RECEIPTS_PRINT: 'receipts:print' as Permission,
   RECEIPTS_REPRINT: 'receipts:reprint' as Permission,
   // Settings & System
   SETTINGS_MANAGE: 'settings:manage' as Permission,

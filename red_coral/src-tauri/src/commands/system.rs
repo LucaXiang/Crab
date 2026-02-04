@@ -8,7 +8,7 @@ use urlencoding::encode;
 
 use crate::core::response::{
     ApiResponse, DeleteData, EmployeeListData, ErrorCode, PriceRuleListData, Role, RoleListData,
-    RolePermissionListData,
+    RolePermission, RolePermissionListData,
 };
 use crate::core::ClientBridge;
 use shared::models::{
@@ -499,12 +499,21 @@ pub async fn get_role_permissions(
     bridge: State<'_, Arc<ClientBridge>>,
     role_id: String,
 ) -> Result<ApiResponse<RolePermissionListData>, String> {
-
+    // API 返回 Vec<String>，需要转换为 Vec<RolePermission>
     match bridge
-        .get(&format!("/api/roles/{}/permissions", encode(&role_id)))
+        .get::<Vec<String>>(&format!("/api/roles/{}/permissions", encode(&role_id)))
         .await
     {
-        Ok(permissions) => Ok(ApiResponse::success(RolePermissionListData { permissions })),
+        Ok(permission_strings) => {
+            let permissions = permission_strings
+                .into_iter()
+                .map(|p| RolePermission {
+                    role_id: role_id.clone(),
+                    permission: p,
+                })
+                .collect();
+            Ok(ApiResponse::success(RolePermissionListData { permissions }))
+        }
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::DatabaseError,
             e.to_string(),

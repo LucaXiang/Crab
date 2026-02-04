@@ -8,7 +8,6 @@ pub const ALL_PERMISSIONS: &[&str] = &[
     "products:read",
     "products:write",
     "products:delete",
-    "products:manage",
     // Category permissions
     "categories:read",
     "categories:manage",
@@ -17,7 +16,6 @@ pub const ALL_PERMISSIONS: &[&str] = &[
     "attributes:manage",
     // Order permissions
     "orders:read",
-    "orders:write",
     "orders:void",
     "orders:discount",
     "orders:comp",
@@ -45,7 +43,6 @@ pub const ALL_PERMISSIONS: &[&str] = &[
     "printers:read",
     "printers:manage",
     // Receipt permissions
-    "receipts:print",
     "receipts:reprint",
     // Settings & System permissions
     "settings:manage",
@@ -65,25 +62,22 @@ pub const DEFAULT_USER_PERMISSIONS: &[&str] = &[
     "categories:read",
     "attributes:read",
     "orders:read",
-    "orders:write",
     "zones:read",
     "tables:read",
     "pricing:read",
     "statistics:read",
     "printers:read",
-    "receipts:print",
 ];
 
 pub const DEFAULT_MANAGER_PERMISSIONS: &[&str] = &[
     "products:read",
     "products:write",
-    "products:manage",
+    "products:delete",
     "categories:read",
     "categories:manage",
     "attributes:read",
     "attributes:manage",
     "orders:read",
-    "orders:write",
     "orders:void",
     "orders:discount",
     "orders:comp",
@@ -101,7 +95,6 @@ pub const DEFAULT_MANAGER_PERMISSIONS: &[&str] = &[
     "statistics:read",
     "printers:read",
     "printers:manage",
-    "receipts:print",
     "receipts:reprint",
     "settings:manage",
     "pos:cash_drawer",
