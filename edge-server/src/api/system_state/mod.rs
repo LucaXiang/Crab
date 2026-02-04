@@ -17,17 +17,18 @@ pub fn router() -> Router<ServerState> {
 }
 
 fn routes() -> Router<ServerState> {
+    // 读取路由：无需权限检查（查看系统状态是基础操作）
     let read_routes = Router::new()
         .route("/", get(handler::get))
-        .route("/pending-sync", get(handler::get_pending_sync))
-        .layer(middleware::from_fn(require_permission("system:read")));
+        .route("/pending-sync", get(handler::get_pending_sync));
 
+    // 写入路由：需要 settings:manage 权限
     let write_routes = Router::new()
         .route("/", put(handler::update))
         .route("/genesis", post(handler::init_genesis))
         .route("/last-order", put(handler::update_last_order))
         .route("/sync-state", put(handler::update_sync_state))
-        .layer(middleware::from_fn(require_permission("system:write")));
+        .layer(middleware::from_fn(require_permission("settings:manage")));
 
     read_routes.merge(write_routes)
 }

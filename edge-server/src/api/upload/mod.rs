@@ -72,9 +72,9 @@ async fn serve_uploaded_file(
 /// Build upload router
 pub fn router() -> Router<ServerState> {
     Router::new()
-        // Upload image API - requires products:write permission
+        // Upload image API - requires menu:manage permission
         .route("/api/image/upload", post(handler::upload))
-        .layer(middleware::from_fn(require_permission("products:write")))
+        .layer(middleware::from_fn(require_permission("menu:manage")))
         // Serve uploaded images - any authenticated user can read
         .merge(
             Router::new()

@@ -16,12 +16,13 @@ pub fn router() -> Router<ServerState> {
 }
 
 fn routes() -> Router<ServerState> {
+    // 读取路由：无需权限检查（查看班次是基础操作）
     let read_routes = Router::new()
         .route("/", get(handler::list))
         .route("/current", get(handler::get_current))
-        .route("/{id}", get(handler::get_by_id))
-        .layer(middleware::from_fn(require_permission("system:read")));
+        .route("/{id}", get(handler::get_by_id));
 
+    // 写入路由：需要 shifts:manage 权限
     let write_routes = Router::new()
         .route("/", post(handler::create))
         .route("/recover", post(handler::recover_stale))
@@ -29,7 +30,7 @@ fn routes() -> Router<ServerState> {
         .route("/{id}/close", post(handler::close))
         .route("/{id}/force-close", post(handler::force_close))
         .route("/{id}/heartbeat", post(handler::heartbeat))
-        .layer(middleware::from_fn(require_permission("system:write")));
+        .layer(middleware::from_fn(require_permission("shifts:manage")));
 
     read_routes.merge(write_routes)
 }
