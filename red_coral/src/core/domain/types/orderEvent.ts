@@ -954,6 +954,8 @@ export interface ItemOption {
   option_idx: number;
   option_name: string;
   price_modifier?: number | null;
+  /** Option quantity (default: 1) */
+  quantity?: number;
 }
 
 export interface SpecificationInfo {

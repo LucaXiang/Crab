@@ -131,11 +131,15 @@ pub fn input_to_snapshot_with_rules(
         "[Reducer] Filtered rules by product scope"
     );
 
-    // Calculate options modifier from selected_options
+    // Calculate options modifier from selected_options (considering quantity)
     let options_modifier: f64 = input
         .selected_options
         .as_ref()
-        .map(|opts| opts.iter().filter_map(|o| o.price_modifier).sum())
+        .map(|opts| {
+            opts.iter()
+                .filter_map(|o| o.price_modifier.map(|p| p * o.quantity as f64))
+                .sum()
+        })
         .unwrap_or(0.0);
 
     let manual_discount = input.manual_discount_percent.unwrap_or(0.0);
@@ -240,6 +244,7 @@ mod tests {
             option_idx: 1,
             option_name: "Large".to_string(),
             price_modifier: Some(2.0),
+            quantity: 1,
         }]);
 
         let id1 = generate_instance_id_from_parts("product:1", 10.0, None, &None, &None);
@@ -407,6 +412,7 @@ mod tests {
                     option_idx: 1,
                     option_name: "Large".to_string(),
                     price_modifier: Some(5.0),
+                    quantity: 1,
                 },
                 ItemOption {
                     attribute_id: "attribute:a2".to_string(),
@@ -414,6 +420,7 @@ mod tests {
                     option_idx: 0,
                     option_name: "Cheese".to_string(),
                     price_modifier: Some(2.0),
+                    quantity: 1,
                 },
             ]),
             selected_specification: None,

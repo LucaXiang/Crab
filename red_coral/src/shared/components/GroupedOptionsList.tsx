@@ -5,6 +5,7 @@ interface SelectedOption {
   attribute_name: string;
   option_name: string;
   price_modifier?: number | null;
+  quantity?: number;
 }
 
 interface GroupedOptionsListProps {
@@ -33,17 +34,24 @@ export const GroupedOptionsList: React.FC<GroupedOptionsListProps> = ({
     <div className={className}>
       {[...grouped.entries()].map(([attrName, opts]) => (
         <div key={attrName} className={`${itemClassName} truncate`}>
-          {attrName}: {opts.map((opt, i) => (
-            <React.Fragment key={i}>
-              {i > 0 && ', '}
-              {opt.option_name}
-              {opt.price_modifier != null && opt.price_modifier !== 0 && (
-                <span className={opt.price_modifier > 0 ? 'text-orange-600 ml-0.5' : 'text-green-600 ml-0.5'}>
-                  {opt.price_modifier > 0 ? '+' : ''}{formatCurrency(opt.price_modifier)}
-                </span>
-              )}
-            </React.Fragment>
-          ))}
+          {attrName}: {opts.map((opt, i) => {
+            const qty = opt.quantity ?? 1;
+            const totalPrice = (opt.price_modifier ?? 0) * qty;
+            return (
+              <React.Fragment key={i}>
+                {i > 0 && ', '}
+                {opt.option_name}
+                {qty > 1 && (
+                  <span className="text-orange-600 ml-0.5">×{qty}</span>
+                )}
+                {totalPrice !== 0 && (
+                  <span className={totalPrice > 0 ? 'text-orange-600 ml-0.5' : 'text-green-600 ml-0.5'}>
+                    {totalPrice > 0 ? '+' : ''}{formatCurrency(totalPrice)}
+                  </span>
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
       ))}
     </div>

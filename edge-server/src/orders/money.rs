@@ -93,7 +93,7 @@ pub fn validate_cart_item(item: &CartItemInput) -> Result<(), OrderError> {
         }
     }
 
-    // Option price modifiers must be finite
+    // Option price modifiers and quantities must be valid
     if let Some(opts) = &item.selected_options {
         for opt in opts {
             if let Some(pm) = opt.price_modifier {
@@ -104,6 +104,21 @@ pub fn validate_cart_item(item: &CartItemInput) -> Result<(), OrderError> {
                         pm
                     )));
                 }
+            }
+            // Validate option quantity
+            if opt.quantity <= 0 {
+                return Err(OrderError::InvalidOperation(format!(
+                    "option quantity must be positive, got {} for option '{}'",
+                    opt.quantity, opt.option_name
+                )));
+            }
+            // Reasonable upper limit for option quantity (99 should be more than enough)
+            const MAX_OPTION_QUANTITY: i32 = 99;
+            if opt.quantity > MAX_OPTION_QUANTITY {
+                return Err(OrderError::InvalidOperation(format!(
+                    "option quantity exceeds maximum allowed ({}), got {} for option '{}'",
+                    MAX_OPTION_QUANTITY, opt.quantity, opt.option_name
+                )));
             }
         }
     }

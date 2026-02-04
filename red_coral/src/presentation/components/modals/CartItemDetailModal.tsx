@@ -31,7 +31,8 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [allOptions, setAllOptions] = useState<Map<string, AttributeOption[]>>(new Map());
   const [bindings, setBindings] = useState<ProductAttribute[]>([]);
-  const [selections, setSelections] = useState<Map<string, string[]>>(new Map());
+  // Map of attributeId -> Map<optionIdx, quantity>
+  const [selections, setSelections] = useState<Map<string, Map<string, number>>>(new Map());
 
   // Load attributes on mount
   useEffect(() => {
@@ -88,13 +89,16 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
             setAllOptions(optionsMap);
 
             // Initialize selections from current item state
-            const initialSelections = new Map<string, string[]>();
+            const initialSelections = new Map<string, Map<string, number>>();
 
-            // 1. Pre-fill with existing selections
+            // 1. Pre-fill with existing selections (including quantity)
             item.selected_options?.forEach(sel => {
                 const attrKey = String(sel.attribute_id);
-                const current = initialSelections.get(attrKey) || [];
-                initialSelections.set(attrKey, [...current, String(sel.option_idx)]);
+                if (!initialSelections.has(attrKey)) {
+                  initialSelections.set(attrKey, new Map<string, number>());
+                }
+                const optionMap = initialSelections.get(attrKey)!;
+                optionMap.set(String(sel.option_idx), sel.quantity ?? 1);
             });
 
             // 2. If no selection for an attribute (and we have defaults), fill with defaults
@@ -106,17 +110,27 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                          const binding = allBindings.find(b => b.out === attrId);
                          const defaults = binding?.default_option_indices ?? attr.default_option_indices;
                          if (defaults && defaults.length > 0) {
-                             let defaultStrs = defaults.map(String);
+                             let defaultIdxs = [...defaults];
                              if (!attr.is_multi_select) {
-                                 defaultStrs = [defaultStrs[0]];
-                             } else if (attr.max_selections && defaultStrs.length > attr.max_selections) {
-                                 defaultStrs = defaultStrs.slice(0, attr.max_selections);
+                                 defaultIdxs = [defaultIdxs[0]];
+                             } else if (attr.max_selections && defaultIdxs.length > attr.max_selections) {
+                                 defaultIdxs = defaultIdxs.slice(0, attr.max_selections);
                              }
-                             initialSelections.set(attrId, defaultStrs);
+                             const optionMap = new Map<string, number>();
+                             defaultIdxs.forEach(idx => optionMap.set(String(idx), 1));
+                             initialSelections.set(attrId, optionMap);
                          }
                      }
                  });
             }
+
+            // Ensure all attributes have an entry (even if empty)
+            attributeList.forEach(attr => {
+              const attrId = String(attr.id);
+              if (!initialSelections.has(attrId)) {
+                initialSelections.set(attrId, new Map<string, number>());
+              }
+            });
 
             setSelections(initialSelections);
 
@@ -129,7 +143,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     };
     load();
     return () => { mounted = false; };
-  }, [item.id, item.instance_id]); 
+  }, [item.id, item.instance_id]);
 
   // Handle specification selection (reset price override when changing spec)
   const handleSpecificationSelect = (specId: string) => {
@@ -137,21 +151,22 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     setLocalBasePrice(null);
   };
 
-  const handleAttributeSelect = (attributeId: string, optionIds: string[]) => {
+  const handleAttributeSelect = (attributeId: string, optionMap: Map<string, number>) => {
       const newSelections = new Map(selections);
-      newSelections.set(attributeId, optionIds);
+      newSelections.set(attributeId, optionMap);
       setSelections(newSelections);
   };
 
   const handleSave = () => {
     // Build selected options array
     const selectedOptions: ItemOption[] = [];
-    selections.forEach((optionIdxs, attributeId) => {
+    selections.forEach((optionMap, attributeId) => {
         const attr = attributes.find(a => String(a.id) === attributeId);
         const options = allOptions.get(attributeId) || [];
 
         if (attr) {
-            optionIdxs.forEach(idxStr => {
+            optionMap.forEach((qty, idxStr) => {
+                if (qty <= 0) return; // Skip unselected
                 const idx = parseInt(idxStr, 10);
                 const opt = options[idx];
                 if (opt) {
@@ -161,6 +176,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                         option_idx: idx,
                         option_name: opt.name,
                         price_modifier: opt.price_modifier ?? null,
+                        quantity: qty,
                     });
                 }
             });
@@ -196,9 +212,9 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
       changes.manual_discount_percent = finalDisc;
     }
 
-    // Compare options by (attribute_id, option_idx) pairs
+    // Compare options by (attribute_id, option_idx, quantity) tuples
     const origOpts = item.selected_options || [];
-    const toKey = (o: ItemOption) => `${o.attribute_id}:${o.option_idx}`;
+    const toKey = (o: ItemOption) => `${o.attribute_id}:${o.option_idx}:${o.quantity ?? 1}`;
     const origKeys = origOpts.map(toKey).sort().join(',');
     const newKeys = selectedOptions.map(toKey).sort().join(',');
     if (newKeys !== origKeys) {
@@ -234,10 +250,10 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
     ? specifications[parseInt(selectedSpecId, 10)]?.price ?? itemBasePrice
     : itemBasePrice;
   const currentPrice = localBasePrice !== null ? localBasePrice : specPrice;
-  
+
   return (
     <ItemConfiguratorModal
-      isOpen={true} 
+      isOpen={true}
       onClose={onClose}
       title={t('pos.cart.edit_item')}
       productName={productExternalId != null ? `${productExternalId} ${item.name}` : item.name}

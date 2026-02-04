@@ -24,8 +24,11 @@ export const CartItem = React.memo<CartItemProps>(({
   const externalId = useProductStore(state => state.items.find(p => p.id === item.id)?.external_id);
   const discountPercent = item.manual_discount_percent || 0;
   
-  // Calculate options modifier for display
-  const optionsModifier = (item.selected_options ?? []).reduce((sum, opt) => sum + (opt.price_modifier ?? 0), 0);
+  // Calculate options modifier for display (considering option quantity)
+  const optionsModifier = (item.selected_options ?? []).reduce(
+    (sum, opt) => sum + (opt.price_modifier ?? 0) * (opt.quantity ?? 1),
+    0
+  );
   const basePrice = item.original_price ?? item.price;
   const baseUnitPrice = basePrice + optionsModifier;
 

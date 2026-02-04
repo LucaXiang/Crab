@@ -13,7 +13,7 @@ pub type AttributeId = RecordId;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeOption {
     pub name: String,
-    /// Price modifier in currency unit (positive=add, negative=subtract, e.g., 2.50 = ¥2.50)
+    /// Price modifier in currency unit (positive=add, negative=subtract, e.g., 2.50 = €2.50)
     #[serde(default)]
     pub price_modifier: f64,
     #[serde(default)]
@@ -25,6 +25,14 @@ pub struct AttributeOption {
     pub is_active: bool,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
+
+    // === Quantity Control ===
+    /// Enable quantity control for this option (default: false)
+    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
+    pub enable_quantity: bool,
+    /// Maximum quantity allowed (only effective when enable_quantity=true)
+    #[serde(default)]
+    pub max_quantity: Option<i32>,
 }
 
 fn default_true() -> bool {
@@ -40,6 +48,8 @@ impl AttributeOption {
             is_active: true,
             receipt_name: None,
             kitchen_print_name: None,
+            enable_quantity: false,
+            max_quantity: None,
         }
     }
 }

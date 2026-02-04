@@ -1239,7 +1239,12 @@
           "set_as_default": "设为默认",
           "status": "状态",
           "kitchen_print_name": "厨房打印名称",
-          "kitchen_print_name_placeholder": "如为空则使用选项名称"
+          "kitchen_print_name_placeholder": "如为空则使用选项名称",
+          "enable_quantity": "启用数量控制",
+          "enable_quantity_hint": "允许顾客选择此选项的数量（如加多份鸡蛋）",
+          "max_quantity": "最大数量",
+          "max_quantity_placeholder": "留空表示无限制",
+          "max_quantity_hint": "单次可选的最大数量（1-99）"
         },
         "add_option": "添加选项",
         "edit_option": "编辑选项",

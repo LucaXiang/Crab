@@ -20,8 +20,9 @@ interface ItemConfiguratorModalProps {
   attributes: Attribute[];
   allOptions: Map<string, AttributeOption[]>;
   bindings?: ProductAttribute[];
-  selections: Map<string, string[]>;
-  onAttributeSelect: (attributeId: string, optionIds: string[]) => void;
+  /** Map of attributeId -> Map<optionIdx, quantity> */
+  selections: Map<string, Map<string, number>>;
+  onAttributeSelect: (attributeId: string, options: Map<string, number>) => void;
 
   // Specification Selection (embedded specs, use index as ID)
   specifications?: EmbeddedSpec[];
@@ -89,15 +90,17 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
     return [...opts].sort((a, b) => a.display_order - b.display_order);
   }, [allOptions]);
 
-  // Calculate options modifier locally since we have all the data
+  // Calculate options modifier locally (considering quantity)
   const optionsModifier = useMemo(() => {
     let mod = 0;
-    selections.forEach((idxs, attrId) => {
+    selections.forEach((optionMap, attrId) => {
       const opts = allOptions.get(attrId) || [];
-      idxs.forEach(idxStr => {
+      optionMap.forEach((qty, idxStr) => {
         const idx = parseInt(idxStr, 10);
         const opt = opts[idx];
-        if (opt) mod += opt.price_modifier;
+        if (opt && qty > 0) {
+          mod += opt.price_modifier * qty;
+        }
       });
     });
     return mod;
@@ -113,7 +116,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-100 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div 
+      <div
         className={`bg-white rounded-3xl w-full ${showAttributesColumn ? 'max-w-4xl' : 'max-w-md'} h-[70vh] overflow-hidden shadow-2xl flex flex-col transition-all duration-300`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -197,7 +200,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                   {hasAttributes && sortedAttributes.map((attr) => {
                     const attrId = String(attr.id);
                     const options = getSortedOptions(attrId);
-                    const selectedOptionIds = selections.get(attrId) || [];
+                    const selectedOptions = selections.get(attrId) || new Map<string, number>();
                     // binding.to is the attribute ID in AttributeBinding relation
                     const binding = bindings?.find(b => b.out === attr.id);
 
@@ -209,9 +212,9 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                         <AttributeSelector
                           attribute={attr}
                           options={options}
-                          selectedOptionIds={selectedOptionIds}
+                          selectedOptions={selectedOptions}
                           defaultOptionIds={defaultOptionIds}
-                          onSelect={(optionIds) => onAttributeSelect(attrId, optionIds)}
+                          onSelect={(optionMap) => onAttributeSelect(attrId, optionMap)}
                         />
                       </div>
                     );

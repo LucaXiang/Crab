@@ -166,6 +166,19 @@ pub struct ItemOption {
     pub option_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub price_modifier: Option<f64>,
+    /// Option quantity (default: 1)
+    /// - Options without quantity control: implicitly 1 (not serialized)
+    /// - Options with quantity control: explicitly stored
+    #[serde(default = "default_option_quantity", skip_serializing_if = "is_default_quantity")]
+    pub quantity: i32,
+}
+
+fn default_option_quantity() -> i32 {
+    1
+}
+
+fn is_default_quantity(qty: &i32) -> bool {
+    *qty == 1
 }
 
 /// Specification info

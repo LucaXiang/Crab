@@ -40,8 +40,8 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
   // Track selected specification
   const [selectedSpecId, setSelectedSpecId] = useState<string | null>(null);
 
-  // Track selected option IDs for each attribute: attributeId -> optionIds[]
-  const [selections, setSelections] = useState<Map<string, string[]>>(new Map());
+  // Track selected options for each attribute: attributeId -> Map<optionIdx, quantity>
+  const [selections, setSelections] = useState<Map<string, Map<string, number>>>(new Map());
   const [quantity, setQuantity] = useState(1);
   const [discount, setDiscount] = useState(0);
   const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; name: string } | undefined>();
@@ -67,44 +67,47 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
         setSelectedSpecId(null);
       }
 
-      const initialSelections = new Map<string, string[]>();
+      const initialSelections = new Map<string, Map<string, number>>();
 
       attributes.forEach((attr) => {
         const options = allOptions.get(String(attr.id)) || [];
         // binding.to is the attribute ID in AttributeBinding relation
         const binding = bindings?.find(b => b.out === attr.id);
 
-        let initialIds: string[] = [];
+        const optionMap = new Map<string, number>();
 
         // Priority: binding override > attribute default
         const defaults = binding?.default_option_indices ?? attr.default_option_indices;
         if (defaults && defaults.length > 0) {
-           initialIds = defaults
-             .filter(idx => options[idx] && options[idx].is_active)
-             .map(String);
+          let selectedDefaults = defaults.filter(idx => options[idx] && options[idx].is_active);
+
+          // Enforce Single Choice constraints (is_multi_select=false means single)
+          const isSingleChoice = !attr.is_multi_select;
+          if (isSingleChoice && selectedDefaults.length > 1) {
+            selectedDefaults = [selectedDefaults[0]];
+          }
+
+          // Enforce max_selections for multi-select
+          if (attr.is_multi_select && attr.max_selections && selectedDefaults.length > attr.max_selections) {
+            selectedDefaults = selectedDefaults.slice(0, attr.max_selections);
+          }
+
+          // Set each default option with quantity 1
+          selectedDefaults.forEach(idx => {
+            optionMap.set(String(idx), 1);
+          });
         }
 
-        // Enforce Single Choice constraints (is_multi_select=false means single)
-        const isSingleChoice = !attr.is_multi_select;
-        if (isSingleChoice && initialIds.length > 1) {
-           initialIds = [initialIds[0]];
-        }
-
-        // Enforce max_selections for multi-select
-        if (attr.is_multi_select && attr.max_selections && initialIds.length > attr.max_selections) {
-           initialIds = initialIds.slice(0, attr.max_selections);
-        }
-
-        initialSelections.set(String(attr.id), initialIds);
+        initialSelections.set(String(attr.id), optionMap);
       });
 
       setSelections(initialSelections);
     }
   }, [isOpen, attributes, allOptions, bindings, specifications, hasMultiSpec]);
 
-  const handleAttributeSelect = (attributeId: string, optionIds: string[]) => {
+  const handleAttributeSelect = (attributeId: string, optionMap: Map<string, number>) => {
     const newSelections = new Map(selections);
-    newSelections.set(attributeId, optionIds);
+    newSelections.set(attributeId, optionMap);
     setSelections(newSelections);
   };
 
@@ -118,12 +121,12 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
     }
 
     // Validate required attributes
-    // Note: With new model, required is determined by binding.is_required, not attr_type
     for (const attr of attributes) {
       const binding = bindings?.find(b => b.out === attr.id);
       if (binding?.is_required) {
-        const selected = selections.get(String(attr.id)) || [];
-        if (selected.length === 0) {
+        const optionMap = selections.get(String(attr.id));
+        const hasSelection = optionMap && Array.from(optionMap.values()).some(qty => qty > 0);
+        if (!hasSelection) {
           toast.error(t('pos.attributeRequired', { name: attr.name }));
           return;
         }
@@ -133,13 +136,15 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
     // Build ItemOption array (backend type)
     const result: ItemOption[] = [];
 
-    selections.forEach((optionIdxs, attributeId) => {
+    selections.forEach((optionMap, attributeId) => {
       const attr = attributes.find(a => String(a.id) === attributeId);
       if (!attr) return;
 
       const options = allOptions.get(attributeId) || [];
 
-      optionIdxs.forEach((optionIdxStr) => {
+      optionMap.forEach((qty, optionIdxStr) => {
+        if (qty <= 0) return; // Skip unselected
+
         const optionIdx = parseInt(optionIdxStr, 10);
         const option = options[optionIdx];
         if (!option) return;
@@ -150,6 +155,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
           option_idx: optionIdx,
           option_name: option.name,
           price_modifier: option.price_modifier ?? null,
+          quantity: qty, // Include quantity in ItemOption
         });
       });
     });

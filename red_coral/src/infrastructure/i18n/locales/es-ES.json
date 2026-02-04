@@ -1239,7 +1239,12 @@
           "set_as_default": "Establecer defecto",
           "status": "Estado",
           "kitchen_print_name": "Nombre cocina",
-          "kitchen_print_name_placeholder": "Vacío = nombre opción"
+          "kitchen_print_name_placeholder": "Vacío = nombre opción",
+          "enable_quantity": "Control de cantidad",
+          "enable_quantity_hint": "Permitir elegir cantidad de esta opción (ej: varios huevos)",
+          "max_quantity": "Cantidad máxima",
+          "max_quantity_placeholder": "Vacío = sin límite",
+          "max_quantity_hint": "Máximo por selección (1-99)"
         },
         "add_option": "Añadir opción",
         "edit_option": "Editar opción",

@@ -6,12 +6,23 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeOption {
     pub name: String,
-    /// Price modifier in currency unit (positive=add, negative=subtract, e.g., 2.50 = ¥2.50)
+    /// Price modifier in currency unit (positive=add, negative=subtract, e.g., 2.50 = €2.50)
     pub price_modifier: f64,
     pub display_order: i32,
     pub is_active: bool,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
+
+    // === Quantity Control ===
+    /// Enable quantity control for this option (default: false)
+    /// When false, the option can only be selected once (quantity implicitly 1)
+    /// When true, user can select multiple quantities with +/- buttons
+    #[serde(default)]
+    pub enable_quantity: bool,
+    /// Maximum quantity allowed (only effective when enable_quantity=true)
+    /// None = unlimited
+    #[serde(default)]
+    pub max_quantity: Option<i32>,
 }
 
 /// Attribute entity

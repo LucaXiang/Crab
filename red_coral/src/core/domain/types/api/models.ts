@@ -208,12 +208,16 @@ export interface ProductFull {
 
 export interface AttributeOption {
   name: string;
-  /** Price modifier in cents */
+  /** Price modifier in currency unit (e.g., 2.50 = €2.50) */
   price_modifier: number;
   display_order: number;
   is_active: boolean;
   receipt_name: string | null;
   kitchen_print_name: string | null;
+  /** Enable quantity control for this option (default: false) */
+  enable_quantity?: boolean;
+  /** Maximum quantity allowed (only effective when enable_quantity=true) */
+  max_quantity?: number | null;
 }
 
 export interface Attribute {

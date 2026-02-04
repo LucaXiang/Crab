@@ -212,7 +212,11 @@ export const useCartStore = create<CartStore>((set, get) => ({
       
       // Fallback to local calculation
       const discountPercent = item.manual_discount_percent || 0;
-      const optionsModifier = (item.selected_options ?? []).reduce((acc, opt) => acc + (opt.price_modifier ?? 0), 0);
+      // Options modifier considers quantity for each option
+      const optionsModifier = (item.selected_options ?? []).reduce(
+        (acc, opt) => acc + (opt.price_modifier ?? 0) * (opt.quantity ?? 1),
+        0
+      );
       const basePrice = item.original_price ?? item.price;
       const baseUnitPrice = basePrice + optionsModifier;
       

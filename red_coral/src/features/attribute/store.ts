@@ -84,6 +84,8 @@ interface AttributeStore {
     is_active?: boolean;
     receipt_name?: string;
     kitchen_print_name?: string;
+    enable_quantity?: boolean;
+    max_quantity?: number | null;
   }) => Promise<void>;
   updateOption: (params: {
     attributeId: string;
@@ -96,6 +98,8 @@ interface AttributeStore {
     is_active?: boolean;
     receipt_name?: string;
     kitchen_print_name?: string;
+    enable_quantity?: boolean;
+    max_quantity?: number | null;
   }) => Promise<void>;
   deleteOption: (attributeId: string, index: number) => Promise<void>;
   reorderOptions: (attributeId: string, ids: string[]) => Promise<void>;

@@ -22,6 +22,8 @@ interface OptionFormData {
   priceModifier: number;
   displayOrder: number;
   isActive: boolean;
+  enableQuantity: boolean;
+  maxQuantity: number | null;
 }
 
 // Map AttributeOption (snake_case) to form data (camelCase)
@@ -34,6 +36,8 @@ const mapToFormData = (opt: AttributeOptionWithIndex | null): OptionFormData => 
       priceModifier: 0,
       displayOrder: 0,
       isActive: true,
+      enableQuantity: false,
+      maxQuantity: null,
     };
   }
   return {
@@ -43,6 +47,8 @@ const mapToFormData = (opt: AttributeOptionWithIndex | null): OptionFormData => 
     priceModifier: opt.price_modifier,
     displayOrder: opt.display_order,
     isActive: opt.is_active,
+    enableQuantity: opt.enable_quantity ?? false,
+    maxQuantity: opt.max_quantity ?? null,
   };
 };
 
@@ -109,6 +115,8 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
           price_modifier: data.priceModifier,
           display_order: data.displayOrder,
           is_active: true,
+          enable_quantity: data.enableQuantity,
+          max_quantity: data.enableQuantity ? data.maxQuantity : null,
         });
       },
       onUpdate: async (data) => {
@@ -124,6 +132,8 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
           price_modifier: data.priceModifier,
           display_order: data.displayOrder,
           is_active: data.isActive,
+          enable_quantity: data.enableQuantity,
+          max_quantity: data.enableQuantity ? data.maxQuantity : null,
         });
       },
       onSuccess: onClose,
@@ -230,6 +240,37 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
                 className={inputClass}
               />
             </FormField>
+
+            {/* 数量控制 */}
+            <CheckboxField
+              id="enableQuantity"
+              label={t('settings.attribute.option.form.enable_quantity')}
+              checked={formData.enableQuantity}
+              onChange={(checked) => handleFieldChange('enableQuantity', checked)}
+            />
+            <p className="text-xs text-gray-500 -mt-2 mb-2">
+              {t('settings.attribute.option.form.enable_quantity_hint')}
+            </p>
+
+            {formData.enableQuantity && (
+              <FormField label={t('settings.attribute.option.form.max_quantity')}>
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={formData.maxQuantity ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                    handleFieldChange('maxQuantity', val);
+                  }}
+                  placeholder={t('settings.attribute.option.form.max_quantity_placeholder')}
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {t('settings.attribute.option.form.max_quantity_hint')}
+                </p>
+              </FormField>
+            )}
 
             {editingOption && (
               <CheckboxField
