@@ -12,6 +12,7 @@ import { createTauriClient } from '@/infrastructure/api/tauri-client';
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useBridgeStore } from '@/core/stores/bridge';
 import { toast } from '@/presentation/components/Toast';
+import { t } from '@/infrastructure/i18n';
 import type { SystemIssue, ResolveSystemIssueRequest } from '@/core/domain/types/api';
 
 const client = createTauriClient();
@@ -44,7 +45,7 @@ export function useSystemIssueGuard() {
       setIssues(pending);
     } catch (err) {
       console.error('[SystemIssueGuard] Failed to fetch pending issues:', err);
-      toast.warning('系统问题检查失败');
+      toast.warning(t('system.issue_check_failed'));
     }
   }, [isServerAuthenticated]);
 

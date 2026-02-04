@@ -73,7 +73,7 @@ export const ShiftGuard: React.FC<ShiftGuardProps> = ({ children }) => {
       }
     } catch (err) {
       console.error('[ShiftGuard] 班次检查失败:', err);
-      setCheckError(err instanceof Error ? err.message : '班次状态检查失败');
+      setCheckError(err instanceof Error ? err.message : t('settings.shift.check_failed'));
       setIsChecking(false);
     }
   };

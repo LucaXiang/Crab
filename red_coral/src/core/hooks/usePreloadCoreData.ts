@@ -16,13 +16,14 @@ import { useTableStore } from '@/features/table';
 import { useCategoryStore } from '@/features/category';
 import { useProductStore } from '@/features/product';
 import { toast } from '@/presentation/components/Toast';
+import { t } from '@/infrastructure/i18n';
 
-// 核心资源：启动时预加载（带名称以便报错）
-const CORE_STORES: { name: string; fetch: () => Promise<unknown> }[] = [
-  { name: '区域', fetch: () => useZoneStore.getState().fetchAll() },
-  { name: '桌台', fetch: () => useTableStore.getState().fetchAll() },
-  { name: '分类', fetch: () => useCategoryStore.getState().fetchAll() },
-  { name: '商品', fetch: () => useProductStore.getState().fetchAll() },
+// 核心资源：启动时预加载（带 i18n key 以便报错）
+const CORE_STORES: { key: string; fetch: () => Promise<unknown> }[] = [
+  { key: 'common.resource.zone', fetch: () => useZoneStore.getState().fetchAll() },
+  { key: 'common.resource.table', fetch: () => useTableStore.getState().fetchAll() },
+  { key: 'common.resource.category', fetch: () => useCategoryStore.getState().fetchAll() },
+  { key: 'common.resource.product', fetch: () => useProductStore.getState().fetchAll() },
 ];
 
 /**
@@ -40,11 +41,11 @@ export function usePreloadCoreData(): boolean {
       );
 
       const failed = results
-        .map((r, i) => (r.status === 'rejected' ? CORE_STORES[i].name : null))
+        .map((r, i) => (r.status === 'rejected' ? t(CORE_STORES[i].key) : null))
         .filter((name): name is string => name !== null);
 
       if (failed.length > 0) {
-        toast.error(`核心数据加载失败: ${failed.join('、')}`);
+        toast.error(t('app.init.load_failed', { resources: failed.join(', ') }));
       }
 
       setReady(true);

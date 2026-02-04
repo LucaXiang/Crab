@@ -4,10 +4,10 @@
  * Loads translations from JSON files with nested structure support
  */
 
-export type Locale = 'zh-CN';
+export type Locale = 'zh-CN' | 'es-ES';
 
-// Supported locales (en-US disabled for now)
-export const SUPPORTED_LOCALES = ['zh-CN'] as const;
+// Supported locales
+export const SUPPORTED_LOCALES = ['zh-CN', 'es-ES'] as const;
 export type SupportedLocale = typeof SUPPORTED_LOCALES[number];
 
 // Default locale
@@ -19,6 +19,7 @@ let currentLocale: Locale = DEFAULT_LOCALE;
 // Flattened translations for quick lookup (loaded from JSON)
 const flattenedTranslations: Record<Locale, Record<string, string>> = {
   'zh-CN': {},
+  'es-ES': {},
 };
 
 // Subscribers for locale changes
@@ -51,12 +52,17 @@ function flattenObject(obj: Record<string, any>, prefix: string = ''): Record<st
  */
 async function loadTranslations(): Promise<void> {
   try {
-    const zhModule = await import('./locales/zh-CN.json');
+    const [zhModule, esModule] = await Promise.all([
+      import('./locales/zh-CN.json'),
+      import('./locales/es-ES.json'),
+    ]);
 
     flattenedTranslations['zh-CN'] = flattenObject(zhModule.default);
+    flattenedTranslations['es-ES'] = flattenObject(esModule.default);
   } catch (error) {
     console.error('Failed to load translations:', error);
     flattenedTranslations['zh-CN'] = {};
+    flattenedTranslations['es-ES'] = {};
   }
 }
 

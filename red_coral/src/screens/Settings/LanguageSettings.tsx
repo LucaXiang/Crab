@@ -28,7 +28,7 @@ export const LanguageSettings: React.FC = React.memo(() => {
             className="w-full border border-gray-200 rounded-lg p-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
           >
             <option value="zh-CN">{t('settings.language.lang.zh')}</option>
-            <option value="en-US">{t('settings.language.lang.en')}</option>
+            <option value="es-ES">{t('settings.language.lang.es')}</option>
           </select>
         </div>
         <div className="flex items-center gap-2 pt-1">

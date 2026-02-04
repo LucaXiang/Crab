@@ -1,0 +1,2293 @@
+{
+  "roles": {
+    "delete": {
+      "confirm": "¿Eliminar rol \"{name}\"? No se puede deshacer y afectará a usuarios asignados."
+    }
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "loading": "Cargando...",
+    "close": "Cerrar",
+    "actions": "Acciones",
+    "action": {
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "delete": "Eliminar",
+      "edit": "Editar",
+      "create": "Crear",
+      "confirm": "Confirmar",
+      "close": "Cerrar",
+      "back": "Volver",
+      "refresh": "Actualizar",
+      "print": "Imprimir",
+      "export": "Exportar",
+      "retry": "Reintentar",
+      "search": "Buscar",
+      "filter": "Filtrar",
+      "clear": "Limpiar",
+      "select": "Seleccionar",
+      "remove": "Quitar",
+      "change": "Cambiar",
+      "enable": "Activar",
+      "hide": "Ocultar",
+      "expand_all": "Expandir todo",
+      "collapse_all": "Contraer todo",
+      "batch_delete": "Eliminar selección",
+      "upload_image": "Subir imagen",
+      "actions": "Acciones"
+    },
+    "status": {
+      "all": "Todos",
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "void": "Anulado",
+      "cancelled": "Cancelado",
+      "enabled": "Activado",
+      "disabled": "Desactivado",
+      "disabled_global": "Desactivado (global)",
+      "show": "Mostrar",
+      "hide": "Ocultar"
+    },
+    "label": {
+      "name": "Nombre",
+      "description": "Descripción",
+      "total": "Total",
+      "details": "Detalles",
+      "default": "Por defecto",
+      "required": "Obligatorio",
+      "optional": "Opcional",
+      "date": "Fecha",
+      "page": "Página",
+      "entries": "registros",
+      "of": "de",
+      "to": "a",
+      "quantity": "Cantidad",
+      "items": "uds",
+      "all": "Todos",
+      "unknown_item": "Plato desconocido",
+      "none": "N/A",
+      "system": "Sistema",
+      "status": "Estado",
+      "is_active": "Estado",
+      "paidQuantity": "{qty} uds pagadas",
+      "retail": "Venta directa",
+      "loss_amount": "Pérdida"
+    },
+    "message": {
+      "loading": "Cargando...",
+      "success": "Éxito",
+      "error": "Error",
+      "submitting": "Enviando...",
+      "processing": "Procesando",
+      "saving": "Guardando...",
+      "save_success": "Guardado correctamente",
+      "save_failed": "Error al guardar",
+      "delete_failed": "Error al eliminar",
+      "load_failed": "Error al cargar datos",
+      "invalid_form": "Formulario inválido",
+      "sent_to_printer": "Enviado a impresora",
+      "exported": "Exportado",
+      "operation_failed": "Operación fallida",
+      "table_occupied_refresh": "Mesa {table} ocupada, actualice la lista",
+      "order_load_failed": "Pedido creado pero error al cargar, reintente",
+      "retail_order_failed": "Error al crear venta directa",
+      "cash_drawer_failed": "Error al abrir cajón: {message}"
+    },
+    "hint": {
+      "search_placeholder": "Buscar...",
+      "name_placeholder": "Introduzca nombre",
+      "description_placeholder": "Introduzca descripción",
+      "long_press_to_edit": "Mantenga pulsado para editar",
+      "tap_to_close": "Pulse para cerrar",
+      "please_select": "Seleccione",
+      "tip": "Aviso"
+    },
+    "empty": {
+      "no_data": "Sin datos",
+      "no_results": "Sin resultados"
+    },
+    "auth": {
+      "required": "Autorización requerida",
+      "denied": "Acceso denegado",
+      "denied_message": "No tiene permiso para esta acción",
+      "click_to_authorize": "Pulse para autorizar"
+    },
+    "selection": {
+      "selected": "Seleccionados",
+      "select_mode": "Modo selección",
+      "showing": "Mostrando"
+    },
+    "dialog": {
+      "ok": "Aceptar",
+      "close_app": "Cerrar aplicación",
+      "confirm_delete": "¿Confirmar eliminación?",
+      "yes": "Sí",
+      "no": "No",
+      "none": "Ninguno"
+    },
+    "resource": {
+      "zone": "Zona",
+      "table": "Mesa",
+      "category": "Categoría",
+      "product": "Plato"
+    },
+    "unit": {
+      "person": "pers."
+    }
+  },
+  "app": {
+    "brand": {
+      "name": "RedCoral",
+      "full_name": "RedCoral POS"
+    },
+    "action": {
+      "open_cash_drawer": "Abrir cajón",
+      "cash_drawer_opened": "Cajón abierto",
+      "cash_drawer_failed": "Error al abrir cajón"
+    },
+    "logout": {
+      "blocked": "No puede salir",
+      "description": "Las siguientes mesas no están cerradas:",
+      "hint": "Cierre todas las mesas antes de salir",
+      "and_more": "y {count} mesas más"
+    },
+    "empty_category": "Categoría vacía",
+    "status": {
+      "loading": "Cargando..."
+    },
+    "init": {
+      "error_title": "Error de inicio",
+      "error_default": "Error de inicio, no se puede conectar al servidor",
+      "load_failed": "Error cargando: {resources}"
+    },
+    "copyright": "© {year} RedCoral. Todos los derechos reservados."
+  },
+  "system": {
+    "syncing": "Sincronizando...",
+    "syncing_wait": "Sincronizando, espere...",
+    "disconnected": "Desconectado",
+    "disconnected_reconnecting": "Desconectado, reconectando...",
+    "initializing": "Iniciando...",
+    "initializing_wait": "Iniciando sistema...",
+    "issue_check_failed": "Error comprobando sistema"
+  },
+  "calendar": {
+    "days": {
+      "sunday": "Dom",
+      "monday": "Lun",
+      "tuesday": "Mar",
+      "wednesday": "Mié",
+      "thursday": "Jue",
+      "friday": "Vie",
+      "saturday": "Sáb"
+    }
+  },
+  "auth": {
+    "unauthorized": {
+      "message": "No tiene permiso para esta página"
+    },
+    "user": {
+      "role": "Rol"
+    },
+    "roles": {
+      "admin": "Administrador"
+    },
+    "activate": {
+      "title": "Activar dispositivo",
+      "description": "Introduzca credenciales para activar",
+      "username_label": "Usuario",
+      "username_placeholder": "Introduzca usuario",
+      "password_label": "Contraseña",
+      "password_placeholder": "Introduzca contraseña",
+      "button_submit": "Activar",
+      "error": {
+        "empty_fields": "Introduzca usuario y contraseña",
+        "failed": "Error de activación"
+      }
+    },
+    "login": {
+      "title": "Iniciar sesión",
+      "subtitle": "Bienvenido a RedCoral POS",
+      "subtitle_desc": "Introduzca sus credenciales",
+      "enter_details": "Introduzca datos de acceso",
+      "username": "Usuario",
+      "username_placeholder": "Introduzca usuario",
+      "password": "Contraseña",
+      "password_placeholder": "Introduzca contraseña",
+      "submit": "Entrar",
+      "error": {
+        "empty_fields": "Complete todos los campos",
+        "invalid_credentials": "Usuario o contraseña incorrectos"
+      },
+      "failed": "Error al iniciar sesión",
+      "feature": {
+        "multi_zone": "Gestión multi-zona",
+        "multi_zone_desc": "Soporte para múltiples zonas",
+        "fast_checkout": "Cobro rápido",
+        "fast_checkout_desc": "Experiencia de cobro eficiente"
+      },
+      "tenant_no_tenant": "Sin establecimiento",
+      "tenant_active": "Establecimiento actual",
+      "tenant_select_prompt": "Seleccione establecimiento",
+      "mode_current": "Modo actual",
+      "connection": "Conexión",
+      "connection_online": "En línea",
+      "connection_offline": "Sin conexión",
+      "mode_disconnected": "Desconectado",
+      "button_setup": "Configurar",
+      "button_switch": "Cambiar"
+    },
+    "supervisor_approval": "Requiere aprobación de supervisor"
+  },
+  "setup": {
+    "title": "Seleccionar modo",
+    "description": "Elija cómo ejecutar la aplicación",
+    "server_mode": {
+      "title": "Modo servidor",
+      "subtitle": "Ejecutar servidor local",
+      "description": "Ideal para TPV independiente. Datos locales con sincronización automática.",
+      "select": "Seleccionar"
+    },
+    "client_mode": {
+      "title": "Modo cliente",
+      "subtitle": "Conectar a servidor remoto",
+      "description": "Conectar a Edge Server existente. Requiere conexión de red.",
+      "select": "Seleccionar"
+    },
+    "configure_server_title": "Configurar modo servidor",
+    "configure_server_desc": "Configure puertos del servidor local",
+    "configure_client_title": "Configurar modo cliente",
+    "configure_client_desc": "Introduzca datos del servidor remoto",
+    "server": {
+      "http_port_label": "Puerto HTTP",
+      "http_port_help": "Puerto API HTTP (por defecto: 9625)",
+      "message_port_label": "Puerto mensajería",
+      "message_port_help": "Puerto tiempo real (por defecto: 9626)"
+    },
+    "client": {
+      "edge_url_label": "Dirección Edge Server",
+      "edge_url_help": "Dirección HTTPS del Edge Server",
+      "message_addr_label": "Dirección mensajería",
+      "message_addr_help": "Host:Puerto para mensajes"
+    },
+    "button_back": "Volver",
+    "button_start_server": "Iniciar servidor",
+    "button_start_client": "Iniciar cliente",
+    "complete_title": "¡Configuración completada!",
+    "complete_description": "Dispositivo activado en {mode}. Ya puede iniciar sesión.",
+    "complete_mode_server": "modo servidor",
+    "complete_mode_client": "modo cliente",
+    "button_continue": "Continuar",
+    "step": {
+      "mode": "Modo",
+      "configure": "Configurar",
+      "complete": "Completar"
+    }
+  },
+  "tenant_select": {
+    "title": "Seleccionar establecimiento",
+    "description": "Seleccione o añada un establecimiento",
+    "empty_state": "Sin establecimientos activados",
+    "button_select": "Seleccionar",
+    "button_remove": "Eliminar",
+    "button_add": "Añadir nuevo",
+    "confirm_remove": "¿Eliminar establecimiento?",
+    "confirm_cancel": "Cancelar",
+    "confirm_remove_button": "Eliminar",
+    "error": {
+      "switch_failed": "Error al cambiar",
+      "remove_failed": "Error al eliminar"
+    }
+  },
+  "pos": {
+    "loading_core_data": "Cargando datos...",
+    "search_product": "Buscar platos...",
+    "attributeRequired": "Seleccione {name}",
+    "all_categories": "Todas",
+    "sidebar": {
+      "get_order": "Recoger",
+      "drafts": "Aparcar",
+      "no_drafts": "Sin aparcados",
+      "hold": "Aparcar",
+      "save": "Guardar",
+      "clear": "Limpiar",
+      "checkout": "Cobrar"
+    },
+    "cart": {
+      "spec": "Variante",
+      "empty": "Pedido vacío",
+      "uncategorized": "Sin categoría",
+      "unknown_category": "Categoría desconocida",
+      "original": "P. original",
+      "surcharge": "Suplemento",
+      "unit_price": "P. unitario",
+      "base_price": "P. base",
+      "final_price": "P. final",
+      "custom": "Personalizado",
+      "subtotal": "Subtotal",
+      "enter_discount": "Introducir descuento",
+      "edit_item": "Editar plato",
+      "edit_final_price": "Pulse para editar precio",
+      "input": {
+        "quantity": "Introducir cantidad",
+        "price": "Introducir precio",
+        "discount": "Introducir % descuento",
+        "final_price": "Introducir precio final",
+        "base_price": "Introducir precio base"
+      }
+    },
+    "product": {
+      "options": "Opciones",
+      "specification_required": "Seleccione variante",
+      "select_options": "Seleccionar opciones",
+      "select_specification": "Seleccionar variante",
+      "no_options": "Sin opciones disponibles"
+    },
+    "quick_add": {
+      "title": "Añadir",
+      "no_products": "Sin platos disponibles",
+      "selected_items": "Seleccionados",
+      "select_prompt": "Seleccione platos a la derecha",
+      "per_unit": "/ud",
+      "confirm": "Confirmar"
+    },
+    "error": {
+      "product_not_found": "Plato no encontrado"
+    }
+  },
+  "checkout": {
+    "method": {
+      "cash": "Efectivo",
+      "card": "Tarjeta",
+      "cash_desc": "Pago en efectivo",
+      "card_desc": "Pago con tarjeta"
+    },
+    "amount": {
+      "due": "A pagar",
+      "paid": "Pagado",
+      "change": "Cambio",
+      "tendered": "Recibido",
+      "remaining": "Pendiente",
+      "total": "Total",
+      "paid_status": "Pagado",
+      "unit_price": "P. unitario"
+    },
+    "split": {
+      "title": "Dividir",
+      "label": "Dividir",
+      "total": "Importe parcial",
+      "success": "División correcta",
+      "failed": "Error al dividir",
+      "pay_cash": "Pagar efectivo",
+      "pay_card": "Pagar tarjeta",
+      "desc": "Dividir cuenta en pagos",
+      "available": "Disponible",
+      "remaining": "Restante",
+      "new_order": "Detalle parcial"
+    },
+    "aa_split": {
+      "title": "Partes iguales",
+      "desc": "Dividir entre comensales",
+      "locked": "División activa, no puede dividir por platos",
+      "paid_shares": "Pagadas",
+      "unpaid_shares": "Pendientes",
+      "shares_unit": "partes",
+      "split_into": "Dividir en",
+      "total_shares": "Total partes",
+      "pay_for": "Pagar",
+      "your_shares": "Partes a pagar",
+      "calculation": "Cálculo",
+      "amount_to_pay": "Importe"
+    },
+    "amount_split": {
+      "title": "Por importe",
+      "desc": "Pagar importe específico",
+      "aa_divide": "Dividir igual",
+      "people": "personas",
+      "custom_amount": "Importe personalizado",
+      "enter_amount": "Introducir importe",
+      "full_amount": "Total",
+      "split_amount": "Importe parcial",
+      "invalid_amount": "Importe inválido",
+      "exceeds_remaining": "Importe excede pendiente",
+      "failed": "Error al dividir",
+      "item_split_disabled": "División por importe activa"
+    },
+    "order_type": {
+      "dine_in": "En sala",
+      "takeout": "Para llevar"
+    },
+    "pre_payment": {
+      "receipt": "Ticket anticipo"
+    },
+    "void": {
+      "title": "Anular pedido",
+      "auth_required": "Anulación requiere supervisor",
+      "confirm": "Confirmar anulación",
+      "select_type": "Tipo de anulación",
+      "paid_amount": "Importe pagado",
+      "unpaid_amount": "Importe pendiente",
+      "type": {
+        "cancelled": "Cancelar pedido",
+        "cancelled_desc": "Pedido no pagado, cancelar directamente",
+        "loss_settled": "Liquidar pérdida",
+        "loss_settled_desc": "Pago parcial, pendiente como pérdida"
+      },
+      "cancel_reason": {
+        "title": "Motivo de cancelación",
+        "customer_cancelled": "Cliente cancela",
+        "system_test": "Prueba sistema",
+        "duplicate_order": "Pedido duplicado",
+        "other": "Otro motivo"
+      },
+      "loss_reason": {
+        "title": "Motivo de pérdida",
+        "customer_fled": "Impago",
+        "customer_insolvent": "Sin medios de pago",
+        "other": "Otro motivo"
+      },
+      "note": "Nota",
+      "note_placeholder": "Introducir nota...",
+      "loss_amount_notice": "Importe {amount} como pérdida"
+    },
+    "retail": {
+      "cancel_title": "Confirmar volver",
+      "cancel_description": "Volver anulará la venta. ¿Continuar?",
+      "cancel_confirm": "Confirmar anulación"
+    },
+    "error": {
+      "title": "Error de cobro",
+      "hint": "Error al cargar, reintente",
+      "insufficient": "Importe insuficiente",
+      "merge_failed": "Error al unir pedidos",
+      "move_failed": "Error al mover"
+    },
+    "table_order": "Pedido mesa",
+    "retail_order": "Venta directa",
+    "order_completed": "Pedido completado",
+    "payment": {
+      "confirm": "Confirmar pago",
+      "failed": "Pago fallido",
+      "method": "Método de pago",
+      "success": "Pago correcto",
+      "records": "Pagos",
+      "record_singular": "",
+      "record_plural": "",
+      "record_count": "pagos",
+      "change": "Cambio",
+      "tendered": "Recibido",
+      "total_paid": "Total pagado",
+      "split_items": "Platos divididos",
+      "cancel": "Cancelar pago",
+      "confirm_cancel": "¿Cancelar este pago?",
+      "confirm_cancel_split": "¿Cancelar este pago parcial? Los platos volverán al pedido.",
+      "cancel_success": "Pago cancelado",
+      "cancel_failed": "Error al cancelar",
+      "remaining": "Pendiente"
+    },
+    "items": {
+      "paid": "Platos pagados",
+      "unpaid": "Platos pendientes"
+    },
+    "cart": {
+      "discount": "Descuento"
+    },
+    "void_reason": {
+      "runaway": "Impago",
+      "dine_and_dash": "Fuga sin pagar",
+      "system_test": "Prueba sistema",
+      "owner_treat": "Invitación"
+    },
+    "timeline": {
+      "label": "Historial",
+      "title": "Historial"
+    },
+    "comp": {
+      "title": "Invitar",
+      "desc": "Plato gratis",
+      "reason_label": "Motivo",
+      "reason_placeholder": "Introducir motivo",
+      "preset": {
+        "customer_complaint": "Queja cliente",
+        "item_defect": "Defecto plato",
+        "promotion": "Promoción",
+        "staff_error": "Error empleado"
+      },
+      "quantity_label": "Cantidad",
+      "confirm": "Confirmar invitación",
+      "auth_required": "Invitación requiere autorización",
+      "badge": "Invitado",
+      "no_items": "Sin platos para invitar",
+      "select_item": "Seleccione plato a invitar",
+      "uncomp": "Revertir invitación",
+      "uncomp_confirm": "¿Revertir invitación? Se restaurará el precio.",
+      "uncomp_auth_required": "Revertir requiere autorización"
+    },
+    "order_discount": {
+      "title": "Descuento",
+      "desc": "Aplicar descuento al pedido",
+      "type_percent": "Porcentaje",
+      "type_fixed": "Importe fijo",
+      "percent_placeholder": "Introducir %",
+      "fixed_placeholder": "Introducir importe",
+      "reason_placeholder": "Motivo (opcional)",
+      "confirm": "Aplicar",
+      "clear": "Quitar descuento",
+      "current_percent": "Descuento: {value}%",
+      "current_fixed": "Descuento: {value}",
+      "auth_required": "Descuento requiere autorización"
+    },
+    "order_surcharge": {
+      "title": "Suplemento",
+      "desc": "Aplicar suplemento al pedido",
+      "type_percent": "Porcentaje",
+      "type_fixed": "Importe fijo",
+      "percent_placeholder": "Introducir %",
+      "amount_placeholder": "Introducir importe",
+      "reason_placeholder": "Motivo (opcional)",
+      "confirm": "Aplicar",
+      "clear": "Quitar recargo",
+      "current": "Suplemento: {value}",
+      "current_percent": "Suplemento: {value}%",
+      "auth_required": "Suplemento requiere autorización"
+    },
+    "breakdown": {
+      "comp": "Invitaciones",
+      "manual_discount": "Dto. manual",
+      "rule_discount": "Dto. regla",
+      "rule_surcharge": "Suplemento regla",
+      "order_discount": "Dto. pedido",
+      "order_surcharge": "Suplemento pedido"
+    },
+    "order_detail": {
+      "title": "Detalle",
+      "desc": "Ver información completa"
+    },
+    "error": {
+      "no_receipt_number": "Pedido sin número",
+      "insufficient": "Importe insuficiente",
+      "title": "Error al cobrar",
+      "hint": "Reintente o contacte al administrador",
+      "merge_failed": "Error al unir pedidos",
+      "move_failed": "Error al mover pedido"
+    },
+    "paidQty": "{qty} uds pagadas"
+  },
+  "table": {
+    "filter": {
+      "all": "Todas",
+      "empty": "Libres",
+      "occupied": "Ocupadas",
+      "pre_payment": "Con anticipo"
+    },
+    "no_tables": "Sin mesas disponibles",
+    "action": {
+      "manage": "Gestionar",
+      "merge": "Unir",
+      "move": "Mover",
+      "price_rules": "Reglas precio"
+    },
+    "description": {
+      "move": "Mover pedido a otra mesa",
+      "price_rules": "Ver y gestionar reglas"
+    },
+    "price_rules": {
+      "order_level": "Nivel pedido",
+      "applied_to": "Aplicado a",
+      "no_rules": "Sin reglas de precio aplicadas",
+      "skipped": "Omitida",
+      "rule_enabled": "Regla activada",
+      "rule_disabled": "Regla omitida",
+      "toggle_failed": "Error al cambiar estado"
+    },
+    "auth_required": {
+      "merge": "Unir mesas requiere supervisor",
+      "move": "Mover mesas requiere supervisor"
+    },
+    "warning": {
+      "cannot_move_with_payments": "No puede mover con platos pagados"
+    },
+    "combine_description": "Unir pedidos de dos mesas",
+    "selection": {
+      "back": "Volver",
+      "title": "Seleccionar mesa",
+      "retrieve": "Recuperar"
+    },
+    "select_target": "Seleccionar mesa destino",
+    "zones": "Zonas",
+    "guests": "comensales",
+    "ghost_orders": "Ventas directas",
+    "add_items": "Añadir",
+    "open_table": "Abrir mesa",
+    "confirm_add": "Confirmar añadir",
+    "confirm_open": "Confirmar abrir"
+  },
+  "history": {
+    "sidebar": {
+      "title": "Historial",
+      "search": "Buscar pedidos..."
+    },
+    "no_orders": "Sin pedidos",
+    "load_more": "Cargar más",
+    "no_more": "No hay más",
+    "status": {
+      "voided": "Anulado",
+      "moved": "Movido",
+      "merged": "Unido"
+    },
+    "void_type": {
+      "CANCELLED": "Cancelado",
+      "LOSS_SETTLED": "Pérdida"
+    },
+    "loss_reason": {
+      "CUSTOMER_FLED": "Impago",
+      "CUSTOMER_INSOLVENT": "Sin medios",
+      "OTHER": "Otro"
+    },
+    "action": {
+      "reprint": "Reimprimir"
+    },
+    "info": {
+      "select_order": "Seleccione pedido",
+      "table": "Mesa",
+      "total_amount": "Total",
+      "order_items": "Platos",
+      "removed_items": "Eliminados",
+      "order_id": "Nº pedido",
+      "status": "Estado",
+      "operator": "Operador"
+    },
+    "payment": {
+      "details": "Detalle pagos",
+      "no_payments": "Sin pagos",
+      "cancel": "Cancelar pago",
+      "confirm_cancel": "¿Cancelar pago?",
+      "confirm_cancel_split": "¿Cancelar pago parcial? Los platos volverán al pedido.",
+      "cancel_success": "Pago cancelado",
+      "cancel_failed": "Error al cancelar",
+      "split_type": {
+        "item": "Por platos",
+        "amount": "Por importe",
+        "aa": "A partes iguales"
+      },
+      "aa_shares_unit": "partes"
+    }
+  },
+  "statistics": {
+    "sidebar": {
+      "title": "Estadísticas",
+      "overview": "Resumen",
+      "analytics": "Análisis",
+      "daily_report": "Informe diario",
+      "audit_log": "Auditoría"
+    },
+    "time": {
+      "today": "Hoy",
+      "week": "Semana",
+      "month": "Mes",
+      "custom": "Personalizado"
+    },
+    "date_range": "Rango fechas",
+    "top_products": "Más vendidos",
+    "error": {
+      "load": "Error al cargar estadísticas"
+    },
+    "report": {
+      "sales": "Informe ventas",
+      "detailed_coming_soon": "Informe detallado próximamente"
+    },
+    "chart": {
+      "revenue_trend": "Tendencia ingresos",
+      "sales_by_category": "Ventas por categoría"
+    },
+    "metric": {
+      "avg_order_value": "Ticket medio",
+      "cash_revenue": "Efectivo",
+      "card_revenue": "Tarjeta",
+      "other_revenue": "Otros",
+      "avg_guest_spend": "Gasto/comensal",
+      "avg_dining_time": "Tiempo medio",
+      "voided_orders": "Anulados",
+      "total_discount": "Descuentos",
+      "orders": "Pedidos",
+      "revenue": "Ingresos",
+      "customers": "Comensales"
+    },
+    "status": {
+      "completed": "Completado",
+      "voided": "Anulado",
+      "merged": "Unido"
+    }
+  },
+  "timeline": {
+    "add_items": "Añadir",
+    "added_items": "Añadidos {n} platos",
+    "empty": "Sin historial",
+    "merged_back": "Unido a",
+    "note_cleared": "Nota eliminada",
+    "note_added": "Nota añadida",
+    "guests_count": "{n} comensales",
+    "receipt_no": "Ticket: {n}",
+    "payment": "Pago",
+    "split_bill": "División",
+    "item_split": "División por platos",
+    "amount_split": "División por importe",
+    "aa_split_started": "División igual",
+    "aa_split_paid": "Pago parcial",
+    "aa_split_cancelled": "División cancelada",
+    "aa_split_cancelled_summary": "{n} personas original",
+    "item_modified": "Plato modificado",
+    "item_removed": "Plato eliminado",
+    "order_completed": "Pedido completado",
+    "order_voided": "Pedido anulado",
+    "table_order": "Pedido mesa",
+    "item_restored": "Plato restaurado",
+    "payment_cancelled": "Pago cancelado",
+    "order_merged": "Pedido unido",
+    "order_moved": "Pedido movido",
+    "order_moved_out": "Pedido transferido",
+    "order_merged_out": "Unión transferida",
+    "pre_payment_printed": "Ticket anticipo",
+    "pre_payment_note": "Nota anticipo",
+    "item_comped": "Plato invitado",
+    "item_uncomped": "Invitación revertida",
+    "discount_applied": "Descuento aplicado",
+    "discount_cleared": "Descuento eliminado",
+    "surcharge_applied": "Suplemento aplicado",
+    "surcharge_cleared": "Suplemento eliminado",
+    "surcharge_exempt": "Suplemento exento",
+    "from": "De",
+    "to": "A",
+    "table_moved": "Mesa movida",
+    "table_reassigned": "Mesa reasignada",
+    "order_info_updated": "Pedido actualizado",
+    "merged_out": "Unido y transferido",
+    "moved_out": "Movido y transferido",
+    "labels": {
+      "guests": "Comensales",
+      "receipt": "Ticket",
+      "table": "Mesa",
+      "zone": "Zona",
+      "price": "Precio",
+      "quantity": "Cantidad",
+      "discount": "Descuento",
+      "surcharge": "Suplemento",
+      "total": "Total",
+      "subtotal": "Subtotal",
+      "pre_payment": "Anticipo",
+      "reason": "Motivo",
+      "loss_amount": "Pérdida",
+      "previous": "Anterior",
+      "authorizer": "Autorizado por",
+      "affected_quantity": "Cantidad afectada",
+      "items": "Platos"
+    },
+    "operation": {
+      "APPLY_DISCOUNT": "Aplicar descuento",
+      "MODIFY_PRICE": "Modificar precio",
+      "MODIFY_QUANTITY": "Modificar cantidad",
+      "APPLY_SURCHARGE": "Aplicar recargo",
+      "MODIFY_OPTIONS": "Modificar opciones",
+      "MODIFY_NOTE": "Modificar nota",
+      "MODIFY_ITEM": "Modificar plato"
+    },
+    "retail_mode": "Venta directa",
+    "rule_toggled": "Regla cambiada",
+    "rule_skipped": "Omitida",
+    "rule_applied": "Aplicada",
+    "option_added": "Añadido",
+    "option_removed": "Eliminado"
+  },
+  "draft": {
+    "action": {
+      "restore": "Recuperar"
+    },
+    "list": {
+      "title": "Aparcados",
+      "empty": "Sin pedidos aparcados"
+    }
+  },
+  "error": {
+    "load_attributes": "Error al cargar atributos",
+    "message": {
+      "title": "Error",
+      "description": "Error desconocido, reintente más tarde."
+    },
+    "action": {
+      "reload": "Recargar",
+      "auto_reload": "Recarga automática",
+      "view_details": "Ver detalles",
+      "copy_details": "Copiar detalles"
+    },
+    "status": {
+      "reloading": "Recargando..."
+    },
+    "friendly": {
+      "network": "No se puede conectar al servidor. Compruebe la conexión.",
+      "auth": "Error de autenticación. Compruebe credenciales.",
+      "certificate": "Error de certificado. Reactive el dispositivo.",
+      "port": "Puerto ocupado. Pruebe otro puerto.",
+      "activation": "Dispositivo no activado. Active primero.",
+      "unknown": "Operación fallida, reintente"
+    }
+  },
+  "settings": {
+    "sidebar": {
+      "title": "Configuración"
+    },
+    "price_rule": {
+      "title": "Reglas de precio",
+      "description": "Gestionar descuentos y recargos",
+      "unit": "reglas",
+      "search_placeholder": "Buscar regla...",
+      "column": {
+        "name": "Nombre",
+        "type": "Tipo",
+        "value": "Valor",
+        "scope": "Ámbito",
+        "time": "Vigencia",
+        "status": "Estado"
+      },
+      "add_rule": "Añadir regla",
+      "edit_rule": "Editar regla",
+      "delete_rule": "Eliminar regla",
+      "rule_deleted": "Regla eliminada",
+      "type": {
+        "discount": "Descuento",
+        "surcharge": "Suplemento"
+      },
+      "scope": {
+        "global": "Todos los platos",
+        "category": "Por categoría",
+        "tag": "Por etiqueta",
+        "product": "Platos específicos"
+      },
+      "time": {
+        "always": "Siempre",
+        "schedule": "Programado",
+        "onetime": "Una vez"
+      },
+      "zone": {
+        "all": "Todas las zonas",
+        "retail": "Venta directa"
+      },
+      "adjustment": {
+        "percentage": "Porcentaje",
+        "fixed": "Importe fijo"
+      },
+      "form": {
+        "name": "Nombre regla",
+        "display_name": "Nombre visible",
+        "receipt_name": "Nombre ticket",
+        "description": "Descripción",
+        "priority": "Prioridad",
+        "is_stackable": "Acumulable",
+        "is_exclusive": "Exclusiva"
+      },
+      "confirm": {
+        "delete": "¿Eliminar regla?"
+      },
+      "message": {
+        "created": "Regla creada",
+        "updated": "Regla actualizada",
+        "deleted": "Regla eliminada"
+      },
+      "delete_confirm_title": "Eliminar regla",
+      "delete_confirm_message": "¿Eliminar regla \"{name}\"?",
+      "wizard": {
+        "title": "Crear regla",
+        "edit_title": "Editar regla",
+        "step1_title": "Tipo",
+        "step2_title": "Valor",
+        "step3_title": "Ámbito",
+        "step4_title": "Vigencia",
+        "step5_title": "Nombre",
+        "step6_title": "Avanzado",
+        "step1_section": "Tipo de regla",
+        "step2_section": "Ajuste",
+        "step3_section": "Ámbito",
+        "step4_section": "Vigencia",
+        "step5_section": "Nombre",
+        "step6_section": "Avanzado",
+        "step1_desc": "Seleccione tipo de regla",
+        "step2_desc": "Configure cálculo y valor",
+        "step3_desc": "Seleccione platos y zonas",
+        "step4_desc": "Configure vigencia",
+        "step5_desc": "Nombre y descripción",
+        "step6_desc": "Prioridad y comportamiento",
+        "rule_type": "Tipo de regla",
+        "discount_option": "Descuento",
+        "surcharge_option": "Suplemento",
+        "discount_desc": "Reducir precio: promociones, ofertas...",
+        "surcharge_desc": "Cargo adicional: servicio, envío...",
+        "adjustment_type": "Cálculo",
+        "discount_value": "Valor descuento",
+        "surcharge_value": "Valor recargo",
+        "percentage_hint": "1-100, ej: 10 = 10%",
+        "fixed_hint": "Importe en €, ej: 5 = 5,00€",
+        "preview": "Vista previa",
+        "preview_discount_percent": "Descuento de {value}%",
+        "preview_discount_fixed": "Descuento de €{value}/ud",
+        "preview_surcharge_percent": "Suplemento de {value}%",
+        "preview_surcharge_fixed": "Suplemento de €{value}/ud",
+        "product_scope": "Ámbito platos",
+        "scope_global_desc": "Todos los platos",
+        "scope_category_desc": "Categorías específicas",
+        "scope_tag_desc": "Platos con etiqueta",
+        "scope_product_desc": "Platos específicos",
+        "select_category": "Seleccionar categoría",
+        "select_tag": "Seleccionar etiqueta",
+        "select_product": "Seleccionar plato",
+        "zone_scope": "Ámbito zonas",
+        "zone_scope_desc": "Zonas donde aplica, vacío = todas",
+        "time_always_desc": "Sin límite de tiempo",
+        "time_schedule_desc": "Horarios semanales",
+        "time_onetime_desc": "Período único",
+        "active_days": "Días activos",
+        "start_time": "Hora inicio",
+        "end_time": "Hora fin",
+        "valid_from": "Desde",
+        "valid_until": "Hasta",
+        "name_hint": "Identificador interno, usar guiones bajos",
+        "display_name_placeholder": "Ej: Menú mediodía",
+        "display_name_hint": "Nombre mostrado en TPV",
+        "receipt_name_placeholder": "Ej: Dto. mediodía",
+        "receipt_name_hint": "Nombre en ticket",
+        "description_placeholder": "Descripción...",
+        "summary_title": "Resumen",
+        "priority_hint": "Mayor = más prioridad",
+        "stackable_hint": "Combinar con otras reglas",
+        "exclusive_hint": "No combinar con otras reglas",
+        "advanced_tip": "Normalmente no necesita cambiar estas opciones.",
+        "next": "Siguiente",
+        "prev": "Anterior",
+        "finish": "Crear",
+        "save": "Guardar"
+      }
+    },
+    "zone": {
+      "title": "Gestión de zonas",
+      "form": {
+        "name": "Nombre zona"
+      },
+      "unit": "zonas",
+      "add_zone": "Añadir zona",
+      "edit_zone": "Editar zona",
+      "delete_zone": "Eliminar zona",
+      "zone_deleted": "Zona eliminada",
+      "message": {
+        "created": "Zona creada",
+        "updated": "Zona actualizada"
+      }
+    },
+    "store": {
+      "title": "Info establecimiento",
+      "description": "Datos básicos y contacto",
+      "form": {
+        "basic_info": "Información básica",
+        "establishment_name": "Nombre",
+        "logo_url": "URL Logo",
+        "logo_help": "Ruta local o URL",
+        "contact_info": "Contacto",
+        "address": "Dirección",
+        "tax_id": "NIF/CIF",
+        "phone": "Teléfono",
+        "email": "Email",
+        "website": "Web",
+        "business_settings": "Configuración negocio",
+        "business_day_cutoff": "Cierre día",
+        "business_day_cutoff_help": "Para turnos e informes. Restaurantes: 00:00, bares: 06:00",
+        "cutoff_presets": {
+          "midnight": "Medianoche (00:00) - Restaurantes",
+          "early_morning": "Madrugada (06:00) - Bares"
+        }
+      }
+    },
+    "batch_delete": {
+      "confirm_title": "Confirmar eliminación",
+      "zones_blocked": "No puede eliminar zonas con mesas",
+      "zones_failed": "Error al eliminar zonas",
+      "failed": "Error al eliminar"
+    },
+    "batchDelete": {
+      "confirmDeleteZones": "¿Eliminar {count} zonas? No se puede deshacer.",
+      "zonesSuccess": "{count} zonas eliminadas",
+      "confirmDeleteTables": "¿Eliminar {count} mesas? No se puede deshacer.",
+      "tablesSuccess": "Mesas eliminadas"
+    },
+    "product": {
+      "title": "Gestión de platos",
+      "description": "Gestionar carta y precios",
+      "confirm": {
+        "delete": "¿Eliminar plato? No se puede deshacer."
+      },
+      "list": {
+        "confirmBatchDelete": "¿Eliminar {count} platos? No se puede deshacer."
+      },
+      "form": {
+        "name": "Nombre plato",
+        "name_placeholder": "Introducir nombre",
+        "name_required": "Nombre requerido",
+        "category": "Categoría",
+        "select_category": "Seleccionar categoría",
+        "price": "Precio",
+        "price_base_hint": "Precio variante por defecto",
+        "tax_rate": "IVA (%)",
+        "tax_rate_general": "General (21%)",
+        "tax_rate_reduced": "Reducido (10%)",
+        "tax_rate_super_reduced": "Superreducido (4%)",
+        "tax_rate_exempt": "Exento (0%)",
+        "external_id": "Código",
+        "external_id_placeholder": "Introducir código",
+        "image": "Imagen",
+        "image_hint": "JPG, PNG, WEBP"
+      },
+      "no_products": "Sin platos",
+      "print": {
+        "settings": "Impresión",
+        "kitchen_printing": "Cocina",
+        "label_printing": "Etiquetas",
+        "receipt_printing": "Tickets",
+        "is_kitchen_print_enabled": "Imprimir en cocina",
+        "is_label_print_enabled": "Imprimir etiqueta",
+        "kitchen_print_name": "Nombre cocina",
+        "kitchen_print_name_placeholder": "Vacío = nombre plato",
+        "effective_state": "Activo",
+        "receipt_name": "Nombre ticket",
+        "receipt_name_placeholder": "Vacío = nombre plato"
+      },
+      "specification": {
+        "title": "Variantes",
+        "manage": "Gestionar variantes",
+        "no_configured": "Sin variantes",
+        "disabled": "Variantes desactivadas",
+        "hint": "Pulse \"Gestionar variantes\"",
+        "label": {
+          "default": "Por defecto"
+        }
+      },
+      "attribute": {
+        "title": "Atributos",
+        "manage": "Gestionar atributos",
+        "no_selected": "Sin atributos",
+        "add": "Añadir atributo",
+        "select": "Seleccionar atributo",
+        "inherited": "Heredado de categoría",
+        "description": "Opciones y variantes del plato",
+        "hint": {
+          "multi_select": "Múltiple",
+          "single_select": "Único",
+          "no_default": "Sin defecto",
+          "default_set": "Con defecto"
+        }
+      },
+      "tags": {
+        "title": "Etiquetas",
+        "description": "Clasificar y filtrar platos",
+        "manage": "Gestionar etiquetas",
+        "no_selected": "Sin etiquetas",
+        "system_tag_hint": "Etiqueta sistema, no editable"
+      },
+      "list": {
+        "batch_delete_title": "Confirmar eliminación",
+        "batch_delete_success": "Eliminados correctamente",
+        "batch_delete_failed": "Error al eliminar"
+      },
+      "add_product": "Añadir plato",
+      "edit_product": "Editar plato",
+      "delete_product": "Eliminar plato",
+      "product_deleted": "Plato eliminado",
+      "header": {
+        "category": "Categoría",
+        "products": "Platos"
+      },
+      "message": {
+        "created": "Plato creado",
+        "updated": "Plato actualizado"
+      }
+    },
+    "tag": {
+      "title": "Gestión etiquetas",
+      "description": "Gestionar etiquetas de platos",
+      "unit": "etiquetas",
+      "name": "Nombre",
+      "name_placeholder": "Introducir nombre",
+      "color": "Color",
+      "display_order": "Orden",
+      "add_tag": "Añadir etiqueta",
+      "edit_tag": "Editar etiqueta",
+      "delete_tag": "Eliminar etiqueta",
+      "tag_deleted": "Etiqueta eliminada",
+      "preview": "Vista previa",
+      "sample_tag": "Ejemplo",
+      "select_title": "Seleccionar etiqueta",
+      "no_tags_available": "Sin etiquetas",
+      "message": {
+        "created": "Etiqueta creada",
+        "updated": "Etiqueta actualizada"
+      }
+    },
+    "category": {
+      "title": "Gestión categorías",
+      "description": "Gestionar categorías de platos",
+      "unit": "categorías",
+      "confirm": {
+        "delete": "¿Eliminar categoría? Los platos quedarán sin categoría."
+      },
+      "header": {
+        "sort": "Ordenar"
+      },
+      "add_category": "Añadir categoría",
+      "edit_category": "Editar categoría",
+      "delete_category": "Eliminar categoría",
+      "adjust_category_order": "Ajustar orden",
+      "category_deleted": "Categoría eliminada",
+      "create_category_success": "Categoría creada",
+      "update_category_success": "Categoría actualizada",
+      "tab": {
+        "normal": "Normales",
+        "virtual": "Virtuales"
+      },
+      "form": {
+        "name": "Nombre",
+        "name_placeholder": "Introducir nombre",
+        "attributes": "Atributos categoría",
+        "attributes_hint": "Los platos heredarán estos atributos",
+        "virtual_settings": "Config. virtual",
+        "is_virtual": "Tipo",
+        "regular_category": "Normal",
+        "virtual_category": "Virtual (por etiqueta)",
+        "match_mode": "Coincidencia",
+        "match_any": "Cualquier etiqueta",
+        "match_all": "Todas las etiquetas",
+        "filter_tags": "Etiquetas filtro",
+        "no_tags_available": "Sin etiquetas",
+        "select_tags_hint": "Seleccione al menos una etiqueta",
+        "is_display": "Mostrar en inicio"
+      },
+      "required": "Seleccione categoría",
+      "create_first": "Cree una categoría primero"
+    },
+    "attribute": {
+      "title": "Gestión atributos",
+      "description": "Gestionar atributos y opciones",
+      "unit": "atributos",
+      "hint": {
+        "add_first": "Añada el primer atributo"
+      },
+      "section": {
+        "basic": "Básico",
+        "print": "Impresión",
+        "advanced": "Avanzado"
+      },
+      "form": {
+        "name": "Nombre",
+        "name_placeholder": "Introducir nombre",
+        "name_required": "Nombre requerido",
+        "type": "Tipo",
+        "receipt_name": "Nombre ticket",
+        "receipt_name_placeholder": "Vacío = nombre atributo",
+        "sort": "Orden",
+        "is_global": "Global",
+        "is_global_desc": "Aplicar a todos los platos",
+        "kitchen_printer": "Impresora cocina",
+        "show_on_receipt": "Mostrar en ticket",
+        "show_on_receipt_hint": "Mostrar opciones en ticket",
+        "status": "Estado",
+        "status_hint": "Desactivado no aparece en TPV",
+        "is_multi_select": "Múltiple",
+        "is_multi_select_desc": "Permitir varias opciones",
+        "max_selections": "Máx. selecciones",
+        "max_selections_placeholder": "Vacío = sin límite",
+        "max_selections_hint": "0 o vacío = sin límite",
+        "kitchen_print_name": "Nombre cocina",
+        "kitchen_print_name_placeholder": "Vacío = nombre atributo",
+        "scope": "Ámbito",
+        "show_on_kitchen_print": "Mostrar en cocina",
+        "show_on_kitchen_print_hint": "Mostrar opciones en ticket cocina"
+      },
+      "type": {
+        "single_required": "Único obligatorio",
+        "single_optional": "Único opcional",
+        "multi_required": "Múltiple obligatorio",
+        "multi_optional": "Múltiple opcional",
+        "single_select": "Único",
+        "multi_select": "Múltiple"
+      },
+      "add_attribute": "Añadir atributo",
+      "edit_attribute": "Editar atributo",
+      "delete_attribute": "Eliminar atributo",
+      "option": {
+        "title": "Opciones",
+        "delete_option": "Eliminar opción",
+        "hint": {
+          "add_first": "Añada la primera opción"
+        },
+        "form": {
+          "name": "Nombre",
+          "name_placeholder": "Introducir nombre",
+          "name_required": "Nombre requerido",
+          "receipt_name": "Nombre ticket",
+          "receipt_name_placeholder": "Vacío = nombre opción",
+          "value_code": "Código",
+          "value_code_placeholder": "Introducir código",
+          "price": "Suplemento",
+          "price_hint": "+/-, ej: +1.50 o -0.50",
+          "sort": "Orden",
+          "default": "Por defecto",
+          "set_as_default": "Establecer defecto",
+          "status": "Estado",
+          "kitchen_print_name": "Nombre cocina",
+          "kitchen_print_name_placeholder": "Vacío = nombre opción"
+        },
+        "add_option": "Añadir opción",
+        "edit_option": "Editar opción",
+        "set_default": "Establecer defecto",
+        "unset_default": "Quitar defecto"
+      },
+      "scope": {
+        "global": "Global",
+        "inherited": "Heredado"
+      },
+      "error": {
+        "max_defaults": "Máximo {n} opciones por defecto"
+      },
+      "confirm": {
+        "delete": "¿Eliminar atributo \"{name}\"?",
+        "deleteOption": "¿Eliminar opción \"{name}\"?"
+      }
+    },
+    "table": {
+      "title": "Gestión mesas",
+      "zone_management": "Mesas y zonas",
+      "zone_management_desc": "Gestionar mesas y zonas",
+      "form": {
+        "name": "Nombre mesa",
+        "name_placeholder": "Introducir nombre",
+        "capacity": "Capacidad"
+      },
+      "add_table": "Añadir mesa",
+      "edit_table": "Editar mesa",
+      "delete_table": "Eliminar mesa",
+      "table_deleted": "Mesa eliminada",
+      "confirm": {
+        "delete": "¿Eliminar mesa? No se puede deshacer."
+      },
+      "message": {
+        "created": "Mesa creada",
+        "updated": "Mesa actualizada"
+      },
+      "zone": {
+        "confirm": {
+          "delete": "¿Eliminar?"
+        },
+        "form": {
+          "name": "Nombre zona",
+          "name_placeholder": "Introducir nombre",
+          "description": "Descripción",
+          "description_placeholder": "Descripción (opcional)"
+        }
+      }
+    },
+    "user": {
+      "title": "Gestión empleados",
+      "description": "Gestionar empleados y permisos",
+      "list": "Empleados",
+      "roles": "Roles",
+      "section": {
+        "account": "Cuenta",
+        "profile": "Perfil"
+      },
+      "form": {
+        "username": "Usuario",
+        "username_placeholder": "Introducir usuario",
+        "username_cannot_change": "Usuario no modificable",
+        "password": "Contraseña",
+        "password_placeholder": "Introducir contraseña",
+        "display_name": "Nombre",
+        "display_name_placeholder": "Introducir nombre",
+        "role": "Rol",
+        "active_status": "Activo",
+        "admin_cannot_disable": "Admin no desactivable",
+        "admin_role_cannot_change": "Rol admin no modificable",
+        "password_required": "Contraseña requerida",
+        "password_too_short": "Mínimo 6 caracteres",
+        "password_mismatch": "Contraseñas no coinciden",
+        "username_required": "Usuario requerido",
+        "display_name_required": "Nombre requerido"
+      },
+      "add_user": "Añadir empleado",
+      "edit_user": "Editar empleado",
+      "reset_password_user": "Cambiar contraseña",
+      "disable_user": "Desactivar empleado",
+      "delete_permanently_user": "Eliminar definitivamente",
+      "column": {
+        "user": "Empleado",
+        "created_at": "Creado",
+        "actions": "Acciones"
+      },
+      "filter": {
+        "show_inactive": "Mostrar inactivos"
+      },
+      "message": {
+        "cannot_delete_self": "No puede eliminarse a sí mismo",
+        "cannot_delete_admin": "No puede eliminar admin",
+        "update_success": "Empleado actualizado",
+        "delete_success": "Eliminado",
+        "update_failed": "Error al actualizar",
+        "delete_failed": "Error al eliminar",
+        "load_roles_failed": "Error al cargar roles",
+        "reset_password_success": "Contraseña cambiada",
+        "reset_password_failed": "Error al cambiar contraseña",
+        "create_success": "Empleado creado"
+      },
+      "confirm": {
+        "disable": "¿Desactivar usuario \"{name}\"?",
+        "deletePermanently": "¿Eliminar usuario \"{name}\" permanentemente? No se puede deshacer."
+      },
+      "unit": "empleados"
+    },
+    "printer": {
+      "title": "Impresoras",
+      "description": "Gestionar impresoras, cocina y etiquetas",
+      "kitchen_printing": {
+        "title": "Cocina",
+        "disabled": "Cocina desactivada",
+        "enable_to_configure": "Active para configurar estaciones y formatos",
+        "select_printer_to_enable": "Seleccione impresora tickets para activar cocina"
+      },
+      "label_printing": "Etiquetas",
+      "tab": {
+        "local": "Impresoras locales",
+        "stations": "Estaciones",
+        "templates": "Plantillas"
+      },
+      "local_printers": {
+        "description": "Impresoras conectadas a este dispositivo.",
+        "current": "Actual"
+      },
+      "print_stations": {
+        "title": "Estaciones",
+        "description": "Rutas de impresión del servidor. Cree estaciones para cocina, tickets, etc.",
+        "unit": "estaciones",
+        "add": "Añadir estación",
+        "edit": "Editar estación",
+        "bound_printers": "Impresoras asignadas",
+        "type_local": "Local",
+        "type_network": "Red",
+        "name_placeholder": "Ej: Cocina, Tickets",
+        "printer_config": "Config. impresora",
+        "ip_address": "IP",
+        "port": "Puerto",
+        "port_hint": "Por defecto 9100"
+      },
+      "badge": {
+        "pos": "TPV",
+        "label": "Etiqueta",
+        "fallback": "Reserva"
+      },
+      "message": {
+        "loading_printers": "Cargando impresoras...",
+        "no_printers": "Sin impresoras",
+        "no_printer": "Sin impresora",
+        "printer_unavailable": "Impresora no disponible"
+      },
+      "kitchen_station": {
+        "title": "Estaciones cocina",
+        "no_data": "Cree su primera estación",
+        "default_name": "Estación",
+        "add_station": "Añadir estación",
+        "edit_station": "Editar estación"
+      },
+      "form": {
+        "target_printer": "Impresora destino",
+        "select_system_printer": "Seleccionar impresora...",
+        "select_printer_placeholder": "Seleccionar...",
+        "main_station": "Impresora",
+        "receipt_printer": "Impresora tickets",
+        "receipt_printer_desc": "Tickets cliente",
+        "cash_drawer_printer": "Impresora cajón",
+        "cash_drawer_printer_desc": "Control cajón",
+        "label_printer_desc": "Etiquetas",
+        "default_global_printer": "Cocina por defecto",
+        "default_global_printer_desc": "Cuando no hay estación específica"
+      },
+      "cash_drawer": {
+        "test": "Probar cajón",
+        "testing": "Probando...",
+        "test_success": "Cajón abierto",
+        "test_failed": "Error al abrir",
+        "use_receipt_printer": "Usar impresora tickets",
+        "auto_open_after_receipt": "Abrir tras ticket"
+      },
+      "routing_system": {
+        "title": "Sistema enrutamiento cocina",
+        "summary": "Los pedidos se enrutan según plato y categoría",
+        "hierarchy": "Prioridad",
+        "priority": "Principal",
+        "switch_hierarchy": "Prioridad: Global > Plato > Categoría",
+        "stations": "Estaciones",
+        "level_product": "Plato",
+        "level_category": "Categoría",
+        "level_global": "Global"
+      },
+      "template": {
+        "new": "Nueva plantilla",
+        "create_template": "Crear plantilla",
+        "edit_design": "Editar diseño",
+        "duplicate_template": "Duplicar",
+        "form": {
+          "name": "Nombre",
+          "name_placeholder": "Ej: Etiqueta 50x30mm",
+          "width_mm": "Ancho (mm)",
+          "height_mm": "Alto (mm)"
+        }
+      },
+      "alert": {
+        "delete_last_template": "No puede eliminar última plantilla",
+        "confirm_delete": "¿Eliminar?",
+        "confirm_delete_desc": "No se puede deshacer"
+      }
+    },
+    "data_transfer": {
+      "title": "Importar/Exportar",
+      "description": "Backup o migración (platos, categorías, zonas, mesas)",
+      "export": {
+        "title": "Exportar",
+        "description": "Exportar datos e imágenes como ZIP.",
+        "button": "Exportar ZIP",
+        "success": "Exportado"
+      },
+      "import": {
+        "title": "Importar",
+        "description": "Importar desde ZIP. Duplicados ignorados.",
+        "button": "Importar ZIP",
+        "success": "Importado, datos actualizados"
+      },
+      "warning": {
+        "title": "Aviso",
+        "item1": "IDs duplicados se ignoran.",
+        "item2": "Imágenes se extraen automáticamente.",
+        "item3": "Haga backup antes de importar."
+      }
+    },
+    "language": {
+      "title": "Idioma",
+      "lang": {
+        "zh": "Chino",
+        "es": "Español"
+      }
+    },
+    "system": {
+      "title": "Sistema",
+      "ui_scale": {
+        "title": "Escala interfaz",
+        "description": "Ajustar tamaño elementos",
+        "reset": "Restablecer"
+      },
+      "font_optimization": {
+        "title": "Optimizar fuentes",
+        "description": "Mejorar renderizado texto"
+      },
+      "clear_cache": {
+        "title": "Limpiar caché",
+        "description": "Eliminar datos locales",
+        "confirm_title": "¿Limpiar caché?",
+        "confirm_description": "La app se recargará"
+      },
+      "performance_mode": "Modo rendimiento",
+      "performance_mode_desc": "Sin animaciones, fuentes sistema, menos efectos"
+    },
+    "permissions": {
+      "menu_manage": "Gestión carta",
+      "tables_manage": "Gestión mesas",
+      "shifts_manage": "Gestión turnos",
+      "reports_view": "Ver informes",
+      "price_rules_manage": "Reglas precio",
+      "settings_manage": "Configuración",
+      "orders_void": "Anular pedidos",
+      "orders_discount": "Aplicar descuentos",
+      "orders_comp": "Invitar platos",
+      "orders_refund": "Devoluciones",
+      "orders_modify_price": "Modificar precios",
+      "cash_drawer_open": "Abrir cajón",
+      "group": {
+        "modular": "Módulos",
+        "modular_desc": "Por función",
+        "sensitive": "Sensibles",
+        "sensitive_desc": "Operaciones de alto riesgo"
+      }
+    },
+    "roles": {
+      "list": {
+        "title": "Roles"
+      },
+      "select_role": "Seleccione rol",
+      "admin_lock": {
+        "title": "Administrador",
+        "desc": "Rol con todos los permisos, no modificable"
+      },
+      "form": {
+        "title": "Crear rol",
+        "add": "Añadir rol",
+        "id": "ID",
+        "id_placeholder": "Minúsculas, números, guiones bajos",
+        "id_hint": "No modificable después",
+        "name": "Nombre",
+        "name_placeholder": "Introducir nombre",
+        "desc": "Descripción",
+        "desc_placeholder": "Descripción (opcional)",
+        "submit": "Crear",
+        "delete_title": "Eliminar rol",
+        "error_empty": "ID y nombre requeridos",
+        "error_format": "ID: minúsculas, números, guiones bajos",
+        "create_success": "Rol creado",
+        "delete_success": "Rol eliminado",
+        "no_description": "Sin descripción"
+      },
+      "message": {
+        "load_failed": "Error al cargar permisos"
+      }
+    },
+    "form": {
+      "placeholder": {
+        "capacity": "4",
+        "price": "0.00",
+        "sort_order": "0"
+      },
+      "basic_info": "Información básica",
+      "extended_info": "Información adicional"
+    },
+    "specification": {
+      "list": "Variantes",
+      "loading": "Cargando variantes...",
+      "no_specs": "Sin variantes",
+      "create_first": "Cree la primera variante",
+      "add_new": "Añadir variante",
+      "edit": "Editar variante",
+      "form": {
+        "name": "Nombre",
+        "name_placeholder": "Ej: Grande, Picante",
+        "price": "Precio",
+        "external_id": "Código",
+        "external_id_placeholder": "Introducir código",
+        "base_spec_price_hint": "Precio base en info plato",
+        "set_default": "Por defecto",
+        "set_default_hint": "Selección inicial",
+        "name_required": "Nombre requerido",
+        "price_required": "Precio válido requerido",
+        "receipt_name": "Nombre ticket",
+        "receipt_name_placeholder": "Nombre en ticket",
+        "is_root": "Base",
+        "is_root_hint": "Variante base no eliminable"
+      },
+      "action": {
+        "save": "Crear variante",
+        "update": "Guardar",
+        "delete": "Eliminar"
+      },
+      "message": {
+        "load_failed": "Error al cargar",
+        "root_cannot_delete": "Base no eliminable",
+        "partial_create_failed": "Error variante, plato creado",
+        "updated": "Variante actualizada",
+        "created": "Variante creada",
+        "deleted": "Variante eliminada"
+      },
+      "confirm": {
+        "delete": "¿Eliminar variante?"
+      },
+      "label": {
+        "root": "Base",
+        "default": "Defecto",
+        "set_default": "Establecer defecto",
+        "cancel_default": "Quitar defecto"
+      },
+      "manage": "Gestionar variantes",
+      "multi_disabled": "Variantes desactivadas",
+      "enable_multi_hint": "Active para añadir variantes",
+      "enable_multi": "Activar variantes"
+    },
+    "status": {
+      "saved": "Guardado"
+    },
+    "label": {
+      "templates": "Plantillas",
+      "width": "Ancho",
+      "height": "Alto",
+      "layers": "Capas",
+      "toggle_layers": "Ver capas",
+      "toggle_properties": "Ver propiedades",
+      "print_test_label": "Imprimir prueba",
+      "select_field_hint": "Seleccione campo",
+      "field_properties": "Propiedades",
+      "display_label": "Etiqueta",
+      "placeholder": "Introducir etiqueta",
+      "x_position": "Posición X",
+      "y_position": "Posición Y",
+      "font_size": "Tamaño fuente",
+      "font_family": "Fuente",
+      "font_style": "Estilo",
+      "style_regular": "Normal",
+      "style_bold": "Negrita",
+      "text_align": "Alinear horizontal",
+      "vertical_align": "Alinear vertical",
+      "content_template": "Plantilla contenido",
+      "text_template_hint": "Use {campo} para datos, ej: {product_name}",
+      "image_template_hint": "Use {campo} para datos",
+      "source_type": "Origen",
+      "source_type_image": "Imagen estática",
+      "source_type_product_image": "Imagen plato",
+      "source_type_qrcode": "QR",
+      "source_type_barcode": "Código barras",
+      "static_image": "Imagen",
+      "static_image_hint": "Se sube al guardar",
+      "select_image": "Seleccionar imagen",
+      "pending_upload": "Pendiente subir",
+      "maintain_aspect_ratio": "Mantener proporción",
+      "separator_hint": "Línea separadora",
+      "field": {
+        "new_text": "Nuevo texto",
+        "default_text": "Texto defecto",
+        "new_image": "Nueva imagen",
+        "default_separator": "Separador",
+        "text": "Texto",
+        "image": "Imagen",
+        "line": "Línea"
+      },
+      "select_printer_first": "Seleccione impresora",
+      "invalid_json": "JSON inválido",
+      "test_sent": "Prueba enviada",
+      "test_failed": "Prueba fallida",
+      "horizontal_line": "Línea horizontal",
+      "no_layers": "Sin capas",
+      "template_name": "Nombre plantilla",
+      "width_mm": "Ancho (mm)",
+      "height_mm": "Alto (mm)",
+      "padding_x": "Margen X",
+      "padding_y": "Margen Y",
+      "show_offset_border": "Mostrar borde offset",
+      "render_dpi": "DPI",
+      "render_dpi_hint": "Normalmente 203 o 300",
+      "select_element_hint": "Pulse para seleccionar",
+      "test_data_json": "Datos prueba (JSON)",
+      "fill_sample": "Rellenar ejemplo",
+      "test_data_hint": "Use {campo}",
+      "zoom_in": "Ampliar",
+      "zoom_out": "Reducir",
+      "fit_to_screen": "Ajustar",
+      "field_key": "Campo",
+      "description": "Descripción",
+      "example": "Ejemplo",
+      "field_helper_hint": "Soporta referencias"
+    },
+    "payment": {
+      "amount_insufficient": "Importe insuficiente",
+      "amount_must_be_positive": "Importe debe ser > 0",
+      "receipt_print_success": "Ticket impreso",
+      "receipt_print_failed": "Error al imprimir, compruebe impresora"
+    },
+    "supported_fields": "Campos disponibles",
+    "all_attributes_selected": "Todos seleccionados",
+    "external_id_required": "Código requerido",
+    "external_id_exists": "Código ya existe",
+    "unsaved_confirm": "Cambios sin guardar",
+    "unsaved_confirm_hint": "¿Salir sin guardar?",
+    "kitchen_printer": "Impresora cocina",
+    "reset_password": "Cambiar contraseña",
+    "new_password": "Nueva contraseña",
+    "enter_new_password": "Introducir nueva contraseña",
+    "password_min_length": "Mínimo 6 caracteres",
+    "confirm_password": "Confirmar contraseña",
+    "confirm_password_placeholder": "Repetir contraseña",
+    "reset_password_warning": "Efectivo inmediatamente",
+    "reorder_failed": "Error al ordenar",
+    "product_order": "Ordenar platos",
+    "drag_to_reorder": "Arrastrar para ordenar",
+    "common": {
+      "untitled": "Sin nombre",
+      "properties": "Propiedades",
+      "actions": "Acciones"
+    },
+    "shift": {
+      "title": "Gestión turnos",
+      "description": "Turnos, arqueo y cierres",
+      "unit": "turnos",
+      "search_placeholder": "Buscar turno...",
+      "empty": "Sin turnos",
+      "load_failed": "Error al cargar",
+      "current_shift": "Turno actual",
+      "started_at": "Iniciado",
+      "expected_cash": "Efectivo esperado",
+      "force_close_default_note": "Recuperación del sistema",
+      "action": {
+        "close": "Cerrar turno",
+        "force_close": "Forzar cierre"
+      },
+      "header": {
+        "operator": "Empleado",
+        "start_time": "Inicio",
+        "end_time": "Fin",
+        "duration": "Duración",
+        "starting_cash": "Fondo caja",
+        "expected_cash": "Esperado",
+        "actual_cash": "Real",
+        "variance": "Diferencia",
+        "status": "Estado"
+      },
+      "status": {
+        "open": "Abierto",
+        "closed": "Cerrado",
+        "abnormal_closed": "Cierre anómalo"
+      },
+      "open_shift": "Abrir turno",
+      "close_shift": "Cerrar turno",
+      "force_close_shift": "Forzar cierre",
+      "no_active_shift": "Sin turno activo",
+      "no_active_shift_hint": "Abra turno para comenzar",
+      "active_shift_warning": "Turno activo",
+      "active_shift_hint": "Cierre turno actual primero",
+      "stale_shift_warning": "Turno con cierre anómalo",
+      "stale_shift_hint": "Turno no cerrado correctamente",
+      "recover_stale": "Gestionar turno",
+      "checking": "Comprobando estado...",
+      "check_failed": "Error comprobando turno",
+      "open_success": "Turno abierto",
+      "close_success_balanced": "Turno cerrado, cuadrado",
+      "close_success_variance": "Turno cerrado, diferencia: {variance}",
+      "force_close_success": "Turno cerrado forzosamente",
+      "stale_shifts_closed": "{count} turnos antiguos cerrados automáticamente",
+      "force_closed_notice_title": "Cierre anómalo",
+      "force_closed_notice_hint": "Abra nuevo turno para continuar.",
+      "open_new_shift": "Abrir nuevo turno",
+      "settlement_notice_title": "Hora de cierre",
+      "settlement_notice_message": "Ha llegado la hora de cierre configurada.",
+      "go_to_settlement": "Cerrar turno",
+      "action_failed": "Operación fallida",
+      "invalid_amount": "Importe inválido",
+      "variance": {
+        "balanced": "Cuadrado",
+        "over": "Sobrante",
+        "short": "Faltante"
+      },
+      "modal": {
+        "open_title": "Abrir turno",
+        "close_title": "Arqueo cierre",
+        "force_close_title": "Forzar cierre",
+        "operator": "Empleado",
+        "starting_cash": "Fondo caja",
+        "starting_cash_hint": "Efectivo inicial en caja",
+        "expected_cash": "Esperado",
+        "actual_cash": "Real",
+        "variance": "Diferencia",
+        "note": "Nota",
+        "note_placeholder": "Nota (opcional)",
+        "force_close_warning_title": "¿Forzar cierre?",
+        "force_close_warning": "Sin arqueo. Solo para recuperación. No reversible.",
+        "force_close_default_note": "Recuperación sistema"
+      },
+      "exit_guard": {
+        "title": "Turno abierto",
+        "message": "¿Cerrar turno antes de salir?",
+        "close_and_exit": "Cerrar y salir",
+        "exit_directly": "Salir directamente"
+      }
+    },
+    "daily_report": {
+      "title": "Informe diario",
+      "description": "Ver y generar informes diarios",
+      "unit": "informes",
+      "search_placeholder": "Buscar fecha...",
+      "empty": "Sin informes",
+      "load_failed": "Error al cargar",
+      "header": {
+        "date": "Fecha",
+        "orders": "Pedidos",
+        "sales": "Ventas",
+        "paid": "Cobrado",
+        "unpaid": "Pendiente",
+        "void": "Anulado",
+        "tax": "IVA"
+      },
+      "no_today_report": "Sin informe de hoy",
+      "no_today_report_hint": "Genere al cerrar",
+      "generate": "Generar",
+      "generate_today": "Generar hoy",
+      "detail_title": "Detalle informe",
+      "summary": {
+        "total_sales": "Total ventas",
+        "total_paid": "Cobrado",
+        "total_unpaid": "Pendiente"
+      },
+      "section": {
+        "orders": "Pedidos",
+        "tax": "IVA",
+        "payment": "Pagos",
+        "additional": "Adicional"
+      },
+      "stat": {
+        "total": "Total",
+        "completed": "Completados",
+        "void": "Anulados",
+        "void_amount": "Importe anulado"
+      },
+      "orders_count": "pedidos",
+      "payments_count": "pagos",
+      "tax_amount": "IVA",
+      "no_tax_data": "Sin datos IVA",
+      "no_payment_data": "Sin datos pago",
+      "total_discount": "Descuentos",
+      "total_surcharge": "Suplementos",
+      "generated_by": "Generado por",
+      "generated_at": "Fecha generación",
+      "note": "Nota",
+      "generate": {
+        "title": "Generar informe",
+        "date_label": "Fecha",
+        "date_hint": "Fecha del informe",
+        "date_required": "Fecha requerida",
+        "future_date_warning": "No puede ser futura",
+        "note_label": "Nota",
+        "note_placeholder": "Nota (opcional)",
+        "info": "El informe resume pedidos, IVA y pagos del día.",
+        "submit": "Generar",
+        "success": "Informe generado",
+        "failed": "Error al generar",
+        "already_exists": "Ya existe informe"
+      }
+    }
+  },
+  "system_issue": {
+    "kind": {
+      "abnormal_shutdown": {
+        "title": "Cierre anómalo",
+        "description": "Sistema detectó cierre incorrecto (último inicio: {last_start_timestamp}). Indique motivo."
+      },
+      "long_downtime": {
+        "title": "Inactividad prolongada",
+        "description": "Sistema inactivo más de {downtime_hours} horas. Indique motivo."
+      }
+    },
+    "option": {
+      "power_outage": "Corte luz",
+      "app_crash": "Fallo aplicación",
+      "device_failure": "Fallo dispositivo",
+      "maintenance_restart": "Mantenimiento",
+      "day_off": "Día libre",
+      "equipment_repair": "Reparación",
+      "renovation": "Reformas",
+      "vacation": "Vacaciones",
+      "other": "Otro"
+    },
+    "resolve_success": "Respuesta enviada",
+    "resolve_failed": "Error al enviar",
+    "input_placeholder": "Indique motivo..."
+  },
+  "errors": {
+    "0": "Éxito",
+    "1": "Error desconocido",
+    "2": "Validación fallida",
+    "3": "No encontrado",
+    "4": "Ya existe",
+    "5": "Petición inválida",
+    "6": "Formato inválido",
+    "7": "Campo requerido vacío",
+    "8": "Valor fuera de rango",
+    "1001": "Inicie sesión primero",
+    "1002": "Usuario o contraseña incorrectos",
+    "1003": "Sesión expirada",
+    "1004": "Credenciales inválidas",
+    "1005": "Sesión expirada",
+    "1006": "Cuenta bloqueada",
+    "1007": "Cuenta desactivada",
+    "2001": "Sin permiso",
+    "2002": "Rol requerido",
+    "2003": "Requiere admin",
+    "2004": "No puede modificar admin",
+    "2005": "No puede eliminar admin",
+    "3001": "Seleccione establecimiento",
+    "3002": "Establecimiento no existe",
+    "3003": "Error activación",
+    "3004": "Certificado inválido",
+    "3005": "Licencia expirada",
+    "4001": "Pedido no existe",
+    "4002": "Pedido ya pagado",
+    "4003": "Pedido completado",
+    "4004": "Pedido anulado",
+    "4005": "Pedido tiene pagos",
+    "4006": "Plato no existe",
+    "4007": "Pedido vacío",
+    "5001": "Pago fallido",
+    "5002": "Importe insuficiente",
+    "5003": "Método pago inválido",
+    "5004": "Ya devuelto",
+    "5005": "Devolución excede pago",
+    "6001": "Plato no existe",
+    "6002": "Precio inválido",
+    "6003": "Sin stock",
+    "6101": "Categoría no existe",
+    "6102": "Categoría tiene platos",
+    "6103": "Categoría ya existe",
+    "6201": "Variante no existe",
+    "6202": "Código ya existe",
+    "6203": "Código requerido",
+    "6301": "Atributo no existe",
+    "6302": "Error vinculando atributo",
+    "7001": "Mesa no existe",
+    "7002": "Mesa ocupada",
+    "7003": "Mesa libre",
+    "7101": "Zona no existe",
+    "7102": "Zona tiene mesas",
+    "7103": "Zona ya existe",
+    "8001": "Empleado no existe",
+    "8002": "Usuario ya existe",
+    "8003": "No puede eliminarse a sí mismo",
+    "8101": "Rol no existe",
+    "8102": "Rol ya existe",
+    "8103": "Rol en uso",
+    "9001": "Error interno",
+    "9002": "Error base datos",
+    "9003": "Error red",
+    "9004": "Timeout",
+    "9005": "Error configuración",
+    "9101": "Sistema no iniciado",
+    "9102": "Sin conexión servidor",
+    "9103": "Error conexión",
+    "9201": "Impresora no disponible",
+    "9202": "Error impresión",
+    "9203": "Etiquetas en desarrollo",
+    "9301": "Cliente desconectado",
+    "3006": "Suscripción pausada",
+    "9401": "Sin espacio",
+    "9402": "Sin memoria",
+    "9403": "Datos corruptos",
+    "9404": "Sistema ocupado"
+  },
+  "subscription": {
+    "status": {
+      "Inactive": "Inactivo",
+      "Active": "Activo",
+      "PastDue": "Vencido",
+      "Expired": "Expirado",
+      "Canceled": "Cancelado",
+      "Unpaid": "Impago",
+      "Unknown": "Desconocido"
+    }
+  },
+  "subscriptionBlocked": {
+    "title": "Suscripción bloqueada",
+    "plan": "Plan actual",
+    "expired_at": "Expiración",
+    "grace_period_ends": "Fin período gracia",
+    "button_renew": "Renovar / Actualizar",
+    "button_contact_support": "Contactar soporte",
+    "button_recheck": "Comprobar estado",
+    "rechecking": "Comprobando...",
+    "still_blocked": "Suscripción inválida, renueve",
+    "button_exit_tenant": "Salir establecimiento",
+    "confirm_exit_tenant": "¿Salir? Deberá reactivar.",
+    "message": {
+      "Inactive": "Suscripción inactiva",
+      "Expired": "Contrato expirado",
+      "Canceled": "Suscripción cancelada",
+      "Unpaid": "Suscripción impaga"
+    },
+    "planType": {
+      "basic": "Básico",
+      "pro": "Profesional",
+      "enterprise": "Empresa"
+    }
+  },
+  "fonts": {
+    "arial": "Arial",
+    "microsoft_ya_hei": "Microsoft YaHei",
+    "segoe_u_i": "Segoe UI",
+    "times_new_roman": "Times New Roman",
+    "courier_new": "Courier New"
+  },
+  "activation": {
+    "title": "Reactivación necesaria",
+    "button_reactivate": "Reactivar",
+    "button_retry_later": "Más tarde",
+    "reason": {
+      "FirstTimeSetup": "¡Bienvenido! Active su dispositivo",
+      "CertificateExpired": "Certificado expirado hace {days_overdue} días",
+      "CertificateExpiringSoon": "Certificado expira en {days_remaining} días",
+      "CertificateInvalid": "Certificado corrupto",
+      "SignatureInvalid": "Verificación fallida",
+      "DeviceMismatch": "Hardware cambiado",
+      "ClockTampering_backward": "Hora retrocedida {hours} h",
+      "ClockTampering_forward": "Hora adelantada {days} días",
+      "BindingInvalid": "Vinculación inválida",
+      "TokenExpired": "Credenciales expiradas",
+      "NetworkError": "Sin conexión servidor",
+      "Revoked": "Dispositivo revocado"
+    },
+    "hint": {
+      "first_time_setup": "Introduzca credenciales admin",
+      "certificate_expired": "Reactive para renovar",
+      "certificate_expiring_soon": "Reactive pronto",
+      "certificate_invalid": "Certificado corrupto, reactive",
+      "signature_invalid": "Verificación fallida, reactive",
+      "device_mismatch": "Hardware nuevo, contacte admin",
+      "clock_tampering": "Compruebe hora sistema",
+      "binding_invalid": "Vinculación inválida, reactive",
+      "token_expired": "Credenciales expiradas, reactive",
+      "network_error_offline_ok": "Funciona offline, sincroniza online",
+      "network_error": "Compruebe conexión",
+      "revoked": "Contacte admin"
+    },
+    "detail": {
+      "certificate_expired_at": "Expiró: {expired_at}",
+      "clock_backward": "Hora retrocedida, compruebe ajustes.",
+      "clock_forward": "Hora adelantada, compruebe ajustes."
+    }
+  },
+  "audit": {
+    "title": "Auditoría",
+    "entries": "registros",
+    "system": "Sistema",
+    "error": {
+      "load": "Error al cargar"
+    },
+    "column": {
+      "time": "Hora",
+      "action": "Acción",
+      "resource": "Recurso",
+      "operator": "Operador"
+    },
+    "detail": {
+      "details": "Detalles",
+      "operator_id": "ID Operador",
+      "prev_hash": "Hash anterior",
+      "curr_hash": "Hash actual",
+      "field": {
+        "name": "Nombre",
+        "display_name": "Nombre visible",
+        "description": "Descripción",
+        "username": "Usuario",
+        "role_name": "Rol",
+        "permissions": "Permisos",
+        "reason": "Motivo",
+        "epoch": "Época",
+        "receipt_number": "Nº Ticket",
+        "status": "Estado",
+        "total": "Total",
+        "final_total": "Total final",
+        "subtotal": "Subtotal",
+        "item_count": "Nº platos",
+        "forced": "Forzado",
+        "starting_cash": "Fondo caja",
+        "expected_cash": "Esperado",
+        "actual_cash": "Real",
+        "cash_variance": "Diferencia",
+        "role": "Rol",
+        "is_active": "Activo",
+        "is_available": "Disponible",
+        "is_stackable": "Acumulable",
+        "is_exclusive": "Exclusiva",
+        "is_kitchen_print_enabled": "Impresión cocina",
+        "is_label_print_enabled": "Impresión etiquetas",
+        "kind": "Tipo",
+        "response": "Respuesta",
+        "source": "Origen",
+        "default_kitchen_printer": "Cocina defecto",
+        "default_label_printer": "Etiquetas defecto",
+        "original_name": "Nombre original",
+        "filename": "Archivo",
+        "size": "Tamaño",
+        "note": "Nota",
+        "last_start_timestamp": "Último inicio",
+        "detected_at": "Detectado",
+        "last_activity_timestamp": "Última actividad",
+        "downtime_ms": "Inactividad (ms)",
+        "downtime_hours": "Inactividad (h)",
+        "target": "Destino",
+        "payment_summary": "Resumen pago",
+        "paid_amount": "Pagado",
+        "table_name": "Mesa",
+        "zone_name": "Zona",
+        "void_type": "Tipo anulación",
+        "loss_reason": "Motivo pérdida",
+        "loss_amount": "Pérdida",
+        "void_note": "Nota anulación",
+        "source_table": "Mesa origen",
+        "target_table": "Mesa destino",
+        "target_zone": "Zona destino",
+        "merged_item_count": "Platos unidos",
+        "merged_payment_count": "Pagos unidos",
+        "merged_paid_amount": "Pagado unido",
+        "authorizer_id": "Autorizador",
+        "authorizer_name": "Nombre autorizador",
+        "price": "Precio",
+        "tax_rate": "IVA",
+        "category_id": "Categoría",
+        "tags": "Etiquetas",
+        "attributes": "Atributos",
+        "options": "Opciones",
+        "position": "Posición",
+        "mode": "Modo",
+        "rule_type": "Tipo regla",
+        "scope": "Ámbito",
+        "value": "Valor",
+        "valid_from": "Desde",
+        "valid_until": "Hasta",
+        "active_days": "Días activos",
+        "active_start_time": "Hora inicio",
+        "active_end_time": "Hora fin",
+        "priority": "Prioridad",
+        "capacity": "Capacidad",
+        "zone_id": "Zona",
+        "opened_at": "Abierto",
+        "closed_at": "Cerrado",
+        "printer_type": "Tipo impresora",
+        "address": "Dirección",
+        "port": "Puerto"
+      },
+      "note": "Nota",
+      "no_changes": "Sin cambios",
+      "value": {
+        "true": "Sí",
+        "false": "No",
+        "none": "Ninguno",
+        "invalid_credentials": "Contraseña incorrecta",
+        "user_not_found": "Usuario no existe",
+        "abnormal_shutdown": "Cierre anómalo",
+        "long_downtime": "Inactividad prolongada",
+        "local": "Local",
+        "remote": "Remoto",
+        "ACTIVE": "Activo",
+        "COMPLETED": "Completado",
+        "VOID": "Anulado",
+        "MOVED": "Movido",
+        "MERGED": "Unido",
+        "power_outage": "Corte luz",
+        "app_crash": "Fallo app",
+        "device_failure": "Fallo dispositivo",
+        "maintenance_restart": "Mantenimiento",
+        "other": "Otro",
+        "abnormal_shutdown_detected": "Cierre anómalo detectado",
+        "CANCELLED": "Cancelado",
+        "LOSS_SETTLED": "Pérdida",
+        "CUSTOMER_FLED": "Impago",
+        "CUSTOMER_INSOLVENT": "Sin medios",
+        "OTHER": "Otro",
+        "percentage": "Porcentaje",
+        "fixed_amount": "Importe fijo",
+        "discount": "Descuento",
+        "surcharge": "Suplemento",
+        "global": "Global",
+        "category": "Categoría",
+        "tag": "Etiqueta",
+        "product": "Plato",
+        "usb": "USB",
+        "network": "Red",
+        "default_spec": "Defecto"
+      },
+      "empty": "Sin detalles"
+    },
+    "filter": {
+      "all_actions": "Todas",
+      "all_resources": "Todos",
+      "search_operator": "Buscar operador...",
+      "title": "Filtros",
+      "button": "Filtrar",
+      "reset": "Limpiar",
+      "selected": "Seleccionados",
+      "resource_type_label": "Tipo recurso",
+      "action_optional": "Acción (opcional)"
+    },
+    "date": {
+      "today": "Hoy",
+      "yesterday": "Ayer",
+      "this_week": "Semana",
+      "this_month": "Mes",
+      "custom": "Personalizado"
+    },
+    "resource_type": {
+      "system": "Sistema",
+      "auth": "Autenticación",
+      "order": "Pedido",
+      "employee": "Empleado",
+      "role": "Rol",
+      "product": "Plato",
+      "category": "Categoría",
+      "tag": "Etiqueta",
+      "attribute": "Atributo",
+      "price_rule": "Regla precio",
+      "zone": "Zona",
+      "dining_table": "Mesa",
+      "shift": "Turno",
+      "print_config": "Config. impresión",
+      "print_destination": "Destino impresión",
+      "label_template": "Plantilla etiqueta",
+      "store_info": "Info establecimiento",
+      "system_issue": "Incidencia",
+      "upload": "Subida"
+    },
+    "group": {
+      "system": "Sistema",
+      "auth": "Autenticación",
+      "order": "Pedidos",
+      "management": "Gestión",
+      "catalog": "Carta",
+      "pricing": "Precios",
+      "venue": "Local",
+      "shift": "Turnos",
+      "config": "Configuración"
+    },
+    "action": {
+      "system_startup": "Inicio sistema",
+      "system_shutdown": "Cierre sistema",
+      "system_abnormal_shutdown": "Cierre anómalo",
+      "system_long_downtime": "Inactividad",
+      "resolve_system_issue": "Resolver incidencia",
+      "login_success": "Login correcto",
+      "login_failed": "Login fallido",
+      "logout": "Logout",
+      "order_completed": "Pedido completado",
+      "order_voided": "Pedido anulado",
+      "order_merged": "Pedido unido",
+      "order_moved": "Pedido movido",
+      "employee_created": "Empleado creado",
+      "employee_updated": "Empleado actualizado",
+      "employee_deleted": "Empleado eliminado",
+      "role_created": "Rol creado",
+      "role_updated": "Rol actualizado",
+      "role_deleted": "Rol eliminado",
+      "shift_opened": "Turno abierto",
+      "shift_closed": "Turno cerrado",
+      "print_config_changed": "Config. impresión cambiada",
+      "store_info_changed": "Info establecimiento cambiada",
+      "daily_report_generated": "Informe generado",
+      "product_created": "Plato creado",
+      "product_updated": "Plato actualizado",
+      "product_deleted": "Plato eliminado",
+      "category_created": "Categoría creada",
+      "category_updated": "Categoría actualizada",
+      "category_deleted": "Categoría eliminada",
+      "tag_created": "Etiqueta creada",
+      "tag_updated": "Etiqueta actualizada",
+      "tag_deleted": "Etiqueta eliminada",
+      "attribute_created": "Atributo creado",
+      "attribute_updated": "Atributo actualizado",
+      "attribute_deleted": "Atributo eliminado",
+      "price_rule_created": "Regla creada",
+      "price_rule_updated": "Regla actualizada",
+      "price_rule_deleted": "Regla eliminada",
+      "zone_created": "Zona creada",
+      "zone_updated": "Zona actualizada",
+      "zone_deleted": "Zona eliminada",
+      "table_created": "Mesa creada",
+      "table_updated": "Mesa actualizada",
+      "table_deleted": "Mesa eliminada",
+      "label_template_created": "Plantilla creada",
+      "label_template_updated": "Plantilla actualizada",
+      "label_template_deleted": "Plantilla eliminada",
+      "print_destination_created": "Destino creado",
+      "print_destination_updated": "Destino actualizado",
+      "print_destination_deleted": "Destino eliminado"
+    }
+  }
+}

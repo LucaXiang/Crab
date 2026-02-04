@@ -561,7 +561,7 @@ export const POSScreen: React.FC = () => {
 
     if (remaining && remaining.length > 0) {
       const names = remaining.map((o) => o.table_name || o.order_id).slice(0, 5).join('、');
-      const moreText = remaining.length > 5 ? ` 等 ${remaining.length} 个桌台` : '';
+      const moreText = remaining.length > 5 ? ` ${t('app.logout.and_more', { count: remaining.length })}` : '';
       setExitDialog({
         open: true,
         title: t('app.logout.blocked'),

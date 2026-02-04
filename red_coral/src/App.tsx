@@ -6,6 +6,7 @@ import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { useSyncListener, useOrderEventListener, useOrderTimelineSync, useSyncConnection, useSystemIssueGuard } from '@/core/hooks';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { t } from '@/infrastructure/i18n';
 
 // Components
 import { ToastContainer } from '@/presentation/components/Toast';
@@ -78,7 +79,7 @@ const useAppInitialization = () => {
       setIsInitialized(true);
     } catch (err) {
       console.error('[AppInit] 初始化失败:', err);
-      setError(err instanceof Error ? err.message : '初始化失败，无法连接后端服务');
+      setError(err instanceof Error ? err.message : t('app.init.error_default'));
     }
   };
 
@@ -281,13 +282,13 @@ const App: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">初始化失败</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">{t('app.init.error_title')}</h3>
             <p className="text-sm text-gray-600 mb-6">{error}</p>
             <button
               onClick={retry}
               className="px-6 py-2.5 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-colors"
             >
-              重试
+              {t('common.action.retry')}
             </button>
           </div>
         </div>

@@ -1,4 +1,9 @@
 {
+  "roles": {
+    "delete": {
+      "confirm": "确定要删除角色 \"{name}\" 吗？此操作无法撤销，且会影响已分配该角色的用户。"
+    }
+  },
   "common": {
     "cancel": "取消",
     "confirm": "确认",
@@ -28,8 +33,6 @@
       "hide": "隐藏",
       "expand_all": "全部展开",
       "collapse_all": "全部收起",
-      "expand": "展开",
-      "collapse": "收起",
       "batch_delete": "批量删除",
       "upload_image": "上传图片",
       "actions": "操作"
@@ -60,9 +63,9 @@
       "of": "/",
       "to": "至",
       "quantity": "数量",
-      "items": "项",
+      "items": "份",
       "all": "全部",
-      "unknown_item": "未知项目",
+      "unknown_item": "未知菜品",
       "none": "N/A",
       "system": "系统",
       "status": "状态",
@@ -95,7 +98,7 @@
       "search_placeholder": "搜索...",
       "name_placeholder": "请输入名称",
       "description_placeholder": "请输入描述",
-      "long_press_to_edit": "提示：长按或双击行即可编辑",
+      "long_press_to_edit": "长按或双击可编辑",
       "tap_to_close": "点击关闭",
       "please_select": "请选择",
       "tip": "提示"
@@ -116,26 +119,27 @@
       "showing": "显示"
     },
     "dialog": {
-      "ok": "我知道了",
+      "ok": "确定",
       "close_app": "关闭应用",
       "confirm_delete": "确认删除吗？",
       "yes": "是",
       "no": "否",
       "none": "无"
     },
-    "discount": {
-      "off": "折扣",
-      "free": "免单"
+    "resource": {
+      "zone": "区域",
+      "table": "桌台",
+      "category": "分类",
+      "product": "菜品"
+    },
+    "unit": {
+      "person": "人"
     }
   },
   "app": {
     "brand": {
       "name": "RedCoral",
       "full_name": "RedCoral POS"
-    },
-    "nav": {
-      "pos": "收银",
-      "history": "历史"
     },
     "action": {
       "open_cash_drawer": "打开钱箱",
@@ -145,12 +149,19 @@
     "logout": {
       "blocked": "无法登出",
       "description": "以下桌台仍未结单：",
-      "hint": "请先结账或清空桌台后再登出"
+      "hint": "请先将所有桌台结账或清台后再登出",
+      "and_more": "等 {count} 个桌台"
     },
-    "empty_category": "此分类暂无商品",
+    "empty_category": "此分类暂无菜品",
     "status": {
       "loading": "加载中..."
-    }
+    },
+    "init": {
+      "error_title": "初始化失败",
+      "error_default": "初始化失败，无法连接后端服务",
+      "load_failed": "数据加载失败: {resources}"
+    },
+    "copyright": "© {year} RedCoral. 版权所有."
   },
   "system": {
     "syncing": "系统同步中...",
@@ -158,7 +169,8 @@
     "disconnected": "连接已断开",
     "disconnected_reconnecting": "连接已断开，请等待重连...",
     "initializing": "初始化中...",
-    "initializing_wait": "系统初始化中..."
+    "initializing_wait": "系统初始化中...",
+    "issue_check_failed": "系统检查失败"
   },
   "calendar": {
     "days": {
@@ -208,6 +220,7 @@
         "empty_fields": "请填写所有字段",
         "invalid_credentials": "用户名或密码错误"
       },
+      "failed": "登录失败",
       "feature": {
         "multi_zone": "多区域管理",
         "multi_zone_desc": "支持多个营业区域",
@@ -270,9 +283,6 @@
       "mode": "模式",
       "configure": "配置",
       "complete": "完成"
-    },
-    "error": {
-      "failed": "启动模式失败"
     }
   },
   "tenant_select": {
@@ -292,12 +302,13 @@
   },
   "pos": {
     "loading_core_data": "正在加载核心数据...",
-    "search_product": "搜索商品...",
+    "search_product": "搜索菜品...",
+    "attributeRequired": "请选择 {name}",
     "all_categories": "全部分类",
     "sidebar": {
-      "get_order": "获取订单",
-      "drafts": "草稿",
-      "no_drafts": "无草稿",
+      "get_order": "取单",
+      "drafts": "挂单",
+      "no_drafts": "无挂单",
       "hold": "挂单",
       "save": "保存",
       "clear": "清空",
@@ -305,7 +316,7 @@
     },
     "cart": {
       "spec": "规格",
-      "empty": "购物车为空",
+      "empty": "订单为空",
       "uncategorized": "未分类",
       "unknown_category": "未知分类",
       "original": "原价",
@@ -316,7 +327,7 @@
       "custom": "自定义",
       "subtotal": "小计",
       "enter_discount": "输入折扣金额",
-      "edit_item": "编辑项目",
+      "edit_item": "编辑菜品",
       "edit_final_price": "点击编辑最终价格",
       "input": {
         "quantity": "输入数量",
@@ -334,15 +345,15 @@
       "no_options": "暂无可用选项"
     },
     "quick_add": {
-      "title": "快速添加",
-      "no_products": "暂无可用商品",
-      "selected_items": "已选项目",
-      "select_prompt": "请从右侧选择物品",
+      "title": "添加",
+      "no_products": "暂无可用菜品",
+      "selected_items": "已选菜品",
+      "select_prompt": "请从右侧选择菜品",
       "per_unit": "/份",
       "confirm": "确认添加"
     },
     "error": {
-      "product_not_found": "找不到该商品"
+      "product_not_found": "找不到该菜品"
     }
   },
   "checkout": {
@@ -405,7 +416,7 @@
     },
     "order_type": {
       "dine_in": "堂食",
-      "takeout": "外卖"
+      "takeout": "外带"
     },
     "pre_payment": {
       "receipt": "预付小票"
@@ -421,19 +432,19 @@
         "cancelled": "取消订单",
         "cancelled_desc": "订单未付款，直接取消",
         "loss_settled": "损失结算",
-        "loss_settled_desc": "部分付款，剩余计入损失"
+        "loss_settled_desc": "顾客已部分付款，未付金额计入损失"
       },
       "cancel_reason": {
         "title": "选择取消原因",
-        "customer_cancelled": "客户取消",
+        "customer_cancelled": "顾客取消",
         "system_test": "系统测试",
         "duplicate_order": "重复下单",
         "other": "其他原因"
       },
       "loss_reason": {
         "title": "选择损失原因",
-        "customer_fled": "顾客逃单",
-        "customer_insolvent": "顾客无力支付",
+        "customer_fled": "逃单",
+        "customer_insolvent": "无力支付",
         "other": "其他原因"
       },
       "note": "备注",
@@ -442,7 +453,7 @@
     },
     "retail": {
       "cancel_title": "确认返回",
-      "cancel_description": "返回将作废当前零售订单，所有商品将被清空。确定要返回吗？",
+      "cancel_description": "返回将作废当前零售订单，所有菜品将被清空。确定要返回吗？",
       "cancel_confirm": "确认作废"
     },
     "error": {
@@ -467,7 +478,7 @@
       "change": "找零",
       "tendered": "收款",
       "total_paid": "已付总额",
-      "split_items": "分单商品",
+      "split_items": "分单菜品",
       "cancel": "取消支付",
       "confirm_cancel": "确定要取消此支付记录吗？",
       "confirm_cancel_split": "确定要取消此分账支付吗？取消后相关菜品将恢复到订单中。",
@@ -476,20 +487,20 @@
       "remaining": "待付金额"
     },
     "items": {
-      "paid": "已付项目",
-      "unpaid": "未付项目"
+      "paid": "已付菜品",
+      "unpaid": "未付菜品"
     },
     "cart": {
       "discount": "折扣"
     },
     "void_reason": {
-      "runaway": "顾客逃单",
-      "dine_and_dash": "吃完就跑",
+      "runaway": "逃单",
+      "dine_and_dash": "霸王餐",
       "system_test": "系统测试",
       "owner_treat": "老板请客"
     },
     "timeline": {
-      "label": "标签",
+      "label": "操作记录",
       "title": "操作记录"
     },
     "comp": {
@@ -552,7 +563,16 @@
     "order_detail": {
       "title": "订单详情",
       "desc": "查看完整订单信息"
-    }
+    },
+    "error": {
+      "no_receipt_number": "订单缺少单号",
+      "insufficient": "金额不足",
+      "title": "结账失败",
+      "hint": "请重试或联系管理员",
+      "merge_failed": "合并订单失败",
+      "move_failed": "转移订单失败"
+    },
+    "paidQty": "{qty} 份已付"
   },
   "table": {
     "filter": {
@@ -586,7 +606,7 @@
       "move": "转移桌台需要主管审批"
     },
     "warning": {
-      "cannot_move_with_payments": "存在已支付项目，无法转移"
+      "cannot_move_with_payments": "存在已支付菜品，无法转移"
     },
     "combine_description": "将两个桌台的订单合并",
     "selection": {
@@ -597,7 +617,7 @@
     "select_target": "选择目标桌台",
     "zones": "区域",
     "guests": "位客人",
-    "ghost_orders": "幽灵订单",
+    "ghost_orders": "零售订单",
     "add_items": "加单",
     "open_table": "开台",
     "confirm_add": "确认加单",
@@ -621,7 +641,7 @@
       "LOSS_SETTLED": "损失结算"
     },
     "loss_reason": {
-      "CUSTOMER_FLED": "跑单",
+      "CUSTOMER_FLED": "逃单",
       "CUSTOMER_INSOLVENT": "无力支付",
       "OTHER": "其他"
     },
@@ -632,8 +652,8 @@
       "select_order": "请选择要查看的订单",
       "table": "桌台",
       "total_amount": "总金额",
-      "order_items": "订单项目",
-      "removed_items": "已删除项目",
+      "order_items": "订单菜品",
+      "removed_items": "已删除菜品",
       "order_id": "订单号",
       "status": "状态",
       "operator": "操作员"
@@ -669,14 +689,12 @@
       "custom": "自定义"
     },
     "date_range": "日期范围",
-    "top_products": "热销商品",
+    "top_products": "热销菜品",
     "error": {
       "load": "加载统计数据失败"
     },
     "report": {
       "sales": "销售报告",
-      "product": "商品报告",
-      "category": "分类报告",
       "detailed_coming_soon": "详细报告即将推出"
     },
     "chart": {
@@ -704,8 +722,11 @@
   },
   "timeline": {
     "add_items": "加单",
-    "added_items": "添加了 {n} 项",
-    "empty": "暂无时间线记录",
+    "added_items": "添加了 {n} 份菜品",
+    "empty": "暂无操作记录",
+    "merged_back": "合并回",
+    "note_cleared": "清除备注",
+    "note_added": "添加备注",
     "guests_count": "{n} 位客人",
     "receipt_no": "小票号: {n}",
     "payment": "支付",
@@ -716,12 +737,12 @@
     "aa_split_paid": "AA付款",
     "aa_split_cancelled": "AA分账已取消",
     "aa_split_cancelled_summary": "原 {n}人分账",
-    "item_modified": "项目修改",
-    "item_removed": "删除项目",
+    "item_modified": "菜品修改",
+    "item_removed": "删除菜品",
     "order_completed": "订单完成",
     "order_voided": "订单作废",
     "table_order": "桌台订单",
-    "item_restored": "恢复项目",
+    "item_restored": "恢复菜品",
     "payment_cancelled": "取消支付",
     "order_merged": "合并订单",
     "order_moved": "转移订单",
@@ -757,9 +778,10 @@
       "pre_payment": "预付款",
       "reason": "原因",
       "loss_amount": "损失金额",
+      "previous": "之前",
       "authorizer": "授权人",
       "affected_quantity": "影响数量",
-      "items": "商品"
+      "items": "菜品"
     },
     "operation": {
       "APPLY_DISCOUNT": "应用折扣",
@@ -768,7 +790,7 @@
       "APPLY_SURCHARGE": "应用附加费",
       "MODIFY_OPTIONS": "修改属性",
       "MODIFY_NOTE": "修改备注",
-      "MODIFY_ITEM": "修改项目"
+      "MODIFY_ITEM": "修改菜品"
     },
     "retail_mode": "零售模式",
     "rule_toggled": "价格规则切换",
@@ -779,11 +801,11 @@
   },
   "draft": {
     "action": {
-      "restore": "恢复订单"
+      "restore": "取单"
     },
     "list": {
-      "title": "暂存订单",
-      "empty": "暂无暂存订单"
+      "title": "挂单列表",
+      "empty": "暂无挂单"
     }
   },
   "error": {
@@ -814,12 +836,6 @@
     "sidebar": {
       "title": "系统设置"
     },
-    "group": {
-      "general": "通用设置",
-      "data": "数据管理",
-      "operations": "营业管理",
-      "system": "系统设置"
-    },
     "price_rule": {
       "title": "价格规则",
       "description": "管理折扣、加价等价格调整规则",
@@ -842,10 +858,10 @@
         "surcharge": "加价"
       },
       "scope": {
-        "global": "全部商品",
+        "global": "全部菜品",
         "category": "按分类",
         "tag": "按标签",
-        "product": "指定商品"
+        "product": "指定菜品"
       },
       "time": {
         "always": "永久生效",
@@ -874,8 +890,11 @@
       },
       "message": {
         "created": "规则创建成功",
-        "updated": "规则更新成功"
+        "updated": "规则更新成功",
+        "deleted": "规则已删除"
       },
+      "delete_confirm_title": "删除价格规则",
+      "delete_confirm_message": "确定要删除价格规则 \"{name}\" 吗？",
       "wizard": {
         "title": "创建价格规则",
         "edit_title": "编辑价格规则",
@@ -893,14 +912,14 @@
         "step6_section": "高级设置",
         "step1_desc": "选择您要创建的价格规则类型",
         "step2_desc": "设置折扣或加价的计算方式和数值",
-        "step3_desc": "选择规则适用的商品范围和区域",
+        "step3_desc": "选择规则适用的菜品范围和区域",
         "step4_desc": "设置规则的生效时间条件",
         "step5_desc": "为规则设置名称和描述信息",
         "step6_desc": "配置规则的优先级和叠加行为",
         "rule_type": "选择规则类型",
         "discount_option": "折扣优惠",
         "surcharge_option": "附加收费",
-        "discount_desc": "降低商品价格，如促销折扣、会员优惠等",
+        "discount_desc": "降低菜品价格，如促销折扣、会员优惠等",
         "surcharge_desc": "增加额外费用，如服务费、打包费等",
         "adjustment_type": "计算方式",
         "discount_value": "折扣数值",
@@ -908,18 +927,18 @@
         "percentage_hint": "输入 1-100 之间的整数，例如 10 表示 10%",
         "fixed_hint": "输入金额（欧元），例如 5 表示 €5.00",
         "preview": "预览",
-        "preview_discount_percent": "商品将享受 {value}% 折扣",
-        "preview_discount_fixed": "每件商品减免 €{value}",
-        "preview_surcharge_percent": "商品将增加 {value}% 费用",
-        "preview_surcharge_fixed": "每件商品加收 €{value}",
-        "product_scope": "商品范围",
-        "scope_global_desc": "适用于所有商品",
+        "preview_discount_percent": "菜品将享受 {value}% 折扣",
+        "preview_discount_fixed": "每份菜品减免 €{value}",
+        "preview_surcharge_percent": "菜品将增加 {value}% 费用",
+        "preview_surcharge_fixed": "每份菜品加收 €{value}",
+        "product_scope": "菜品范围",
+        "scope_global_desc": "适用于所有菜品",
         "scope_category_desc": "适用于指定分类",
-        "scope_tag_desc": "适用于带特定标签的商品",
-        "scope_product_desc": "仅适用于指定商品",
+        "scope_tag_desc": "适用于带特定标签的菜品",
+        "scope_product_desc": "仅适用于指定菜品",
         "select_category": "选择分类",
         "select_tag": "选择标签",
-        "select_product": "选择商品",
+        "select_product": "选择菜品",
         "zone_scope": "区域范围",
         "zone_scope_desc": "选择规则生效的区域，留空则全部区域生效",
         "time_always_desc": "规则始终生效，无时间限制",
@@ -991,16 +1010,25 @@
       "zones_failed": "批量删除区域失败",
       "failed": "批量删除失败"
     },
+    "batchDelete": {
+      "confirmDeleteZones": "确定要删除选中的 {count} 个区域吗？此操作无法撤销。",
+      "zonesSuccess": "成功删除 {count} 个区域",
+      "confirmDeleteTables": "确定要删除选中的 {count} 个桌台吗？此操作无法撤销。",
+      "tablesSuccess": "批量删除成功"
+    },
     "product": {
       "title": "菜品管理",
       "description": "管理餐厅菜品和价格",
       "confirm": {
         "delete": "确定要删除该菜品吗？此操作无法撤销。"
       },
+      "list": {
+        "confirmBatchDelete": "确定要删除选中的 {count} 个菜品吗？此操作无法撤销。"
+      },
       "form": {
         "name": "菜品名称",
         "name_placeholder": "请输入菜品名称",
-        "name_required": "请输入商品名称",
+        "name_required": "请输入菜品名称",
         "category": "分类",
         "select_category": "选择分类",
         "price": "价格",
@@ -1015,7 +1043,7 @@
         "image": "图片",
         "image_hint": "支持 JPG, PNG, WEBP 格式"
       },
-      "no_products": "暂无商品",
+      "no_products": "暂无菜品",
       "print": {
         "settings": "打印设置",
         "kitchen_printing": "厨房打印",
@@ -1030,7 +1058,7 @@
         "receipt_name_placeholder": "如为空则使用菜品名称"
       },
       "specification": {
-        "title": "产品规格",
+        "title": "菜品规格",
         "manage": "管理规格",
         "no_configured": "暂无规格配置",
         "disabled": "多规格功能未启用",
@@ -1040,13 +1068,13 @@
         }
       },
       "attribute": {
-        "title": "产品属性",
+        "title": "菜品属性",
         "manage": "管理属性",
         "no_selected": "未选择任何属性",
         "add": "添加属性",
         "select": "选择属性",
         "inherited": "继承自分类",
-        "description": "配置产品的可选规格和属性",
+        "description": "配置菜品的可选规格和属性",
         "hint": {
           "multi_select": "可多选",
           "single_select": "单选",
@@ -1056,7 +1084,7 @@
       },
       "tags": {
         "title": "标签",
-        "description": "为产品添加标签用于分类和筛选",
+        "description": "为菜品添加标签用于分类和筛选",
         "manage": "管理标签",
         "no_selected": "未选择任何标签",
         "system_tag_hint": "系统标签，不可手动编辑"
@@ -1075,13 +1103,13 @@
         "products": "菜品"
       },
       "message": {
-        "created": "商品创建成功",
-        "updated": "商品更新成功"
+        "created": "菜品创建成功",
+        "updated": "菜品更新成功"
       }
     },
     "tag": {
       "title": "标签管理",
-      "description": "管理商品标签",
+      "description": "管理菜品标签",
       "unit": "个标签",
       "name": "标签名称",
       "name_placeholder": "请输入标签名称",
@@ -1095,9 +1123,6 @@
       "sample_tag": "示例标签",
       "select_title": "选择标签",
       "no_tags_available": "暂无可用标签",
-      "confirm": {
-        "delete": "确定要删除标签 \"{name}\" 吗？"
-      },
       "message": {
         "created": "标签创建成功",
         "updated": "标签更新成功"
@@ -1105,10 +1130,10 @@
     },
     "category": {
       "title": "分类管理",
-      "description": "管理商品分类",
+      "description": "管理菜品分类",
       "unit": "个分类",
       "confirm": {
-        "delete": "确定要删除该分类吗？删除后该分类下的商品将变为未分类状态。"
+        "delete": "确定要删除该分类吗？删除后该分类下的菜品将变为未分类状态。"
       },
       "header": {
         "sort": "排序"
@@ -1120,9 +1145,6 @@
       "category_deleted": "分类已删除",
       "create_category_success": "分类创建成功",
       "update_category_success": "分类更新成功",
-      "label": {
-        "virtual": "虚拟"
-      },
       "tab": {
         "normal": "实体分类",
         "virtual": "虚拟分类"
@@ -1131,29 +1153,25 @@
         "name": "分类名称",
         "name_placeholder": "请输入分类名称",
         "attributes": "分类属性",
-        "attributes_hint": "该分类下所有商品将继承这些属性",
+        "attributes_hint": "该分类下所有菜品将继承这些属性",
         "virtual_settings": "虚拟分类设置",
         "is_virtual": "分类类型",
         "regular_category": "常规分类",
         "virtual_category": "虚拟分类（按标签筛选）",
-        "type_cannot_change": "分类类型创建后不可更改",
         "match_mode": "匹配模式",
         "match_any": "匹配任一标签",
         "match_all": "匹配全部标签",
         "filter_tags": "筛选标签",
         "no_tags_available": "暂无可用标签",
-        "select_tags_hint": "请至少选择一个标签用于筛选产品",
+        "select_tags_hint": "请至少选择一个标签用于筛选菜品",
         "is_display": "在主页显示"
-      },
-      "message": {
-        "exists": "分类已存在"
       },
       "required": "请选择分类",
       "create_first": "请先创建分类"
     },
     "attribute": {
       "title": "属性管理",
-      "description": "管理商品属性和选项",
+      "description": "管理菜品属性和选项",
       "unit": "个属性",
       "hint": {
         "add_first": "请点击上方按钮添加第一个属性"
@@ -1172,7 +1190,7 @@
         "receipt_name_placeholder": "如为空则使用属性名称",
         "sort": "排序",
         "is_global": "全局属性",
-        "is_global_desc": "全局属性将自动应用到所有商品",
+        "is_global_desc": "全局属性将自动应用到所有菜品",
         "kitchen_printer": "厨房打印机",
         "show_on_receipt": "显示在小票",
         "show_on_receipt_hint": "选择此项后，该属性的选项将显示在收据上",
@@ -1234,6 +1252,10 @@
       },
       "error": {
         "max_defaults": "最多只能设置 {n} 个默认选项"
+      },
+      "confirm": {
+        "delete": "确定要删除属性 \"{name}\" 吗？",
+        "deleteOption": "确定要删除选项 \"{name}\" 吗？"
       }
     },
     "table": {
@@ -1269,9 +1291,9 @@
       }
     },
     "user": {
-      "title": "用户管理",
-      "description": "管理系统用户和权限",
-      "list": "用户列表",
+      "title": "员工管理",
+      "description": "管理系统员工和权限",
+      "list": "员工列表",
       "roles": "角色权限",
       "section": {
         "account": "账号信息",
@@ -1295,13 +1317,13 @@
         "username_required": "请输入用户名",
         "display_name_required": "请输入显示名称"
       },
-      "add_user": "新增用户",
-      "edit_user": "编辑用户",
+      "add_user": "新增员工",
+      "edit_user": "编辑员工",
       "reset_password_user": "重置密码",
-      "disable_user": "禁用用户",
-      "delete_permanently_user": "永久删除用户",
+      "disable_user": "禁用员工",
+      "delete_permanently_user": "永久删除员工",
       "column": {
-        "user": "用户",
+        "user": "员工",
         "created_at": "创建时间",
         "actions": "操作"
       },
@@ -1311,16 +1333,20 @@
       "message": {
         "cannot_delete_self": "无法删除自己的账号",
         "cannot_delete_admin": "无法删除管理员账号",
-        "update_success": "用户更新成功",
+        "update_success": "员工更新成功",
         "delete_success": "删除成功",
         "update_failed": "更新失败",
         "delete_failed": "删除失败",
         "load_roles_failed": "无法加载角色列表",
         "reset_password_success": "密码重置成功",
         "reset_password_failed": "密码重置失败",
-        "create_success": "用户创建成功"
+        "create_success": "员工创建成功"
       },
-      "unit": "个用户"
+      "confirm": {
+        "disable": "确定要禁用用户 \"{name}\" 吗？",
+        "deletePermanently": "确定要永久删除用户 \"{name}\" 吗？此操作无法撤销。"
+      },
+      "unit": "个员工"
     },
     "printer": {
       "title": "打印机设置",
@@ -1332,8 +1358,6 @@
         "select_printer_to_enable": "请先选择收据打印机以启用厨房打印功能"
       },
       "label_printing": "标签打印",
-      "hardware": "硬件",
-      "templates": "标签模板",
       "tab": {
         "local": "本地打印机",
         "stations": "打印站点",
@@ -1399,12 +1423,12 @@
       },
       "routing_system": {
         "title": "厨房路由系统",
-        "summary": "根据商品和分类设置，订单会被智能路由到指定的打印机",
+        "summary": "根据菜品和分类设置，订单会被智能路由到指定的打印机",
         "hierarchy": "路由优先级",
         "priority": "主开关",
-        "switch_hierarchy": "全局开关优先一切，然后商品开关优先分类开关",
+        "switch_hierarchy": "优先级：全局开关 > 菜品开关 > 分类开关",
         "stations": "路由工位",
-        "level_product": "商品优先级",
+        "level_product": "菜品优先级",
         "level_category": "分类优先级",
         "level_global": "全局优先级"
       },
@@ -1415,7 +1439,7 @@
         "duplicate_template": "复制",
         "form": {
           "name": "模板名称",
-          "name_placeholder": "例如：商品标签 50x30mm",
+          "name_placeholder": "例如：菜品标签 50x30mm",
           "width_mm": "宽度 (mm)",
           "height_mm": "高度 (mm)"
         }
@@ -1452,7 +1476,7 @@
       "title": "语言设置",
       "lang": {
         "zh": "中文",
-        "en": "英文"
+        "es": "西班牙语"
       }
     },
     "system": {
@@ -1566,7 +1590,7 @@
       "message": {
         "load_failed": "加载规格失败",
         "root_cannot_delete": "基础规格不能删除",
-        "partial_create_failed": "规格创建失败，但产品已成功创建",
+        "partial_create_failed": "规格创建失败，但菜品已成功创建",
         "updated": "规格已更新",
         "created": "规格已创建",
         "deleted": "规格已删除"
@@ -1614,7 +1638,7 @@
       "image_template_hint": "使用 {字段名} 引用数据",
       "source_type": "来源类型",
       "source_type_image": "静态图片",
-      "source_type_product_image": "商品图片",
+      "source_type_product_image": "菜品图片",
       "source_type_qrcode": "二维码",
       "source_type_barcode": "条形码",
       "static_image": "图片",
@@ -1671,7 +1695,6 @@
     "unsaved_confirm": "有未保存的更改",
     "unsaved_confirm_hint": "确定要离开吗？",
     "kitchen_printer": "厨房打印机",
-    "label_printer": "标签打印机",
     "reset_password": "重置密码",
     "new_password": "新密码",
     "enter_new_password": "输入新密码",
@@ -1680,7 +1703,7 @@
     "confirm_password_placeholder": "请再次输入密码",
     "reset_password_warning": "密码将立即生效",
     "reorder_failed": "排序失败",
-    "product_order": "商品排序",
+    "product_order": "菜品排序",
     "drag_to_reorder": "拖拽排序",
     "common": {
       "untitled": "未命名",
@@ -1697,6 +1720,7 @@
       "current_shift": "当前班次",
       "started_at": "开始于",
       "expected_cash": "应结现金",
+      "force_close_default_note": "系统异常恢复",
       "action": {
         "close": "收班",
         "force_close": "强制关闭"
@@ -1708,7 +1732,7 @@
         "duration": "时长",
         "starting_cash": "备用金",
         "expected_cash": "应结现金",
-        "actual_cash": "实际现金",
+        "actual_cash": "实收现金",
         "variance": "差异",
         "status": "状态"
       },
@@ -1728,6 +1752,7 @@
       "stale_shift_hint": "系统检测到有班次未正常关闭，可能是由于断电或系统崩溃导致",
       "recover_stale": "处理异常班次",
       "checking": "正在检查班次状态...",
+      "check_failed": "班次检查失败",
       "open_success": "开班成功",
       "close_success_balanced": "收班成功，现金无差异",
       "close_success_variance": "收班成功，差异: {variance}",
@@ -1754,7 +1779,7 @@
         "starting_cash": "备用金",
         "starting_cash_hint": "输入开班时收银机内的现金金额",
         "expected_cash": "应结现金",
-        "actual_cash": "实际现金",
+        "actual_cash": "实收现金",
         "variance": "差异",
         "note": "备注",
         "note_placeholder": "输入备注信息（可选）",
@@ -1898,11 +1923,11 @@
     "5003": "无效的支付方式",
     "5004": "已退款",
     "5005": "退款金额超出支付金额",
-    "6001": "商品不存在",
-    "6002": "商品价格无效",
-    "6003": "商品库存不足",
+    "6001": "菜品不存在",
+    "6002": "菜品价格无效",
+    "6003": "菜品库存不足",
     "6101": "分类不存在",
-    "6102": "分类下存在商品，无法删除",
+    "6102": "分类下存在菜品，无法删除",
     "6103": "分类名称已存在",
     "6201": "规格不存在",
     "6202": "外部ID已存在",
@@ -2021,7 +2046,6 @@
   },
   "audit": {
     "title": "审计日志",
-    "sidebar": "审计日志",
     "entries": "条记录",
     "system": "系统",
     "error": {
@@ -2052,11 +2076,11 @@
         "total": "金额",
         "final_total": "最终金额",
         "subtotal": "小计",
-        "item_count": "商品数",
+        "item_count": "菜品数",
         "forced": "强制操作",
         "starting_cash": "备用金",
         "expected_cash": "预期现金",
-        "actual_cash": "实际现金",
+        "actual_cash": "实收现金",
         "cash_variance": "现金差异",
         "role": "角色",
         "is_active": "启用状态",
@@ -2091,7 +2115,7 @@
         "source_table": "来源桌号",
         "target_table": "目标桌号",
         "target_zone": "目标区域",
-        "merged_item_count": "合并商品数",
+        "merged_item_count": "合并菜品数",
         "merged_payment_count": "合并支付笔数",
         "merged_paid_amount": "合并已付金额",
         "authorizer_id": "授权人",
@@ -2128,7 +2152,7 @@
         "false": "否",
         "none": "无",
         "invalid_credentials": "密码错误",
-        "user_not_found": "用户不存在",
+        "user_not_found": "员工不存在",
         "abnormal_shutdown": "异常关闭",
         "long_downtime": "长时间停机",
         "local": "本地检测",
@@ -2146,8 +2170,8 @@
         "abnormal_shutdown_detected": "检测到上次异常关闭",
         "CANCELLED": "取消",
         "LOSS_SETTLED": "损失结算",
-        "CUSTOMER_FLED": "客人逃单",
-        "CUSTOMER_INSOLVENT": "客人无力支付",
+        "CUSTOMER_FLED": "顾客逃单",
+        "CUSTOMER_INSOLVENT": "顾客无力支付",
         "OTHER": "其他",
         "percentage": "百分比",
         "fixed_amount": "固定金额",
@@ -2156,7 +2180,7 @@
         "global": "全局",
         "category": "分类",
         "tag": "标签",
-        "product": "商品",
+        "product": "菜品",
         "usb": "USB",
         "network": "网络",
         "default_spec": "默认"
@@ -2187,7 +2211,7 @@
       "order": "订单",
       "employee": "员工",
       "role": "角色",
-      "product": "商品",
+      "product": "菜品",
       "category": "分类",
       "tag": "标签",
       "attribute": "属性",
@@ -2207,7 +2231,7 @@
       "auth": "认证",
       "order": "订单",
       "management": "管理",
-      "catalog": "商品目录",
+      "catalog": "菜品目录",
       "pricing": "定价",
       "venue": "区域桌台",
       "shift": "班次",
@@ -2237,9 +2261,9 @@
       "print_config_changed": "打印配置变更",
       "store_info_changed": "门店信息变更",
       "daily_report_generated": "生成日结报告",
-      "product_created": "创建商品",
-      "product_updated": "更新商品",
-      "product_deleted": "删除商品",
+      "product_created": "创建菜品",
+      "product_updated": "更新菜品",
+      "product_deleted": "删除菜品",
       "category_created": "创建分类",
       "category_updated": "更新分类",
       "category_deleted": "删除分类",

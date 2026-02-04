@@ -286,7 +286,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
         render: (item) => (
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
             <Users size={12} />
-            <span>{item.capacity} 人</span>
+            <span>{item.capacity} {t('common.unit.person')}</span>
           </div>
         ),
       },

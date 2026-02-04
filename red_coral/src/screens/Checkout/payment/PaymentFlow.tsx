@@ -375,7 +375,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     try {
       // Receipt number is already set by server at OpenTable time
       if (!order.receipt_number) {
-        toast.error('Order has no receipt number');
+        toast.error(t('checkout.error.no_receipt_number'));
         return;
       }
 
