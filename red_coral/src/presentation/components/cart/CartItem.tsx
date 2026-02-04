@@ -4,6 +4,7 @@ import { CartItem as CartItemType } from '@/core/domain/types';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useProductStore } from '@/core/stores/resources';
 import { formatCurrency, Currency } from '@/utils/currency';
+import { calculateOptionsModifier } from '@/utils/pricing';
 import { useLongPress } from '@/hooks/useLongPress';
 import { t } from '@/infrastructure/i18n';
 import { GroupedOptionsList } from '@/shared/components';
@@ -25,10 +26,7 @@ export const CartItem = React.memo<CartItemProps>(({
   const discountPercent = item.manual_discount_percent || 0;
   
   // Calculate options modifier for display (considering option quantity)
-  const optionsModifier = (item.selected_options ?? []).reduce(
-    (sum, opt) => sum + (opt.price_modifier ?? 0) * (opt.quantity ?? 1),
-    0
-  );
+  const optionsModifier = calculateOptionsModifier(item.selected_options);
   const basePrice = item.original_price ?? item.price;
   const baseUnitPrice = basePrice + optionsModifier;
 

@@ -7,7 +7,7 @@
 use crate::orders::traits::OrderError;
 use rust_decimal::prelude::*;
 use shared::models::price_rule::{AdjustmentType, RuleType};
-use shared::order::{CartItemInput, CartItemSnapshot, ItemChanges, OrderSnapshot, PaymentInput};
+use shared::order::{CartItemInput, CartItemSnapshot, ItemChanges, OrderSnapshot, PaymentInput, MAX_OPTION_QUANTITY};
 
 /// Rounding strategy for monetary values (2 decimal places, half-up)
 const DECIMAL_PLACES: u32 = 2;
@@ -112,8 +112,7 @@ pub fn validate_cart_item(item: &CartItemInput) -> Result<(), OrderError> {
                     opt.quantity, opt.option_name
                 )));
             }
-            // Reasonable upper limit for option quantity (99 should be more than enough)
-            const MAX_OPTION_QUANTITY: i32 = 99;
+            // Use shared constant for max option quantity
             if opt.quantity > MAX_OPTION_QUANTITY {
                 return Err(OrderError::InvalidOperation(format!(
                     "option quantity exceeds maximum allowed ({}), got {} for option '{}'",
@@ -1326,6 +1325,7 @@ mod tests {
                     option_idx: 2,
                     option_name: "Large".to_string(),
                     price_modifier: Some(3.0),
+                    quantity: 1,
                 },
                 shared::order::ItemOption {
                     attribute_id: "attr:topping".to_string(),
@@ -1333,6 +1333,7 @@ mod tests {
                     option_idx: 0,
                     option_name: "Extra Cheese".to_string(),
                     price_modifier: Some(1.50),
+                    quantity: 1,
                 },
             ]),
             selected_specification: None,
@@ -1377,6 +1378,7 @@ mod tests {
                 option_idx: 0,
                 option_name: "Cheese".to_string(),
                 price_modifier: Some(5.0),
+                quantity: 1,
             }]),
             selected_specification: None,
             manual_discount_percent: Some(10.0),   // 10% off
@@ -1616,6 +1618,7 @@ mod tests {
                 option_idx: 0,
                 option_name: "Large".to_string(),
                 price_modifier: Some(f64::NAN),
+                quantity: 1,
             }]),
             selected_specification: None,
         };
@@ -1635,6 +1638,7 @@ mod tests {
                 option_idx: 0,
                 option_name: "Large".to_string(),
                 price_modifier: Some(MAX_PRICE + 1.0),
+                quantity: 1,
             }]),
             selected_specification: None,
         };
@@ -2194,6 +2198,7 @@ mod tests {
             option_idx: 1,
             option_name: "Large".to_string(),
             price_modifier: Some(3.0),
+            quantity: 1,
         }]);
 
         let up = calculate_unit_price(&item);

@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { CartItem, ItemOption } from '@/core/domain/types';
 import { ProductWithPrice } from '@/features/product';
 import { Currency } from '@/utils/currency';
+import { calculateOptionsModifier } from '@/utils/pricing';
 
 /**
  * Compare two selectedOptions arrays for equality
@@ -213,10 +214,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       // Fallback to local calculation
       const discountPercent = item.manual_discount_percent || 0;
       // Options modifier considers quantity for each option
-      const optionsModifier = (item.selected_options ?? []).reduce(
-        (acc, opt) => acc + (opt.price_modifier ?? 0) * (opt.quantity ?? 1),
-        0
-      );
+      const optionsModifier = calculateOptionsModifier(item.selected_options);
       const basePrice = item.original_price ?? item.price;
       const baseUnitPrice = basePrice + optionsModifier;
       
