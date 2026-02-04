@@ -161,6 +161,7 @@ pub async fn run() {
             commands::login_employee,
             commands::logout_employee,
             commands::get_current_session,
+            commands::escalate_permission,
             // Data commands
             commands::list_tags,
             commands::get_tag,

@@ -4,20 +4,14 @@ import { X, Shield, Lock, User as UserIcon, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { User } from '@/core/domain/types';
 
-interface AuthData {
-  mode: string;
-  session: {
-    username: string;
-    user_info: {
-      id: string;
-      username: string;
-      display_name: string;
-      role_id: string;
-      role_name: string;
-      permissions: string[];
-      is_system: boolean;
-    };
-  } | null;
+interface EscalateAuthorizer {
+  id: string;
+  username: string;
+  display_name: string;
+  role_id: string;
+  role_name: string;
+  permissions: string[];
+  is_system: boolean;
 }
 
 interface SupervisorAuthModalProps {
@@ -51,38 +45,23 @@ export const SupervisorAuthModal: React.FC<SupervisorAuthModalProps> = ({
     setError(null);
 
     try {
-      // 直接调用 login_employee 验证凭据（不会影响当前 session，因为这是一次性验证）
-      const authData = await invokeApi<AuthData>('login_employee', {
+      // 调用提权 API (后端验证凭据和权限，成功时记录审计日志)
+      const authorizer = await invokeApi<EscalateAuthorizer>('escalate_permission', {
         username,
         password,
+        requiredPermission,
       });
 
-      if (!authData.session) {
-        throw new Error(t('auth.login.invalid_credentials'));
-      }
-
-      const userInfo = authData.session.user_info;
-
-      // 检查权限: admin 有所有权限，或者检查特定权限
-      const hasPermission =
-        userInfo.role_name === 'admin' ||
-        userInfo.permissions.includes('all') ||
-        userInfo.permissions.includes(requiredPermission);
-
-      if (!hasPermission) {
-        throw new Error(t('auth.unauthorized.permission'));
-      }
-
-      // 构造 User 对象返回 (UserInfo from backend has all required fields)
+      // 构造 User 对象返回
       const supervisor: User = {
-        id: userInfo.id,
-        username: userInfo.username,
-        display_name: userInfo.display_name,
-        role_id: userInfo.role_id,
-        role_name: userInfo.role_name,
-        permissions: userInfo.permissions,
+        id: authorizer.id,
+        username: authorizer.username,
+        display_name: authorizer.display_name,
+        role_id: authorizer.role_id,
+        role_name: authorizer.role_name,
+        permissions: authorizer.permissions,
         is_active: true,
-        is_system: userInfo.is_system,
+        is_system: authorizer.is_system,
       };
 
       onSuccess(supervisor);

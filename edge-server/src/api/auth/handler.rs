@@ -13,7 +13,7 @@ use crate::db::models::{Employee, Role};
 use crate::AppError;
 
 // Re-use shared DTOs for API consistency
-use shared::client::{LoginRequest, LoginResponse, UserInfo};
+use shared::client::{EscalateRequest, EscalateResponse, LoginRequest, LoginResponse, UserInfo};
 
 /// Fixed delay for authentication to prevent timing attacks
 const AUTH_FIXED_DELAY_MS: u64 = 500;
@@ -185,4 +185,149 @@ pub async fn logout(
     );
 
     Ok(Json(()))
+}
+
+/// Escalate handler (supervisor authorization)
+///
+/// Validates supervisor credentials and checks permission.
+/// Only logs on success for audit trail.
+pub async fn escalate(
+    State(state): State<ServerState>,
+    Extension(current_user): Extension<CurrentUser>,
+    Json(req): Json<EscalateRequest>,
+) -> Result<Json<EscalateResponse>, AppError> {
+    let db = state.get_db();
+    let username = req.username.clone();
+
+    // Query employee by username
+    let mut result = db
+        .query("SELECT * FROM employee WHERE username = $username LIMIT 1")
+        .bind(("username", username.clone()))
+        .await
+        .map_err(|e| AppError::database(format!("Query failed: {}", e)))?;
+
+    let employee: Option<Employee> = result
+        .take(0)
+        .map_err(|e| AppError::database(format!("Failed to parse employee: {}", e)))?;
+
+    // Fixed delay to prevent timing attacks
+    tokio::time::sleep(Duration::from_millis(AUTH_FIXED_DELAY_MS)).await;
+
+    // Check authentication result
+    let employee = match employee {
+        Some(e) => {
+            if !e.is_active {
+                return Err(AppError::forbidden("Account has been disabled".to_string()));
+            }
+
+            let password_valid = e
+                .verify_password(&req.password)
+                .map_err(|e| AppError::internal(format!("Password verification failed: {}", e)))?;
+
+            if !password_valid {
+                tracing::warn!(
+                    username = %username,
+                    required_permission = %req.required_permission,
+                    "Escalation failed - invalid credentials"
+                );
+                return Err(AppError::invalid("Invalid username or password".to_string()));
+            }
+
+            e
+        }
+        None => {
+            tracing::warn!(
+                username = %username,
+                required_permission = %req.required_permission,
+                "Escalation failed - user not found"
+            );
+            return Err(AppError::invalid("Invalid username or password".to_string()));
+        }
+    };
+
+    // Fetch role information
+    let role_id = employee.role.clone();
+    let mut role_result = db
+        .query("SELECT * FROM $role_id")
+        .bind(("role_id", role_id))
+        .await
+        .map_err(|e| AppError::database(format!("Failed to query role: {}", e)))?;
+
+    let role: Option<Role> = role_result
+        .take(0)
+        .map_err(|e| AppError::database(format!("Failed to parse role: {}", e)))?;
+
+    let role = role.ok_or_else(|| AppError::internal("Role not found".to_string()))?;
+
+    if !role.is_active {
+        return Err(AppError::forbidden("Role has been disabled".to_string()));
+    }
+
+    // Check permission
+    let has_permission = role.name == "admin"
+        || role.permissions.iter().any(|p| p == "all")
+        || role.permissions.iter().any(|p| p == &req.required_permission)
+        || role.permissions.iter().any(|p| {
+            // Wildcard match: "orders:*" matches "orders:void"
+            if let Some(prefix) = p.strip_suffix(":*") {
+                req.required_permission.starts_with(&format!("{}:", prefix))
+            } else {
+                false
+            }
+        });
+
+    if !has_permission {
+        tracing::warn!(
+            authorizer = %username,
+            required_permission = %req.required_permission,
+            "Escalation failed - insufficient permission"
+        );
+        return Err(AppError::forbidden(format!(
+            "User does not have permission: {}",
+            req.required_permission
+        )));
+    }
+
+    let authorizer_id = employee
+        .id
+        .as_ref()
+        .map(|t| t.to_string())
+        .unwrap_or_default();
+
+    // Log successful escalation
+    state.audit_service.log(
+        AuditAction::EscalationSuccess,
+        "auth",
+        format!("employee:{}", authorizer_id),
+        Some(authorizer_id.clone()),
+        Some(employee.display_name.clone()),
+        serde_json::json!({
+            "authorizer_username": &employee.username,
+            "required_permission": &req.required_permission,
+            "requester_id": &current_user.id,
+            "requester_name": &current_user.display_name,
+        }),
+    ).await;
+
+    tracing::info!(
+        authorizer_id = %authorizer_id,
+        authorizer_username = %employee.username,
+        required_permission = %req.required_permission,
+        requester_id = %current_user.id,
+        "Permission escalation successful"
+    );
+
+    let response = EscalateResponse {
+        authorizer: UserInfo {
+            id: authorizer_id,
+            username: employee.username,
+            display_name: employee.display_name,
+            role_id: employee.role.to_string(),
+            role_name: role.name,
+            permissions: role.permissions,
+            is_system: employee.is_system,
+        },
+    };
+
+    Ok(Json(response))
 }

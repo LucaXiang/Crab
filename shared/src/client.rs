@@ -39,3 +39,21 @@ pub struct UserInfo {
 
 /// Current user response (same as UserInfo)
 pub type CurrentUserResponse = UserInfo;
+
+/// Escalation request (supervisor authorization)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EscalateRequest {
+    /// 授权人用户名
+    pub username: String,
+    /// 授权人密码
+    pub password: String,
+    /// 所需权限
+    pub required_permission: String,
+}
+
+/// Escalation response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EscalateResponse {
+    /// 授权人信息
+    pub authorizer: UserInfo,
+}

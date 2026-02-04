@@ -8,7 +8,7 @@ use crate::core::ServerState;
 
 /// Build authentication router
 /// - /api/auth/login: public (no auth required)
-/// - /api/auth/me, /api/auth/logout: public (auth middleware handled at Router level)
+/// - /api/auth/me, /api/auth/logout, /api/auth/escalate: protected (require authentication)
 pub fn router() -> Router<ServerState> {
     Router::new()
         // Public route - no auth middleware applied
@@ -16,4 +16,5 @@ pub fn router() -> Router<ServerState> {
         // Protected routes - require authentication (handled by global require_auth middleware)
         .route("/api/auth/me", get(handler::me))
         .route("/api/auth/logout", post(handler::logout))
+        .route("/api/auth/escalate", post(handler::escalate))
 }

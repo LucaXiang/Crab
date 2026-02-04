@@ -30,6 +30,8 @@ pub enum AuditAction {
     LoginFailed,
     /// 登出
     Logout,
+    /// 权限提升（主管授权）
+    EscalationSuccess,
 
     // ═══ 订单（财务关键 — 仅终结状态，中间操作由 OrderEvents 事件溯源覆盖）═══
     /// 订单完成结账
