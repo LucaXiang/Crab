@@ -16,10 +16,11 @@ pub fn router() -> Router<ServerState> {
 }
 
 fn routes() -> Router<ServerState> {
+    // 日报查看：需要 reports:view 权限
     Router::new()
         .route("/", get(handler::list))
         .route("/generate", post(handler::generate))
         .route("/{id}", get(handler::get_by_id))
         .route("/date/{date}", get(handler::get_by_date))
-        .layer(middleware::from_fn(require_permission("statistics:read")))
+        .layer(middleware::from_fn(require_permission("reports:view")))
 }

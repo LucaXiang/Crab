@@ -12,19 +12,16 @@ pub fn router() -> Router<ServerState> {
 }
 
 fn routes() -> Router<ServerState> {
+    // 读取路由：无需权限检查
     let read_routes = Router::new()
         .route("/", get(handler::list))
-        .route("/{id}", get(handler::get_by_id))
-        .layer(middleware::from_fn(require_permission("products:read")));
+        .route("/{id}", get(handler::get_by_id));
 
-    let write_routes = Router::new()
+    // 管理路由：需要 menu:manage 权限
+    let manage_routes = Router::new()
         .route("/", axum::routing::post(handler::create))
-        .route("/{id}", axum::routing::put(handler::update))
-        .layer(middleware::from_fn(require_permission("products:write")));
+        .route("/{id}", axum::routing::put(handler::update).delete(handler::delete))
+        .layer(middleware::from_fn(require_permission("menu:manage")));
 
-    let delete_routes = Router::new()
-        .route("/{id}", axum::routing::delete(handler::delete))
-        .layer(middleware::from_fn(require_permission("products:delete")));
-
-    read_routes.merge(write_routes).merge(delete_routes)
+    read_routes.merge(manage_routes)
 }

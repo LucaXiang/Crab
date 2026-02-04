@@ -337,7 +337,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
               </button>
             </ProtectedGate>
           ) : (
-            <ProtectedGate permission={Permission.ZONES_MANAGE}>
+            <ProtectedGate permission={Permission.TABLES_MANAGE}>
               <button
                 onClick={() => openModal('ZONE', 'CREATE')}
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-purple-600/20 hover:bg-purple-700 hover:shadow-purple-600/30 transition-all"

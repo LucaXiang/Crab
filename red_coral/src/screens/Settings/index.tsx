@@ -33,35 +33,37 @@ const SettingsContent: React.FC = React.memo(() => {
     <div className="flex-1 overflow-y-auto bg-gray-50/50">
       <div className="p-6 md:p-8 max-w-7xl mx-auto w-full space-y-6">
         {activeCategory === 'TABLES' && (
-          <TableManagement initialTab="tables" />
+          <ProtectedGate permission={Permission.TABLES_MANAGE}>
+            <TableManagement initialTab="tables" />
+          </ProtectedGate>
         )}
         {activeCategory === 'PRODUCTS' && (
-          <ProtectedGate permission={Permission.PRODUCTS_WRITE}>
+          <ProtectedGate permission={Permission.MENU_MANAGE}>
             <ProductManagement />
           </ProtectedGate>
         )}
         {activeCategory === 'CATEGORIES' && (
-          <ProtectedGate permission={Permission.CATEGORIES_MANAGE}>
+          <ProtectedGate permission={Permission.MENU_MANAGE}>
             <CategoryManagement />
           </ProtectedGate>
         )}
         {activeCategory === 'TAGS' && (
-          <ProtectedGate permission={Permission.CATEGORIES_MANAGE}>
+          <ProtectedGate permission={Permission.MENU_MANAGE}>
             <TagManagement />
           </ProtectedGate>
         )}
         {activeCategory === 'ATTRIBUTES' && (
-          <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
+          <ProtectedGate permission={Permission.MENU_MANAGE}>
             <AttributeManagement />
           </ProtectedGate>
         )}
         {activeCategory === 'PRICE_RULES' && (
-          <ProtectedGate permission={Permission.SYSTEM_WRITE}>
+          <ProtectedGate permission={Permission.PRICE_RULES_MANAGE}>
             <PriceRuleManagement />
           </ProtectedGate>
         )}
         {activeCategory === 'SHIFTS' && (
-          <ProtectedGate permission={Permission.SYSTEM_WRITE}>
+          <ProtectedGate permission={Permission.SHIFTS_MANAGE}>
             <ShiftManagement />
           </ProtectedGate>
         )}
@@ -72,22 +74,22 @@ const SettingsContent: React.FC = React.memo(() => {
         )}
         {activeCategory === 'LANG' && <LanguageSettings />}
         {activeCategory === 'PRINTER' && (
-          <ProtectedGate permission={Permission.PRINTERS_MANAGE}>
+          <ProtectedGate permission={Permission.SETTINGS_MANAGE}>
             <PrinterSettings />
           </ProtectedGate>
         )}
         {activeCategory === 'DATA_TRANSFER' && (
-          <ProtectedGate permission={Permission.SYSTEM_WRITE}>
+          <ProtectedGate permission={Permission.SETTINGS_MANAGE}>
             <DataTransfer />
           </ProtectedGate>
         )}
         {activeCategory === 'STORE' && (
-          <ProtectedGate permission={Permission.SYSTEM_WRITE}>
+          <ProtectedGate permission={Permission.SETTINGS_MANAGE}>
             <StoreSettings />
           </ProtectedGate>
         )}
         {activeCategory === 'SYSTEM' && (
-          <ProtectedGate permission={Permission.SYSTEM_WRITE}>
+          <ProtectedGate permission={Permission.SETTINGS_MANAGE}>
             <SystemSettings />
           </ProtectedGate>
         )}

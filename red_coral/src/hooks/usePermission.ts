@@ -26,10 +26,10 @@ export const usePermission = () => {
 };
 
 // ==================== Specific Permission Hooks ====================
+// 简化权限系统：模块化权限 + 敏感操作
 
 /**
- * Check if user can manage other users (create/edit/delete)
- * Admin only
+ * Check if user can manage users (admin only)
  */
 export const useCanManageUsers = () => {
   const { hasPermission } = usePermission();
@@ -37,55 +37,66 @@ export const useCanManageUsers = () => {
 };
 
 /**
- * Check if user can manage products (create/edit/delete)
- * Manager and Admin only
+ * Check if user can manage menu (products, categories, attributes, tags)
  */
-export const useCanManageProducts = () => {
+export const useCanManageMenu = () => {
   const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.PRODUCTS_WRITE);
+  return hasPermission(PermissionValues.MENU_MANAGE);
 };
 
 /**
- * Check if user can update products
- * Manager and Admin only
- */
-export const useCanUpdateProduct = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.PRODUCTS_WRITE);
-};
-
-/**
- * Check if user can delete products
- * Manager and Admin only
- */
-export const useCanDeleteProduct = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.PRODUCTS_DELETE);
-};
-
-/**
- * Check if user can manage categories
- * Manager and Admin only
- */
-export const useCanManageCategories = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.CATEGORIES_MANAGE);
-};
-
-/**
- * Check if user can manage zones
- * Manager and Admin only
- */
-export const useCanManageZones = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.ZONES_MANAGE);
-};
-
-/**
- * Check if user can manage tables
- * Manager and Admin only
+ * Check if user can manage tables and zones
  */
 export const useCanManageTables = () => {
   const { hasPermission } = usePermission();
   return hasPermission(PermissionValues.TABLES_MANAGE);
 };
+
+/**
+ * Check if user can view reports
+ */
+export const useCanViewReports = () => {
+  const { hasPermission } = usePermission();
+  return hasPermission(PermissionValues.REPORTS_VIEW);
+};
+
+/**
+ * Check if user can manage settings
+ */
+export const useCanManageSettings = () => {
+  const { hasPermission } = usePermission();
+  return hasPermission(PermissionValues.SETTINGS_MANAGE);
+};
+
+/**
+ * Check if user can manage shifts
+ */
+export const useCanManageShifts = () => {
+  const { hasPermission } = usePermission();
+  return hasPermission(PermissionValues.SHIFTS_MANAGE);
+};
+
+/**
+ * Check if user can manage price rules
+ */
+export const useCanManagePriceRules = () => {
+  const { hasPermission } = usePermission();
+  return hasPermission(PermissionValues.PRICE_RULES_MANAGE);
+};
+
+// === 兼容性别名 (deprecated) ===
+
+/** @deprecated Use useCanManageMenu */
+export const useCanManageProducts = () => useCanManageMenu();
+
+/** @deprecated Use useCanManageMenu */
+export const useCanUpdateProduct = () => useCanManageMenu();
+
+/** @deprecated Use useCanManageMenu */
+export const useCanDeleteProduct = () => useCanManageMenu();
+
+/** @deprecated Use useCanManageMenu */
+export const useCanManageCategories = () => useCanManageMenu();
+
+/** @deprecated Use useCanManageTables */
+export const useCanManageZones = () => useCanManageTables();

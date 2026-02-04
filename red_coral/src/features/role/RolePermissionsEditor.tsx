@@ -7,59 +7,24 @@ import { Shield, Save, RefreshCw, Check, Plus, Trash2, Info } from 'lucide-react
 import { Role, RoleListData, RolePermissionListData } from '@/core/domain/types';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 
-// Map permissions to readable labels (resource:action format)
+// Simplified permission labels (12 configurable permissions)
 const usePermissionLabels = () => {
   const { t } = useI18n();
   return {
-    // Product permissions
-    'products:read': t('settings.permissions.products_read'),
-    'products:write': t('settings.permissions.create_product'),
-    'products:delete': t('settings.permissions.delete_product'),
-    'products:manage': t('settings.permissions.manage_products'),
-    // Category permissions
-    'categories:read': t('settings.permissions.categories_read'),
-    'categories:manage': t('settings.permissions.manage_categories'),
-    // Attribute permissions
-    'attributes:read': t('settings.permissions.attributes_read'),
-    'attributes:manage': t('settings.permissions.manage_attributes'),
-    // Order permissions
-    'orders:read': t('settings.permissions.orders_read'),
-    'orders:write': t('settings.permissions.orders_write'),
-    'orders:void': t('settings.permissions.void_order'),
-    'orders:discount': t('settings.permissions.apply_discount'),
-    'orders:comp': t('settings.permissions.comp_item'),
-    'orders:refund': t('settings.permissions.refund_order'),
-    'orders:cancel_item': t('settings.permissions.cancel_item'),
-    // User management
-    'users:read': t('settings.permissions.users_read'),
-    'users:manage': t('settings.permissions.manage_users'),
-    // Role management
-    'roles:read': t('settings.permissions.roles_read'),
-    'roles:write': t('settings.permissions.roles_write'),
-    // Zone & Table permissions
-    'zones:read': t('settings.permissions.zones_read'),
-    'zones:manage': t('settings.permissions.manage_zones'),
-    'tables:read': t('settings.permissions.tables_read'),
-    'tables:manage': t('settings.permissions.manage_tables'),
-    'tables:merge_bill': t('settings.permissions.merge_bill'),
-    'tables:transfer': t('settings.permissions.transfer_table'),
-    // Pricing permissions
-    'pricing:read': t('settings.permissions.pricing_read'),
-    'pricing:write': t('settings.permissions.modify_price'),
-    // Statistics
-    'statistics:read': t('settings.permissions.view_statistics'),
-    // Printer permissions
-    'printers:read': t('settings.permissions.printers_read'),
-    'printers:manage': t('settings.permissions.manage_printers'),
-    // Receipt permissions
-    'receipts:print': t('settings.permissions.print_receipts'),
-    'receipts:reprint': t('settings.permissions.reprint_receipt'),
-    // Settings & System
-    'settings:manage': t('settings.permissions.manage_settings'),
-    'system:read': t('settings.permissions.system_read'),
-    'system:write': t('settings.permissions.system_settings'),
-    // POS operations
-    'pos:cash_drawer': t('settings.permissions.open_cash_drawer'),
+    // === 模块化权限 (6) ===
+    'menu:manage': t('settings.permissions.menu_manage'),
+    'tables:manage': t('settings.permissions.tables_manage'),
+    'shifts:manage': t('settings.permissions.shifts_manage'),
+    'reports:view': t('settings.permissions.reports_view'),
+    'price_rules:manage': t('settings.permissions.price_rules_manage'),
+    'settings:manage': t('settings.permissions.settings_manage'),
+    // === 敏感操作 (6) ===
+    'orders:void': t('settings.permissions.orders_void'),
+    'orders:discount': t('settings.permissions.orders_discount'),
+    'orders:comp': t('settings.permissions.orders_comp'),
+    'orders:refund': t('settings.permissions.orders_refund'),
+    'orders:modify_price': t('settings.permissions.orders_modify_price'),
+    'cash_drawer:open': t('settings.permissions.cash_drawer_open'),
   };
 };
 
@@ -82,42 +47,34 @@ export const RolePermissionsEditor: React.FC = () => {
 
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
-  // Group permissions (resource:action format)
+  // Simplified permission groups (2 groups, 12 permissions total)
   const getPermissionGroups = () => {
-    const groups = {
-      menu: {
-        title: t('settings.permissions.group.menu'),
-        perms: ['products:read', 'products:write', 'products:delete', 'categories:read', 'categories:manage', 'attributes:read', 'attributes:manage']
+    return {
+      modular: {
+        title: t('settings.permissions.group.modular'),
+        description: t('settings.permissions.group.modular_desc'),
+        perms: [
+          'menu:manage',
+          'tables:manage',
+          'shifts:manage',
+          'reports:view',
+          'price_rules:manage',
+          'settings:manage',
+        ]
       },
-      pos: {
-        title: t('settings.permissions.group.pos'),
-        perms: ['orders:read', 'orders:void', 'orders:discount', 'orders:comp', 'orders:refund', 'orders:cancel_item', 'tables:merge_bill', 'tables:transfer', 'pos:cash_drawer', 'receipts:reprint', 'pricing:read', 'pricing:write']
-      },
-      store: {
-        title: t('settings.permissions.group.store'),
-        perms: ['zones:read', 'zones:manage', 'tables:read', 'tables:manage', 'printers:read', 'printers:manage']
-      },
-      system: {
-        title: t('settings.permissions.group.system'),
-        perms: ['users:read', 'users:manage', 'roles:read', 'roles:write', 'statistics:read', 'settings:manage', 'system:read', 'system:write']
+      sensitive: {
+        title: t('settings.permissions.group.sensitive'),
+        description: t('settings.permissions.group.sensitive_desc'),
+        perms: [
+          'orders:void',
+          'orders:discount',
+          'orders:comp',
+          'orders:refund',
+          'orders:modify_price',
+          'cash_drawer:open',
+        ]
       }
     };
-
-    // Catch any unassigned permissions
-    const assigned = new Set(Object.values(groups).flatMap(g => g.perms));
-    const other = availablePermissions.filter(p => !assigned.has(p));
-
-    if (other.length > 0) {
-      return {
-        ...groups,
-        other: {
-          title: t('settings.permissions.group.other'),
-          perms: other
-        }
-      };
-    }
-
-    return groups;
   };
 
   // Load data
@@ -358,22 +315,35 @@ export const RolePermissionsEditor: React.FC = () => {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {Object.entries(permissionGroups).map(([key, group]: [string, any]) => (
-                  <div key={key} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                    <h4 className="font-bold text-gray-700 mb-3 pb-2 border-b border-gray-200 flex items-center justify-between">
-                      {group.title}
-                      <span className="text-xs font-normal text-gray-400 bg-white px-2 py-0.5 rounded-full border border-gray-200">
-                        {group.perms.length}
-                      </span>
-                    </h4>
-                    <div className="space-y-2">
+                {Object.entries(permissionGroups).map(([key, group]: [string, { title: string; description?: string; perms: string[] }]) => (
+                  <div key={key} className={`rounded-xl p-5 border ${
+                    key === 'sensitive' ? 'bg-amber-50/50 border-amber-200' : 'bg-gray-50 border-gray-100'
+                  }`}>
+                    <div className="mb-4">
+                      <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                        {group.title}
+                        <span className={`text-xs font-normal px-2 py-0.5 rounded-full ${
+                          key === 'sensitive' ? 'bg-amber-100 text-amber-700' : 'bg-gray-200 text-gray-500'
+                        }`}>
+                          {group.perms.length}
+                        </span>
+                      </h4>
+                      {group.description && (
+                        <p className="text-xs text-gray-500 mt-1">{group.description}</p>
+                      )}
+                    </div>
+                    <div className="space-y-1">
                       {group.perms.map((perm: string) => {
                         const isChecked = rolePermissions[selectedRole.name]?.includes(perm) || false;
                         const isSystemAdmin = selectedRole.name === 'admin';
 
                         return (
-                          <label key={perm} className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
-                            isSystemAdmin ? 'opacity-70 cursor-not-allowed' : 'hover:bg-white cursor-pointer'
+                          <label key={perm} className={`flex items-center gap-3 p-2.5 rounded-lg transition-all ${
+                            isSystemAdmin
+                              ? 'opacity-60 cursor-not-allowed'
+                              : isChecked
+                                ? 'bg-white shadow-sm'
+                                : 'hover:bg-white/80 cursor-pointer'
                           }`}>
                             <div className="relative flex items-center">
                               <input
@@ -383,15 +353,15 @@ export const RolePermissionsEditor: React.FC = () => {
                                 onChange={() => !isSystemAdmin && handleToggle(selectedRole.name, perm)}
                                 disabled={isSystemAdmin}
                               />
-                              <div className={`w-5 h-5 border-2 rounded transition-all flex items-center justify-center
+                              <div className={`w-5 h-5 border-2 rounded-md transition-all flex items-center justify-center
                                 ${isSystemAdmin || isChecked
-                                  ? 'bg-blue-600 border-blue-600'
+                                  ? key === 'sensitive' ? 'bg-amber-500 border-amber-500' : 'bg-blue-600 border-blue-600'
                                   : 'bg-white border-gray-300 peer-hover:border-blue-400'
                                 }`}>
-                                <Check size={12} className="text-white" strokeWidth={3} />
+                                {(isSystemAdmin || isChecked) && <Check size={12} className="text-white" strokeWidth={3} />}
                               </div>
                             </div>
-                            <span className="text-sm text-gray-700 font-medium">
+                            <span className={`text-sm font-medium ${isChecked ? 'text-gray-800' : 'text-gray-600'}`}>
                               {permissionLabels[perm as keyof typeof permissionLabels] || perm}
                             </span>
                           </label>

@@ -2,9 +2,8 @@
 
 mod handler;
 
-use axum::{middleware, routing::get, Router};
+use axum::{routing::get, Router};
 
-use crate::auth::require_permission;
 use crate::core::ServerState;
 
 pub fn router() -> Router<ServerState> {
@@ -12,8 +11,8 @@ pub fn router() -> Router<ServerState> {
 }
 
 fn routes() -> Router<ServerState> {
+    // 归档验证：无需权限检查（基础操作）
     Router::new()
         .route("/order/{receipt_number}", get(handler::verify_order))
         .route("/daily/{date}", get(handler::verify_daily_chain))
-        .layer(middleware::from_fn(require_permission("orders:read")))
 }

@@ -353,7 +353,7 @@ export const ProductManagement: React.FC = React.memo(() => {
               </p>
             </div>
           </div>
-          <ProtectedGate permission={Permission.PRODUCTS_WRITE}>
+          <ProtectedGate permission={Permission.MENU_MANAGE}>
             <button
               onClick={() => openModal('PRODUCT', 'CREATE')}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-orange-500/20 hover:bg-orange-600 hover:shadow-orange-500/30 transition-all"

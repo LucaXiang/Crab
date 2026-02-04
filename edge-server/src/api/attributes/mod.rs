@@ -16,11 +16,12 @@ pub fn router() -> Router<ServerState> {
 }
 
 fn routes() -> Router<ServerState> {
+    // 读取路由：无需权限检查
     let read_routes = Router::new()
         .route("/", get(handler::list))
-        .route("/{id}", get(handler::get_by_id))
-        .layer(middleware::from_fn(require_permission("attributes:read")));
+        .route("/{id}", get(handler::get_by_id));
 
+    // 管理路由：需要 menu:manage 权限
     let manage_routes = Router::new()
         .route("/", post(handler::create))
         .route("/{id}", put(handler::update).delete(handler::delete))
@@ -29,7 +30,7 @@ fn routes() -> Router<ServerState> {
             "/{id}/options/{idx}",
             put(handler::update_option).delete(handler::remove_option),
         )
-        .layer(middleware::from_fn(require_permission("attributes:manage")));
+        .layer(middleware::from_fn(require_permission("menu:manage")));
 
     read_routes.merge(manage_routes)
 }

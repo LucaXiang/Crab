@@ -140,55 +140,56 @@ export type DraftOrder = HeldOrder;
 export type CompletedOrder = HeldOrder;
 
 // Permission type and constants
+// 简化权限系统：12 个可配置权限 + 1 个管理员专属权限
 export type Permission = string;
 
 export const Permission = {
-  // User management
-  USERS_READ: 'users:read' as Permission,
-  USERS_MANAGE: 'users:manage' as Permission,
-  // Product permissions
-  PRODUCTS_READ: 'products:read' as Permission,
-  PRODUCTS_WRITE: 'products:write' as Permission,
-  PRODUCTS_DELETE: 'products:delete' as Permission,
-  // Category permissions
-  CATEGORIES_READ: 'categories:read' as Permission,
-  CATEGORIES_MANAGE: 'categories:manage' as Permission,
-  // Attribute permissions
-  ATTRIBUTES_READ: 'attributes:read' as Permission,
-  ATTRIBUTES_MANAGE: 'attributes:manage' as Permission,
-  // Order permissions
-  ORDERS_READ: 'orders:read' as Permission,
-  ORDERS_VOID: 'orders:void' as Permission,
-  ORDERS_DISCOUNT: 'orders:discount' as Permission,
-  ORDERS_COMP: 'orders:comp' as Permission,
-  ORDERS_REFUND: 'orders:refund' as Permission,
-  ORDERS_CANCEL_ITEM: 'orders:cancel_item' as Permission,
-  // Zone & Table permissions
-  ZONES_READ: 'zones:read' as Permission,
-  ZONES_MANAGE: 'zones:manage' as Permission,
-  TABLES_READ: 'tables:read' as Permission,
-  TABLES_MANAGE: 'tables:manage' as Permission,
-  TABLES_MERGE_BILL: 'tables:merge_bill' as Permission,
-  TABLES_TRANSFER: 'tables:transfer' as Permission,
-  // Pricing permissions
-  PRICING_READ: 'pricing:read' as Permission,
-  PRICING_WRITE: 'pricing:write' as Permission,
-  // Statistics
-  STATISTICS_READ: 'statistics:read' as Permission,
-  // Printer permissions
-  PRINTERS_READ: 'printers:read' as Permission,
-  PRINTERS_MANAGE: 'printers:manage' as Permission,
-  // Receipt permissions
-  RECEIPTS_REPRINT: 'receipts:reprint' as Permission,
-  // Settings & System
-  SETTINGS_MANAGE: 'settings:manage' as Permission,
-  SYSTEM_READ: 'system:read' as Permission,
-  SYSTEM_WRITE: 'system:write' as Permission,
-  // Role management
-  ROLES_READ: 'roles:read' as Permission,
-  ROLES_WRITE: 'roles:write' as Permission,
-  // POS operations
-  POS_CASH_DRAWER: 'pos:cash_drawer' as Permission,
+  // === 模块化权限 (6) ===
+  MENU_MANAGE: 'menu:manage' as Permission,           // 菜单管理
+  TABLES_MANAGE: 'tables:manage' as Permission,       // 桌台管理
+  SHIFTS_MANAGE: 'shifts:manage' as Permission,       // 班次管理
+  REPORTS_VIEW: 'reports:view' as Permission,         // 报表查看
+  PRICE_RULES_MANAGE: 'price_rules:manage' as Permission, // 价格规则
+  SETTINGS_MANAGE: 'settings:manage' as Permission,   // 系统设置
+
+  // === 敏感操作 (6) ===
+  ORDERS_VOID: 'orders:void' as Permission,           // 作废订单
+  ORDERS_DISCOUNT: 'orders:discount' as Permission,   // 应用折扣
+  ORDERS_COMP: 'orders:comp' as Permission,           // 赠送菜品
+  ORDERS_REFUND: 'orders:refund' as Permission,       // 退款
+  ORDERS_MODIFY_PRICE: 'orders:modify_price' as Permission, // 修改价格
+  CASH_DRAWER_OPEN: 'cash_drawer:open' as Permission, // 打开钱箱
+
+  // === 管理员专属 ===
+  USERS_MANAGE: 'users:manage' as Permission,         // 用户管理 (仅 admin)
+
+  // === 兼容性别名 (deprecated, 用于过渡) ===
+  /** @deprecated Use MENU_MANAGE */
+  PRODUCTS_WRITE: 'menu:manage' as Permission,
+  /** @deprecated Use MENU_MANAGE */
+  PRODUCTS_DELETE: 'menu:manage' as Permission,
+  /** @deprecated Use MENU_MANAGE */
+  CATEGORIES_MANAGE: 'menu:manage' as Permission,
+  /** @deprecated Use MENU_MANAGE */
+  ATTRIBUTES_MANAGE: 'menu:manage' as Permission,
+  /** @deprecated Use TABLES_MANAGE */
+  ZONES_MANAGE: 'tables:manage' as Permission,
+  /** @deprecated Use REPORTS_VIEW */
+  STATISTICS_READ: 'reports:view' as Permission,
+  /** @deprecated Use CASH_DRAWER_OPEN */
+  POS_CASH_DRAWER: 'cash_drawer:open' as Permission,
+  /** @deprecated Use SETTINGS_MANAGE */
+  SYSTEM_WRITE: 'settings:manage' as Permission,
+  /** @deprecated Use SETTINGS_MANAGE */
+  PRINTERS_MANAGE: 'settings:manage' as Permission,
+  /** @deprecated Use SETTINGS_MANAGE */
+  RECEIPTS_REPRINT: 'settings:manage' as Permission,
+  /** @deprecated 基础操作，无需权限检查 */
+  ORDERS_CANCEL_ITEM: 'orders:void' as Permission,
+  /** @deprecated 基础操作，无需权限检查 */
+  TABLES_MERGE_BILL: 'tables:manage' as Permission,
+  /** @deprecated 基础操作，无需权限检查 */
+  TABLES_TRANSFER: 'tables:manage' as Permission,
 } as const;
 
 // Statistics types

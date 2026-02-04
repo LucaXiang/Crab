@@ -16,8 +16,9 @@ pub fn router() -> Router<ServerState> {
 }
 
 fn routes() -> Router<ServerState> {
+    // 报表查看：需要 reports:view 权限
     Router::new()
         .route("/", get(handler::get_statistics))
         .route("/sales-report", get(handler::get_sales_report))
-        .layer(middleware::from_fn(require_permission("statistics:read")))
+        .layer(middleware::from_fn(require_permission("reports:view")))
 }

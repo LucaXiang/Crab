@@ -1,103 +1,63 @@
 //! Permission Definitions
 //!
-//! Defines all available permissions for the RBAC system.
+//! Simplified RBAC permission system.
+//!
+//! ## 设计原则
+//! - 基础操作（查看菜单、订单、基础POS操作）无需权限，登录即可使用
+//! - 模块化权限：按功能模块授权
+//! - 敏感操作：单独控制高风险操作
+//! - 用户管理：仅 admin 角色可用（is_system 保护）
 
-/// All available permissions in the system
+/// 可配置权限列表（12 项）
+/// 不包含 "all" 和 "users:manage"，这些是系统级权限
 pub const ALL_PERMISSIONS: &[&str] = &[
-    // Product permissions
-    "products:read",
-    "products:write",
-    "products:delete",
-    // Category permissions
-    "categories:read",
-    "categories:manage",
-    // Attribute permissions
-    "attributes:read",
-    "attributes:manage",
-    // Order permissions
-    "orders:read",
-    "orders:void",
-    "orders:discount",
-    "orders:comp",
-    "orders:refund",
-    "orders:cancel_item",
-    // User management permissions
-    "users:read",
-    "users:manage",
-    // Role management permissions
-    "roles:read",
-    "roles:write",
-    // Zone & Table permissions
-    "zones:read",
-    "zones:manage",
-    "tables:read",
-    "tables:manage",
-    "tables:merge_bill",
-    "tables:transfer",
-    // Pricing permissions
-    "pricing:read",
-    "pricing:write",
-    // Statistics permissions
-    "statistics:read",
-    // Printer permissions
-    "printers:read",
-    "printers:manage",
-    // Receipt permissions
-    "receipts:reprint",
-    // Settings & System permissions
-    "settings:manage",
-    "system:read",
-    "system:write",
-    // POS operations
-    "pos:cash_drawer",
-    // Admin permission (grants all access)
-    "all",
+    // === 模块化权限 (6) ===
+    "menu:manage",         // 菜单管理（商品/分类/属性/标签 增删改查）
+    "tables:manage",       // 桌台管理（区域/餐桌 增删改查）
+    "shifts:manage",       // 班次管理
+    "reports:view",        // 报表查看
+    "price_rules:manage",  // 价格规则管理
+    "settings:manage",     // 系统设置
+
+    // === 敏感操作 (6) ===
+    "orders:void",         // 作废订单
+    "orders:discount",     // 应用折扣/附加费
+    "orders:comp",         // 赠送菜品
+    "orders:refund",       // 退款
+    "orders:modify_price", // 修改价格
+    "cash_drawer:open",    // 打开钱箱
+];
+
+/// Admin 专属权限（不在可配置列表中）
+pub const ADMIN_ONLY_PERMISSIONS: &[&str] = &[
+    "users:manage", // 用户管理
+    "all",          // 超级权限
 ];
 
 /// Default role permissions
 pub const DEFAULT_ADMIN_PERMISSIONS: &[&str] = &["all"];
 
-pub const DEFAULT_USER_PERMISSIONS: &[&str] = &[
-    "products:read",
-    "categories:read",
-    "attributes:read",
-    "orders:read",
-    "zones:read",
-    "tables:read",
-    "pricing:read",
-    "statistics:read",
-    "printers:read",
-];
-
+/// 经理角色默认权限（全部可配置权限）
 pub const DEFAULT_MANAGER_PERMISSIONS: &[&str] = &[
-    "products:read",
-    "products:write",
-    "products:delete",
-    "categories:read",
-    "categories:manage",
-    "attributes:read",
-    "attributes:manage",
-    "orders:read",
+    // 模块化
+    "menu:manage",
+    "tables:manage",
+    "shifts:manage",
+    "reports:view",
+    "price_rules:manage",
+    "settings:manage",
+    // 敏感操作
     "orders:void",
     "orders:discount",
     "orders:comp",
     "orders:refund",
-    "orders:cancel_item",
-    "users:read",
-    "zones:read",
-    "zones:manage",
-    "tables:read",
-    "tables:manage",
-    "tables:merge_bill",
-    "tables:transfer",
-    "pricing:read",
-    "pricing:write",
-    "statistics:read",
-    "printers:read",
-    "printers:manage",
-    "receipts:reprint",
-    "settings:manage",
-    "pos:cash_drawer",
+    "orders:modify_price",
+    "cash_drawer:open",
+];
+
+/// 普通员工默认权限（仅查看报表）
+pub const DEFAULT_USER_PERMISSIONS: &[&str] = &[
+    "reports:view",
 ];
 
 /// Get permissions for a role name
@@ -115,11 +75,13 @@ pub fn get_default_permissions(role_name: &str) -> Vec<String> {
             .iter()
             .map(|s| s.to_string())
             .collect(),
-        _ => vec!["products:read".to_string()],
+        _ => vec![],
     }
 }
 
 /// Validate if a permission string is valid
 pub fn is_valid_permission(permission: &str) -> bool {
-    ALL_PERMISSIONS.contains(&permission) || permission.ends_with(":*")
+    ALL_PERMISSIONS.contains(&permission)
+        || ADMIN_ONLY_PERMISSIONS.contains(&permission)
+        || permission.ends_with(":*")
 }

@@ -61,11 +61,11 @@ export const ActionBar: React.FC<ActionBarProps> = ({
 
       <div className="flex items-center gap-2">
         <IconBtn icon={SettingsIcon} size={24} className="p-3 hover:bg-white/10 rounded-xl" onClick={() => onSetScreen('SETTINGS')} onMouseDown={(e) => e.preventDefault()} />
-        <ProtectedGate permission={Permission.STATISTICS_READ}>
+        <ProtectedGate permission={Permission.REPORTS_VIEW}>
           <IconBtn icon={ChartArea} size={24} className="p-3 hover:bg-white/10 rounded-xl" onClick={() => onSetScreen('STATISTICS')} onMouseDown={(e) => e.preventDefault()} />
         </ProtectedGate>
-        <EscalatableGate 
-          permission={Permission.POS_CASH_DRAWER}
+        <EscalatableGate
+          permission={Permission.CASH_DRAWER_OPEN}
           mode="intercept"
           description={t('app.action.open_cash_drawer')}
           onAuthorized={onOpenCashDrawer}

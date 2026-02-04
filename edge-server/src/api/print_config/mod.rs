@@ -14,13 +14,14 @@ pub fn router() -> Router<ServerState> {
 }
 
 fn routes() -> Router<ServerState> {
+    // 读取路由：无需权限检查
     let read_routes = Router::new()
-        .route("/", get(handler::get))
-        .layer(middleware::from_fn(require_permission("printers:read")));
+        .route("/", get(handler::get));
 
+    // 管理路由：需要 settings:manage 权限
     let manage_routes = Router::new()
         .route("/", axum::routing::put(handler::update))
-        .layer(middleware::from_fn(require_permission("printers:manage")));
+        .layer(middleware::from_fn(require_permission("settings:manage")));
 
     read_routes.merge(manage_routes)
 }

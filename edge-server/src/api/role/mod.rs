@@ -4,19 +4,20 @@ mod handler;
 
 use axum::{Router, middleware, routing::get};
 
-use crate::auth::require_permission;
+use crate::auth::require_admin;
 use crate::core::ServerState;
 
-/// Role router - requires authentication and role permissions
+/// Role router - role management is admin-only
 pub fn router() -> Router<ServerState> {
+    // 读取路由：无需权限检查（查看角色列表）
     let read_routes = Router::new()
         .nest("/api/roles", roles_read_routes())
-        .route("/api/permissions", get(handler::get_all_permissions))
-        .layer(middleware::from_fn(require_permission("roles:read")));
+        .route("/api/permissions", get(handler::get_all_permissions));
 
+    // 写入路由：仅管理员可用 (users:manage)
     let write_routes = Router::new()
         .nest("/api/roles", roles_write_routes())
-        .layer(middleware::from_fn(require_permission("roles:write")));
+        .layer(middleware::from_fn(require_admin));
 
     read_routes.merge(write_routes)
 }

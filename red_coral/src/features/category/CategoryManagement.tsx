@@ -281,7 +281,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
               </p>
             </div>
           </div>
-          <ProtectedGate permission={Permission.CATEGORIES_MANAGE}>
+          <ProtectedGate permission={Permission.MENU_MANAGE}>
             <button
               onClick={() => openModal('CATEGORY', 'CREATE', activeTab === 'virtual' ? { is_virtual: true } : undefined)}
               className={`inline-flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-semibold shadow-lg transition-all ${

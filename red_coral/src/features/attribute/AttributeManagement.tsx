@@ -222,7 +222,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
         addButtonText={t('settings.attribute.add_attribute')}
         onAdd={handleAddAttribute}
         themeColor="teal"
-        permission={Permission.ATTRIBUTES_MANAGE}
+        permission={Permission.MENU_MANAGE}
       />
 
       <FilterBar
@@ -318,7 +318,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
 
                         {/* Action Buttons */}
                         <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
+                          <ProtectedGate permission={Permission.MENU_MANAGE}>
                             <button
                               onClick={(e) => handleAddOption(attrId, e)}
                               className="p-2 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors"
@@ -327,7 +327,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                               <Plus size={16} />
                             </button>
                           </ProtectedGate>
-                          <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
+                          <ProtectedGate permission={Permission.MENU_MANAGE}>
                             <button
                               onClick={(e) => handleEditAttribute(attr, e)}
                               className="p-2 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
@@ -335,7 +335,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                               <Edit size={16} />
                             </button>
                           </ProtectedGate>
-                          <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
+                          <ProtectedGate permission={Permission.MENU_MANAGE}>
                             <button
                               onClick={(e) => handleDeleteAttribute(attr, e)}
                               className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -375,7 +375,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                 }`}
                               >
                                 {/* Default star */}
-                                <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
+                                <ProtectedGate permission={Permission.MENU_MANAGE}>
                                   <button
                                     onClick={(e) => handleToggleDefault(attr, option.index, e)}
                                     className={`shrink-0 p-0.5 rounded transition-colors ${
@@ -433,7 +433,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
 
                                 {/* Actions */}
                                 <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/opt:opacity-100 transition-opacity">
-                                  <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
+                                  <ProtectedGate permission={Permission.MENU_MANAGE}>
                                     <button
                                       onClick={(e) => handleEditOption(option, e)}
                                       className="p-1 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-md transition-colors"
@@ -441,7 +441,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                       <Edit size={13} />
                                     </button>
                                   </ProtectedGate>
-                                  <ProtectedGate permission={Permission.ATTRIBUTES_MANAGE}>
+                                  <ProtectedGate permission={Permission.MENU_MANAGE}>
                                     <button
                                       onClick={(e) => handleDeleteOption(option, e)}
                                       className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
