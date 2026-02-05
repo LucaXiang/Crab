@@ -25,13 +25,19 @@ const ZONE_ICONS: Record<string, React.ElementType> = {
   'zone:retail': ShoppingCart,
 };
 
+// Day keys for i18n (Sunday = 0)
+const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+
+// Week order starting from Monday: [1,2,3,4,5,6,0]
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
 export const RuleListPanel: React.FC<RuleListPanelProps> = ({
   rules,
   selectedRuleId,
   onSelectRule,
   searchQuery,
 }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const zones = useZoneStore(state => state.items);
 
   // Filter rules by search query
@@ -61,15 +67,54 @@ export const RuleListPanel: React.FC<RuleListPanelProps> = ({
     return Armchair; // Default for specific zones
   };
 
+  // Format active days - compress consecutive ranges (same logic as TimeVisualization)
+  const formatActiveDays = (activeDays: number[]): string => {
+    // Sort by week order (Mon-Sun)
+    const sorted = [...activeDays].sort((a, b) =>
+      WEEK_ORDER.indexOf(a) - WEEK_ORDER.indexOf(b)
+    );
+
+    // Find consecutive ranges
+    const ranges: number[][] = [];
+    let currentRange: number[] = [sorted[0]];
+
+    for (let i = 1; i < sorted.length; i++) {
+      const prevIdx = WEEK_ORDER.indexOf(sorted[i - 1]);
+      const currIdx = WEEK_ORDER.indexOf(sorted[i]);
+      if (currIdx === prevIdx + 1) {
+        currentRange.push(sorted[i]);
+      } else {
+        ranges.push(currentRange);
+        currentRange = [sorted[i]];
+      }
+    }
+    ranges.push(currentRange);
+
+    // Format each range
+    const listFormatter = new Intl.ListFormat(locale, { style: 'narrow', type: 'conjunction' });
+
+    const parts = ranges.map(range => {
+      if (range.length === 1) {
+        return t(`calendar.days.${DAY_KEYS[range[0]]}`);
+      } else if (range.length === 2) {
+        const twoDays = range.map(d => t(`calendar.days.${DAY_KEYS[d]}`));
+        return listFormatter.format(twoDays);
+      } else {
+        // Range of 3+: "一至五" / "L-V"
+        return `${t(`calendar.days.${DAY_KEYS[range[0]]}`)}${t('settings.price_rule.time_viz.to')}${t(`calendar.days.${DAY_KEYS[range[range.length - 1]]}`)}`;
+      }
+    });
+
+    return listFormatter.format(parts);
+  };
+
   // Format time summary
   const formatTimeSummary = (rule: PriceRule): string => {
     const parts: string[] = [];
 
     // Days of week
     if (rule.active_days && rule.active_days.length > 0 && rule.active_days.length < 7) {
-      const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
-      const days = rule.active_days.map(d => dayNames[d]).join('');
-      parts.push(`周${days}`);
+      parts.push(formatActiveDays(rule.active_days));
     }
 
     // Time range
@@ -79,14 +124,15 @@ export const RuleListPanel: React.FC<RuleListPanelProps> = ({
 
     // Date range
     if (rule.valid_from || rule.valid_until) {
-      const from = rule.valid_from ? new Date(rule.valid_from).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : '';
-      const until = rule.valid_until ? new Date(rule.valid_until).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : '';
+      const formatDate = (ts: number) => new Date(ts).toLocaleDateString(locale, { month: 'numeric', day: 'numeric' });
+      const from = rule.valid_from ? formatDate(rule.valid_from) : '';
+      const until = rule.valid_until ? formatDate(rule.valid_until) : '';
       if (from && until) {
         parts.push(`${from}~${until}`);
       } else if (from) {
-        parts.push(`${from}起`);
+        parts.push(`${from} ${t('settings.price_rule.time_viz.onwards')}`);
       } else if (until) {
-        parts.push(`至${until}`);
+        parts.push(`${t('settings.price_rule.time_viz.until')} ${until}`);
       }
     }
 
@@ -103,16 +149,16 @@ export const RuleListPanel: React.FC<RuleListPanelProps> = ({
   };
 
   return (
-    <div className="w-80 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
+    <div className="w-80 shrink-0 flex flex-col h-full overflow-hidden bg-gray-50">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 bg-white">
+      <div className="px-4 py-3 border-b border-gray-200">
         <span className="text-sm font-medium text-gray-700">
           {t('settings.price_rule.list_title')} ({filteredRules.length})
         </span>
       </div>
 
       {/* Rule list */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {filteredRules.length === 0 ? (
           <div className="text-center py-8 text-gray-400 text-sm">
             {searchQuery ? t('common.empty.no_results') : t('settings.price_rule.empty')}

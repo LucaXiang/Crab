@@ -380,8 +380,8 @@
       "total": "分单金额",
       "success": "分单成功",
       "failed": "分单失败",
-      "pay_cash": "现金支付",
-      "pay_card": "刷卡支付",
+      "pay_cash": "现金",
+      "pay_card": "刷卡",
       "desc": "拆分订单分别支付",
       "available": "可选",
       "remaining": "剩余",
@@ -851,6 +851,8 @@
         "status": "状态"
       },
       "add_rule": "添加规则",
+      "test_rules": "规则测试",
+      "test_rules_description": "选择区域和商品，查看哪些规则会生效",
       "edit_rule": "编辑规则",
       "delete_rule": "删除规则",
       "rule_deleted": "规则已删除",
@@ -926,7 +928,9 @@
         "days": "天",
         "expired": "已过期",
         "onwards": "起",
-        "until": "至"
+        "until": "至",
+        "to": "至",
+        "next_day": "(次日)"
       },
       "preview": {
         "title": "规则预览",
@@ -938,7 +942,11 @@
         "matched": "命中规则",
         "unmatched": "未命中规则",
         "current": "当前",
-        "more_rules": "条更多规则"
+        "more_rules": "条更多规则",
+        "test_time": "测试时间",
+        "current_time": "当前时间",
+        "custom_time": "自定义时间",
+        "ignore_time": "忽略时间"
       },
       "conflict": {
         "title": "规则交互",

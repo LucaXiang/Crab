@@ -199,11 +199,11 @@ export const CashPaymentModal: React.FC<CashPaymentModalProps> = ({
             ))}
           </div>
 
-          {/* Cancel Button */}
+          {/* Cancel Button - mt-auto pushes to bottom to align with confirm button */}
           <button
             onClick={onCancel}
             disabled={isProcessing}
-            className="mt-3 md:mt-6 w-full py-3 md:py-4 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mt-auto w-full h-14 md:h-20 bg-gray-100 text-gray-600 text-lg md:text-2xl font-bold hover:bg-gray-200 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('common.action.cancel')}
           </button>

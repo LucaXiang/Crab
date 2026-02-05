@@ -335,11 +335,11 @@ export const ShiftActionModal: React.FC<ShiftActionModalProps> = ({
             </div>
           )}
 
-          {/* Cancel button */}
+          {/* Cancel button - mt-auto pushes to bottom to align with confirm button */}
           <button
             onClick={onClose}
             disabled={loading}
-            className="mt-4 w-full py-3 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition-colors"
+            className="mt-auto w-full h-14 md:h-20 bg-gray-100 text-gray-600 text-lg md:text-2xl font-bold hover:bg-gray-200 rounded-xl transition-colors disabled:opacity-50"
           >
             {t('common.cancel')}
           </button>

@@ -380,8 +380,8 @@
       "total": "Importe parcial",
       "success": "División correcta",
       "failed": "Error al dividir",
-      "pay_cash": "Pagar efectivo",
-      "pay_card": "Pagar tarjeta",
+      "pay_cash": "Efectivo",
+      "pay_card": "Tarjeta",
       "desc": "Dividir cuenta en pagos",
       "available": "Disponible",
       "remaining": "Restante",
@@ -851,6 +851,8 @@
         "status": "Estado"
       },
       "add_rule": "Añadir regla",
+      "test_rules": "Probar reglas",
+      "test_rules_description": "Selecciona zona y producto para ver qué reglas aplican",
       "edit_rule": "Editar regla",
       "delete_rule": "Eliminar regla",
       "rule_deleted": "Regla eliminada",
@@ -926,7 +928,9 @@
         "days": "días",
         "expired": "Caducada",
         "onwards": "desde",
-        "until": "hasta"
+        "until": "hasta",
+        "to": "-",
+        "next_day": "(día sig.)"
       },
       "preview": {
         "title": "Vista previa",
@@ -938,7 +942,11 @@
         "matched": "Reglas aplicadas",
         "unmatched": "Reglas no aplicadas",
         "current": "actual",
-        "more_rules": "reglas más"
+        "more_rules": "reglas más",
+        "test_time": "Hora de prueba",
+        "current_time": "Hora actual",
+        "custom_time": "Hora personalizada",
+        "ignore_time": "Ignorar hora"
       },
       "conflict": {
         "title": "Interacción reglas",

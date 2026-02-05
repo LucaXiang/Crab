@@ -14,7 +14,7 @@ import { ResetPasswordModal } from './ResetPasswordModal';
 import { RolePermissionsEditor } from '@/features/role';
 
 export const UserManagement: React.FC = React.memo(() => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   // Permission check
   const canManageUsers = useCanManageUsers();
@@ -168,8 +168,11 @@ export const UserManagement: React.FC = React.memo(() => {
     return labels[role] || role;
   };
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString('zh-CN', {
+  const formatDate = (timestamp: number | undefined) => {
+    if (!timestamp || isNaN(timestamp)) return '-';
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -208,7 +211,7 @@ export const UserManagement: React.FC = React.memo(() => {
       {
         key: 'role',
         header: t('auth.user.role'),
-        width: '120px',
+        width: '160px',
         render: (user) => (
           <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getRoleBadgeClass(
@@ -223,7 +226,7 @@ export const UserManagement: React.FC = React.memo(() => {
       {
         key: 'createdAt',
         header: t('settings.user.column.created_at'),
-        width: '120px',
+        width: '140px',
         render: (user) => (
           <div className="flex items-center gap-1.5 text-sm text-gray-600">
             <Calendar size={14} />
@@ -234,7 +237,7 @@ export const UserManagement: React.FC = React.memo(() => {
       {
         key: 'actions',
         header: t('settings.user.column.actions'),
-        width: '160px',
+        width: '100px',
         align: 'right',
         render: (user) => (
           <ProtectedGate permission={Permission.USERS_MANAGE}>
