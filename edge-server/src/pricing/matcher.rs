@@ -180,18 +180,31 @@ pub fn is_time_valid(rule: &PriceRule, current_time: i64, tz: chrono_tz::Tz) -> 
     }
 
     // Check active_start_time/active_end_time ("HH:MM" format) in LOCAL time
-    if rule.active_start_time.is_some() || rule.active_end_time.is_some() {
+    // Supports cross-midnight ranges (e.g., 21:00-04:00)
+    if let (Some(start), Some(end)) = (&rule.active_start_time, &rule.active_end_time) {
         let current_time_str = local_datetime.format("%H:%M").to_string();
 
-        if let Some(ref start) = rule.active_start_time
-            && current_time_str < *start
-        {
+        let in_range = if end > start {
+            // Normal range (e.g., 09:00-18:00): current must be >= start AND < end
+            current_time_str >= *start && current_time_str < *end
+        } else {
+            // Cross-midnight range (e.g., 21:00-04:00): current must be >= start OR < end
+            current_time_str >= *start || current_time_str < *end
+        };
+
+        if !in_range {
             return false;
         }
-
-        if let Some(ref end) = rule.active_end_time
-            && current_time_str > *end
-        {
+    } else if let Some(ref start) = rule.active_start_time {
+        // Only start time specified
+        let current_time_str = local_datetime.format("%H:%M").to_string();
+        if current_time_str < *start {
+            return false;
+        }
+    } else if let Some(ref end) = rule.active_end_time {
+        // Only end time specified
+        let current_time_str = local_datetime.format("%H:%M").to_string();
+        if current_time_str >= *end {
             return false;
         }
     }
@@ -400,5 +413,69 @@ mod tests {
         let now = shared::util::now_millis();
 
         assert!(is_time_valid(&rule, now, chrono_tz::UTC));
+    }
+
+    #[test]
+    fn test_cross_midnight_time_range() {
+        // Test cross-midnight time range (e.g., 09:00 - 04:00 next day)
+        let mut rule = make_rule(ProductScope::Global, None);
+        rule.active_start_time = Some("09:00".to_string());
+        rule.active_end_time = Some("04:00".to_string()); // Next day
+
+        // 15:00 should be valid (within 09:00 - 04:00 next day)
+        let time_15_00 = chrono::DateTime::parse_from_rfc3339("2024-01-15T15:00:00Z")
+            .unwrap()
+            .timestamp_millis();
+        assert!(is_time_valid(&rule, time_15_00, chrono_tz::UTC));
+
+        // 23:00 should be valid (within 09:00 - 04:00 next day)
+        let time_23_00 = chrono::DateTime::parse_from_rfc3339("2024-01-15T23:00:00Z")
+            .unwrap()
+            .timestamp_millis();
+        assert!(is_time_valid(&rule, time_23_00, chrono_tz::UTC));
+
+        // 02:00 should be valid (within 09:00 - 04:00 next day, after midnight)
+        let time_02_00 = chrono::DateTime::parse_from_rfc3339("2024-01-15T02:00:00Z")
+            .unwrap()
+            .timestamp_millis();
+        assert!(is_time_valid(&rule, time_02_00, chrono_tz::UTC));
+
+        // 06:00 should be INVALID (outside 09:00 - 04:00)
+        let time_06_00 = chrono::DateTime::parse_from_rfc3339("2024-01-15T06:00:00Z")
+            .unwrap()
+            .timestamp_millis();
+        assert!(!is_time_valid(&rule, time_06_00, chrono_tz::UTC));
+
+        // 08:00 should be INVALID (outside 09:00 - 04:00)
+        let time_08_00 = chrono::DateTime::parse_from_rfc3339("2024-01-15T08:00:00Z")
+            .unwrap()
+            .timestamp_millis();
+        assert!(!is_time_valid(&rule, time_08_00, chrono_tz::UTC));
+    }
+
+    #[test]
+    fn test_night_shift_time_range() {
+        // Test typical night shift: 21:00 - 05:00
+        let mut rule = make_rule(ProductScope::Global, None);
+        rule.active_start_time = Some("21:00".to_string());
+        rule.active_end_time = Some("05:00".to_string());
+
+        // 22:00 should be valid
+        let time_22_00 = chrono::DateTime::parse_from_rfc3339("2024-01-15T22:00:00Z")
+            .unwrap()
+            .timestamp_millis();
+        assert!(is_time_valid(&rule, time_22_00, chrono_tz::UTC));
+
+        // 03:00 should be valid
+        let time_03_00 = chrono::DateTime::parse_from_rfc3339("2024-01-15T03:00:00Z")
+            .unwrap()
+            .timestamp_millis();
+        assert!(is_time_valid(&rule, time_03_00, chrono_tz::UTC));
+
+        // 12:00 should be INVALID
+        let time_12_00 = chrono::DateTime::parse_from_rfc3339("2024-01-15T12:00:00Z")
+            .unwrap()
+            .timestamp_millis();
+        assert!(!is_time_valid(&rule, time_12_00, chrono_tz::UTC));
     }
 }
