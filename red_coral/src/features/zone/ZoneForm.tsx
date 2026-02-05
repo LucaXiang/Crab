@@ -1,11 +1,9 @@
 import React from 'react';
-import { FormField, FormSection, inputClass, SelectField } from '@/shared/components/FormField';
-import { Settings } from 'lucide-react';
+import { FormField, inputClass } from '@/shared/components/FormField';
 
 interface ZoneFormData {
   name: string;
   description?: string;
-  is_active?: boolean;
 }
 
 interface ZoneFormProps {
@@ -35,19 +33,6 @@ export const ZoneForm: React.FC<ZoneFormProps> = ({ formData, onFieldChange, t }
           rows={2}
         />
       </FormField>
-
-      {/* Status Settings */}
-      <FormSection title={t('common.label.status')} icon={Settings}>
-        <SelectField
-          label={t('common.label.is_active')}
-          value={formData.is_active !== false ? 'true' : 'false'}
-          onChange={(value) => onFieldChange('is_active', String(value) === 'true')}
-          options={[
-            { value: 'true', label: t('common.status.enabled') },
-            { value: 'false', label: t('common.status.disabled') },
-          ]}
-        />
-      </FormSection>
     </div>
   );
 };

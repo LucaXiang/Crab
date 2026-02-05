@@ -77,7 +77,6 @@ export const ZoneModal: React.FC = React.memo(() => {
       const zonePayload = {
         name: formData.name.trim(),
         description: formData.description?.trim() || undefined,
-        is_active: formData.is_active ?? true,
       };
 
       if (action === 'CREATE') {
@@ -90,7 +89,6 @@ export const ZoneModal: React.FC = React.memo(() => {
         await updateZone(String(data.id), {
           name: zonePayload.name,
           description: zonePayload.description,
-          is_active: zonePayload.is_active,
         });
         toast.success(t('settings.zone.message.updated'));
       }
@@ -118,7 +116,6 @@ export const ZoneModal: React.FC = React.memo(() => {
         formData={{
           name: formData.name,
           description: formData.description ?? '',
-          is_active: formData.is_active ?? true,
         }}
         onFieldChange={setFormField}
         t={t}

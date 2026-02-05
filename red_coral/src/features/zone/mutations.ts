@@ -11,7 +11,6 @@ export interface CreateZoneInput {
 export interface UpdateZoneInput {
   name?: string;
   description?: string;
-  is_active?: boolean;
 }
 
 /**
@@ -33,7 +32,6 @@ export async function updateZone(id: string, input: UpdateZoneInput): Promise<vo
   await getApi().updateZone(String(id), {
     name: input.name,
     description: input.description,
-    is_active: input.is_active,
   });
   // Refresh zones from server
   await useZoneStore.getState().fetchAll(true);

@@ -54,7 +54,6 @@ interface AttributeStore {
     is_multi_select?: boolean;
     max_selections?: number | null;
     display_order?: number;
-    is_active?: boolean;
     show_on_receipt?: boolean;
     receipt_name?: string;
     show_on_kitchen_print?: boolean;
@@ -67,7 +66,6 @@ interface AttributeStore {
     max_selections?: number | null;
     default_option_indices?: number[] | null;
     display_order?: number;
-    is_active?: boolean;
     show_on_receipt?: boolean;
     receipt_name?: string;
     show_on_kitchen_print?: boolean;
@@ -81,7 +79,6 @@ interface AttributeStore {
     price_modifier?: number;
     is_default?: boolean;
     display_order?: number;
-    is_active?: boolean;
     receipt_name?: string;
     kitchen_print_name?: string;
     enable_quantity?: boolean;
@@ -95,7 +92,6 @@ interface AttributeStore {
     price_modifier?: number;
     is_default?: boolean;
     display_order?: number;
-    is_active?: boolean;
     receipt_name?: string;
     kitchen_print_name?: string;
     enable_quantity?: boolean;

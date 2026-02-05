@@ -82,7 +82,6 @@ export const TagModal: React.FC = React.memo(() => {
         name: formData.name.trim(),
         color: formData.color || '#3B82F6',
         display_order: formData.display_order ?? 0,
-        is_active: formData.is_active ?? true,
       };
 
       if (action === 'CREATE') {
@@ -98,7 +97,6 @@ export const TagModal: React.FC = React.memo(() => {
           name: tagPayload.name,
           color: tagPayload.color,
           display_order: tagPayload.display_order,
-          is_active: tagPayload.is_active,
         });
         refreshData();
         toast.success(t('settings.tag.message.updated'));
@@ -128,7 +126,6 @@ export const TagModal: React.FC = React.memo(() => {
           name: formData.name,
           color: formData.color || '#3B82F6',
           display_order: formData.display_order ?? 0,
-          is_active: formData.is_active ?? true,
         }}
         onFieldChange={setFormField}
         t={t}

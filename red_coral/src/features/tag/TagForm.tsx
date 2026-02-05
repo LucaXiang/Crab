@@ -1,12 +1,11 @@
 import React from 'react';
-import { Tag, Palette, Settings } from 'lucide-react';
-import { FormField, FormSection, inputClass, SelectField } from '@/shared/components/FormField';
+import { Tag, Palette } from 'lucide-react';
+import { FormField, FormSection, inputClass } from '@/shared/components/FormField';
 
 interface TagFormData {
   name: string;
   color: string;
   display_order?: number;
-  is_active?: boolean;
 }
 
 interface TagFormProps {
@@ -100,18 +99,6 @@ export const TagForm: React.FC<TagFormProps> = ({ formData, onFieldChange, t }) 
         </div>
       </FormSection>
 
-      {/* Status Settings */}
-      <FormSection title={t('common.label.status')} icon={Settings}>
-        <SelectField
-          label={t('common.label.is_active')}
-          value={formData.is_active !== false ? 'true' : 'false'}
-          onChange={(value) => onFieldChange('is_active', String(value) === 'true')}
-          options={[
-            { value: 'true', label: t('common.status.enabled') },
-            { value: 'false', label: t('common.status.disabled') },
-          ]}
-        />
-      </FormSection>
     </div>
   );
 };

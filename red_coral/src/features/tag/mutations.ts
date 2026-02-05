@@ -13,7 +13,6 @@ export interface UpdateTagInput {
   name?: string;
   color?: string;
   display_order?: number;
-  is_active?: boolean;
 }
 
 /**

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FormField, FormSection, SubField, inputClass, SelectField, KitchenPrinterSelector, AttributeDisplayTag } from '@/shared/components/FormField';
-import { Printer, Filter, Tags, Settings } from 'lucide-react';
+import { Printer, Filter, Tags } from 'lucide-react';
 import { attributeHelpers, useTags } from '@/core/stores/resources';
 import { AttributeSelectionModal } from '@/features/attribute';
 
@@ -11,7 +11,6 @@ interface CategoryFormData {
   print_destinations?: string[];
   is_kitchen_print_enabled?: PrintState;  // 0=disabled, 1=enabled
   is_label_print_enabled?: PrintState;    // 0=disabled, 1=enabled
-  is_active?: boolean;
   selected_attribute_ids?: string[];
   attribute_default_options?: Record<string, string | string[]>;
   is_virtual?: boolean;
@@ -225,19 +224,6 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
         </div>
       </FormSection>
       )}
-
-      {/* Status Settings */}
-      <FormSection title={t('common.label.status')} icon={Settings}>
-        <SelectField
-          label={t('common.label.is_active')}
-          value={formData.is_active !== false ? 'true' : 'false'}
-          onChange={(value) => onFieldChange('is_active', String(value) === 'true')}
-          options={[
-            { value: 'true', label: t('common.status.enabled') },
-            { value: 'false', label: t('common.status.disabled') },
-          ]}
-        />
-      </FormSection>
 
       <AttributeSelectionModal
         isOpen={showAttributeModal}

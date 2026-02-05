@@ -76,7 +76,6 @@ export interface CategoryFormData {
   print_destinations?: string[];
   is_kitchen_print_enabled?: PrintState;
   is_label_print_enabled?: PrintState;
-  is_active?: boolean;
   selected_attribute_ids?: string[];
   attribute_default_options?: Record<string, string | string[]>;
   is_virtual?: boolean;
