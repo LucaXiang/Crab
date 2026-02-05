@@ -870,7 +870,10 @@
       },
       "zone": {
         "all": "所有区域",
-        "retail": "零售区"
+        "retail": "零售区",
+        "all_desc": "适用于所有区域",
+        "retail_desc": "仅限外带/快速结账",
+        "custom_desc": "特定区域"
       },
       "adjustment": {
         "percentage": "百分比",
@@ -895,6 +898,72 @@
       },
       "delete_confirm_title": "删除价格规则",
       "delete_confirm_message": "确定要删除价格规则 \"{name}\" 吗？",
+      "list_title": "规则列表",
+      "empty": "暂无价格规则",
+      "hint": {
+        "select_rule": "请从左侧选择一个规则查看详情"
+      },
+      "priority": "优先级",
+      "stacking": {
+        "exclusive": "独占",
+        "stackable": "可叠加",
+        "non_stackable": "不可叠加"
+      },
+      "stacking_label": "叠加模式",
+      "status_label": "状态",
+      "scope_section": "应用范围",
+      "behavior_section": "行为设置",
+      "product_scope_label": "菜品",
+      "zone_scope_label": "区域",
+      "time_viz": {
+        "title": "生效时间",
+        "every_day": "每天",
+        "all_day": "全天",
+        "always_active": "永久生效，无时间限制",
+        "date_range": "日期范围",
+        "remaining": "剩余",
+        "days": "天",
+        "expired": "已过期",
+        "onwards": "起",
+        "until": "至"
+      },
+      "preview": {
+        "title": "规则预览",
+        "zone": "区域",
+        "product": "商品",
+        "select_product": "请选择商品",
+        "base_price": "原价",
+        "final_price": "最终价",
+        "matched": "命中规则",
+        "unmatched": "未命中规则",
+        "current": "当前",
+        "more_rules": "条更多规则"
+      },
+      "conflict": {
+        "title": "规则交互",
+        "no_related": "没有相关规则",
+        "priority_order": "同时生效的规则（按优先级排序）",
+        "current": "当前",
+        "blocked_by_exclusive": "将被「{name}」独占规则阻止",
+        "will_block": "将阻止 {count} 条其他规则",
+        "help": "独占规则生效时会阻止所有优先级更低的规则"
+      },
+      "picker": {
+        "select_zone": "选择区域",
+        "select_product": "选择商品",
+        "search_product": "搜索商品..."
+      },
+      "reason": {
+        "disabled": "规则已禁用",
+        "zone_mismatch": "区域不匹配",
+        "product_mismatch": "商品不匹配",
+        "time_mismatch": "时间不匹配",
+        "not_started": "尚未开始",
+        "expired": "已过期",
+        "only": "仅",
+        "category": "分类",
+        "tag": "标签"
+      },
       "wizard": {
         "title": "创建价格规则",
         "edit_title": "编辑价格规则",
