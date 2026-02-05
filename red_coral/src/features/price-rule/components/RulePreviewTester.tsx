@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { FlaskConical, ChevronRight, Check, X, Globe, ShoppingCart, Armchair } from 'lucide-react';
+import { FlaskConical, ChevronRight, Check, X, Globe, ShoppingCart, Armchair, Clock } from 'lucide-react';
 import type { PriceRule, Product } from '@/core/domain/types/api';
 import { useI18n } from '@/hooks/useI18n';
 import { useZoneStore } from '@/features/zone/store';
@@ -12,7 +12,6 @@ import { ProductPicker } from './ProductPicker';
 
 interface RulePreviewTesterProps {
   rules: PriceRule[];
-  currentRuleId: string | null;
 }
 
 interface RuleMatchResult {
@@ -22,9 +21,11 @@ interface RuleMatchResult {
   adjustment: number;
 }
 
+// Day keys for i18n (Sunday = 0)
+const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+
 export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
   rules,
-  currentRuleId,
 }) => {
   const { t } = useI18n();
   const zones = useZoneStore(state => state.items);
@@ -36,6 +37,13 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showZonePicker, setShowZonePicker] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
+
+  // Time mode: 'ignore' | 'current' | 'custom'
+  const [timeMode, setTimeMode] = useState<'ignore' | 'current' | 'custom'>('ignore');
+  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
+  const [selectedTime, setSelectedTime] = useState<string>(
+    `${new Date().getHours().toString().padStart(2, '0')}:00`
+  );
 
   // Get zone display name
   const getZoneName = (zoneScope: string): string => {
@@ -114,52 +122,67 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
       }
     }
 
-    // Check time constraints
-    const now = new Date();
-    const currentDay = now.getDay();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    // Check time constraints (skip if timeMode === 'ignore')
+    if (timeMode !== 'ignore') {
+      const now = new Date();
+      const testDay = timeMode === 'custom' ? selectedDay : now.getDay();
+      const testTime = timeMode === 'custom'
+        ? selectedTime
+        : `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
-    // Check date range
-    if (rule.valid_from && Date.now() < rule.valid_from) {
-      return {
-        rule,
-        matched: false,
-        reason: t('settings.price_rule.reason.not_started'),
-        adjustment: 0,
-      };
-    }
-    if (rule.valid_until && Date.now() > rule.valid_until) {
-      return {
-        rule,
-        matched: false,
-        reason: t('settings.price_rule.reason.expired'),
-        adjustment: 0,
-      };
-    }
-
-    // Check active days
-    if (rule.active_days && rule.active_days.length > 0 && rule.active_days.length < 7) {
-      if (!rule.active_days.includes(currentDay)) {
-        const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
-        const days = rule.active_days.map(d => `周${dayNames[d]}`).join('、');
+      // Check date range
+      if (rule.valid_from && Date.now() < rule.valid_from) {
         return {
           rule,
           matched: false,
-          reason: `${t('settings.price_rule.reason.time_mismatch')} (${t('settings.price_rule.reason.only')} ${days})`,
+          reason: t('settings.price_rule.reason.not_started'),
           adjustment: 0,
         };
       }
-    }
-
-    // Check time range
-    if (rule.active_start_time && rule.active_end_time) {
-      if (currentTime < rule.active_start_time || currentTime > rule.active_end_time) {
+      if (rule.valid_until && Date.now() > rule.valid_until) {
         return {
           rule,
           matched: false,
-          reason: `${t('settings.price_rule.reason.time_mismatch')} (${t('settings.price_rule.reason.only')} ${rule.active_start_time}-${rule.active_end_time})`,
+          reason: t('settings.price_rule.reason.expired'),
           adjustment: 0,
         };
+      }
+
+      // Check active days
+      if (rule.active_days && rule.active_days.length > 0 && rule.active_days.length < 7) {
+        if (!rule.active_days.includes(testDay)) {
+          const days = rule.active_days.map(d => t(`calendar.days.${DAY_KEYS[d]}`)).join('、');
+          return {
+            rule,
+            matched: false,
+            reason: `${t('settings.price_rule.reason.time_mismatch')} (${t('settings.price_rule.reason.only')} ${days})`,
+            adjustment: 0,
+          };
+        }
+      }
+
+      // Check time range (handle cross-midnight)
+      if (rule.active_start_time && rule.active_end_time) {
+        const start = rule.active_start_time;
+        const end = rule.active_end_time;
+
+        let inRange: boolean;
+        if (end > start) {
+          // Normal range (e.g., 09:00 - 18:00)
+          inRange = testTime >= start && testTime < end;
+        } else {
+          // Cross-midnight range (e.g., 21:00 - 04:00)
+          inRange = testTime >= start || testTime < end;
+        }
+
+        if (!inRange) {
+          return {
+            rule,
+            matched: false,
+            reason: `${t('settings.price_rule.reason.time_mismatch')} (${t('settings.price_rule.reason.only')} ${start}-${end})`,
+            adjustment: 0,
+          };
+        }
       }
     }
 
@@ -185,7 +208,7 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
   // Evaluate all rules
   const matchResults = useMemo(() => {
     return rules.map(evaluateRule);
-  }, [rules, selectedZone, selectedProduct]);
+  }, [rules, selectedZone, selectedProduct, timeMode, selectedDay, selectedTime]);
 
   const matchedRules = matchResults.filter(r => r.matched);
   const unmatchedRules = matchResults.filter(r => !r.matched);
@@ -211,7 +234,7 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
       </div>
 
       {/* Selection buttons */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-2 gap-3 mb-3">
         {/* Zone selector */}
         <button
           onClick={() => setShowZonePicker(true)}
@@ -254,6 +277,56 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
         </button>
       </div>
 
+      {/* Time mode selector */}
+      <div className="mb-4 p-3 bg-white rounded-xl border border-gray-200">
+        <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+          <Clock size={14} />
+          <span>{t('settings.price_rule.preview.test_time')}</span>
+        </div>
+
+        {/* Three-option selector */}
+        <div className="flex gap-1 p-1 bg-gray-100 rounded-lg mb-2">
+          {(['ignore', 'current', 'custom'] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setTimeMode(mode)}
+              className={`flex-1 py-1.5 px-2 text-xs font-medium rounded-md transition-colors ${
+                timeMode === mode
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t(`settings.price_rule.preview.${mode}_time`)}
+            </button>
+          ))}
+        </div>
+
+        {timeMode === 'custom' && (
+          <div className="flex items-center gap-3">
+            {/* Day selector */}
+            <select
+              value={selectedDay}
+              onChange={(e) => setSelectedDay(Number(e.target.value))}
+              className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              {[1, 2, 3, 4, 5, 6, 0].map(day => (
+                <option key={day} value={day}>
+                  {t(`calendar.days.${DAY_KEYS[day]}`)}
+                </option>
+              ))}
+            </select>
+
+            {/* Time selector */}
+            <input
+              type="time"
+              value={selectedTime}
+              onChange={(e) => setSelectedTime(e.target.value)}
+              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+          </div>
+        )}
+      </div>
+
       {/* Results */}
       {selectedProduct && (
         <div className="bg-white rounded-xl p-4 space-y-3">
@@ -273,15 +346,12 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
                 {t('settings.price_rule.preview.matched')}:
               </div>
               {matchedRules.map(({ rule, adjustment }) => {
-                const isCurrentRule = rule.id === currentRuleId;
                 const isDiscount = rule.rule_type === 'DISCOUNT';
 
                 return (
                   <div
                     key={rule.id}
-                    className={`flex items-center justify-between text-sm p-2 rounded-lg ${
-                      isCurrentRule ? 'bg-teal-50 ring-1 ring-teal-200' : ''
-                    }`}
+                    className="flex items-center justify-between text-sm p-2 rounded-lg"
                   >
                     <div className="flex items-center gap-2">
                       <span
@@ -289,10 +359,7 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
                           isDiscount ? 'bg-amber-500' : 'bg-purple-500'
                         }`}
                       />
-                      <span className={isCurrentRule ? 'font-medium' : ''}>
-                        {rule.display_name}
-                        {isCurrentRule && ` ← ${t('settings.price_rule.preview.current')}`}
-                      </span>
+                      <span>{rule.display_name}</span>
                     </div>
                     <span
                       className={`font-medium ${
@@ -315,15 +382,12 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
                 {t('settings.price_rule.preview.unmatched')}:
               </div>
               {unmatchedRules.slice(0, 5).map(({ rule, reason }) => {
-                const isCurrentRule = rule.id === currentRuleId;
                 const isDiscount = rule.rule_type === 'DISCOUNT';
 
                 return (
                   <div
                     key={rule.id}
-                    className={`flex items-center justify-between text-sm text-gray-400 p-2 rounded-lg ${
-                      isCurrentRule ? 'bg-gray-100' : ''
-                    }`}
+                    className="flex items-center justify-between text-sm text-gray-400 p-2 rounded-lg"
                   >
                     <div className="flex items-center gap-2">
                       <span

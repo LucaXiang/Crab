@@ -76,6 +76,7 @@ export const TargetPicker: React.FC<TargetPickerProps> = ({
     return allItems.filter(item => item.name.toLowerCase().includes(q));
   }, [productScope, categories, tags, products, searchQuery]);
 
+  // Early return AFTER all hooks to comply with React's rules of hooks
   if (!isOpen) return null;
 
   const getTitle = () => {

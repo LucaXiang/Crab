@@ -78,7 +78,7 @@ export const ZonePicker: React.FC<ZonePickerProps> = ({
         </div>
 
         {/* Options */}
-        <div className="p-4 overflow-y-auto max-h-[60vh] space-y-2">
+        <div className="overflow-y-auto max-h-[60vh] divide-y divide-gray-100">
           {allOptions.map(option => {
             const Icon = option.icon;
             const isSelected = selectedZone === option.value;
@@ -88,29 +88,26 @@ export const ZonePicker: React.FC<ZonePickerProps> = ({
                 key={option.value}
                 onClick={() => handleSelect(option.value)}
                 className={`
-                  w-full flex items-center gap-4 p-4 rounded-xl transition-all
+                  w-full flex items-center gap-3 px-5 py-3 transition-all
                   ${isSelected
-                    ? 'bg-teal-50 ring-2 ring-teal-500'
-                    : 'bg-gray-50 hover:bg-gray-100'
+                    ? 'bg-teal-50'
+                    : 'hover:bg-gray-50'
                   }
                 `}
               >
                 <div
                   className={`
-                    w-12 h-12 rounded-xl flex items-center justify-center shrink-0
-                    ${isSelected ? 'bg-teal-500 text-white' : 'bg-white text-gray-500'}
+                    w-8 h-8 rounded-lg flex items-center justify-center shrink-0
+                    ${isSelected ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-500'}
                   `}
                 >
-                  <Icon size={24} />
+                  <Icon size={16} />
                 </div>
-                <div className="flex-1 text-left">
-                  <div className="font-medium text-gray-900">{option.label}</div>
-                  <div className="text-sm text-gray-500">{option.description}</div>
+                <div className="flex-1 text-left min-w-0">
+                  <div className="font-medium text-gray-900 truncate">{option.label}</div>
                 </div>
                 {isSelected && (
-                  <div className="w-6 h-6 rounded-full bg-teal-500 flex items-center justify-center shrink-0">
-                    <Check size={14} className="text-white" />
-                  </div>
+                  <Check size={18} className="text-teal-500 shrink-0" />
                 )}
               </button>
             );

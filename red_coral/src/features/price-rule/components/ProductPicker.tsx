@@ -26,8 +26,6 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
-  if (!isOpen) return null;
-
   // Filter products
   const filteredProducts = useMemo(() => {
     let result = products.filter(p => p.is_active);
@@ -55,6 +53,9 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
     const categoryIds = new Set(products.filter(p => p.is_active).map(p => p.category));
     return categories.filter(c => categoryIds.has(c.id));
   }, [categories, products]);
+
+  // Early return after all hooks
+  if (!isOpen) return null;
 
   const handleSelect = (product: Product) => {
     onSelect(product);

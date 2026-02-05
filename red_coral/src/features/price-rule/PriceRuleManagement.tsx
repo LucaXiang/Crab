@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Percent, Settings } from 'lucide-react';
+import { Percent, Settings, Plus, FlaskConical } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { usePriceRuleStore } from './store';
 import { createTauriClient } from '@/infrastructure/api';
@@ -7,14 +7,14 @@ import { toast } from '@/presentation/components/Toast';
 import type { PriceRule } from '@/core/domain/types';
 import { Permission } from '@/core/domain/types';
 import { usePermission } from '@/hooks/usePermission';
-import { ManagementHeader } from '@/screens/Settings/components';
+import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { FilterBar } from '@/shared/components/FilterBar';
+import { X } from 'lucide-react';
 import { PriceRuleWizard } from './PriceRuleWizard';
 import {
   RuleListPanel,
   RuleDetailPanel,
   RulePreviewTester,
-  RuleConflictAnalysis,
 } from './components';
 
 const getApi = () => createTauriClient();
@@ -33,6 +33,7 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<PriceRule | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<PriceRule | null>(null);
+  const [testerOpen, setTesterOpen] = useState(false);
 
   useEffect(() => {
     priceRuleStore.fetchAll();
@@ -93,15 +94,29 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
   if (!loading && rules.length === 0) {
     return (
       <div className="space-y-5">
-        <ManagementHeader
-          icon={Percent}
-          title={t('settings.price_rule.title')}
-          description={t('settings.price_rule.description')}
-          addButtonText={t('settings.price_rule.add_rule')}
-          onAdd={handleAdd}
-          themeColor="teal"
-          permission={Permission.SETTINGS_MANAGE}
-        />
+        {/* Custom Header */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                <Percent size={20} className="text-teal-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">{t('settings.price_rule.title')}</h2>
+                <p className="text-sm text-gray-500">{t('settings.price_rule.description')}</p>
+              </div>
+            </div>
+            <ProtectedGate permission={Permission.SETTINGS_MANAGE}>
+              <button
+                onClick={handleAdd}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-teal-600/20 hover:bg-teal-700 hover:shadow-teal-600/30 transition-all"
+              >
+                <Plus size={16} />
+                <span>{t('settings.price_rule.add_rule')}</span>
+              </button>
+            </ProtectedGate>
+          </div>
+        </div>
 
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
           <Settings size={64} className="mb-4 opacity-50" />
@@ -130,15 +145,40 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
 
   return (
     <div className="space-y-5 h-full flex flex-col">
-      <ManagementHeader
-        icon={Percent}
-        title={t('settings.price_rule.title')}
-        description={t('settings.price_rule.description')}
-        addButtonText={t('settings.price_rule.add_rule')}
-        onAdd={handleAdd}
-        themeColor="teal"
-        permission={Permission.SETTINGS_MANAGE}
-      />
+      {/* Custom Header with Test Button */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+              <Percent size={20} className="text-teal-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">{t('settings.price_rule.title')}</h2>
+              <p className="text-sm text-gray-500">{t('settings.price_rule.description')}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Test Rules Button */}
+            <button
+              onClick={() => setTesterOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all"
+            >
+              <FlaskConical size={16} />
+              <span>{t('settings.price_rule.test_rules')}</span>
+            </button>
+            {/* Add Rule Button */}
+            <ProtectedGate permission={Permission.SETTINGS_MANAGE}>
+              <button
+                onClick={handleAdd}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-teal-600/20 hover:bg-teal-700 hover:shadow-teal-600/30 transition-all"
+              >
+                <Plus size={16} />
+                <span>{t('settings.price_rule.add_rule')}</span>
+              </button>
+            </ProtectedGate>
+          </div>
+        </div>
+      </div>
 
       <FilterBar
         searchQuery={searchQuery}
@@ -150,7 +190,7 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
       />
 
       {/* Master-Detail Layout */}
-      <div className="flex-1 flex bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-0">
+      <div className="flex bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden divide-x divide-gray-200 h-[calc(100vh-320px)] min-h-[400px]">
         {/* Left Panel - Rule List */}
         <RuleListPanel
           rules={rules}
@@ -169,18 +209,6 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
                   rule={selectedRule}
                   onRuleUpdated={handleRuleUpdated}
                   onDeleteRule={setDeleteConfirm}
-                />
-
-                {/* Rule Preview Tester */}
-                <RulePreviewTester
-                  rules={rules}
-                  currentRuleId={selectedRuleId}
-                />
-
-                {/* Rule Conflict Analysis */}
-                <RuleConflictAnalysis
-                  currentRule={selectedRule}
-                  allRules={rules}
                 />
               </div>
             </div>
@@ -232,6 +260,38 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
                   {t('common.action.delete')}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rule Tester Modal */}
+      {testerOpen && (
+        <div className="fixed inset-0 z-90 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                  <FlaskConical size={20} className="text-teal-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    {t('settings.price_rule.test_rules')}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    {t('settings.price_rule.test_rules_description')}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setTesterOpen(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X size={20} className="text-gray-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <RulePreviewTester rules={rules} />
             </div>
           </div>
         </div>

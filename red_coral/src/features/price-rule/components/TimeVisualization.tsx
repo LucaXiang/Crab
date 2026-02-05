@@ -7,54 +7,80 @@ interface TimeVisualizationProps {
   rule: PriceRule;
 }
 
-// Day labels (Sunday = 0)
-const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+// Day keys for i18n (Sunday = 0)
+const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 
-// Time slots for visualization (every 2 hours)
-const TIME_SLOTS = ['06', '08', '10', '12', '14', '16', '18', '20', '22', '24'];
+// Week order starting from Monday: [1,2,3,4,5,6,0]
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 export const TimeVisualization: React.FC<TimeVisualizationProps> = ({ rule }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const isDiscount = rule.rule_type === 'DISCOUNT';
 
-  // Parse time to minutes since midnight
-  const parseTime = (timeStr: string | null): number | null => {
-    if (!timeStr) return null;
-    const [h, m] = timeStr.split(':').map(Number);
-    return h * 60 + m;
+  // Check if time range crosses midnight (e.g., 21:00 - 04:00)
+  const isCrossMidnight = (): boolean => {
+    if (!rule.active_start_time || !rule.active_end_time) return false;
+    const [startH] = rule.active_start_time.split(':').map(Number);
+    const [endH] = rule.active_end_time.split(':').map(Number);
+    return endH < startH;
   };
 
-  const startMinutes = parseTime(rule.active_start_time);
-  const endMinutes = parseTime(rule.active_end_time);
-
-  // Check if a day is active
-  const isDayActive = (dayIndex: number): boolean => {
-    if (!rule.active_days || rule.active_days.length === 0) return true;
-    return rule.active_days.includes(dayIndex);
-  };
-
-  // Calculate which time slots are active for visualization
-  const isSlotActive = (slotHour: number): boolean => {
-    if (startMinutes === null || endMinutes === null) return true;
-    const slotMinutes = slotHour * 60;
-    return slotMinutes >= startMinutes && slotMinutes < endMinutes;
-  };
-
-  // Format active days text
+  // Format active days - compress consecutive ranges
   const formatActiveDays = (): string => {
     if (!rule.active_days || rule.active_days.length === 0 || rule.active_days.length === 7) {
       return t('settings.price_rule.time_viz.every_day');
     }
-    const days = rule.active_days.map(d => `周${DAY_LABELS[d]}`).join('、');
-    return days;
+
+    // Sort by week order (Mon-Sun)
+    const sorted = [...rule.active_days].sort((a, b) =>
+      WEEK_ORDER.indexOf(a) - WEEK_ORDER.indexOf(b)
+    );
+
+    // Find consecutive ranges
+    const ranges: number[][] = [];
+    let currentRange: number[] = [sorted[0]];
+
+    for (let i = 1; i < sorted.length; i++) {
+      const prevIdx = WEEK_ORDER.indexOf(sorted[i - 1]);
+      const currIdx = WEEK_ORDER.indexOf(sorted[i]);
+      if (currIdx === prevIdx + 1) {
+        currentRange.push(sorted[i]);
+      } else {
+        ranges.push(currentRange);
+        currentRange = [sorted[i]];
+      }
+    }
+    ranges.push(currentRange);
+
+    // Format each range
+    const listFormatter = new Intl.ListFormat(locale, { style: 'narrow', type: 'conjunction' });
+
+    const parts = ranges.map(range => {
+      if (range.length === 1) {
+        return t(`calendar.days.${DAY_KEYS[range[0]]}`);
+      } else if (range.length === 2) {
+        // Use ListFormat for 2 consecutive days: "一、二" / "L, M"
+        const twoDays = range.map(d => t(`calendar.days.${DAY_KEYS[d]}`));
+        return listFormatter.format(twoDays);
+      } else {
+        // Range of 3+: "一至五" / "L-V"
+        return `${t(`calendar.days.${DAY_KEYS[range[0]]}`)}${t('settings.price_rule.time_viz.to')}${t(`calendar.days.${DAY_KEYS[range[range.length - 1]]}`)}`;
+      }
+    });
+
+    return listFormatter.format(parts);
   };
 
-  // Format time range text
+  // Format time range with cross-midnight indicator
   const formatTimeRange = (): string => {
     if (!rule.active_start_time || !rule.active_end_time) {
       return t('settings.price_rule.time_viz.all_day');
     }
-    return `${rule.active_start_time} - ${rule.active_end_time}`;
+    const timeStr = `${rule.active_start_time} - ${rule.active_end_time}`;
+    if (isCrossMidnight()) {
+      return `${timeStr} ${t('settings.price_rule.time_viz.next_day')}`;
+    }
+    return timeStr;
   };
 
   // Format date range
@@ -62,7 +88,7 @@ export const TimeVisualization: React.FC<TimeVisualizationProps> = ({ rule }) =>
     if (!rule.valid_from && !rule.valid_until) return null;
 
     const formatDate = (ts: number) =>
-      new Date(ts).toLocaleDateString('zh-CN', {
+      new Date(ts).toLocaleDateString(locale, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -102,68 +128,16 @@ export const TimeVisualization: React.FC<TimeVisualizationProps> = ({ rule }) =>
       </div>
 
       {isAlwaysActive ? (
-        <div className="text-center py-4">
-          <span className="text-sm text-gray-500">
-            {t('settings.price_rule.time_viz.always_active')}
-          </span>
+        <div className="text-sm text-gray-500">
+          {t('settings.price_rule.time_viz.always_active')}
         </div>
       ) : (
-        <>
-          {/* Week calendar visualization */}
-          <div className="bg-white rounded-lg p-3 mb-3">
-            <div className="grid grid-cols-8 gap-1">
-              {/* Header row */}
-              <div /> {/* Empty corner */}
-              {[1, 2, 3, 4, 5, 6, 0].map(dayIndex => (
-                <div
-                  key={dayIndex}
-                  className={`text-center text-xs font-medium py-1 ${
-                    isDayActive(dayIndex) ? 'text-gray-700' : 'text-gray-300'
-                  }`}
-                >
-                  {DAY_LABELS[dayIndex]}
-                </div>
-              ))}
-
-              {/* Time rows */}
-              {TIME_SLOTS.slice(0, -1).map((slot, slotIndex) => {
-                const hour = parseInt(slot);
-                const showActive = isSlotActive(hour);
-
-                return (
-                  <React.Fragment key={slot}>
-                    {/* Time label */}
-                    <div className="text-xs text-gray-400 text-right pr-1 py-0.5">
-                      {slot}:00
-                    </div>
-                    {/* Day cells */}
-                    {[1, 2, 3, 4, 5, 6, 0].map(dayIndex => {
-                      const isActive = isDayActive(dayIndex) && showActive;
-                      return (
-                        <div
-                          key={`${slot}-${dayIndex}`}
-                          className={`h-4 rounded-sm ${
-                            isActive ? activeColor : 'bg-gray-100'
-                          }`}
-                        />
-                      );
-                    })}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Text summary */}
-          <div className="space-y-1 text-sm">
-            <div className="flex items-center gap-2">
-              <span className={`w-3 h-3 rounded ${activeColor}`} />
-              <span className="text-gray-600">
-                {formatActiveDays()} {formatTimeRange()}
-              </span>
-            </div>
-          </div>
-        </>
+        <div className="flex items-center gap-2 text-sm">
+          <span className={`w-3 h-3 rounded-full shrink-0 ${activeColor}`} />
+          <span className="text-gray-700">
+            {formatActiveDays()} {formatTimeRange()}
+          </span>
+        </div>
       )}
 
       {/* Date range */}
