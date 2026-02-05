@@ -183,7 +183,7 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
 
                     {/* Selected indicator */}
                     {isSelected && (
-                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-teal-500 flex items-center justify-center">
                         <Check size={12} className="text-white" />
                       </div>
                     )}

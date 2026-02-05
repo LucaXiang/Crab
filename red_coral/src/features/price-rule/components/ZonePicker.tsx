@@ -108,7 +108,7 @@ export const ZonePicker: React.FC<ZonePickerProps> = ({
                   <div className="text-sm text-gray-500">{option.description}</div>
                 </div>
                 {isSelected && (
-                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shrink-0">
+                  <div className="w-6 h-6 rounded-full bg-teal-500 flex items-center justify-center shrink-0">
                     <Check size={14} className="text-white" />
                   </div>
                 )}

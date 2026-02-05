@@ -258,7 +258,8 @@ export const RuleDetailPanel: React.FC<RuleDetailPanelProps> = ({
     if (scope === 'GLOBAL') {
       updateEditData({ product_scope: scope, target: undefined });
     } else {
-      updateEditData({ product_scope: scope });
+      // Clear target when changing scope (different entity types)
+      updateEditData({ product_scope: scope, target: undefined });
       // Open target picker if scope requires a target
       setShowTargetPicker(true);
     }

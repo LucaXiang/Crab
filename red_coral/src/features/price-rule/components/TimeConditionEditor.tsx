@@ -103,12 +103,14 @@ export const TimeConditionEditor: React.FC<TimeConditionEditorProps> = ({
   const formatDateForInput = (timestamp: number | undefined): string => {
     if (!timestamp) return '';
     const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return '';
     return date.toISOString().split('T')[0];
   };
 
   const parseDateInput = (dateStr: string): number | undefined => {
     if (!dateStr) return undefined;
-    return new Date(dateStr).getTime();
+    const millis = new Date(dateStr).getTime();
+    return isNaN(millis) ? undefined : millis;
   };
 
   return (
