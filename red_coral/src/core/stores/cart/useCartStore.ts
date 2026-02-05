@@ -33,7 +33,8 @@ function areOptionsEqual(
     return (
       opt1.attribute_id === opt2.attribute_id &&
       opt1.option_idx === opt2.option_idx &&
-      opt1.price_modifier === opt2.price_modifier
+      opt1.price_modifier === opt2.price_modifier &&
+      (opt1.quantity ?? 1) === (opt2.quantity ?? 1)
     );
   });
 }

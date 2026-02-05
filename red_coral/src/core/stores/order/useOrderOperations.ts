@@ -62,6 +62,7 @@ function toCartItemInput(item: CartItem): CartItemInput {
     option_idx: opt.option_idx,
     option_name: opt.option_name,
     price_modifier: opt.price_modifier ?? null,
+    quantity: opt.quantity ?? 1,
   })) ?? null;
 
   return {

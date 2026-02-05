@@ -150,12 +150,14 @@ export const POSScreen: React.FC = () => {
             return tagIds.some((tagId) => productTagIds.includes(tagId));
           }
         })
+        .sort((a, b) => a.sort_order - b.sort_order)
         .map(mapProductWithSpec);
     }
 
     // Regular category: filter by category id
     return products
       .filter((p) => p.is_active && p.category === category.id)
+      .sort((a, b) => a.sort_order - b.sort_order)
       .map(mapProductWithSpec);
   }, [products, categories, selectedCategory]);
 
@@ -371,6 +373,7 @@ export const POSScreen: React.FC = () => {
                     option_idx: idx,
                     option_name: opt.name,
                     price_modifier: opt.price_modifier ?? null,
+                    quantity: 1, // Default quantity for quick add
                   });
                   count++;
                 }

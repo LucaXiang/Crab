@@ -178,14 +178,14 @@ fn has_actual_changes(item: &CartItemSnapshot, changes: &ItemChanges) -> bool {
         if new_opts.len() != current.len() {
             return true;
         }
-        // Compare by (attribute_id, option_idx) pairs
+        // Compare by (attribute_id, option_idx, quantity) tuples
         let mut new_keys: Vec<_> = new_opts
             .iter()
-            .map(|o| (&o.attribute_id, o.option_idx))
+            .map(|o| (&o.attribute_id, o.option_idx, o.quantity))
             .collect();
         let mut cur_keys: Vec<_> = current
             .iter()
-            .map(|o| (&o.attribute_id, o.option_idx))
+            .map(|o| (&o.attribute_id, o.option_idx, o.quantity))
             .collect();
         new_keys.sort();
         cur_keys.sort();

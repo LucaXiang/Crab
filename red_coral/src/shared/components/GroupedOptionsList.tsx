@@ -42,7 +42,7 @@ export const GroupedOptionsList: React.FC<GroupedOptionsListProps> = ({
                 {i > 0 && ', '}
                 {opt.option_name}
                 {qty > 1 && (
-                  <span className="text-orange-600 ml-0.5">×{qty}</span>
+                  <span className="text-purple-600 font-semibold ml-0.5">×{qty}</span>
                 )}
                 {totalPrice !== 0 && (
                   <span className={totalPrice > 0 ? 'text-orange-600 ml-0.5' : 'text-green-600 ml-0.5'}>

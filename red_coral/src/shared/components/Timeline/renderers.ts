@@ -175,17 +175,18 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
       details.push(`${t('pos.cart.spec')}: ${oldName} → ${changes.selected_specification.name}`);
     }
 
-    // Show options change (diff by attribute: added/removed)
+    // Show options change (diff by attribute: added/removed/quantity changed)
     if (changes.selected_options) {
       const oldOpts = (previousValues.selected_options as any[] | undefined) || [];
       const newOpts = changes.selected_options;
 
+      // Group by attribute, storing option_name -> quantity
       const groupByAttr = (opts: any[]) => {
-        const map = new Map<string, Set<string>>();
+        const map = new Map<string, Map<string, number>>();
         for (const o of opts) {
           const attr = o.attribute_name || '';
-          if (!map.has(attr)) map.set(attr, new Set());
-          map.get(attr)!.add(o.option_name);
+          if (!map.has(attr)) map.set(attr, new Map());
+          map.get(attr)!.set(o.option_name, o.quantity ?? 1);
         }
         return map;
       };
@@ -195,16 +196,24 @@ const ItemModifiedRenderer: EventRenderer<ItemModifiedPayload> = {
       const allAttrs = new Set([...oldByAttr.keys(), ...newByAttr.keys()]);
 
       for (const attr of allAttrs) {
-        const oldSet = oldByAttr.get(attr) || new Set();
-        const newSet = newByAttr.get(attr) || new Set();
-        for (const name of newSet) {
-          if (!oldSet.has(name)) {
-            details.push(`${attr} ${t('timeline.option_added')} ${name}`);
-          }
-        }
-        for (const name of oldSet) {
-          if (!newSet.has(name)) {
+        const oldMap = oldByAttr.get(attr) || new Map();
+        const newMap = newByAttr.get(attr) || new Map();
+        const allOptions = new Set([...oldMap.keys(), ...newMap.keys()]);
+
+        for (const name of allOptions) {
+          const oldQty = oldMap.get(name);
+          const newQty = newMap.get(name);
+
+          if (oldQty === undefined && newQty !== undefined) {
+            // Option added
+            const qtyStr = newQty > 1 ? ` ×${newQty}` : '';
+            details.push(`${attr} ${t('timeline.option_added')} ${name}${qtyStr}`);
+          } else if (oldQty !== undefined && newQty === undefined) {
+            // Option removed
             details.push(`${attr} ${t('timeline.option_removed')} ${name}`);
+          } else if (oldQty !== newQty) {
+            // Quantity changed
+            details.push(`${attr} ${name}: ×${oldQty} → ×${newQty}`);
           }
         }
       }
