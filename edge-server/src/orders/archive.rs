@@ -1006,7 +1006,7 @@ impl OrderArchiveService {
             prev_hash,
             curr_hash,
             related_order_id: None,
-            created_at: None,
+            created_at: snapshot.start_time,
         })
     }
 

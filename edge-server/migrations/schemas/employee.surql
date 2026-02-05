@@ -27,4 +27,9 @@ DEFINE FIELD OVERWRITE is_system ON employee TYPE bool DEFAULT false
 DEFINE FIELD OVERWRITE is_active ON employee TYPE bool DEFAULT true
     PERMISSIONS FULL;
 
+DEFINE FIELD OVERWRITE created_at ON employee TYPE int
+    DEFAULT time::unix(time::now()) * 1000
+    READONLY
+    PERMISSIONS FULL;
+
 DEFINE INDEX OVERWRITE username_unique ON employee FIELDS username UNIQUE;

@@ -16,4 +16,5 @@ CREATE employee:admin CONTENT {
     role: role:admin,
     is_system: true,
     is_active: true,
+    created_at: time::unix(time::now()) * 1000,
 };

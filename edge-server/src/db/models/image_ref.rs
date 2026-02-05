@@ -40,20 +40,9 @@ pub struct ImageRef {
     pub entity_type: String,
     /// 引用实体 ID
     pub entity_id: String,
-    /// 创建时间
-    pub created_at: Option<i64>,
-}
-
-impl ImageRef {
-    pub fn new(hash: String, entity_type: ImageRefEntityType, entity_id: String) -> Self {
-        Self {
-            id: None,
-            hash,
-            entity_type: entity_type.to_string(),
-            entity_id,
-            created_at: None,
-        }
-    }
+    /// 创建时间 (Unix millis)
+    #[serde(default)]
+    pub created_at: i64,
 }
 
 /// Create image reference payload

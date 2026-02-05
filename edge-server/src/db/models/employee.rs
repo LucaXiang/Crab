@@ -27,6 +27,8 @@ pub struct Employee {
         deserialize_with = "serde_helpers::bool_true"
     )]
     pub is_active: bool,
+    /// Created timestamp (Unix millis)
+    pub created_at: i64,
 }
 
 fn default_true() -> bool {

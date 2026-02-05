@@ -21,8 +21,9 @@ DEFINE FIELD OVERWRITE entity_id ON image_ref TYPE string
     ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
--- 创建时间
+-- 创建时间 (Unix millis)
 DEFINE FIELD OVERWRITE created_at ON image_ref TYPE int
+    DEFAULT time::unix(time::now()) * 1000
     PERMISSIONS FULL;
 
 -- 唯一索引：同一实体对同一图片只记录一次

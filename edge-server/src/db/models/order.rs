@@ -65,7 +65,9 @@ pub struct Order {
     pub void_note: Option<String>,
     pub prev_hash: String,
     pub curr_hash: String,
-    pub created_at: Option<i64>,
+    /// Created timestamp (Unix millis)
+    #[serde(default)]
+    pub created_at: i64,
 }
 
 /// Split item in a payment
