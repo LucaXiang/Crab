@@ -76,6 +76,14 @@ impl ErrorCode {
             | Self::PrintFailed
             | Self::ClientDisconnected => StatusCode::INTERNAL_SERVER_ERROR,
 
+            // 413 Payload Too Large
+            Self::FileTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+
+            // 415 Unsupported Media Type
+            Self::UnsupportedFileFormat | Self::InvalidImageFile => {
+                StatusCode::UNSUPPORTED_MEDIA_TYPE
+            }
+
             // 400 Bad Request (default for validation/business errors)
             _ => StatusCode::BAD_REQUEST,
         }

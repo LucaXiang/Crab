@@ -136,6 +136,26 @@ pub enum ErrorCode {
     /// Attribute binding failed
     AttributeBindFailed = 6302,
 
+    // ==================== 65xx: File Upload ====================
+    /// File too large
+    FileTooLarge = 6501,
+    /// Unsupported file format
+    UnsupportedFileFormat = 6502,
+    /// Invalid/corrupted image file
+    InvalidImageFile = 6503,
+    /// No file provided in request
+    NoFileProvided = 6504,
+    /// Empty file provided
+    EmptyFile = 6505,
+    /// No filename provided
+    NoFilename = 6506,
+    /// Invalid file extension
+    InvalidFileExtension = 6507,
+    /// Image processing failed
+    ImageProcessingFailed = 6508,
+    /// File storage failed
+    FileStorageFailed = 6509,
+
     // ==================== 7xxx: Table ====================
     /// Table not found
     TableNotFound = 7001,
@@ -280,6 +300,17 @@ impl ErrorCode {
             ErrorCode::AttributeNotFound => "Attribute not found",
             ErrorCode::AttributeBindFailed => "Failed to bind attribute",
 
+            // File Upload
+            ErrorCode::FileTooLarge => "File too large",
+            ErrorCode::UnsupportedFileFormat => "Unsupported file format",
+            ErrorCode::InvalidImageFile => "Invalid image file",
+            ErrorCode::NoFileProvided => "No file provided",
+            ErrorCode::EmptyFile => "Empty file provided",
+            ErrorCode::NoFilename => "No filename provided",
+            ErrorCode::InvalidFileExtension => "Invalid file extension",
+            ErrorCode::ImageProcessingFailed => "Image processing failed",
+            ErrorCode::FileStorageFailed => "File storage failed",
+
             // Table
             ErrorCode::TableNotFound => "Table not found",
             ErrorCode::TableOccupied => "Table is occupied",
@@ -402,8 +433,20 @@ impl TryFrom<u16> for ErrorCode {
             6103 => Ok(ErrorCode::CategoryNameExists),
             6201 => Ok(ErrorCode::SpecNotFound),
             6202 => Ok(ErrorCode::ProductExternalIdExists),
+            6203 => Ok(ErrorCode::ProductExternalIdRequired),
             6301 => Ok(ErrorCode::AttributeNotFound),
             6302 => Ok(ErrorCode::AttributeBindFailed),
+
+            // File Upload
+            6501 => Ok(ErrorCode::FileTooLarge),
+            6502 => Ok(ErrorCode::UnsupportedFileFormat),
+            6503 => Ok(ErrorCode::InvalidImageFile),
+            6504 => Ok(ErrorCode::NoFileProvided),
+            6505 => Ok(ErrorCode::EmptyFile),
+            6506 => Ok(ErrorCode::NoFilename),
+            6507 => Ok(ErrorCode::InvalidFileExtension),
+            6508 => Ok(ErrorCode::ImageProcessingFailed),
+            6509 => Ok(ErrorCode::FileStorageFailed),
 
             // Table
             7001 => Ok(ErrorCode::TableNotFound),

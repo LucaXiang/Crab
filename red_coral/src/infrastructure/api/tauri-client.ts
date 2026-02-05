@@ -101,11 +101,21 @@ function handleAuthError(code: number) {
   }
 }
 
-/** 根据错误码 + 原始消息生成用户友好的错误提示 */
-function localizeErrorCode(code: number, rawMessage?: string): string {
+/** 根据错误码 + details + 原始消息生成用户友好的错误提示 */
+function localizeErrorCode(
+  code: number,
+  rawMessage?: string,
+  details?: Record<string, unknown>
+): string {
   // 优先用错误码查 i18n
   const key = `errors.${code}`;
-  const localized = t(key);
+  // 将 details 转换为 t() 需要的参数格式
+  const params = details
+    ? Object.fromEntries(
+        Object.entries(details).map(([k, v]) => [k, String(v)])
+      )
+    : undefined;
+  const localized = t(key, params);
   if (localized !== key) {
     return localized;
   }
@@ -122,7 +132,11 @@ export async function invokeApi<T>(command: string, args?: Record<string, unknow
     const response = await invoke<ApiResponse<T>>(command, args);
     if (response.code && response.code > 0) {
       handleAuthError(response.code);
-      throw new ApiError(response.code, localizeErrorCode(response.code, response.message), response.details ?? undefined);
+      throw new ApiError(
+        response.code,
+        localizeErrorCode(response.code, response.message, response.details ?? undefined),
+        response.details ?? undefined
+      );
     }
     return response.data as T;
   } catch (error) {

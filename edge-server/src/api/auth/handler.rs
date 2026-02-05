@@ -47,7 +47,7 @@ pub async fn login(
         Some(e) => {
             // User found - check active status
             if !e.is_active {
-                return Err(AppError::forbidden("Account has been disabled".to_string()));
+                return Err(AppError::account_disabled());
             }
 
             // Verify password
@@ -62,9 +62,7 @@ pub async fn login(
                     serde_json::json!({"reason": "invalid_credentials"}),
                 ).await;
                 tracing::warn!(username = %username, "Login failed - invalid credentials");
-                return Err(AppError::invalid(
-                    "Invalid username or password".to_string(),
-                ));
+                return Err(AppError::invalid_credentials());
             }
 
             e
@@ -76,9 +74,7 @@ pub async fn login(
                 serde_json::json!({"reason": "user_not_found"}),
             ).await;
             tracing::warn!(username = %username, "Login failed - user not found");
-            return Err(AppError::invalid(
-                "Invalid username or password".to_string(),
-            ));
+            return Err(AppError::invalid_credentials());
         }
     };
 
@@ -94,10 +90,10 @@ pub async fn login(
         .take(0)
         .map_err(|e| AppError::database(format!("Failed to parse role: {}", e)))?;
 
-    let role = role.ok_or_else(|| AppError::internal("Role not found".to_string()))?;
+    let role = role.ok_or_else(|| AppError::new(shared::ErrorCode::RoleNotFound))?;
 
     if !role.is_active {
-        return Err(AppError::forbidden("Role has been disabled".to_string()));
+        return Err(AppError::role_disabled());
     }
 
     // Generate JWT token
@@ -238,7 +234,7 @@ pub async fn escalate(
     let employee = match employee {
         Some(e) => {
             if !e.is_active {
-                return Err(AppError::forbidden("Account has been disabled".to_string()));
+                return Err(AppError::account_disabled());
             }
 
             let password_valid = e
@@ -251,7 +247,7 @@ pub async fn escalate(
                     required_permission = %req.required_permission,
                     "Escalation failed - invalid credentials"
                 );
-                return Err(AppError::invalid("Invalid username or password".to_string()));
+                return Err(AppError::invalid_credentials());
             }
 
             e
@@ -262,7 +258,7 @@ pub async fn escalate(
                 required_permission = %req.required_permission,
                 "Escalation failed - user not found"
             );
-            return Err(AppError::invalid("Invalid username or password".to_string()));
+            return Err(AppError::invalid_credentials());
         }
     };
 
@@ -278,10 +274,10 @@ pub async fn escalate(
         .take(0)
         .map_err(|e| AppError::database(format!("Failed to parse role: {}", e)))?;
 
-    let role = role.ok_or_else(|| AppError::internal("Role not found".to_string()))?;
+    let role = role.ok_or_else(|| AppError::new(shared::ErrorCode::RoleNotFound))?;
 
     if !role.is_active {
-        return Err(AppError::forbidden("Role has been disabled".to_string()));
+        return Err(AppError::role_disabled());
     }
 
     // Check permission
@@ -303,10 +299,8 @@ pub async fn escalate(
             required_permission = %req.required_permission,
             "Escalation failed - insufficient permission"
         );
-        return Err(AppError::forbidden(format!(
-            "User does not have permission: {}",
-            req.required_permission
-        )));
+        return Err(AppError::permission_denied("Insufficient permission")
+            .with_detail("required_permission", req.required_permission.clone()));
     }
 
     let authorizer_id = employee

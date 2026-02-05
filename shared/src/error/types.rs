@@ -156,6 +156,72 @@ impl AppError {
     pub fn subscription_blocked(msg: impl Into<String>) -> Self {
         Self::with_message(ErrorCode::SubscriptionBlocked, msg)
     }
+
+    // ==================== File Upload Errors ====================
+
+    /// Create a file too large error
+    pub fn file_too_large(max_bytes: usize, actual_bytes: usize) -> Self {
+        Self::new(ErrorCode::FileTooLarge)
+            .with_detail("max_bytes", max_bytes as i64)
+            .with_detail("max_mb", (max_bytes / 1024 / 1024) as i64)
+            .with_detail("actual_bytes", actual_bytes as i64)
+    }
+
+    /// Create an unsupported file format error
+    pub fn unsupported_format(format: impl Into<String>, supported: &[&str]) -> Self {
+        Self::new(ErrorCode::UnsupportedFileFormat)
+            .with_detail("format", format.into())
+            .with_detail("supported", supported.join(", "))
+    }
+
+    /// Create an invalid image file error
+    pub fn invalid_image(filename: impl Into<String>, reason: impl Into<String>) -> Self {
+        Self::new(ErrorCode::InvalidImageFile)
+            .with_detail("filename", filename.into())
+            .with_detail("reason", reason.into())
+    }
+
+    /// Create a no file provided error
+    pub fn no_file_provided() -> Self {
+        Self::new(ErrorCode::NoFileProvided)
+    }
+
+    /// Create an empty file error
+    pub fn empty_file() -> Self {
+        Self::new(ErrorCode::EmptyFile)
+    }
+
+    /// Create a no filename error
+    pub fn no_filename() -> Self {
+        Self::new(ErrorCode::NoFilename)
+    }
+
+    /// Create an invalid file extension error
+    pub fn invalid_file_extension(filename: impl Into<String>) -> Self {
+        Self::new(ErrorCode::InvalidFileExtension).with_detail("filename", filename.into())
+    }
+
+    /// Create an image processing failed error
+    pub fn image_processing_failed(reason: impl Into<String>) -> Self {
+        Self::new(ErrorCode::ImageProcessingFailed).with_detail("reason", reason.into())
+    }
+
+    /// Create a file storage failed error
+    pub fn file_storage_failed(reason: impl Into<String>) -> Self {
+        Self::new(ErrorCode::FileStorageFailed).with_detail("reason", reason.into())
+    }
+
+    // ==================== Auth Errors ====================
+
+    /// Create an account disabled error
+    pub fn account_disabled() -> Self {
+        Self::new(ErrorCode::AccountDisabled)
+    }
+
+    /// Create a role disabled error
+    pub fn role_disabled() -> Self {
+        Self::new(ErrorCode::RoleRequired).with_detail("reason", "role_disabled")
+    }
 }
 
 /// Unified API response structure

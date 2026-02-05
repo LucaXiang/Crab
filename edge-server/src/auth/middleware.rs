@@ -172,7 +172,7 @@ pub async fn require_admin(req: Request, next: Next) -> Result<Response, AppErro
             username = user.username.clone(),
             user_role = user.role_name.clone()
         );
-        return Err(AppError::forbidden("Admin access required".to_string()));
+        return Err(AppError::new(shared::ErrorCode::AdminRequired));
     }
 
     Ok(next.run(req).await)
