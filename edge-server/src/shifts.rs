@@ -145,7 +145,11 @@ impl ShiftAutoCloseScheduler {
                 (target_date.and_time(cutoff_time) + chrono::Duration::minutes(1))
                     .and_local_timezone(tz)
                     .latest()
-                    .expect("Cannot resolve local time")
+                    .unwrap_or_else(|| {
+                        // Ultimate fallback: use current time + 1 hour
+                        tracing::error!("Cannot resolve local time for shift close, using fallback");
+                        now + chrono::Duration::hours(1)
+                    })
             });
 
         let duration = target_datetime.signed_duration_since(now);

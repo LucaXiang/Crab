@@ -496,7 +496,8 @@ mod tests {
     fn test_terminal_event_types() {
         assert!(TERMINAL_EVENT_TYPES.contains(&OrderEventType::OrderCompleted));
         assert!(TERMINAL_EVENT_TYPES.contains(&OrderEventType::OrderVoided));
-        assert!(TERMINAL_EVENT_TYPES.contains(&OrderEventType::OrderMoved));
+        // OrderMoved is NOT a terminal event - moving to another table keeps the order active
+        assert!(!TERMINAL_EVENT_TYPES.contains(&OrderEventType::OrderMoved));
         assert!(TERMINAL_EVENT_TYPES.contains(&OrderEventType::OrderMerged));
         assert!(!TERMINAL_EVENT_TYPES.contains(&OrderEventType::ItemsAdded));
     }

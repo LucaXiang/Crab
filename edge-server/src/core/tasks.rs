@@ -9,7 +9,9 @@
 //! - [`TaskKind::Listener`] - 事件监听器
 //! - [`TaskKind::Periodic`] - 定时任务
 
+use futures::FutureExt;
 use std::fmt;
+use std::panic::AssertUnwindSafe;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
@@ -92,6 +94,8 @@ impl BackgroundTasks {
 
     /// 注册并启动一个后台任务
     ///
+    /// 任务会被包装以捕获 panic，如果任务异常退出会记录错误日志。
+    ///
     /// # 参数
     ///
     /// - `name`: 任务名称（用于日志和调试）
@@ -101,7 +105,37 @@ impl BackgroundTasks {
     where
         F: std::future::Future<Output = ()> + Send + 'static,
     {
-        let handle = tokio::spawn(future);
+        // Wrap the future to catch panics and log errors
+        let wrapped_future = async move {
+            let result: Result<(), Box<dyn std::any::Any + Send>> =
+                AssertUnwindSafe(future).catch_unwind().await;
+            match result {
+                Ok(()) => {
+                    // Normal completion - only log for non-Warmup tasks
+                    if kind != TaskKind::Warmup {
+                        tracing::warn!(task = %name, kind = %kind, "Background task completed unexpectedly");
+                    }
+                }
+                Err(panic_info) => {
+                    // Task panicked - log error with panic info
+                    let panic_msg: String = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                        (*s).to_string()
+                    } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                        s.clone()
+                    } else {
+                        "Unknown panic".to_string()
+                    };
+                    tracing::error!(
+                        task = %name,
+                        kind = %kind,
+                        panic = %panic_msg,
+                        "🚨 Background task panicked! This is a bug that should be reported."
+                    );
+                }
+            }
+        };
+
+        let handle = tokio::spawn(wrapped_future);
         tracing::debug!(task = %name, kind = %kind, "Registered background task");
         self.tasks.push(RegisteredTask { name, kind, handle });
     }
@@ -146,6 +180,32 @@ impl BackgroundTasks {
             periodic,
             warmup
         );
+    }
+
+    /// 检查所有任务健康状态
+    ///
+    /// 返回异常终止的任务数量。如果有任务 panic 或意外退出，会记录错误日志。
+    pub fn check_health(&self) -> usize {
+        let mut failed_count = 0;
+        for task in &self.tasks {
+            if task.handle.is_finished() {
+                tracing::error!(
+                    task = %task.name,
+                    kind = %task.kind,
+                    "🚨 Background task unexpectedly finished! This may indicate a panic or error."
+                );
+                failed_count += 1;
+            }
+        }
+        if failed_count > 0 {
+            tracing::error!(
+                failed = failed_count,
+                total = self.tasks.len(),
+                "Background task health check: {} task(s) failed",
+                failed_count
+            );
+        }
+        failed_count
     }
 
     /// Graceful shutdown - 取消所有任务并等待完成
