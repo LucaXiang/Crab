@@ -2,40 +2,12 @@ import React, { useMemo } from 'react';
 import { Zap, AlertTriangle, Info } from 'lucide-react';
 import type { PriceRule } from '@/core/domain/types/api';
 import { useI18n } from '@/hooks/useI18n';
+import { calculatePriority, getStackingMode } from '../utils';
 
 interface RuleConflictAnalysisProps {
   currentRule: PriceRule;
   allRules: PriceRule[];
 }
-
-// Calculate priority score for a rule
-// Higher zone specificity + higher product specificity = higher priority
-const calculatePriority = (rule: PriceRule): number => {
-  // Zone weight: all < retail < specific
-  let zoneWeight = 0;
-  if (rule.zone_scope === 'zone:all') zoneWeight = 0;
-  else if (rule.zone_scope === 'zone:retail') zoneWeight = 1;
-  else zoneWeight = 2;
-
-  // Product weight: global < category < tag < product
-  const productWeights: Record<string, number> = {
-    GLOBAL: 0,
-    CATEGORY: 1,
-    TAG: 2,
-    PRODUCT: 3,
-  };
-  const productWeight = productWeights[rule.product_scope] || 0;
-
-  // Combine: zone_weight * 10 + product_weight
-  return zoneWeight * 10 + productWeight;
-};
-
-// Get stacking mode label
-const getStackingMode = (rule: PriceRule): 'exclusive' | 'non_stackable' | 'stackable' => {
-  if (rule.is_exclusive) return 'exclusive';
-  if (rule.is_stackable) return 'stackable';
-  return 'non_stackable';
-};
 
 export const RuleConflictAnalysis: React.FC<RuleConflictAnalysisProps> = ({
   currentRule,
@@ -163,7 +135,7 @@ export const RuleConflictAnalysis: React.FC<RuleConflictAnalysisProps> = ({
             <div
               key={rule.id}
               className={`flex items-center gap-3 p-3 ${
-                isCurrent ? 'bg-blue-50' : ''
+                isCurrent ? 'bg-teal-50' : ''
               }`}
             >
               {/* Rank number */}
@@ -185,7 +157,7 @@ export const RuleConflictAnalysis: React.FC<RuleConflictAnalysisProps> = ({
                 >
                   {rule.display_name}
                   {isCurrent && (
-                    <span className="text-blue-500 text-xs ml-1">
+                    <span className="text-teal-500 text-xs ml-1">
                       ← {t('settings.price_rule.conflict.current')}
                     </span>
                   )}

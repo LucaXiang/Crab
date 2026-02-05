@@ -35,7 +35,8 @@
       "collapse_all": "Contraer todo",
       "batch_delete": "Eliminar selección",
       "upload_image": "Subir imagen",
-      "actions": "Acciones"
+      "actions": "Acciones",
+      "done": "Listo"
     },
     "status": {
       "all": "Todos",
@@ -870,7 +871,10 @@
       },
       "zone": {
         "all": "Todas las zonas",
-        "retail": "Venta directa"
+        "retail": "Venta directa",
+        "all_desc": "Aplica en todas las zonas",
+        "retail_desc": "Solo para llevar/venta rápida",
+        "custom_desc": "Zona específica"
       },
       "adjustment": {
         "percentage": "Porcentaje",
@@ -895,6 +899,91 @@
       },
       "delete_confirm_title": "Eliminar regla",
       "delete_confirm_message": "¿Eliminar regla \"{name}\"?",
+      "list_title": "Lista de reglas",
+      "empty": "Sin reglas de precio",
+      "hint": {
+        "select_rule": "Seleccione una regla para ver detalles"
+      },
+      "priority": "Prioridad",
+      "stacking": {
+        "exclusive": "Exclusiva",
+        "stackable": "Acumulable",
+        "non_stackable": "No acumulable"
+      },
+      "stacking_label": "Modo",
+      "status_label": "Estado",
+      "scope_section": "Ámbito",
+      "behavior_section": "Comportamiento",
+      "product_scope_label": "Platos",
+      "zone_scope_label": "Zona",
+      "time_viz": {
+        "title": "Vigencia",
+        "every_day": "Todos los días",
+        "all_day": "Todo el día",
+        "always_active": "Siempre activa, sin límite",
+        "date_range": "Rango de fechas",
+        "remaining": "Quedan",
+        "days": "días",
+        "expired": "Caducada",
+        "onwards": "desde",
+        "until": "hasta"
+      },
+      "preview": {
+        "title": "Vista previa",
+        "zone": "Zona",
+        "product": "Plato",
+        "select_product": "Seleccione plato",
+        "base_price": "Precio base",
+        "final_price": "Precio final",
+        "matched": "Reglas aplicadas",
+        "unmatched": "Reglas no aplicadas",
+        "current": "actual",
+        "more_rules": "reglas más"
+      },
+      "conflict": {
+        "title": "Interacción reglas",
+        "no_related": "Sin reglas relacionadas",
+        "priority_order": "Reglas activas (por prioridad)",
+        "current": "actual",
+        "blocked_by_exclusive": "Bloqueada por «{name}» (exclusiva)",
+        "will_block": "Bloqueará {count} reglas",
+        "help": "Reglas exclusivas bloquean las de menor prioridad"
+      },
+      "picker": {
+        "select_zone": "Seleccionar zona",
+        "select_product": "Seleccionar plato",
+        "select_category": "Seleccionar categoría",
+        "select_tag": "Seleccionar etiqueta",
+        "search_product": "Buscar plato...",
+        "search_category": "Buscar categoría...",
+        "search_tag": "Buscar etiqueta..."
+      },
+      "edit": {
+        "time_condition": "Horario",
+        "time_mode": "Modo de tiempo",
+        "active_days": "Días activos",
+        "all_days": "Todos",
+        "weekdays": "L-V",
+        "weekends": "Fines de semana",
+        "time_range": "Rango horario",
+        "date_range": "Fecha de validez",
+        "valid_from": "Desde",
+        "valid_until": "Hasta",
+        "clear_time": "Quitar horario",
+        "clear_date": "Quitar fechas",
+        "select_target": "Seleccionar destino"
+      },
+      "reason": {
+        "disabled": "Regla desactivada",
+        "zone_mismatch": "Zona no coincide",
+        "product_mismatch": "Plato no coincide",
+        "time_mismatch": "Horario no coincide",
+        "not_started": "Aún no activa",
+        "expired": "Caducada",
+        "only": "solo",
+        "category": "categoría",
+        "tag": "etiqueta"
+      },
       "wizard": {
         "title": "Crear regla",
         "edit_title": "Editar regla",

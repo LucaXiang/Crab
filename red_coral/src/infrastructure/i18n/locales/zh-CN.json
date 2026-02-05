@@ -35,7 +35,8 @@
       "collapse_all": "全部收起",
       "batch_delete": "批量删除",
       "upload_image": "上传图片",
-      "actions": "操作"
+      "actions": "操作",
+      "done": "完成"
     },
     "status": {
       "all": "全部",
@@ -951,7 +952,26 @@
       "picker": {
         "select_zone": "选择区域",
         "select_product": "选择商品",
-        "search_product": "搜索商品..."
+        "select_category": "选择分类",
+        "select_tag": "选择标签",
+        "search_product": "搜索商品...",
+        "search_category": "搜索分类...",
+        "search_tag": "搜索标签..."
+      },
+      "edit": {
+        "time_condition": "时间条件",
+        "time_mode": "生效模式",
+        "active_days": "生效日期",
+        "all_days": "每天",
+        "weekdays": "工作日",
+        "weekends": "周末",
+        "time_range": "时间段",
+        "date_range": "有效期",
+        "valid_from": "开始日期",
+        "valid_until": "结束日期",
+        "clear_time": "清除时间段",
+        "clear_date": "清除有效期",
+        "select_target": "点击选择目标"
       },
       "reason": {
         "disabled": "规则已禁用",

@@ -3,6 +3,7 @@ import { Globe, Package, Tag, Layers, ShoppingCart, Armchair } from 'lucide-reac
 import type { PriceRule } from '@/core/domain/types/api';
 import { useI18n } from '@/hooks/useI18n';
 import { useZoneStore } from '@/features/zone/store';
+import { calculatePriority, getStackingMode } from '../utils';
 
 interface RuleListPanelProps {
   rules: PriceRule[];
@@ -101,13 +102,6 @@ export const RuleListPanel: React.FC<RuleListPanelProps> = ({
     return `${sign}€${rule.adjustment_value.toFixed(2)}`;
   };
 
-  // Get stacking mode label
-  const getStackingLabel = (rule: PriceRule): string => {
-    if (rule.is_exclusive) return t('settings.price_rule.stacking.exclusive');
-    if (rule.is_stackable) return t('settings.price_rule.stacking.stackable');
-    return t('settings.price_rule.stacking.non_stackable');
-  };
-
   return (
     <div className="w-80 shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
       {/* Header */}
@@ -189,11 +183,11 @@ export const RuleListPanel: React.FC<RuleListPanelProps> = ({
                 {/* Row 4: Priority + Stacking */}
                 <div className="flex items-center gap-2 mt-1.5 text-xs">
                   <span className="text-gray-400">
-                    {t('settings.price_rule.priority')}: {rule.is_exclusive ? 99 : (rule.is_stackable ? 1 : 50)}
+                    P{calculatePriority(rule)}
                   </span>
                   <span className="text-gray-300">·</span>
                   <span className={`${rule.is_exclusive ? 'text-red-500' : rule.is_stackable ? 'text-green-500' : 'text-gray-500'}`}>
-                    {getStackingLabel(rule)}
+                    {t(`settings.price_rule.stacking.${getStackingMode(rule)}`)}
                   </span>
                 </div>
               </button>

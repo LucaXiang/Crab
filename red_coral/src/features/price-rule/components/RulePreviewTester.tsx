@@ -215,7 +215,7 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
         {/* Zone selector */}
         <button
           onClick={() => setShowZonePicker(true)}
-          className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-300 transition-colors text-left"
+          className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-200 hover:border-teal-300 transition-colors text-left"
         >
           <div>
             <div className="text-xs text-gray-500 mb-1">
@@ -232,7 +232,7 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
         {/* Product selector */}
         <button
           onClick={() => setShowProductPicker(true)}
-          className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-300 transition-colors text-left"
+          className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-200 hover:border-teal-300 transition-colors text-left"
         >
           <div>
             <div className="text-xs text-gray-500 mb-1">
@@ -280,7 +280,7 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
                   <div
                     key={rule.id}
                     className={`flex items-center justify-between text-sm p-2 rounded-lg ${
-                      isCurrentRule ? 'bg-blue-50 ring-1 ring-blue-200' : ''
+                      isCurrentRule ? 'bg-teal-50 ring-1 ring-teal-200' : ''
                     }`}
                   >
                     <div className="flex items-center gap-2">

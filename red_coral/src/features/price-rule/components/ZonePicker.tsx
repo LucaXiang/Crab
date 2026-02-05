@@ -90,7 +90,7 @@ export const ZonePicker: React.FC<ZonePickerProps> = ({
                 className={`
                   w-full flex items-center gap-4 p-4 rounded-xl transition-all
                   ${isSelected
-                    ? 'bg-blue-50 ring-2 ring-blue-500'
+                    ? 'bg-teal-50 ring-2 ring-teal-500'
                     : 'bg-gray-50 hover:bg-gray-100'
                   }
                 `}
@@ -98,7 +98,7 @@ export const ZonePicker: React.FC<ZonePickerProps> = ({
                 <div
                   className={`
                     w-12 h-12 rounded-xl flex items-center justify-center shrink-0
-                    ${isSelected ? 'bg-blue-500 text-white' : 'bg-white text-gray-500'}
+                    ${isSelected ? 'bg-teal-500 text-white' : 'bg-white text-gray-500'}
                   `}
                 >
                   <Icon size={24} />
