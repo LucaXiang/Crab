@@ -29,33 +29,37 @@ export const TargetPicker: React.FC<TargetPickerProps> = ({
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  if (!isOpen) return null;
+  // Build and filter items based on scope and search
+  const items = useMemo(() => {
+    type Item = {
+      id: string;
+      name: string;
+      icon: React.ElementType;
+      subtitle?: string;
+      image?: string;
+    };
 
-  // Get items based on product scope
-  const getItems = (): Array<{
-    id: string;
-    name: string;
-    icon: React.ElementType;
-    subtitle?: string;
-    image?: string;
-  }> => {
+    let allItems: Item[] = [];
+
     switch (productScope) {
       case 'CATEGORY':
-        return categories
+        allItems = categories
           .filter(c => c.is_active)
           .map(c => ({
             id: c.id,
             name: c.name,
             icon: Layers,
           }));
+        break;
       case 'TAG':
-        return tags.map(t => ({
-          id: t.id,
-          name: t.name,
+        allItems = tags.map(tg => ({
+          id: tg.id,
+          name: tg.name,
           icon: Tag,
         }));
+        break;
       case 'PRODUCT':
-        return products
+        allItems = products
           .filter(p => p.is_active)
           .map(p => ({
             id: p.id,
@@ -64,17 +68,15 @@ export const TargetPicker: React.FC<TargetPickerProps> = ({
             subtitle: formatCurrency(p.specs?.[0]?.price ?? 0),
             image: p.image,
           }));
-      default:
-        return [];
+        break;
     }
-  };
 
-  const items = useMemo(() => {
-    const allItems = getItems();
     if (!searchQuery.trim()) return allItems;
     const q = searchQuery.toLowerCase();
     return allItems.filter(item => item.name.toLowerCase().includes(q));
   }, [productScope, categories, tags, products, searchQuery]);
+
+  if (!isOpen) return null;
 
   const getTitle = () => {
     switch (productScope) {
