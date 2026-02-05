@@ -1,8 +1,6 @@
 import React, { Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { HeldOrder, CompletedOrder } from '@/core/domain/types';
-import { useI18n } from '@/hooks/useI18n';
-import { SectionErrorBoundary } from '@/presentation/components/SectionErrorBoundary';
 import { LoadingScreen } from '@/presentation/components/LoadingScreen';
 
 // Lazy load heavy screens
@@ -31,8 +29,6 @@ export const POSOverlays = React.memo<POSOverlaysProps>(({
 	  onSetScreen,
 	  onManageTable,
 }) => {
-	  const { t } = useI18n();
-
 	  if (typeof document === 'undefined') {
 	    return null;
 	  }
@@ -42,19 +38,12 @@ export const POSOverlays = React.memo<POSOverlaysProps>(({
 	      {viewMode === 'checkout' && checkoutOrder && (
 	        <div className="fixed inset-0 z-40 bg-gray-100 animate-in slide-in-from-right duration-300 shadow-2xl">
 	          <Suspense fallback={<LoadingScreen />}>
-            <SectionErrorBoundary
-              region="checkout_overlay"
-              title={t('checkout.error.title')}
-              description={t('checkout.error.hint')}
-              autoReload={true}
-            >
               <CheckoutScreen
                 order={checkoutOrder}
 	                onCancel={onCheckoutCancel}
 	                onComplete={onCheckoutComplete}
 	                onManageTable={onManageTable}
 	              />
-	            </SectionErrorBoundary>
 	          </Suspense>
 	        </div>
 	      )}
