@@ -1174,7 +1174,8 @@
       "description": "Gestionar atributos y opciones",
       "unit": "atributos",
       "hint": {
-        "add_first": "Añada el primer atributo"
+        "add_first": "Añada el primer atributo",
+        "select_attribute": "Seleccione un atributo de la izquierda"
       },
       "section": {
         "basic": "Básico",
@@ -1249,7 +1250,8 @@
         "add_option": "Añadir opción",
         "edit_option": "Editar opción",
         "set_default": "Establecer defecto",
-        "unset_default": "Quitar defecto"
+        "unset_default": "Quitar defecto",
+        "quantity_control": "Control de cantidad"
       },
       "scope": {
         "global": "Global",

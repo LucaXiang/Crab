@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Settings, Plus, Edit, Trash2, ChevronRight, List, Star, ReceiptText, ChefHat } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Settings, Plus, Edit, Trash2, List, Star, ReceiptText, ChefHat, Hash, DollarSign, Search } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -16,15 +16,15 @@ import { AttributeForm } from './AttributeForm';
 import { OptionForm } from './OptionForm';
 import { Permission } from '@/core/domain/types';
 import type { Attribute, AttributeOption } from '@/core/domain/types/api';
+import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
+import { ManagementHeader } from '@/screens/Settings/components';
+import { formatCurrency } from '@/utils/currency';
 
 // Extended option type with index for UI (matches store type)
 interface AttributeOptionWithIndex extends AttributeOption {
   index: number;
   attributeId: string;
 }
-import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
-import { ManagementHeader, FilterBar } from '@/screens/Settings/components';
-import { formatCurrency } from '@/utils/currency';
 
 export const AttributeManagement: React.FC = React.memo(() => {
   const { t } = useI18n();
@@ -43,13 +43,12 @@ export const AttributeManagement: React.FC = React.memo(() => {
   const [optionFormOpen, setOptionFormOpen] = useState(false);
   const [editingAttribute, setEditingAttribute] = useState<Attribute | null>(null);
   const [editingOption, setEditingOption] = useState<AttributeOptionWithIndex | null>(null);
-  const [selectedAttributeForOption, setSelectedAttributeForOption] = useState<string | null>(null);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Expanded attributes (track which attributes are expanded)
-  const [expandedAttributes, setExpandedAttributes] = useState<Set<string>>(new Set());
+  // Selected attribute (Master-Detail)
+  const [selectedAttributeId, setSelectedAttributeId] = useState<string | null>(null);
 
   // Confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -64,7 +63,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
     useShallow((state) => state.options)
   );
 
-  const filteredAttributes = React.useMemo(() => {
+  const filteredAttributes = useMemo(() => {
     let list = [...attributes].sort((a, b) => a.display_order - b.display_order);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -73,34 +72,43 @@ export const AttributeManagement: React.FC = React.memo(() => {
     return list;
   }, [attributes, searchQuery]);
 
+  // Get selected attribute
+  const selectedAttribute = useMemo(() => {
+    if (!selectedAttributeId) return null;
+    return attributes.find(a => String(a.id) === selectedAttributeId) ?? null;
+  }, [attributes, selectedAttributeId]);
+
+  // Get options for selected attribute
+  const selectedOptions = useMemo(() => {
+    if (!selectedAttributeId) return [];
+    return [...(allOptions.get(selectedAttributeId) || [])].sort((a, b) => a.display_order - b.display_order);
+  }, [allOptions, selectedAttributeId]);
+
   // Load attributes on mount
   useEffect(() => {
     fetchAll();
   }, []);
 
-  // Load options for expanded attributes
+  // Load options when attribute is selected
   useEffect(() => {
-    expandedAttributes.forEach((attrId) => {
-      if (!allOptions.has(attrId)) {
-        loadOptions(attrId);
-      }
-    });
-  }, [expandedAttributes]);
-
-  // Toggle attribute expansion
-  const toggleAttribute = (attributeId: string) => {
-    const newExpanded = new Set(expandedAttributes);
-    if (newExpanded.has(attributeId)) {
-      newExpanded.delete(attributeId);
-    } else {
-      newExpanded.add(attributeId);
-      // Load options if not already loaded
-      if (!allOptions.has(attributeId)) {
-        loadOptions(attributeId);
-      }
+    if (selectedAttributeId && !allOptions.has(selectedAttributeId)) {
+      loadOptions(selectedAttributeId);
     }
-    setExpandedAttributes(newExpanded);
-  };
+  }, [selectedAttributeId]);
+
+  // Auto-select first attribute if none selected
+  useEffect(() => {
+    if (!selectedAttributeId && filteredAttributes.length > 0) {
+      setSelectedAttributeId(String(filteredAttributes[0].id));
+    }
+  }, [filteredAttributes, selectedAttributeId]);
+
+  // Clear selection if selected attribute is deleted
+  useEffect(() => {
+    if (selectedAttributeId && !attributes.find(a => String(a.id) === selectedAttributeId)) {
+      setSelectedAttributeId(filteredAttributes.length > 0 ? String(filteredAttributes[0].id) : null);
+    }
+  }, [attributes]);
 
   // Handlers for Attributes
   const handleAddAttribute = () => {
@@ -108,19 +116,16 @@ export const AttributeManagement: React.FC = React.memo(() => {
     setAttributeFormOpen(true);
   };
 
-  const handleEditAttribute = (attr: Attribute, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleEditAttribute = (attr: Attribute) => {
     setEditingAttribute(attr);
     setAttributeFormOpen(true);
   };
 
-  const handleDeleteAttribute = (attr: Attribute, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteAttribute = (attr: Attribute) => {
     setConfirmDialog({
       isOpen: true,
       title: t('settings.attribute.delete_attribute'),
-      description:
-        t('settings.attribute.confirm.delete', { name: attr.name }),
+      description: t('settings.attribute.confirm.delete', { name: attr.name }),
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
@@ -135,27 +140,22 @@ export const AttributeManagement: React.FC = React.memo(() => {
   };
 
   // Handlers for Options
-  const handleAddOption = (attributeId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedAttributeForOption(attributeId);
+  const handleAddOption = () => {
+    if (!selectedAttributeId) return;
     setEditingOption(null);
     setOptionFormOpen(true);
   };
 
-  const handleEditOption = (option: AttributeOptionWithIndex, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedAttributeForOption(option.attributeId);
+  const handleEditOption = (option: AttributeOptionWithIndex) => {
     setEditingOption(option);
     setOptionFormOpen(true);
   };
 
-  const handleDeleteOption = (option: AttributeOptionWithIndex, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteOption = (option: AttributeOptionWithIndex) => {
     setConfirmDialog({
       isOpen: true,
       title: t('settings.attribute.option.delete_option'),
-      description:
-        t('settings.attribute.confirm.deleteOption', { name: option.name }),
+      description: t('settings.attribute.confirm.deleteOption', { name: option.name }),
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
@@ -169,18 +169,15 @@ export const AttributeManagement: React.FC = React.memo(() => {
     });
   };
 
-  const handleToggleDefault = async (attr: Attribute, optionIndex: number, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleDefault = async (attr: Attribute, optionIndex: number) => {
     const current = attr.default_option_indices ?? [];
     const isCurrentlyDefault = current.includes(optionIndex);
 
     let newDefaults: number[];
     if (attr.is_multi_select) {
-      // Multi-select: toggle this index in/out of the array
       if (isCurrentlyDefault) {
         newDefaults = current.filter(i => i !== optionIndex);
       } else {
-        // Enforce max_selections limit
         if (attr.max_selections && current.length >= attr.max_selections) {
           toast.error(t('settings.attribute.error.max_defaults', { n: attr.max_selections }));
           return;
@@ -188,7 +185,6 @@ export const AttributeManagement: React.FC = React.memo(() => {
         newDefaults = [...current, optionIndex];
       }
     } else {
-      // Single-select: set or clear
       newDefaults = isCurrentlyDefault ? [] : [optionIndex];
     }
 
@@ -203,14 +199,12 @@ export const AttributeManagement: React.FC = React.memo(() => {
     }
   };
 
-  const getAttributeTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      SINGLE_REQUIRED: t('settings.attribute.type.single_required'),
-      SINGLE_OPTIONAL: t('settings.attribute.type.single_optional'),
-      MULTI_REQUIRED: t('settings.attribute.type.multi_required'),
-      MULTI_OPTIONAL: t('settings.attribute.type.multi_optional'),
-    };
-    return labels[type] || type;
+  // Check if attribute has special features
+  const getAttributeFeatures = (attr: Attribute) => {
+    const options = allOptions.get(String(attr.id)) || [];
+    const hasPrice = options.some(o => o.price_modifier !== 0);
+    const hasQuantity = options.some(o => o.enable_quantity);
+    return { hasPrice, hasQuantity };
   };
 
   return (
@@ -225,242 +219,287 @@ export const AttributeManagement: React.FC = React.memo(() => {
         permission={Permission.MENU_MANAGE}
       />
 
-      <FilterBar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchPlaceholder={t('common.hint.search_placeholder')}
-        totalCount={filteredAttributes.length}
-        countUnit={t('settings.attribute.unit')}
-        themeColor="teal"
-      />
-
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden min-h-[25rem] shadow-sm">
-        {isLoading && attributes.length > 0 && (
-          <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-[1px]">
-            <div className="w-8 h-8 border-4 border-gray-200 border-t-teal-500 rounded-full animate-spin" />
-          </div>
-        )}
-
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex" style={{ minHeight: '28rem' }}>
         {isLoading && attributes.length === 0 ? (
-          <div className="text-gray-400 text-sm text-center py-16 flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-4 border-gray-200 border-t-teal-500 rounded-full animate-spin" />
-            <span>{t('common.message.loading')}</span>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-gray-400 text-sm text-center flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-4 border-gray-200 border-t-teal-500 rounded-full animate-spin" />
+              <span>{t('common.message.loading')}</span>
+            </div>
           </div>
-        ) : filteredAttributes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
+        ) : attributes.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-16 text-center">
             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
               <Settings className="text-gray-300" size={32} />
             </div>
-            <p className="text-gray-500 font-medium">
-              {searchQuery ? t('common.empty.no_results') : t('common.empty.no_data')}
-            </p>
-            {!searchQuery && (
-              <p className="text-sm text-gray-400 mt-1">
-                {t('settings.attribute.hint.add_first')}
-              </p>
-            )}
+            <p className="text-gray-500 font-medium">{t('common.empty.no_data')}</p>
+            <p className="text-sm text-gray-400 mt-1">{t('settings.attribute.hint.add_first')}</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {filteredAttributes.map((attr) => {
-              const attrId = String(attr.id);
-              const isExpanded = expandedAttributes.has(attrId);
-              const options = [...(allOptions.get(attrId) || [])].sort((a, b) => a.display_order - b.display_order);
+          <>
+            {/* Left Panel - Attribute List */}
+            <div className="w-72 border-r border-gray-100 bg-gray-50/50 flex flex-col shrink-0">
+              {/* Search */}
+              <div className="p-3 border-b border-gray-100">
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t('common.hint.search_placeholder')}
+                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400"
+                  />
+                </div>
+              </div>
 
-              return (
-                <div
-                  key={attrId}
-                  className="transition-all hover:bg-teal-50/30 group"
-                >
-                  {/* Attribute Header */}
-                  <div
-                    onClick={() => toggleAttribute(attrId)}
-                    className={`p-4 cursor-pointer transition-colors ${isExpanded ? 'bg-teal-50/50' : ''}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        {/* Expand Icon */}
-                        <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
-                           <ChevronRight size={18} className={`shrink-0 ${isExpanded ? 'text-teal-500' : 'text-gray-400'}`} />
-                        </div>
+              {/* Attribute List */}
+              <div className="flex-1 overflow-y-auto">
+                {filteredAttributes.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-gray-400">
+                    {t('common.empty.no_results')}
+                  </div>
+                ) : (
+                  <div className="py-1">
+                    {filteredAttributes.map((attr) => {
+                      const attrId = String(attr.id);
+                      const isSelected = selectedAttributeId === attrId;
+                      const { hasPrice, hasQuantity } = getAttributeFeatures(attr);
+                      const optionCount = attr.options?.length ?? 0;
 
-                        {/* Attribute Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className={`font-medium text-sm md:text-base ${isExpanded ? 'text-teal-900' : 'text-gray-900'}`}>
+                      return (
+                        <div
+                          key={attrId}
+                          onClick={() => setSelectedAttributeId(attrId)}
+                          className={`
+                            mx-2 my-1 px-3 py-2.5 rounded-lg cursor-pointer transition-all
+                            ${isSelected
+                              ? 'bg-teal-50 border-l-3 border-l-teal-500 shadow-sm'
+                              : 'hover:bg-white border-l-3 border-l-transparent'
+                            }
+                          `}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className={`font-medium text-sm truncate ${isSelected ? 'text-teal-900' : 'text-gray-800'}`}>
                               {attr.name}
                             </h3>
-                            <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">
+                            <div className="flex items-center gap-1 shrink-0">
+                              {hasQuantity && (
+                                <Hash size={12} className="text-purple-500" />
+                              )}
+                              {hasPrice && (
+                                <DollarSign size={12} className="text-orange-500" />
+                              )}
+                              {attr.show_on_kitchen_print && (
+                                <ChefHat size={12} className="text-purple-400" />
+                              )}
+                              {attr.show_on_receipt && (
+                                <ReceiptText size={12} className="text-blue-400" />
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                            <span className={`px-1.5 py-0.5 rounded ${isSelected ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'}`}>
                               {attr.is_multi_select ? t('settings.attribute.type.multi_select') : t('settings.attribute.type.single_select')}
                             </span>
-                            {!attr.is_active && (
-                              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
-                                {t('common.status.inactive')}
-                              </span>
-                            )}
-                            <span className="text-xs text-gray-400">
-                              · {attr.options?.length ?? 0} {t('settings.attribute.option.title')}
-                            </span>
-                            {attr.show_on_receipt && (
-                              <span className="text-xs text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                <ReceiptText size={10} />
-                                {attr.receipt_name || t('settings.attribute.show_on_receipt')}
-                              </span>
-                            )}
-                            {attr.show_on_kitchen_print && (
-                              <span className="text-xs text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                <ChefHat size={10} />
-                                {attr.kitchen_print_name || t('settings.attribute.show_on_kitchen_print')}
-                              </span>
-                            )}
+                            <span>· {optionCount} {t('settings.attribute.option.title')}</span>
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <ProtectedGate permission={Permission.MENU_MANAGE}>
-                            <button
-                              onClick={(e) => handleAddOption(attrId, e)}
-                              className="p-2 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors"
-                              title={t('settings.attribute.option.add_option')}
-                            >
-                              <Plus size={16} />
-                            </button>
-                          </ProtectedGate>
-                          <ProtectedGate permission={Permission.MENU_MANAGE}>
-                            <button
-                              onClick={(e) => handleEditAttribute(attr, e)}
-                              className="p-2 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                            >
-                              <Edit size={16} />
-                            </button>
-                          </ProtectedGate>
-                          <ProtectedGate permission={Permission.MENU_MANAGE}>
-                            <button
-                              onClick={(e) => handleDeleteAttribute(attr, e)}
-                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </ProtectedGate>
+            {/* Right Panel - Option Detail */}
+            <div className="flex-1 flex flex-col min-w-0">
+              {!selectedAttribute ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                  <List size={32} className="mb-2 text-gray-300" />
+                  <p className="text-sm">{t('settings.attribute.hint.select_attribute')}</p>
+                </div>
+              ) : (
+                <>
+                  {/* Attribute Header */}
+                  <div className="p-4 border-b border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-semibold text-gray-900">{selectedAttribute.name}</h2>
+                        <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+                          <span className="px-2 py-0.5 bg-teal-50 text-teal-700 rounded font-medium text-xs">
+                            {selectedAttribute.is_multi_select ? t('settings.attribute.type.multi_select') : t('settings.attribute.type.single_select')}
+                          </span>
+                          {selectedAttribute.show_on_receipt && (
+                            <span className="flex items-center gap-1 text-blue-600">
+                              <ReceiptText size={12} />
+                              {selectedAttribute.receipt_name || t('settings.attribute.show_on_receipt')}
+                            </span>
+                          )}
+                          {selectedAttribute.show_on_kitchen_print && (
+                            <span className="flex items-center gap-1 text-purple-600">
+                              <ChefHat size={12} />
+                              {selectedAttribute.kitchen_print_name || t('settings.attribute.show_on_kitchen_print')}
+                            </span>
+                          )}
                         </div>
                       </div>
+                      <ProtectedGate permission={Permission.MENU_MANAGE}>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEditAttribute(selectedAttribute)}
+                            className="px-3 py-1.5 text-sm text-gray-600 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors flex items-center gap-1"
+                          >
+                            <Edit size={14} />
+                            {t('common.action.edit')}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAttribute(selectedAttribute)}
+                            className="px-3 py-1.5 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1"
+                          >
+                            <Trash2 size={14} />
+                            {t('common.action.delete')}
+                          </button>
+                        </div>
+                      </ProtectedGate>
                     </div>
                   </div>
 
-                  {/* Options List (Expanded) */}
-                  {isExpanded && (
-                    <div className="border-t border-gray-100 bg-gray-50/30">
-                      {options.length === 0 ? (
-                        <div className="p-6 text-sm text-gray-400 text-center flex flex-col items-center justify-center border-dashed border-2 border-gray-100 m-3 rounded-xl">
-                          <span className="mb-1.5 block text-gray-300"><List size={20} /></span>
-                          {t('common.empty.no_data')}
+                  {/* Options List Header */}
+                  <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
+                    <h3 className="font-medium text-gray-700 text-sm">{t('settings.attribute.option.title')}</h3>
+                    <ProtectedGate permission={Permission.MENU_MANAGE}>
+                      <button
+                        onClick={handleAddOption}
+                        className="px-3 py-1.5 text-sm bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors flex items-center gap-1"
+                      >
+                        <Plus size={14} />
+                        {t('settings.attribute.option.add_option')}
+                      </button>
+                    </ProtectedGate>
+                  </div>
+
+                  {/* Options List */}
+                  <div className="flex-1 overflow-y-auto p-4">
+                    {selectedOptions.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl text-gray-400">
+                        <List size={24} className="mb-2 text-gray-300" />
+                        <p className="text-sm">{t('common.empty.no_data')}</p>
+                        <ProtectedGate permission={Permission.MENU_MANAGE}>
                           <button
-                            onClick={(e) => handleAddOption(attrId, e)}
-                            className="mt-1.5 text-teal-600 hover:text-teal-700 font-medium text-xs hover:underline"
+                            onClick={handleAddOption}
+                            className="mt-2 text-teal-600 hover:text-teal-700 text-sm font-medium hover:underline"
                           >
                             {t('settings.attribute.option.hint.add_first')}
                           </button>
-                        </div>
-                      ) : (
-                        <div className="py-1.5 px-3">
-                          {options.map((option) => {
-                            const isDefault = attr.default_option_indices?.includes(option.index) ?? false;
-                            const hasPriceMod = option.price_modifier !== 0;
-                            return (
-                              <div
-                                key={option.index}
-                                className={`flex items-center gap-2 px-3 py-2 rounded-lg my-0.5 group/opt transition-colors ${
-                                  isDefault ? 'bg-amber-50/60' : 'hover:bg-white'
-                                }`}
-                              >
-                                {/* Default star */}
+                        </ProtectedGate>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {selectedOptions.map((option) => {
+                          const isDefault = selectedAttribute.default_option_indices?.includes(option.index) ?? false;
+                          const hasPriceMod = option.price_modifier !== 0;
+                          const hasQuantityControl = option.enable_quantity;
+
+                          return (
+                            <div
+                              key={option.index}
+                              className={`
+                                p-3 rounded-lg border transition-colors group
+                                ${isDefault ? 'bg-amber-50/50 border-amber-200' : 'bg-white border-gray-200 hover:border-gray-300'}
+                              `}
+                            >
+                              {/* Row 1: Name + Price + Actions */}
+                              <div className="flex items-center gap-2">
                                 <ProtectedGate permission={Permission.MENU_MANAGE}>
                                   <button
-                                    onClick={(e) => handleToggleDefault(attr, option.index, e)}
-                                    className={`shrink-0 p-0.5 rounded transition-colors ${
-                                      isDefault
-                                        ? 'text-amber-500 hover:text-amber-600'
-                                        : 'text-gray-300 hover:text-amber-400'
+                                    onClick={() => handleToggleDefault(selectedAttribute, option.index)}
+                                    className={`shrink-0 p-1 rounded transition-colors ${
+                                      isDefault ? 'text-amber-500 hover:text-amber-600' : 'text-gray-300 hover:text-amber-400'
                                     }`}
                                     title={isDefault ? t('settings.attribute.option.unset_default') : t('settings.attribute.option.set_default')}
                                   >
-                                    <Star size={14} fill={isDefault ? 'currentColor' : 'none'} />
+                                    <Star size={16} fill={isDefault ? 'currentColor' : 'none'} />
                                   </button>
                                 </ProtectedGate>
 
-                                {/* Option name */}
-                                <span className={`text-sm font-medium min-w-0 truncate ${isDefault ? 'text-gray-800' : 'text-gray-700'}`}>
+                                <span className={`font-medium ${isDefault ? 'text-gray-900' : 'text-gray-800'}`}>
                                   {option.name}
                                 </span>
 
-                                {/* Price modifier (only non-zero) */}
-                                {hasPriceMod && (
-                                  <span
-                                    className={`text-xs font-semibold px-1.5 py-0.5 rounded-md shrink-0 ${
-                                      option.price_modifier > 0
-                                        ? 'bg-orange-50 text-orange-600 border border-orange-100'
-                                        : 'bg-green-50 text-green-600 border border-green-100'
-                                    }`}
-                                  >
-                                    {option.price_modifier > 0 ? '+' : ''}{formatCurrency(option.price_modifier)}
-                                  </span>
-                                )}
-
-                                {/* Inactive badge */}
                                 {!option.is_active && (
-                                  <span className="text-[0.625rem] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded shrink-0">
+                                  <span className="text-[0.625rem] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
                                     {t('common.status.inactive')}
                                   </span>
                                 )}
 
-                                {/* Spacer */}
                                 <div className="flex-1" />
 
-                                {/* ReceiptText / Kitchen print names */}
-                                {option.receipt_name && (
-                                  <span className="text-xs text-blue-500 flex items-center gap-0.5 shrink-0" title={t('settings.attribute.option.receipt_name')}>
-                                    <ReceiptText size={10} />
-                                    {option.receipt_name}
-                                  </span>
-                                )}
-                                {option.kitchen_print_name && (
-                                  <span className="text-xs text-purple-500 flex items-center gap-0.5 shrink-0" title={t('settings.attribute.option.kitchen_print_name')}>
-                                    <ChefHat size={10} />
-                                    {option.kitchen_print_name}
+                                {hasPriceMod && (
+                                  <span className={`text-sm font-semibold px-2 py-0.5 rounded ${
+                                    option.price_modifier > 0
+                                      ? 'bg-orange-50 text-orange-600 border border-orange-100'
+                                      : 'bg-green-50 text-green-600 border border-green-100'
+                                  }`}>
+                                    {option.price_modifier > 0 ? '+' : ''}{formatCurrency(option.price_modifier)}
                                   </span>
                                 )}
 
-                                {/* Actions */}
-                                <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/opt:opacity-100 transition-opacity">
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <ProtectedGate permission={Permission.MENU_MANAGE}>
                                     <button
-                                      onClick={(e) => handleEditOption(option, e)}
-                                      className="p-1 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-md transition-colors"
+                                      onClick={() => handleEditOption(option)}
+                                      className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-md transition-colors"
                                     >
-                                      <Edit size={13} />
+                                      <Edit size={14} />
                                     </button>
                                   </ProtectedGate>
                                   <ProtectedGate permission={Permission.MENU_MANAGE}>
                                     <button
-                                      onClick={(e) => handleDeleteOption(option, e)}
-                                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                      onClick={() => handleDeleteOption(option)}
+                                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                                     >
-                                      <Trash2 size={13} />
+                                      <Trash2 size={14} />
                                     </button>
                                   </ProtectedGate>
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+
+                              {/* Row 2: Quantity Control (if enabled) */}
+                              {hasQuantityControl && (
+                                <div className="mt-2 flex items-center gap-2 text-xs text-purple-600">
+                                  <Hash size={12} />
+                                  <span>{t('settings.attribute.option.quantity_control')}: 1~{option.max_quantity ?? 99}</span>
+                                </div>
+                              )}
+
+                              {/* Row 3: Receipt/Kitchen names (if any) */}
+                              {(option.receipt_name || option.kitchen_print_name) && (
+                                <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                                  {option.receipt_name && (
+                                    <span className="flex items-center gap-1 text-blue-500">
+                                      <ReceiptText size={11} />
+                                      {option.receipt_name}
+                                    </span>
+                                  )}
+                                  {option.kitchen_print_name && (
+                                    <span className="flex items-center gap-1 text-purple-500">
+                                      <ChefHat size={11} />
+                                      {option.kitchen_print_name}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -476,15 +515,14 @@ export const AttributeManagement: React.FC = React.memo(() => {
         />
       )}
 
-      {optionFormOpen && selectedAttributeForOption && (
+      {optionFormOpen && selectedAttributeId && (
         <OptionForm
           isOpen={optionFormOpen}
           onClose={() => {
             setOptionFormOpen(false);
             setEditingOption(null);
-            setSelectedAttributeForOption(null);
           }}
-          attributeId={selectedAttributeForOption}
+          attributeId={selectedAttributeId}
           editingOption={editingOption}
         />
       )}
