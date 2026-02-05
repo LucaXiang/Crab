@@ -49,15 +49,12 @@ pub struct PriceRule {
     #[serde(default, with = "serde_helpers::option_record_id")]
     pub target: Option<RecordId>,
     /// Zone scope: "zone:all", "zone:retail", or specific zone ID like "zone:xxx"
-    #[serde(default = "default_zone_scope")]
     pub zone_scope: String,
     pub adjustment_type: AdjustmentType,
     /// Adjustment value (percentage: 30=30%, fixed: amount in currency unit e.g. 5.00)
     pub adjustment_value: f64,
-    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_stackable: bool,
     /// Whether this rule is exclusive (cannot be combined with other rules)
-    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_exclusive: bool,
     /// Valid from datetime (Unix timestamp millis)
     pub valid_from: Option<i64>,
@@ -69,24 +66,11 @@ pub struct PriceRule {
     pub active_start_time: Option<String>,
     /// Active end time (HH:MM format)
     pub active_end_time: Option<String>,
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_active: bool,
     #[serde(default, with = "serde_helpers::option_record_id")]
     pub created_by: Option<RecordId>,
     /// Created datetime (Unix timestamp millis)
-    #[serde(default)]
     pub created_at: i64,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-fn default_zone_scope() -> String {
-    ZONE_SCOPE_ALL.to_string()
 }
 
 /// Create price rule payload

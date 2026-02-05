@@ -144,6 +144,8 @@ pub async fn login(
             role_name: role.name,
             permissions: role.permissions,
             is_system: employee.is_system,
+            is_active: employee.is_active,
+            created_at: employee.created_at,
         },
     };
 
@@ -152,8 +154,25 @@ pub async fn login(
 
 /// Get current user info
 pub async fn me(
+    State(state): State<ServerState>,
     Extension(user): Extension<CurrentUser>,
 ) -> Result<Json<UserInfo>, AppError> {
+    // Query fresh employee data from database for is_active and created_at
+    let db = state.get_db();
+    let id_part = user.id.strip_prefix("employee:").unwrap_or(&user.id).to_string();
+    let mut result = db
+        .query("SELECT is_active, created_at FROM type::thing('employee', $id)")
+        .bind(("id", id_part))
+        .await
+        .map_err(|e| AppError::database(format!("Failed to query employee: {}", e)))?;
+
+    let employee_data: Option<(bool, i64)> = result
+        .take::<Option<Employee>>(0)
+        .map_err(|e| AppError::database(format!("Failed to parse employee: {}", e)))?
+        .map(|e| (e.is_active, e.created_at));
+
+    let (is_active, created_at) = employee_data.unwrap_or((true, 0));
+
     let user_info = UserInfo {
         id: user.id,
         username: user.username,
@@ -162,6 +181,8 @@ pub async fn me(
         role_name: user.role_name,
         permissions: user.permissions,
         is_system: user.is_system,
+        is_active,
+        created_at,
     };
 
     Ok(Json(user_info))
@@ -326,6 +347,8 @@ pub async fn escalate(
             role_name: role.name,
             permissions: role.permissions,
             is_system: employee.is_system,
+            is_active: employee.is_active,
+            created_at: employee.created_at,
         },
     };
 

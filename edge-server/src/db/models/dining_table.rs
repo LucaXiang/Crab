@@ -13,17 +13,8 @@ pub struct DiningTable {
     /// Zone reference
     #[serde(with = "serde_helpers::record_id")]
     pub zone: RecordId,
-    #[serde(default)]
     pub capacity: i32,
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_active: bool,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 /// Create dining table payload

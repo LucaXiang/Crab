@@ -13,18 +13,13 @@ pub type ProductId = RecordId;
 pub struct EmbeddedSpec {
     pub name: String,
     /// Price in currency unit (e.g., 10.50 = ¥10.50)
-    #[serde(default)]
     pub price: f64,
-    #[serde(default)]
     pub display_order: i32,
-    #[serde(default)]
     pub is_default: bool,
-    #[serde(default = "default_true")]
     pub is_active: bool,
     /// Receipt display name (e.g., "L", "M", "大杯")
     pub receipt_name: Option<String>,
     /// Root spec, cannot be deleted (each product must have at least one)
-    #[serde(default)]
     pub is_root: bool,
 }
 
@@ -34,45 +29,27 @@ pub struct Product {
     #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<ProductId>,
     pub name: String,
-    #[serde(default)]
     pub image: String,
     /// Record link to category
     #[serde(with = "serde_helpers::record_id")]
     pub category: RecordId,
-    #[serde(default)]
     pub sort_order: i32,
     /// Tax rate in percentage (e.g., 10 = 10%)
-    #[serde(default)]
     pub tax_rate: i32,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
-    #[serde(default = "default_inherit")]
     pub is_kitchen_print_enabled: i32,
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
-    #[serde(default = "default_inherit")]
     pub is_label_print_enabled: i32,
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_active: bool,
     /// 菜品编号 (POS 集成)
     pub external_id: Option<i64>,
     /// Array of record links to tags
-    #[serde(default, with = "serde_helpers::vec_record_id")]
+    #[serde(with = "serde_helpers::vec_record_id")]
     pub tags: Vec<RecordId>,
     /// 嵌入式规格数组
-    #[serde(default)]
     pub specs: Vec<EmbeddedSpec>,
-}
-
-fn default_inherit() -> i32 {
-    -1
-}
-
-fn default_true() -> bool {
-    true
 }
 
 impl Product {
@@ -166,27 +143,18 @@ pub struct ProductFull {
     #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<ProductId>,
     pub name: String,
-    #[serde(default)]
     pub image: String,
     #[serde(with = "serde_helpers::record_id")]
     pub category: RecordId,
-    #[serde(default)]
     pub sort_order: i32,
     /// Tax rate in percentage (e.g., 10 = 10%)
-    #[serde(default)]
     pub tax_rate: i32,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
     /// 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
-    #[serde(default = "default_inherit")]
     pub is_kitchen_print_enabled: i32,
     /// 标签打印启用状态 (-1=继承, 0=禁用, 1=启用)
-    #[serde(default = "default_inherit")]
     pub is_label_print_enabled: i32,
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_active: bool,
     /// 菜品编号 (POS 集成)
     pub external_id: Option<i64>,

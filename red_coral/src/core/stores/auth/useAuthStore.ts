@@ -66,7 +66,8 @@ export const useAuthStore = create<AuthStore>()(
             role_name: userData.role_name,
             permissions: userData.permissions,
             is_system: userData.is_system,
-            is_active: true,
+            is_active: userData.is_active,
+            created_at: userData.created_at,
           };
 
           set({

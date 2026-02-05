@@ -29,7 +29,6 @@ pub struct Shift {
     pub operator_name: String,
 
     /// 班次状态
-    #[serde(default)]
     pub status: ShiftStatus,
 
     /// 开班时间 (Unix timestamp millis)
@@ -39,11 +38,9 @@ pub struct Shift {
     pub end_time: Option<i64>,
 
     /// 备用金 (开班时的现金准备金)
-    #[serde(default)]
     pub starting_cash: f64,
 
     /// 预期现金 (starting_cash + 班次内现金收款)
-    #[serde(default)]
     pub expected_cash: f64,
 
     /// 实际现金 (收班时盘点)
@@ -53,7 +50,6 @@ pub struct Shift {
     pub cash_variance: Option<f64>,
 
     /// 是否异常关闭 (断电/崩溃)
-    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub abnormal_close: bool,
 
     /// 最后活动时间 (心跳)

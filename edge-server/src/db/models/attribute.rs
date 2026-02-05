@@ -14,29 +14,17 @@ pub type AttributeId = RecordId;
 pub struct AttributeOption {
     pub name: String,
     /// Price modifier in currency unit (positive=add, negative=subtract, e.g., 2.50 = €2.50)
-    #[serde(default)]
     pub price_modifier: f64,
-    #[serde(default)]
     pub display_order: i32,
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_active: bool,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
 
     // === Quantity Control ===
     /// Enable quantity control for this option (default: false)
-    #[serde(default)]
     pub enable_quantity: bool,
     /// Maximum quantity allowed (only effective when enable_quantity=true)
-    #[serde(default)]
     pub max_quantity: Option<i32>,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 impl AttributeOption {
@@ -62,7 +50,6 @@ pub struct Attribute {
     pub name: String,
 
     // 选择模式
-    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_multi_select: bool,
     /// Max selections (null = unlimited)
     pub max_selections: Option<i32>,
@@ -71,26 +58,18 @@ pub struct Attribute {
     pub default_option_indices: Option<Vec<i32>>,
 
     // 显示
-    #[serde(default)]
     pub display_order: i32,
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_active: bool,
 
     // 小票
-    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub show_on_receipt: bool,
     pub receipt_name: Option<String>,
 
     // 厨打
-    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub show_on_kitchen_print: bool,
     pub kitchen_print_name: Option<String>,
 
     /// Embedded options (Graph DB style - no join table)
-    #[serde(default)]
     pub options: Vec<AttributeOption>,
 }
 
@@ -162,9 +141,7 @@ pub struct AttributeBinding {
     pub from: RecordId, // product or category
     #[serde(rename = "out", with = "serde_helpers::record_id")]
     pub to: RecordId, // attribute
-    #[serde(default)]
     pub is_required: bool,
-    #[serde(default)]
     pub display_order: i32,
     /// Override attribute's default options (supports multi-select)
     pub default_option_indices: Option<Vec<i32>>,
@@ -182,7 +159,6 @@ pub struct AttributeBindingFull {
     pub display_order: i32,
     /// Override attribute's default options (supports multi-select)
     pub default_option_indices: Option<Vec<i32>>,
-    /// Whether this binding is inherited from the product's category
-    #[serde(default)]
+    /// Whether this binding is inherited from the product's category (computed field, not from DB)
     pub is_inherited: bool,
 }

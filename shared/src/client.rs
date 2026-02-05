@@ -31,10 +31,10 @@ pub struct UserInfo {
     pub display_name: String,
     pub role_id: String,
     pub role_name: String,
-    #[serde(default)]
     pub permissions: Vec<String>,
-    #[serde(default)]
     pub is_system: bool,
+    pub is_active: bool,
+    pub created_at: i64,
 }
 
 /// Current user response (same as UserInfo)

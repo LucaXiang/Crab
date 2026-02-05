@@ -12,53 +12,26 @@ pub struct Category {
     #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<CategoryId>,
     pub name: String,
-    #[serde(default)]
     pub sort_order: i32,
     /// Kitchen print destination references
-    #[serde(default, with = "serde_helpers::vec_record_id")]
+    #[serde(with = "serde_helpers::vec_record_id")]
     pub kitchen_print_destinations: Vec<RecordId>,
     /// Label print destination references
-    #[serde(default, with = "serde_helpers::vec_record_id")]
+    #[serde(with = "serde_helpers::vec_record_id")]
     pub label_print_destinations: Vec<RecordId>,
     /// Whether kitchen printing is enabled for this category
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_kitchen_print_enabled: bool,
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_label_print_enabled: bool,
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_active: bool,
     /// Whether this is a virtual category (filters by tags instead of direct assignment)
-    #[serde(default)]
     pub is_virtual: bool,
     /// Tag IDs for virtual category filtering
-    #[serde(default, with = "serde_helpers::vec_record_id")]
+    #[serde(with = "serde_helpers::vec_record_id")]
     pub tag_ids: Vec<RecordId>,
     /// Match mode for virtual category: "any" or "all"
-    #[serde(default = "default_match_mode")]
     pub match_mode: String,
     /// Whether to display this category in POS (for virtual categories)
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_display: bool,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-fn default_match_mode() -> String {
-    "any".to_string()
 }
 
 impl Category {

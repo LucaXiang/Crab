@@ -162,6 +162,8 @@ export interface UserInfo {
   role_name: string;
   permissions: string[];
   is_system: boolean;
+  is_active: boolean;
+  created_at: number;
 }
 
 export interface EmployeeSession {

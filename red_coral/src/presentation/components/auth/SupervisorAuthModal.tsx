@@ -12,6 +12,8 @@ interface EscalateAuthorizer {
   role_name: string;
   permissions: string[];
   is_system: boolean;
+  is_active: boolean;
+  created_at: number;
 }
 
 interface SupervisorAuthModalProps {
@@ -60,8 +62,9 @@ export const SupervisorAuthModal: React.FC<SupervisorAuthModalProps> = ({
         role_id: authorizer.role_id,
         role_name: authorizer.role_name,
         permissions: authorizer.permissions,
-        is_active: true,
+        is_active: authorizer.is_active,
         is_system: authorizer.is_system,
+        created_at: authorizer.created_at,
       };
 
       onSuccess(supervisor);

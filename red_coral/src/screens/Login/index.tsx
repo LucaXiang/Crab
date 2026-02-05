@@ -111,7 +111,8 @@ export const LoginScreen: React.FC = () => {
           role_name: userInfo.role_name,
           permissions: userInfo.permissions,
           is_system: userInfo.is_system,
-          is_active: true,
+          is_active: userInfo.is_active,
+          created_at: userInfo.created_at,
         });
 
         // Navigation handled by useEffect

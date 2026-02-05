@@ -528,9 +528,7 @@ export interface User {
   permissions: string[];
   is_system: boolean;
   is_active: boolean;
-  // 可选字段（后端可能不返回）
-  created_at?: number;
-  updated_at?: number;
+  created_at: number;
 }
 
 // ============ Product/Category Attribute Bindings ============

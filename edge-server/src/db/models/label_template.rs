@@ -52,7 +52,6 @@ pub struct LabelField {
     /// Height in mm
     pub height: f32,
     /// Font size
-    #[serde(default = "default_font_size")]
     pub font_size: i32,
     /// Font weight (e.g., "normal", "bold")
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -75,7 +74,6 @@ pub struct LabelField {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
     /// Whether the field is visible
-    #[serde(default = "default_true")]
     pub visible: bool,
     /// UI-specific: label text
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -106,10 +104,6 @@ pub struct LabelField {
     pub line_style: Option<String>,
 }
 
-fn default_font_size() -> i32 {
-    10
-}
-
 fn default_true() -> bool {
     true
 }
@@ -129,13 +123,10 @@ pub struct LabelTemplate {
     /// Label height in mm
     pub height: f32,
     /// Template fields
-    #[serde(default)]
     pub fields: Vec<LabelField>,
     /// Is default template
-    #[serde(default)]
     pub is_default: bool,
     /// Is active
-    #[serde(default = "default_true")]
     pub is_active: bool,
     /// Created timestamp
     pub created_at: Option<i64>,

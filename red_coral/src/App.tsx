@@ -64,7 +64,8 @@ const useAppInitialization = () => {
             role_name: session.user_info.role_name,
             permissions: session.user_info.permissions,
             is_system: session.user_info.is_system,
-            is_active: true,
+            is_active: session.user_info.is_active,
+            created_at: session.user_info.created_at,
           };
           useAuthStore.getState().setUser(user);
         } else {

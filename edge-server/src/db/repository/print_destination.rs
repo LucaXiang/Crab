@@ -78,7 +78,7 @@ impl PrintDestinationRepository {
             name: data.name,
             description: data.description,
             printers: data.printers,
-            is_active: data.is_active,
+            is_active: data.is_active.unwrap_or(true),
         };
 
         let created: Option<PrintDestination> = self.base.db().create(TABLE).content(item).await?;

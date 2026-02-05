@@ -11,15 +11,7 @@ pub struct Zone {
     pub id: Option<RecordId>,
     pub name: String,
     pub description: Option<String>,
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_active: bool,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 /// Create zone payload

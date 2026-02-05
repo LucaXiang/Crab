@@ -20,19 +20,10 @@ pub struct Employee {
     pub hash_pass: String,
     #[serde(with = "serde_helpers::record_id")]
     pub role: RoleId,
-    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_system: bool,
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_active: bool,
     /// Created timestamp (Unix millis)
     pub created_at: i64,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 /// Create employee payload

@@ -12,26 +12,11 @@ pub struct Tag {
     #[serde(default, with = "serde_helpers::option_record_id")]
     pub id: Option<TagId>,
     pub name: String,
-    #[serde(default = "default_color")]
     pub color: String,
-    #[serde(default)]
     pub display_order: i32,
-    #[serde(
-        default = "default_true",
-        deserialize_with = "serde_helpers::bool_true"
-    )]
     pub is_active: bool,
     /// System tag (e.g., "热卖", "新品"), cannot be deleted
-    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
     pub is_system: bool,
-}
-
-fn default_color() -> String {
-    "#3B82F6".to_string()
-}
-
-fn default_true() -> bool {
-    true
 }
 
 impl Tag {
@@ -39,7 +24,7 @@ impl Tag {
         Self {
             id: None,
             name,
-            color: default_color(),
+            color: "#3B82F6".to_string(),
             display_order: 0,
             is_active: true,
             is_system: false,
