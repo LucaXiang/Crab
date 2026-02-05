@@ -28,7 +28,7 @@ interface CategoryListProps {
   isVirtual: boolean;
   searchQuery: string;
   themeColor: 'teal' | 'purple';
-  onProductOrder: (categoryName: string) => void;
+  onProductOrder: (category: { id: string; name: string }) => void;
 }
 
 const CategoryList: React.FC<CategoryListProps> = React.memo(({
@@ -178,7 +178,7 @@ const CategoryList: React.FC<CategoryListProps> = React.memo(({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onProductOrder(item.name);
+              onProductOrder({ id: item.id, name: item.name });
             }}
             disabled={!canManageCategories}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
@@ -233,8 +233,9 @@ export const CategoryManagement: React.FC = React.memo(() => {
   const [searchQuery, setSearchQuery] = useState('');
   const [productOrderModal, setProductOrderModal] = useState<{
     isOpen: boolean;
-    category: string;
-  }>({ isOpen: false, category: '' });
+    categoryId: string;
+    categoryName: string;
+  }>({ isOpen: false, categoryId: '', categoryName: '' });
 
   // Load data on mount and when dataVersion changes
   useEffect(() => {
@@ -375,7 +376,7 @@ export const CategoryManagement: React.FC = React.memo(() => {
           isVirtual={false}
           searchQuery={searchQuery}
           themeColor="teal"
-          onProductOrder={(name) => setProductOrderModal({ isOpen: true, category: name })}
+          onProductOrder={(cat) => setProductOrderModal({ isOpen: true, categoryId: cat.id, categoryName: cat.name })}
         />
       ) : (
         <CategoryList
@@ -385,13 +386,14 @@ export const CategoryManagement: React.FC = React.memo(() => {
           isVirtual={true}
           searchQuery={searchQuery}
           themeColor="purple"
-          onProductOrder={(name) => setProductOrderModal({ isOpen: true, category: name })}
+          onProductOrder={(cat) => setProductOrderModal({ isOpen: true, categoryId: cat.id, categoryName: cat.name })}
         />
       )}
 
       <ProductOrderModal
         isOpen={productOrderModal.isOpen}
-        category={productOrderModal.category}
+        categoryId={productOrderModal.categoryId}
+        categoryName={productOrderModal.categoryName}
         onClose={() => setProductOrderModal({ ...productOrderModal, isOpen: false })}
       />
     </div>

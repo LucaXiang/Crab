@@ -61,14 +61,16 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ id, product }
           className="w-full h-full object-cover pointer-events-none group-hover:scale-105 transition-transform duration-500 ease-out"
           onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
         />
-        {/* Sort Order Tag - Bottom Left Black/White */}
-        <div className="absolute bottom-1 left-1 z-10">
-           <div className="bg-black/80 backdrop-blur-[1px] px-1.5 py-0.5 rounded shadow-sm min-w-[1.25rem] flex items-center justify-center">
-             <span className="text-[0.625rem] text-white font-medium font-mono leading-none">
-               {product.sort_order}
-             </span>
-           </div>
-        </div>
+        {/* External ID Tag - Bottom Left Black/White */}
+        {product.external_id != null && (
+          <div className="absolute bottom-1 left-1 z-10">
+            <div className="bg-black/80 backdrop-blur-[1px] px-1.5 py-0.5 rounded shadow-sm min-w-[1.25rem] flex items-center justify-center">
+              <span className="text-[0.625rem] text-white font-medium font-mono leading-none">
+                {product.external_id}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
       
       <div className="flex-1 flex items-center w-full p-2.5 bg-white">
@@ -94,13 +96,15 @@ const DragOverlayProductItem: React.FC<{ product: Product }> = ({ product }) => 
           className="w-full h-full object-cover pointer-events-none"
           onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
         />
-        <div className="absolute bottom-1 left-1 z-10">
-          <div className="bg-black/80 backdrop-blur-[1px] px-1.5 py-0.5 rounded shadow-sm min-w-[1.25rem] flex items-center justify-center">
-            <span className="text-[0.625rem] text-white font-medium font-mono leading-none">
-              {product.sort_order}
-            </span>
+        {product.external_id != null && (
+          <div className="absolute bottom-1 left-1 z-10">
+            <div className="bg-black/80 backdrop-blur-[1px] px-1.5 py-0.5 rounded shadow-sm min-w-[1.25rem] flex items-center justify-center">
+              <span className="text-[0.625rem] text-white font-medium font-mono leading-none">
+                {product.external_id}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
       <div className="flex-1 flex items-center w-full p-2.5 bg-white">
         <span className="font-medium text-gray-700 text-xs text-left line-clamp-2 leading-tight w-full">
@@ -114,10 +118,11 @@ const DragOverlayProductItem: React.FC<{ product: Product }> = ({ product }) => 
 interface ProductOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
-  category: string;
+  categoryId: string;
+  categoryName: string;
 }
 
-export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, category, onClose }) => {
+export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, categoryId, categoryName, onClose }) => {
   const { t } = useI18n();
   const allStoreProducts = useProducts() as Product[];
   const [products, setProducts] = useState<Product[]>([]);
@@ -136,13 +141,15 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
     })
   );
 
-  // Initialize local products from store (filtered by category)
+  // Initialize local products from store (filtered by category, sorted by sort_order)
   useEffect(() => {
-    if (isOpen && category) {
-      const filtered = allStoreProducts.filter(p => p.category === category);
+    if (isOpen && categoryId) {
+      const filtered = allStoreProducts
+        .filter(p => p.category === categoryId)
+        .sort((a, b) => a.sort_order - b.sort_order);
       setProducts(filtered);
     }
-  }, [isOpen, category, allStoreProducts]);
+  }, [isOpen, categoryId, allStoreProducts]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -198,7 +205,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
             </h3>
             <div className="flex items-center gap-3 mt-2">
                <span className="px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 text-xs font-semibold border border-teal-100">
-                 {category}
+                 {categoryName}
                </span>
                <p className="text-xs text-gray-400">
                 {t('settings.drag_to_reorder')}
