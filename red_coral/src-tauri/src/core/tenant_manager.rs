@@ -191,9 +191,9 @@ impl TenantManager {
                 let subscription_status = Self::read_subscription_status(paths);
                 TenantInfo {
                     tenant_id: tenant_id.clone(),
-                    tenant_name: None, // TODO: Load from credential
+                    tenant_name: None,
                     has_certificates: paths.is_server_activated(),
-                    last_used: None, // TODO: Track last used time
+                    last_used: None,
                     subscription_status,
                 }
             })

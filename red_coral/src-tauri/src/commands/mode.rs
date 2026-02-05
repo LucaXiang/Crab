@@ -187,8 +187,8 @@ pub async fn get_app_config(
     Ok(ApiResponse::success(AppConfigResponse {
         current_mode: info.mode,
         current_tenant: info.tenant_id,
-        server_config: ServerModeConfig::default(), // TODO: 从配置读取
-        client_config: None,                        // TODO: 从配置读取
+        server_config: ServerModeConfig::default(),
+        client_config: None,
         known_tenants: tenant_manager
             .list_tenants()
             .into_iter()

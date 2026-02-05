@@ -64,11 +64,8 @@ class Logger {
 
     this.log('error', message, errorContext);
 
-    // 生产环境可以发送到错误监控服务
-    if (!this.isDev) {
-      // TODO: 集成Sentry或其他错误监控服务
-      // Sentry.captureException(error, { extra: errorContext });
-    }
+    // 局域网部署：本地日志足够，无需 Sentry
+    // 如需云端监控可在此集成
   }
 
   /**

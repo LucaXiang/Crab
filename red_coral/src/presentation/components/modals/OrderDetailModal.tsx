@@ -4,6 +4,7 @@ import { useHistoryOrderDetail } from '@/hooks/useHistoryOrderDetail';
 import { useI18n } from '@/hooks/useI18n';
 import { HistoryDetail } from '@/screens/History/HistoryDetail';
 import { toast } from '@/presentation/components/Toast';
+import { getErrorMessage } from '@/utils/error';
 
 interface OrderDetailModalProps {
   isOpen: boolean;
@@ -21,9 +22,14 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleReprint = () => {
-    // TODO: Implement reprint logic or connect to printer service
-    toast.success(t('common.message.sent_to_printer'));
+  const handleReprint = async () => {
+    if (!order) return;
+    try {
+      const { reprintReceipt } = await import('@/infrastructure/print/printService');
+      await reprintReceipt(order.order_id);
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
   };
 
   if (loading) {

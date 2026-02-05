@@ -19,6 +19,8 @@ import { SupervisorAuthModal } from '@/presentation/components/auth/SupervisorAu
 import { usePermission } from '@/hooks/usePermission';
 import { Permission } from '@/core/domain/types';
 import { useCheckoutActions } from '@/core/stores/order/useCheckoutStore';
+import { toast } from '@/presentation/components/Toast';
+import { getErrorMessage } from '@/utils/error';
 
 interface CheckoutScreenProps {
   order: HeldOrder;
@@ -111,9 +113,8 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       const response = await voidOrder(orderKey, options);
 
       if (!response.success) {
-        // Display error to user
         console.error('Void order failed:', response.error);
-        // TODO: Add toast notification
+        toast.error(getErrorMessage(response.error));
         setIsVoidModalOpen(false);
         return;
       }

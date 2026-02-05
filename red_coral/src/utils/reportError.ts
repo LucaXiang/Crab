@@ -53,6 +53,6 @@ export async function reportError(
     Object.assign(payload, options.extras);
   }
 
-  // TODO: 错误上报功能待实现后端支持
+  // 局域网部署：使用本地日志即可，无需云端上报
   console.error('[reportError]', payload);
 }

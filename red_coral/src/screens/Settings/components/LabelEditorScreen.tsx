@@ -368,8 +368,8 @@ export const LabelEditorScreen: React.FC<LabelEditorScreenProps> = ({
           override_dpi: template.render_dpi
         };
 
-        // TODO: 标签打印功能已移至服务端，前端测试打印暂不可用
-        console.warn('[LabelEditor] 标签打印功能已由服务端处理，测试打印暂不可用', ticketData);
+        // TODO: 调用服务端标签打印 API 实现测试打印
+        console.warn('[LabelEditor] 待实现：调用服务端标签打印 API', ticketData);
         setDialogConfig({
           isOpen: true,
           title: t('common.message.success'),
