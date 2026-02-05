@@ -20,9 +20,9 @@ export const CategoryNav = React.memo<CategoryNavProps>(
 
     // Organize categories: [all] | [virtual categories] | [regular categories]
     const organizedCategories = useMemo(() => {
-      // Filter and sort virtual categories (is_virtual=true, is_active=true)
+      // Filter and sort virtual categories (is_virtual=true)
       const virtualCats = categories
-        .filter((c) => c.is_virtual && c.is_active)
+        .filter((c) => c.is_virtual)
         .sort((a, b) => a.sort_order - b.sort_order);
 
       // Filter and sort regular categories (is_virtual=false)
@@ -180,7 +180,6 @@ export const CategoryNav = React.memo<CategoryNavProps>(
         cat.id === next[idx].id &&
         cat.name === next[idx].name &&
         cat.is_virtual === next[idx].is_virtual &&
-        cat.is_active === next[idx].is_active &&
         cat.sort_order === next[idx].sort_order
       );
     };

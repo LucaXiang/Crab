@@ -24,7 +24,6 @@ export interface Tag {
   display_order: number;
   /** 系统标签 */
   is_system: boolean;
-  is_active: boolean;
 }
 
 export interface TagCreate {
@@ -37,7 +36,6 @@ export interface TagUpdate {
   name?: string;
   color?: string;
   display_order?: number;
-  is_active?: boolean;
 }
 
 // ============ Category ============
@@ -53,7 +51,6 @@ export interface Category {
   /** Whether kitchen printing is enabled for this category */
   is_kitchen_print_enabled: boolean;
   is_label_print_enabled: boolean;
-  is_active: boolean;
   /** Whether this is a virtual category (filters by tags instead of direct assignment) */
   is_virtual: boolean;
   /** Tag IDs for virtual category filtering */
@@ -94,7 +91,6 @@ export interface CategoryUpdate {
   /** Whether kitchen printing is enabled */
   is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
-  is_active?: boolean;
   /** Whether this is a virtual category */
   is_virtual?: boolean;
   /** Tag IDs for virtual category filtering */
@@ -211,7 +207,6 @@ export interface AttributeOption {
   /** Price modifier in currency unit (e.g., 2.50 = €2.50) */
   price_modifier: number;
   display_order: number;
-  is_active: boolean;
   receipt_name: string | null;
   kitchen_print_name: string | null;
   /** Enable quantity control for this option (default: false) */
@@ -227,7 +222,6 @@ export interface Attribute {
   max_selections: number | null;
   default_option_indices: number[] | null;
   display_order: number;
-  is_active: boolean;
   show_on_receipt: boolean;
   receipt_name: string | null;
   show_on_kitchen_print: boolean;
@@ -254,7 +248,6 @@ export interface AttributeUpdate {
   max_selections?: number | null;
   default_option_indices?: number[] | null;
   display_order?: number;
-  is_active?: boolean;
   show_on_receipt?: boolean;
   receipt_name?: string;
   show_on_kitchen_print?: boolean;
@@ -320,7 +313,6 @@ export interface Zone {
   id: string;
   name: string;
   description: string | null;
-  is_active: boolean;
 }
 
 export interface ZoneCreate {
@@ -331,7 +323,6 @@ export interface ZoneCreate {
 export interface ZoneUpdate {
   name?: string;
   description?: string;
-  is_active?: boolean;
 }
 
 // ============ Dining Table ============

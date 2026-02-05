@@ -14,7 +14,6 @@ pub struct Tag {
     pub name: String,
     pub color: String,
     pub display_order: i32,
-    pub is_active: bool,
     /// System tag (e.g., "热卖", "新品"), cannot be deleted
     pub is_system: bool,
 }
@@ -26,7 +25,6 @@ impl Tag {
             name,
             color: "#3B82F6".to_string(),
             display_order: 0,
-            is_active: true,
             is_system: false,
         }
     }
@@ -49,6 +47,4 @@ pub struct TagUpdate {
     pub color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_order: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_active: Option<bool>,
 }

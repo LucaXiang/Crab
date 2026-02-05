@@ -35,7 +35,7 @@ export const useCategoryActions = () => ({
 export const useVirtualCategories = () =>
   useCategoryStore((state) =>
     state.items
-      .filter((c) => c.is_virtual && c.is_active)
+      .filter((c) => c.is_virtual)
       .sort((a, b) => a.sort_order - b.sort_order)
   );
 
@@ -52,7 +52,7 @@ export const useCategoryByName = (name: string) =>
 // Static getters for non-hook usage
 export const getVirtualCategories = () =>
   useCategoryStore.getState().items
-    .filter((c) => c.is_virtual && c.is_active)
+    .filter((c) => c.is_virtual)
     .sort((a, b) => a.sort_order - b.sort_order);
 
 export const getRegularCategories = () =>

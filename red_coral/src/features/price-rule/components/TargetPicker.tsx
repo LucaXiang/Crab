@@ -43,13 +43,11 @@ export const TargetPicker: React.FC<TargetPickerProps> = ({
 
     switch (productScope) {
       case 'CATEGORY':
-        allItems = categories
-          .filter(c => c.is_active)
-          .map(c => ({
-            id: c.id,
-            name: c.name,
-            icon: Layers,
-          }));
+        allItems = categories.map(c => ({
+          id: c.id,
+          name: c.name,
+          icon: Layers,
+        }));
         break;
       case 'TAG':
         allItems = tags.map(tg => ({

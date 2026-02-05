@@ -45,9 +45,7 @@ export const ZonePicker: React.FC<ZonePickerProps> = ({
   ];
 
   // Custom zones from store
-  const customZoneOptions: ZoneOption[] = zones
-    .filter(z => z.is_active)
-    .map(z => ({
+  const customZoneOptions: ZoneOption[] = zones.map(z => ({
       value: `zone:${z.id.replace('zone:', '')}`,
       icon: Armchair,
       label: z.name,

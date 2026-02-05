@@ -200,7 +200,6 @@ impl From<ProductFull> for shared::models::ProductFull {
                     max_selections: b.attribute.max_selections,
                     default_option_indices: b.attribute.default_option_indices,
                     display_order: b.attribute.display_order,
-                    is_active: b.attribute.is_active,
                     show_on_receipt: b.attribute.show_on_receipt,
                     receipt_name: b.attribute.receipt_name,
                     show_on_kitchen_print: b.attribute.show_on_kitchen_print,
@@ -209,7 +208,6 @@ impl From<ProductFull> for shared::models::ProductFull {
                         name: o.name,
                         price_modifier: o.price_modifier,
                         display_order: o.display_order,
-                        is_active: o.is_active,
                         receipt_name: o.receipt_name,
                         kitchen_print_name: o.kitchen_print_name,
                         enable_quantity: o.enable_quantity,
@@ -226,7 +224,6 @@ impl From<ProductFull> for shared::models::ProductFull {
                 name: t.name,
                 color: t.color,
                 display_order: t.display_order,
-                is_active: t.is_active,
                 is_system: t.is_system,
             }).collect(),
         }

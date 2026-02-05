@@ -18,7 +18,6 @@ pub struct Category {
     #[serde(default)]
     pub is_kitchen_print_enabled: bool,
     pub is_label_print_enabled: bool,
-    pub is_active: bool,
     /// Whether this is a virtual category (filters by tags instead of direct assignment)
     #[serde(default)]
     pub is_virtual: bool,
@@ -71,7 +70,6 @@ pub struct CategoryUpdate {
     /// Whether kitchen printing is enabled
     pub is_kitchen_print_enabled: Option<bool>,
     pub is_label_print_enabled: Option<bool>,
-    pub is_active: Option<bool>,
     /// Whether this is a virtual category
     pub is_virtual: Option<bool>,
     /// Tag IDs for virtual category filtering

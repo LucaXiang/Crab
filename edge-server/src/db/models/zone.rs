@@ -11,7 +11,6 @@ pub struct Zone {
     pub id: Option<RecordId>,
     pub name: String,
     pub description: Option<String>,
-    pub is_active: bool,
 }
 
 /// Create zone payload
@@ -28,6 +27,4 @@ pub struct ZoneUpdate {
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_active: Option<bool>,
 }

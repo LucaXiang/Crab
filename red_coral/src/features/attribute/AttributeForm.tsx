@@ -14,7 +14,6 @@ interface AttributeFormData {
   isMultiSelect: boolean;
   maxSelections: number | null;
   displayOrder: number;
-  isActive: boolean;
   showOnReceipt: boolean;
   showOnKitchenPrint: boolean;
   kitchenPrintName: string;
@@ -29,7 +28,6 @@ const mapToFormData = (attr: Attribute | null): AttributeFormData => {
       isMultiSelect: false,
       maxSelections: null,
       displayOrder: 0,
-      isActive: true,
       showOnReceipt: false,
       showOnKitchenPrint: false,
       kitchenPrintName: '',
@@ -41,7 +39,6 @@ const mapToFormData = (attr: Attribute | null): AttributeFormData => {
     isMultiSelect: attr.is_multi_select,
     maxSelections: attr.max_selections ?? null,
     displayOrder: attr.display_order ?? 0,
-    isActive: attr.is_active ?? true,
     showOnReceipt: attr.show_on_receipt ?? false,
     showOnKitchenPrint: attr.show_on_kitchen_print ?? false,
     kitchenPrintName: attr.kitchen_print_name || '',
@@ -108,7 +105,6 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
           is_multi_select: data.isMultiSelect,
           max_selections: data.isMultiSelect ? data.maxSelections : null,
           display_order: data.displayOrder,
-          is_active: data.isActive,
           show_on_receipt: data.showOnReceipt,
           receipt_name: data.receiptName?.trim() || undefined,
           show_on_kitchen_print: data.showOnKitchenPrint,
@@ -242,16 +238,6 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
                 className={inputClass}
               />
             </FormField>
-
-            {editingAttribute && (
-              <CheckboxField
-                id="isActive"
-                label={t('common.status.active')}
-                description={t('settings.attribute.form.status_hint')}
-                checked={formData.isActive}
-                onChange={(checked) => handleFieldChange('isActive', checked)}
-              />
-            )}
           </FormSection>
         </div>
 

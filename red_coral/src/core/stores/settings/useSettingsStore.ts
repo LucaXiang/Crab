@@ -229,7 +229,6 @@ export const useSettingsStore = create<SettingsStore>()(
             ...formData,
             name: zoneData?.name || '',
             description: zoneData?.description || '',
-            is_active: zoneData?.is_active ?? true,  // Default to active for new zones
           };
         } else if (entity === 'PRODUCT') {
           const productData = data as ProductEditData | null;
@@ -260,7 +259,6 @@ export const useSettingsStore = create<SettingsStore>()(
             label_print_destinations: categoryData?.label_print_destinations || [],
             is_kitchen_print_enabled: categoryData?.is_kitchen_print_enabled ? 1 : 0,  // Category: bool → 0/1
             is_label_print_enabled: categoryData?.is_label_print_enabled ? 1 : 0,  // Category: bool → 0/1
-            is_active: categoryData?.is_active ?? true,  // Default to active for new categories
             is_virtual: categoryData?.is_virtual ?? false,
             tag_ids: categoryData?.tag_ids ?? [],
             match_mode: categoryData?.match_mode ?? 'any',
@@ -274,7 +272,6 @@ export const useSettingsStore = create<SettingsStore>()(
             name: tagData?.name || '',
             color: tagData?.color || '#3B82F6',
             display_order: tagData?.display_order ?? 0,
-            is_active: tagData?.is_active ?? true,  // Default to active for new tags
           };
         }
 

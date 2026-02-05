@@ -140,7 +140,6 @@ export async function updateCategory(id: string, formData: CategoryFormData): Pr
     label_print_destinations: formData.label_print_destinations ?? [],
     is_kitchen_print_enabled: kitchenEnabled,
     is_label_print_enabled: labelEnabled,
-    is_active: formData.is_active ?? true,
     is_virtual: formData.is_virtual ?? false,
     tag_ids: formData.tag_ids ?? [],
     match_mode: formData.match_mode ?? 'any',

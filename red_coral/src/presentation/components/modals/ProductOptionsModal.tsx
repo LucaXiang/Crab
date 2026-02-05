@@ -79,7 +79,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
         // Priority: binding override > attribute default
         const defaults = binding?.default_option_indices ?? attr.default_option_indices;
         if (defaults && defaults.length > 0) {
-          let selectedDefaults = defaults.filter(idx => options[idx] && options[idx].is_active);
+          let selectedDefaults = defaults.filter(idx => options[idx]);
 
           // Enforce Single Choice constraints (is_multi_select=false means single)
           const isSingleChoice = !attr.is_multi_select;

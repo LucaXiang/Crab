@@ -8,7 +8,6 @@ pub struct Zone {
     pub id: Option<String>,
     pub name: String,
     pub description: Option<String>,
-    pub is_active: bool,
 }
 
 /// Create zone payload
@@ -23,5 +22,4 @@ pub struct ZoneCreate {
 pub struct ZoneUpdate {
     pub name: Option<String>,
     pub description: Option<String>,
-    pub is_active: Option<bool>,
 }

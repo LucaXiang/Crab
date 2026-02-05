@@ -82,10 +82,9 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
     return [];
   };
 
-  const activeAttributes = attributes.filter(attr => attr.is_active);
   const allSelectedIds = [...selectedAttributeIds, ...inheritedAttributeIds];
-  const selectedAttributes = activeAttributes.filter(attr => allSelectedIds.includes(String(attr.id)));
-  const unselectedAttributes = activeAttributes.filter(attr =>
+  const selectedAttributes = attributes.filter(attr => allSelectedIds.includes(String(attr.id)));
+  const unselectedAttributes = attributes.filter(attr =>
     !allSelectedIds.includes(String(attr.id))
   );
 

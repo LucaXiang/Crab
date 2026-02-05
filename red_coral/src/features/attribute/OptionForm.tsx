@@ -21,7 +21,6 @@ interface OptionFormData {
   kitchenPrintName: string;
   priceModifier: number;
   displayOrder: number;
-  isActive: boolean;
   enableQuantity: boolean;
   maxQuantity: number | null;
 }
@@ -35,7 +34,6 @@ const mapToFormData = (opt: AttributeOptionWithIndex | null): OptionFormData => 
       kitchenPrintName: '',
       priceModifier: 0,
       displayOrder: 0,
-      isActive: true,
       enableQuantity: false,
       maxQuantity: null,
     };
@@ -46,7 +44,6 @@ const mapToFormData = (opt: AttributeOptionWithIndex | null): OptionFormData => 
     kitchenPrintName: opt.kitchen_print_name || '',
     priceModifier: opt.price_modifier,
     displayOrder: opt.display_order,
-    isActive: opt.is_active,
     enableQuantity: opt.enable_quantity ?? false,
     maxQuantity: opt.max_quantity ?? null,
   };
@@ -78,7 +75,6 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
       editingOption?.index,
       editingOption?.name,
       editingOption?.price_modifier,
-      editingOption?.is_active,
       editingOption?.enable_quantity,
       editingOption?.max_quantity,
     ]
@@ -122,7 +118,6 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
           kitchen_print_name: data.kitchenPrintName?.trim() || undefined,
           price_modifier: data.priceModifier,
           display_order: data.displayOrder,
-          is_active: true,
           enable_quantity: data.enableQuantity,
           max_quantity: data.enableQuantity ? data.maxQuantity : null,
         });
@@ -139,7 +134,6 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
           kitchen_print_name: data.kitchenPrintName?.trim() || undefined,
           price_modifier: data.priceModifier,
           display_order: data.displayOrder,
-          is_active: data.isActive,
           enable_quantity: data.enableQuantity,
           max_quantity: data.enableQuantity ? data.maxQuantity : null,
         });
@@ -278,15 +272,6 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
                   {t('settings.attribute.option.form.max_quantity_hint')}
                 </p>
               </FormField>
-            )}
-
-            {editingOption && (
-              <CheckboxField
-                id="isActive"
-                label={t('common.status.active')}
-                checked={formData.isActive}
-                onChange={(checked) => handleFieldChange('isActive', checked)}
-              />
             )}
           </FormSection>
         </div>

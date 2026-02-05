@@ -16,7 +16,6 @@ pub struct AttributeOption {
     /// Price modifier in currency unit (positive=add, negative=subtract, e.g., 2.50 = €2.50)
     pub price_modifier: f64,
     pub display_order: i32,
-    pub is_active: bool,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
 
@@ -33,7 +32,6 @@ impl AttributeOption {
             name,
             price_modifier: 0.0,
             display_order: 0,
-            is_active: true,
             receipt_name: None,
             kitchen_print_name: None,
             enable_quantity: false,
@@ -59,7 +57,6 @@ pub struct Attribute {
 
     // 显示
     pub display_order: i32,
-    pub is_active: bool,
 
     // 小票
     pub show_on_receipt: bool,
@@ -82,7 +79,6 @@ impl Attribute {
             max_selections: None,
             default_option_indices: None,
             display_order: 0,
-            is_active: true,
             show_on_receipt: false,
             receipt_name: None,
             show_on_kitchen_print: false,
@@ -118,8 +114,6 @@ pub struct AttributeUpdate {
     pub default_option_indices: Option<Vec<i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_order: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_active: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub show_on_receipt: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]

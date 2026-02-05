@@ -9,7 +9,6 @@ pub struct AttributeOption {
     /// Price modifier in currency unit (positive=add, negative=subtract, e.g., 2.50 = €2.50)
     pub price_modifier: f64,
     pub display_order: i32,
-    pub is_active: bool,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
 
@@ -41,7 +40,6 @@ pub struct Attribute {
 
     // 显示
     pub display_order: i32,
-    pub is_active: bool,
 
     // 小票
     pub show_on_receipt: bool,
@@ -78,7 +76,6 @@ pub struct AttributeUpdate {
     pub max_selections: Option<i32>,
     pub default_option_indices: Option<Vec<i32>>,
     pub display_order: Option<i32>,
-    pub is_active: Option<bool>,
     pub show_on_receipt: Option<bool>,
     pub receipt_name: Option<String>,
     pub show_on_kitchen_print: Option<bool>,

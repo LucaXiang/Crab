@@ -428,12 +428,6 @@ export const AttributeManagement: React.FC = React.memo(() => {
                                   {option.name}
                                 </span>
 
-                                {!option.is_active && (
-                                  <span className="text-[0.625rem] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
-                                    {t('common.status.inactive')}
-                                  </span>
-                                )}
-
                                 <div className="flex-1" />
 
                                 {hasPriceMod && (

@@ -58,7 +58,6 @@ impl ZoneRepository {
             id: None,
             name: data.name,
             description: data.description,
-            is_active: true,
         };
 
         let created: Option<Zone> = self.base.db().create(TABLE).content(zone).await?;

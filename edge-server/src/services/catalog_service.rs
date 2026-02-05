@@ -921,8 +921,6 @@ impl CatalogService {
             #[serde(skip_serializing_if = "Option::is_none")]
             is_label_print_enabled: Option<bool>,
             #[serde(skip_serializing_if = "Option::is_none")]
-            is_active: Option<bool>,
-            #[serde(skip_serializing_if = "Option::is_none")]
             is_virtual: Option<bool>,
             #[serde(
                 skip_serializing_if = "Option::is_none",
@@ -946,7 +944,6 @@ impl CatalogService {
                 .map(|ids| ids.iter().filter_map(|id| id.parse().ok()).collect()),
             is_kitchen_print_enabled: data.is_kitchen_print_enabled,
             is_label_print_enabled: data.is_label_print_enabled,
-            is_active: data.is_active,
             is_virtual: data.is_virtual,
             tag_ids: data
                 .tag_ids
@@ -969,11 +966,7 @@ impl CatalogService {
         // Update cache
         {
             let mut cache = self.categories.write();
-            if updated.is_active {
-                cache.insert(id.to_string(), updated.clone());
-            } else {
-                cache.remove(id);
-            }
+            cache.insert(id.to_string(), updated.clone());
         }
 
         Ok(updated)

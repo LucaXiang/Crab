@@ -25,8 +25,8 @@ export const AttributeSelector: React.FC<AttributeSelectorProps> = React.memo(({
   // is_multi_select=false means single select, is_multi_select=true means multi select
   const isSingleChoice = !attribute.is_multi_select;
 
-  // Filter only active options
-  const activeOptions = options.filter(opt => opt.is_active);
+  // All options are now active (is_active field removed)
+  const activeOptions = options;
 
   // Count selected options (quantity > 0)
   const selectedCount = Array.from(selectedOptions.values()).filter(q => q > 0).length;

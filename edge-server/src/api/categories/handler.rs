@@ -177,7 +177,6 @@ pub async fn batch_update_sort_order(
                     label_print_destinations: None,
                     is_kitchen_print_enabled: None,
                     is_label_print_enabled: None,
-                    is_active: None,
                     is_virtual: None,
                     tag_ids: None,
                     match_mode: None,

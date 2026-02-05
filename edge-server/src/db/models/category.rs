@@ -22,7 +22,6 @@ pub struct Category {
     /// Whether kitchen printing is enabled for this category
     pub is_kitchen_print_enabled: bool,
     pub is_label_print_enabled: bool,
-    pub is_active: bool,
     /// Whether this is a virtual category (filters by tags instead of direct assignment)
     pub is_virtual: bool,
     /// Tag IDs for virtual category filtering
@@ -44,7 +43,6 @@ impl Category {
             label_print_destinations: Vec::new(),
             is_kitchen_print_enabled: true,
             is_label_print_enabled: true,
-            is_active: true,
             is_virtual: false,
             tag_ids: Vec::new(),
             match_mode: "any".to_string(),
@@ -94,8 +92,6 @@ pub struct CategoryUpdate {
     pub is_kitchen_print_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_label_print_enabled: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_active: Option<bool>,
     /// Whether this is a virtual category
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_virtual: Option<bool>,

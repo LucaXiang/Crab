@@ -22,9 +22,9 @@ export const TagSelectionModal: React.FC<TagSelectionModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Filter: only show active, non-system tags (system tags are managed by the system)
+  // Filter: only show non-system tags (system tags are managed by the system)
   const selectableTags = allTags
-    .filter((tag) => tag.is_active && !tag.is_system)
+    .filter((tag) => !tag.is_system)
     .sort((a, b) => a.display_order - b.display_order);
 
   const handleTagToggle = (tagId: string) => {

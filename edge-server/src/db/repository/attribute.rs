@@ -56,7 +56,6 @@ impl AttributeRepository {
             max_selections: data.max_selections,
             default_option_indices: data.default_option_indices,
             display_order: data.display_order.unwrap_or(0),
-            is_active: true,
             show_on_receipt: data.show_on_receipt.unwrap_or(false),
             receipt_name: data.receipt_name,
             show_on_kitchen_print: data.show_on_kitchen_print.unwrap_or(false),

@@ -346,9 +346,9 @@ export const POSScreen: React.FC = () => {
             const defaults = binding.default_option_indices
               ?? binding.attribute?.default_option_indices;
             if (!defaults || defaults.length === 0) return false;
-            // 确保至少有一个默认选项是活跃的
+            // 确保至少有一个默认选项存在
             const attrOpts = optionsMap.get(String(binding.attribute?.id)) || [];
-            return defaults.some(idx => attrOpts[idx]?.is_active);
+            return defaults.some(idx => attrOpts[idx] !== undefined);
           });
 
           if (canQuickAdd && (!hasMultiSpec || selectedDefaultSpec)) {
@@ -366,7 +366,7 @@ export const POSScreen: React.FC = () => {
                 // Enforce max_selections for multi-select
                 if (attr.is_multi_select && attr.max_selections && count >= attr.max_selections) return;
                 const opt = attrOpts[idx];
-                if (opt && opt.is_active) {
+                if (opt) {
                   quickOptions.push({
                     attribute_id: String(attr.id),
                     attribute_name: attr.name,
