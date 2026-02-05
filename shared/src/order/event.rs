@@ -349,7 +349,8 @@ pub enum EventPayload {
         source_table_name: String,
         items: Vec<CartItemSnapshot>,
         payments: Vec<PaymentRecord>,
-        paid_item_quantities: std::collections::HashMap<String, i32>,
+        /// Uses BTreeMap for deterministic serialization order (hash chain integrity)
+        paid_item_quantities: std::collections::BTreeMap<String, i32>,
         paid_amount: f64,
         has_amount_split: bool,
         aa_total_shares: Option<i32>,

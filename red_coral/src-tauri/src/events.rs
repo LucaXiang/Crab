@@ -148,7 +148,7 @@ mod tests {
             status: OrderStatus::Active,
             items: vec![],
             payments: vec![],
-            paid_item_quantities: std::collections::HashMap::new(),
+            paid_item_quantities: std::collections::BTreeMap::new(),
             original_total: 0.0,
             subtotal: 0.0,
             total_discount: 0.0,

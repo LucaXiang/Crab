@@ -142,7 +142,7 @@ mod tests {
             source_table_name,
             items,
             vec![],
-            std::collections::HashMap::new(),
+            std::collections::BTreeMap::new(),
             0.0,
             false,
             None,
@@ -157,7 +157,7 @@ mod tests {
         source_table_name: &str,
         items: Vec<CartItemSnapshot>,
         payments: Vec<shared::order::PaymentRecord>,
-        paid_item_quantities: std::collections::HashMap<String, i32>,
+        paid_item_quantities: std::collections::BTreeMap<String, i32>,
         paid_amount: f64,
         has_amount_split: bool,
         aa_total_shares: Option<i32>,
@@ -542,7 +542,7 @@ mod tests {
             split_type: None,
         };
 
-        let mut paid_item_quantities = std::collections::HashMap::new();
+        let mut paid_item_quantities = std::collections::BTreeMap::new();
         paid_item_quantities.insert("item-src-1".to_string(), 1);
 
         let event = create_order_merged_event_with_payments(
@@ -622,7 +622,7 @@ mod tests {
             "Table 2",
             vec![],
             vec![source_payment],
-            std::collections::HashMap::new(),
+            std::collections::BTreeMap::new(),
             8.0,
             false,
             None,

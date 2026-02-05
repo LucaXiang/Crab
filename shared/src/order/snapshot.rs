@@ -106,8 +106,9 @@ pub struct OrderSnapshot {
     #[serde(default)]
     pub remaining_amount: f64,
     /// Quantities paid per item (for split bill)
-    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
-    pub paid_item_quantities: std::collections::HashMap<String, i32>,
+    /// Uses BTreeMap for deterministic serialization order (hash chain integrity)
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub paid_item_quantities: std::collections::BTreeMap<String, i32>,
     /// Whether this order has amount-based split payments (金额分单)
     /// If true, item-based split is disabled
     #[serde(default)]
@@ -206,7 +207,7 @@ impl OrderSnapshot {
             total: 0.0,
             paid_amount: 0.0,
             remaining_amount: 0.0,
-            paid_item_quantities: std::collections::HashMap::new(),
+            paid_item_quantities: std::collections::BTreeMap::new(),
             has_amount_split: false,
             aa_total_shares: None,
             aa_paid_shares: 0,

@@ -1048,7 +1048,7 @@ mod tests {
             total: 100.0,
             paid_amount: 100.0,
             remaining_amount: 0.0,
-            paid_item_quantities: std::collections::HashMap::new(),
+            paid_item_quantities: std::collections::BTreeMap::new(),
             receipt_number: "R001".to_string(),
             is_pre_payment: false,
             note: None,
