@@ -62,6 +62,7 @@ pub(crate) fn generate_instance_id_from_parts(
         for opt in opts {
             hasher.update(opt.attribute_id.as_bytes());
             hasher.update(opt.option_idx.to_be_bytes());
+            hasher.update(opt.quantity.to_be_bytes());
         }
     }
 

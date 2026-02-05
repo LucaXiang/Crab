@@ -197,11 +197,21 @@ impl KitchenPrintService {
         // Get product external_id (now at product level)
         let external_id = product.as_ref().and_then(|p| p.external_id);
 
-        // Build options list
+        // Build options list (with quantity if > 1)
         let options: Vec<String> = item
             .selected_options
             .as_ref()
-            .map(|opts| opts.iter().map(|opt| opt.option_name.clone()).collect())
+            .map(|opts| {
+                opts.iter()
+                    .map(|opt| {
+                        if opt.quantity > 1 {
+                            format!("{}×{}", opt.option_name, opt.quantity)
+                        } else {
+                            opt.option_name.clone()
+                        }
+                    })
+                    .collect()
+            })
             .unwrap_or_default();
 
         let spec_name = item
