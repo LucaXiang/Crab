@@ -191,7 +191,8 @@ export const AttributeManagement: React.FC = React.memo(() => {
     try {
       await updateAttribute({
         id: attr.id,
-        default_option_indices: newDefaults.length > 0 ? newDefaults : null,
+        // 发送空数组表示"清除默认"，不要发送 null（会被忽略）
+        default_option_indices: newDefaults,
       });
     } catch (error) {
       console.error('Toggle default error:', error);
