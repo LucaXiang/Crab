@@ -244,6 +244,8 @@ impl From<ProductFull> for shared::models::ProductFull {
                         is_active: o.is_active,
                         receipt_name: o.receipt_name,
                         kitchen_print_name: o.kitchen_print_name,
+                        enable_quantity: o.enable_quantity,
+                        max_quantity: o.max_quantity,
                     }).collect(),
                 },
                 is_required: b.is_required,

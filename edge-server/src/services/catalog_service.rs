@@ -190,6 +190,18 @@ impl CatalogService {
             .await?
             .take(0)?;
 
+        tracing::info!("📦 CatalogService: Loaded {} attribute bindings", bindings.len());
+
+        // Debug: log first binding's attribute options count
+        if let Some(first) = bindings.first() {
+            tracing::debug!(
+                "📦 First binding: from={}, attr={}, options_count={}",
+                first.from,
+                first.to.name,
+                first.to.options.len()
+            );
+        }
+
         // Group bindings by source (product or category)
         let mut product_bindings: HashMap<String, Vec<AttributeBindingFull>> = HashMap::new();
         let mut category_bindings: HashMap<String, Vec<AttributeBindingFull>> = HashMap::new();

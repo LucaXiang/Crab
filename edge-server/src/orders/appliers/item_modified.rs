@@ -613,6 +613,7 @@ mod tests {
             option_idx: 1,
             option_name: "Large".to_string(),
             price_modifier: Some(2.0),
+            quantity: 1,
         }];
 
         let changes = ItemChanges {
@@ -669,6 +670,7 @@ mod tests {
             option_idx: 2,
             option_name: "Extra Hot".to_string(),
             price_modifier: None,
+            quantity: 1,
         }];
 
         let changes = ItemChanges {
@@ -709,6 +711,7 @@ mod tests {
             option_idx: 1,
             option_name: "Mild".to_string(),
             price_modifier: None,
+            quantity: 1,
         }];
 
         let changes = ItemChanges {

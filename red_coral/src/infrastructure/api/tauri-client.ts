@@ -309,12 +309,12 @@ export class TauriApiClient {
 
   // ============ Attribute Options ============
 
-  async addAttributeOption(attributeId: string, data: { name: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string; kitchen_print_name?: string }): Promise<Attribute> {
+  async addAttributeOption(attributeId: string, data: { name: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string; kitchen_print_name?: string; enable_quantity?: boolean; max_quantity?: number | null }): Promise<Attribute> {
     const result = await invokeAndUnwrap<{ template: Attribute }>('add_attribute_option', { attributeId, data });
     return result.template;
   }
 
-  async updateAttributeOption(attributeId: string, index: number, data: { name?: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string; kitchen_print_name?: string }): Promise<Attribute> {
+  async updateAttributeOption(attributeId: string, index: number, data: { name?: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string; kitchen_print_name?: string; enable_quantity?: boolean; max_quantity?: number | null }): Promise<Attribute> {
     const result = await invokeAndUnwrap<{ template: Attribute }>('update_attribute_option', { attributeId, index, data });
     return result.template;
   }

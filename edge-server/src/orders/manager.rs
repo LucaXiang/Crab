@@ -2460,6 +2460,7 @@ mod tests {
                             option_idx: 2,
                             option_name: "Large".to_string(),
                             price_modifier: Some(3.0), // +3
+                            quantity: 1,
                         },
                         shared::order::ItemOption {
                             attribute_id: "attr:topping".to_string(),
@@ -2467,6 +2468,7 @@ mod tests {
                             option_idx: 0,
                             option_name: "Extra Cheese".to_string(),
                             price_modifier: Some(1.50), // +1.50
+                            quantity: 1,
                         },
                     ]),
                     selected_specification: None,
@@ -2527,6 +2529,7 @@ mod tests {
                         option_idx: 0,
                         option_name: "Smaller".to_string(),
                         price_modifier: Some(-15.0), // -15 使总价变负
+                        quantity: 1,
                     }]),
                     selected_specification: None,
                     manual_discount_percent: None,
@@ -2617,6 +2620,7 @@ mod tests {
                         option_idx: 1,
                         option_name: "Large".to_string(),
                         price_modifier: Some(1.67),
+                        quantity: 1,
                     }]),
                     selected_specification: None,
                     manual_discount_percent: Some(10.0), // 10% off
@@ -2984,6 +2988,7 @@ mod tests {
                             option_idx: 0,
                             option_name: "BBQ".to_string(),
                             price_modifier: Some(3.0),
+                            quantity: 1,
                         },
                         shared::order::ItemOption {
                             attribute_id: "attr:side".to_string(),
@@ -2991,6 +2996,7 @@ mod tests {
                             option_idx: 1,
                             option_name: "Fries".to_string(),
                             price_modifier: Some(2.0),
+                            quantity: 1,
                         },
                     ]),
                     selected_specification: None,
@@ -3059,6 +3065,7 @@ mod tests {
                         option_idx: 0,
                         option_name: "Extra".to_string(),
                         price_modifier: Some(2.5),
+                        quantity: 1,
                     }]),
                     selected_specification: None,
                     manual_discount_percent: None,

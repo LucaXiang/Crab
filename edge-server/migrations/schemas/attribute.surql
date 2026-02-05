@@ -73,6 +73,14 @@ DEFINE FIELD OVERWRITE options.*.receipt_name ON attribute TYPE option<string>
 DEFINE FIELD OVERWRITE options.*.kitchen_print_name ON attribute TYPE option<string>
     PERMISSIONS FULL;
 
+-- Quantity control for option
+DEFINE FIELD OVERWRITE options.*.enable_quantity ON attribute TYPE bool
+    DEFAULT false
+    PERMISSIONS FULL;
+
+DEFINE FIELD OVERWRITE options.*.max_quantity ON attribute TYPE option<int>
+    PERMISSIONS FULL;
+
 DEFINE INDEX OVERWRITE attr_order ON attribute FIELDS display_order;
 
 -- =============================================================================

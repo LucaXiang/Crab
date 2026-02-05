@@ -471,6 +471,7 @@ mod tests {
             option_idx: 1,
             option_name: "Large".to_string(),
             price_modifier: Some(5.0),
+            quantity: 1,
         }]);
         snapshot.items.push(item);
         snapshot.subtotal = 49.0;

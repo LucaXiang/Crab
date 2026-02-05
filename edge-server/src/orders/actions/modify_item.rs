@@ -802,6 +802,7 @@ mod tests {
             option_idx: 1,
             option_name: "Large".to_string(),
             price_modifier: Some(2.0),
+            quantity: 1,
         }];
 
         let action = ModifyItemAction {
@@ -989,6 +990,7 @@ mod tests {
             option_idx: 1,
             option_name: "Large".to_string(),
             price_modifier: Some(2.0),
+            quantity: 1,
         }];
 
         let mut item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
@@ -1087,6 +1089,7 @@ mod tests {
                     option_idx: 1,
                     option_name: "Large".to_string(),
                     price_modifier: None,
+                    quantity: 1,
                 }]),
                 ..Default::default()
             }

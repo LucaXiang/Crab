@@ -329,11 +329,15 @@ pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
     // Use original_price as the base for discount calculation (before any discounts)
     let base_price = to_decimal(item.original_price.unwrap_or(item.price));
 
-    // Options modifier: sum of all selected option price modifiers
+    // Options modifier: sum of (price_modifier × quantity) for each selected option
     let options_modifier: Decimal = item
         .selected_options
         .as_ref()
-        .map(|opts| opts.iter().filter_map(|o| o.price_modifier.map(to_decimal)).sum())
+        .map(|opts| {
+            opts.iter()
+                .filter_map(|o| o.price_modifier.map(|p| to_decimal(p) * Decimal::from(o.quantity)))
+                .sum()
+        })
         .unwrap_or(Decimal::ZERO);
 
     // Base with options = spec price + options
@@ -403,10 +407,15 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
 
         // Calculate original price (base price before any adjustments) + options modifier
         let base_price = to_decimal(item.original_price.unwrap_or(item.price));
+        // Options modifier: sum of (price_modifier × quantity) for each selected option
         let options_modifier: Decimal = item
             .selected_options
             .as_ref()
-            .map(|opts| opts.iter().filter_map(|o| o.price_modifier.map(to_decimal)).sum())
+            .map(|opts| {
+                opts.iter()
+                    .filter_map(|o| o.price_modifier.map(|p| to_decimal(p) * Decimal::from(o.quantity)))
+                    .sum()
+            })
             .unwrap_or(Decimal::ZERO);
         let base_with_options = base_price + options_modifier;
         original_total += base_with_options * quantity;
@@ -1408,6 +1417,115 @@ mod tests {
         let total = calculate_item_total(&item);
         // 91.5 * 2 = 183.0
         assert_eq!(to_f64(total), 183.0);
+    }
+
+    #[test]
+    fn test_option_quantity_multiplies_price_modifier() {
+        // Test that option price_modifier is multiplied by quantity
+        // Scenario: +鸡蛋 ×3 with price_modifier=2.0 should add 6.0 to the price
+        let item = CartItemSnapshot {
+            id: "p1".to_string(),
+            instance_id: "i1".to_string(),
+            name: "Noodles".to_string(),
+            price: 16.0,                      // item_final from reducer
+            original_price: Some(10.0),       // base price
+            quantity: 1,
+            unpaid_quantity: 1,
+            selected_options: Some(vec![
+                shared::order::ItemOption {
+                    attribute_id: "attr:egg".to_string(),
+                    attribute_name: "加蛋".to_string(),
+                    option_idx: 0,
+                    option_name: "鸡蛋".to_string(),
+                    price_modifier: Some(2.0),  // +2 per egg
+                    quantity: 3,                // 3 eggs!
+                },
+            ]),
+            selected_specification: None,
+            manual_discount_percent: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            unit_price: None,
+            line_total: None,
+            tax: None,
+            tax_rate: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_name: None,
+            is_comped: false,
+        };
+
+        let unit_price = calculate_unit_price(&item);
+        // base_price = 10.0
+        // options = 2.0 * 3 = 6.0
+        // base_with_options = 16.0
+        // No discounts
+        // unit_price = 16.0
+        assert_eq!(to_f64(unit_price), 16.0);
+
+        let total = calculate_item_total(&item);
+        assert_eq!(to_f64(total), 16.0);
+    }
+
+    #[test]
+    fn test_multiple_options_with_different_quantities() {
+        // Test multiple options with different quantities
+        let item = CartItemSnapshot {
+            id: "p1".to_string(),
+            instance_id: "i1".to_string(),
+            name: "Burger".to_string(),
+            price: 17.0,
+            original_price: Some(10.0),       // base price
+            quantity: 2,                      // 2 burgers
+            unpaid_quantity: 2,
+            selected_options: Some(vec![
+                shared::order::ItemOption {
+                    attribute_id: "attr:cheese".to_string(),
+                    attribute_name: "Cheese".to_string(),
+                    option_idx: 0,
+                    option_name: "Cheddar".to_string(),
+                    price_modifier: Some(1.5),  // +1.5 per slice
+                    quantity: 2,                // 2 slices
+                },
+                shared::order::ItemOption {
+                    attribute_id: "attr:bacon".to_string(),
+                    attribute_name: "Bacon".to_string(),
+                    option_idx: 0,
+                    option_name: "Crispy".to_string(),
+                    price_modifier: Some(2.0),  // +2 per strip
+                    quantity: 2,                // 2 strips
+                },
+            ]),
+            selected_specification: None,
+            manual_discount_percent: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            unit_price: None,
+            line_total: None,
+            tax: None,
+            tax_rate: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_name: None,
+            is_comped: false,
+        };
+
+        let unit_price = calculate_unit_price(&item);
+        // base_price = 10.0
+        // cheese = 1.5 * 2 = 3.0
+        // bacon = 2.0 * 2 = 4.0
+        // options total = 7.0
+        // base_with_options = 17.0
+        // unit_price = 17.0
+        assert_eq!(to_f64(unit_price), 17.0);
+
+        let total = calculate_item_total(&item);
+        // 17.0 * 2 burgers = 34.0
+        assert_eq!(to_f64(total), 34.0);
     }
 
     #[test]
@@ -2471,5 +2589,58 @@ mod tests {
         recalculate_totals(&mut snapshot);
         let ca2 = snapshot.order_applied_rules.as_ref().unwrap()[0].calculated_amount;
         assert_eq!(ca2, 20.0, "order calculated_amount should update to 200*10%=20");
+    }
+
+    #[test]
+    fn test_recalculate_totals_with_option_quantity() {
+        // Verify recalculate_totals correctly handles option quantity multiplication
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+
+        // Item with options that have quantity > 1
+        let item = CartItemSnapshot {
+            id: "p1".to_string(),
+            instance_id: "i1".to_string(),
+            name: "Noodles".to_string(),
+            price: 16.0,                      // base 10 + options 6
+            original_price: Some(10.0),
+            quantity: 2,                      // 2 bowls
+            unpaid_quantity: 2,
+            selected_options: Some(vec![
+                shared::order::ItemOption {
+                    attribute_id: "attr:egg".to_string(),
+                    attribute_name: "加蛋".to_string(),
+                    option_idx: 0,
+                    option_name: "鸡蛋".to_string(),
+                    price_modifier: Some(2.0),  // +2 per egg
+                    quantity: 3,                // 3 eggs per bowl
+                },
+            ]),
+            selected_specification: None,
+            manual_discount_percent: None,
+            rule_discount_amount: None,
+            rule_surcharge_amount: None,
+            applied_rules: None,
+            unit_price: None,
+            line_total: None,
+            tax: None,
+            tax_rate: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+            category_name: None,
+            is_comped: false,
+        };
+        snapshot.items.push(item);
+
+        recalculate_totals(&mut snapshot);
+
+        // base_price = 10.0
+        // options = 2.0 * 3 = 6.0
+        // unit_price = 16.0
+        // line_total = 16.0 * 2 = 32.0
+        assert_eq!(snapshot.items[0].unit_price, Some(16.0));
+        assert_eq!(snapshot.items[0].line_total, Some(32.0));
+        assert_eq!(snapshot.subtotal, 32.0);
+        assert_eq!(snapshot.total, 32.0);
     }
 }

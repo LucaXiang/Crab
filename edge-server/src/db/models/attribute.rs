@@ -28,7 +28,7 @@ pub struct AttributeOption {
 
     // === Quantity Control ===
     /// Enable quantity control for this option (default: false)
-    #[serde(default, deserialize_with = "serde_helpers::bool_false")]
+    #[serde(default)]
     pub enable_quantity: bool,
     /// Maximum quantity allowed (only effective when enable_quantity=true)
     #[serde(default)]

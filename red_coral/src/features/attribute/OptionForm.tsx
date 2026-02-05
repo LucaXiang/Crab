@@ -69,11 +69,19 @@ export const OptionForm: React.FC<OptionFormProps> = React.memo(({
   const { createOption, updateOption } = useOptionActions();
 
   // Memoize the initial form data to prevent useEffect from re-running on every render
-  // Use attributeId + index as stable key - options don't have their own id
+  // Include all editable fields in deps to ensure form updates when option data changes
   const initialFormData = useMemo(
     () => (editingOption ? mapToFormData(editingOption) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [editingOption?.attributeId, editingOption?.index]
+    [
+      editingOption?.attributeId,
+      editingOption?.index,
+      editingOption?.name,
+      editingOption?.price_modifier,
+      editingOption?.is_active,
+      editingOption?.enable_quantity,
+      editingOption?.max_quantity,
+    ]
   );
 
   // Use form initialization hook with mapped data
