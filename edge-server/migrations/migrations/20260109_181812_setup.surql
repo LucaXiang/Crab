@@ -18,3 +18,19 @@ CREATE employee:admin CONTENT {
     is_active: true,
     created_at: time::unix(time::now()) * 1000,
 };
+
+-- 单例表初始化
+CREATE store_info:main CONTENT {
+    name: '',
+    address: '',
+    nif: '',
+    business_day_cutoff: '00:00',
+    created_at: time::unix(time::now()) * 1000,
+    updated_at: time::unix(time::now()) * 1000,
+};
+
+CREATE system_state:main CONTENT {
+    order_count: 0,
+    created_at: time::unix(time::now()) * 1000,
+    updated_at: time::unix(time::now()) * 1000,
+};

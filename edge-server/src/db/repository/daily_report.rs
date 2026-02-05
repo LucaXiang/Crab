@@ -28,14 +28,6 @@ impl DailyReportRepository {
         operator_id: Option<String>,
         operator_name: Option<String>,
     ) -> RepoResult<DailyReport> {
-        // Check if report already exists
-        if self.find_by_date(&data.business_date).await?.is_some() {
-            return Err(RepoError::Duplicate(format!(
-                "Daily report for {} already exists",
-                data.business_date
-            )));
-        }
-
         // Complex aggregation query for daily report
         let mut result = self
             .base

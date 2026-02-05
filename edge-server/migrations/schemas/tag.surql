@@ -7,7 +7,6 @@ DEFINE TABLE OVERWRITE tag TYPE NORMAL SCHEMAFULL
             WHERE $auth.role = role:admin OR $auth.id = employee:admin;
 
 DEFINE FIELD OVERWRITE name ON tag TYPE string
-    ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE color ON tag TYPE string

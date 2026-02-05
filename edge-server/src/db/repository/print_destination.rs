@@ -65,14 +65,6 @@ impl PrintDestinationRepository {
 
     /// Create a new print destination
     pub async fn create(&self, data: PrintDestinationCreate) -> RepoResult<PrintDestination> {
-        // Check duplicate name
-        if self.find_by_name(&data.name).await?.is_some() {
-            return Err(RepoError::Duplicate(format!(
-                "Print destination '{}' already exists",
-                data.name
-            )));
-        }
-
         let item = PrintDestination {
             id: None,
             name: data.name,
@@ -94,21 +86,6 @@ impl PrintDestinationRepository {
         let thing: RecordId = id
             .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-        let existing = self
-            .find_by_id(id)
-            .await?
-            .ok_or_else(|| RepoError::NotFound(format!("Print destination {} not found", id)))?;
-
-        // Check duplicate name if changing
-        if let Some(ref new_name) = data.name
-            && new_name != &existing.name
-            && self.find_by_name(new_name).await?.is_some()
-        {
-            return Err(RepoError::Duplicate(format!(
-                "Print destination '{}' already exists",
-                new_name
-            )));
-        }
 
         let mut result = self.base
             .db()

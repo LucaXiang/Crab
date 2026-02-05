@@ -8,7 +8,6 @@ DEFINE TABLE OVERWRITE label_template TYPE NORMAL SCHEMAFULL
 
 -- 模板名称
 DEFINE FIELD OVERWRITE name ON label_template TYPE string
-    ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
 -- 模板描述
@@ -36,7 +35,6 @@ DEFINE FIELD OVERWRITE fields ON label_template TYPE array<object>
 DEFINE FIELD OVERWRITE fields.*.id ON label_template TYPE string PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE fields.*.name ON label_template TYPE string PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE fields.*.type ON label_template TYPE string
-    ASSERT $value IN ["text", "barcode", "qrcode", "image", "separator", "datetime", "price", "counter"]
     PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE fields.*.x ON label_template TYPE float PERMISSIONS FULL;
 DEFINE FIELD OVERWRITE fields.*.y ON label_template TYPE float PERMISSIONS FULL;

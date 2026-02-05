@@ -88,18 +88,6 @@ impl DiningTableRepository {
 
     /// Create a new dining table
     pub async fn create(&self, data: DiningTableCreate) -> RepoResult<DiningTable> {
-        // Check duplicate name in same zone
-        if self
-            .find_by_name_in_zone(&data.zone, &data.name)
-            .await?
-            .is_some()
-        {
-            return Err(RepoError::Duplicate(format!(
-                "Table '{}' already exists in this zone",
-                data.name
-            )));
-        }
-
         let mut result = self
             .base
             .db()
@@ -125,24 +113,12 @@ impl DiningTableRepository {
         let thing: RecordId = id
             .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+
+        // 获取现有记录用于合并更新数据
         let existing = self
             .find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Dining table {} not found", id)))?;
-
-        // Check duplicate name in zone if changing name or zone
-        let check_zone = data.zone.as_ref().unwrap_or(&existing.zone);
-        let check_name = data.name.as_ref().unwrap_or(&existing.name);
-
-        if (data.name.is_some() || data.zone.is_some())
-            && let Some(found) = self.find_by_name_in_zone(check_zone, check_name).await?
-            && found.id != existing.id
-        {
-            return Err(RepoError::Duplicate(format!(
-                "Table '{}' already exists in this zone",
-                check_name
-            )));
-        }
 
         // 手动构建 UPDATE 语句，避免 zone 被序列化为字符串
         let name = data.name.unwrap_or(existing.name);

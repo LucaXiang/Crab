@@ -59,9 +59,6 @@ impl SystemStateRepository {
 
     /// Update system state
     pub async fn update(&self, data: SystemStateUpdate) -> RepoResult<SystemState> {
-        // Ensure singleton exists
-        self.get_or_create().await?;
-
         let singleton_id = RecordId::from_table_key(TABLE, SINGLETON_ID);
         let mut merge_data = serde_json::to_value(&data)
             .map_err(|e| RepoError::Database(format!("Serialize error: {}", e)))?;
@@ -93,9 +90,6 @@ impl SystemStateRepository {
     /// Atomically increment order_count and return the new value
     /// Used for generating receipt numbers
     pub async fn get_next_order_number(&self) -> RepoResult<i32> {
-        // Ensure singleton exists
-        self.get_or_create().await?;
-
         let singleton_id = RecordId::from_table_key(TABLE, SINGLETON_ID);
         let mut result = self
             .base
@@ -124,9 +118,6 @@ impl SystemStateRepository {
         let order_thing = order_id
             .parse::<RecordId>()
             .map_err(|_| RepoError::Validation(format!("Invalid order ID: {}", order_id)))?;
-
-        // Ensure singleton exists
-        self.get_or_create().await?;
 
         // Use atomic increment for order_count to avoid race conditions
         let singleton_id = RecordId::from_table_key(TABLE, SINGLETON_ID);

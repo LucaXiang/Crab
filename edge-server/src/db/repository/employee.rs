@@ -72,14 +72,6 @@ impl EmployeeRepository {
 
     /// Create a new employee
     pub async fn create(&self, data: EmployeeCreate) -> RepoResult<Employee> {
-        // Check duplicate username
-        if self.find_by_username(&data.username).await?.is_some() {
-            return Err(RepoError::Duplicate(format!(
-                "Username '{}' already exists",
-                data.username
-            )));
-        }
-
         // Hash password
         let hash_pass = Employee::hash_password(&data.password)
             .map_err(|e| RepoError::Database(format!("Failed to hash password: {}", e)))?;
@@ -114,29 +106,18 @@ impl EmployeeRepository {
         let thing: RecordId = id
             .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+
+        // Check is_system flag (业务规则：系统用户只能改密码)
         let existing = self
             .find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Employee {} not found", id)))?;
-
-        // System users can only change password
         if existing.is_system
             && (data.username.is_some() || data.role.is_some() || data.is_active.is_some() || data.display_name.is_some())
         {
             return Err(RepoError::Validation(
                 "System user can only change password".to_string(),
             ));
-        }
-
-        // Check duplicate username if changing
-        if let Some(ref new_username) = data.username
-            && new_username != &existing.username
-            && self.find_by_username(new_username).await?.is_some()
-        {
-            return Err(RepoError::Duplicate(format!(
-                "Username '{}' already exists",
-                new_username
-            )));
         }
 
         let hash_pass = if let Some(ref password) = data.password {

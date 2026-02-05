@@ -65,14 +65,6 @@ impl RoleRepository {
 
     /// Create a new role
     pub async fn create(&self, data: RoleCreate) -> RepoResult<Role> {
-        // Check duplicate name
-        if self.find_by_name(&data.name).await?.is_some() {
-            return Err(RepoError::Duplicate(format!(
-                "Role '{}' already exists",
-                data.name
-            )));
-        }
-
         let mut role = Role::new(data.name, data.permissions);
         if let Some(display_name) = data.display_name {
             role.display_name = display_name;
@@ -87,27 +79,16 @@ impl RoleRepository {
         let thing: RecordId = id
             .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
+
+        // Check is_system flag (业务规则：系统角色不可修改)
         let existing = self
             .find_by_id(id)
             .await?
             .ok_or_else(|| RepoError::NotFound(format!("Role {} not found", id)))?;
-
-        // Prevent modifying system roles
         if existing.is_system {
             return Err(RepoError::Validation(
                 "Cannot modify system role".to_string(),
             ));
-        }
-
-        // Check duplicate name if changing
-        if let Some(ref new_name) = data.name
-            && new_name != &existing.name
-            && self.find_by_name(new_name).await?.is_some()
-        {
-            return Err(RepoError::Duplicate(format!(
-                "Role '{}' already exists",
-                new_name
-            )));
         }
 
         let mut result = self.base

@@ -65,14 +65,6 @@ impl TagRepository {
 
     /// Create a new tag
     pub async fn create(&self, data: TagCreate) -> RepoResult<Tag> {
-        // Check duplicate name
-        if self.find_by_name(&data.name).await?.is_some() {
-            return Err(RepoError::Duplicate(format!(
-                "Tag '{}' already exists",
-                data.name
-            )));
-        }
-
         let tag = Tag {
             id: None,
             name: data.name,
@@ -91,21 +83,6 @@ impl TagRepository {
         let thing: RecordId = id
             .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-        let existing = self
-            .find_by_id(id)
-            .await?
-            .ok_or_else(|| RepoError::NotFound(format!("Tag {} not found", id)))?;
-
-        // Check duplicate name if changing
-        if let Some(ref new_name) = data.name
-            && new_name != &existing.name
-            && self.find_by_name(new_name).await?.is_some()
-        {
-            return Err(RepoError::Duplicate(format!(
-                "Tag '{}' already exists",
-                new_name
-            )));
-        }
 
         let mut result = self.base
             .db()

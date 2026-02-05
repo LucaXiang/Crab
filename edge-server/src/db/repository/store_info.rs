@@ -47,9 +47,6 @@ impl StoreInfoRepository {
 
     /// Update store info
     pub async fn update(&self, data: StoreInfoUpdate) -> RepoResult<StoreInfo> {
-        // Ensure singleton exists
-        self.get_or_create().await?;
-
         // 将 updated_at 合入 merge 数据（MERGE 和 SET 不能同时使用）
         let mut merge_data = serde_json::to_value(&data)
             .map_err(|e| RepoError::Database(format!("Serialize error: {}", e)))?;

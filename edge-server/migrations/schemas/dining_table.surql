@@ -7,7 +7,6 @@ DEFINE TABLE OVERWRITE dining_table TYPE NORMAL SCHEMAFULL
             WHERE $auth.role = role:admin OR $auth.id = employee:admin;
 
 DEFINE FIELD OVERWRITE name ON dining_table TYPE string
-    ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
 -- 区域关联

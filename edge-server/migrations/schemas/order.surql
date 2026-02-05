@@ -11,7 +11,6 @@ DEFINE TABLE OVERWRITE order TYPE NORMAL SCHEMAFULL
             WHERE $auth.role = role:admin OR $auth.id = employee:admin;
 
 DEFINE FIELD OVERWRITE receipt_number ON order TYPE string
-    ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE zone_name ON order TYPE option<string>
@@ -21,7 +20,6 @@ DEFINE FIELD OVERWRITE table_name ON order TYPE option<string>
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE status ON order TYPE string
-    ASSERT $value IN ["COMPLETED", "VOID", "MOVED", "MERGED"]
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE is_retail ON order TYPE bool

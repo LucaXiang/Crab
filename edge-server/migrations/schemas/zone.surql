@@ -7,7 +7,6 @@ DEFINE TABLE OVERWRITE zone TYPE NORMAL SCHEMAFULL
             WHERE $auth.role = role:admin OR $auth.id = employee:admin;
 
 DEFINE FIELD OVERWRITE name ON zone TYPE string
-    ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE description ON zone TYPE option<string>

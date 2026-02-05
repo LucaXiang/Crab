@@ -8,17 +8,14 @@ DEFINE TABLE OVERWRITE image_ref TYPE NORMAL SCHEMAFULL
 
 -- 图片哈希 (SHA256 内容哈希)
 DEFINE FIELD OVERWRITE hash ON image_ref TYPE string
-    ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
 -- 引用实体类型: "product", "label_template"
 DEFINE FIELD OVERWRITE entity_type ON image_ref TYPE string
-    ASSERT $value IN ["product", "label_template"]
     PERMISSIONS FULL;
 
 -- 引用实体 ID (格式: "product:xxx" 或 "label_template:xxx")
 DEFINE FIELD OVERWRITE entity_id ON image_ref TYPE string
-    ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
 -- 创建时间 (Unix millis)

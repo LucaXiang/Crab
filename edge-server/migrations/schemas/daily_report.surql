@@ -8,7 +8,6 @@ DEFINE TABLE OVERWRITE daily_report TYPE NORMAL SCHEMAFULL
 
 -- 营业日期 (YYYY-MM-DD)
 DEFINE FIELD OVERWRITE business_date ON daily_report TYPE string
-    ASSERT string::len($value) = 10
     PERMISSIONS FULL;
 
 -- === 订单统计 ===

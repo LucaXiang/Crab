@@ -9,7 +9,6 @@ DEFINE TABLE OVERWRITE archive_verification TYPE NORMAL SCHEMAFULL
 
 -- 验证类型
 DEFINE FIELD OVERWRITE verification_type ON archive_verification TYPE string
-    ASSERT $value IN ["daily", "full"]
     PERMISSIONS FULL;
 
 -- 营业日标签 (daily: "2026-01-29", full: None)

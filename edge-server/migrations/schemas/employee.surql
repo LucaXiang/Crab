@@ -7,11 +7,9 @@ DEFINE TABLE OVERWRITE employee TYPE NORMAL SCHEMAFULL
             WHERE $auth.role = role:admin OR $auth.id = employee:admin;
 
 DEFINE FIELD OVERWRITE username ON employee TYPE string
-    ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE hash_pass ON employee TYPE string
-    ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE display_name ON employee TYPE string

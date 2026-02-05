@@ -7,7 +7,6 @@ DEFINE TABLE OVERWRITE print_destination TYPE NORMAL SCHEMAFULL
             WHERE $auth.role = role:admin OR $auth.id = employee:admin;
 
 DEFINE FIELD OVERWRITE name ON print_destination TYPE string
-    ASSERT string::len($value) > 0
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE description ON print_destination TYPE option<string>

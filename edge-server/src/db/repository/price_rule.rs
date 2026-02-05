@@ -93,14 +93,6 @@ impl PriceRuleRepository {
 
     /// Create a new price rule
     pub async fn create(&self, data: PriceRuleCreate) -> RepoResult<PriceRule> {
-        // Check duplicate name
-        if self.find_by_name(&data.name).await?.is_some() {
-            return Err(RepoError::Duplicate(format!(
-                "Price rule '{}' already exists",
-                data.name
-            )));
-        }
-
         // Convert target string to RecordId if provided
         let target_thing: Option<RecordId> = data.target.as_ref().and_then(|t| t.parse().ok());
 
@@ -161,21 +153,6 @@ impl PriceRuleRepository {
         let thing: RecordId = id
             .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-        let existing = self
-            .find_by_id(id)
-            .await?
-            .ok_or_else(|| RepoError::NotFound(format!("Price rule {} not found", id)))?;
-
-        // Check duplicate name if changing
-        if let Some(ref new_name) = data.name
-            && new_name != &existing.name
-            && self.find_by_name(new_name).await?.is_some()
-        {
-            return Err(RepoError::Duplicate(format!(
-                "Price rule '{}' already exists",
-                new_name
-            )));
-        }
 
         // Convert target string to RecordId if provided
         let target_thing: Option<RecordId> = data.target.as_ref().and_then(|t| t.parse().ok());

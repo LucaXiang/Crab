@@ -17,7 +17,6 @@ DEFINE FIELD OVERWRITE operator_name ON shift TYPE string
 -- 班次状态
 DEFINE FIELD OVERWRITE status ON shift TYPE string
     DEFAULT "OPEN"
-    ASSERT $value IN ["OPEN", "CLOSED"]
     PERMISSIONS FULL;
 
 -- 开班时间 (Unix timestamp millis)
