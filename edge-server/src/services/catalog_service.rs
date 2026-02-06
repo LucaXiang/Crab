@@ -838,11 +838,10 @@ impl CatalogService {
         struct InternalCategory {
             name: String,
             sort_order: i32,
-            kitchen_print_destinations: Vec<RecordId>,
-            label_print_destinations: Vec<RecordId>,
+            kitchen_print_destinations: Option<Vec<RecordId>>,
+            label_print_destinations: Option<Vec<RecordId>>,
             is_kitchen_print_enabled: bool,
             is_label_print_enabled: bool,
-            is_active: bool,
             is_virtual: bool,
             tag_ids: Vec<RecordId>,
             match_mode: String,
@@ -852,11 +851,18 @@ impl CatalogService {
         let category = InternalCategory {
             name: data.name,
             sort_order: data.sort_order.unwrap_or(0),
-            kitchen_print_destinations,
-            label_print_destinations,
-            is_kitchen_print_enabled: data.is_kitchen_print_enabled.unwrap_or(true),
-            is_label_print_enabled: data.is_label_print_enabled.unwrap_or(true),
-            is_active: true,
+            kitchen_print_destinations: if kitchen_print_destinations.is_empty() {
+                None
+            } else {
+                Some(kitchen_print_destinations)
+            },
+            label_print_destinations: if label_print_destinations.is_empty() {
+                None
+            } else {
+                Some(label_print_destinations)
+            },
+            is_kitchen_print_enabled: data.is_kitchen_print_enabled.unwrap_or(false),
+            is_label_print_enabled: data.is_label_print_enabled.unwrap_or(false),
             is_virtual: data.is_virtual.unwrap_or(false),
             tag_ids,
             match_mode: data.match_mode.unwrap_or_else(|| "any".to_string()),
@@ -1091,8 +1097,13 @@ impl CatalogService {
 
         // Determine destinations (category > global default)
         let destinations = if let Some(cat) = category.filter(|c| !c.is_virtual) {
-            if !cat.kitchen_print_destinations.is_empty() {
-                cat.kitchen_print_destinations.iter().map(|t| t.to_string()).collect()
+            if let Some(ref dests) = cat.kitchen_print_destinations {
+                if !dests.is_empty() {
+                    dests.iter().map(|t| t.to_string()).collect()
+                } else {
+                    let defaults = self.print_defaults.read();
+                    defaults.kitchen_destination.iter().cloned().collect()
+                }
             } else {
                 let defaults = self.print_defaults.read();
                 defaults.kitchen_destination.iter().cloned().collect()
@@ -1138,8 +1149,13 @@ impl CatalogService {
 
         // Determine destinations (category > global default)
         let destinations = if let Some(cat) = category.filter(|c| !c.is_virtual) {
-            if !cat.label_print_destinations.is_empty() {
-                cat.label_print_destinations.iter().map(|t| t.to_string()).collect()
+            if let Some(ref dests) = cat.label_print_destinations {
+                if !dests.is_empty() {
+                    dests.iter().map(|t| t.to_string()).collect()
+                } else {
+                    let defaults = self.print_defaults.read();
+                    defaults.label_destination.iter().cloned().collect()
+                }
             } else {
                 let defaults = self.print_defaults.read();
                 defaults.label_destination.iter().cloned().collect()

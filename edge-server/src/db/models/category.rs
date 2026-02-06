@@ -14,11 +14,11 @@ pub struct Category {
     pub name: String,
     pub sort_order: i32,
     /// Kitchen print destination references
-    #[serde(with = "serde_helpers::vec_record_id")]
-    pub kitchen_print_destinations: Vec<RecordId>,
+    #[serde(with = "serde_helpers::option_vec_record_id")]
+    pub kitchen_print_destinations: Option<Vec<RecordId>>,
     /// Label print destination references
-    #[serde(with = "serde_helpers::vec_record_id")]
-    pub label_print_destinations: Vec<RecordId>,
+    #[serde(with = "serde_helpers::option_vec_record_id")]
+    pub label_print_destinations: Option<Vec<RecordId>>,
     /// Whether kitchen printing is enabled for this category
     pub is_kitchen_print_enabled: bool,
     pub is_label_print_enabled: bool,
@@ -39,10 +39,10 @@ impl Category {
             id: None,
             name,
             sort_order: 0,
-            kitchen_print_destinations: Vec::new(),
-            label_print_destinations: Vec::new(),
-            is_kitchen_print_enabled: true,
-            is_label_print_enabled: true,
+            kitchen_print_destinations: None,
+            label_print_destinations: None,
+            is_kitchen_print_enabled: false,
+            is_label_print_enabled: false,
             is_virtual: false,
             tag_ids: Vec::new(),
             match_mode: "any".to_string(),

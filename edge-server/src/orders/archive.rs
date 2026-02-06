@@ -840,7 +840,8 @@ impl OrderArchiveService {
                     <string>id AS order_id,
                     receipt_number,
                     prev_hash,
-                    curr_hash
+                    curr_hash,
+                    created_at
                 FROM order
                 WHERE created_at >= $start AND created_at < $end
                 ORDER BY created_at
@@ -862,7 +863,7 @@ impl OrderArchiveService {
             .db
             .query(
                 r#"
-                SELECT curr_hash
+                SELECT curr_hash, created_at
                 FROM order
                 WHERE created_at < $start
                 ORDER BY created_at DESC
