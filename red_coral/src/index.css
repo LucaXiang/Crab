@@ -327,3 +327,8 @@ body.vkb-visible .overflow-y-auto {
   scroll-padding-bottom: var(--vkb-height);
 }
 
+/* Modals: shift up when keyboard is visible (no resize, just reposition) */
+body.vkb-visible .fixed.inset-0 {
+  padding-bottom: var(--vkb-height);
+}
+

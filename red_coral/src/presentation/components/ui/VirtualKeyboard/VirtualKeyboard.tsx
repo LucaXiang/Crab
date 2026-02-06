@@ -303,6 +303,7 @@ export const VirtualKeyboard: React.FC = () => {
       }}
     >
       <Keyboard
+        key={`${language}-${layout}-${useSymbols}`}
         keyboardRef={(r) => { keyboardRef.current = r; }}
         layout={currentLayout}
         layoutName={layoutName}
