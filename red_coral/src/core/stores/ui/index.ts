@@ -27,3 +27,11 @@ export {
 
 // UI Scale Store
 export { useUIScaleStore, useUIScale, useSetUIScale, initUIScale } from './useUIScaleStore';
+
+// Virtual Keyboard Store
+export {
+  useVirtualKeyboardStore,
+  useVirtualKeyboardVisible,
+  useVirtualKeyboardLayout,
+  useVirtualKeyboardMode,
+} from './useVirtualKeyboardStore';

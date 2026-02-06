@@ -27,8 +27,11 @@ export const Z_INDEX = {
   /** 权限升级 - 主管授权 (全局最高优先级) */
   MODAL_AUTH: 9999,
 
+  /** 虚拟键盘 - 在 Toast 之上，确保所有弹窗中都可用 */
+  VIRTUAL_KEYBOARD: 10001,
+
   /** Toast 通知 - 始终位于最上层 */
-  TOAST: 10000,
+  TOAST: 10002,
 } as const;
 
 /**

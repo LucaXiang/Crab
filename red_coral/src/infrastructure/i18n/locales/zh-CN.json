@@ -580,7 +580,8 @@
       "all": "全部",
       "empty": "空闲",
       "occupied": "占用",
-      "pre_payment": "预付"
+      "pre_payment": "预付",
+      "overtime": "久坐"
     },
     "no_tables": "没有可用的桌台",
     "action": {
@@ -1601,7 +1602,12 @@
         "confirm_description": "清除后应用将重新加载，可能需要一些时间恢复数据"
       },
       "performance_mode": "性能模式",
-      "performance_mode_desc": "禁用动画效果，使用系统字体，降低视觉复杂度以提升响应速度"
+      "performance_mode_desc": "禁用动画效果，使用系统字体，降低视觉复杂度以提升响应速度",
+      "virtual_keyboard": "虚拟键盘",
+      "virtual_keyboard_desc": "为触摸屏用户提供应用内虚拟键盘",
+      "virtual_keyboard_always": "始终开启",
+      "virtual_keyboard_auto": "自动",
+      "virtual_keyboard_never": "关闭"
     },
     "permissions": {
       "menu_manage": "菜单管理",

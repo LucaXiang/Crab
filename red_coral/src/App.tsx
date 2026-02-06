@@ -16,6 +16,8 @@ import { PermissionEscalationProvider } from '@/presentation/components/auth/Per
 import { NotificationProvider } from '@/presentation/components/notifications';
 import { ShiftGuard } from '@/presentation/components/shift';
 import { SystemIssueDialog } from '@/presentation/components/modals/SystemIssueDialog';
+import { VirtualKeyboard } from '@/presentation/components/ui/VirtualKeyboard';
+import { useVirtualKeyboardStore } from '@/core/stores/ui';
 
 // Screens
 import { LoginScreen } from '@/screens/Login';
@@ -174,6 +176,40 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Virtual keyboard: global focus detection
+  useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      const el = e.target as HTMLElement;
+      if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
+      // Skip inputs that use their own Numpad
+      if ((el as HTMLElement).dataset.noVkb != null) return;
+      // Skip read-only inputs
+      if ((el as HTMLInputElement).readOnly) return;
+
+      const store = useVirtualKeyboardStore.getState();
+      if (store.isEnabled()) {
+        store.show(el);
+      }
+    };
+
+    const handleFocusOut = (_e: FocusEvent) => {
+      // Delay to let keyboard button pointer events settle
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (active?.tagName !== 'INPUT' && active?.tagName !== 'TEXTAREA') {
+          useVirtualKeyboardStore.getState().hide();
+        }
+      }, 100);
+    };
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
+
   // Disable browser default shortcuts and interactions (生产环境)
   useEffect(() => {
     if (!import.meta.env.PROD) {
@@ -310,6 +346,7 @@ const App: React.FC = () => {
         <ToastContainer />
         <ServerMessageToastContainer />
         <PermissionEscalationProvider />
+        <VirtualKeyboard />
         <SystemIssueDialog issue={currentIssue} onResolve={resolveIssue} />
 
         <Routes>

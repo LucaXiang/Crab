@@ -580,7 +580,8 @@
       "all": "Todas",
       "empty": "Libres",
       "occupied": "Ocupadas",
-      "pre_payment": "Con anticipo"
+      "pre_payment": "Pendiente de pago",
+      "overtime": "Tiempo excedido"
     },
     "no_tables": "Sin mesas disponibles",
     "action": {
@@ -1601,7 +1602,12 @@
         "confirm_description": "La app se recargará"
       },
       "performance_mode": "Modo rendimiento",
-      "performance_mode_desc": "Sin animaciones, fuentes sistema, menos efectos"
+      "performance_mode_desc": "Sin animaciones, fuentes sistema, menos efectos",
+      "virtual_keyboard": "Teclado virtual",
+      "virtual_keyboard_desc": "Teclado en pantalla para dispositivos táctiles",
+      "virtual_keyboard_always": "Siempre",
+      "virtual_keyboard_auto": "Auto",
+      "virtual_keyboard_never": "Nunca"
     },
     "permissions": {
       "menu_manage": "Gestión carta",

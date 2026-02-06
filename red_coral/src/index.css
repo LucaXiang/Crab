@@ -148,3 +148,101 @@ body.performance-mode .focus\:ring-2:focus {
   outline: 2px solid #3b82f6 !important; /* Fallback outline */
 }
 
+/* ============ Virtual Keyboard Theme ============ */
+.vkb-theme.hg-theme-default {
+  background: #f3f4f6;
+  padding: 8px 6px;
+  border-radius: 0;
+  font-family: inherit;
+}
+
+.vkb-theme .hg-row {
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.vkb-theme .hg-button {
+  height: 3rem;
+  border-radius: 0.75rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  color: #1f2937;
+  font-size: 1.1rem;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  flex-grow: 1;
+  cursor: pointer;
+}
+
+.vkb-theme .hg-button:active,
+.vkb-theme .hg-button.hg-activeButton {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #2563eb;
+  transform: scale(0.95);
+}
+
+/* Space bar */
+.vkb-theme .hg-button[data-skbtn="{space}"] {
+  min-width: 40%;
+  background: #fff;
+}
+
+/* Backspace */
+.vkb-theme .hg-button[data-skbtn="{bksp}"] {
+  max-width: 4.5rem;
+  color: #6b7280;
+}
+.vkb-theme .hg-button[data-skbtn="{bksp}"]:active {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #dc2626;
+}
+
+/* Shift / Lock */
+.vkb-theme .hg-button[data-skbtn="{shift}"],
+.vkb-theme .hg-button[data-skbtn="{lock}"] {
+  max-width: 5rem;
+  color: #6b7280;
+  font-size: 1.2rem;
+}
+
+/* Enter */
+.vkb-theme .hg-button[data-skbtn="{enter}"] {
+  max-width: 5rem;
+  background: #1f2937;
+  color: #fff;
+  border-color: #1f2937;
+  font-size: 1.3rem;
+}
+.vkb-theme .hg-button[data-skbtn="{enter}"]:active {
+  background: #111827;
+}
+
+/* Tab - hide it */
+.vkb-theme .hg-button[data-skbtn="{tab}"] {
+  display: none;
+}
+
+/* Symbol / ABC toggle */
+.vkb-theme .hg-button[data-skbtn="{symbols}"],
+.vkb-theme .hg-button[data-skbtn="{abc}"] {
+  max-width: 5rem;
+  font-size: 0.85rem;
+  color: #6b7280;
+  background: #f3f4f6;
+}
+
+/* Number layout */
+.vkb-number .hg-button {
+  height: 3.5rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  border-radius: 1rem;
+}
+
+.vkb-number .hg-row {
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
