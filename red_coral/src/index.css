@@ -48,6 +48,7 @@
 
 :root {
   --ui-scale: 1;
+  --vkb-height: 0px;
   /* Roboto (Latin) + System CJK fonts (中文 fallback) */
   font-family: 'Roboto', "PingFang SC", "Microsoft YaHei", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
@@ -154,11 +155,20 @@ body.performance-mode .focus\:ring-2:focus {
   padding: 8px 6px;
   border-radius: 0;
   font-family: inherit;
+  overflow: visible;
 }
 
-.vkb-theme .hg-row {
+/* Override default theme row spacing (specificity must beat .hg-theme-default .hg-row:not(:last-child)) */
+.vkb-theme.hg-theme-default .hg-row,
+.vkb-theme.hg-theme-default .hg-row:not(:last-child) {
   gap: 4px;
   margin-bottom: 4px;
+}
+
+/* Reset default theme button margin-right (let gap handle spacing) */
+.vkb-theme.hg-theme-default .hg-row .hg-button,
+.vkb-theme.hg-theme-default .hg-row .hg-button:not(:last-child) {
+  margin-right: 0;
 }
 
 .vkb-theme .hg-button {
@@ -184,7 +194,7 @@ body.performance-mode .focus\:ring-2:focus {
 
 /* Space bar */
 .vkb-theme .hg-button[data-skbtn="{space}"] {
-  min-width: 40%;
+  flex: 4;
   background: #fff;
 }
 
@@ -233,6 +243,55 @@ body.performance-mode .focus\:ring-2:focus {
   background: #f3f4f6;
 }
 
+/* Language switch button */
+.vkb-theme .hg-button[data-skbtn="{lang}"] {
+  flex: 0 0 3.5rem;
+  font-size: 1.3rem;
+  color: #6b7280;
+  background: #f3f4f6;
+}
+
+/* Bottom row @ and . keys */
+.vkb-theme .hg-button[data-skbtn="@"],
+.vkb-theme .hg-button[data-skbtn="."] {
+  flex: 0 0 3rem;
+  color: #6b7280;
+}
+
+/* Chinese candidate box — hide when empty */
+.vkb-theme .hg-candidate-box:empty {
+  display: none;
+}
+
+.vkb-theme .hg-candidate-box {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-size: 1.2rem;
+  font-weight: 600;
+  padding: 4px;
+}
+
+.vkb-theme .hg-candidate-box ul li {
+  padding: 6px 12px;
+  border-radius: 0.5rem;
+  min-width: 2.5rem;
+  text-align: center;
+}
+
+.vkb-theme .hg-candidate-box ul li:hover,
+.vkb-theme .hg-candidate-box ul li:active {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.vkb-theme .hg-candidate-box-prev,
+.vkb-theme .hg-candidate-box-next {
+  color: #6b7280;
+  padding: 4px 8px;
+}
+
 /* Number layout */
 .vkb-number .hg-button {
   height: 3.5rem;
@@ -241,8 +300,16 @@ body.performance-mode .focus\:ring-2:focus {
   border-radius: 1rem;
 }
 
-.vkb-number .hg-row {
+.vkb-number.hg-theme-default .hg-row,
+.vkb-number.hg-theme-default .hg-row:not(:last-child) {
   gap: 6px;
   margin-bottom: 6px;
+}
+
+/* ============ Virtual Keyboard Layout Adjustments ============ */
+
+/* Scroll containers: hint scrollIntoView to clear the keyboard */
+body.vkb-visible .overflow-y-auto {
+  scroll-padding-bottom: var(--vkb-height);
 }
 

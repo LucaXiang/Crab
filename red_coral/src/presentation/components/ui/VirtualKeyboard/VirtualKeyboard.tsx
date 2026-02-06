@@ -3,11 +3,57 @@ import Keyboard from 'react-simple-keyboard';
 import type { SimpleKeyboard } from 'react-simple-keyboard';
 import 'react-simple-keyboard/build/css/index.css';
 import spanishLayout from 'simple-keyboard-layouts/build/layouts/spanish';
-import { useVirtualKeyboardStore, useVirtualKeyboardVisible, useVirtualKeyboardLayout } from '@/core/stores/ui/useVirtualKeyboardStore';
+import englishLayout from 'simple-keyboard-layouts/build/layouts/english';
+import chineseLayout from 'simple-keyboard-layouts/build/layouts/chinese';
+import { useVirtualKeyboardStore, useVirtualKeyboardVisible, useVirtualKeyboardLayout, useVirtualKeyboardLanguage } from '@/core/stores/ui/useVirtualKeyboardStore';
+import type { KeyboardLanguage } from '@/core/stores/ui/useVirtualKeyboardStore';
 import { handleKeyboardChange, getCurrentInputValue, scrollActiveElementIntoView } from './useKeyboardInput';
 import { Z_INDEX } from '@/shared/constants/zIndex';
 
-const KEYBOARD_HEIGHT = 280;
+import { pinyinWords } from './pinyinWords';
+
+// The chinese layout exports layoutCandidates at runtime but the TS type doesn't include it
+const charCandidates = (chineseLayout as unknown as { layoutCandidates: Record<string, string> }).layoutCandidates;
+
+/**
+ * Expand word entries into all prefix entries and merge with single-char candidates.
+ *
+ * For word "nihao" → "你好", generates prefix entries:
+ *   "nih"   → "你好"
+ *   "niha"  → "你好"
+ *   "nihao" → "你好"
+ *
+ * Prefixes that already have single-char candidates (like "ni") are skipped
+ * so they don't pollute single-character selection.
+ */
+function buildCandidates(
+  chars: Record<string, string>,
+  words: Record<string, string>,
+): Record<string, string> {
+  const merged = { ...chars };
+
+  // Collect all word candidates per prefix
+  const prefixMap: Record<string, string[]> = {};
+  for (const [pinyin, word] of Object.entries(words)) {
+    for (let len = 2; len <= pinyin.length; len++) {
+      const prefix = pinyin.substring(0, len);
+      // Skip prefixes that have single-char candidates (e.g. "ni", "hao")
+      if (chars[prefix]) continue;
+      if (!prefixMap[prefix]) prefixMap[prefix] = [];
+      if (!prefixMap[prefix].includes(word)) {
+        prefixMap[prefix].push(word);
+      }
+    }
+  }
+
+  for (const [prefix, wordList] of Object.entries(prefixMap)) {
+    merged[prefix] = wordList.join(' ');
+  }
+
+  return merged;
+}
+
+const chineseCandidates = buildCandidates(charCandidates, pinyinWords);
 
 /** Number-only layout for numeric inputs */
 const numberLayout = {
@@ -23,16 +69,22 @@ const numberDisplay: Record<string, string> = {
   '{bksp}': '⌫',
 };
 
-/** Display labels for Spanish text layout */
+/** Display labels for text layout (space is set dynamically per language) */
 const textDisplay: Record<string, string> = {
   '{bksp}': '⌫',
   '{enter}': '↵',
   '{shift}': '⇧',
   '{lock}': '⇪',
   '{tab}': '⇥',
-  '{space}': ' ',
   '{symbols}': '?123',
   '{abc}': 'ABC',
+  '{lang}': '🌐',
+};
+
+const spaceLabel: Record<KeyboardLanguage, string> = {
+  spanish: 'español',
+  english: 'English',
+  chinese: '中文',
 };
 
 /** Symbols layout */
@@ -41,14 +93,47 @@ const symbolsLayout = {
     '1 2 3 4 5 6 7 8 9 0',
     '@ # € % & - + ( )',
     '{abc} ! ? / \' " : ; {bksp}',
-    '{space}',
+    '{lang} {abc} {space}',
   ],
 };
+
+/** Bottom row for text layouts */
+const TEXT_BOTTOM_ROW = '{lang} {symbols} {space} @ .';
+
+/** Replace the original bottom row (.com @ {space}) with our balanced layout */
+function patchBottomRow(layout: Record<string, string[]>): Record<string, string[]> {
+  const patched: Record<string, string[]> = {};
+  for (const key of Object.keys(layout)) {
+    const rows = [...layout[key]];
+    rows[rows.length - 1] = TEXT_BOTTOM_ROW;
+    patched[key] = rows;
+  }
+  return patched;
+}
+
+// Module-level cached patched layouts (computed once)
+const patchedSpanish = patchBottomRow(spanishLayout.layout);
+const patchedEnglish = patchBottomRow(englishLayout.layout);
+const patchedChinese = patchBottomRow(chineseLayout.layout);
+
+const layoutsByLanguage: Record<KeyboardLanguage, Record<string, string[]>> = {
+  spanish: patchedSpanish,
+  english: patchedEnglish,
+  chinese: patchedChinese,
+};
+
+/** Set the --vkb-height CSS variable on :root */
+function setVkbHeight(px: number) {
+  document.documentElement.style.setProperty('--vkb-height', `${px}px`);
+}
 
 export const VirtualKeyboard: React.FC = () => {
   const visible = useVirtualKeyboardVisible();
   const layout = useVirtualKeyboardLayout();
+  const language = useVirtualKeyboardLanguage();
+  const activeElement = useVirtualKeyboardStore((s) => s.activeElement);
   const keyboardRef = useRef<SimpleKeyboard | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const layoutNameRef = useRef<string>('default');
   const [layoutName, setLayoutName] = React.useState('default');
   const [useSymbols, setUseSymbols] = React.useState(false);
@@ -58,32 +143,62 @@ export const VirtualKeyboard: React.FC = () => {
     if (visible && keyboardRef.current) {
       const val = getCurrentInputValue();
       keyboardRef.current.setInput(val);
-      // Scroll into view when keyboard appears
-      scrollActiveElementIntoView();
     }
-  }, [visible]);
+  }, [visible, activeElement]);
 
-  // Set body padding when keyboard is visible
+  // Set CSS variable + body class based on keyboard visibility
   useEffect(() => {
-    if (visible) {
-      document.body.style.paddingBottom = `${KEYBOARD_HEIGHT}px`;
-      document.body.classList.add('vkb-visible');
-    } else {
-      document.body.style.paddingBottom = '';
+    if (!visible) {
+      setVkbHeight(0);
       document.body.classList.remove('vkb-visible');
+      return;
     }
+
+    document.body.classList.add('vkb-visible');
+
+    const updateHeight = () => {
+      if (containerRef.current) {
+        setVkbHeight(containerRef.current.offsetHeight);
+      }
+    };
+
+    // Measure after first paint
+    requestAnimationFrame(updateHeight);
+
+    // Watch for size changes (layout switch, font load, etc.)
+    const observer = new ResizeObserver(updateHeight);
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
     return () => {
-      document.body.style.paddingBottom = '';
+      observer.disconnect();
+      setVkbHeight(0);
       document.body.classList.remove('vkb-visible');
     };
   }, [visible]);
 
-  // Reset symbols state when layout changes
+  // Scroll active element into view when keyboard appears or focus changes
+  useEffect(() => {
+    if (!visible || !activeElement) return;
+
+    // Double rAF ensures CSS variable is applied before scroll calculation
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollActiveElementIntoView();
+      });
+    });
+  }, [visible, activeElement]);
+
+  // Reset symbols state when layout or language changes
   useEffect(() => {
     setUseSymbols(false);
     setLayoutName('default');
     layoutNameRef.current = 'default';
-  }, [layout]);
+    if (keyboardRef.current) {
+      keyboardRef.current.setInput(getCurrentInputValue());
+    }
+  }, [layout, language]);
 
   // Sync activeElement value whenever it changes externally
   useEffect(() => {
@@ -118,6 +233,10 @@ export const VirtualKeyboard: React.FC = () => {
   }, []);
 
   const onKeyPress = useCallback((button: string) => {
+    if (button === '{lang}') {
+      useVirtualKeyboardStore.getState().cycleLanguage();
+      return;
+    }
     if (button === '{shift}' || button === '{lock}') {
       const next = layoutNameRef.current === 'default' ? 'shift' : 'default';
       layoutNameRef.current = next;
@@ -152,25 +271,21 @@ export const VirtualKeyboard: React.FC = () => {
   if (!visible) return null;
 
   const isNumber = layout === 'number';
+  const isChinese = language === 'chinese';
   const currentLayout = isNumber
     ? numberLayout
     : useSymbols
       ? symbolsLayout
-      : spanishLayout.layout;
+      : layoutsByLanguage[language];
   const currentDisplay = isNumber
     ? numberDisplay
-    : useSymbols
-      ? { ...textDisplay }
-      : { ...textDisplay };
+    : { ...textDisplay, '{space}': spaceLabel[language] };
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 bg-gray-100 border-t border-gray-300 shadow-2xl transition-transform duration-200 ease-out"
-      style={{
-        zIndex: Z_INDEX.VIRTUAL_KEYBOARD,
-        height: KEYBOARD_HEIGHT,
-        transform: visible ? 'translateY(0)' : 'translateY(100%)',
-      }}
+      ref={containerRef}
+      className="fixed bottom-0 left-0 right-0 bg-gray-100 border-t border-gray-300 shadow-2xl"
+      style={{ zIndex: Z_INDEX.VIRTUAL_KEYBOARD }}
       onPointerDown={(e) => {
         // Prevent the keyboard container from stealing focus
         e.preventDefault();
@@ -188,6 +303,10 @@ export const VirtualKeyboard: React.FC = () => {
         physicalKeyboardHighlight={false}
         mergeDisplay
         theme={`hg-theme-default hg-layout-default vkb-theme ${isNumber ? 'vkb-number' : 'vkb-text'}`}
+        {...(!isNumber && isChinese && !useSymbols ? {
+          layoutCandidates: chineseCandidates,
+          layoutCandidatesPageSize: 5,
+        } : {})}
       />
     </div>
   );

@@ -2,17 +2,22 @@ import { create } from 'zustand';
 
 type VirtualKeyboardMode = 'always' | 'never' | 'auto';
 type KeyboardLayout = 'text' | 'number';
+export type KeyboardLanguage = 'spanish' | 'english' | 'chinese';
+
+const LANGUAGES: KeyboardLanguage[] = ['spanish', 'english', 'chinese'];
 
 interface VirtualKeyboardState {
   mode: VirtualKeyboardMode;
   visible: boolean;
   activeElement: HTMLElement | null;
   layout: KeyboardLayout;
+  language: KeyboardLanguage;
 
   setMode: (mode: VirtualKeyboardMode) => void;
   show: (element: HTMLElement) => void;
   hide: () => void;
   isEnabled: () => boolean;
+  cycleLanguage: () => void;
 }
 
 function detectTouchScreen(): boolean {
@@ -28,8 +33,10 @@ function resolveLayout(el: HTMLElement): KeyboardLayout {
   return 'text';
 }
 
-// Persist mode to localStorage manually (simple, no middleware needed since it's one field)
+// Persist mode & language to localStorage
 const STORAGE_KEY = 'virtual-keyboard-mode';
+const LANG_STORAGE_KEY = 'virtual-keyboard-language';
+
 function loadMode(): VirtualKeyboardMode {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
@@ -38,11 +45,20 @@ function loadMode(): VirtualKeyboardMode {
   return 'auto';
 }
 
+function loadLanguage(): KeyboardLanguage {
+  try {
+    const v = localStorage.getItem(LANG_STORAGE_KEY);
+    if (v === 'spanish' || v === 'english' || v === 'chinese') return v;
+  } catch { /* ignore */ }
+  return 'spanish';
+}
+
 export const useVirtualKeyboardStore = create<VirtualKeyboardState>()((set, get) => ({
   mode: loadMode(),
   visible: false,
   activeElement: null,
   layout: 'text',
+  language: loadLanguage(),
 
   setMode: (mode) => {
     try { localStorage.setItem(STORAGE_KEY, mode); } catch { /* ignore */ }
@@ -64,6 +80,14 @@ export const useVirtualKeyboardStore = create<VirtualKeyboardState>()((set, get)
     if (mode === 'never') return false;
     return detectTouchScreen();
   },
+
+  cycleLanguage: () => {
+    const current = get().language;
+    const idx = LANGUAGES.indexOf(current);
+    const next = LANGUAGES[(idx + 1) % LANGUAGES.length];
+    try { localStorage.setItem(LANG_STORAGE_KEY, next); } catch { /* ignore */ }
+    set({ language: next });
+  },
 }));
 
 // Selectors
@@ -75,3 +99,6 @@ export const useVirtualKeyboardLayout = () =>
 
 export const useVirtualKeyboardMode = () =>
   useVirtualKeyboardStore((s) => s.mode);
+
+export const useVirtualKeyboardLanguage = () =>
+  useVirtualKeyboardStore((s) => s.language);
