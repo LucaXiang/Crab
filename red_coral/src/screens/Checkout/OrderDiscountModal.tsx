@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { HeldOrder, Permission } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { X, Percent, Tag } from 'lucide-react';
@@ -6,8 +6,11 @@ import { formatCurrency } from '@/utils/currency';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { applyOrderDiscount } from '@/core/stores/order/useOrderOperations';
 import { toast } from '@/presentation/components/Toast';
+import { Numpad } from '@/presentation/components/ui/Numpad';
 
 type DiscountType = 'percent' | 'fixed';
+
+const QUICK_PERCENT_VALUES = [5, 10, 15, 20];
 
 interface OrderDiscountModalProps {
   isOpen: boolean;
@@ -28,6 +31,7 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
     order.order_manual_discount_fixed ? 'fixed' : 'percent'
   );
   const [value, setValue] = useState('');
+  const [isSelected, setIsSelected] = useState(true);
   const [reason, setReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -44,6 +48,7 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
         setDiscountType('percent');
         setValue('');
       }
+      setIsSelected(true);
       setReason('');
       setIsProcessing(false);
     }
@@ -58,6 +63,44 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
     if (discountType === 'percent' && parsedValue > 100) return false;
     return true;
   }, [isProcessing, parsedValue, discountType]);
+
+  const handleNumPress = useCallback((num: string) => {
+    if (isSelected) {
+      setIsSelected(false);
+      setValue(num === '.' ? '0.' : num);
+      return;
+    }
+    setValue((prev) => {
+      if (num === '.' && prev.includes('.')) return prev;
+      if (prev.includes('.') && prev.split('.')[1].length >= 2) return prev;
+      if (prev === '0' && num !== '.') return num;
+      return prev + num;
+    });
+  }, [isSelected]);
+
+  const handleDelete = useCallback(() => {
+    setIsSelected(false);
+    setValue((prev) => {
+      const newVal = prev.slice(0, -1);
+      return newVal || '0';
+    });
+  }, []);
+
+  const handleNumpadClear = useCallback(() => {
+    setValue('0');
+    setIsSelected(true);
+  }, []);
+
+  const handleQuickValue = useCallback((val: number) => {
+    setValue(String(val));
+    setIsSelected(false);
+  }, []);
+
+  const handleTypeChange = useCallback((type: DiscountType) => {
+    setDiscountType(type);
+    setValue('');
+    setIsSelected(true);
+  }, []);
 
   const handleApply = async (authorizer?: { id: string; name: string }) => {
     if (!canConfirm) return;
@@ -97,9 +140,9 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-80 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-orange-50">
+        <div className="shrink-0 px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-orange-50">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-orange-100 rounded-full text-orange-600">
               <Percent size={24} />
@@ -112,9 +155,9 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-6">
+        <div className="p-5 overflow-y-auto space-y-4">
           {/* Order Total Display */}
-          <div className="bg-gray-50 rounded-xl p-4">
+          <div className="bg-gray-50 rounded-xl p-3">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">{t('checkout.amount.total')}</span>
               <span className="font-medium text-gray-900">{formatCurrency(order.original_total)}</span>
@@ -122,76 +165,103 @@ export const OrderDiscountModal: React.FC<OrderDiscountModalProps> = ({
           </div>
 
           {/* Discount Type Selection */}
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => { setDiscountType('percent'); setValue(''); }}
-                className={`p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
-                  discountType === 'percent'
-                    ? 'border-orange-500 bg-orange-50'
-                    : 'border-gray-100 hover:border-orange-200 hover:bg-gray-50'
-                }`}
-              >
-                <div className={`p-2 rounded-lg ${discountType === 'percent' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}>
-                  <Percent size={20} />
-                </div>
-                <span className={`font-medium ${discountType === 'percent' ? 'text-orange-700' : 'text-gray-700'}`}>
-                  {t('checkout.order_discount.type_percent')}
-                </span>
-              </button>
-              <button
-                onClick={() => { setDiscountType('fixed'); setValue(''); }}
-                className={`p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
-                  discountType === 'fixed'
-                    ? 'border-orange-500 bg-orange-50'
-                    : 'border-gray-100 hover:border-orange-200 hover:bg-gray-50'
-                }`}
-              >
-                <div className={`p-2 rounded-lg ${discountType === 'fixed' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}>
-                  <Tag size={20} />
-                </div>
-                <span className={`font-medium ${discountType === 'fixed' ? 'text-orange-700' : 'text-gray-700'}`}>
-                  {t('checkout.order_discount.type_fixed')}
-                </span>
-              </button>
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => handleTypeChange('percent')}
+              className={`p-3 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
+                discountType === 'percent'
+                  ? 'border-orange-500 bg-orange-50'
+                  : 'border-gray-100 hover:border-orange-200 hover:bg-gray-50'
+              }`}
+            >
+              <div className={`p-2 rounded-lg ${discountType === 'percent' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}>
+                <Percent size={20} />
+              </div>
+              <span className={`font-medium ${discountType === 'percent' ? 'text-orange-700' : 'text-gray-700'}`}>
+                {t('checkout.order_discount.type_percent')}
+              </span>
+            </button>
+            <button
+              onClick={() => handleTypeChange('fixed')}
+              className={`p-3 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
+                discountType === 'fixed'
+                  ? 'border-orange-500 bg-orange-50'
+                  : 'border-gray-100 hover:border-orange-200 hover:bg-gray-50'
+              }`}
+            >
+              <div className={`p-2 rounded-lg ${discountType === 'fixed' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}>
+                <Tag size={20} />
+              </div>
+              <span className={`font-medium ${discountType === 'fixed' ? 'text-orange-700' : 'text-gray-700'}`}>
+                {t('checkout.order_discount.type_fixed')}
+              </span>
+            </button>
           </div>
 
-          {/* Value Input */}
+          {/* Value Display */}
           <div className="space-y-2">
-            <input
-              type="number"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder={discountType === 'percent'
-                ? t('checkout.order_discount.percent_placeholder')
-                : t('checkout.order_discount.fixed_placeholder')
-              }
-              className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-2xl font-bold text-center tabular-nums"
-              min="0"
-              max={discountType === 'percent' ? '100' : undefined}
-              step={discountType === 'percent' ? '1' : '0.01'}
-              autoFocus
-            />
+            <div className="h-14 bg-white rounded-xl flex items-center justify-center px-4 border-2 border-orange-200 shadow-sm">
+              <div className="flex items-center">
+                {discountType === 'fixed' && (
+                  <span className="text-orange-500 mr-2 text-xl font-bold">€</span>
+                )}
+                <span
+                  className={`text-3xl font-mono font-bold px-2 rounded transition-colors ${
+                    isSelected ? 'bg-orange-500 text-white' : 'text-gray-800'
+                  }`}
+                >
+                  {value || '0'}
+                </span>
+                {discountType === 'percent' && (
+                  <span className="text-orange-500 ml-1 text-xl font-bold">%</span>
+                )}
+                {!isSelected && (
+                  <span className="animate-pulse ml-0.5 w-0.5 h-7 bg-orange-400 rounded" />
+                )}
+              </div>
+            </div>
             {discountType === 'percent' && parsedValue > 100 && (
               <p className="text-sm text-red-500 text-center">0-100%</p>
             )}
           </div>
 
+          {/* Quick Value Buttons */}
+          {discountType === 'percent' && (
+            <div className="grid grid-cols-4 gap-2">
+              {QUICK_PERCENT_VALUES.map((val) => (
+                <button
+                  key={val}
+                  onClick={() => handleQuickValue(val)}
+                  disabled={isProcessing}
+                  className="h-10 bg-orange-50 border border-orange-200 text-orange-600 font-semibold rounded-lg hover:bg-orange-100 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {val}%
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Numpad */}
+          <Numpad
+            onNumber={handleNumPress}
+            onDelete={handleDelete}
+            onClear={handleNumpadClear}
+            showEnter={false}
+            showDecimal={discountType === 'fixed'}
+          />
+
           {/* Reason */}
-          <div className="space-y-2">
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={t('checkout.order_discount.reason_placeholder')}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none text-sm"
-              rows={2}
-            />
-          </div>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={t('checkout.order_discount.reason_placeholder')}
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none text-sm"
+            rows={2}
+          />
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-100 flex flex-col gap-3 bg-gray-50">
+        <div className="shrink-0 p-5 border-t border-gray-100 flex flex-col gap-3 bg-gray-50">
           {hasExistingDiscount && (
             <EscalatableGate
               permission={Permission.ORDERS_DISCOUNT}
