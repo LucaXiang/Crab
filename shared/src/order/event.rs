@@ -406,8 +406,6 @@ pub enum EventPayload {
         #[serde(skip_serializing_if = "Option::is_none")]
         previous_discount_fixed: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        reason: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_id: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
@@ -427,8 +425,6 @@ pub enum EventPayload {
         previous_surcharge_percent: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         previous_surcharge_amount: Option<f64>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        reason: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_id: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]

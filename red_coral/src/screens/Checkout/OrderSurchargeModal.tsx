@@ -35,7 +35,6 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
   );
   const [value, setValue] = useState('');
   const [isSelected, setIsSelected] = useState(true);
-  const [reason, setReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Reset state only when modal opens (not on order WebSocket updates)
@@ -52,7 +51,6 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
         setValue('');
       }
       setIsSelected(true);
-      setReason('');
       setIsProcessing(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -112,7 +110,6 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
       await applyOrderSurcharge(order.order_id, {
         surchargePercent: surchargeType === 'percent' ? parsedValue : undefined,
         surchargeAmount: surchargeType === 'fixed' ? parsedValue : undefined,
-        reason: reason.trim() || undefined,
         authorizer,
       });
       toast.success(t('checkout.order_surcharge.title'));
@@ -253,14 +250,6 @@ export const OrderSurchargeModal: React.FC<OrderSurchargeModalProps> = ({
             showDecimal={surchargeType === 'fixed'}
           />
 
-          {/* Reason */}
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder={t('checkout.order_surcharge.reason_placeholder')}
-            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm"
-            rows={2}
-          />
         </div>
 
         {/* Footer */}

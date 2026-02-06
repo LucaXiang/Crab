@@ -15,7 +15,6 @@ pub struct ApplyOrderDiscountAction {
     pub order_id: String,
     pub discount_percent: Option<f64>,
     pub discount_fixed: Option<f64>,
-    pub reason: Option<String>,
     pub authorizer_id: Option<String>,
     pub authorizer_name: Option<String>,
 }
@@ -88,7 +87,6 @@ impl CommandHandler for ApplyOrderDiscountAction {
                 discount_fixed: self.discount_fixed,
                 previous_discount_percent,
                 previous_discount_fixed,
-                reason: self.reason.clone(),
                 authorizer_id: self.authorizer_id.clone(),
                 authorizer_name: self.authorizer_name.clone(),
                 subtotal: snapshot.subtotal,
@@ -107,7 +105,6 @@ pub struct ApplyOrderSurchargeAction {
     pub order_id: String,
     pub surcharge_percent: Option<f64>,
     pub surcharge_amount: Option<f64>,
-    pub reason: Option<String>,
     pub authorizer_id: Option<String>,
     pub authorizer_name: Option<String>,
 }
@@ -180,7 +177,6 @@ impl CommandHandler for ApplyOrderSurchargeAction {
                 surcharge_amount: self.surcharge_amount,
                 previous_surcharge_percent,
                 previous_surcharge_amount,
-                reason: self.reason.clone(),
                 authorizer_id: self.authorizer_id.clone(),
                 authorizer_name: self.authorizer_name.clone(),
                 subtotal: snapshot.subtotal,
@@ -270,7 +266,6 @@ mod tests {
             order_id: "order-1".to_string(),
             discount_percent: Some(10.0),
             discount_fixed: None,
-            reason: Some("VIP customer".to_string()),
             authorizer_id: Some("mgr-1".to_string()),
             authorizer_name: Some("Manager".to_string()),
         };
@@ -315,7 +310,6 @@ mod tests {
             order_id: "order-1".to_string(),
             discount_percent: None,
             discount_fixed: Some(25.0),
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -361,7 +355,6 @@ mod tests {
             order_id: "order-1".to_string(),
             discount_percent: None,
             discount_fixed: None,
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -402,7 +395,6 @@ mod tests {
             order_id: "order-1".to_string(),
             discount_percent: Some(10.0),
             discount_fixed: Some(20.0), // 两者同时设置
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -426,7 +418,6 @@ mod tests {
             order_id: "order-1".to_string(),
             discount_percent: Some(-5.0),
             discount_fixed: None,
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -446,7 +437,6 @@ mod tests {
             order_id: "order-1".to_string(),
             discount_percent: Some(101.0),
             discount_fixed: None,
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -467,7 +457,6 @@ mod tests {
             order_id: "order-1".to_string(),
             discount_percent: None,
             discount_fixed: Some(-10.0),
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -494,7 +483,6 @@ mod tests {
             order_id: "order-1".to_string(),
             discount_percent: Some(10.0),
             discount_fixed: None,
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -514,7 +502,6 @@ mod tests {
             order_id: "nonexistent".to_string(),
             discount_percent: Some(10.0),
             discount_fixed: None,
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -540,7 +527,6 @@ mod tests {
             order_id: "order-1".to_string(),
             surcharge_percent: None,
             surcharge_amount: Some(15.0),
-            reason: Some("Large party".to_string()),
             authorizer_id: Some("mgr-1".to_string()),
             authorizer_name: Some("Manager".to_string()),
         };
@@ -589,7 +575,6 @@ mod tests {
             order_id: "order-1".to_string(),
             surcharge_percent: None,
             surcharge_amount: None, // 清除
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -628,7 +613,6 @@ mod tests {
             order_id: "order-1".to_string(),
             surcharge_percent: None,
             surcharge_amount: Some(-5.0),
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -655,7 +639,6 @@ mod tests {
             order_id: "order-1".to_string(),
             surcharge_percent: None,
             surcharge_amount: Some(10.0),
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -675,7 +658,6 @@ mod tests {
             order_id: "nonexistent".to_string(),
             surcharge_percent: None,
             surcharge_amount: Some(10.0),
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -710,7 +692,6 @@ mod tests {
             order_id: "order-1".to_string(),
             discount_percent: Some(10.0), // 10% of 200 = 20 discount
             discount_fixed: None,
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -747,7 +728,6 @@ mod tests {
             order_id: "order-1".to_string(),
             discount_percent: Some(f64::NAN),
             discount_fixed: None,
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -769,7 +749,6 @@ mod tests {
             order_id: "order-1".to_string(),
             surcharge_percent: None,
             surcharge_amount: Some(f64::NAN),
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };
@@ -791,7 +770,6 @@ mod tests {
             order_id: "order-1".to_string(),
             discount_percent: Some(5.0),
             discount_fixed: None,
-            reason: None,
             authorizer_id: None,
             authorizer_name: None,
         };

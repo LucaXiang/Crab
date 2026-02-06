@@ -227,8 +227,6 @@ pub enum OrderCommandPayload {
         discount_fixed: Option<f64>,
         /// 都为 None = 取消折扣；percent 和 fixed 互斥
         #[serde(skip_serializing_if = "Option::is_none")]
-        reason: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_id: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
@@ -268,8 +266,6 @@ pub enum OrderCommandPayload {
         /// 固定附加费金额，与 surcharge_percent 互斥；两者都为 None = 清除
         #[serde(skip_serializing_if = "Option::is_none")]
         surcharge_amount: Option<f64>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        reason: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_id: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]

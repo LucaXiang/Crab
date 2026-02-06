@@ -682,7 +682,6 @@ export const applyOrderDiscount = async (
   options?: {
     discountPercent?: number;
     discountFixed?: number;
-    reason?: string;
     authorizer?: { id: string; name: string };
   },
 ): Promise<void> => {
@@ -691,7 +690,6 @@ export const applyOrderDiscount = async (
     order_id: orderId,
     discount_percent: options?.discountPercent ?? null,
     discount_fixed: options?.discountFixed ?? null,
-    reason: options?.reason ?? null,
     authorizer_id: options?.authorizer?.id ?? null,
     authorizer_name: options?.authorizer?.name ?? null,
   });
@@ -710,7 +708,6 @@ export const applyOrderSurcharge = async (
   options?: {
     surchargePercent?: number;
     surchargeAmount?: number;
-    reason?: string;
     authorizer?: { id: string; name: string };
   },
 ): Promise<void> => {
@@ -719,7 +716,6 @@ export const applyOrderSurcharge = async (
     order_id: orderId,
     surcharge_percent: options?.surchargePercent ?? null,
     surcharge_amount: options?.surchargeAmount ?? null,
-    reason: options?.reason ?? null,
     authorizer_id: options?.authorizer?.id ?? null,
     authorizer_name: options?.authorizer?.name ?? null,
   });

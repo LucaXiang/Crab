@@ -123,7 +123,6 @@ mod tests {
                 discount_fixed,
                 previous_discount_percent,
                 previous_discount_fixed,
-                reason: None,
                 authorizer_id: None,
                 authorizer_name: None,
                 subtotal: 0.0,   // applier recalculates
@@ -152,7 +151,6 @@ mod tests {
                 surcharge_amount,
                 previous_surcharge_percent: None,
                 previous_surcharge_amount,
-                reason: None,
                 authorizer_id: None,
                 authorizer_name: None,
                 subtotal: 0.0,

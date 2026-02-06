@@ -366,7 +366,6 @@ export interface OrderDiscountAppliedPayload {
   discount_fixed?: number | null;
   previous_discount_percent?: number | null;
   previous_discount_fixed?: number | null;
-  reason?: string | null;
   authorizer_id?: string | null;
   authorizer_name?: string | null;
   subtotal: number;
@@ -381,7 +380,6 @@ export interface OrderSurchargeAppliedPayload {
   surcharge_amount?: number | null;
   previous_surcharge_percent?: number | null;
   previous_surcharge_amount?: number | null;
-  reason?: string | null;
   authorizer_id?: string | null;
   authorizer_name?: string | null;
   subtotal: number;

@@ -543,7 +543,6 @@ export function useOrderCommands() {
       options?: {
         discountPercent?: number;
         discountFixed?: number;
-        reason?: string;
         authorizer?: { id: string; name: string };
       },
     ): Promise<CommandResponse> => {
@@ -552,7 +551,6 @@ export function useOrderCommands() {
         order_id: orderId,
         discount_percent: options?.discountPercent ?? null,
         discount_fixed: options?.discountFixed ?? null,
-        reason: options?.reason ?? null,
         authorizer_id: options?.authorizer?.id ?? null,
         authorizer_name: options?.authorizer?.name ?? null,
       });
@@ -571,7 +569,6 @@ export function useOrderCommands() {
       orderId: string,
       options?: {
         surchargeAmount?: number;
-        reason?: string;
         authorizer?: { id: string; name: string };
       },
     ): Promise<CommandResponse> => {
@@ -579,7 +576,6 @@ export function useOrderCommands() {
         type: 'APPLY_ORDER_SURCHARGE',
         order_id: orderId,
         surcharge_amount: options?.surchargeAmount ?? null,
-        reason: options?.reason ?? null,
         authorizer_id: options?.authorizer?.id ?? null,
         authorizer_name: options?.authorizer?.name ?? null,
       });
