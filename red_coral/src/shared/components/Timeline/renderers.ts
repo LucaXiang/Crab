@@ -439,7 +439,7 @@ const ItemSplitRenderer: EventRenderer<ItemSplitPayload> = {
     return {
       title: t('timeline.item_split'),
       summary: payload.split_amount != null
-        ? `${formatCurrency(payload.split_amount)} (${methodDisplay})`
+        ? `${formatCurrency(payload.split_amount)} · ${methodDisplay}`
         : '',
       details,
       icon: Split,
@@ -457,7 +457,7 @@ const AmountSplitRenderer: EventRenderer<AmountSplitPayload> = {
     return {
       title: t('timeline.amount_split'),
       summary: payload.split_amount != null
-        ? `${formatCurrency(payload.split_amount)} (${methodDisplay})`
+        ? `${formatCurrency(payload.split_amount)} · ${methodDisplay}`
         : '',
       details: [],
       icon: Split,
@@ -495,7 +495,7 @@ const AaSplitPaidRenderer: EventRenderer<AaSplitPaidPayload> = {
     return {
       title: t('timeline.aa_split_paid'),
       summary: payload.amount != null
-        ? `${formatCurrency(payload.amount)} (${methodDisplay})${progress}`
+        ? `${formatCurrency(payload.amount)} · ${methodDisplay}${progress}`
         : '',
       details: [],
       icon: Users,
@@ -779,7 +779,6 @@ const OrderDiscountAppliedRenderer: EventRenderer<OrderDiscountAppliedPayload> =
 
     return {
       title: isClearing ? t('timeline.discount_cleared') : t('timeline.discount_applied'),
-      summary: payload.reason ?? undefined,
       details,
       detailTags,
       icon: Tag,
@@ -814,7 +813,6 @@ const OrderSurchargeAppliedRenderer: EventRenderer<OrderSurchargeAppliedPayload>
 
     return {
       title: isClearing ? t('timeline.surcharge_cleared') : t('timeline.surcharge_applied'),
-      summary: payload.reason ?? undefined,
       details,
       detailTags,
       icon: Tag,
