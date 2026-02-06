@@ -281,19 +281,24 @@ export function useCheckoutActions() {
 // Retail service type state
 export type RetailServiceType = 'dineIn' | 'takeout';
 
-// Create a simple store for retail service type
-let _retailServiceType: RetailServiceType = 'dineIn';
+const useRetailServiceTypeStore = create<{
+  serviceType: RetailServiceType;
+  set: (type: RetailServiceType) => void;
+}>((set) => ({
+  serviceType: 'dineIn',
+  set: (type) => set({ serviceType: type }),
+}));
 
 export function getRetailServiceType(): RetailServiceType {
-  return _retailServiceType;
+  return useRetailServiceTypeStore.getState().serviceType;
 }
 
 export function setRetailServiceType(type: RetailServiceType): void {
-  _retailServiceType = type;
+  useRetailServiceTypeStore.getState().set(type);
 }
 
 export function useRetailServiceType(): RetailServiceType {
-  return _retailServiceType;
+  return useRetailServiceTypeStore((s) => s.serviceType);
 }
 
 /** Map frontend RetailServiceType to backend ServiceType */

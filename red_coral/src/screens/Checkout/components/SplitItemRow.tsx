@@ -18,9 +18,10 @@ export const SplitItemRow: React.FC<SplitItemRowProps> = ({ item }) => {
   const [imageUrl] = useImageUrl(product?.image);
   const imageSrc = imageUrl || DefaultImage;
 
-  // Server-authoritative: use backend-computed values
+  // For split items, always compute from unit_price × quantity
+  // (item.line_total may reflect the original item's full total, not the split portion)
   const unitPrice = item.unit_price ?? item.price;
-  const lineTotal = item.line_total ?? (unitPrice * item.quantity);
+  const lineTotal = unitPrice * item.quantity;
 
   return (
     <div className="flex items-center gap-3 py-2 select-none">
@@ -59,7 +60,7 @@ export const SplitItemRow: React.FC<SplitItemRowProps> = ({ item }) => {
       {/* Price */}
       <div className="text-right shrink-0 tabular-nums">
         <div className="text-sm text-gray-500">
-          x{item.quantity} @ {formatCurrency(unitPrice)}
+          x{item.quantity} · {formatCurrency(unitPrice)}
         </div>
         <div className="font-bold text-gray-700">{formatCurrency(lineTotal)}</div>
       </div>

@@ -52,7 +52,7 @@ export const Numpad: React.FC<NumpadProps> = React.memo(
       {/* Action Row */}
       <button
         onClick={onClear}
-        className={`bg-gray-50 border border-gray-100 rounded-2xl text-gray-500 font-bold hover:bg-gray-100 hover:text-gray-700 active:scale-95 active:bg-gray-200 transition-all shadow-sm ${!showEnter ? 'col-span-3' : ''}`}
+        className={`bg-red-50 border border-red-100 rounded-2xl text-red-500 font-bold hover:bg-red-100 hover:text-red-700 active:scale-95 active:bg-red-200 transition-all shadow-sm ${!showEnter ? 'col-span-3' : ''}`}
       >
         C
       </button>

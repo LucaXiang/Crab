@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { HeldOrder, PaymentRecord } from '@/core/domain/types';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag, Receipt, ImageOff, Users, Calculator, PieChart, X, Lock as LockIcon, Check, Clock, Gift, Percent, TrendingUp, ClipboardList } from 'lucide-react';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag, Receipt, ImageOff, Users, Calculator, PieChart, X, Lock as LockIcon, Check, Clock, Gift, Percent, TrendingUp, ClipboardList, ChevronRight } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
 import { Permission } from '@/core/domain/types';
-import { useRetailServiceType, setRetailServiceType } from '@/core/stores/order/useCheckoutStore';
+import { useRetailServiceType, setRetailServiceType, toBackendServiceType } from '@/core/stores/order/useCheckoutStore';
 import { CompItemMode } from '../CompItemMode';
 import { OrderDetailMode } from '../OrderDetailMode';
 import { OrderDiscountModal } from '../OrderDiscountModal';
@@ -88,13 +88,16 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   const aaRemainingShares = isAALocked ? (order.aa_total_shares! - (order.aa_paid_shares ?? 0)) : 0;
   const [splitMode, setSplitMode] = useState<'CUSTOM' | 'AA'>('CUSTOM');
   const [activeInput, setActiveInput] = useState<'CUSTOM' | 'AA_TOTAL' | 'AA_PAY'>('CUSTOM');
+  const replaceMode = React.useRef(true); // First keypress after focus clears the field
   const [aaTotalStr, setAATotalStr] = useState<string>(String(order.guest_count || 2));
   const [aaPayStr, setAAPayStr] = useState<string>('1');
 
-  // Auto-enter AA mode when server has AA locked
+  // Auto-enter AA mode: when server has AA locked, or when entering AMOUNT_SPLIT
   React.useEffect(() => {
     if (isAALocked) {
       setSplitMode('AA');
+      setActiveInput('AA_PAY');
+      replaceMode.current = true;
       setAATotalStr(order.aa_total_shares!.toString());
       // Clamp aaPayStr to remaining shares
       const pay = parseInt(aaPayStr) || 1;
@@ -102,8 +105,13 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
       if (pay > maxPay && maxPay > 0) {
         setAAPayStr(maxPay.toString());
       }
+    } else if (mode === 'AMOUNT_SPLIT') {
+      // First time entering AA: focus on total shares
+      setSplitMode('AA');
+      setActiveInput('AA_TOTAL');
+      replaceMode.current = true;
     }
-  }, [isAALocked, order.aa_total_shares, aaRemainingShares]);
+  }, [isAALocked, order.aa_total_shares, aaRemainingShares, mode]);
 
   // Sync amountSplitValue with AA state
   React.useEffect(() => {
@@ -132,45 +140,46 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
       if (activeInput === 'CUSTOM') setAmountSplitValue('');
       else if (activeInput === 'AA_TOTAL') setAATotalStr('');
       else if (activeInput === 'AA_PAY') setAAPayStr('');
+      replaceMode.current = false;
       return;
     }
 
     if (value === 'backspace') {
+      replaceMode.current = false;
       if (activeInput === 'CUSTOM') setAmountSplitValue(prev => prev.slice(0, -1));
       else if (activeInput === 'AA_TOTAL') setAATotalStr(prev => prev.slice(0, -1));
       else if (activeInput === 'AA_PAY') setAAPayStr(prev => prev.slice(0, -1));
       return;
     }
 
+    // Replace mode: first keypress after focus clears the field
+    const shouldReplace = replaceMode.current;
+    if (shouldReplace) replaceMode.current = false;
+
     // Handle numeric input
     if (activeInput === 'CUSTOM') {
       // Allow decimals for amount
-      if (value === '.' && amountSplitValue.includes('.')) return;
-      setAmountSplitValue(prev => {
-        const next = prev + value;
-        // Basic validation: max 2 decimals
-        if (next.includes('.') && next.split('.')[1].length > 2) return prev;
-        return next;
-      });
+      const base = shouldReplace ? '' : amountSplitValue;
+      if (value === '.' && base.includes('.')) return;
+      const next = base + value;
+      if (next.includes('.') && next.split('.')[1].length > 2) return;
+      setAmountSplitValue(next);
     } else {
       // Integer only for counts
       if (value === '.') return;
-      
+
       if (activeInput === 'AA_TOTAL') {
         setAATotalStr(prev => {
-          const next = prev + value;
-          if (parseInt(next) > 999) return prev; // Sanity limit
+          const next = (shouldReplace ? '' : prev) + value;
+          if (parseInt(next) > 999) return prev;
           return next;
         });
       } else if (activeInput === 'AA_PAY') {
         setAAPayStr(prev => {
-          const next = prev + value;
+          const next = (shouldReplace ? '' : prev) + value;
           const total = parseInt(aaTotalStr) || 1;
           const maxPay = isAALocked ? aaRemainingShares : total;
-
-          // Prevent entering more shares than allowed
-          if (parseInt(next) > maxPay) return prev;
-
+          if (parseInt(next) > maxPay) return shouldReplace ? value : prev;
           if (parseInt(next) > 999) return prev;
           return next;
         });
@@ -183,9 +192,9 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     // When AA is locked, prevent switching to CUSTOM mode
     if (field === 'CUSTOM' && isAALocked) return;
     setActiveInput(field);
+    replaceMode.current = true; // First keypress will replace existing value
     if (field === 'CUSTOM') {
       setSplitMode('CUSTOM');
-      // Do not reset amountSplitValue, allow user to edit current value (whether from AA or manual)
     } else {
       setSplitMode('AA');
     }
@@ -302,7 +311,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
         // Complete order via backend (fire & forget)
         // receipt_number is server-generated at OpenTable
-        await completeOrder(order.order_id, [payment]);
+        await completeOrder(order.order_id, [payment], order.is_retail ? toBackendServiceType(serviceType) : null);
         const is_retail = order.is_retail;
 
         setShowCashModal(false);
@@ -347,7 +356,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
 
       // Complete order via backend (fire & forget)
       // receipt_number is server-generated at OpenTable
-      await completeOrder(order.order_id, [payment]);
+      await completeOrder(order.order_id, [payment], order.is_retail ? toBackendServiceType(serviceType) : null);
       const is_retail = order.is_retail;
 
       setSuccessModal({
@@ -447,7 +456,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         const willComplete = Currency.sub(remaining, total).toNumber() <= 0.01;
 
         if (willComplete) {
-          await completeOrder(order.order_id, []);
+          await completeOrder(order.order_id, [], order.is_retail ? toBackendServiceType(serviceType) : null);
         }
 
         // Show success modal for cash payments
@@ -544,7 +553,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         const willComplete = Currency.sub(remaining, amount).toNumber() <= 0.01;
 
         if (willComplete) {
-          await completeOrder(order.order_id, []);
+          await completeOrder(order.order_id, [], order.is_retail ? toBackendServiceType(serviceType) : null);
         }
 
         // Show success modal for cash payments
@@ -1519,16 +1528,19 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                       </div>
                     </div>
 
-                    {/* Split Items Detail */}
+                    {/* Split Items Detail (collapsible, default collapsed) */}
                     {payment.split_items && payment.split_items.length > 0 && (
-                      <div className="mt-4 pt-4 border-t border-gray-100">
-                        <div className="text-xs text-gray-400 uppercase font-bold mb-2">{t('checkout.payment.split_items')}</div>
-                        <div className="divide-y divide-gray-50">
+                      <details className="mt-4 pt-4 border-t border-gray-100">
+                        <summary className="text-xs text-gray-400 uppercase font-bold cursor-pointer select-none hover:text-gray-500 transition-colors list-none flex items-center gap-1">
+                          <ChevronRight size={14} className="transition-transform [details[open]>&]:rotate-90" />
+                          {t('checkout.payment.split_items')} ({payment.split_items.length})
+                        </summary>
+                        <div className="divide-y divide-gray-50 mt-2">
                           {payment.split_items.map((item, idx) => (
                             <SplitItemRow key={idx} item={item} />
                           ))}
                         </div>
-                      </div>
+                      </details>
                     )}
                   </div>
                 );
