@@ -20,7 +20,6 @@ mod modify_item;
 mod move_order;
 pub mod open_table;
 mod remove_item;
-mod restore_item;
 mod split_order;
 mod toggle_rule_skip;
 mod uncomp_item;
@@ -39,7 +38,6 @@ pub use modify_item::ModifyItemAction;
 pub use move_order::MoveOrderAction;
 pub use open_table::OpenTableAction;
 pub use remove_item::RemoveItemAction;
-pub use restore_item::RestoreItemAction;
 pub use split_order::{PayAaSplitAction, SplitByAmountAction, SplitByItemsAction, StartAaSplitAction};
 pub use toggle_rule_skip::ToggleRuleSkipAction;
 pub use uncomp_item::UncompItemAction;
@@ -52,7 +50,6 @@ pub enum CommandAction {
     AddItems(AddItemsAction),
     ModifyItem(ModifyItemAction),
     RemoveItem(RemoveItemAction),
-    RestoreItem(RestoreItemAction),
     CompItem(CompItemAction),
     UncompItem(UncompItemAction),
     AddPayment(AddPaymentAction),
@@ -85,7 +82,6 @@ impl CommandHandler for CommandAction {
             CommandAction::AddItems(action) => action.execute(ctx, metadata).await,
             CommandAction::ModifyItem(action) => action.execute(ctx, metadata).await,
             CommandAction::RemoveItem(action) => action.execute(ctx, metadata).await,
-            CommandAction::RestoreItem(action) => action.execute(ctx, metadata).await,
             CommandAction::CompItem(action) => action.execute(ctx, metadata).await,
             CommandAction::UncompItem(action) => action.execute(ctx, metadata).await,
             CommandAction::AddPayment(action) => action.execute(ctx, metadata).await,
@@ -198,13 +194,6 @@ impl From<&OrderCommand> for CommandAction {
                 note: note.clone(),
                 authorizer_id: authorizer_id.clone(),
                 authorizer_name: authorizer_name.clone(),
-            }),
-            OrderCommandPayload::RestoreItem {
-                order_id,
-                instance_id,
-            } => CommandAction::RestoreItem(RestoreItemAction {
-                order_id: order_id.clone(),
-                instance_id: instance_id.clone(),
             }),
             OrderCommandPayload::UpdateOrderInfo {
                 order_id,

@@ -15,7 +15,6 @@ import type {
   ItemsAddedPayload,
   ItemModifiedPayload,
   ItemRemovedPayload,
-  ItemRestoredPayload,
   ItemCompedPayload,
   ItemUncompedPayload,
   PaymentAddedPayload,
@@ -275,20 +274,6 @@ const ItemRemovedRenderer: EventRenderer<ItemRemovedPayload> = {
       details,
       icon: Trash2,
       colorClass: 'bg-red-500',
-      timestamp: event.timestamp,
-      tags: payload.instance_id ? [{ text: `#${payload.instance_id.slice(-5)}`, type: 'item' as const }] : [],
-    };
-  }
-};
-
-const ItemRestoredRenderer: EventRenderer<ItemRestoredPayload> = {
-  render(event, payload, t) {
-    return {
-      title: t('timeline.item_restored'),
-      summary: payload.item_name || '',
-      details: [],
-      icon: Utensils,
-      colorClass: 'bg-green-400',
       timestamp: event.timestamp,
       tags: payload.instance_id ? [{ text: `#${payload.instance_id.slice(-5)}`, type: 'item' as const }] : [],
     };
@@ -876,7 +861,6 @@ export const EVENT_RENDERERS: Record<OrderEventType, EventRenderer<any>> = {
   ITEMS_ADDED: ItemsAddedRenderer,
   ITEM_MODIFIED: ItemModifiedRenderer,
   ITEM_REMOVED: ItemRemovedRenderer,
-  ITEM_RESTORED: ItemRestoredRenderer,
   ITEM_COMPED: ItemCompedRenderer,
   ITEM_UNCOMPED: ItemUncompedRenderer,
   PAYMENT_ADDED: PaymentAddedRenderer,

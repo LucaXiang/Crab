@@ -1911,9 +1911,6 @@ impl ClientBridge {
                             shared::order::OrderCommandPayload::RemoveItem { .. } => {
                                 "order.remove_item"
                             }
-                            shared::order::OrderCommandPayload::RestoreItem { .. } => {
-                                "order.restore_item"
-                            }
                             shared::order::OrderCommandPayload::AddPayment { .. } => {
                                 "order.add_payment"
                             }

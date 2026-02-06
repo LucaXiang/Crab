@@ -48,7 +48,6 @@ pub enum OrderEventType {
     ItemsAdded,
     ItemModified,
     ItemRemoved,
-    ItemRestored,
     ItemComped,
     ItemUncomped,
 
@@ -93,7 +92,6 @@ impl std::fmt::Display for OrderEventType {
             OrderEventType::ItemsAdded => write!(f, "ITEMS_ADDED"),
             OrderEventType::ItemModified => write!(f, "ITEM_MODIFIED"),
             OrderEventType::ItemRemoved => write!(f, "ITEM_REMOVED"),
-            OrderEventType::ItemRestored => write!(f, "ITEM_RESTORED"),
             OrderEventType::ItemComped => write!(f, "ITEM_COMPED"),
             OrderEventType::ItemUncomped => write!(f, "ITEM_UNCOMPED"),
             OrderEventType::PaymentAdded => write!(f, "PAYMENT_ADDED"),
@@ -205,11 +203,6 @@ pub enum EventPayload {
         authorizer_id: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         authorizer_name: Option<String>,
-    },
-
-    ItemRestored {
-        instance_id: String,
-        item_name: String,
     },
 
     /// Item comped (gifted) - marked as free with audit trail

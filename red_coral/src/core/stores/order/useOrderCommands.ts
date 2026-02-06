@@ -241,22 +241,6 @@ export function useOrderCommands() {
     []
   );
 
-  /**
-   * Restore a removed item
-   */
-  const restoreItem = useCallback(
-    async (orderId: string, instanceId: string): Promise<CommandResponse> => {
-      const command = createCommand({
-        type: 'RESTORE_ITEM',
-        order_id: orderId,
-        instance_id: instanceId,
-      });
-
-      return sendCommand(command);
-    },
-    []
-  );
-
   // ==================== Payment Operations ====================
 
   /**
@@ -614,7 +598,6 @@ export function useOrderCommands() {
     addItems,
     modifyItem,
     removeItem,
-    restoreItem,
 
     // Payment Operations
     addPayment,

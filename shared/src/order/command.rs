@@ -109,12 +109,6 @@ pub enum OrderCommandPayload {
         authorizer_name: Option<String>,
     },
 
-    /// Restore a removed item
-    RestoreItem {
-        order_id: String,
-        instance_id: String,
-    },
-
     // ========== Payment Operations ==========
     /// Add payment to order
     AddPayment {
@@ -316,7 +310,6 @@ impl OrderCommand {
             OrderCommandPayload::AddItems { order_id, .. } => Some(order_id),
             OrderCommandPayload::ModifyItem { order_id, .. } => Some(order_id),
             OrderCommandPayload::RemoveItem { order_id, .. } => Some(order_id),
-            OrderCommandPayload::RestoreItem { order_id, .. } => Some(order_id),
             OrderCommandPayload::AddPayment { order_id, .. } => Some(order_id),
             OrderCommandPayload::CancelPayment { order_id, .. } => Some(order_id),
             OrderCommandPayload::SplitByItems { order_id, .. } => Some(order_id),

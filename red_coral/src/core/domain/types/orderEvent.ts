@@ -30,7 +30,6 @@ export type OrderEventType =
   | 'ITEMS_ADDED'
   | 'ITEM_MODIFIED'
   | 'ITEM_REMOVED'
-  | 'ITEM_RESTORED'
   | 'ITEM_COMPED'
   | 'ITEM_UNCOMPED'
   | 'PAYMENT_ADDED'
@@ -93,7 +92,6 @@ export type EventPayload =
   | ItemsAddedPayload
   | ItemModifiedPayload
   | ItemRemovedPayload
-  | ItemRestoredPayload
   | ItemCompedPayload
   | ItemUncompedPayload
   | PaymentAddedPayload
@@ -198,12 +196,6 @@ export interface ItemRemovedPayload {
   reason?: string | null;
   authorizer_id?: string | null;
   authorizer_name?: string | null;
-}
-
-export interface ItemRestoredPayload {
-  type: 'ITEM_RESTORED';
-  instance_id: string;
-  item_name: string;
 }
 
 /** Item comped (gifted) - marked as free with audit trail */
@@ -433,7 +425,6 @@ export type OrderCommandPayload =
   | AddItemsCommand
   | ModifyItemCommand
   | RemoveItemCommand
-  | RestoreItemCommand
   | AddPaymentCommand
   | CancelPaymentCommand
   | SplitByItemsCommand
@@ -508,12 +499,6 @@ export interface RemoveItemCommand {
   reason?: string | null;
   authorizer_id?: string | null;
   authorizer_name?: string | null;
-}
-
-export interface RestoreItemCommand {
-  type: 'RESTORE_ITEM';
-  order_id: string;
-  instance_id: string;
 }
 
 /** Comp (gift) an item - mark as free with reason and authorizer */
