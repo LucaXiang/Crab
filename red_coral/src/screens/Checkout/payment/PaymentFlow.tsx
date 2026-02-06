@@ -443,19 +443,36 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           method === 'CASH' ? cashDetails?.tendered : undefined,
         );
 
+        // Check if this split covers the remaining amount → auto-complete
+        const willComplete = Currency.sub(remaining, total).toNumber() <= 0.01;
+
+        if (willComplete) {
+          await completeOrder(order.order_id, []);
+        }
+
         // Show success modal for cash payments
         if (method === 'CASH' && cashDetails?.tendered !== undefined) {
           setSuccessModal({
             isOpen: true,
             type: 'CASH',
             change: cashDetails.tendered - total,
-            onClose: () => setSuccessModal(null),
-            autoCloseDelay: 10000,
+            onClose: willComplete ? handleComplete : () => setSuccessModal(null),
+            autoCloseDelay: willComplete && order.is_retail ? 0 : 10000,
+          });
+        } else if (willComplete) {
+          // Card split that completes the order
+          setSuccessModal({
+            isOpen: true,
+            type: 'NORMAL',
+            onClose: handleComplete,
+            autoCloseDelay: order.is_retail ? 0 : 10000,
           });
         }
 
-        setMode('ITEM_SPLIT');
-        setSplitItems({});
+        if (!willComplete) {
+          setMode('ITEM_SPLIT');
+          setSplitItems({});
+        }
         return true;
       } catch (err) {
         console.error('Split failed:', err);
@@ -465,7 +482,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         setIsProcessingSplit(false);
       }
     },
-    [order, isProcessingSplit, splitItems, t]
+    [order, isProcessingSplit, splitItems, remaining, t, handleComplete]
   );
 
   const handleConfirmSplitCash = useCallback(
@@ -523,18 +540,35 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
           await splitByAmount(order.order_id, amount, method, tendered);
         }
 
+        // Check if this split covers the remaining amount → auto-complete
+        const willComplete = Currency.sub(remaining, amount).toNumber() <= 0.01;
+
+        if (willComplete) {
+          await completeOrder(order.order_id, []);
+        }
+
         // Show success modal for cash payments
         if (method === 'CASH' && cashDetails?.tendered !== undefined) {
           setSuccessModal({
             isOpen: true,
             type: 'CASH',
             change: cashDetails.tendered - amount,
-            onClose: () => setSuccessModal(null),
-            autoCloseDelay: 10000,
+            onClose: willComplete ? handleComplete : () => setSuccessModal(null),
+            autoCloseDelay: willComplete && order.is_retail ? 0 : 10000,
+          });
+        } else if (willComplete) {
+          // Card split that completes the order
+          setSuccessModal({
+            isOpen: true,
+            type: 'NORMAL',
+            onClose: handleComplete,
+            autoCloseDelay: order.is_retail ? 0 : 10000,
           });
         }
 
-        setAmountSplitValue('');
+        if (!willComplete) {
+          setAmountSplitValue('');
+        }
         return true;
       } catch (err) {
         console.error('Amount split failed:', err);
@@ -544,7 +578,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
         setIsProcessingAmountSplit(false);
       }
     },
-    [order, isProcessingAmountSplit, amountSplitValue, remaining, t, splitMode, aaPayStr, aaTotalStr, isAALocked]
+    [order, isProcessingAmountSplit, amountSplitValue, remaining, t, splitMode, aaPayStr, aaTotalStr, isAALocked, handleComplete]
   );
 
   const handleConfirmAmountSplitCash = useCallback(
