@@ -57,6 +57,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         >
           <ClipboardList size={24} />
         </button>
+        <IconBtn icon={LogOut} size={24} className="p-3 hover:bg-white/10 rounded-xl text-white/50" onClick={onRequestExit} onMouseDown={(e) => e.preventDefault()} />
       </div>
 
       <div className="flex items-center gap-2">
@@ -72,7 +73,6 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         >
           <IconBtn icon={Archive} size={24} className="p-3 hover:bg-white/10 rounded-xl" onClick={onOpenCashDrawer} onMouseDown={(e) => e.preventDefault()} />
         </EscalatableGate>
-        <IconBtn icon={LogOut} size={24} className="p-3 hover:bg-white/10 rounded-xl" onClick={onRequestExit} onMouseDown={(e) => e.preventDefault()} />
       </div>
     </div>
   );

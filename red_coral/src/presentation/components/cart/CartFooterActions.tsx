@@ -1,5 +1,5 @@
 import React from 'react';
-import { List, RotateCcw, PauseCircle, Save, Trash2 } from 'lucide-react';
+import { List, RotateCcw, Bookmark, Save, Trash2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 
 interface CartFooterActionsProps {
@@ -51,7 +51,7 @@ export const CartFooterActions = React.memo<CartFooterActionsProps>(({
             onClick={onManageTable}
             className="flex-1 hover:bg-gray-50 active:bg-orange-100 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 pt-1 text-orange-600"
           >
-            <PauseCircle size={20} />
+            <Bookmark size={20} />
             <span className="text-sm">{t('pos.sidebar.hold')}</span>
           </button>
           <button

@@ -308,8 +308,8 @@
     "all_categories": "全部分类",
     "sidebar": {
       "get_order": "取单",
-      "drafts": "挂单",
-      "no_drafts": "无挂单",
+      "drafts": "草稿",
+      "no_drafts": "无草稿",
       "hold": "挂单",
       "save": "保存",
       "clear": "清空",

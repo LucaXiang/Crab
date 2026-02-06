@@ -72,7 +72,7 @@
       "status": "Estado",
       "is_active": "Estado",
       "paidQuantity": "{qty} uds pagadas",
-      "retail": "Venta directa",
+      "retail": "Venta",
       "loss_amount": "Pérdida"
     },
     "message": {
@@ -308,8 +308,8 @@
     "all_categories": "Todas",
     "sidebar": {
       "get_order": "Recoger",
-      "drafts": "Aparcar",
-      "no_drafts": "Sin aparcados",
+      "drafts": "Borradores",
+      "no_drafts": "Sin borradores",
       "hold": "Aparcar",
       "save": "Guardar",
       "clear": "Limpiar",
@@ -465,7 +465,7 @@
       "move_failed": "Error al mover"
     },
     "table_order": "Pedido mesa",
-    "retail_order": "Venta directa",
+    "retail_order": "Venta",
     "order_completed": "Pedido completado",
     "payment": {
       "confirm": "Confirmar pago",
@@ -794,7 +794,7 @@
       "MODIFY_NOTE": "Modificar nota",
       "MODIFY_ITEM": "Modificar plato"
     },
-    "retail_mode": "Venta directa",
+    "retail_mode": "Venta",
     "rule_toggled": "Regla cambiada",
     "rule_skipped": "Omitida",
     "rule_applied": "Aplicada",
@@ -874,7 +874,7 @@
       },
       "zone": {
         "all": "Todas las zonas",
-        "retail": "Venta directa",
+        "retail": "Venta",
         "all_desc": "Aplica en todas las zonas",
         "retail_desc": "Solo para llevar/venta rápida",
         "custom_desc": "Zona específica"
