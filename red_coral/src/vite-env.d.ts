@@ -6,3 +6,13 @@ declare module '*.svg' {
   const src: string;
   export default src;
 }
+
+declare module 'pinyin-engine' {
+  class PinyinEngine {
+    constructor(data: string[], indexs?: string | string[], begin?: boolean);
+    constructor(data: object[], indexs: string | string[], begin?: boolean);
+    query(keyword: string): string[];
+    static participle(keyword: string): string;
+  }
+  export default PinyinEngine;
+}

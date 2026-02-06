@@ -264,20 +264,33 @@ body.performance-mode .focus\:ring-2:focus {
 }
 
 .vkb-theme .hg-candidate-box {
+  display: flex;
+  left: 0;
+  right: 0;
   background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: none;
+  border-bottom: 1px solid #e5e7eb;
+  border-radius: 0;
+  box-shadow: none;
   font-size: 1.2rem;
   font-weight: 600;
-  padding: 4px;
+  padding: 4px 6px;
+  margin-top: 0;
+  transform: translateY(-100%);
+}
+
+.vkb-theme .hg-candidate-box ul {
+  flex: 1;
+  overflow-x: auto;
 }
 
 .vkb-theme .hg-candidate-box ul li {
-  padding: 6px 12px;
+  padding: 6px 14px;
   border-radius: 0.5rem;
   min-width: 2.5rem;
   text-align: center;
+  height: auto;
+  width: auto;
 }
 
 .vkb-theme .hg-candidate-box ul li:hover,
@@ -289,7 +302,8 @@ body.performance-mode .focus\:ring-2:focus {
 .vkb-theme .hg-candidate-box-prev,
 .vkb-theme .hg-candidate-box-next {
   color: #6b7280;
-  padding: 4px 8px;
+  padding: 4px 10px;
+  flex-shrink: 0;
 }
 
 /* Number layout */

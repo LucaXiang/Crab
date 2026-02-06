@@ -10,38 +10,49 @@ import type { KeyboardLanguage } from '@/core/stores/ui/useVirtualKeyboardStore'
 import { handleKeyboardChange, getCurrentInputValue, scrollActiveElementIntoView } from './useKeyboardInput';
 import { Z_INDEX } from '@/shared/constants/zIndex';
 
-import { pinyinWords } from './pinyinWords';
+import PinyinEngine from 'pinyin-engine';
+import { chineseWords } from './pinyinWords';
 
 // The chinese layout exports layoutCandidates at runtime but the TS type doesn't include it
 const charCandidates = (chineseLayout as unknown as { layoutCandidates: Record<string, string> }).layoutCandidates;
 
+/** Max number of word candidates per pinyin prefix */
+const MAX_WORDS_PER_KEY = 20;
+
 /**
- * Expand word entries into all prefix entries and merge with single-char candidates.
+ * Build layoutCandidates by merging single-char candidates with word candidates.
  *
- * For word "nihao" → "你好", generates prefix entries:
- *   "nih"   → "你好"
- *   "niha"  → "你好"
- *   "nihao" → "你好"
+ * Uses PinyinEngine.participle() to auto-generate all pinyin forms for each word:
+ * - Full pinyin: "weishenme" → 为什么
+ * - Abbreviations: "wsm" → 为什么
  *
- * Prefixes that already have single-char candidates (like "ni") are skipped
- * so they don't pollute single-character selection.
+ * Then expands each pinyin form into prefix entries so partial input also matches:
+ * - "weishen" → 为什么, "nih" → 你好, "ws" → 为什么
+ *
+ * Prefixes that already have single-char candidates are skipped to avoid pollution.
  */
 function buildCandidates(
   chars: Record<string, string>,
-  words: Record<string, string>,
+  words: string[],
 ): Record<string, string> {
   const merged = { ...chars };
-
-  // Collect all word candidates per prefix
   const prefixMap: Record<string, string[]> = {};
-  for (const [pinyin, word] of Object.entries(words)) {
-    for (let len = 2; len <= pinyin.length; len++) {
-      const prefix = pinyin.substring(0, len);
-      // Skip prefixes that have single-char candidates (e.g. "ni", "hao")
-      if (chars[prefix]) continue;
-      if (!prefixMap[prefix]) prefixMap[prefix] = [];
-      if (!prefixMap[prefix].includes(word)) {
-        prefixMap[prefix].push(word);
+
+  for (const word of words) {
+    // participle returns: "word\u0001fullPinyin1\u0001fullPinyin2\u0001...\u0001abbr1\u0001abbr2"
+    const parts = PinyinEngine.participle(word).split('\u0001');
+    // parts[0] is the original Chinese text, rest are pinyin forms
+    for (let i = 1; i < parts.length; i++) {
+      const pinyin = parts[i];
+      // Generate all prefixes of length >= 2
+      for (let len = 2; len <= pinyin.length; len++) {
+        const prefix = pinyin.substring(0, len);
+        // Skip prefixes that have single-char candidates (e.g. "ni", "hao")
+        if (chars[prefix]) continue;
+        if (!prefixMap[prefix]) prefixMap[prefix] = [];
+        if (!prefixMap[prefix].includes(word) && prefixMap[prefix].length < MAX_WORDS_PER_KEY) {
+          prefixMap[prefix].push(word);
+        }
       }
     }
   }
@@ -53,7 +64,7 @@ function buildCandidates(
   return merged;
 }
 
-const chineseCandidates = buildCandidates(charCandidates, pinyinWords);
+const chineseCandidates = buildCandidates(charCandidates, chineseWords);
 
 /** Number-only layout for numeric inputs */
 const numberLayout = {

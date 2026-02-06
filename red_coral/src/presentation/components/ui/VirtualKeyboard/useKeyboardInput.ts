@@ -54,6 +54,8 @@ export function handleKeyboardChange(input: string) {
 export function scrollActiveElementIntoView() {
   const el = useVirtualKeyboardStore.getState().activeElement;
   if (el) {
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    // 'nearest' respects scroll-padding-bottom on the scroll container,
+    // ensuring the element is scrolled above the virtual keyboard area.
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 }
