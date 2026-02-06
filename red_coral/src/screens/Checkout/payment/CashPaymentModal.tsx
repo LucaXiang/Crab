@@ -140,7 +140,7 @@ export const CashPaymentModal: React.FC<CashPaymentModalProps> = ({
               <button
                 onClick={onCancel}
                 disabled={isProcessing}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50"
                 aria-label={t('common.action.close')}
               >
                 <X size={20} className="text-gray-500" />

@@ -117,7 +117,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
   return createPortal(
     <div className="fixed inset-0 z-100 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div
-        className={`bg-white rounded-3xl w-full ${showAttributesColumn ? 'max-w-4xl' : 'max-w-md'} h-[70vh] overflow-hidden shadow-2xl flex flex-col transition-all duration-300`}
+        className={`bg-white rounded-2xl w-full ${showAttributesColumn ? 'max-w-4xl' : 'max-w-md'} h-[70vh] overflow-hidden shadow-2xl flex flex-col transition-all duration-300`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -128,9 +128,9 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-12 h-12 flex items-center justify-center bg-gray-50 hover:bg-gray-100 rounded-full transition-colors active:scale-95"
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
-            <X size={24} className="text-gray-600" />
+            <X size={20} className="text-gray-500" />
           </button>
         </div>
 

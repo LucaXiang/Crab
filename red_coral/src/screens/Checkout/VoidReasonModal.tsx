@@ -105,8 +105,8 @@ export const VoidReasonModal: React.FC<VoidReasonModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-80 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-80 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-red-50">
           <div className="flex items-center gap-3">

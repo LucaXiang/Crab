@@ -269,14 +269,14 @@ export const ProductModal: React.FC = React.memo(() => {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`shrink-0 px-6 py-4 border-b border-gray-100 bg-linear-to-r from-${accent}-50 to-white`}>
+        <div className="shrink-0 px-6 py-4 border-b border-gray-100 bg-primary-50">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900">{getTitle()}</h2>
             <button
               onClick={handleClose}
-              className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
             >
-              <X size={18} className="text-gray-500" />
+              <X size={20} className="text-gray-500" />
             </button>
           </div>
         </div>
