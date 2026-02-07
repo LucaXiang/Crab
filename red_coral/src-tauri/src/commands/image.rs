@@ -20,8 +20,8 @@ use crate::core::paths::TenantPaths;
 /// 支持的图片格式
 const SUPPORTED_FORMATS: &[&str] = &["png", "jpg", "jpeg", "webp"];
 
-/// 最大文件大小 (5MB)
-const MAX_FILE_SIZE: usize = 5 * 1024 * 1024;
+/// 最大文件大小 (20MB)
+const MAX_FILE_SIZE: usize = 20 * 1024 * 1024;
 
 /// JPEG 压缩质量 (85% - 保持颜色质量同时控制文件大小)
 const JPEG_QUALITY: u8 = 85;

@@ -96,8 +96,8 @@ impl CommandHandler for CompItemAction {
         // 9. Capture original price BEFORE zeroing
         let original_price = item.original_price.unwrap_or(item.price);
 
-        // 10. Determine full vs partial comp
-        let is_full_comp = self.quantity == item.quantity;
+        // 10. Determine full vs partial comp (compare against unpaid, not total)
+        let is_full_comp = self.quantity == item.unpaid_quantity;
 
         let (event_instance_id, source_instance_id) = if is_full_comp {
             // Full comp: instance_id stays the same, source == instance
@@ -533,6 +533,47 @@ mod tests {
         let metadata = create_test_metadata();
         let result = action.execute(&mut ctx, &metadata).await;
         assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
+
+    /// Test: comp all unpaid items on a partially paid item → full comp (not split).
+    /// Item total=5, paid=2, unpaid=3. Comp 3 → is_full_comp=true.
+    #[tokio::test]
+    async fn test_comp_all_unpaid_is_full_comp() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 5);
+        item.unpaid_quantity = 3; // 5 total - 2 paid = 3 unpaid
+        let snapshot = create_active_order_with_item("order-1", item);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = CompItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: 3, // comp all unpaid
+            reason: "VIP".to_string(),
+            authorizer_id: "manager-1".to_string(),
+            authorizer_name: "Manager".to_string(),
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::ItemComped {
+            instance_id,
+            source_instance_id,
+            ..
+        } = &events[0].payload
+        {
+            // Full comp: instance_id == source (no split)
+            assert_eq!(instance_id, "item-1");
+            assert_eq!(source_instance_id, "item-1");
+        } else {
+            panic!("Expected ItemComped payload");
+        }
     }
 
     #[tokio::test]

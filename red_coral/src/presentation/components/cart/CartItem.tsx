@@ -168,9 +168,13 @@ export const CartItem = React.memo<CartItemProps>(({
             </div>
           )}
           {/* Quantity Controls */}
-          <div 
+          <div
             className="flex items-center bg-gray-100 rounded-lg overflow-hidden border border-gray-200 shadow-sm"
             onClick={e => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
+            onMouseUp={e => e.stopPropagation()}
+            onTouchStart={e => e.stopPropagation()}
+            onTouchEnd={e => e.stopPropagation()}
             onMouseEnter={() => setIsHoveringControl(true)}
             onMouseLeave={() => setIsHoveringControl(false)}
           >

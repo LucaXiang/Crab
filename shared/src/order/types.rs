@@ -69,9 +69,9 @@ pub struct CartItemSnapshot {
     pub price: f64,
     /// Original price before discounts
     pub original_price: Option<f64>,
-    /// Quantity
+    /// Total quantity (paid + unpaid)
     pub quantity: i32,
-    /// Unpaid quantity (computed: quantity - paid_quantity)
+    /// Unpaid quantity (computed by recalculate_totals: quantity - paid_qty)
     #[serde(default)]
     pub unpaid_quantity: i32,
     /// Selected options
@@ -199,11 +199,19 @@ pub struct SpecificationInfo {
     pub price: Option<f64>,
 }
 
-/// Item changes for modification
+/// Item changes for modification.
+///
+/// All fields are optional — only changed fields need to be set.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ItemChanges {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub price: Option<f64>,
+    /// New **unpaid** quantity.
+    ///
+    /// When the item has paid units (split-bill), the applier computes:
+    ///   `item.quantity = paid_qty + quantity`
+    ///
+    /// When no units are paid, this equals the new total quantity.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quantity: Option<i32>,
     /// Manual discount percentage

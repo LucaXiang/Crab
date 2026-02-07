@@ -775,6 +775,11 @@ const OrderDiscountAppliedRenderer: EventRenderer<OrderDiscountAppliedPayload> =
       });
     }
     details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
+    // Show surcharge if present (derived: surcharge = total - subtotal + discount)
+    const derivedSurcharge = payload.total - payload.subtotal + payload.discount;
+    if (derivedSurcharge > 0.005) {
+      details.push(`${t('timeline.labels.surcharge')}: +${formatCurrency(derivedSurcharge)}`);
+    }
     details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`);
 
     return {
@@ -809,6 +814,11 @@ const OrderSurchargeAppliedRenderer: EventRenderer<OrderSurchargeAppliedPayload>
       });
     }
     details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
+    // Show discount if present (derived: discount = subtotal + surcharge - total)
+    const derivedDiscount = payload.subtotal + payload.surcharge - payload.total;
+    if (derivedDiscount > 0.005) {
+      details.push(`${t('timeline.labels.discount')}: -${formatCurrency(derivedDiscount)}`);
+    }
     details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`);
 
     return {

@@ -5,7 +5,6 @@ import { useImageUrl } from '@/core/hooks';
 import { formatCurrency } from '@/utils/currency';
 import { t } from '@/infrastructure/i18n';
 import DefaultImage from '@/assets/reshot.svg';
-import { ImageOff } from 'lucide-react';
 import { GroupedOptionsList } from '@/shared/components';
 
 interface SplitItemRowProps {
@@ -27,18 +26,12 @@ export const SplitItemRow: React.FC<SplitItemRowProps> = ({ item }) => {
     <div className="flex items-center gap-3 py-2 select-none">
       {/* Image */}
       <div className="w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
-        {product?.image ? (
-          <img
-            src={imageSrc}
-            alt={item.name}
-            className="w-full h-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-300">
-            <ImageOff size={20} />
-          </div>
-        )}
+        <img
+          src={imageSrc}
+          alt={item.name}
+          className="w-full h-full object-cover"
+          onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
+        />
       </div>
 
       {/* Info */}

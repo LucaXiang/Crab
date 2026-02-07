@@ -2,7 +2,7 @@
 
 use super::types::{KitchenOrder, LabelPrintRecord};
 use redb::{
-    Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition,
+    Database, ReadableDatabase, ReadableTable, TableDefinition,
     WriteTransaction,
 };
 use std::path::Path;
@@ -399,23 +399,6 @@ impl PrintStorage {
         Ok(deleted)
     }
 
-    /// Get storage statistics
-    pub fn get_stats(&self) -> PrintStorageResult<PrintStorageStats> {
-        let read_txn = self.db.begin_read()?;
-        let ko_table = read_txn.open_table(KITCHEN_ORDERS_TABLE)?;
-        let lr_table = read_txn.open_table(LABEL_RECORDS_TABLE)?;
-
-        Ok(PrintStorageStats {
-            kitchen_order_count: ko_table.len()?,
-            label_record_count: lr_table.len()?,
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct PrintStorageStats {
-    pub kitchen_order_count: u64,
-    pub label_record_count: u64,
 }
 
 #[cfg(test)]

@@ -5,10 +5,11 @@
  * 使用活跃订单 HeldOrder (OrderSnapshot) 数据，而非归档数据。
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { HeldOrder, CartItemSnapshot, PaymentRecord } from '@/core/domain/types';
 import { OrderSidebar } from '@/presentation/components/OrderSidebar';
 import { useI18n } from '@/hooks/useI18n';
+import { useProductStore, useCategoryStore } from '@/core/stores/resources';
 import { formatCurrency, Currency } from '@/utils/currency';
 import {
   ArrowLeft, Receipt, CreditCard, Coins,
@@ -47,8 +48,35 @@ export const OrderDetailMode: React.FC<OrderDetailModeProps> = ({
 }) => {
   const { t } = useI18n();
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const products = useProductStore((s) => s.items);
+  const categories = useCategoryStore((s) => s.items);
 
-  const visibleItems = order.items.filter(i => !i._removed);
+  const visibleItems = useMemo(() => {
+    const items = order.items.filter(i => !i._removed);
+    const categoryMap = new Map(categories.map(c => [c.id, c]));
+    const productMap = new Map(products.map(p => [p.id, p]));
+
+    return [...items].sort((a, b) => {
+      // Sort by category sort_order
+      const catA = productMap.get(a.id)?.category;
+      const catB = productMap.get(b.id)?.category;
+      const sortA = catA ? (categoryMap.get(catA)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
+      const sortB = catB ? (categoryMap.get(catB)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
+      if (sortA !== sortB) return sortA - sortB;
+
+      // Comped items sink to end of each category
+      const compA = a.is_comped ? 1 : 0;
+      const compB = b.is_comped ? 1 : 0;
+      if (compA !== compB) return compA - compB;
+
+      // Then by external_id
+      const extA = productMap.get(a.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
+      const extB = productMap.get(b.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
+      if (extA !== extB) return extA - extB;
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [order.items, products, categories]);
 
   const toggleItem = useCallback((idx: number) => {
     setExpandedItems(prev => {

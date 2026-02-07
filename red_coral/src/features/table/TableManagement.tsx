@@ -281,10 +281,10 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
       {
         key: 'capacity',
         header: t('settings.table.form.capacity'),
-        width: '120px',
+        width: '150px',
         align: 'center',
         render: (item) => (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium whitespace-nowrap">
             <Users size={12} />
             <span>{item.capacity} {t('common.unit.person')}</span>
           </div>
@@ -293,7 +293,6 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
       {
         key: 'zone',
         header: t('table.zones'),
-        width: '140px',
         render: (item) => (
           <span className="inline-flex items-center px-2.5 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium">
             {zonesMap.get(item.zone || '') || item.zone}

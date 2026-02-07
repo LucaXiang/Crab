@@ -17,8 +17,8 @@ use std::{fs, io::Cursor};
 use crate::{AppError, CurrentUser, ServerState};
 use shared::ErrorCode;
 
-/// Maximum file size (5MB)
-const MAX_FILE_SIZE: usize = 5 * 1024 * 1024;
+/// Maximum file size (20MB)
+const MAX_FILE_SIZE: usize = 20 * 1024 * 1024;
 
 /// Supported image formats
 const SUPPORTED_FORMATS: &[&str] = &["png", "jpg", "jpeg", "webp"];

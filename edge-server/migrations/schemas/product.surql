@@ -34,16 +34,6 @@ DEFINE FIELD OVERWRITE receipt_name ON product TYPE option<string>
 DEFINE FIELD OVERWRITE kitchen_print_name ON product TYPE option<string>
     PERMISSIONS FULL;
 
--- 厨房打印目的地
-DEFINE FIELD OVERWRITE kitchen_print_destinations ON product TYPE array<record<print_destination>>
-    DEFAULT []
-    PERMISSIONS FULL;
-
--- 标签打印目的地
-DEFINE FIELD OVERWRITE label_print_destinations ON product TYPE array<record<print_destination>>
-    DEFAULT []
-    PERMISSIONS FULL;
-
 -- 厨房打印启用状态 (-1=继承, 0=禁用, 1=启用)
 DEFINE FIELD OVERWRITE is_kitchen_print_enabled ON product TYPE int
     DEFAULT -1

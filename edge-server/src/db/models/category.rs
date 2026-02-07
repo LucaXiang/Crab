@@ -14,10 +14,10 @@ pub struct Category {
     pub name: String,
     pub sort_order: i32,
     /// Kitchen print destination references
-    #[serde(with = "serde_helpers::option_vec_record_id")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "serde_helpers::option_vec_record_id")]
     pub kitchen_print_destinations: Option<Vec<RecordId>>,
     /// Label print destination references
-    #[serde(with = "serde_helpers::option_vec_record_id")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "serde_helpers::option_vec_record_id")]
     pub label_print_destinations: Option<Vec<RecordId>>,
     /// Whether kitchen printing is enabled for this category
     pub is_kitchen_print_enabled: bool,

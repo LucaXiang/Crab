@@ -23,7 +23,7 @@ const ProductGridInner: React.FC<ProductGridProps> = ({
 
   return (
     <div className="relative flex-1 overflow-y-auto p-4 custom-scrollbar">
-      <div className={`grid gap-3 ${className || 'grid-cols-[repeat(auto-fill,minmax(12.5rem,1fr))]'}`}>
+      <div className={`grid gap-3 ${className || 'grid-cols-[repeat(auto-fill,minmax(max(12.5rem,calc(25%-0.5625rem)),1fr))]'}`}>
         {isLoading ? (
 	          <div className="col-span-full flex flex-col items-center justify-center h-64 text-gray-400">
 	            <div className="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full mb-2" />

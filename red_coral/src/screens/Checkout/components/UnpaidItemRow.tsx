@@ -16,6 +16,9 @@ interface UnpaidItemRowProps {
   selectedQuantities: Record<number, number>;
   onUpdateSelectedQty: (index: number, delta: number) => void;
   onEditItem: (item: CartItem) => void;
+  bgColor?: string;
+  hoverColor?: string;
+  accentColor?: string;
 }
 
 export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
@@ -26,6 +29,9 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
   selectedQuantities,
   onUpdateSelectedQty,
   onEditItem,
+  bgColor,
+  hoverColor,
+  accentColor,
 }) => {
   const isSelected = selectedQuantities[originalIndex] > 0;
   const currentQty = selectedQuantities[originalIndex] || 0;
@@ -69,11 +75,17 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
         ${isComped
           ? 'bg-emerald-50/50 border-emerald-200'
           : isSelected
-            ? 'bg-white border-blue-500 ring-1 ring-blue-500 shadow-md bg-blue-50/5'
-            : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-md'
+            ? 'ring-1 ring-blue-500 shadow-md'
+            : 'hover:shadow-md'
         }
-        ${isSelectMode ? 'cursor-pointer hover:bg-gray-50' : ''}
+        ${isSelectMode ? 'cursor-pointer' : ''}
+        ${!isComped && hoverColor ? 'hover:[background-color:var(--hover-bg)]' : ''}
       `}
+      style={!isComped ? {
+        backgroundColor: bgColor || '#ffffff',
+        borderColor: isSelected ? '#3b82f6' : (hoverColor || '#e5e7eb'),
+        '--hover-bg': hoverColor,
+      } as React.CSSProperties : undefined}
     >
       <div className="flex items-start justify-between gap-4">
         {/* Left: Item Info */}
@@ -104,7 +116,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
           {/* Line 5: Quantity × Unit Price */}
           <div className="flex items-center gap-2 mt-2 text-sm text-gray-500 tabular-nums">
             <span className="font-medium">x{remainingQty}</span>
-            <span className="w-1 h-1 bg-gray-300 rounded-full" />
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor || '#d1d5db' }} />
             {isComped ? (
               <>
                 <span className="line-through text-gray-400">{formatCurrency(item.original_price ?? basePrice)}</span>

@@ -1,7 +1,6 @@
 import React, { useRef, useCallback } from 'react';
 import { Product } from '@/core/domain/types';
 import DefaultImage from '@/assets/reshot.svg';
-import { ImageOff } from 'lucide-react';
 import { useImageUrl } from '@/core/hooks';
 import { useSettingsStore } from '@/core/stores/settings/useSettingsStore';
 import { useLongPress } from '@/hooks/useLongPress';
@@ -83,9 +82,12 @@ export const ProductCard = React.memo<ProductCardProps>(
               onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }}
             />
           ) : (
-             <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-50 text-gray-300">
-               <ImageOff size={24} />
-             </div>
+             <img
+               ref={imgRef}
+               src={DefaultImage}
+               alt={product.name}
+               className="absolute inset-0 w-full h-full object-cover object-center"
+             />
           )}
           {product.external_id !== undefined && (
             <div className="absolute bottom-0 left-0 bg-gray-900/85 text-white text-sm font-bold font-mono px-2 py-1 rounded-tr-lg backdrop-blur-[1px] shadow-sm z-10 leading-none">

@@ -2,7 +2,6 @@ import React from 'react';
 import {
   ArrowLeft,
   Settings as SettingsIcon,
-  Languages,
   Printer,
   LayoutGrid,
   Utensils,
@@ -21,7 +20,7 @@ import { useSettingsCategory, useSettingsStore } from '@/core/stores/settings/us
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
 import { Permission } from '@/core/domain/types';
 
-type SettingsCategory = 'LANG' | 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS' | 'SHIFTS';
+type SettingsCategory = 'PRINTER' | 'TABLES' | 'PRODUCTS' | 'CATEGORIES' | 'TAGS' | 'ATTRIBUTES' | 'PRICE_RULES' | 'DATA_TRANSFER' | 'STORE' | 'SYSTEM' | 'USERS' | 'SHIFTS';
 
 interface SettingsSidebarProps {
   onBack: () => void;
@@ -117,16 +116,16 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
         </ProtectedGate>
         <ProtectedGate permission={Permission.MENU_MANAGE}>
           <CategoryItem
-            category="ATTRIBUTES"
-            icon={Sliders}
-            label={t('settings.attribute.title')}
+            category="TAGS"
+            icon={Tags}
+            label={t('settings.tag.title')}
           />
         </ProtectedGate>
         <ProtectedGate permission={Permission.MENU_MANAGE}>
           <CategoryItem
-            category="TAGS"
-            icon={Tags}
-            label={t('settings.tag.title')}
+            category="ATTRIBUTES"
+            icon={Sliders}
+            label={t('settings.attribute.title')}
           />
         </ProtectedGate>
         <ProtectedGate permission={Permission.PRICE_RULES_MANAGE}>
@@ -169,7 +168,6 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ onBack }) => {
         <Divider />
 
         {/* 系统设置 */}
-        <CategoryItem category="LANG" icon={Languages} label={t('settings.language.title')} />
         <ProtectedGate permission={Permission.SETTINGS_MANAGE}>
           <CategoryItem category="PRINTER" icon={Printer} label={t('settings.printer.title')} />
         </ProtectedGate>

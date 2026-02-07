@@ -151,8 +151,8 @@ body.performance-mode .focus\:ring-2:focus {
 
 /* ============ Virtual Keyboard Theme ============ */
 .vkb-theme.hg-theme-default {
-  background: #f3f4f6;
-  padding: 8px 6px;
+  background: #d1d5db;
+  padding: 14px 250px;
   border-radius: 0;
   font-family: inherit;
   overflow: visible;
@@ -161,8 +161,8 @@ body.performance-mode .focus\:ring-2:focus {
 /* Override default theme row spacing (specificity must beat .hg-theme-default .hg-row:not(:last-child)) */
 .vkb-theme.hg-theme-default .hg-row,
 .vkb-theme.hg-theme-default .hg-row:not(:last-child) {
-  gap: 4px;
-  margin-bottom: 4px;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
 /* Reset default theme button margin-right (let gap handle spacing) */
@@ -172,49 +172,50 @@ body.performance-mode .focus\:ring-2:focus {
 }
 
 .vkb-theme .hg-button {
-  height: 3rem;
-  border-radius: 0.75rem;
+  height: 3.5rem;
+  border-radius: 0.5rem;
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: none;
   color: #1f2937;
-  font-size: 1.1rem;
-  font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  font-size: 1.15rem;
+  font-weight: 500;
+  box-shadow: 0 1px 0 1px rgba(0, 0, 0, 0.1);
   flex-grow: 1;
   cursor: pointer;
 }
 
 .vkb-theme .hg-button:active,
 .vkb-theme .hg-button.hg-activeButton {
-  background: #eff6ff;
-  border-color: #3b82f6;
-  color: #2563eb;
-  transform: scale(0.95);
+  background: #c7c7c7;
+  color: #1f2937;
+  transform: scale(0.97);
 }
 
-/* Space bar */
+/* Space bar — iPad style: widest key in bottom row */
 .vkb-theme .hg-button[data-skbtn="{space}"] {
-  flex: 4;
+  flex: 5;
   background: #fff;
 }
 
 /* Backspace */
 .vkb-theme .hg-button[data-skbtn="{bksp}"] {
   max-width: 4.5rem;
-  color: #6b7280;
+  color: #1f2937;
+  background: #adb5bd;
+  box-shadow: 0 1px 0 1px rgba(0, 0, 0, 0.15);
 }
 .vkb-theme .hg-button[data-skbtn="{bksp}"]:active {
-  background: #fef2f2;
-  border-color: #ef4444;
-  color: #dc2626;
+  background: #868e96;
 }
 
 /* Shift / Lock */
 .vkb-theme .hg-button[data-skbtn="{shift}"],
 .vkb-theme .hg-button[data-skbtn="{lock}"] {
   max-width: 5rem;
-  color: #6b7280;
+  color: #1f2937;
   font-size: 1.2rem;
+  background: #adb5bd;
+  box-shadow: 0 1px 0 1px rgba(0, 0, 0, 0.15);
 }
 
 /* Enter */
@@ -222,8 +223,9 @@ body.performance-mode .focus\:ring-2:focus {
   max-width: 5rem;
   background: #1f2937;
   color: #fff;
-  border-color: #1f2937;
+  border: none;
   font-size: 1.3rem;
+  box-shadow: 0 1px 0 1px rgba(0, 0, 0, 0.2);
 }
 .vkb-theme .hg-button[data-skbtn="{enter}"]:active {
   background: #111827;
@@ -234,28 +236,41 @@ body.performance-mode .focus\:ring-2:focus {
   display: none;
 }
 
-/* Symbol / ABC toggle */
+/* Symbol / ABC toggle — iPad style utility key */
 .vkb-theme .hg-button[data-skbtn="{symbols}"],
 .vkb-theme .hg-button[data-skbtn="{abc}"] {
-  max-width: 5rem;
-  font-size: 0.85rem;
-  color: #6b7280;
-  background: #f3f4f6;
+  flex: 2;
+  font-size: 0.9rem;
+  color: #1f2937;
+  background: #adb5bd;
+  box-shadow: 0 1px 0 1px rgba(0, 0, 0, 0.15);
 }
 
-/* Language switch button */
+/* Language switch button — iPad style globe */
 .vkb-theme .hg-button[data-skbtn="{lang}"] {
-  flex: 0 0 3.5rem;
-  font-size: 1.3rem;
-  color: #6b7280;
-  background: #f3f4f6;
+  flex: 1.2;
+  font-size: 0.9rem;
+  color: #1f2937;
+  background: #adb5bd;
+  box-shadow: 0 1px 0 1px rgba(0, 0, 0, 0.15);
 }
 
-/* Bottom row @ and . keys */
-.vkb-theme .hg-button[data-skbtn="@"],
+/* Bottom row . key */
 .vkb-theme .hg-button[data-skbtn="."] {
-  flex: 0 0 3rem;
   color: #6b7280;
+}
+
+/* Text keyboard close button — iPad style "done" */
+.vkb-text .hg-button[data-skbtn="{close}"] {
+  flex: 2;
+  background: #adb5bd;
+  color: #1f2937;
+  border: none;
+  box-shadow: 0 1px 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.vkb-text .hg-button[data-skbtn="{close}"]:active {
+  background: #868e96;
 }
 
 /* Chinese candidate box — hide when empty */
@@ -267,14 +282,14 @@ body.performance-mode .focus\:ring-2:focus {
   display: flex;
   left: 0;
   right: 0;
-  background: #fff;
+  background: #d1d5db;
   border: none;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #c5c9cf;
   border-radius: 0;
   box-shadow: none;
   font-size: 1.2rem;
-  font-weight: 600;
-  padding: 4px 6px;
+  font-weight: 500;
+  padding: 6px 250px;
   margin-top: 0;
   transform: translateY(-100%);
 }
@@ -291,22 +306,43 @@ body.performance-mode .focus\:ring-2:focus {
   text-align: center;
   height: auto;
   width: auto;
+  color: #1f2937;
 }
 
 .vkb-theme .hg-candidate-box ul li:hover,
 .vkb-theme .hg-candidate-box ul li:active {
-  background: #eff6ff;
-  color: #2563eb;
+  background: rgba(255, 255, 255, 0.5);
+  color: #1f2937;
 }
 
 .vkb-theme .hg-candidate-box-prev,
 .vkb-theme .hg-candidate-box-next {
-  color: #6b7280;
-  padding: 4px 10px;
+  color: #4b5563;
+  padding: 0 12px;
   flex-shrink: 0;
+  font-size: 1rem;
+}
+
+/* Override default ◄ ► with consistent chevrons */
+.vkb-theme .hg-candidate-box-prev::before {
+  content: "‹";
+  font-size: 1.4rem;
+  font-weight: 300;
+}
+
+.vkb-theme .hg-candidate-box-next::before {
+  content: "›";
+  font-size: 1.4rem;
+  font-weight: 300;
 }
 
 /* Number layout */
+.vkb-number.hg-theme-default {
+  padding: 12px 24px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
 .vkb-number .hg-button {
   height: 3.5rem;
   font-size: 1.5rem;
@@ -316,8 +352,34 @@ body.performance-mode .focus\:ring-2:focus {
 
 .vkb-number.hg-theme-default .hg-row,
 .vkb-number.hg-theme-default .hg-row:not(:last-child) {
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.vkb-number .hg-button[data-skbtn="0"],
+.vkb-number .hg-button[data-skbtn="{close}"] {
+  flex: 0 0 calc((100% - 16px) / 3);
+  max-width: calc((100% - 16px) / 3);
+}
+
+.vkb-number .hg-button[data-skbtn="{bksp}"] {
+  background: #fef2f2;
+  color: #ef4444;
+  border-color: #fecaca;
+}
+
+.vkb-number .hg-button[data-skbtn="{bksp}"]:active {
+  background: #fee2e2;
+}
+
+.vkb-number .hg-button[data-skbtn="{close}"] {
+  background: #1f2937;
+  color: #fff;
+  border-color: #1f2937;
+}
+
+.vkb-number .hg-button[data-skbtn="{close}"]:active {
+  background: #111827;
 }
 
 /* ============ Virtual Keyboard Layout Adjustments ============ */
@@ -327,8 +389,13 @@ body.vkb-visible .overflow-y-auto {
   scroll-padding-bottom: var(--vkb-height);
 }
 
-/* Modals: shift up when keyboard is visible (no resize, just reposition) */
+/* Modals: shrink available space when keyboard is visible */
 body.vkb-visible .fixed.inset-0 {
   padding-bottom: var(--vkb-height);
+}
+
+/* Modal cards: reduce max-height to fit above keyboard */
+body.vkb-visible .fixed.inset-0 > div {
+  max-height: calc(100vh - var(--vkb-height) - 2rem);
 }
 

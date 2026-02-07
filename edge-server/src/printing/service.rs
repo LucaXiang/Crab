@@ -58,11 +58,6 @@ impl KitchenPrintService {
         Self { storage }
     }
 
-    /// Get the storage (for external queries)
-    pub fn storage(&self) -> &PrintStorage {
-        &self.storage
-    }
-
     /// Process an ItemsAdded event
     ///
     /// Creates KitchenOrder and LabelPrintRecord entries if printing is enabled.
@@ -308,16 +303,6 @@ impl KitchenPrintService {
         Ok(self.storage.cleanup_old_records(max_age_secs)?)
     }
 
-    /// Delete kitchen orders and label records for an order
-    pub fn delete_records_for_order(&self, order_id: &str) -> PrintServiceResult<()> {
-        let txn = self.storage.begin_write()?;
-        self.storage
-            .delete_kitchen_orders_for_order(&txn, order_id)?;
-        self.storage
-            .delete_label_records_for_order(&txn, order_id)?;
-        txn.commit().map_err(PrintStorageError::from)?;
-        Ok(())
-    }
 }
 
 impl std::fmt::Debug for KitchenPrintService {

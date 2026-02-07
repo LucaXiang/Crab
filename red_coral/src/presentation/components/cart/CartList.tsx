@@ -4,6 +4,7 @@ import { CartItem as CartItemType } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { useCategories, useProducts } from '@/core/stores/resources';
 import { CartItem } from './CartItem';
+import { CATEGORY_BG, CATEGORY_HEADER_BG, CATEGORY_ACCENT, hashToColorIndex } from '@/utils/categoryColors';
 
 interface CartListProps {
   cart: CartItemType[];
@@ -39,14 +40,14 @@ export const CartList = React.memo<CartListProps>(({
 
   const sortedGroups = React.useMemo(() => {
     const categoryMap = new Map(categories.map(c => [c.id, c]));
-    
+
     return Object.entries(groupedItems).sort(([catIdA], [catIdB]) => {
       if (catIdA === 'uncategorized') return 1;
       if (catIdB === 'uncategorized') return -1;
-      
+
       const catA = categoryMap.get(catIdA);
       const catB = categoryMap.get(catIdB);
-      
+
       return (catA?.sort_order ?? 0) - (catB?.sort_order ?? 0);
     });
   }, [groupedItems, categories]);
@@ -71,23 +72,29 @@ export const CartList = React.memo<CartListProps>(({
   return (
     <div className="pb-4">
       <div>
-        {sortedGroups.map(([categoryId, items]) => (
-          <div key={categoryId} className="mb-0">
-            <div className="bg-gray-50/80 backdrop-blur-sm px-4 py-2 text-xs font-medium text-gray-500 sticky top-0 z-10 border-y border-gray-100/50">
-              {getCategoryName(categoryId)}
+        {sortedGroups.map(([categoryId, items]) => {
+          const colorIdx = hashToColorIndex(categoryId);
+          return (
+            <div key={categoryId} className="mb-0" style={{ backgroundColor: CATEGORY_BG[colorIdx] }}>
+              <div
+                className="px-4 py-2 text-xs font-semibold sticky top-0 z-10 border-y border-gray-100/50"
+                style={{ backgroundColor: CATEGORY_HEADER_BG[colorIdx], color: CATEGORY_ACCENT[colorIdx] }}
+              >
+                {getCategoryName(categoryId)}
+              </div>
+              <div className="divide-y divide-gray-100/50">
+                {items.map((item) => (
+                  <CartItem
+                    key={item.instance_id}
+                    item={item}
+                    onQuantityChange={onQuantityChange}
+                    onClick={onItemClick}
+                  />
+                ))}
+              </div>
             </div>
-            <div className="divide-y divide-gray-100">
-              {items.map((item) => (
-                <CartItem
-                  key={item.instance_id}
-                  item={item}
-                  onQuantityChange={onQuantityChange}
-                  onClick={onItemClick}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutGrid, CheckCircle, Utensils, Receipt } from 'lucide-react';
+import { LayoutGrid, CheckCircle, Utensils, Receipt, AlertTriangle } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { TableFilter } from './types';
 
@@ -85,6 +85,15 @@ export const TableFilters: React.FC<TableFiltersProps> = React.memo(
           count={stats.OCCUPIED}
           isActive={activeFilter === 'OCCUPIED'}
           onClick={() => onFilterChange('OCCUPIED')}
+        />
+        <FilterButton
+          type="OVERTIME"
+          label={t("table.filter.overtime")}
+          icon={AlertTriangle}
+          colorClass="bg-orange-500 text-white border-orange-500"
+          count={stats.OVERTIME}
+          isActive={activeFilter === 'OVERTIME'}
+          onClick={() => onFilterChange('OVERTIME')}
         />
         <FilterButton
           type="PRE_PAYMENT"

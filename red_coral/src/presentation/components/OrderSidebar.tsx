@@ -41,6 +41,7 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
       i.instance_id ? i.instance_id === item.instance_id : i.id === item.id
     );
     if (index !== -1) {
+      // Pass server-authoritative data directly — backend handles split logic
       setEditingItem({ item, index });
     }
   }, [order]);
@@ -64,22 +65,8 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
 
   const handleDeleteItem = React.useCallback(async (index: number, authorizer?: { id: string; name: string }) => {
     const item = order.items[index];
-    const instanceId = item.instance_id;
-    const paidQty = order.paid_item_quantities?.[instanceId] || 0;
-
-    // Case 1: Partially paid item - Remove unpaid portion
-    if (paidQty > 0 && paidQty < item.quantity) {
-      const qtyToRemove = item.quantity - paidQty;
-
-      // Send command to backend - state will be updated via event (Server Authority)
-      await orderOps.removeItem(order.order_id, instanceId, 'Removed unpaid portion', qtyToRemove, authorizer);
-      return;
-    }
-
-    // Case 2: Fully paid or Unpaid - Remove (Soft Delete)
-    // Send command to backend - state will be updated via event (Server Authority)
-    await orderOps.removeItem(order.order_id, instanceId, 'Removed from payment screen', undefined, authorizer);
-
+    // Server Authority: backend handles paid item protection, no local computation
+    await orderOps.removeItem(order.order_id, item.instance_id, 'Removed from payment screen', undefined, authorizer);
     setEditingItem(null);
   }, [order]);
 
@@ -103,16 +90,6 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
 
   const displayFinalTotal = order.total;
   const displayRemainingAmount = order.remaining_amount;
-
-  // Use backend-provided unpaidQuantity for each item
-  const unpaidItems = React.useMemo(() => {
-    return order.items
-      .filter(item => !item._removed && (item.unpaid_quantity ?? item.quantity) > 0)
-      .map(item => ({
-        ...item,
-        quantity: item.unpaid_quantity ?? item.quantity, // Use unpaid quantity for display
-      }));
-  }, [order.items]);
 
   // Timeline 现在直接从 store 获取，不需要 useEffect
 
@@ -196,7 +173,6 @@ export const OrderSidebar = React.memo<OrderSidebarProps>(({ order, totalPaid, r
         {activeTab === 'ITEMS' ? (
           <OrderItemsSummary
             items={order.items.filter(i => !i._removed)}
-            unpaidItems={unpaidItems}
             mode="SELECT"
             selectedQuantities={{}}
             onUpdateSelectedQty={() => {}}

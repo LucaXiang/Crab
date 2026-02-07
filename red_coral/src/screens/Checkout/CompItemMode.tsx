@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { HeldOrder, Permission } from '@/core/domain/types';
-import { Gift, ArrowLeft, Minus, Plus, ImageOff, Undo2 } from 'lucide-react';
+import { Gift, ArrowLeft, Minus, Plus, Undo2 } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { formatCurrency } from '@/utils/currency';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
@@ -245,11 +245,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
 
                           <div className="p-3">
                             <div className="w-full aspect-square rounded-xl bg-gray-100 overflow-hidden relative mb-3">
-                              {imageRef ? (
-                                <img src={imageSrc} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageOff size={28} /></div>
-                              )}
+                              <img src={imageSrc} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
                               <span className="absolute top-2 left-2 text-[0.6rem] text-blue-600 bg-white/90 backdrop-blur-sm font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200/50">
                                 #{item.instance_id.slice(-5)}
                               </span>
@@ -295,11 +291,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
 
                           <div className="p-3">
                             <div className="w-full aspect-square rounded-xl bg-gray-100 overflow-hidden relative mb-3 opacity-60">
-                              {imageRef ? (
-                                <img src={imageSrc} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageOff size={28} /></div>
-                              )}
+                              <img src={imageSrc} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
                               <span className="absolute top-2 left-2 text-[0.6rem] text-blue-600 bg-white/90 backdrop-blur-sm font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200/50">
                                 #{item.instance_id.slice(-5)}
                               </span>

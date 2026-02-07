@@ -555,6 +555,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_apply_percent_surcharge() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        setup_active_order(&storage, "order-1", vec![
+            create_test_item(100.0, 4), // subtotal = 400
+        ]);
+
+        let txn = storage.begin_write().unwrap();
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = ApplyOrderSurchargeAction {
+            order_id: "order-1".to_string(),
+            surcharge_percent: Some(20.0), // 20% of 400 = 80
+            surcharge_amount: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let events = action.execute(&mut ctx, &create_test_metadata()).await.unwrap();
+        assert_eq!(events.len(), 1);
+
+        if let EventPayload::OrderSurchargeApplied {
+            surcharge_percent,
+            surcharge_amount,
+            subtotal,
+            surcharge,
+            total,
+            ..
+        } = &events[0].payload
+        {
+            assert_eq!(*surcharge_percent, Some(20.0));
+            assert_eq!(*surcharge_amount, None);
+            assert_eq!(*subtotal, 400.0);
+            assert_eq!(*surcharge, 80.0);
+            assert_eq!(*total, 480.0); // 400 + 80 = 480
+        } else {
+            panic!("Expected OrderSurchargeApplied payload");
+        }
+    }
+
+    #[tokio::test]
     async fn test_clear_surcharge() {
         let storage = OrderStorage::open_in_memory().unwrap();
         // 先设置一个已有附加费的订单

@@ -5,8 +5,8 @@
  */
 
 import { memo } from 'react';
-import { ImageOff } from 'lucide-react';
 import { useImageUrl } from '@/core/hooks';
+import DefaultImage from '@/assets/reshot.svg';
 
 interface ProductImageProps {
   src: string | null | undefined;
@@ -33,8 +33,8 @@ export const ProductImage = memo(function ProductImage({
 
   if (!url) {
     return fallback ? <>{fallback}</> : (
-      <div className={`bg-gray-50 flex items-center justify-center text-gray-300 ${className}`}>
-        <ImageOff size={20} />
+      <div className={`bg-gray-50 flex items-center justify-center ${className}`}>
+        <img src={DefaultImage} alt={alt} className="w-full h-full object-contain p-2" />
       </div>
     );
   }

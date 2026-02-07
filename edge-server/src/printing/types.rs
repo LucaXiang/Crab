@@ -62,27 +62,3 @@ pub struct LabelPrintRecord {
     pub print_count: u32,
 }
 
-/// 商品打印配置（内存缓存）
-#[derive(Debug, Clone)]
-pub struct ProductPrintConfig {
-    pub product_id: String,
-    pub product_name: String,
-    pub kitchen_name: String,
-    pub kitchen_print_destinations: Vec<String>,
-    pub label_print_destinations: Vec<String>,
-    pub is_kitchen_print_enabled: i32,   // -1=继承, 0=禁用, 1=启用
-    pub is_label_print_enabled: i32,     // -1=继承, 0=禁用, 1=启用
-    pub external_id: Option<i64>,
-    pub category_id: String,
-}
-
-/// 分类打印配置（内存缓存）
-#[derive(Debug, Clone)]
-pub struct CategoryPrintConfig {
-    pub category_id: String,
-    pub category_name: String,
-    pub kitchen_print_destinations: Vec<String>,
-    pub label_print_destinations: Vec<String>,
-    pub is_kitchen_print_enabled: bool,
-    pub is_label_print_enabled: bool,
-}

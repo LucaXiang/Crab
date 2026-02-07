@@ -51,11 +51,23 @@ export function handleKeyboardChange(input: string) {
   }
 }
 
+/**
+ * Ensure the active input is visible above the keyboard.
+ *
+ * Uses `block: 'nearest'` so that:
+ * - Inputs already visible → no scroll (avoids pushing top inputs out)
+ * - Inputs hidden behind keyboard → scrolls just enough to reveal them
+ * - Inputs pushed above viewport by modal resize → scrolls down to show them
+ */
 export function scrollActiveElementIntoView() {
   const el = useVirtualKeyboardStore.getState().activeElement;
-  if (el) {
-    // 'nearest' respects scroll-padding-bottom on the scroll container,
-    // ensuring the element is scrolled above the virtual keyboard area.
+  if (!el) return;
+
+  // Wait for CSS reflow (modal max-height + re-center needs to settle)
+  setTimeout(() => {
     el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }
+  }, 150);
 }
+
+/** No-op — scroll-based approach, nothing to reset */
+export function resetContentOffset() {}

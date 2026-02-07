@@ -63,22 +63,47 @@ impl CommandHandler for RemoveItemAction {
             ));
         }
 
-        // 5. Validate quantity (if specified)
-        if let Some(qty) = self.quantity {
-            if qty <= 0 {
-                return Err(OrderError::InvalidOperation(
-                    "quantity must be positive".to_string(),
-                ));
-            }
-            if qty > item.quantity {
-                return Err(OrderError::InsufficientQuantity);
-            }
-        }
+        // 5. Compute unpaid quantity (protect paid items)
+        let paid_qty = snapshot
+            .paid_item_quantities
+            .get(&self.instance_id)
+            .copied()
+            .unwrap_or(0);
+        let unpaid_qty = item.quantity - paid_qty;
 
-        // 6. Allocate sequence number
+        // 6. Determine effective removal quantity
+        let effective_qty = match self.quantity {
+            Some(qty) => {
+                if qty <= 0 {
+                    return Err(OrderError::InvalidOperation(
+                        "quantity must be positive".to_string(),
+                    ));
+                }
+                if qty > unpaid_qty {
+                    return Err(OrderError::InsufficientQuantity);
+                }
+                Some(qty)
+            }
+            None => {
+                if unpaid_qty <= 0 {
+                    return Err(OrderError::InvalidOperation(
+                        "Fully paid item cannot be removed".to_string(),
+                    ));
+                }
+                if paid_qty > 0 {
+                    // Partially paid: only remove unpaid portion
+                    Some(unpaid_qty)
+                } else {
+                    // No paid qty: remove all
+                    None
+                }
+            }
+        };
+
+        // 7. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 7. Create event
+        // 8. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -90,7 +115,7 @@ impl CommandHandler for RemoveItemAction {
             EventPayload::ItemRemoved {
                 instance_id: self.instance_id.clone(),
                 item_name: item.name.clone(),
-                quantity: self.quantity,
+                quantity: effective_qty,
                 reason: self.reason.clone(),
                 authorizer_id: self.authorizer_id.clone(),
                 authorizer_name: self.authorizer_name.clone(),
@@ -509,6 +534,162 @@ mod tests {
         assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
         if let Err(OrderError::InvalidOperation(msg)) = result {
             assert!(msg.contains("comped"), "Error message should mention comped: {msg}");
+        }
+    }
+
+    // ---- Paid item protection tests (server authority) ----
+
+    /// quantity=None on partially paid item → clamp to unpaid portion only
+    #[tokio::test]
+    async fn test_remove_partially_paid_item_clamps_to_unpaid() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 6);
+        let mut snapshot = create_active_order_with_item("order-1", item);
+        snapshot.paid_item_quantities.insert("item-1".to_string(), 2); // 2 paid, 4 unpaid
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = RemoveItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: None, // Frontend says "remove all" — backend should protect paid
+            reason: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::ItemRemoved { quantity, .. } = &events[0].payload {
+            // Should clamp to unpaid portion (4), NOT None
+            assert_eq!(*quantity, Some(4));
+        } else {
+            panic!("Expected ItemRemoved payload");
+        }
+    }
+
+    /// quantity=None on fully paid item → rejected
+    #[tokio::test]
+    async fn test_remove_fully_paid_item_rejected() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
+        let mut snapshot = create_active_order_with_item("order-1", item);
+        snapshot.paid_item_quantities.insert("item-1".to_string(), 3); // fully paid
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = RemoveItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: None,
+            reason: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
+
+    /// quantity=Some(qty) where qty > unpaid → rejected
+    #[tokio::test]
+    async fn test_remove_more_than_unpaid_rejected() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 6);
+        let mut snapshot = create_active_order_with_item("order-1", item);
+        snapshot.paid_item_quantities.insert("item-1".to_string(), 4); // 4 paid, 2 unpaid
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = RemoveItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: Some(3), // Only 2 unpaid, asking to remove 3
+            reason: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(matches!(result, Err(OrderError::InsufficientQuantity)));
+    }
+
+    /// quantity=Some(qty) where qty <= unpaid → succeeds
+    #[tokio::test]
+    async fn test_remove_within_unpaid_succeeds() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 6);
+        let mut snapshot = create_active_order_with_item("order-1", item);
+        snapshot.paid_item_quantities.insert("item-1".to_string(), 4); // 4 paid, 2 unpaid
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = RemoveItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: Some(2), // Exactly unpaid amount
+            reason: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        if let EventPayload::ItemRemoved { quantity, .. } = &events[0].payload {
+            assert_eq!(*quantity, Some(2));
+        } else {
+            panic!("Expected ItemRemoved payload");
+        }
+    }
+
+    /// No paid qty → quantity=None stays as None (remove all, existing behavior)
+    #[tokio::test]
+    async fn test_remove_unpaid_item_full_stays_none() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
+        let snapshot = create_active_order_with_item("order-1", item);
+        // No paid_item_quantities entry
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = RemoveItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            quantity: None,
+            reason: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+        if let EventPayload::ItemRemoved { quantity, .. } = &events[0].payload {
+            assert_eq!(*quantity, None); // Full removal, no clamping
+        } else {
+            panic!("Expected ItemRemoved payload");
         }
     }
 }

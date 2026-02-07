@@ -13,19 +13,22 @@ DEFINE FIELD OVERWRITE sort_order ON category TYPE int
     DEFAULT 0
     PERMISSIONS FULL;
 
--- 打印目的地
-DEFINE FIELD OVERWRITE print_destinations ON category TYPE array<record<print_destination>>
-    DEFAULT []
+-- 厨房打印目的地
+DEFINE FIELD OVERWRITE kitchen_print_destinations ON category TYPE option<array<record<print_destination>>>
+    PERMISSIONS FULL;
+
+-- 标签打印目的地
+DEFINE FIELD OVERWRITE label_print_destinations ON category TYPE option<array<record<print_destination>>>
     PERMISSIONS FULL;
 
 -- 厨房打印开关
 DEFINE FIELD OVERWRITE is_kitchen_print_enabled ON category TYPE bool
-    DEFAULT true
+    DEFAULT false
     PERMISSIONS FULL;
 
 -- 标签打印开关
 DEFINE FIELD OVERWRITE is_label_print_enabled ON category TYPE bool
-    DEFAULT true
+    DEFAULT false
     PERMISSIONS FULL;
 
 DEFINE FIELD OVERWRITE is_active ON category TYPE bool

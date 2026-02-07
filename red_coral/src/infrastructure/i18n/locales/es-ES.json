@@ -1038,7 +1038,7 @@
         "select_tag": "Seleccionar etiqueta",
         "select_product": "Seleccionar plato",
         "zone_scope": "Ámbito zonas",
-        "zone_scope_desc": "Zonas donde aplica, vacío = todas",
+        "zone_scope_desc": "Zonas donde aplica la regla",
         "time_always_desc": "Sin límite de tiempo",
         "time_schedule_desc": "Horarios semanales",
         "time_onetime_desc": "Período único",

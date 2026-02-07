@@ -1,7 +1,6 @@
 import React from 'react';
 import { useSettingsCategory } from '@/core/stores/settings/useSettingsStore';
 import { SettingsSidebar } from './SettingsSidebar';
-import { LanguageSettings } from './LanguageSettings';
 import { PrinterSettings } from './PrinterSettings';
 import { TableManagement } from '@/features/table';
 import { ProductManagement } from '@/features/product';
@@ -72,7 +71,6 @@ const SettingsContent: React.FC = React.memo(() => {
             <UserManagement />
           </ProtectedGate>
         )}
-        {activeCategory === 'LANG' && <LanguageSettings />}
         {activeCategory === 'PRINTER' && (
           <ProtectedGate permission={Permission.SETTINGS_MANAGE}>
             <PrinterSettings />

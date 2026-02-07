@@ -1038,7 +1038,7 @@
         "select_tag": "选择标签",
         "select_product": "选择菜品",
         "zone_scope": "区域范围",
-        "zone_scope_desc": "选择规则生效的区域，留空则全部区域生效",
+        "zone_scope_desc": "选择规则生效的区域",
         "time_always_desc": "规则始终生效，无时间限制",
         "time_schedule_desc": "按每周固定时段重复生效",
         "time_onetime_desc": "仅在指定时间段内生效一次",

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { HeldOrder, PaymentRecord } from '@/core/domain/types';
-import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag, Receipt, ImageOff, Users, Calculator, PieChart, X, Lock as LockIcon, Check, Clock, Gift, Percent, TrendingUp, ClipboardList, ChevronRight } from 'lucide-react';
+import { Coins, CreditCard, ArrowLeft, Printer, Trash2, Split, Minus, Plus, Banknote, Utensils, ShoppingBag, Receipt, Users, Calculator, PieChart, X, Lock as LockIcon, Check, Clock, Gift, Percent, TrendingUp, ClipboardList, ChevronRight } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '@/presentation/components/Toast';
 import { EscalatableGate } from '@/presentation/components/auth/EscalatableGate';
@@ -687,8 +687,24 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
       });
     });
 
-    // Sort by category name
-    result.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+    // Sort items within each group by external_id (consistent with OrderItemsSummary)
+    const extIdMap = new Map(products.map(p => [p.id, p.external_id]));
+    for (const group of result) {
+      group.items.sort((a, b) => {
+        const extA = extIdMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const extB = extIdMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+        if (extA !== extB) return extA - extB;
+        return a.name.localeCompare(b.name);
+      });
+    }
+
+    // Sort groups by category sort_order (consistent with OrderItemsSummary)
+    const categoryMap = new Map(categories.map(c => [c.id, c]));
+    result.sort((a, b) => {
+      const sortA = a.categoryId ? (categoryMap.get(a.categoryId)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
+      const sortB = b.categoryId ? (categoryMap.get(b.categoryId)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
+      return sortA - sortB;
+    });
 
     // Add uncategorized at the end
     if (uncategorized.length > 0) {
@@ -700,7 +716,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     }
 
     return result;
-  }, [order.items, order.paid_item_quantities, productInfoMap, categories, t]);
+  }, [order.items, order.paid_item_quantities, productInfoMap, categories, products, t]);
 
   // Filter logic for Split Mode UI
   const [selectedCategory, setSelectedCategory] = useState<string | 'ALL'>('ALL');
@@ -820,11 +836,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                                           >
                                               <div className="p-3">
                                                   <div className="w-full aspect-square rounded-xl bg-gray-100 overflow-hidden relative mb-3">
-                                                      {imageRef ? (
-                                                        <img src={imageSrc} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
-                                                      ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageOff size={28} /></div>
-                                                      )}
+                                                      <img src={imageSrc} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
                                                       {isFullySelected && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><div className="text-white text-xs font-bold">ALL</div></div>}
                                                       <span className="absolute top-2 left-2 text-[0.6rem] text-blue-600 bg-white/90 backdrop-blur-sm font-bold font-mono px-1.5 py-0.5 rounded border border-blue-200/50">
                                                         #{item.instance_id.slice(-5)}
@@ -870,8 +882,24 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                           </div>
                       ) : (
                           <div className="space-y-3">
-                              {Object.entries(splitItems).map(([instanceId, qty]) => {
-                                  if (qty <= 0) return null;
+                              {Object.entries(splitItems)
+                                .filter(([, qty]) => qty > 0)
+                                .sort(([idA], [idB]) => {
+                                  const itemA = order.items.find(i => i.instance_id === idA);
+                                  const itemB = order.items.find(i => i.instance_id === idB);
+                                  if (!itemA || !itemB) return 0;
+                                  // Sort by category sort_order, then external_id, then name
+                                  const catA = categories.find(c => c.id === productInfoMap.get(idA)?.category);
+                                  const catB = categories.find(c => c.id === productInfoMap.get(idB)?.category);
+                                  const sortA = catA?.sort_order ?? 0;
+                                  const sortB = catB?.sort_order ?? 0;
+                                  if (sortA !== sortB) return sortA - sortB;
+                                  const extA = products.find(p => p.id === itemA.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
+                                  const extB = products.find(p => p.id === itemB.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
+                                  if (extA !== extB) return extA - extB;
+                                  return itemA.name.localeCompare(itemB.name);
+                                })
+                                .map(([instanceId, qty]) => {
                                   const item = order.items.find(i => i.instance_id === instanceId);
                                   if (!item) return null;
                                   const unitPrice = item.unit_price ?? item.price;
@@ -879,11 +907,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                                   return (
                                       <div key={instanceId} className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm animate-in slide-in-from-right-4 duration-300">
                                           <div className="w-10 h-10 rounded-lg bg-gray-100 shrink-0 overflow-hidden">
-                                              {productInfoMap.get(instanceId)?.image ? (
-                                                  <img src={imageUrls.get(productInfoMap.get(instanceId)!.image!) || DefaultImage} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
-                                              ) : (
-                                                  <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageOff size={14} /></div>
-                                              )}
+                                              <img src={imageUrls.get(productInfoMap.get(instanceId)?.image ?? '') || DefaultImage} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = DefaultImage; }} />
                                           </div>
                                           <div className="flex-1 min-w-0">
                                               <div className="text-sm font-bold text-gray-800 truncate">{item.name}</div>

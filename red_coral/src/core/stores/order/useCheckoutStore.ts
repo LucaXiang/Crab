@@ -1,16 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { HeldOrder, CartItem, PaymentRecord, CheckoutMode, DetailTab, PendingCashTx } from '@/core/domain/types';
-
-function calculateUnpaidItems(items: CartItem[], paidQuantities?: Record<string, number>): CartItem[] {
-  if (!paidQuantities) return items;
-  return items.map(item => {
-      const paidQty = paidQuantities[item.instance_id] || 0;
-      const remainingQty = item.quantity - paidQty;
-      if (remainingQty <= 0) return null;
-      return { ...item, quantity: remainingQty };
-  }).filter((i): i is CartItem => i !== null);
-}
+import { HeldOrder, PaymentRecord, CheckoutMode, DetailTab, PendingCashTx } from '@/core/domain/types';
 
 interface CheckoutState {
   // Base Data
@@ -24,7 +14,6 @@ interface CheckoutState {
   
   // Payment State
   paymentRecords: PaymentRecord[];
-  unpaidItems: CartItem[];
   selectedQuantities: Record<number, number>;
   
   // Input State
@@ -49,7 +38,6 @@ interface CheckoutState {
   setMode: (mode: CheckoutMode) => void;
   setActiveTab: (tab: DetailTab) => void;
   setPaymentRecords: (updater: PaymentRecord[] | ((prev: PaymentRecord[]) => PaymentRecord[])) => void;
-  setUnpaidItems: (updater: CartItem[] | ((prev: CartItem[]) => CartItem[])) => void;
   setSelectedQuantities: (updater: Record<number, number> | ((prev: Record<number, number>) => Record<number, number>)) => void;
   setInputBuffer: (updater: string | ((prev: string) => string)) => void;
   setIsTyping: (typing: boolean) => void;
@@ -84,7 +72,6 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
   mode: 'retail',
   activeTab: 'items',
   paymentRecords: [],
-  unpaidItems: [],
   selectedQuantities: {},
   inputBuffer: '',
   isTyping: false,
@@ -100,7 +87,6 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
     mode: 'retail',
     activeTab: 'items',
     paymentRecords: [],
-    unpaidItems: calculateUnpaidItems(order.items, order.paid_item_quantities),
     selectedQuantities: {},
     inputBuffer: '',
     isTyping: false,
@@ -115,10 +101,7 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
       // Recalculate unpaid items when order updates
       // Note: We do not reset session state (paymentRecords, etc.) here
       // as this might be an intermediate update.
-      set({
-          order,
-          unpaidItems: calculateUnpaidItems(order.items, order.paid_item_quantities)
-      });
+      set({ order });
   },
 
   setCurrentOrderKey: (key) => set({ currentOrderKey: key }),
@@ -132,7 +115,6 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
     mode: 'retail',
     activeTab: 'items',
     paymentRecords: [],
-    unpaidItems: [],
     selectedQuantities: {},
     inputBuffer: '',
     isTyping: false,
@@ -146,10 +128,6 @@ export const useCheckoutStore = create<CheckoutState>()(subscribeWithSelector((s
   
   setPaymentRecords: (updater) => set((state) => ({
     paymentRecords: typeof updater === 'function' ? updater(state.paymentRecords) : updater
-  })),
-
-  setUnpaidItems: (updater) => set((state) => ({
-    unpaidItems: typeof updater === 'function' ? updater(state.unpaidItems) : updater
   })),
 
   setSelectedQuantities: (updater) => set((state) => ({
@@ -213,7 +191,6 @@ export const subscribeToCheckout = <T>(
 export const useCheckoutMode = () => useCheckoutStore((s) => s.mode);
 export const useCheckoutActiveTab = () => useCheckoutStore((s) => s.activeTab);
 export const useCheckoutPayments = () => useCheckoutStore((s) => s.paymentRecords);
-export const useCheckoutUnpaidItems = () => useCheckoutStore((s) => s.unpaidItems);
 export const useCheckoutSelectedQuantities = () => useCheckoutStore((s) => s.selectedQuantities);
 export const useCheckoutRemainingBuffer = () => useCheckoutStore((s) => s.inputBuffer);
 export const useCheckoutIsTyping = () => useCheckoutStore((s) => s.isTyping);
@@ -266,7 +243,6 @@ export function useCheckoutActions() {
     setMode: store.setMode,
     setActiveTab: store.setActiveTab,
     setPaymentRecords: store.setPaymentRecords,
-    setUnpaidItems: store.setUnpaidItems,
     setSelectedQuantities: store.setSelectedQuantities,
     setInputBuffer: store.setInputBuffer,
     setIsTyping: store.setIsTyping,

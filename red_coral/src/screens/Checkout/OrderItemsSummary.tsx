@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
 import { CartItem, CheckoutMode } from '@/core/domain/types';
-import { useProductStore } from '@/core/stores/resources';
+import { useProductStore, useCategories } from '@/core/stores/resources';
+import { useI18n } from '@/hooks/useI18n';
 import { UnpaidItemRow } from './components';
+import { CATEGORY_BG, CATEGORY_HEADER_BG, CATEGORY_ACCENT, hashToColorIndex } from '@/utils/categoryColors';
 
 interface OrderItemsSummaryProps {
   items: CartItem[];
-  unpaidItems: CartItem[];
   mode: CheckoutMode;
   selectedQuantities: Record<number, number>;
   onUpdateSelectedQty: (index: number, delta: number) => void;
@@ -14,67 +15,102 @@ interface OrderItemsSummaryProps {
 
 export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
   items,
-  unpaidItems,
   mode,
   selectedQuantities,
   onUpdateSelectedQty,
   onEditItem,
 }) => {
-  // Build active (unpaid) items list
-  const activeItems: { item: CartItem; remainingQty: number; originalIndex: number }[] = [];
-
-  items.forEach((item) => {
-    if (item._removed) return;
-
-    // Find corresponding unpaid item
-    const unpaidIdx = unpaidItems.findIndex(u =>
-      item.instance_id
-        ? u.instance_id === item.instance_id
-        : u.id === item.id
-    );
-
-    const remainingItem = unpaidIdx !== -1 ? unpaidItems[unpaidIdx] : null;
-    const remainingQty = remainingItem ? remainingItem.quantity : 0;
-
-    if (remainingQty > 0) {
-      activeItems.push({ item, remainingQty, originalIndex: unpaidIdx });
-    }
-  });
-
-  // Build product ID → external_id map for O(1) lookup during sort
+  const { t } = useI18n();
   const products = useProductStore(state => state.items);
-  const externalIdMap = useMemo(() => {
-    const map = new Map<string, number | null>();
-    for (const p of products) map.set(p.id, p.external_id);
-    return map;
-  }, [products]);
-  const sortItems = (aItem: CartItem, bItem: CartItem) => {
-    const extIdA = externalIdMap.get(aItem.id) ?? Number.MAX_SAFE_INTEGER;
-    const extIdB = externalIdMap.get(bItem.id) ?? Number.MAX_SAFE_INTEGER;
-    if (extIdA !== extIdB) return extIdA - extIdB;
-    return aItem.name.localeCompare(bItem.name);
-  };
+  const categories = useCategories();
 
-  activeItems.sort((a, b) => sortItems(a.item, b.item));
+  // Filter to items with unpaid quantity > 0
+  const activeItems = useMemo(() => {
+    return items
+      .map((item, idx) => {
+        if (item._removed) return null;
+        const remainingQty = item.unpaid_quantity ?? item.quantity;
+        if (remainingQty <= 0) return null;
+        return { item, remainingQty, originalIndex: idx };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+  }, [items]);
+
+  // Group by category
+  const groupedByCategory = useMemo(() => {
+    const productMap = new Map(products.map(p => [p.id, p]));
+    const groups: Record<string, typeof activeItems> = {};
+
+    activeItems.forEach(entry => {
+      const product = productMap.get(entry.item.id);
+      const categoryId = product?.category || 'uncategorized';
+
+      if (!groups[categoryId]) {
+        groups[categoryId] = [];
+      }
+      groups[categoryId].push(entry);
+    });
+
+    // Sort within each group by external_id
+    const externalIdMap = new Map<string, number | null>();
+    for (const p of products) externalIdMap.set(p.id, p.external_id);
+
+    for (const entries of Object.values(groups)) {
+      entries.sort((a, b) => {
+        // Comped items sink to end of each category group
+        const compA = a.item.is_comped ? 1 : 0;
+        const compB = b.item.is_comped ? 1 : 0;
+        if (compA !== compB) return compA - compB;
+
+        const extIdA = externalIdMap.get(a.item.id) ?? Number.MAX_SAFE_INTEGER;
+        const extIdB = externalIdMap.get(b.item.id) ?? Number.MAX_SAFE_INTEGER;
+        if (extIdA !== extIdB) return extIdA - extIdB;
+        return a.item.name.localeCompare(b.item.name);
+      });
+    }
+
+    return groups;
+  }, [activeItems, products]);
+
+  // Sort groups by category sort_order
+  const sortedGroups = useMemo(() => {
+    const categoryMap = new Map(categories.map(c => [c.id, c]));
+
+    return Object.entries(groupedByCategory).sort(([catIdA], [catIdB]) => {
+      if (catIdA === 'uncategorized') return 1;
+      if (catIdB === 'uncategorized') return -1;
+
+      const catA = categoryMap.get(catIdA);
+      const catB = categoryMap.get(catIdB);
+
+      return (catA?.sort_order ?? 0) - (catB?.sort_order ?? 0);
+    });
+  }, [groupedByCategory, categories]);
 
   return (
     <div className="space-y-6">
-      {/* Unpaid Items */}
-      <div className="space-y-3">
-        {activeItems.map(({ item, remainingQty, originalIndex }, idx) => (
-          <UnpaidItemRow
-            key={`unpaid-${idx}`}
-            item={item}
-            remainingQty={remainingQty}
-            originalIndex={originalIndex}
-            mode={mode}
-            selectedQuantities={selectedQuantities}
-            onUpdateSelectedQty={onUpdateSelectedQty}
-            onEditItem={onEditItem}
-          />
-        ))}
-      </div>
-
+      {sortedGroups.map(([categoryId, entries]) => {
+        const colorIdx = hashToColorIndex(categoryId);
+        return (
+          <div key={categoryId} className="space-y-3">
+            {entries.map(({ item, remainingQty, originalIndex }) => (
+              <UnpaidItemRow
+                key={`unpaid-${originalIndex}`}
+                item={item}
+                remainingQty={remainingQty}
+                originalIndex={originalIndex}
+                mode={mode}
+                selectedQuantities={selectedQuantities}
+                onUpdateSelectedQty={onUpdateSelectedQty}
+                onEditItem={onEditItem}
+                bgColor={CATEGORY_BG[colorIdx]}
+                hoverColor={CATEGORY_HEADER_BG[colorIdx]}
+                accentColor={CATEGORY_ACCENT[colorIdx]}
+              />
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 };
