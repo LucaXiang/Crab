@@ -119,7 +119,7 @@ mod tests {
     #[tokio::test]
     async fn test_config_default() {
         let config = MessageClientConfig::default();
-        assert_eq!(config.request_timeout, Duration::from_secs(3)); // 局域网默认 3 秒
+        assert_eq!(config.request_timeout, Duration::from_millis(1500)); // 局域网默认 1.5 秒
         assert_eq!(config.heartbeat_interval, Duration::from_secs(5)); // 5 秒心跳
         assert!(config.auto_reconnect);
     }
