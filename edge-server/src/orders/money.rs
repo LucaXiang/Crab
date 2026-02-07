@@ -317,7 +317,7 @@ fn effective_order_rule_surcharge(snapshot: &OrderSnapshot, subtotal: Decimal) -
 /// Calculate item unit price with precise decimal arithmetic
 ///
 /// Formula: base_price * (1 - manual_discount_percent/100) - rule_discount + rule_surcharge
-/// where base_price = original_price if available, otherwise price
+/// where base_price = original_price (base price for calculations, updated on manual repricing)
 ///
 /// This is the final per-unit price shown to customers
 pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
@@ -326,7 +326,7 @@ pub fn calculate_unit_price(item: &CartItemSnapshot) -> Decimal {
         return Decimal::ZERO;
     }
 
-    // Use original_price as the base for discount calculation (before any discounts)
+    // Use original_price as the base for calculations (updated on manual repricing/spec change)
     let base_price = to_decimal(item.original_price.unwrap_or(item.price));
 
     // Options modifier: sum of (price_modifier × quantity) for each selected option
@@ -405,7 +405,7 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
             .unwrap_or(0);
         item.unpaid_quantity = (item.quantity - paid_qty).max(0);
 
-        // Calculate original price (base price before any adjustments) + options modifier
+        // Calculate base price + options modifier
         let base_price = to_decimal(item.original_price.unwrap_or(item.price));
         // Options modifier: sum of (price_modifier × quantity) for each selected option
         let options_modifier: Decimal = item
@@ -421,17 +421,23 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         original_total += base_with_options * quantity;
 
         // Calculate item-level discount (based on full base including options)
+        // Comped items keep their applied_rules/manual_discount for uncomp restoration,
+        // but should not contribute to discount/surcharge totals (they're free).
         let manual_discount = item
             .manual_discount_percent
             .map(|d| base_with_options * to_decimal(d) / Decimal::ONE_HUNDRED)
             .unwrap_or(Decimal::ZERO);
         let after_manual = base_with_options - manual_discount;
         let rule_discount = effective_rule_discount(item, after_manual);
-        item_discount_total += (manual_discount + rule_discount) * quantity;
+        if !item.is_comped {
+            item_discount_total += (manual_discount + rule_discount) * quantity;
+        }
 
         // Calculate item-level surcharge (from rules only)
         let rule_surcharge = effective_rule_surcharge(item, base_with_options);
-        item_surcharge_total += rule_surcharge * quantity;
+        if !item.is_comped {
+            item_surcharge_total += rule_surcharge * quantity;
+        }
 
         // Sync calculated_amount in applied_rules so snapshot stays consistent
         if let Some(ref mut rules) = item.applied_rules {
@@ -456,6 +462,8 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         // Calculate and set unit_price (final per-unit price for display)
         let unit_price = calculate_unit_price(item);
         item.unit_price = Some(to_f64(unit_price));
+        // Sync item.price to match computed unit_price (keeps price = "final price after rules")
+        item.price = to_f64(unit_price);
 
         // Calculate and set line_total (unit_price * quantity)
         let item_total = unit_price * quantity;
@@ -473,8 +481,11 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
         total_tax += item_tax;
 
         // Accumulate comp total (original value of comped items)
+        // Use original_price for comp value since item.price is zeroed on comp
         if item.is_comped {
-            comp_total += base_with_options * quantity;
+            let comp_base = to_decimal(item.original_price.unwrap_or(item.price));
+            let comp_with_options = comp_base + options_modifier;
+            comp_total += comp_with_options * quantity;
         }
 
         // Accumulate subtotal
@@ -1313,7 +1324,7 @@ mod tests {
     }
 
     // ========================================================================
-    // 规则 + options + original_price 不再双重计算
+    // original_price = base price for calculations; avoid double-counting
     // ========================================================================
 
     #[test]
@@ -1407,7 +1418,7 @@ mod tests {
         };
 
         let unit_price = calculate_unit_price(&item);
-        // base_price = 100.0
+        // base_price = original_price = 100.0
         // options = 5.0
         // base_with_options = 105.0
         // manual_discount = 105.0 * 10% = 10.5
@@ -1459,7 +1470,7 @@ mod tests {
         };
 
         let unit_price = calculate_unit_price(&item);
-        // base_price = 10.0
+        // base_price = original_price = 10.0
         // options = 2.0 * 3 = 6.0
         // base_with_options = 16.0
         // No discounts

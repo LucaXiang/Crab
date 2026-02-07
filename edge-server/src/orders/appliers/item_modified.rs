@@ -91,6 +91,7 @@ fn apply_item_modified(
                 new_item.unpaid_quantity = new_unpaid;
                 if let Some(price) = changes.price {
                     new_item.price = price;
+                    new_item.original_price = Some(price);
                 }
                 if let Some(discount) = changes.manual_discount_percent {
                     new_item.manual_discount_percent = if discount.abs() < 0.01 { None } else { Some(discount) };
@@ -149,6 +150,7 @@ fn apply_item_modified(
                     new_item.quantity = result.quantity;
                     new_item.unpaid_quantity = result.quantity;
                     new_item.price = result.price;
+                    new_item.original_price = Some(result.price);
                     new_item.manual_discount_percent = result.manual_discount_percent;
 
                     // Apply additional changes (note, options, specification)
@@ -215,6 +217,7 @@ fn merge_duplicate_unpaid_items(snapshot: &mut OrderSnapshot) {
 fn apply_changes_to_item_skip_quantity(item: &mut CartItemSnapshot, changes: &ItemChanges) {
     if let Some(price) = changes.price {
         item.price = price;
+        item.original_price = Some(price);
     }
     // Skip quantity — already set correctly by the caller
     if let Some(discount) = changes.manual_discount_percent {
@@ -236,6 +239,7 @@ fn apply_changes_to_item_skip_quantity(item: &mut CartItemSnapshot, changes: &It
 fn apply_changes_to_item(item: &mut CartItemSnapshot, changes: &ItemChanges) {
     if let Some(price) = changes.price {
         item.price = price;
+        item.original_price = Some(price);
     }
     if let Some(quantity) = changes.quantity {
         item.quantity = quantity;
@@ -621,10 +625,12 @@ mod tests {
         let applier = ItemModifiedApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(snapshot.items[0].price, 15.0);
+        // item.price is synced to computed unit_price by recalculate_totals
+        // base=15.0 * (1 - 10%) = 13.5
+        assert_eq!(snapshot.items[0].price, 13.5);
+        assert_eq!(snapshot.items[0].original_price, Some(15.0));
         assert_eq!(snapshot.items[0].manual_discount_percent, Some(10.0));
         assert_eq!(snapshot.items[0].note, Some("Special order".to_string()));
-        // unit_price = 15.0 * 0.9 = 13.5
         // subtotal = 13.5 * 2 = 27.0
         assert!((snapshot.subtotal - 27.0).abs() < 0.001);
     }
@@ -1094,10 +1100,11 @@ mod tests {
         assert_eq!(snapshot.items[0].manual_discount_percent, None);
 
         // Item 1: unpaid portion (discount applied)
+        // item.price synced to unit_price: 5.0 * 0.5 = 2.5
         assert_eq!(snapshot.items[1].instance_id, "item-1-discounted");
         assert_eq!(snapshot.items[1].quantity, 1);
         assert_eq!(snapshot.items[1].unpaid_quantity, 1);
-        assert_eq!(snapshot.items[1].price, 5.0);
+        assert_eq!(snapshot.items[1].price, 2.5);
         assert_eq!(snapshot.items[1].manual_discount_percent, Some(50.0));
 
         // paid_item_quantities stays with original instance_id (paid portion)

@@ -35,10 +35,9 @@ impl EventApplier for ItemCompedApplier {
                     }
                     item.is_comped = true;
                     item.price = 0.0;
-                    item.manual_discount_percent = None;
-                    item.rule_discount_amount = None;
-                    item.rule_surcharge_amount = None;
-                    item.applied_rules = None;
+                    // Keep applied_rules and manual_discount_percent intact:
+                    // calculate_unit_price() returns 0 for comped items anyway,
+                    // and preserving them allows correct restoration on uncomp.
                 }
             } else {
                 // Partial comp: find SOURCE item by source_instance_id (deterministic!)
@@ -55,6 +54,8 @@ impl EventApplier for ItemCompedApplier {
                         (snapshot.items[source_idx].unpaid_quantity - quantity).max(0);
 
                     // Create new comped item as a split
+                    // Clone preserves applied_rules and manual_discount_percent
+                    // for correct restoration on uncomp.
                     let mut comped_item = source;
                     comped_item.instance_id = instance_id.to_string();
                     comped_item.quantity = *quantity;
@@ -62,10 +63,6 @@ impl EventApplier for ItemCompedApplier {
                     comped_item.is_comped = true;
                     comped_item.price = 0.0;
                     comped_item.original_price = Some(*original_price);
-                    comped_item.manual_discount_percent = None;
-                    comped_item.rule_discount_amount = None;
-                    comped_item.rule_surcharge_amount = None;
-                    comped_item.applied_rules = None;
 
                     snapshot.items.push(comped_item);
                 }
@@ -296,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn test_item_comped_clears_discounts_and_surcharges() {
+    fn test_item_comped_preserves_discounts_and_rules() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         let mut item = create_test_item("item-1", "product:p1", "Product A", 100.0, 1);
         item.manual_discount_percent = Some(10.0);
@@ -311,9 +308,10 @@ mod tests {
 
         assert!(snapshot.items[0].is_comped);
         assert_eq!(snapshot.items[0].price, 0.0);
-        assert_eq!(snapshot.items[0].manual_discount_percent, None);
-        assert_eq!(snapshot.items[0].rule_discount_amount, None);
-        assert_eq!(snapshot.items[0].rule_surcharge_amount, None);
+        // Discounts and rules are preserved for uncomp restoration
+        assert_eq!(snapshot.items[0].manual_discount_percent, Some(10.0));
+        assert_eq!(snapshot.items[0].rule_discount_amount, Some(5.0));
+        assert_eq!(snapshot.items[0].rule_surcharge_amount, Some(2.0));
     }
 
     #[test]

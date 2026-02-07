@@ -4,6 +4,7 @@
 
 use crate::orders::money::{self, to_decimal, to_f64, MONEY_TOLERANCE};
 use crate::orders::traits::EventApplier;
+use rust_decimal::Decimal;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot, PaymentRecord};
 
 /// PaymentAdded applier
@@ -42,9 +43,14 @@ impl EventApplier for PaymentAddedApplier {
             // Update paid_amount using Decimal for precision
             snapshot.paid_amount = to_f64(to_decimal(snapshot.paid_amount) + to_decimal(*amount));
 
+            // Sync remaining_amount after paid_amount changes (must always be updated)
+            let paid = to_decimal(snapshot.paid_amount);
+            let total = to_decimal(snapshot.total);
+            snapshot.remaining_amount = to_f64((total - paid).max(Decimal::ZERO));
+
             // When fully paid, mark all items as paid for reliable tracking
             // 金额分单不跟踪商品数量，跳过填充 paid_item_quantities
-            if to_decimal(snapshot.paid_amount) >= to_decimal(snapshot.total) - MONEY_TOLERANCE {
+            if paid >= total - MONEY_TOLERANCE {
                 if !snapshot.has_amount_split {
                     let item_quantities: Vec<(String, i32)> = snapshot
                         .items
