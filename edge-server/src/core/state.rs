@@ -75,7 +75,7 @@ impl Default for ResourceVersions {
 /// | 字段 | 类型 | 说明 |
 /// |------|------|------|
 /// | config | Config | 配置项 (不可变) |
-/// | db | Surreal<Db> | 嵌入式数据库 |
+/// | db | SqlitePool | 嵌入式数据库 |
 /// | activation | ActivationService | 激活状态管理 |
 /// | cert_service | CertService | 证书管理服务 |
 /// | message_bus | MessageBusService | 消息总线服务 |
@@ -226,7 +226,7 @@ impl ServerState {
             PrintStorage::open(&print_db_path).expect("Failed to initialize print storage");
         let kitchen_print_service = Arc::new(KitchenPrintService::new(print_storage));
 
-        // 7. Initialize AuditService (税务级审计日志 — SurrealDB)
+        // 7. Initialize AuditService (税务级审计日志 — SQLite)
         let data_dir = config.data_dir();
         let (audit_service, audit_rx) = AuditService::new(pool.clone(), &data_dir, 1024, config.timezone);
 
@@ -322,7 +322,7 @@ impl ServerState {
         // Worker Tasks (长期后台工作者)
         // ═══════════════════════════════════════════════════════════════════
 
-        // ArchiveWorker: 归档已完成订单到 SurrealDB
+        // ArchiveWorker: 归档已完成订单到 SQLite
         self.register_archive_worker(&mut tasks, channels.archive_rx);
 
         // MessageHandler: 处理来自客户端的消息
@@ -477,7 +477,7 @@ impl ServerState {
 
     /// 注册 ArchiveWorker
     ///
-    /// 归档已完成的订单到 SurrealDB
+    /// 归档已完成的订单到 SQLite
     /// 接收来自 EventRouter 的 mpsc 通道（已过滤为终端事件）
     fn register_archive_worker(
         &self,

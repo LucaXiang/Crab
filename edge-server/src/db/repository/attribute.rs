@@ -1,6 +1,6 @@
 //! Attribute Repository
 //!
-//! Manages attributes, options, and bindings (replaces SurrealDB graph edges).
+//! Manages attributes, options, and bindings.
 
 use super::{RepoError, RepoResult};
 use shared::models::{
@@ -164,7 +164,7 @@ async fn create_option(pool: &SqlitePool, attribute_id: i64, opt: &AttributeOpti
 }
 
 // =========================================================================
-// Attribute Bindings (replaces SurrealDB RELATE has_attribute)
+// Attribute Bindings
 // =========================================================================
 
 pub async fn link(

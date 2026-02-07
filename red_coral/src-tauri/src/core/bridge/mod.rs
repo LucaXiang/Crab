@@ -695,7 +695,7 @@ impl ClientBridge {
                         } else {
                             HealthLevel::Critical
                         },
-                        size_bytes: None, // SurrealDB embedded 不易获取大小
+                        size_bytes: None,
                         last_write_at: None,
                     }
                 };

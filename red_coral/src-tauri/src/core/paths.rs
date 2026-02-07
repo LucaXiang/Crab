@@ -26,7 +26,7 @@
 //!     │   ├── edge_cert.pem    # Edge Server 证书
 //!     │   └── edge_key.pem     # Edge Server 私钥
 //!     ├── data/
-//!     │   ├── main.db/         # SurrealDB (RocksDB 目录)
+//!     │   ├── main.db           # SQLite 数据库
 //!     │   ├── orders.redb      # 订单 Event Sourcing
 //!     │   └── print.redb       # 打印队列
 //!     └── images/              # 图片存储 (可写)
@@ -124,7 +124,7 @@ impl TenantPaths {
 
     // ============ 具体文件路径 ============
 
-    /// SurrealDB 数据目录: {tenant}/server/data/main.db/
+    /// SQLite 数据库路径: {tenant}/server/data/main.db
     pub fn main_db_dir(&self) -> PathBuf {
         self.server_data_dir().join("main.db")
     }

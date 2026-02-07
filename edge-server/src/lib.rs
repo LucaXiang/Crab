@@ -5,7 +5,7 @@
 //! 本模块是 Edge Server 的主入口，提供以下核心功能：
 //!
 //! - **消息总线** (`message`): 支持 TCP/TLS/Memory 传输的实时消息系统
-//! - **数据库** (`db`): 嵌入式 SurrealDB 存储
+//! - **数据库** (`db`): 嵌入式 SQLite 存储
 //! - **认证** (`auth`): JWT + Argon2 认证体系
 //! - **证书管理** (`services/cert`): mTLS 三层证书体系
 //! - **HTTP API** (`api`): RESTful API 接口

@@ -93,7 +93,7 @@ pub struct AttributeUpdate {
     pub is_active: Option<bool>,
 }
 
-/// Attribute binding (replaces SurrealDB has_attribute graph edge)
+/// Attribute binding (owner_type + owner_id polymorphic FK)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct AttributeBinding {

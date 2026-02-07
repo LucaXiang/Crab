@@ -1,6 +1,6 @@
 //! 审计日志后台 Worker
 //!
-//! 从 mpsc 通道消费 AuditLogRequest，写入 SurrealDB。
+//! 从 mpsc 通道消费 AuditLogRequest，写入 SQLite。
 //! 失败时重试 3 次（指数退避），通道关闭时自动退出。
 
 use super::service::AuditLogRequest;
@@ -11,7 +11,7 @@ const MAX_RETRIES: u32 = 3;
 
 /// 审计日志后台 Worker
 ///
-/// 从 mpsc 通道消费日志请求，写入 SurrealDB 存储。
+/// 从 mpsc 通道消费日志请求，写入 SQLite 存储。
 /// 失败时最多重试 3 次，退避间隔 100ms → 200ms → 400ms。
 pub struct AuditWorker {
     storage: AuditStorage,

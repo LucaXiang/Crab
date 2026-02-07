@@ -70,7 +70,7 @@ pub struct Claims {
     pub username: String,
     /// 显示名称
     pub display_name: String,
-    /// 角色 ID (RecordId 字符串)
+    /// 角色 ID
     pub role_id: String,
     /// 角色名称
     pub role_name: String,

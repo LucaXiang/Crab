@@ -224,7 +224,7 @@ impl Config {
     /// 确保工作目录结构存在
     ///
     /// work_dir 是 `{tenant}/server/`，创建结构:
-    /// - `data/` - 数据目录 (SurrealDB, orders.redb, print.redb)
+    /// - `data/` - 数据目录 (orders.redb, print.redb, main.db)
     /// - `images/` - 图片存储目录
     ///
     /// 注意: 证书目录 `{tenant}/certs/` 由 TenantManager 创建
@@ -248,7 +248,7 @@ impl Config {
         PathBuf::from(&self.work_dir).join("data")
     }
 
-    /// 获取 SurrealDB 数据库目录路径: {tenant}/server/data/main.db/
+    /// 获取 SQLite 数据库目录路径: {tenant}/server/data/main.db/
     pub fn database_dir(&self) -> PathBuf {
         self.data_dir().join("main.db")
     }

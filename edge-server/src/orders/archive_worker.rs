@@ -33,7 +33,7 @@ const MAX_RETRY_COUNT: u32 = 3;
 const RETRY_BASE_DELAY_SECS: u64 = 5;
 const RETRY_MAX_DELAY_SECS: u64 = 60; // 1 minute max
 const QUEUE_SCAN_INTERVAL_SECS: u64 = 60;
-/// 并发归档数量（单店场景 10 即可，避免 SurrealDB 连接压力）
+/// 并发归档数量（单店场景 10 即可，避免 SQLite 写入压力）
 const ARCHIVE_CONCURRENCY: usize = 10;
 
 /// Worker for processing archive queue (支持并发归档)
@@ -176,7 +176,7 @@ impl ArchiveWorker {
             None => return,
         };
 
-        // 2. Archive to SurrealDB (async)
+        // 2. Archive to SQLite (async)
         match self.archive_service.archive_order(&snapshot, events.clone()).await {
             Ok(()) => {
                 tracing::info!(order_id = %order_id, "Order archived successfully");

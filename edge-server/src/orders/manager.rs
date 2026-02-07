@@ -195,7 +195,7 @@ pub struct OrdersManager {
     rule_cache: Arc<RwLock<HashMap<String, Vec<PriceRule>>>>,
     /// Catalog service for product metadata lookup
     catalog_service: Option<Arc<crate::services::CatalogService>>,
-    /// Archive service for completed orders (optional, only set when SurrealDB is available)
+    /// Archive service for completed orders (optional, only set when SQLite is available)
     archive_service: Option<super::OrderArchiveService>,
     /// 业务时区
     tz: Tz,
