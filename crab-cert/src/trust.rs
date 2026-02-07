@@ -111,7 +111,33 @@ fn extract_tbs_bytes(der: &[u8]) -> Result<&[u8]> {
 }
 
 /// Verify a certificate chain against a Root CA.
+/// Walks the chain: cert[0] signed by cert[1], ..., cert[N-1] signed by root.
 /// Uses signature verification only, no hostname checking.
 pub fn verify_chain_against_root(chain_pem: &str, root_ca_pem: &str) -> Result<()> {
-    verify_ca_signature(chain_pem, root_ca_pem)
+    let pems: Vec<::pem::Pem> = ::pem::parse_many(chain_pem)
+        .map_err(|e| CertError::VerificationFailed(format!("PEM parse error: {}", e)))?;
+
+    let cert_pems: Vec<String> = pems
+        .into_iter()
+        .filter(|p| p.tag() == "CERTIFICATE")
+        .map(|p| ::pem::encode(&p))
+        .collect();
+
+    if cert_pems.is_empty() {
+        return Err(CertError::VerificationFailed(
+            "No certificates found in chain".into(),
+        ));
+    }
+
+    // Verify each cert against its issuer; last cert verified against root
+    for i in 0..cert_pems.len() {
+        let issuer_pem = if i + 1 < cert_pems.len() {
+            &cert_pems[i + 1]
+        } else {
+            root_ca_pem
+        };
+        verify_ca_signature(&cert_pems[i], issuer_pem)?;
+    }
+
+    Ok(())
 }
