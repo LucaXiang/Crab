@@ -6,7 +6,9 @@
 //! - OrderMerged for the target order
 
 use async_trait::async_trait;
+use rust_decimal::Decimal;
 
+use crate::orders::money::to_decimal;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -84,12 +86,12 @@ impl CommandHandler for MergeOrdersAction {
         }
 
         // 6. Reject if either order has payments
-        if source_snapshot.paid_amount > 0.0 {
+        if to_decimal(source_snapshot.paid_amount) > Decimal::ZERO {
             return Err(OrderError::InvalidOperation(
                 "存在支付记录的订单不能合并".to_string(),
             ));
         }
-        if target_snapshot.paid_amount > 0.0 {
+        if to_decimal(target_snapshot.paid_amount) > Decimal::ZERO {
             return Err(OrderError::InvalidOperation(
                 "目标订单存在支付记录，不能合并".to_string(),
             ));

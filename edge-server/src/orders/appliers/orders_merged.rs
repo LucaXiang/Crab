@@ -4,6 +4,7 @@
 //! - OrderMerged: Target order receives items, payments, and split state from source order
 //! - OrderMergedOut: Source order is marked as Merged status
 
+use super::items_added::add_or_merge_item;
 use crate::orders::money;
 use crate::orders::traits::EventApplier;
 use shared::order::{EventPayload, OrderEvent, OrderSnapshot, OrderStatus};
@@ -26,9 +27,9 @@ impl EventApplier for OrderMergedApplier {
             ..
         } = &event.payload
         {
-            // Merge items
+            // Merge items (deduplicate by instance_id)
             for item in items {
-                snapshot.items.push(item.clone());
+                add_or_merge_item(snapshot, item);
             }
 
             // Merge payment records

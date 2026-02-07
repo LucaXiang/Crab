@@ -4,7 +4,9 @@
 //! Only applicable to orders in Active status.
 
 use async_trait::async_trait;
+use rust_decimal::Decimal;
 
+use crate::orders::money::to_decimal;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -45,7 +47,7 @@ impl CommandHandler for MoveOrderAction {
         }
 
         // 3. Reject if order has any payments
-        if snapshot.paid_amount > 0.0 {
+        if to_decimal(snapshot.paid_amount) > Decimal::ZERO {
             return Err(OrderError::InvalidOperation(
                 "存在支付记录的订单不能移动桌台".to_string(),
             ));

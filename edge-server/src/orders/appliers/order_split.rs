@@ -83,13 +83,14 @@ impl EventApplier for ItemSplitApplier {
             };
             snapshot.payments.push(payment);
 
-            // When fully paid after item-based split, mark all items as paid
+            // When fully paid after item-based split, mark all non-comped items as paid
             if !items.is_empty()
                 && to_decimal(snapshot.paid_amount) >= to_decimal(snapshot.total) - MONEY_TOLERANCE
             {
                 let item_quantities: Vec<(String, i32)> = snapshot
                     .items
                     .iter()
+                    .filter(|item| !item.is_comped)
                     .map(|item| (item.instance_id.clone(), item.quantity))
                     .collect();
                 for (instance_id, quantity) in item_quantities {

@@ -91,6 +91,20 @@ impl CommandHandler for ModifyItemAction {
             }
         }
 
+        // 8b. Validate affected_qty doesn't exceed unpaid quantity
+        //     (cannot modify already-paid portions via partial split)
+        let paid_qty = snapshot
+            .paid_item_quantities
+            .get(&self.instance_id)
+            .copied()
+            .unwrap_or(0);
+        if paid_qty > 0 && affected_qty > item.unpaid_quantity && affected_qty < item.quantity {
+            return Err(OrderError::InvalidOperation(format!(
+                "affected_quantity ({}) exceeds unpaid quantity ({})",
+                affected_qty, item.unpaid_quantity
+            )));
+        }
+
         // 9. Calculate previous values for audit trail
         let previous_values = ItemChanges {
             price: if self.changes.price.is_some() {
@@ -129,11 +143,6 @@ impl CommandHandler for ModifyItemAction {
         let operation = determine_operation(&self.changes);
 
         // 11. Calculate modification results (handle split scenario)
-        let paid_qty = snapshot
-            .paid_item_quantities
-            .get(&self.instance_id)
-            .copied()
-            .unwrap_or(0);
         let results = calculate_modification_results(item, affected_qty, &self.changes, paid_qty);
 
         // 12. Allocate sequence number
@@ -170,7 +179,7 @@ impl CommandHandler for ModifyItemAction {
 /// Treats `None` and `Some(0.0)` as equivalent for discount.
 fn has_actual_changes(item: &CartItemSnapshot, changes: &ItemChanges) -> bool {
     if let Some(price) = changes.price
-        && (price - item.price).abs() > f64::EPSILON {
+        && (price - item.price).abs() > 0.01 {
             return true;
         }
     if let Some(qty) = changes.quantity
@@ -179,7 +188,7 @@ fn has_actual_changes(item: &CartItemSnapshot, changes: &ItemChanges) -> bool {
         }
     if let Some(discount) = changes.manual_discount_percent {
         let current = item.manual_discount_percent.unwrap_or(0.0);
-        if (discount - current).abs() > f64::EPSILON {
+        if (discount - current).abs() > 0.01 {
             return true;
         }
     }
@@ -217,7 +226,7 @@ fn has_actual_changes(item: &CartItemSnapshot, changes: &ItemChanges) -> bool {
                 // Compare price (both optional)
                 let new_p = new_spec.price.unwrap_or(0.0);
                 let cur_p = curr.price.unwrap_or(0.0);
-                if (new_p - cur_p).abs() > f64::EPSILON {
+                if (new_p - cur_p).abs() > 0.01 {
                     return true;
                 }
             }
@@ -261,7 +270,7 @@ fn calculate_modification_results(
     let new_discount = changes
         .manual_discount_percent
         .or(item.manual_discount_percent)
-        .filter(|&d| d.abs() > f64::EPSILON);
+        .filter(|&d| d.abs() > 0.01);
     let new_options = changes
         .selected_options
         .as_ref()

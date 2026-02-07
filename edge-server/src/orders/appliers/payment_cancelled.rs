@@ -110,7 +110,17 @@ fn restore_split_items(snapshot: &mut OrderSnapshot, items_to_restore: &[CartIte
             .paid_item_quantities
             .get_mut(&restore_item.instance_id)
         {
-            *paid_qty = (*paid_qty - restore_item.quantity).max(0);
+            let new_qty = *paid_qty - restore_item.quantity;
+            if new_qty < 0 {
+                tracing::warn!(
+                    order_id = %snapshot.order_id,
+                    instance_id = %restore_item.instance_id,
+                    paid_qty = *paid_qty,
+                    restore_qty = restore_item.quantity,
+                    "Data inconsistency: paid_qty < restore quantity, clamping to 0"
+                );
+            }
+            *paid_qty = new_qty.max(0);
             if *paid_qty == 0 {
                 snapshot
                     .paid_item_quantities

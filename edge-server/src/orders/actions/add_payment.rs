@@ -46,13 +46,23 @@ impl CommandHandler for AddPaymentAction {
             }
         }
 
-        // 4. Allocate sequence number
+        // 4. Overpayment guard: reject if amount exceeds remaining
+        let remaining = to_decimal(snapshot.total) - to_decimal(snapshot.paid_amount);
+        if to_decimal(self.payment.amount) > remaining + MONEY_TOLERANCE {
+            return Err(OrderError::InvalidOperation(format!(
+                "Payment amount ({:.2}) exceeds remaining unpaid ({:.2})",
+                self.payment.amount,
+                to_f64(remaining)
+            )));
+        }
+
+        // 5. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 5. Generate payment_id
+        // 6. Generate payment_id
         let payment_id = uuid::Uuid::new_v4().to_string();
 
-        // 6. Validate tendered amount
+        // 7. Validate tendered amount
         if let Some(t) = self.payment.tendered
             && to_decimal(t) < to_decimal(self.payment.amount) - MONEY_TOLERANCE {
                 return Err(OrderError::InvalidOperation(format!(
@@ -61,13 +71,13 @@ impl CommandHandler for AddPaymentAction {
                 )));
             }
 
-        // 7. Calculate change for cash payments (using rust_decimal)
+        // 8. Calculate change for cash payments (using rust_decimal)
         let change = self.payment.tendered.map(|t| {
             let diff = to_decimal(t) - to_decimal(self.payment.amount);
             to_f64(diff.max(Decimal::ZERO))
         });
 
-        // 8. Create event
+        // 9. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -322,6 +332,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_add_payment_exceeds_remaining_fails() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.total = 100.0;
+        snapshot.paid_amount = 60.0; // Already paid 60, remaining = 40
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = AddPaymentAction {
+            order_id: "order-1".to_string(),
+            payment: create_payment_input("CARD", 50.0), // 50 > 40 remaining
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        if let Err(OrderError::InvalidOperation(msg)) = result {
+            assert!(msg.contains("exceeds remaining unpaid"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_add_payment_exact_remaining_succeeds() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.total = 100.0;
+        snapshot.paid_amount = 60.0;
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = AddPaymentAction {
+            order_id: "order-1".to_string(),
+            payment: create_payment_input("CARD", 40.0), // Exact remaining
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
     async fn test_add_payment_with_note() {
         let storage = OrderStorage::open_in_memory().unwrap();
 
@@ -329,6 +393,7 @@ mod tests {
 
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
+        snapshot.total = 100.0;
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();

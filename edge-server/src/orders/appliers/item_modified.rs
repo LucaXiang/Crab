@@ -93,7 +93,7 @@ fn apply_item_modified(
                     new_item.price = price;
                 }
                 if let Some(discount) = changes.manual_discount_percent {
-                    new_item.manual_discount_percent = if discount.abs() < f64::EPSILON { None } else { Some(discount) };
+                    new_item.manual_discount_percent = if discount.abs() < 0.01 { None } else { Some(discount) };
                 }
                 if let Some(ref note) = changes.note {
                     new_item.note = Some(note.clone());
@@ -219,7 +219,7 @@ fn apply_changes_to_item_skip_quantity(item: &mut CartItemSnapshot, changes: &It
     // Skip quantity — already set correctly by the caller
     if let Some(discount) = changes.manual_discount_percent {
         // 0% discount ≡ no discount — normalize to None so instance_id stays consistent
-        item.manual_discount_percent = if discount.abs() < f64::EPSILON { None } else { Some(discount) };
+        item.manual_discount_percent = if discount.abs() < 0.01 { None } else { Some(discount) };
     }
     if let Some(ref note) = changes.note {
         item.note = Some(note.clone());
@@ -242,7 +242,7 @@ fn apply_changes_to_item(item: &mut CartItemSnapshot, changes: &ItemChanges) {
         item.unpaid_quantity = quantity; // Reset unpaid quantity
     }
     if let Some(discount) = changes.manual_discount_percent {
-        item.manual_discount_percent = if discount.abs() < f64::EPSILON { None } else { Some(discount) };
+        item.manual_discount_percent = if discount.abs() < 0.01 { None } else { Some(discount) };
     }
     if let Some(ref note) = changes.note {
         item.note = Some(note.clone());

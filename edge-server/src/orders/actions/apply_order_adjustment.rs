@@ -36,6 +36,13 @@ impl CommandHandler for ApplyOrderDiscountAction {
             ));
         }
 
+        // 2b. Validate: no payments made yet
+        if to_decimal(snapshot.paid_amount) > Decimal::ZERO {
+            return Err(OrderError::InvalidOperation(
+                "Cannot apply order-level adjustments after payments have been made".to_string(),
+            ));
+        }
+
         // 3. Validate: percent 和 fixed 互斥
         if self.discount_percent.is_some() && self.discount_fixed.is_some() {
             return Err(OrderError::InvalidOperation(
@@ -123,6 +130,13 @@ impl CommandHandler for ApplyOrderSurchargeAction {
         if !matches!(snapshot.status, OrderStatus::Active) {
             return Err(OrderError::InvalidOperation(
                 "Cannot apply surcharge on non-active order".to_string(),
+            ));
+        }
+
+        // 2b. Validate: no payments made yet
+        if to_decimal(snapshot.paid_amount) > Decimal::ZERO {
+            return Err(OrderError::InvalidOperation(
+                "Cannot apply order-level adjustments after payments have been made".to_string(),
             ));
         }
 
@@ -466,6 +480,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_apply_discount_after_payment_fails() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.items = vec![create_test_item(100.0, 1)];
+        snapshot.paid_amount = 30.0;
+        recalculate_totals(&mut snapshot);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+        txn.commit().unwrap();
+
+        let txn = storage.begin_write().unwrap();
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = ApplyOrderDiscountAction {
+            order_id: "order-1".to_string(),
+            discount_percent: Some(10.0),
+            discount_fixed: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        if let Err(OrderError::InvalidOperation(msg)) = result {
+            assert!(msg.contains("after payments have been made"));
+        }
+    }
+
+    #[tokio::test]
     async fn test_discount_on_non_active_order() {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
@@ -638,6 +683,37 @@ mod tests {
             assert_eq!(*total, 100.0);
         } else {
             panic!("Expected OrderSurchargeApplied payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_apply_surcharge_after_payment_fails() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.items = vec![create_test_item(100.0, 1)];
+        snapshot.paid_amount = 20.0;
+        recalculate_totals(&mut snapshot);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+        txn.commit().unwrap();
+
+        let txn = storage.begin_write().unwrap();
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = ApplyOrderSurchargeAction {
+            order_id: "order-1".to_string(),
+            surcharge_percent: None,
+            surcharge_amount: Some(15.0),
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        if let Err(OrderError::InvalidOperation(msg)) = result {
+            assert!(msg.contains("after payments have been made"));
         }
     }
 

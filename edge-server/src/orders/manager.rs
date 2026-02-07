@@ -1134,7 +1134,7 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn test_add_payment_overpay_is_allowed() {
+    fn test_add_payment_overpay_is_rejected() {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
@@ -1142,7 +1142,7 @@ mod tests {
             vec![simple_item("product:p1", "Coffee", 10.0, 1)],
         );
 
-        // Pay way more than the total
+        // Pay way more than the total — should be rejected
         let pay_cmd = OrderCommand::new(
             "op-1".to_string(),
             "Test Operator".to_string(),
@@ -1157,14 +1157,13 @@ mod tests {
             },
         );
         let resp = manager.execute_command(pay_cmd);
-        // Documenting: AddPayment currently allows unlimited overpayment
         assert!(
-            resp.success,
-            "AddPayment allows overpayment (no upper bound check)"
+            !resp.success,
+            "AddPayment should reject overpayment"
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert_eq!(snapshot.paid_amount, 10000.0);
+        assert_eq!(snapshot.paid_amount, 0.0);
     }
 
     // ========================================================================
@@ -4130,7 +4129,7 @@ mod tests {
         let resp = manager.execute_command(open_cmd);
         let order_id = resp.order_id.unwrap();
 
-        // 缓存规则
+        // 缓存规则 (10% global discount)
         manager.cache_rules(&order_id, vec![create_test_rule("Rule")]);
         assert!(manager.get_cached_rules(&order_id).is_some());
 
@@ -4145,7 +4144,11 @@ mod tests {
         );
         manager.execute_command(add_cmd);
 
-        // 支付
+        // 查询实际 total（可能因规则折扣而与原价不同）
+        let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
+        let actual_total = snapshot.total;
+
+        // 支付实际 total
         let pay_cmd = OrderCommand::new(
             "op-1".to_string(),
             "Test Operator".to_string(),
@@ -4153,13 +4156,14 @@ mod tests {
                 order_id: order_id.clone(),
                 payment: PaymentInput {
                     method: "CASH".to_string(),
-                    amount: 10.0,
-                    tendered: Some(10.0),
+                    amount: actual_total,
+                    tendered: Some(actual_total),
                     note: None,
                 },
             },
         );
-        manager.execute_command(pay_cmd);
+        let pay_resp = manager.execute_command(pay_cmd);
+        assert!(pay_resp.success, "Payment should succeed");
 
         // 完成订单
         let complete_cmd = OrderCommand::new(

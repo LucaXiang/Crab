@@ -522,7 +522,8 @@ pub fn recalculate_totals(snapshot: &mut OrderSnapshot) {
     let total_surcharge = item_surcharge_total + order_surcharge;
 
     // Final total (Spanish IVA: tax is already included in subtotal)
-    let total = subtotal - order_discount + order_surcharge;
+    // Clamp to zero — extreme discounts must not produce negative totals
+    let total = (subtotal - order_discount + order_surcharge).max(Decimal::ZERO);
     let paid = to_decimal(snapshot.paid_amount);
     let remaining = (total - paid).max(Decimal::ZERO);
 
@@ -1284,10 +1285,10 @@ mod tests {
 
         recalculate_totals(&mut snapshot);
 
-        // total = subtotal(50) - order_discount(100) = -50, 但 remaining_amount 被 clamp 到 0
+        // total = max(subtotal(50) - order_discount(100), 0) = 0
         assert_eq!(snapshot.subtotal, 50.0);
-        assert_eq!(snapshot.total, -50.0, "total 可以为负 (订单折扣大于小计)");
-        assert_eq!(snapshot.remaining_amount, 0.0, "remaining_amount 被 clamp 到 0");
+        assert_eq!(snapshot.total, 0.0, "total 被 clamp 到 0 (折扣不产生负总额)");
+        assert_eq!(snapshot.remaining_amount, 0.0, "remaining_amount 也为 0");
     }
 
     // ========================================================================

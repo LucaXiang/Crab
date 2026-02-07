@@ -73,6 +73,19 @@ fn validate_items_and_calculate(
     snapshot: &shared::order::OrderSnapshot,
     items: &[SplitItem],
 ) -> Result<Decimal, OrderError> {
+    // Reject duplicate instance_ids (would double-count amounts)
+    {
+        let mut seen = std::collections::HashSet::new();
+        for item in items {
+            if !seen.insert(&item.instance_id) {
+                return Err(OrderError::InvalidOperation(format!(
+                    "Duplicate instance_id '{}' in split items",
+                    item.instance_id
+                )));
+            }
+        }
+    }
+
     let mut calculated_amount = Decimal::ZERO;
     for split_item in items {
         let order_item = snapshot
