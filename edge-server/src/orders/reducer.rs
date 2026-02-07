@@ -54,7 +54,7 @@ pub(crate) fn generate_instance_id_from_parts(
     hasher.update(product_id.as_bytes());
     hasher.update(price.to_be_bytes());
 
-    if let Some(discount) = manual_discount_percent {
+    if let Some(discount) = manual_discount_percent.filter(|&d| d.abs() > f64::EPSILON) {
         hasher.update(discount.to_be_bytes());
     }
 

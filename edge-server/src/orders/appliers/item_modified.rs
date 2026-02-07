@@ -24,6 +24,12 @@ impl EventApplier for ItemModifiedApplier {
         {
             apply_item_modified(snapshot, source, *affected_quantity, changes, results);
 
+            // Merge items with duplicate instance_id that have no paid quantities.
+            // This prevents fragmentation from split-modify cycles (e.g., discount
+            // cycling + payment cancellation leaves multiple items with the same
+            // content-addressed instance_id).
+            merge_duplicate_unpaid_items(snapshot);
+
             // Update sequence and timestamp
             snapshot.last_sequence = event.sequence;
             snapshot.updated_at = event.timestamp;
@@ -61,23 +67,64 @@ fn apply_item_modified(
             .unwrap_or(0);
 
         if paid_qty > 0 && affected_quantity >= original_qty {
-            // Item has been partially paid - need to split to preserve paid portion
-            // 1. Keep paid portion with original instance_id (so split_items can find it)
-            snapshot.items[idx].quantity = paid_qty;
-            snapshot.items[idx].unpaid_quantity = 0;
-            // Don't apply changes or update instance_id for paid portion
-
-            // 2. Create new item for unpaid portion with modifications
+            let has_price_change =
+                changes.price.is_some() || changes.manual_discount_percent.is_some();
             let unpaid_qty = original_qty - paid_qty;
-            if unpaid_qty > 0
-                && let Some(result) = results.iter().find(|r| r.action == "UPDATED") {
-                    let mut new_item = source.clone();
+
+            if has_price_change && unpaid_qty > 0 {
+                // Price/discount change on partially paid item — split to protect paid portion.
+                // Similar to how item_comped splits: paid portion keeps original price/discount,
+                // unpaid portion gets the new changes applied.
+
+                // 1. Shrink original item to paid-only portion (frozen at original price)
+                snapshot.items[idx].quantity = paid_qty;
+                snapshot.items[idx].unpaid_quantity = 0;
+                // paid_item_quantities stays with original instance_id
+
+                // 2. Create new item for unpaid portion with changes applied
+                let mut new_item = source.clone();
+                if let Some(result) = results.iter().find(|r| r.action == "UPDATED") {
                     new_item.instance_id = result.instance_id.clone();
-                    new_item.quantity = unpaid_qty;
-                    new_item.unpaid_quantity = unpaid_qty;
-                    apply_changes_to_item(&mut new_item, changes);
-                    snapshot.items.push(new_item);
                 }
+                let new_unpaid = changes.quantity.unwrap_or(unpaid_qty);
+                new_item.quantity = new_unpaid;
+                new_item.unpaid_quantity = new_unpaid;
+                if let Some(price) = changes.price {
+                    new_item.price = price;
+                }
+                if let Some(discount) = changes.manual_discount_percent {
+                    new_item.manual_discount_percent = if discount.abs() < f64::EPSILON { None } else { Some(discount) };
+                }
+                if let Some(ref note) = changes.note {
+                    new_item.note = Some(note.clone());
+                }
+                if let Some(ref options) = changes.selected_options {
+                    new_item.selected_options = Some(options.clone());
+                }
+                if let Some(ref spec) = changes.selected_specification {
+                    new_item.selected_specification = Some(spec.clone());
+                }
+
+                snapshot.items.push(new_item);
+            } else {
+                // Non-price change (quantity, note, options, spec) — safe to update in place
+                if let Some(new_unpaid) = changes.quantity {
+                    snapshot.items[idx].quantity = paid_qty + new_unpaid;
+                }
+
+                apply_changes_to_item_skip_quantity(&mut snapshot.items[idx], changes);
+
+                // Migrate paid_item_quantities key to new instance_id
+                if let Some(result) = results.iter().find(|r| r.action == "UPDATED") {
+                    snapshot.items[idx].instance_id = result.instance_id.clone();
+                    snapshot
+                        .paid_item_quantities
+                        .remove(&source.instance_id);
+                    snapshot
+                        .paid_item_quantities
+                        .insert(result.instance_id.clone(), paid_qty);
+                }
+            }
         } else if affected_quantity >= original_qty {
             // Full modification (no paid portion): update entire item in place
             apply_changes_to_item(&mut snapshot.items[idx], changes);
@@ -122,6 +169,69 @@ fn apply_item_modified(
     }
 }
 
+/// Merge items with duplicate instance_id when neither has paid quantities.
+///
+/// After modification, a content-addressed instance_id may match an existing item
+/// (e.g., discount cycling: 50%→20%→50% → cancel payments → remove all discounts
+/// results in multiple fragments with identical instance_id).
+///
+/// Having duplicate instance_ids is a correctness hazard: `paid_item_quantities`
+/// is keyed by instance_id, so a single paid entry would incorrectly subtract
+/// from ALL duplicates in `recalculate_totals`.
+fn merge_duplicate_unpaid_items(snapshot: &mut OrderSnapshot) {
+    let mut i = 0;
+    while i < snapshot.items.len() {
+        let instance_id = snapshot.items[i].instance_id.clone();
+
+        // Skip if this instance_id has paid quantities — merging paid items is unsafe
+        if snapshot
+            .paid_item_quantities
+            .get(&instance_id)
+            .copied()
+            .unwrap_or(0)
+            > 0
+        {
+            i += 1;
+            continue;
+        }
+
+        // Absorb all later duplicates with the same instance_id
+        let mut j = i + 1;
+        while j < snapshot.items.len() {
+            if snapshot.items[j].instance_id == instance_id {
+                snapshot.items[i].quantity += snapshot.items[j].quantity;
+                snapshot.items[i].unpaid_quantity += snapshot.items[j].unpaid_quantity;
+                snapshot.items.remove(j);
+            } else {
+                j += 1;
+            }
+        }
+        i += 1;
+    }
+}
+
+/// Apply changes to a single item, skipping quantity (used in split-bill path
+/// where quantity is already calculated correctly as unpaid_qty).
+fn apply_changes_to_item_skip_quantity(item: &mut CartItemSnapshot, changes: &ItemChanges) {
+    if let Some(price) = changes.price {
+        item.price = price;
+    }
+    // Skip quantity — already set correctly by the caller
+    if let Some(discount) = changes.manual_discount_percent {
+        // 0% discount ≡ no discount — normalize to None so instance_id stays consistent
+        item.manual_discount_percent = if discount.abs() < f64::EPSILON { None } else { Some(discount) };
+    }
+    if let Some(ref note) = changes.note {
+        item.note = Some(note.clone());
+    }
+    if let Some(ref options) = changes.selected_options {
+        item.selected_options = Some(options.clone());
+    }
+    if let Some(ref specification) = changes.selected_specification {
+        item.selected_specification = Some(specification.clone());
+    }
+}
+
 /// Apply changes to a single item
 fn apply_changes_to_item(item: &mut CartItemSnapshot, changes: &ItemChanges) {
     if let Some(price) = changes.price {
@@ -132,7 +242,7 @@ fn apply_changes_to_item(item: &mut CartItemSnapshot, changes: &ItemChanges) {
         item.unpaid_quantity = quantity; // Reset unpaid quantity
     }
     if let Some(discount) = changes.manual_discount_percent {
-        item.manual_discount_percent = Some(discount);
+        item.manual_discount_percent = if discount.abs() < f64::EPSILON { None } else { Some(discount) };
     }
     if let Some(ref note) = changes.note {
         item.note = Some(note.clone());
@@ -861,5 +971,234 @@ mod tests {
         assert_eq!(snapshot.items[1].instance_id, "original-id");
         assert_eq!(snapshot.items[1].manual_discount_percent, None);
         assert_eq!(snapshot.items[1].quantity, 1);
+    }
+
+    /// Test: after partial payment, modifying quantity updates in place (no split).
+    ///
+    /// Scenario: item x6, paid x1 → unpaid x5.
+    /// User changes unpaid to 7. Expected: total=8, unpaid=7, single item.
+    #[test]
+    fn test_item_modified_paid_quantity_change_in_place() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot
+            .items
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 6));
+        snapshot.paid_item_quantities.insert("item-1".to_string(), 1);
+
+        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 6);
+        let changes = ItemChanges {
+            quantity: Some(7), // new unpaid quantity
+            ..Default::default()
+        };
+        let results = vec![ItemModificationResult {
+            instance_id: "item-1-updated".to_string(),
+            quantity: 8,
+            price: 10.0,
+            manual_discount_percent: None,
+            action: "UPDATED".to_string(),
+        }];
+
+        let event = create_item_modified_event("order-1", 2, source, 6, changes, results);
+
+        let applier = ItemModifiedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Single item, no splitting
+        assert_eq!(snapshot.items.len(), 1);
+        assert_eq!(snapshot.items[0].instance_id, "item-1-updated");
+        assert_eq!(snapshot.items[0].quantity, 8);  // paid(1) + unpaid(7)
+        assert_eq!(snapshot.items[0].unpaid_quantity, 7);
+
+        // paid_item_quantities key migrated to new instance_id
+        assert_eq!(snapshot.paid_item_quantities.get("item-1"), None);
+        assert_eq!(snapshot.paid_item_quantities.get("item-1-updated"), Some(&1));
+    }
+
+    /// Test: after partial payment, modifying note without quantity stays in place.
+    ///
+    /// Scenario: item x6, paid x1. User changes note only.
+    /// Expected: single item, quantities unchanged.
+    #[test]
+    fn test_item_modified_paid_note_only_in_place() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot
+            .items
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 6));
+        snapshot.paid_item_quantities.insert("item-1".to_string(), 1);
+
+        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 6);
+        let changes = ItemChanges {
+            note: Some("Extra spicy".to_string()),
+            ..Default::default()
+        };
+        let results = vec![ItemModificationResult {
+            instance_id: "item-1-updated".to_string(),
+            quantity: 6,
+            price: 10.0,
+            manual_discount_percent: None,
+            action: "UPDATED".to_string(),
+        }];
+
+        let event = create_item_modified_event("order-1", 2, source, 6, changes, results);
+
+        let applier = ItemModifiedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Single item, no splitting
+        assert_eq!(snapshot.items.len(), 1);
+        assert_eq!(snapshot.items[0].instance_id, "item-1-updated");
+        assert_eq!(snapshot.items[0].quantity, 6);  // unchanged
+        assert_eq!(snapshot.items[0].unpaid_quantity, 5);  // 6 - paid(1) = 5
+        assert_eq!(snapshot.items[0].note, Some("Extra spicy".to_string()));
+    }
+
+    /// BUG FIX: applying discount to partially paid item must split, not in-place.
+    ///
+    /// Scenario: item x10 @ 5€, paid x9 → unpaid x1.
+    /// User applies 50% discount. Expected: paid portion frozen at 5€, unpaid at 2.5€.
+    #[test]
+    fn test_item_modified_paid_discount_splits_to_protect_paid() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot
+            .items
+            .push(create_test_item("item-1", "product:p1", "Product A", 5.0, 10));
+        snapshot.paid_item_quantities.insert("item-1".to_string(), 9);
+        snapshot.paid_amount = 45.0;
+
+        let source = create_test_item("item-1", "product:p1", "Product A", 5.0, 10);
+        let changes = ItemChanges {
+            manual_discount_percent: Some(50.0),
+            ..Default::default()
+        };
+        let results = vec![ItemModificationResult {
+            instance_id: "item-1-discounted".to_string(),
+            quantity: 10,
+            price: 5.0,
+            manual_discount_percent: Some(50.0),
+            action: "UPDATED".to_string(),
+        }];
+
+        let event = create_item_modified_event("order-1", 2, source, 10, changes, results);
+
+        let applier = ItemModifiedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Should have 2 items: paid portion + unpaid portion
+        assert_eq!(snapshot.items.len(), 2);
+
+        // Item 0: paid portion (frozen at original price, no discount)
+        assert_eq!(snapshot.items[0].instance_id, "item-1");
+        assert_eq!(snapshot.items[0].quantity, 9);
+        assert_eq!(snapshot.items[0].unpaid_quantity, 0);
+        assert_eq!(snapshot.items[0].price, 5.0);
+        assert_eq!(snapshot.items[0].manual_discount_percent, None);
+
+        // Item 1: unpaid portion (discount applied)
+        assert_eq!(snapshot.items[1].instance_id, "item-1-discounted");
+        assert_eq!(snapshot.items[1].quantity, 1);
+        assert_eq!(snapshot.items[1].unpaid_quantity, 1);
+        assert_eq!(snapshot.items[1].price, 5.0);
+        assert_eq!(snapshot.items[1].manual_discount_percent, Some(50.0));
+
+        // paid_item_quantities stays with original instance_id (paid portion)
+        assert_eq!(snapshot.paid_item_quantities.get("item-1"), Some(&9));
+        assert_eq!(snapshot.paid_item_quantities.get("item-1-discounted"), None);
+
+        // Totals: paid(9×5=45) + unpaid(1×2.5=2.5) = 47.5
+        assert!((snapshot.subtotal - 47.5).abs() < 0.01);
+        assert!((snapshot.total - 47.5).abs() < 0.01);
+        // remaining = 47.5 - 45 = 2.5
+        assert!((snapshot.remaining_amount - 2.5).abs() < 0.01);
+    }
+
+    /// Test: discount + quantity change on partially paid item.
+    ///
+    /// Scenario: item x10 @ 5€, paid x9 → unpaid x1.
+    /// User applies 50% discount AND changes unpaid to 10.
+    /// Expected: paid(9@5€) + unpaid(10@2.5€=25€). Total=70, remaining=25.
+    #[test]
+    fn test_item_modified_paid_discount_with_quantity_change() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot
+            .items
+            .push(create_test_item("item-1", "product:p1", "Product A", 5.0, 10));
+        snapshot.paid_item_quantities.insert("item-1".to_string(), 9);
+        snapshot.paid_amount = 45.0;
+
+        let source = create_test_item("item-1", "product:p1", "Product A", 5.0, 10);
+        let changes = ItemChanges {
+            manual_discount_percent: Some(50.0),
+            quantity: Some(10), // new unpaid qty
+            ..Default::default()
+        };
+        let results = vec![ItemModificationResult {
+            instance_id: "item-1-discounted".to_string(),
+            quantity: 10,
+            price: 5.0,
+            manual_discount_percent: Some(50.0),
+            action: "UPDATED".to_string(),
+        }];
+
+        let event = create_item_modified_event("order-1", 2, source, 10, changes, results);
+
+        let applier = ItemModifiedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // 2 items: paid(9) + unpaid(10)
+        assert_eq!(snapshot.items.len(), 2);
+
+        // Paid portion frozen
+        assert_eq!(snapshot.items[0].quantity, 9);
+        assert_eq!(snapshot.items[0].price, 5.0);
+        assert_eq!(snapshot.items[0].manual_discount_percent, None);
+
+        // Unpaid portion with discount and new quantity
+        assert_eq!(snapshot.items[1].quantity, 10);
+        assert_eq!(snapshot.items[1].manual_discount_percent, Some(50.0));
+
+        // Total: 9*5 + 10*2.5 = 45 + 25 = 70
+        assert!((snapshot.subtotal - 70.0).abs() < 0.01);
+        // Remaining: 70 - 45 = 25
+        assert!((snapshot.remaining_amount - 25.0).abs() < 0.01);
+    }
+
+    /// Test: price change on partially paid item also splits.
+    #[test]
+    fn test_item_modified_paid_price_change_splits() {
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot
+            .items
+            .push(create_test_item("item-1", "product:p1", "Product A", 10.0, 5));
+        snapshot.paid_item_quantities.insert("item-1".to_string(), 3);
+        snapshot.paid_amount = 30.0;
+
+        let source = create_test_item("item-1", "product:p1", "Product A", 10.0, 5);
+        let changes = ItemChanges {
+            price: Some(8.0), // reduce price
+            ..Default::default()
+        };
+        let results = vec![ItemModificationResult {
+            instance_id: "item-1-repriced".to_string(),
+            quantity: 5,
+            price: 8.0,
+            manual_discount_percent: None,
+            action: "UPDATED".to_string(),
+        }];
+
+        let event = create_item_modified_event("order-1", 2, source, 5, changes, results);
+
+        let applier = ItemModifiedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Split: paid(3@10) + unpaid(2@8)
+        assert_eq!(snapshot.items.len(), 2);
+        assert_eq!(snapshot.items[0].quantity, 3);
+        assert_eq!(snapshot.items[0].price, 10.0);
+        assert_eq!(snapshot.items[1].quantity, 2);
+        assert_eq!(snapshot.items[1].price, 8.0);
+
+        // Total: 30 + 16 = 46, remaining: 46 - 30 = 16
+        assert!((snapshot.subtotal - 46.0).abs() < 0.01);
+        assert!((snapshot.remaining_amount - 16.0).abs() < 0.01);
     }
 }

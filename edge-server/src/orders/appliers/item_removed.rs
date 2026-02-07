@@ -38,28 +38,34 @@ impl EventApplier for ItemRemovedApplier {
 }
 
 /// Apply item removal to snapshot
+///
+/// Removes only the FIRST matching item by index, not all items with the same
+/// instance_id. This is important because duplicate instance_ids can exist
+/// transiently (e.g., after discount cycling + payment cancellation).
 fn apply_item_removed(snapshot: &mut OrderSnapshot, instance_id: &str, quantity: Option<i32>) {
+    let Some(idx) = snapshot
+        .items
+        .iter()
+        .position(|i| i.instance_id == instance_id)
+    else {
+        return;
+    };
+
     if let Some(qty) = quantity {
         // Partial removal: reduce quantity
-        if let Some(item) = snapshot
-            .items
-            .iter_mut()
-            .find(|i| i.instance_id == instance_id)
-        {
-            item.quantity = (item.quantity - qty).max(0);
-            item.unpaid_quantity = (item.unpaid_quantity - qty).max(0);
+        snapshot.items[idx].quantity = (snapshot.items[idx].quantity - qty).max(0);
+        snapshot.items[idx].unpaid_quantity = (snapshot.items[idx].unpaid_quantity - qty).max(0);
 
-            // If quantity reaches 0, remove the item entirely
-            if item.quantity == 0 {
-                snapshot.items.retain(|i| i.instance_id != instance_id);
-            }
+        // If quantity reaches 0, remove this specific item
+        if snapshot.items[idx].quantity == 0 {
+            snapshot.items.remove(idx);
         }
     } else {
-        // Full removal: remove the entire item
-        snapshot.items.retain(|i| i.instance_id != instance_id);
+        // Full removal: remove this specific item (not all with same instance_id)
+        snapshot.items.remove(idx);
     }
 
-    // Clean up paid_item_quantities if item was removed
+    // Clean up paid_item_quantities if no items with this instance_id remain
     if !snapshot.items.iter().any(|i| i.instance_id == instance_id) {
         snapshot.paid_item_quantities.remove(instance_id);
     }

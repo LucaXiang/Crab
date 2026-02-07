@@ -82,7 +82,16 @@ impl CommandHandler for ModifyItemAction {
             return Err(OrderError::InsufficientQuantity);
         }
 
-        // 8. Calculate previous values for audit trail
+        // 8. Validate quantity against paid amount
+        if let Some(new_qty) = self.changes.quantity {
+            if new_qty <= 0 {
+                return Err(OrderError::InvalidOperation(
+                    "quantity must be positive".to_string(),
+                ));
+            }
+        }
+
+        // 9. Calculate previous values for audit trail
         let previous_values = ItemChanges {
             price: if self.changes.price.is_some() {
                 Some(item.price)
@@ -90,7 +99,7 @@ impl CommandHandler for ModifyItemAction {
                 None
             },
             quantity: if self.changes.quantity.is_some() {
-                Some(item.quantity)
+                Some(item.unpaid_quantity)
             } else {
                 None
             },
@@ -116,16 +125,21 @@ impl CommandHandler for ModifyItemAction {
             },
         };
 
-        // 9. Determine operation type for audit
+        // 10. Determine operation type for audit
         let operation = determine_operation(&self.changes);
 
-        // 10. Calculate modification results (handle split scenario)
-        let results = calculate_modification_results(item, affected_qty, &self.changes);
+        // 11. Calculate modification results (handle split scenario)
+        let paid_qty = snapshot
+            .paid_item_quantities
+            .get(&self.instance_id)
+            .copied()
+            .unwrap_or(0);
+        let results = calculate_modification_results(item, affected_qty, &self.changes, paid_qty);
 
-        // 11. Allocate sequence number
+        // 12. Allocate sequence number
         let seq = ctx.next_sequence();
 
-        // 12. Create event
+        // 13. Create event
         let event = OrderEvent::new(
             seq,
             self.order_id.clone(),
@@ -160,7 +174,7 @@ fn has_actual_changes(item: &CartItemSnapshot, changes: &ItemChanges) -> bool {
             return true;
         }
     if let Some(qty) = changes.quantity
-        && qty != item.quantity {
+        && qty != item.unpaid_quantity {
             return true;
         }
     if let Some(discount) = changes.manual_discount_percent {
@@ -230,35 +244,55 @@ fn determine_operation(changes: &ItemChanges) -> &'static str {
     }
 }
 
-/// Calculate modification results, handling split scenario
+/// Calculate modification results, handling split scenario.
+///
+/// When `paid_qty > 0` and changes affect price/discount, the applier will split
+/// the item into a frozen paid portion and a new unpaid portion. In this case,
+/// generate a unique instance_id (with UUID suffix) for the new portion to avoid
+/// hash collisions with previously frozen items that may share the same properties.
+/// (Same pattern as comp: `{source}::comp::{uuid}`)
 fn calculate_modification_results(
     item: &CartItemSnapshot,
     affected_qty: i32,
     changes: &ItemChanges,
+    paid_qty: i32,
 ) -> Vec<ItemModificationResult> {
+    let new_price = changes.price.unwrap_or(item.price);
+    let new_discount = changes
+        .manual_discount_percent
+        .or(item.manual_discount_percent)
+        .filter(|&d| d.abs() > f64::EPSILON);
+    let new_options = changes
+        .selected_options
+        .as_ref()
+        .or(item.selected_options.as_ref());
+    let new_specification = changes
+        .selected_specification
+        .as_ref()
+        .or(item.selected_specification.as_ref());
+
+    // Generate base instance_id from item properties (deterministic hash)
+    let base_id = generate_instance_id_from_parts(
+        &item.id,
+        new_price,
+        new_discount,
+        &new_options.cloned(),
+        &new_specification.cloned(),
+    );
+
+    // When item has paid portions AND price/discount is changing, the applier
+    // will split: frozen paid portion keeps original instance_id, new unpaid
+    // portion needs a unique ID to avoid collision with previously frozen items.
+    let has_price_change =
+        changes.price.is_some() || changes.manual_discount_percent.is_some();
+    let new_instance_id = if paid_qty > 0 && has_price_change {
+        format!("{}::mod::{}", base_id, uuid::Uuid::new_v4())
+    } else {
+        base_id
+    };
+
     if affected_qty >= item.quantity {
-        // Full modification: regenerate instance_id to reflect new state
-        // This ensures that adding the same product later creates a separate item
-        let new_price = changes.price.unwrap_or(item.price);
-        let new_discount = changes.manual_discount_percent.or(item.manual_discount_percent);
-        let new_options = changes
-            .selected_options
-            .as_ref()
-            .or(item.selected_options.as_ref());
-        let new_specification = changes
-            .selected_specification
-            .as_ref()
-            .or(item.selected_specification.as_ref());
-
-        // Generate new instance_id based on the modified state
-        let new_instance_id = generate_instance_id_from_parts(
-            &item.id,
-            new_price,
-            new_discount,
-            &new_options.cloned(),
-            &new_specification.cloned(),
-        );
-
+        // Full modification
         vec![ItemModificationResult {
             instance_id: new_instance_id,
             quantity: item.quantity,
@@ -268,26 +302,6 @@ fn calculate_modification_results(
         }]
     } else {
         // Partial modification: split into unchanged + modified portions
-        let new_price = changes.price.unwrap_or(item.price);
-        let new_discount = changes.manual_discount_percent.or(item.manual_discount_percent);
-        let new_options = changes
-            .selected_options
-            .as_ref()
-            .or(item.selected_options.as_ref());
-        let new_specification = changes
-            .selected_specification
-            .as_ref()
-            .or(item.selected_specification.as_ref());
-
-        // Generate new instance_id for the modified portion
-        let new_instance_id = generate_instance_id_from_parts(
-            &item.id,
-            new_price,
-            new_discount,
-            &new_options.cloned(),
-            &new_specification.cloned(),
-        );
-
         vec![
             // Unchanged portion (reduced quantity)
             ItemModificationResult {
@@ -1109,6 +1123,184 @@ mod tests {
                 ..Default::default()
             }
         ));
+    }
+
+    /// Test: changes.quantity is unpaid, not total.
+    /// Item total=5, paid=2, unpaid=3. User changes unpaid 3→5.
+    /// changes.quantity=5 must NOT be confused with item.quantity=5.
+    #[tokio::test]
+    async fn test_modify_paid_item_unpaid_quantity_semantics() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut item = create_test_item("item-1", "product:p1", "Test Product", 5.0, 5);
+        item.unpaid_quantity = 3; // 5 total - 2 paid = 3 unpaid
+        let mut snapshot = create_active_order_with_item("order-1", item);
+        snapshot.paid_item_quantities.insert("item-1".to_string(), 2);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        // User changes unpaid from 3 to 5
+        let action = ModifyItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            affected_quantity: None,
+            changes: ItemChanges {
+                quantity: Some(5), // new unpaid = 5 (same as item.quantity!)
+                ..Default::default()
+            },
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        assert_eq!(events.len(), 1);
+        if let EventPayload::ItemModified {
+            changes,
+            previous_values,
+            ..
+        } = &events[0].payload
+        {
+            // changes.quantity = 5 (new unpaid)
+            assert_eq!(changes.quantity, Some(5));
+            // previous_values.quantity = 3 (old unpaid, NOT 5 total)
+            assert_eq!(previous_values.quantity, Some(3));
+        } else {
+            panic!("Expected ItemModified payload");
+        }
+    }
+
+    // ---- Paid item unique ID tests ----
+
+    /// BUG FIX: paid item + price/discount change → result uses unique instance_id
+    /// (prevents collision when discount cycles back to a previously-used value)
+    #[tokio::test]
+    async fn test_modify_paid_item_discount_generates_unique_id() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 10);
+        let mut snapshot = create_active_order_with_item("order-1", item);
+        snapshot.paid_item_quantities.insert("item-1".to_string(), 3);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = ModifyItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            affected_quantity: None,
+            changes: ItemChanges {
+                manual_discount_percent: Some(50.0),
+                ..Default::default()
+            },
+            authorizer_id: Some("admin".to_string()),
+            authorizer_name: Some("Admin".to_string()),
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::ItemModified { results, .. } = &events[0].payload {
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].action, "UPDATED");
+            // Must contain ::mod:: suffix for uniqueness
+            assert!(
+                results[0].instance_id.contains("::mod::"),
+                "Paid item with price change should have unique instance_id, got: {}",
+                results[0].instance_id
+            );
+        } else {
+            panic!("Expected ItemModified payload");
+        }
+    }
+
+    /// Non-price change on paid item → deterministic instance_id (no UUID suffix)
+    #[tokio::test]
+    async fn test_modify_paid_item_note_keeps_deterministic_id() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 5);
+        let mut snapshot = create_active_order_with_item("order-1", item);
+        snapshot.paid_item_quantities.insert("item-1".to_string(), 2);
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = ModifyItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            affected_quantity: None,
+            changes: ItemChanges {
+                note: Some("Extra spicy".to_string()),
+                ..Default::default()
+            },
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::ItemModified { results, .. } = &events[0].payload {
+            assert_eq!(results.len(), 1);
+            // Non-price change → no UUID suffix
+            assert!(
+                !results[0].instance_id.contains("::mod::"),
+                "Non-price change should have deterministic instance_id, got: {}",
+                results[0].instance_id
+            );
+        } else {
+            panic!("Expected ItemModified payload");
+        }
+    }
+
+    /// No paid items → deterministic instance_id regardless of change type
+    #[tokio::test]
+    async fn test_modify_unpaid_item_discount_keeps_deterministic_id() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 5);
+        let snapshot = create_active_order_with_item("order-1", item);
+        // No paid_item_quantities
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = ModifyItemAction {
+            order_id: "order-1".to_string(),
+            instance_id: "item-1".to_string(),
+            affected_quantity: None,
+            changes: ItemChanges {
+                manual_discount_percent: Some(50.0),
+                ..Default::default()
+            },
+            authorizer_id: Some("admin".to_string()),
+            authorizer_name: Some("Admin".to_string()),
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::ItemModified { results, .. } = &events[0].payload {
+            // No paid items → deterministic, no UUID suffix
+            assert!(
+                !results[0].instance_id.contains("::mod::"),
+                "Unpaid item should have deterministic instance_id, got: {}",
+                results[0].instance_id
+            );
+        } else {
+            panic!("Expected ItemModified payload");
+        }
     }
 
     // ---- Comped item protection tests ----
