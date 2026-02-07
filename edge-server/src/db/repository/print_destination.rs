@@ -101,15 +101,29 @@ pub async fn update(
         )));
     }
 
-    // Replace printers if provided
+    // Replace printers if provided (atomic: delete + re-create in transaction)
     if let Some(printers) = &data.printers {
+        let mut tx = pool.begin().await?;
         sqlx::query("DELETE FROM printer WHERE print_destination_id = ?")
             .bind(id)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
         for printer in printers {
-            create_printer(pool, id, printer).await?;
+            sqlx::query(
+                "INSERT INTO printer (print_destination_id, printer_type, printer_format, ip, port, driver_name, priority, is_active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            )
+            .bind(id)
+            .bind(&printer.printer_type)
+            .bind(&printer.printer_format)
+            .bind(&printer.ip)
+            .bind(printer.port)
+            .bind(&printer.driver_name)
+            .bind(printer.priority)
+            .bind(printer.is_active)
+            .execute(&mut *tx)
+            .await?;
         }
+        tx.commit().await?;
     }
 
     find_by_id(pool, id)

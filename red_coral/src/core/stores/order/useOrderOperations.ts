@@ -582,7 +582,7 @@ export const removeItem = async (
  */
 export const toggleRuleSkip = async (
   orderId: string,
-  ruleId: string,
+  ruleId: number,
   skipped: boolean
 ): Promise<void> => {
   const command = createCommand({

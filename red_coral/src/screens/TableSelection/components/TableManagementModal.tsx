@@ -397,7 +397,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
     const allAppliedRules = useMemo(() => {
         if (!sourceOrder) return [];
         
-        const rulesMap = new Map<string, { rule: AppliedRule; sources: string[] }>();
+        const rulesMap = new Map<number, { rule: AppliedRule; sources: string[] }>();
         
         // Add item-level rules
         sourceOrder.items.forEach(item => {
@@ -428,7 +428,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         return Array.from(rulesMap.values());
     }, [sourceOrder, t]);
 
-    const handleToggleRule = async (ruleId: string, currentSkipped: boolean) => {
+    const handleToggleRule = async (ruleId: number, currentSkipped: boolean) => {
         if (!sourceOrder) return;
         try {
             await toggleRuleSkip(sourceOrder.order_id, ruleId, !currentSkipped);

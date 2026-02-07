@@ -132,16 +132,14 @@ pub async fn me(
     Extension(user): Extension<CurrentUser>,
 ) -> Result<Json<UserInfo>, AppError> {
     // Query fresh employee data from database for is_active and created_at
-    let id: i64 = user.id.strip_prefix("employee:")
-        .unwrap_or(&user.id)
-        .parse()
+    let id: i64 = user.id.parse()
         .map_err(|_| AppError::internal(format!("Invalid user ID: {}", user.id)))?;
 
-    let employee_data = employee::find_by_id(&state.pool, id).await?;
+    let emp = employee::find_by_id(&state.pool, id)
+        .await?
+        .ok_or_else(|| AppError::new(shared::ErrorCode::EmployeeNotFound))?;
 
-    let (is_active, created_at) = employee_data
-        .map(|e| (e.is_active, e.created_at))
-        .unwrap_or((true, 0));
+    let (is_active, created_at) = (emp.is_active, emp.created_at);
 
     let role_id: i64 = user.role_id
         .parse()

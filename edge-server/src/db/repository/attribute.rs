@@ -101,16 +101,29 @@ pub async fn update(pool: &SqlitePool, id: i64, data: AttributeUpdate) -> RepoRe
         return Err(RepoError::NotFound(format!("Attribute {id} not found")));
     }
 
-    // Replace options if provided
+    // Replace options if provided (atomic: delete + re-create in transaction)
     if let Some(options) = data.options {
-        // Delete existing options and re-create
+        let mut tx = pool.begin().await?;
         sqlx::query("DELETE FROM attribute_option WHERE attribute_id = ?")
             .bind(id)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
-        for opt in options {
-            create_option(pool, id, &opt).await?;
+        for opt in &options {
+            sqlx::query(
+                "INSERT INTO attribute_option (attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, ?8)",
+            )
+            .bind(id)
+            .bind(&opt.name)
+            .bind(opt.price_modifier)
+            .bind(opt.display_order)
+            .bind(&opt.receipt_name)
+            .bind(&opt.kitchen_print_name)
+            .bind(opt.enable_quantity)
+            .bind(opt.max_quantity)
+            .execute(&mut *tx)
+            .await?;
         }
+        tx.commit().await?;
     }
 
     find_by_id(pool, id)

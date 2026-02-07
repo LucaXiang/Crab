@@ -354,7 +354,7 @@ export interface OrderInfoUpdatedPayload {
 
 export interface RuleSkipToggledPayload {
   type: 'RULE_SKIP_TOGGLED';
-  rule_id: string;
+  rule_id: number;
   rule_name: string;
   skipped: boolean;
 }
@@ -617,7 +617,7 @@ export interface UpdateOrderInfoCommand {
 export interface ToggleRuleSkipCommand {
   type: 'TOGGLE_RULE_SKIP';
   order_id: string;
-  rule_id: string;
+  rule_id: number;
   skipped: boolean;
 }
 
@@ -897,14 +897,14 @@ export interface CartItemSnapshot {
  * Applied price rule (matches Rust AppliedRule)
  */
 export interface AppliedRule {
-  rule_id: string;
+  rule_id: number;
   name: string;
   display_name: string;
   receipt_name: string;
   rule_type: 'DISCOUNT' | 'SURCHARGE';
   adjustment_type: 'PERCENTAGE' | 'FIXED_AMOUNT';
   product_scope: 'GLOBAL' | 'CATEGORY' | 'TAG' | 'PRODUCT';
-  /** Zone scope: "zone:all", "zone:retail", or specific zone ID */
+  /** Zone scope: "all", "retail", or specific zone ID */
   zone_scope: string;
   adjustment_value: number;
   calculated_amount: number;

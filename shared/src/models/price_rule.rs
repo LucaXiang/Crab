@@ -34,7 +34,7 @@ pub enum AdjustmentType {
     FixedAmount,
 }
 
-/// Zone scope constants (no longer prefixed with "zone:")
+/// Zone scope constants
 pub const ZONE_SCOPE_ALL: &str = "all";
 pub const ZONE_SCOPE_RETAIL: &str = "retail";
 
