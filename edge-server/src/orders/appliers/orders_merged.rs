@@ -639,4 +639,73 @@ mod tests {
         assert_eq!(snapshot.total, 50.0);
         assert_eq!(snapshot.remaining_amount, 32.0);
     }
+
+    #[test]
+    fn test_order_merged_same_instance_id_different_pricing_keeps_separate() {
+        let mut snapshot = create_test_snapshot("target-1");
+        // Target has item with 20% manual discount
+        let mut target_item = create_test_item("item-1", "Coffee");
+        target_item.price = 8.0;
+        target_item.original_price = Some(10.0);
+        target_item.manual_discount_percent = Some(20.0);
+        snapshot.items.push(target_item);
+
+        // Source has same item but no discount
+        let source_item = create_test_item("item-1", "Coffee"); // price=10.0, no discount
+
+        let event = create_order_merged_event(
+            "target-1",
+            2,
+            "dining_table:t2",
+            "Table 2",
+            vec![source_item],
+        );
+
+        let applier = OrderMergedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Should have 2 items (not merged) because pricing differs
+        assert_eq!(snapshot.items.len(), 2);
+        assert_eq!(snapshot.items[0].instance_id, "item-1");
+        assert_eq!(snapshot.items[0].price, 8.0);
+        assert_eq!(snapshot.items[0].manual_discount_percent, Some(20.0));
+
+        // Second item gets suffixed instance_id
+        assert!(snapshot.items[1].instance_id.starts_with("item-1::m"));
+        assert_eq!(snapshot.items[1].price, 10.0);
+        assert_eq!(snapshot.items[1].manual_discount_percent, None);
+
+        // Totals: 8.0 * 1 + 10.0 * 1 = 18.0
+        assert_eq!(snapshot.subtotal, 18.0);
+        assert_eq!(snapshot.total, 18.0);
+    }
+
+    #[test]
+    fn test_order_merged_same_instance_id_same_pricing_merges() {
+        let mut snapshot = create_test_snapshot("target-1");
+        snapshot.items.push(create_test_item("item-1", "Coffee")); // price=10, qty=1
+
+        // Source has same item with same pricing
+        let source_item = create_test_item("item-1", "Coffee"); // price=10, qty=1
+
+        let event = create_order_merged_event(
+            "target-1",
+            2,
+            "dining_table:t2",
+            "Table 2",
+            vec![source_item],
+        );
+
+        let applier = OrderMergedApplier;
+        applier.apply(&mut snapshot, &event);
+
+        // Should merge into 1 item
+        assert_eq!(snapshot.items.len(), 1);
+        assert_eq!(snapshot.items[0].instance_id, "item-1");
+        assert_eq!(snapshot.items[0].quantity, 2); // 1 + 1
+
+        // Totals: 10.0 * 2 = 20.0
+        assert_eq!(snapshot.subtotal, 20.0);
+        assert_eq!(snapshot.total, 20.0);
+    }
 }

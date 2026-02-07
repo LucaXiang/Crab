@@ -30,6 +30,20 @@ impl CommandHandler for ToggleRuleSkipAction {
             ));
         }
 
+        // 2b. Block during active split payments (AA or amount split)
+        // Changing rules would alter the total, making existing per-share
+        // or per-split amounts inconsistent.
+        if snapshot.aa_total_shares.is_some() {
+            return Err(OrderError::InvalidOperation(
+                "Cannot toggle rule during AA split".to_string(),
+            ));
+        }
+        if snapshot.has_amount_split {
+            return Err(OrderError::InvalidOperation(
+                "Cannot toggle rule during amount split".to_string(),
+            ));
+        }
+
         // 3. Find rule in the order and get its name
         let rule_name = snapshot
             .items
@@ -530,5 +544,66 @@ mod tests {
         let metadata = create_test_metadata();
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
         assert_eq!(events.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_toggle_rule_skip_blocked_during_aa_split() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.items = vec![create_test_item_with_rule("rule-1")];
+        snapshot.aa_total_shares = Some(3);
+        snapshot.aa_paid_shares = 1;
+        snapshot.paid_amount = 10.0;
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = ToggleRuleSkipAction {
+            order_id: "order-1".to_string(),
+            rule_id: "rule-1".to_string(),
+            skipped: true,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        if let Err(OrderError::InvalidOperation(msg)) = result {
+            assert!(msg.contains("AA split"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_toggle_rule_skip_blocked_during_amount_split() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.items = vec![create_test_item_with_rule("rule-1")];
+        snapshot.has_amount_split = true;
+        snapshot.paid_amount = 20.0;
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = ToggleRuleSkipAction {
+            order_id: "order-1".to_string(),
+            rule_id: "rule-1".to_string(),
+            skipped: true,
+        };
+
+        let metadata = create_test_metadata();
+        let result = action.execute(&mut ctx, &metadata).await;
+
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        if let Err(OrderError::InvalidOperation(msg)) = result {
+            assert!(msg.contains("amount split"));
+        }
     }
 }
