@@ -11,19 +11,18 @@ use uuid::Uuid;
 use crate::db::models::PriceRule;
 use crate::db::repository::PriceRuleRepository;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
-use crate::pricing::matcher::is_time_valid;
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
-/// 加载匹配的价格规则
+/// 加载匹配区域的价格规则（静态缓存）
 ///
-/// 根据订单的 zone 信息加载适用的价格规则：
+/// 区域是静态的（开台定格），时间是动态的（每次加菜实时检查）。
+/// 此函数只做区域过滤，不做时间过滤。
+///
+/// DB 层过滤：
 /// - zone_scope = "zone:all": 适用于所有区域
 /// - zone_scope = "zone:retail": 适用于零售订单 (is_retail = true)
 /// - zone_scope = "zone:xxx": 适用于特定区域 (zone_id 匹配)
-///
-/// 同时过滤：
 /// - is_active = true: 规则必须是激活状态
-/// - 时间有效性: 规则必须在当前时间有效
 ///
 /// # Arguments
 /// * `db` - SurrealDB 数据库连接
@@ -31,21 +30,20 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// * `is_retail` - 是否为零售订单
 ///
 /// # Returns
-/// 返回匹配的活跃价格规则列表
+/// 返回区域匹配的活跃价格规则列表（不含时间过滤）
 pub async fn load_matching_rules(
     db: &Surreal<Db>,
     zone_id: Option<&str>,
     is_retail: bool,
-    tz: chrono_tz::Tz,
 ) -> Vec<PriceRule> {
     info!(
         zone_id = ?zone_id,
         is_retail,
-        "[LoadRules] Loading matching price rules"
+        "[LoadRules] Loading zone-matched price rules"
     );
 
     let repo = PriceRuleRepository::new(db.clone());
-    let all_rules = match repo.find_all().await {
+    let rules = match repo.find_by_zone(zone_id, is_retail).await {
         Ok(rules) => rules,
         Err(e) => {
             tracing::error!("加载价格规则失败: {:?}", e);
@@ -54,101 +52,13 @@ pub async fn load_matching_rules(
     };
 
     info!(
-        total_rules = all_rules.len(),
-        "[LoadRules] Loaded all rules from database"
-    );
-
-    let current_time = shared::util::now_millis();
-
-    // 过滤规则: is_active + zone_scope + 时间有效性
-    let matched_rules: Vec<PriceRule> = all_rules
-        .into_iter()
-        .filter(|r| {
-            let rule_name = &r.name;
-
-            // 必须是激活状态
-            if !r.is_active {
-                debug!(
-                    rule_name = %rule_name,
-                    "[LoadRules] Rule filtered: not active"
-                );
-                return false;
-            }
-
-            // 检查时间有效性
-            if !is_time_valid(r, current_time, tz) {
-                debug!(
-                    rule_name = %rule_name,
-                    valid_from = ?r.valid_from,
-                    valid_until = ?r.valid_until,
-                    active_days = ?r.active_days,
-                    active_start_time = ?r.active_start_time,
-                    active_end_time = ?r.active_end_time,
-                    current_time,
-                    "[LoadRules] Rule filtered: time invalid"
-                );
-                return false;
-            }
-
-            // zone_scope = "zone:all": 适用于所有区域
-            if r.zone_scope == crate::db::models::ZONE_SCOPE_ALL {
-                debug!(
-                    rule_name = %rule_name,
-                    zone_scope = %r.zone_scope,
-                    "[LoadRules] Rule matched: zone_scope=all"
-                );
-                return true;
-            }
-            // zone_scope = "zone:retail": 仅适用于零售订单
-            if r.zone_scope == crate::db::models::ZONE_SCOPE_RETAIL && is_retail {
-                debug!(
-                    rule_name = %rule_name,
-                    zone_scope = %r.zone_scope,
-                    "[LoadRules] Rule matched: zone_scope=retail"
-                );
-                return true;
-            }
-            // zone_scope = "zone:xxx": 匹配特定区域 ID
-            // zone_id 格式规范: "zone:xxx" (与 zone_scope 格式一致)
-            if let Some(zid) = zone_id {
-                let matches = r.zone_scope == zid;
-                if matches {
-                    debug!(
-                        rule_name = %rule_name,
-                        zone_scope = r.zone_scope,
-                        zone_id = %zid,
-                        "[LoadRules] Rule matched: specific zone"
-                    );
-                } else {
-                    debug!(
-                        rule_name = %rule_name,
-                        zone_scope = r.zone_scope,
-                        zone_id = %zid,
-                        "[LoadRules] Rule filtered: zone mismatch"
-                    );
-                }
-                return matches;
-            }
-
-            debug!(
-                rule_name = %rule_name,
-                zone_scope = r.zone_scope,
-                is_retail,
-                zone_id = ?zone_id,
-                "[LoadRules] Rule filtered: no zone match"
-            );
-            false
-        })
-        .collect();
-
-    info!(
-        matched_rules_count = matched_rules.len(),
+        matched_rules_count = rules.len(),
         zone_id = ?zone_id,
         is_retail,
-        "[LoadRules] Final matched rules"
+        "[LoadRules] Zone-matched rules loaded"
     );
 
-    for rule in &matched_rules {
+    for rule in &rules {
         debug!(
             rule_name = %rule.name,
             rule_type = ?rule.rule_type,
@@ -163,7 +73,7 @@ pub async fn load_matching_rules(
         );
     }
 
-    matched_rules
+    rules
 }
 
 /// OpenTable action

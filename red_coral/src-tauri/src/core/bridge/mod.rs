@@ -1863,7 +1863,6 @@ impl ClientBridge {
                                 &server_state.get_db(),
                                 zone_id.as_deref(),
                                 is_retail,
-                                server_state.config.timezone,
                             )
                             .await;
 

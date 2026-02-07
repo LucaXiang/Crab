@@ -409,7 +409,6 @@ impl ServerState {
                     &self.db,
                     order.zone_id.as_deref(),
                     order.is_retail,
-                    self.config.timezone,
                 )
                 .await;
 
@@ -456,7 +455,6 @@ impl ServerState {
             &self.db,
             snapshot.zone_id.as_deref(),
             snapshot.is_retail,
-            self.config.timezone,
         )
         .await;
 

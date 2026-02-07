@@ -29,6 +29,7 @@ use super::money;
 use super::storage::{OrderStorage, StorageError};
 use super::traits::{CommandContext, CommandHandler, CommandMetadata, EventApplier, OrderError};
 use crate::db::models::PriceRule;
+use crate::pricing::matcher::is_time_valid;
 use crate::services::catalog_service::ProductMeta;
 use chrono::Utc;
 use chrono_tz::Tz;
@@ -515,7 +516,13 @@ impl OrdersManager {
                 })
             }
             shared::order::OrderCommandPayload::AddItems { order_id, items } => {
-                let rules = self.get_cached_rules(order_id).unwrap_or_default();
+                let cached_rules = self.get_cached_rules(order_id).unwrap_or_default();
+                // 按当前时间动态过滤（区域是静态缓存，时间是动态的）
+                let now = shared::util::now_millis();
+                let rules: Vec<PriceRule> = cached_rules
+                    .into_iter()
+                    .filter(|r| is_time_valid(r, now, self.tz))
+                    .collect();
                 let product_metadata = self.get_product_metadata_for_items(items);
                 CommandAction::AddItems(super::actions::AddItemsAction {
                     order_id: order_id.clone(),
@@ -9819,5 +9826,290 @@ mod tests {
         assert!(r.success);
 
         assert_snapshot_consistent(&manager, &order_id);
+    }
+
+    // ========================================================================
+    // AddItems 时间动态过滤测试 (Tests: time-filter)
+    // ========================================================================
+
+    /// Helper: 创建带时间约束的折扣规则
+    fn make_timed_discount_rule(
+        id: &str,
+        percent: f64,
+        valid_from: Option<i64>,
+        valid_until: Option<i64>,
+        active_days: Option<Vec<u8>>,
+        active_start_time: Option<&str>,
+        active_end_time: Option<&str>,
+    ) -> crate::db::models::PriceRule {
+        use crate::db::models::price_rule::*;
+        crate::db::models::PriceRule {
+            id: Some(surrealdb::RecordId::from(("price_rule", id))),
+            name: format!("timed_{}", id),
+            display_name: format!("Timed {}", id),
+            receipt_name: "DISC".to_string(),
+            description: None,
+            rule_type: RuleType::Discount,
+            product_scope: ProductScope::Global,
+            target: None,
+            zone_scope: "zone:all".to_string(),
+            adjustment_type: AdjustmentType::Percentage,
+            adjustment_value: percent,
+            is_stackable: true,
+            is_exclusive: false,
+            valid_from,
+            valid_until,
+            active_days,
+            active_start_time: active_start_time.map(|s| s.to_string()),
+            active_end_time: active_end_time.map(|s| s.to_string()),
+            is_active: true,
+            created_by: None,
+            created_at: 0,
+        }
+    }
+
+    /// valid_from 在未来 → 规则不应用，商品原价
+    #[test]
+    fn test_add_items_filters_rule_valid_from_future() {
+        let manager = create_test_manager();
+        let order_id = open_table(&manager, "T-time-1");
+
+        let future = shared::util::now_millis() + 3_600_000; // 1 小时后
+        let rule = make_timed_discount_rule("future", 10.0, Some(future), None, None, None, None);
+        manager.cache_rules(&order_id, vec![rule]);
+
+        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Steak", 100.0, 1)]);
+        assert!(r.success);
+
+        let s = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // 规则被过滤掉，100€ 原价
+        assert_eq!(s.subtotal, 100.0);
+    }
+
+    /// valid_until 已过期 → 规则不应用
+    #[test]
+    fn test_add_items_filters_rule_valid_until_expired() {
+        let manager = create_test_manager();
+        let order_id = open_table(&manager, "T-time-2");
+
+        let past = shared::util::now_millis() - 3_600_000; // 1 小时前
+        let rule = make_timed_discount_rule("expired", 10.0, None, Some(past), None, None, None);
+        manager.cache_rules(&order_id, vec![rule]);
+
+        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Wine", 50.0, 2)]);
+        assert!(r.success);
+
+        let s = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // 过期规则不生效，50×2=100
+        assert_eq!(s.subtotal, 100.0);
+    }
+
+    /// valid_from ≤ now ≤ valid_until → 规则生效
+    #[test]
+    fn test_add_items_applies_rule_within_valid_range() {
+        let manager = create_test_manager();
+        let order_id = open_table(&manager, "T-time-3");
+
+        let now = shared::util::now_millis();
+        let rule = make_timed_discount_rule(
+            "active_range",
+            10.0,
+            Some(now - 3_600_000), // 1小时前开始
+            Some(now + 3_600_000), // 1小时后结束
+            None,
+            None,
+            None,
+        );
+        manager.cache_rules(&order_id, vec![rule]);
+
+        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Pasta", 100.0, 1)]);
+        assert!(r.success);
+
+        let s = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // 10% 折扣: 100 → 90
+        assert_eq!(s.subtotal, 90.0);
+    }
+
+    /// active_days 不匹配当前星期几 → 规则不应用
+    #[test]
+    fn test_add_items_filters_rule_wrong_day() {
+        let manager = create_test_manager();
+        let order_id = open_table(&manager, "T-time-4");
+
+        // 获取当前是星期几 (0=Sun, 1=Mon, ..., 6=Sat)
+        let now_local = chrono::Utc::now().with_timezone(&chrono_tz::Europe::Madrid);
+        let today = now_local.format("%u").to_string().parse::<u8>().unwrap() % 7; // ISO weekday → 0-6
+
+        // 设置 active_days 只包含"明天"
+        let wrong_day = (today + 1) % 7;
+        let rule = make_timed_discount_rule("wrong_day", 10.0, None, None, Some(vec![wrong_day]), None, None);
+        manager.cache_rules(&order_id, vec![rule]);
+
+        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Salad", 40.0, 1)]);
+        assert!(r.success);
+
+        let s = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // 不匹配日期，40€ 原价
+        assert_eq!(s.subtotal, 40.0);
+    }
+
+    /// active_days 匹配当前星期几 → 规则生效
+    #[test]
+    fn test_add_items_applies_rule_matching_day() {
+        let manager = create_test_manager();
+        let order_id = open_table(&manager, "T-time-5");
+
+        let now_local = chrono::Utc::now().with_timezone(&chrono_tz::Europe::Madrid);
+        let today = now_local.format("%u").to_string().parse::<u8>().unwrap() % 7;
+
+        let rule = make_timed_discount_rule("right_day", 20.0, None, None, Some(vec![today]), None, None);
+        manager.cache_rules(&order_id, vec![rule]);
+
+        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Pizza", 50.0, 2)]);
+        assert!(r.success);
+
+        let s = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // 20% 折扣: 50×2=100 → 80
+        assert_eq!(s.subtotal, 80.0);
+    }
+
+    /// active_start_time/active_end_time 不在当前时间范围 → 规则不应用
+    #[test]
+    fn test_add_items_filters_rule_outside_time_window() {
+        let manager = create_test_manager();
+        let order_id = open_table(&manager, "T-time-6");
+
+        // 构造一个绝对不在当前时间的窗口: 凌晨 03:00-04:00（除非真的在这个时间运行测试）
+        // 使用更安全的方法：当前时间 +3h 到 +4h
+        let now_local = chrono::Utc::now().with_timezone(&chrono_tz::Europe::Madrid);
+        let hour = now_local.format("%H").to_string().parse::<u32>().unwrap();
+        let start = format!("{:02}:00", (hour + 3) % 24);
+        let end = format!("{:02}:00", (hour + 4) % 24);
+
+        let rule = make_timed_discount_rule("off_hours", 15.0, None, None, None, Some(&start), Some(&end));
+        manager.cache_rules(&order_id, vec![rule]);
+
+        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Soup", 20.0, 3)]);
+        assert!(r.success);
+
+        let s = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // 不在时间窗口，20×3=60 原价
+        assert_eq!(s.subtotal, 60.0);
+    }
+
+    /// 混合规则: 一个过期 + 一个有效 → 只有有效的应用
+    #[test]
+    fn test_add_items_mixed_expired_and_active_rules() {
+        let manager = create_test_manager();
+        let order_id = open_table(&manager, "T-time-7");
+
+        let now = shared::util::now_millis();
+        let expired_rule = make_timed_discount_rule(
+            "expired",
+            50.0, // 50% 折扣 — 如果被应用会很明显
+            None,
+            Some(now - 3_600_000), // 1小时前过期
+            None,
+            None,
+            None,
+        );
+        let active_rule = make_timed_discount_rule(
+            "active",
+            10.0,
+            Some(now - 3_600_000),
+            Some(now + 3_600_000),
+            None,
+            None,
+            None,
+        );
+        manager.cache_rules(&order_id, vec![expired_rule, active_rule]);
+
+        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Fish", 200.0, 1)]);
+        assert!(r.success);
+
+        let s = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // 只有 10% 有效: 200 → 180 (如果 50% 也生效会是 90)
+        assert_eq!(s.subtotal, 180.0);
+    }
+
+    /// 无时间约束的规则始终生效
+    #[test]
+    fn test_add_items_no_time_constraint_always_applies() {
+        let manager = create_test_manager();
+        let order_id = open_table(&manager, "T-time-8");
+
+        // 没有任何时间限制
+        let rule = make_timed_discount_rule("always", 10.0, None, None, None, None, None);
+        manager.cache_rules(&order_id, vec![rule]);
+
+        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Bread", 10.0, 5)]);
+        assert!(r.success);
+
+        let s = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // 10% 折扣: 10×5=50 → 45
+        assert_eq!(s.subtotal, 45.0);
+    }
+
+    /// valid_from + active_days 组合: valid_from 有效但 active_days 不匹配 → 不应用
+    #[test]
+    fn test_add_items_valid_from_ok_but_wrong_day() {
+        let manager = create_test_manager();
+        let order_id = open_table(&manager, "T-time-9");
+
+        let now = shared::util::now_millis();
+        let now_local = chrono::Utc::now().with_timezone(&chrono_tz::Europe::Madrid);
+        let today = now_local.format("%u").to_string().parse::<u8>().unwrap() % 7;
+        let wrong_day = (today + 1) % 7;
+
+        let rule = make_timed_discount_rule(
+            "combo_fail",
+            10.0,
+            Some(now - 3_600_000), // valid_from OK
+            None,
+            Some(vec![wrong_day]), // wrong day
+            None,
+            None,
+        );
+        manager.cache_rules(&order_id, vec![rule]);
+
+        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Cake", 30.0, 2)]);
+        assert!(r.success);
+
+        let s = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // active_days 不匹配，30×2=60 原价
+        assert_eq!(s.subtotal, 60.0);
+    }
+
+    /// 第二次加菜时规则也需要实时检查时间
+    #[test]
+    fn test_add_items_second_batch_also_checks_time() {
+        let manager = create_test_manager();
+        let order_id = open_table(&manager, "T-time-10");
+
+        let now = shared::util::now_millis();
+        // 规则有效
+        let rule = make_timed_discount_rule(
+            "valid_now",
+            10.0,
+            Some(now - 3_600_000),
+            Some(now + 3_600_000),
+            None,
+            None,
+            None,
+        );
+        manager.cache_rules(&order_id, vec![rule]);
+
+        // 第一批加菜
+        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 1)]);
+        assert!(r.success);
+        let s = manager.get_snapshot(&order_id).unwrap().unwrap();
+        assert_eq!(s.subtotal, 90.0); // 10% off
+
+        // 第二批加菜（规则仍然有效）
+        let r = add_items(&manager, &order_id, vec![simple_item("product:p2", "B", 50.0, 2)]);
+        assert!(r.success);
+        let s = manager.get_snapshot(&order_id).unwrap().unwrap();
+        // A: 90, B: 45×2=90 → 180
+        assert_eq!(s.subtotal, 180.0);
     }
 }

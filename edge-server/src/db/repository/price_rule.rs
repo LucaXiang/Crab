@@ -17,6 +17,35 @@ impl PriceRuleRepository {
         }
     }
 
+    /// Find active rules by zone scope (DB-level filtering)
+    ///
+    /// Matches rules where:
+    /// - zone_scope = "zone:all" (applies to all zones)
+    /// - zone_scope = "zone:retail" AND is_retail = true
+    /// - zone_scope = specific zone_id
+    pub async fn find_by_zone(
+        &self,
+        zone_id: Option<&str>,
+        is_retail: bool,
+    ) -> RepoResult<Vec<PriceRule>> {
+        let zone_id_owned = zone_id.unwrap_or("").to_string();
+        let rules: Vec<PriceRule> = self
+            .base
+            .db()
+            .query(
+                "SELECT * FROM price_rule WHERE is_active = true AND (
+                    zone_scope = 'zone:all'
+                    OR (zone_scope = 'zone:retail' AND $is_retail = true)
+                    OR zone_scope = $zone_id
+                ) ORDER BY created_at DESC",
+            )
+            .bind(("is_retail", is_retail))
+            .bind(("zone_id", zone_id_owned))
+            .await?
+            .take(0)?;
+        Ok(rules)
+    }
+
     /// Find all active price rules
     pub async fn find_all(&self) -> RepoResult<Vec<PriceRule>> {
         let rules: Vec<PriceRule> = self
