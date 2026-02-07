@@ -5,13 +5,13 @@ const getApi = () => createTauriClient();
 
 export interface CreateTableInput {
   name: string;
-  zone: string;
+  zone_id: number;
   capacity: number;
 }
 
 export interface UpdateTableInput {
   name?: string;
-  zone?: string;
+  zone_id?: number;
   capacity?: number;
   is_active?: boolean;
 }
@@ -22,8 +22,8 @@ export interface UpdateTableInput {
 export async function createTable(input: CreateTableInput): Promise<void> {
   await getApi().createTable({
     name: input.name,
-    zone: String(input.zone),
-    capacity: Number(input.capacity),
+    zone_id: input.zone_id,
+    capacity: input.capacity,
   });
   // Refresh tables from server
   await useTableStore.getState().fetchAll(true);
@@ -32,11 +32,11 @@ export async function createTable(input: CreateTableInput): Promise<void> {
 /**
  * Update an existing table
  */
-export async function updateTable(id: string, input: UpdateTableInput): Promise<void> {
-  await getApi().updateTable(String(id), {
+export async function updateTable(id: number, input: UpdateTableInput): Promise<void> {
+  await getApi().updateTable(id, {
     name: input.name,
-    zone: input.zone ? String(input.zone) : undefined,
-    capacity: input.capacity ? Number(input.capacity) : undefined,
+    zone_id: input.zone_id,
+    capacity: input.capacity,
     is_active: input.is_active,
   });
   // Refresh tables from server
@@ -46,8 +46,8 @@ export async function updateTable(id: string, input: UpdateTableInput): Promise<
 /**
  * Delete a table
  */
-export async function deleteTable(id: string): Promise<void> {
-  await getApi().deleteTable(String(id));
+export async function deleteTable(id: number): Promise<void> {
+  await getApi().deleteTable(id);
   // Refresh tables from server
   await useTableStore.getState().fetchAll(true);
 }

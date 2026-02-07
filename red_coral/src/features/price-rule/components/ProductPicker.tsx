@@ -8,7 +8,7 @@ import type { Product } from '@/core/domain/types/api';
 
 interface ProductPickerProps {
   isOpen: boolean;
-  selectedProductId: string | null;
+  selectedProductId: number | null;
   onSelect: (product: Product) => void;
   onClose: () => void;
 }
@@ -24,7 +24,7 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
   const categories = useCategoryStore(state => state.items);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
   // Filter products
   const filteredProducts = useMemo(() => {
@@ -32,7 +32,7 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
 
     // Filter by category
     if (selectedCategoryId) {
-      result = result.filter(p => p.category === selectedCategoryId);
+      result = result.filter(p => p.category_id === selectedCategoryId);
     }
 
     // Filter by search
@@ -50,7 +50,7 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
 
   // Active categories (that have products)
   const activeCategories = useMemo(() => {
-    const categoryIds = new Set(products.filter(p => p.is_active).map(p => p.category));
+    const categoryIds = new Set(products.filter(p => p.is_active).map(p => p.category_id));
     return categories.filter(c => categoryIds.has(c.id));
   }, [categories, products]);
 

@@ -24,7 +24,7 @@ import {
 	}	from './components';
 
 // Types
-import { Product, ItemOption, Attribute, AttributeOption, EmbeddedSpec, ProductAttribute } from '@/core/domain/types';
+import { Product, ItemOption, Attribute, AttributeOption, ProductSpec, ProductAttribute } from '@/core/domain/types';
 
 // i18n
 import { useI18n } from '@/hooks/useI18n';
@@ -156,7 +156,7 @@ export const POSScreen: React.FC = () => {
 
     // Regular category: filter by category id
     return products
-      .filter((p) => p.is_active && p.category === category.id)
+      .filter((p) => p.is_active && p.category_id === category.id)
       .sort((a, b) => a.sort_order - b.sort_order)
       .map(mapProductWithSpec);
   }, [products, categories, selectedCategory]);
@@ -201,7 +201,7 @@ export const POSScreen: React.FC = () => {
     attributes: Attribute[];
     options: Map<string, AttributeOption[]>;
     bindings: ProductAttribute[];
-    specifications?: EmbeddedSpec[];
+    specifications?: ProductSpec[];
     hasMultiSpec?: boolean;
   } | null>(null);
   const {
@@ -262,7 +262,7 @@ export const POSScreen: React.FC = () => {
   const addToCart = useCallback(
     async (product: Product, startRect?: DOMRect, skipQuickAdd: boolean = false) => {
       // Get full product data from store (ProductFull includes attributes)
-      const productFull = useProductStore.getState().getById(String(product.id));
+      const productFull = useProductStore.getState().getById(product.id);
       if (!productFull) {
         toast.error(t('pos.error.product_not_found'));
         return;
@@ -278,18 +278,18 @@ export const POSScreen: React.FC = () => {
         }
       });
       const allBindings: ProductAttribute[] = attrBindings.map(binding => ({
-        id: binding.id ?? null,
-        in: binding.is_inherited ? productFull.category : String(product.id),
-        out: String(binding.attribute.id),
+        id: binding.id,
+        owner_id: binding.is_inherited ? productFull.category_id : product.id as number,
+        attribute_id: binding.attribute.id,
         is_required: binding.is_required,
         display_order: binding.display_order,
         default_option_indices: binding.default_option_indices,
         attribute: binding.attribute,
       }));
 
-      // Specs are now embedded in ProductFull (EmbeddedSpec[])
+      // Specs are now embedded in ProductFull (ProductSpec[])
         const hasMultiSpec = productFull.specs.length > 1;
-        const specifications: EmbeddedSpec[] = productFull.specs || [];
+        const specifications: ProductSpec[] = productFull.specs || [];
 
         // Get base price from default spec or first spec
         const defaultSpec = specifications.find((s) => s.is_default) || specifications[0];
@@ -314,7 +314,7 @@ export const POSScreen: React.FC = () => {
 
         // CASE 2: Has Multi-Spec or Attributes -> Check if we need modal
 
-        let selectedDefaultSpec: EmbeddedSpec | undefined = undefined;
+        let selectedDefaultSpec: ProductSpec | undefined = undefined;
 
         if (hasMultiSpec) {
             // Check for default specification

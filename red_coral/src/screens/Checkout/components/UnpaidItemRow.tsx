@@ -35,7 +35,7 @@ export const UnpaidItemRow: React.FC<UnpaidItemRowProps> = ({
 }) => {
   const isSelected = selectedQuantities[originalIndex] > 0;
   const currentQty = selectedQuantities[originalIndex] || 0;
-  const externalId = useProductStore(state => state.items.find(p => p.id === item.id)?.external_id);
+  const externalId = useProductStore(state => state.items.find(p => String(p.id) === item.id)?.external_id);
 
   // Price calculations
   const optionsModifier = calculateOptionsModifier(item.selected_options);

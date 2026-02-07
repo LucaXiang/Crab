@@ -6,7 +6,7 @@ import { useZoneStore } from '@/features/zone/store';
 import { useTableStore } from './store';
 import { createTauriClient } from '@/infrastructure/api';
 import { getErrorMessage } from '@/utils/error';
-import { displayThingId } from '@/utils/formatting';
+import { displayId } from '@/utils/formatting';
 
 const getApi = () => createTauriClient();
 import { DataTable, Column } from '@/shared/components/DataTable';
@@ -17,7 +17,7 @@ import { Permission } from '@/core/domain/types';
 import { useCanManageTables, useCanManageZones } from '@/hooks/usePermission';
 
 interface ZoneItem {
-  id: string;
+  id: number;
   name: string;
 }
 
@@ -50,7 +50,7 @@ const ZoneList: React.FC = React.memo(() => {
     if (!searchQuery.trim()) return zones;
     const q = searchQuery.toLowerCase();
     return zones.filter(
-      (z) => z.name.toLowerCase().includes(q) || z.id.toLowerCase().includes(q)
+      (z) => z.name.toLowerCase().includes(q) || String(z.id).includes(q)
     );
   }, [zones, searchQuery]);
 
@@ -103,7 +103,7 @@ const ZoneList: React.FC = React.memo(() => {
             </div>
             <div>
               <span className="font-medium text-gray-900">{item.name}</span>
-              <div className="text-xs text-gray-400 mt-0.5">ID: {displayThingId(item.id)}</div>
+              <div className="text-xs text-gray-400 mt-0.5">ID: {displayId(item.id)}</div>
             </div>
           </div>
         ),
@@ -159,7 +159,7 @@ const ZoneList: React.FC = React.memo(() => {
         data={filteredZones}
         columns={columns}
         loading={loading}
-        getRowKey={(item) => item.id}
+        getRowKey={(item) => String(item.id)}
         onEdit={canManageZones ? (item) => openModal('ZONE', 'EDIT', item) : undefined}
         onDelete={canManageZones ? (item) => openModal('ZONE', 'DELETE', item) : undefined}
         onBatchDelete={canManageZones ? handleBatchDelete : undefined}
@@ -181,9 +181,9 @@ const ZoneList: React.FC = React.memo(() => {
 });
 
 interface TableItem {
-  id: string;
+  id: number;
   name: string;
-  zone?: string;
+  zone_id?: number;
   capacity?: number;
 }
 
@@ -234,7 +234,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
   }, [zoneFilter, page, searchQuery, dataVersion, activeTab]);
 
   const zonesMap = useMemo(() => {
-    const m = new Map<string, string>();
+    const m = new Map<number, string>();
     zones.forEach((z) => m.set(z.id, z.name));
     return m;
   }, [zones]);
@@ -242,7 +242,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
   // Filter tables by zone
   const filteredTables = useMemo(() => {
     if (zoneFilter === 'all') return tables;
-    return tables.filter((t) => t.zone === zoneFilter);
+    return tables.filter((t) => String(t.zone_id) === zoneFilter);
   }, [tables, zoneFilter]);
 
   const handleBatchDelete = (items: TableItem[]) => {
@@ -295,7 +295,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
         header: t('table.zones'),
         render: (item) => (
           <span className="inline-flex items-center px-2.5 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium">
-            {zonesMap.get(item.zone || '') || item.zone}
+            {zonesMap.get(item.zone_id ?? 0) || item.zone_id}
           </span>
         ),
       },
@@ -438,7 +438,7 @@ export const TableManagement: React.FC<TableManagementProps> = React.memo(({ ini
             data={filteredTables}
             columns={columns}
             loading={loading}
-            getRowKey={(item) => item.id}
+            getRowKey={(item) => String(item.id)}
             onEdit={canManageTables ? (item) => openModal('TABLE', 'EDIT', item) : undefined}
             onDelete={canManageTables ? (item) => openModal('TABLE', 'DELETE', item) : undefined}
             onBatchDelete={canManageTables ? handleBatchDelete : undefined}

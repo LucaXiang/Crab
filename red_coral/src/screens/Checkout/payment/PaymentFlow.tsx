@@ -635,10 +635,10 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
   const productInfoMap = useMemo(() => {
     const map = new Map<string, { image?: string; category?: string }>();
     order.items.forEach(item => {
-      const product = products.find(p => p.id === item.id);
+      const product = products.find(p => String(p.id) === item.id);
       map.set(item.instance_id, {
         image: product?.image,
-        category: product?.category,
+        category: product?.category_id != null ? String(product.category_id) : undefined,
       });
     });
     return map;
@@ -679,7 +679,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     const result: Array<{ categoryId: string | null; categoryName: string; items: typeof order.items }> = [];
 
     groups.forEach((items, categoryRef) => {
-      const category = categories.find(c => c.id === categoryRef);
+      const category = categories.find(c => String(c.id) === categoryRef);
       result.push({
         categoryId: categoryRef,
         categoryName: category?.name || t('common.label.unknown_item'),
@@ -688,7 +688,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     });
 
     // Sort items within each group by external_id (consistent with OrderItemsSummary)
-    const extIdMap = new Map(products.map(p => [p.id, p.external_id]));
+    const extIdMap = new Map(products.map(p => [String(p.id), p.external_id]));
     for (const group of result) {
       group.items.sort((a, b) => {
         const extA = extIdMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
@@ -699,7 +699,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
     }
 
     // Sort groups by category sort_order (consistent with OrderItemsSummary)
-    const categoryMap = new Map(categories.map(c => [c.id, c]));
+    const categoryMap = new Map(categories.map(c => [String(c.id), c]));
     result.sort((a, b) => {
       const sortA = a.categoryId ? (categoryMap.get(a.categoryId)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
       const sortB = b.categoryId ? (categoryMap.get(b.categoryId)?.sort_order ?? 0) : Number.MAX_SAFE_INTEGER;
@@ -889,13 +889,13 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                                   const itemB = order.items.find(i => i.instance_id === idB);
                                   if (!itemA || !itemB) return 0;
                                   // Sort by category sort_order, then external_id, then name
-                                  const catA = categories.find(c => c.id === productInfoMap.get(idA)?.category);
-                                  const catB = categories.find(c => c.id === productInfoMap.get(idB)?.category);
+                                  const catA = categories.find(c => String(c.id) === productInfoMap.get(idA)?.category);
+                                  const catB = categories.find(c => String(c.id) === productInfoMap.get(idB)?.category);
                                   const sortA = catA?.sort_order ?? 0;
                                   const sortB = catB?.sort_order ?? 0;
                                   if (sortA !== sortB) return sortA - sortB;
-                                  const extA = products.find(p => p.id === itemA.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
-                                  const extB = products.find(p => p.id === itemB.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
+                                  const extA = products.find(p => String(p.id) === itemA.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
+                                  const extB = products.find(p => String(p.id) === itemB.id)?.external_id ?? Number.MAX_SAFE_INTEGER;
                                   if (extA !== extB) return extA - extB;
                                   return itemA.name.localeCompare(itemB.name);
                                 })
@@ -1532,7 +1532,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({ order, onComplete, onC
                           mode="intercept"
                           description={t('checkout.payment.cancel')}
                           onAuthorized={(user) => {
-                            setCancelAuthorizer({ id: user.id, name: user.display_name });
+                            setCancelAuthorizer({ id: String(user.id), name: user.display_name });
                             handleCancelPayment(payment.payment_id, isSplit);
                           }}
                         >

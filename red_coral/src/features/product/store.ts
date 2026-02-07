@@ -4,15 +4,12 @@ import type { ProductFull, ProductCreate, ProductUpdate } from '@/core/domain/ty
 
 const getApi = () => createTauriClient();
 
-// ProductFull with guaranteed id (contains specs, attributes, tags)
-type ProductEntity = ProductFull & { id: string };
-
-export const useProductStore = createCrudResourceStore<ProductEntity, ProductCreate, ProductUpdate>(
+export const useProductStore = createCrudResourceStore<ProductFull, ProductCreate, ProductUpdate>(
   'product',
-  () => getApi().listProducts() as Promise<ProductEntity[]>,
+  () => getApi().listProducts(),
   {
-    create: (data) => getApi().createProduct(data) as Promise<ProductEntity>,
-    update: (id, data) => getApi().updateProduct(id, data) as Promise<ProductEntity>,
+    create: (data) => getApi().createProduct(data),
+    update: (id, data) => getApi().updateProduct(id, data),
     remove: (id) => getApi().deleteProduct(id),
   }
 );
@@ -20,7 +17,7 @@ export const useProductStore = createCrudResourceStore<ProductEntity, ProductCre
 // Convenience hooks
 export const useProducts = () => useProductStore((state) => state.items);
 export const useProductsLoading = () => useProductStore((state) => state.isLoading);
-export const useProductById = (id: string) =>
+export const useProductById = (id: number) =>
   useProductStore((state) => state.items.find((p) => p.id === id));
 
 // CRUD action hooks

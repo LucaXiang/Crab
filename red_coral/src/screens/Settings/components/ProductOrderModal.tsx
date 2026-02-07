@@ -15,7 +15,7 @@ import { useImageUrl } from '@/core/hooks';
 import { useSettingsStore } from '@/core/stores/settings';
 
 interface SortableProductItemProps {
-  id: string;
+  id: number;
   product: Product;
 }
 
@@ -118,7 +118,7 @@ const DragOverlayProductItem: React.FC<{ product: Product }> = ({ product }) => 
 interface ProductOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
-  categoryId: string;
+  categoryId: number;
   categoryName: string;
 }
 
@@ -127,7 +127,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
   const allStoreProducts = useProducts() as Product[];
   const [products, setProducts] = useState<Product[]>([]);
   const [saving, setSaving] = useState(false);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<number | null>(null);
   const refreshData = useSettingsStore((s) => s.refreshData);
 
   const sensors = useSensors(
@@ -145,7 +145,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
   useEffect(() => {
     if (isOpen && categoryId) {
       const filtered = allStoreProducts
-        .filter(p => p.category === categoryId)
+        .filter(p => p.category_id === categoryId)
         .sort((a, b) => a.sort_order - b.sort_order);
       setProducts(filtered);
     }
@@ -153,7 +153,7 @@ export const ProductOrderModal: React.FC<ProductOrderModalProps> = ({ isOpen, ca
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
-    setActiveId(String(active.id));
+    setActiveId(Number(active.id));
   };
 
   const handleDragEnd = (event: DragEndEvent) => {

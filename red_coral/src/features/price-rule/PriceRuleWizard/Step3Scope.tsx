@@ -11,7 +11,7 @@ interface Step3ScopeProps {
 }
 
 /** Generic card-grid selector with search, used for Category / Tag / Product */
-function CardGridSelector<T extends { id: string; name: string }>({
+function CardGridSelector<T extends { id: number; name: string }>({
   items,
   selectedId,
   onSelect,
@@ -20,8 +20,8 @@ function CardGridSelector<T extends { id: string; name: string }>({
   renderExtra,
 }: {
   items: T[];
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
+  selectedId: number | null;
+  onSelect: (id: number | null) => void;
   searchPlaceholder: string;
   emptyText: string;
   renderExtra?: (item: T) => React.ReactNode;
@@ -34,7 +34,7 @@ function CardGridSelector<T extends { id: string; name: string }>({
     return items.filter((item) => item.name.toLowerCase().includes(lower));
   }, [items, search]);
 
-  const handleSelect = (id: string) => {
+  const handleSelect = (id: number) => {
     onSelect(selectedId === id ? null : id);
   };
 
@@ -106,7 +106,7 @@ export const Step3Scope: React.FC<Step3ScopeProps> = ({ state, updateState }) =>
 
   // Build category lookup for product cards
   const categoryMap = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<number, string>();
     categories.forEach((cat) => map.set(cat.id, cat.name));
     return map;
   }, [categories]);
@@ -124,7 +124,7 @@ export const Step3Scope: React.FC<Step3ScopeProps> = ({ state, updateState }) =>
   ];
 
   const handleScopeChange = (scope: WizardState['product_scope']) => {
-    updateState({ product_scope: scope, target: null });
+    updateState({ product_scope: scope, target_id: null });
   };
 
   const renderTargetSelector = () => {
@@ -135,8 +135,8 @@ export const Step3Scope: React.FC<Step3ScopeProps> = ({ state, updateState }) =>
             <CardGridSelector
               key="category"
               items={categories}
-              selectedId={state.target}
-              onSelect={(id) => updateState({ target: id })}
+              selectedId={state.target_id}
+              onSelect={(id) => updateState({ target_id: id })}
               searchPlaceholder={t('common.action.search')}
               emptyText={t('common.empty.no_results')}
             />
@@ -148,8 +148,8 @@ export const Step3Scope: React.FC<Step3ScopeProps> = ({ state, updateState }) =>
             <CardGridSelector
               key="tag"
               items={tags}
-              selectedId={state.target}
-              onSelect={(id) => updateState({ target: id })}
+              selectedId={state.target_id}
+              onSelect={(id) => updateState({ target_id: id })}
               searchPlaceholder={t('common.action.search')}
               emptyText={t('common.empty.no_results')}
               renderExtra={(tag) => (
@@ -167,12 +167,12 @@ export const Step3Scope: React.FC<Step3ScopeProps> = ({ state, updateState }) =>
             <CardGridSelector
               key="product"
               items={products}
-              selectedId={state.target}
-              onSelect={(id) => updateState({ target: id })}
+              selectedId={state.target_id}
+              onSelect={(id) => updateState({ target_id: id })}
               searchPlaceholder={t('common.action.search')}
               emptyText={t('common.empty.no_results')}
               renderExtra={(prod) => {
-                const catName = 'category' in prod ? categoryMap.get(prod.category as string) : undefined;
+                const catName = 'category_id' in prod ? categoryMap.get(prod.category_id as number) : undefined;
                 return catName ? (
                   <span className="text-[0.625rem] text-gray-400 mt-0.5 leading-tight">{catName}</span>
                 ) : null;
@@ -246,10 +246,10 @@ export const Step3Scope: React.FC<Step3ScopeProps> = ({ state, updateState }) =>
           onChange={(e) => updateState({ zone_scope: e.target.value })}
           className={selectClass}
         >
-          <option value="zone:all">{t('settings.price_rule.zone.all')}</option>
-          <option value="zone:retail">{t('settings.price_rule.zone.retail')}</option>
+          <option value="all">{t('settings.price_rule.zone.all')}</option>
+          <option value="retail">{t('settings.price_rule.zone.retail')}</option>
           {zones.map((zone) => (
-            <option key={zone.id} value={zone.id ?? ''}>
+            <option key={zone.id} value={String(zone.id)}>
               {zone.name}
             </option>
           ))}

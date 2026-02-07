@@ -111,10 +111,10 @@ pub async fn login(
     let response = LoginResponse {
         token,
         user: UserInfo {
-            id: user_id,
+            id: emp.id,
             username: emp.username,
             display_name: emp.display_name,
-            role_id: emp.role_id.to_string(),
+            role_id: emp.role_id,
             role_name: role.name,
             permissions: role.permissions,
             is_system: emp.is_system,
@@ -143,11 +143,15 @@ pub async fn me(
         .map(|e| (e.is_active, e.created_at))
         .unwrap_or((true, 0));
 
+    let role_id: i64 = user.role_id
+        .parse()
+        .map_err(|_| AppError::internal(format!("Invalid role ID: {}", user.role_id)))?;
+
     let user_info = UserInfo {
-        id: user.id,
+        id,
         username: user.username,
         display_name: user.display_name,
-        role_id: user.role_id,
+        role_id,
         role_name: user.role_name,
         permissions: user.permissions,
         is_system: user.is_system,
@@ -285,10 +289,10 @@ pub async fn escalate(
 
     let response = EscalateResponse {
         authorizer: UserInfo {
-            id: authorizer_id,
+            id: emp.id,
             username: emp.username,
             display_name: emp.display_name,
-            role_id: emp.role_id.to_string(),
+            role_id: emp.role_id,
             role_name: role.name,
             permissions: role.permissions,
             is_system: emp.is_system,

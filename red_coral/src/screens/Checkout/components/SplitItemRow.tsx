@@ -13,7 +13,7 @@ interface SplitItemRowProps {
 
 export const SplitItemRow: React.FC<SplitItemRowProps> = ({ item }) => {
   // Get product to get image
-  const product = useProductById(item.id);
+  const product = useProductById(Number(item.id));
   const [imageUrl] = useImageUrl(product?.image);
   const imageSrc = imageUrl || DefaultImage;
 

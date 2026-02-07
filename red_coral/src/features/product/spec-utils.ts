@@ -2,14 +2,14 @@
  * Specification utility functions
  */
 
-import type { EmbeddedSpec } from '@/core/domain/types';
+import type { ProductSpec } from '@/core/domain/types';
 
 /**
  * Validate spec data for creation/update
  * @returns error message or null if valid
  */
 export function validateSpecData(
-  spec: Partial<EmbeddedSpec>,
+  spec: Partial<ProductSpec>,
   isRoot: boolean,
   t: (key: string) => string
 ): string | null {
@@ -31,9 +31,9 @@ export function validateSpecData(
  * Set a spec as the default (ensuring only one default at a time)
  */
 export function setDefaultSpec(
-  specs: EmbeddedSpec[],
+  specs: ProductSpec[],
   index: number | null
-): EmbeddedSpec[] {
+): ProductSpec[] {
   return specs.map((spec, i) => ({
     ...spec,
     is_default: index === null ? false : i === index,
@@ -43,7 +43,7 @@ export function setDefaultSpec(
 /**
  * Create a new spec with defaults
  */
-export function createEmptySpec(): Partial<EmbeddedSpec> {
+export function createEmptySpec(): Partial<ProductSpec> {
   return {
     name: '',
     receipt_name: undefined,
@@ -58,6 +58,6 @@ export function createEmptySpec(): Partial<EmbeddedSpec> {
 /**
  * Check if a spec can be deleted
  */
-export function canDeleteSpec(spec: EmbeddedSpec): boolean {
+export function canDeleteSpec(spec: ProductSpec): boolean {
   return !spec.is_root;
 }

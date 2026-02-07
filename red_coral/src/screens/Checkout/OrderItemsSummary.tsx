@@ -38,12 +38,12 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
 
   // Group by category
   const groupedByCategory = useMemo(() => {
-    const productMap = new Map(products.map(p => [p.id, p]));
+    const productMap = new Map(products.map(p => [String(p.id), p]));
     const groups: Record<string, typeof activeItems> = {};
 
     activeItems.forEach(entry => {
       const product = productMap.get(entry.item.id);
-      const categoryId = product?.category || 'uncategorized';
+      const categoryId = product?.category_id != null ? String(product.category_id) : 'uncategorized';
 
       if (!groups[categoryId]) {
         groups[categoryId] = [];
@@ -53,7 +53,7 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
 
     // Sort within each group by external_id
     const externalIdMap = new Map<string, number | null>();
-    for (const p of products) externalIdMap.set(p.id, p.external_id);
+    for (const p of products) externalIdMap.set(String(p.id), p.external_id);
 
     for (const entries of Object.values(groups)) {
       entries.sort((a, b) => {
@@ -74,7 +74,7 @@ export const OrderItemsSummary: React.FC<OrderItemsSummaryProps> = ({
 
   // Sort groups by category sort_order
   const sortedGroups = useMemo(() => {
-    const categoryMap = new Map(categories.map(c => [c.id, c]));
+    const categoryMap = new Map(categories.map(c => [String(c.id), c]));
 
     return Object.entries(groupedByCategory).sort(([catIdA], [catIdB]) => {
       if (catIdA === 'uncategorized') return 1;

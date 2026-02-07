@@ -29,7 +29,7 @@ export const PriceRuleManagement: React.FC = React.memo(() => {
   const loading = priceRuleStore.isLoading;
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
+  const [selectedRuleId, setSelectedRuleId] = useState<number | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<PriceRule | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<PriceRule | null>(null);

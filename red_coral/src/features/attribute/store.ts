@@ -18,10 +18,10 @@ function cascadeRefreshProducts() {
 // Extended option type with index for UI purposes
 interface AttributeOptionWithIndex extends AttributeOption {
   index: number;
-  attributeId: string;
+  attributeId: number;
 }
 
-type AttributeEntity = Attribute & { id: string };
+type AttributeEntity = Attribute;
 
 interface AttributeStore {
   // State
@@ -32,21 +32,21 @@ interface AttributeStore {
   lastVersion: number;
 
   // Options state
-  options: Map<string, AttributeOptionWithIndex[]>;
-  selectedAttributeId: string | null;
+  options: Map<number, AttributeOptionWithIndex[]>;
+  selectedAttributeId: number | null;
 
   // Core actions
   fetchAll: (force?: boolean) => Promise<void>;
   applySync: (payload: SyncPayload<AttributeEntity>) => void;
-  getById: (id: string) => AttributeEntity | undefined;
+  getById: (id: number) => AttributeEntity | undefined;
   clear: () => void;
 
   // UI actions
-  setSelectedAttributeId: (id: string | null) => void;
+  setSelectedAttributeId: (id: number | null) => void;
 
   // Options actions
-  getOptionsByAttributeId: (attributeId: string) => AttributeOptionWithIndex[];
-  loadOptions: (attributeId: string) => Promise<void>;
+  getOptionsByAttributeId: (attributeId: number) => AttributeOptionWithIndex[];
+  loadOptions: (attributeId: number) => Promise<void>;
 
   // CRUD operations
   createAttribute: (params: {
@@ -60,7 +60,7 @@ interface AttributeStore {
     kitchen_print_name?: string;
   }) => Promise<void>;
   updateAttribute: (params: {
-    id: string;
+    id: number;
     name?: string;
     is_multi_select?: boolean;
     max_selections?: number | null;
@@ -71,9 +71,9 @@ interface AttributeStore {
     show_on_kitchen_print?: boolean;
     kitchen_print_name?: string;
   }) => Promise<void>;
-  deleteAttribute: (id: string) => Promise<void>;
+  deleteAttribute: (id: number) => Promise<void>;
   createOption: (params: {
-    attributeId: string;
+    attributeId: number;
     name: string;
     value_code?: string;
     price_modifier?: number;
@@ -85,7 +85,7 @@ interface AttributeStore {
     max_quantity?: number | null;
   }) => Promise<void>;
   updateOption: (params: {
-    attributeId: string;
+    attributeId: number;
     index: number;
     name?: string;
     value_code?: string;
@@ -97,15 +97,15 @@ interface AttributeStore {
     enable_quantity?: boolean;
     max_quantity?: number | null;
   }) => Promise<void>;
-  deleteOption: (attributeId: string, index: number) => Promise<void>;
-  reorderOptions: (attributeId: string, ids: string[]) => Promise<void>;
+  deleteOption: (attributeId: number, index: number) => Promise<void>;
+  reorderOptions: (attributeId: number, ids: number[]) => Promise<void>;
   bindProductAttribute: (params: {
-    product_id: string;
-    attribute_id: string;
+    product_id: number;
+    attribute_id: number;
     is_required?: boolean;
     display_order?: number;
   }) => Promise<void>;
-  unbindProductAttribute: (bindingId: string) => Promise<void>;
+  unbindProductAttribute: (bindingId: number) => Promise<void>;
 }
 
 export const useAttributeStore = create<AttributeStore>((set, get) => ({
@@ -339,8 +339,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
       if (!attr?.options) return;
 
       // Reorder options array based on newOrder indices
-      const reorderedOptions = newOrder.map((idxStr, newIdx) => {
-        const oldIdx = parseInt(idxStr, 10);
+      const reorderedOptions = newOrder.map((oldIdx, newIdx) => {
         const opt = attr.options![oldIdx];
         return { ...opt, display_order: newIdx };
       });
@@ -395,7 +394,7 @@ export const useAttributeStore = create<AttributeStore>((set, get) => ({
 // Convenience hooks
 export const useAttributes = () => useAttributeStore((state) => state.items);
 export const useAttributesLoading = () => useAttributeStore((state) => state.isLoading);
-export const useAttributeById = (id: string) =>
+export const useAttributeById = (id: number) =>
   useAttributeStore((state) => state.items.find((a) => a.id === id));
 
 // Action hooks
@@ -429,10 +428,10 @@ export const useOptionActions = () =>
 
 // Stable helper object - same reference every render
 export const attributeHelpers = {
-  getAttributeById: (id: string) => {
-    return useAttributeStore.getState().items.find((attr) => String(attr.id) === id);
+  getAttributeById: (id: number) => {
+    return useAttributeStore.getState().items.find((attr) => attr.id === id);
   },
-  getOptionsByAttributeId: (attributeId: string) => {
+  getOptionsByAttributeId: (attributeId: number) => {
     return useAttributeStore.getState().options.get(attributeId) || [];
   },
 };

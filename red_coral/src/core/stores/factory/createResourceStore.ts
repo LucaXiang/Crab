@@ -9,7 +9,7 @@ import { create } from 'zustand';
  * - 检测到版本间隙: 触发全量刷新
  */
 export interface SyncPayload<T = unknown> {
-  id: string;
+  id: number;
   version: number;
   action: 'created' | 'updated' | 'deleted';
   data: T | null;
@@ -20,7 +20,7 @@ export interface SyncPayload<T = unknown> {
  *
  * 所有资源 Store 统一使用此接口，确保一致的数据管理模式。
  */
-export interface ResourceStore<T extends { id: string }> {
+export interface ResourceStore<T extends { id: number }> {
   // 状态
   items: T[];
   isLoading: boolean;
@@ -32,21 +32,21 @@ export interface ResourceStore<T extends { id: string }> {
   fetchAll: (force?: boolean) => Promise<void>;
   applySync: (payload: SyncPayload<T>) => void;
   checkVersion: (serverVersion: number) => boolean;
-  getById: (id: string) => T | undefined;
+  getById: (id: number) => T | undefined;
   clear: () => void;
 }
 
 /**
  * 带 CRUD 操作的资源 Store 接口
  */
-export interface CrudResourceStore<T extends { id: string }, TCreate, TUpdate>
+export interface CrudResourceStore<T extends { id: number }, TCreate, TUpdate>
   extends ResourceStore<T> {
   create: (data: TCreate) => Promise<T>;
-  update: (id: string, data: TUpdate) => Promise<T>;
-  remove: (id: string) => Promise<void>;
+  update: (id: number, data: TUpdate) => Promise<T>;
+  remove: (id: number) => Promise<void>;
   // 乐观更新辅助
-  optimisticUpdate: (id: string, updater: (item: T) => T, version?: number) => void;
-  optimisticRemove: (id: string) => void;
+  optimisticUpdate: (id: number, updater: (item: T) => T, version?: number) => void;
+  optimisticRemove: (id: number) => void;
   optimisticAdd: (item: T) => void;
 }
 
@@ -55,8 +55,8 @@ export interface CrudResourceStore<T extends { id: string }, TCreate, TUpdate>
  */
 export interface CrudOperations<T, TCreate, TUpdate> {
   create: (data: TCreate) => Promise<T>;
-  update: (id: string, data: TUpdate) => Promise<T>;
-  remove: (id: string) => Promise<void>;
+  update: (id: number, data: TUpdate) => Promise<T>;
+  remove: (id: number) => Promise<void>;
 }
 
 /**
@@ -71,7 +71,7 @@ export interface CrudOperations<T, TCreate, TUpdate> {
  * @param resourceName - 资源名称（用于日志）
  * @param fetchFn - 获取数据的函数
  */
-export function createResourceStore<T extends { id: string }>(
+export function createResourceStore<T extends { id: number }>(
   resourceName: string,
   fetchFn: () => Promise<T[]>
 ) {
@@ -174,7 +174,7 @@ export function createResourceStore<T extends { id: string }>(
  * @param crudOps - CRUD 操作函数
  */
 export function createCrudResourceStore<
-  T extends { id: string },
+  T extends { id: number },
   TCreate = Partial<Omit<T, 'id'>>,
   TUpdate = Partial<Omit<T, 'id'>>
 >(

@@ -4,7 +4,7 @@ import { useI18n } from '@/hooks/useI18n';
 import { FormField, FormSection, inputClass } from '@/shared/components/FormField';
 import { useFormInitialization } from '@/hooks/useFormInitialization';
 import { usePriceInput } from '@/hooks/usePriceInput';
-import type { EmbeddedSpec } from '@/core/domain/types';
+import type { ProductSpec } from '@/core/domain/types';
 import { validateSpecData, createEmptySpec } from './spec-utils';
 import { toast } from '@/presentation/components/Toast';
 
@@ -15,7 +15,7 @@ interface SpecFormData {
   isDefault: boolean;
 }
 
-const mapToFormData = (spec: EmbeddedSpec | null): SpecFormData => {
+const mapToFormData = (spec: ProductSpec | null): SpecFormData => {
   if (!spec) {
     const empty = createEmptySpec();
     return {
@@ -36,10 +36,10 @@ const mapToFormData = (spec: EmbeddedSpec | null): SpecFormData => {
 interface SpecificationFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  spec: EmbeddedSpec | null;
+  spec: ProductSpec | null;
   specIndex: number | null;
   isRootSpec: boolean;
-  onSave: (spec: EmbeddedSpec, index: number | null) => Promise<void>;
+  onSave: (spec: ProductSpec, index: number | null) => Promise<void>;
 }
 
 export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = React.memo(({
@@ -84,7 +84,7 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
   const handleSubmit = async () => {
     commitPrice();
 
-    const specData: Partial<EmbeddedSpec> = {
+    const specData: Partial<ProductSpec> = {
       name: formData.name.trim(),
       price: formData.price,
     };
@@ -97,7 +97,7 @@ export const SpecificationFormModal: React.FC<SpecificationFormModalProps> = Rea
 
     setIsSubmitting(true);
     try {
-      const fullSpec: EmbeddedSpec = {
+      const fullSpec: ProductSpec = {
         name: formData.name.trim(),
         receipt_name: formData.receiptName.trim() || undefined,
         price: (isRootSpec && isEditing && spec) ? spec.price : formData.price,

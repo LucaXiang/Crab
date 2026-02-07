@@ -8,16 +8,16 @@ const getApi = () => createTauriClient();
 
 // Helper for attribute binding synchronization
 async function syncAttributeBindings(
-  categoryId: string,
-  selectedAttributeIds: string[],
-  attributeDefaultOptions: Record<string, string | string[]>,
-  existingBindings: { attributeId: string; id: string }[]
+  categoryId: number,
+  selectedAttributeIds: number[],
+  attributeDefaultOptions: Record<number, number | number[]>,
+  existingBindings: { attributeId: number; id: number }[]
 ) {
   // Unbind removed attributes - use binding ID, not attribute ID
   const toUnbind = existingBindings.filter(b => !selectedAttributeIds.includes(b.attributeId));
   for (const binding of toUnbind) {
     try {
-      await getApi().unbindCategoryAttribute(categoryId, String(binding.id));
+      await getApi().unbindCategoryAttribute(categoryId, binding.id);
     } catch (error) {
       console.error('Failed to unbind attribute:', binding.attributeId, error);
     }
@@ -73,22 +73,22 @@ async function syncAttributeBindings(
 
 export interface CategoryFormData {
   name: string;
-  print_destinations?: string[];
+  print_destinations?: number[];
   is_kitchen_print_enabled?: PrintState;
   is_label_print_enabled?: PrintState;
-  selected_attribute_ids?: string[];
-  attribute_default_options?: Record<string, string | string[]>;
+  selected_attribute_ids?: number[];
+  attribute_default_options?: Record<number, number | number[]>;
   is_virtual?: boolean;
-  tag_ids?: string[];
+  tag_ids?: number[];
   match_mode?: 'any' | 'all';
-  label_print_destinations?: string[];
+  label_print_destinations?: number[];
   sort_order?: number;
 }
 
 /**
  * Create a new category
  */
-export async function createCategory(formData: CategoryFormData): Promise<string> {
+export async function createCategory(formData: CategoryFormData): Promise<number> {
   // PrintState to boolean: 1=true, 0=false (Category API uses boolean)
   const kitchenEnabled = formData.is_kitchen_print_enabled === 0 ? false : true;
   const labelEnabled = formData.is_label_print_enabled === 0 ? false : true;
@@ -105,7 +105,7 @@ export async function createCategory(formData: CategoryFormData): Promise<string
     match_mode: formData.match_mode ?? 'any',
   });
 
-  const categoryId = created?.id || '';
+  const categoryId = created?.id ?? 0;
 
   // Handle attribute bindings for new category
   const selectedAttributeIds = formData.selected_attribute_ids || [];
@@ -127,7 +127,7 @@ export async function createCategory(formData: CategoryFormData): Promise<string
 /**
  * Update an existing category
  */
-export async function updateCategory(id: string, formData: CategoryFormData): Promise<void> {
+export async function updateCategory(id: number, formData: CategoryFormData): Promise<void> {
   // PrintState to boolean: 1=true, 0=false (Category API uses boolean)
   const kitchenEnabled = formData.is_kitchen_print_enabled === 0 ? false : true;
   const labelEnabled = formData.is_label_print_enabled === 0 ? false : true;
@@ -148,14 +148,14 @@ export async function updateCategory(id: string, formData: CategoryFormData): Pr
   const selectedAttributeIds = formData.selected_attribute_ids || [];
 
   // Get existing bindings
-  let existingBindings: { attributeId: string; id: string }[] = [];
+  let existingBindings: { attributeId: number; id: number }[] = [];
   try {
     const catAttrs = await getApi().listCategoryAttributes(id);
     // Transform to expected format for syncAttributeBindings
-    // API returns relation records with 'to' pointing to attribute
+    // API returns Attribute[] - we use attribute id as both attributeId and binding id
     existingBindings = catAttrs.map((ca) => ({
-      attributeId: (ca as unknown as { out: string }).out,
-      id: ca.id as string
+      attributeId: ca.id,
+      id: ca.id
     }));
   } catch (error) {
     console.error('Failed to fetch existing category attributes:', error);
@@ -175,7 +175,7 @@ export async function updateCategory(id: string, formData: CategoryFormData): Pr
 /**
  * Delete a category
  */
-export async function deleteCategory(id: string): Promise<void> {
+export async function deleteCategory(id: number): Promise<void> {
   await getApi().deleteCategory(id);
 
   // Refresh products and categories from resources stores
@@ -186,20 +186,20 @@ export async function deleteCategory(id: string): Promise<void> {
 /**
  * Load category attributes (for editing)
  */
-export async function loadCategoryAttributes(categoryId: string): Promise<{
-  attributeIds: string[];
-  defaultOptions: Record<string, string[]>;
+export async function loadCategoryAttributes(categoryId: number): Promise<{
+  attributeIds: number[];
+  defaultOptions: Record<number, number[]>;
 }> {
   const catAttrs = await getApi().listCategoryAttributes(categoryId);
   // API returns Attribute[] (with id field), not bindings (with attribute_id)
   const safeAttrs: Attribute[] = catAttrs ?? [];
-  const attributeIds = safeAttrs.map((ca) => ca.id).filter(Boolean) as string[];
+  const attributeIds = safeAttrs.map((ca) => ca.id).filter((id): id is number => id != null);
 
   // Load default options from category attributes
-  const defaultOptions: Record<string, string[]> = {};
+  const defaultOptions: Record<number, number[]> = {};
   safeAttrs.forEach((ca) => {
-    const defaults = ca.default_option_indices?.map(String) ?? [];
-    if (defaults.length > 0 && ca.id) {
+    const defaults = ca.default_option_indices ?? [];
+    if (defaults.length > 0 && ca.id != null) {
       defaultOptions[ca.id] = defaults;
     }
   });

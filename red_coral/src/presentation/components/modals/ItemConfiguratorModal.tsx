@@ -4,7 +4,7 @@ import { X, Check } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { AttributeSelector } from './AttributeSelector';
 import { ItemActionPanel } from '../ui/ItemActionPanel';
-import { Attribute, AttributeOption, ProductAttribute, EmbeddedSpec } from '@/core/domain/types';
+import { Attribute, AttributeOption, ProductAttribute, ProductSpec } from '@/core/domain/types';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
 
 interface ItemConfiguratorModalProps {
@@ -24,8 +24,8 @@ interface ItemConfiguratorModalProps {
   selections: Map<string, Map<string, number>>;
   onAttributeSelect: (attributeId: string, options: Map<string, number>) => void;
 
-  // Specification Selection (embedded specs, use index as ID)
-  specifications?: EmbeddedSpec[];
+  // Specification Selection (product specs, use index as ID)
+  specifications?: ProductSpec[];
   hasMultiSpec?: boolean;
   selectedSpecId?: string | null;
   onSpecificationSelect?: (specId: string) => void;
@@ -78,8 +78,8 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
   // Sort attributes by binding display_order, then by attribute display_order
   const sortedAttributes = useMemo(() => {
     return [...attributes].sort((a, b) => {
-      const bindA = bindings.find(bd => bd.out === a.id);
-      const bindB = bindings.find(bd => bd.out === b.id);
+      const bindA = bindings.find(bd => bd.attribute_id === a.id);
+      const bindB = bindings.find(bd => bd.attribute_id === b.id);
       return (bindA?.display_order ?? a.display_order) - (bindB?.display_order ?? b.display_order);
     });
   }, [attributes, bindings]);
@@ -202,7 +202,7 @@ export const ItemConfiguratorModal: React.FC<ItemConfiguratorModalProps> = ({
                     const options = getSortedOptions(attrId);
                     const selectedOptions = selections.get(attrId) || new Map<string, number>();
                     // binding.to is the attribute ID in AttributeBinding relation
-                    const binding = bindings?.find(b => b.out === attr.id);
+                    const binding = bindings?.find(b => b.attribute_id === attr.id);
 
                     // Logic to find defaults for display (visual cues in AttributeSelector)
                     const defaultOptionIds = attr.default_option_indices?.map(String) ?? [];

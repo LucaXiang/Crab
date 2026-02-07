@@ -29,13 +29,13 @@ export async function createTag(data: CreateTagInput): Promise<Tag> {
 /**
  * Update an existing tag
  */
-export async function updateTag(id: string, data: UpdateTagInput): Promise<Tag> {
+export async function updateTag(id: number, data: UpdateTagInput): Promise<Tag> {
   return await getApi().updateTag(id, data);
 }
 
 /**
  * Delete a tag
  */
-export async function deleteTag(id: string): Promise<void> {
+export async function deleteTag(id: number): Promise<void> {
   await getApi().deleteTag(id);
 }

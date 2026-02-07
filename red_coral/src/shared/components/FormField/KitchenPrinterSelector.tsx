@@ -4,8 +4,8 @@ import { selectClass } from './FormField';
 import { usePrintDestinationStore } from '@/core/stores/resources';
 
 export interface KitchenPrinterSelectorProps {
-  value: string | number | null | undefined;
-  onChange: (value: string | null) => void;
+  value: number | null | undefined;
+  onChange: (value: number | null) => void;
   label?: string;
   t: (key: string) => string;
 }
@@ -24,7 +24,7 @@ export const KitchenPrinterSelector: React.FC<KitchenPrinterSelectorProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
-    onChange(val || null);
+    onChange(val ? Number(val) : null);
   };
 
   return (

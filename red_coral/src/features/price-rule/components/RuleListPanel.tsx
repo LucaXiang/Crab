@@ -7,8 +7,8 @@ import { calculatePriority, getStackingMode } from '../utils';
 
 interface RuleListPanelProps {
   rules: PriceRule[];
-  selectedRuleId: string | null;
-  onSelectRule: (id: string) => void;
+  selectedRuleId: number | null;
+  onSelectRule: (id: number) => void;
   searchQuery: string;
 }
 
@@ -21,8 +21,8 @@ const PRODUCT_SCOPE_ICONS: Record<string, React.ElementType> = {
 };
 
 const ZONE_ICONS: Record<string, React.ElementType> = {
-  'zone:all': Globe,
-  'zone:retail': ShoppingCart,
+  'all': Globe,
+  'retail': ShoppingCart,
 };
 
 // Day keys for i18n (Sunday = 0)
@@ -53,12 +53,10 @@ export const RuleListPanel: React.FC<RuleListPanelProps> = ({
 
   // Get zone display name
   const getZoneName = (zoneScope: string): string => {
-    if (zoneScope === 'zone:all') return t('settings.price_rule.zone.all');
-    if (zoneScope === 'zone:retail') return t('settings.price_rule.zone.retail');
-    // Extract zone ID from "zone:xxx" format
-    const zoneId = zoneScope.replace('zone:', '');
-    const zone = zones.find(z => z.id === zoneId || z.id === `zone:${zoneId}`);
-    return zone?.name || zoneId;
+    if (zoneScope === 'all') return t('settings.price_rule.zone.all');
+    if (zoneScope === 'retail') return t('settings.price_rule.zone.retail');
+    const zone = zones.find(z => String(z.id) === zoneScope);
+    return zone?.name || zoneScope;
   };
 
   // Get zone icon

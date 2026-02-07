@@ -426,7 +426,7 @@ export const UserManagement: React.FC = React.memo(() => {
         data={filteredUsers}
         columns={columns}
         loading={isLoading}
-        getRowKey={(user) => user.id}
+        getRowKey={(user) => String(user.id)}
         emptyText={t('common.empty.no_data')}
         themeColor="blue"
       />

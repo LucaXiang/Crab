@@ -10,8 +10,8 @@ import type { ProductScope } from '@/core/domain/types/api';
 interface TargetPickerProps {
   isOpen: boolean;
   productScope: ProductScope;
-  selectedTarget: string | null;
-  onSelect: (target: string) => void;
+  selectedTarget: number | null;
+  onSelect: (target: number) => void;
   onClose: () => void;
 }
 
@@ -32,7 +32,7 @@ export const TargetPicker: React.FC<TargetPickerProps> = ({
   // Build and filter items based on scope and search
   const items = useMemo(() => {
     type Item = {
-      id: string;
+      id: number;
       name: string;
       icon: React.ElementType;
       subtitle?: string;
@@ -103,7 +103,7 @@ export const TargetPicker: React.FC<TargetPickerProps> = ({
     }
   };
 
-  const handleSelect = (id: string) => {
+  const handleSelect = (id: number) => {
     onSelect(id);
     onClose();
   };

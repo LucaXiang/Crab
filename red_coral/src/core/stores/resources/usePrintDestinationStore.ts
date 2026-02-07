@@ -5,11 +5,9 @@ import type { SyncPayload } from '../factory/createResourceStore';
 
 const getApi = () => createTauriClient();
 
-type PrintDestinationEntity = PrintDestination & { id: string };
-
 interface PrintDestinationStore {
   // State
-  items: PrintDestinationEntity[];
+  items: PrintDestination[];
   isLoading: boolean;
   isLoaded: boolean;
   error: string | null;
@@ -17,19 +15,19 @@ interface PrintDestinationStore {
 
   // Core actions
   fetchAll: (force?: boolean) => Promise<void>;
-  applySync: (payload: SyncPayload<PrintDestinationEntity>) => void;
-  getById: (id: string) => PrintDestinationEntity | undefined;
+  applySync: (payload: SyncPayload<PrintDestination>) => void;
+  getById: (id: number) => PrintDestination | undefined;
   clear: () => void;
 
   // CRUD actions
-  create: (data: PrintDestinationCreate) => Promise<PrintDestinationEntity>;
-  update: (id: string, data: PrintDestinationUpdate) => Promise<PrintDestinationEntity>;
-  remove: (id: string) => Promise<void>;
+  create: (data: PrintDestinationCreate) => Promise<PrintDestination>;
+  update: (id: number, data: PrintDestinationUpdate) => Promise<PrintDestination>;
+  remove: (id: number) => Promise<void>;
 
   // Optimistic update helpers
-  optimisticAdd: (item: PrintDestinationEntity) => void;
-  optimisticUpdate: (id: string, updater: (item: PrintDestinationEntity) => PrintDestinationEntity) => void;
-  optimisticRemove: (id: string) => void;
+  optimisticAdd: (item: PrintDestination) => void;
+  optimisticUpdate: (id: number, updater: (item: PrintDestination) => PrintDestination) => void;
+  optimisticRemove: (id: number) => void;
 }
 
 export const usePrintDestinationStore = create<PrintDestinationStore>((set, get) => ({
@@ -48,7 +46,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
 
     set({ isLoading: true, error: null });
     try {
-      const destinations = await getApi().listPrintDestinations() as PrintDestinationEntity[];
+      const destinations = await getApi().listPrintDestinations();
       const safeDestinations = destinations ?? [];
       safeDestinations.sort((a, b) => a.name.localeCompare(b.name));
       set({ items: safeDestinations, isLoading: false, isLoaded: true });
@@ -59,7 +57,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
     }
   },
 
-  applySync: (payload: SyncPayload<PrintDestinationEntity>) => {
+  applySync: (payload: SyncPayload<PrintDestination>) => {
     const state = get();
     if (!state.isLoaded) return;
 
@@ -120,7 +118,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
   create: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      const newDestination = await getApi().createPrintDestination(data) as PrintDestinationEntity;
+      const newDestination = await getApi().createPrintDestination(data);
       // 直接更新 items，不依赖 fetchAll（避免 isLoading 互锁）
       set((state) => ({
         items: [...state.items, newDestination],
@@ -138,7 +136,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
   update: async (id, data) => {
     set({ isLoading: true, error: null });
     try {
-      const updated = await getApi().updatePrintDestination(id, data) as PrintDestinationEntity;
+      const updated = await getApi().updatePrintDestination(id, data);
       // 直接替换 items 中对应项
       set((state) => ({
         items: state.items.map((item) => (item.id === id ? updated : item)),
@@ -191,7 +189,7 @@ export const usePrintDestinationStore = create<PrintDestinationStore>((set, get)
 // Convenience hooks
 export const usePrintDestinations = () => usePrintDestinationStore((state) => state.items);
 export const usePrintDestinationsLoading = () => usePrintDestinationStore((state) => state.isLoading);
-export const usePrintDestinationById = (id: string) =>
+export const usePrintDestinationById = (id: number) =>
   usePrintDestinationStore((state) => state.items.find((p) => p.id === id));
 
 // CRUD action hooks

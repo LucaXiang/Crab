@@ -29,10 +29,10 @@ interface ShiftStore {
   staleShift: Shift | null;
 
   // Actions
-  fetchCurrentShift: (operatorId: string) => Promise<Shift | null>;
+  fetchCurrentShift: (operatorId: number) => Promise<Shift | null>;
   openShift: (data: ShiftCreate) => Promise<Shift>;
-  closeShift: (shiftId: string, data: ShiftClose) => Promise<Shift>;
-  forceCloseShift: (shiftId: string, data: ShiftForceClose) => Promise<Shift>;
+  closeShift: (shiftId: number, data: ShiftClose) => Promise<Shift>;
+  forceCloseShift: (shiftId: number, data: ShiftForceClose) => Promise<Shift>;
   clearShift: () => void;
   setNeedsOpenShift: (needs: boolean) => void;
   setForceClosedMessage: (message: string | null) => void;
@@ -51,7 +51,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
   /**
    * Fetch current open shift for operator
    */
-  fetchCurrentShift: async (operatorId: string) => {
+  fetchCurrentShift: async (operatorId: number) => {
     set({ isLoading: true, error: null });
     try {
       const shift = await getApi().getCurrentShift(operatorId);
@@ -95,7 +95,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
   /**
    * Close current shift (正常收班)
    */
-  closeShift: async (shiftId: string, data: ShiftClose) => {
+  closeShift: async (shiftId: number, data: ShiftClose) => {
     set({ isLoading: true, error: null });
     try {
       const shift = await getApi().closeShift(shiftId, data);
@@ -114,7 +114,7 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
   /**
    * Force close shift (强制关闭)
    */
-  forceCloseShift: async (shiftId: string, data: ShiftForceClose) => {
+  forceCloseShift: async (shiftId: number, data: ShiftForceClose) => {
     set({ isLoading: true, error: null });
     try {
       const shift = await getApi().forceCloseShift(shiftId, data);

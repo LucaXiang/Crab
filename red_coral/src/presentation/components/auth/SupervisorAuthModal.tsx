@@ -5,10 +5,10 @@ import { useI18n } from '@/hooks/useI18n';
 import { User } from '@/core/domain/types';
 
 interface EscalateAuthorizer {
-  id: string;
+  id: number;
   username: string;
   display_name: string;
-  role_id: string;
+  role_id: number;
   role_name: string;
   permissions: string[];
   is_system: boolean;

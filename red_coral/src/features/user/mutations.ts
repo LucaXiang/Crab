@@ -8,7 +8,7 @@
 import { useAuthStore } from '@/core/stores/auth/useAuthStore';
 import { invokeApi } from '@/infrastructure/api';
 import type { User, Role } from '@/core/domain/types';
-import type { RoleListData } from '@/core/domain/types/api';
+import type { RoleListData } from '@/core/domain/types';
 
 /**
  * 获取用户列表
@@ -24,7 +24,7 @@ export async function createUser(params: {
   username: string;
   password: string;
   displayName: string;
-  role: string;
+  role_id: number;
 }): Promise<User> {
   return useAuthStore.getState().createUser(params);
 }
@@ -33,10 +33,10 @@ export async function createUser(params: {
  * 更新用户
  */
 export async function updateUser(
-  userId: string,
+  userId: number,
   params: {
     displayName?: string;
-    role?: string;
+    role_id?: number;
     isActive?: boolean;
   }
 ): Promise<User> {
@@ -46,14 +46,14 @@ export async function updateUser(
 /**
  * 删除用户
  */
-export async function deleteUser(userId: string): Promise<void> {
+export async function deleteUser(userId: number): Promise<void> {
   return useAuthStore.getState().deleteUser(userId);
 }
 
 /**
  * 重置用户密码
  */
-export async function resetPassword(userId: string, newPassword: string): Promise<void> {
+export async function resetPassword(userId: number, newPassword: string): Promise<void> {
   return useAuthStore.getState().resetPassword(userId, newPassword);
 }
 
@@ -68,13 +68,13 @@ export async function fetchRoles(): Promise<Role[]> {
 /**
  * 禁用用户（软删除）
  */
-export async function disableUser(userId: string): Promise<User> {
+export async function disableUser(userId: number): Promise<User> {
   return updateUser(userId, { isActive: false });
 }
 
 /**
  * 启用用户
  */
-export async function enableUser(userId: string): Promise<User> {
+export async function enableUser(userId: number): Promise<User> {
   return updateUser(userId, { isActive: true });
 }

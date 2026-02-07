@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CartItem, Attribute, AttributeOption, ProductAttribute, ItemOption, EmbeddedSpec } from '@/core/domain/types';
+import { CartItem, Attribute, AttributeOption, ProductAttribute, ItemOption, ProductSpec } from '@/core/domain/types';
 import { useI18n } from '@/hooks/useI18n';
 import { useProductStore } from '@/features/product';
 import { toast } from '../Toast';
@@ -15,7 +15,7 @@ interface CartItemDetailModalProps {
 
 export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item, onClose, onUpdate, onRemove, readOnlyAttributes = false }) => {
   const { t } = useI18n();
-  const productExternalId = useProductStore(state => state.items.find(p => p.id === item.id)?.external_id);
+  const productExternalId = useProductStore(state => state.items.find(p => String(p.id) === item.id)?.external_id);
   // 直接用服务端提供的 unpaid_quantity
   const unpaidQuantity = item.unpaid_quantity ?? item.quantity;
   const [quantity, setQuantity] = useState(unpaidQuantity);
@@ -23,7 +23,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
   const [discountAuthorizer, setDiscountAuthorizer] = useState<{ id: string; name: string } | undefined>();
 
   // Specification State
-  const [specifications, setSpecifications] = useState<EmbeddedSpec[]>([]);
+  const [specifications, setSpecifications] = useState<ProductSpec[]>([]);
   const [selectedSpecId, setSelectedSpecId] = useState<string | undefined>(item.selected_specification?.id);
   // Local override for base price (null = use spec/default price)
   const [localBasePrice, setLocalBasePrice] = useState<number | null>(null);
@@ -43,7 +43,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
         setIsLoadingAttributes(true);
         try {
             // Get full product data from store (ProductFull includes attributes)
-            const productFull = useProductStore.getState().getById(String(item.id));
+            const productFull = useProductStore.getState().getById(Number(item.id));
             if (!productFull) {
               console.error('Product not found in store:', item.id);
               setIsLoadingAttributes(false);
@@ -71,9 +71,9 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
             setAttributes(attributeList);
 
             const allBindings: ProductAttribute[] = attrBindings.map(binding => ({
-              id: binding.id ?? null,
-              in: binding.is_inherited ? productFull.category : String(item.id),
-              out: String(binding.attribute.id),
+              id: binding.id,
+              owner_id: binding.is_inherited ? productFull.category_id : Number(item.id),
+              attribute_id: binding.attribute.id,
               is_required: binding.is_required,
               display_order: binding.display_order,
               default_option_indices: binding.default_option_indices,
@@ -109,7 +109,7 @@ export const CartItemDetailModal = React.memo<CartItemDetailModalProps>(({ item,
                      const attrId = String(attr.id);
                      if (!initialSelections.has(attrId)) {
                          // Priority: binding override > attribute default
-                         const binding = allBindings.find(b => b.out === attrId);
+                         const binding = allBindings.find(b => String(b.attribute_id) === attrId);
                          const defaults = binding?.default_option_indices ?? attr.default_option_indices;
                          if (defaults && defaults.length > 0) {
                              let defaultIdxs = [...defaults];

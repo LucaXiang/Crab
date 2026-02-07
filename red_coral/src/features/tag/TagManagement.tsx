@@ -192,7 +192,7 @@ export const TagManagement: React.FC = React.memo(() => {
         data={filteredItems}
         columns={columns}
         loading={loading}
-        getRowKey={(item) => item.id || item.name}
+        getRowKey={(item) => String(item.id)}
         onEdit={canManageTags ? (item) => openModal('TAG', 'EDIT', item) : undefined}
         onDelete={canManageTags ? (item) => openModal('TAG', 'DELETE', item) : undefined}
         emptyText={t('common.empty.no_data')}

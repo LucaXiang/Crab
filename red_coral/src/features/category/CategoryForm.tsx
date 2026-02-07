@@ -8,13 +8,13 @@ import type { PrintState } from '@/core/domain/types';
 
 interface CategoryFormData {
   name: string;
-  print_destinations?: string[];
+  print_destinations?: number[];
   is_kitchen_print_enabled?: PrintState;  // 0=disabled, 1=enabled
   is_label_print_enabled?: PrintState;    // 0=disabled, 1=enabled
-  selected_attribute_ids?: string[];
-  attribute_default_options?: Record<string, string | string[]>;
+  selected_attribute_ids?: number[];
+  attribute_default_options?: Record<number, number | number[]>;
   is_virtual?: boolean;
-  tag_ids?: string[];
+  tag_ids?: number[];
   match_mode?: 'any' | 'all';
   is_display?: boolean;
 }
@@ -49,7 +49,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ formData, onFieldCha
   const isLabelPrintEnabled: PrintState = formData.is_label_print_enabled === 0 ? 0 : (formData.is_label_print_enabled ?? 1);
 
   // Toggle tag selection
-  const handleTagToggle = (tagId: string) => {
+  const handleTagToggle = (tagId: number) => {
     const newTagIds = selectedTagIds.includes(tagId)
       ? selectedTagIds.filter((id) => id !== tagId)
       : [...selectedTagIds, tagId];

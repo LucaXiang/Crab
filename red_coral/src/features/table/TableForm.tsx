@@ -6,7 +6,7 @@ import { Zone } from '@/core/domain/types';
 interface TableFormData {
   name: string;
   capacity: number;
-  zone: string;
+  zone_id?: number;
   is_active?: boolean;
 }
 
@@ -44,8 +44,8 @@ export const TableForm: React.FC<TableFormProps> = ({ formData, zones, onFieldCh
 
           <SelectField
             label={t('table.zones')}
-            value={formData.zone}
-            onChange={(value) => onFieldChange('zone', value as string)}
+            value={formData.zone_id}
+            onChange={(value) => onFieldChange('zone_id', value as number)}
             options={zones.map((z) => ({ value: z.id, label: z.name }))}
             required
           />

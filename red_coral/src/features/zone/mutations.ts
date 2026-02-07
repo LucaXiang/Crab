@@ -28,8 +28,8 @@ export async function createZone(input: CreateZoneInput): Promise<void> {
 /**
  * Update an existing zone
  */
-export async function updateZone(id: string, input: UpdateZoneInput): Promise<void> {
-  await getApi().updateZone(String(id), {
+export async function updateZone(id: number, input: UpdateZoneInput): Promise<void> {
+  await getApi().updateZone(id, {
     name: input.name,
     description: input.description,
   });
@@ -40,8 +40,8 @@ export async function updateZone(id: string, input: UpdateZoneInput): Promise<vo
 /**
  * Delete a zone
  */
-export async function deleteZone(id: string): Promise<void> {
-  await getApi().deleteZone(String(id));
+export async function deleteZone(id: number): Promise<void> {
+  await getApi().deleteZone(id);
   // Refresh zones from server
   await useZoneStore.getState().fetchAll(true);
 }

@@ -43,7 +43,7 @@ export const RolePermissionsEditor: React.FC = () => {
   const [newRoleDesc, setNewRoleDesc] = useState('');
 
   // Delete Role State
-  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; roleId: string; roleName: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; roleId: number; roleName: string } | null>(null);
 
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 

@@ -23,7 +23,7 @@ import { formatCurrency } from '@/utils/currency';
 // Extended option type with index for UI (matches store type)
 interface AttributeOptionWithIndex extends AttributeOption {
   index: number;
-  attributeId: string;
+  attributeId: number;
 }
 
 export const AttributeManagement: React.FC = React.memo(() => {
@@ -48,7 +48,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Selected attribute (Master-Detail)
-  const [selectedAttributeId, setSelectedAttributeId] = useState<string | null>(null);
+  const [selectedAttributeId, setSelectedAttributeId] = useState<number | null>(null);
 
   // Confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -75,7 +75,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
   // Get selected attribute
   const selectedAttribute = useMemo(() => {
     if (!selectedAttributeId) return null;
-    return attributes.find(a => String(a.id) === selectedAttributeId) ?? null;
+    return attributes.find(a => a.id === selectedAttributeId) ?? null;
   }, [attributes, selectedAttributeId]);
 
   // Get options for selected attribute
@@ -99,14 +99,14 @@ export const AttributeManagement: React.FC = React.memo(() => {
   // Auto-select first attribute if none selected
   useEffect(() => {
     if (!selectedAttributeId && filteredAttributes.length > 0) {
-      setSelectedAttributeId(String(filteredAttributes[0].id));
+      setSelectedAttributeId(filteredAttributes[0].id);
     }
   }, [filteredAttributes, selectedAttributeId]);
 
   // Clear selection if selected attribute is deleted
   useEffect(() => {
-    if (selectedAttributeId && !attributes.find(a => String(a.id) === selectedAttributeId)) {
-      setSelectedAttributeId(filteredAttributes.length > 0 ? String(filteredAttributes[0].id) : null);
+    if (selectedAttributeId && !attributes.find(a => a.id === selectedAttributeId)) {
+      setSelectedAttributeId(filteredAttributes.length > 0 ? filteredAttributes[0].id : null);
     }
   }, [attributes]);
 
@@ -129,7 +129,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
-          await deleteAttribute(String(attr.id));
+          await deleteAttribute(attr.id);
           toast.success(t('settings.user.message.delete_success'));
         } catch (error) {
           console.error('Delete attribute error:', error);
@@ -202,7 +202,7 @@ export const AttributeManagement: React.FC = React.memo(() => {
 
   // Check if attribute has special features
   const getAttributeFeatures = (attr: Attribute) => {
-    const options = allOptions.get(String(attr.id)) || [];
+    const options = allOptions.get(attr.id) || [];
     const hasPrice = options.some(o => o.price_modifier !== 0);
     const hasQuantity = options.some(o => o.enable_quantity);
     return { hasPrice, hasQuantity };
@@ -263,15 +263,14 @@ export const AttributeManagement: React.FC = React.memo(() => {
                 ) : (
                   <div className="py-1">
                     {filteredAttributes.map((attr) => {
-                      const attrId = String(attr.id);
-                      const isSelected = selectedAttributeId === attrId;
+                      const isSelected = selectedAttributeId === attr.id;
                       const { hasPrice, hasQuantity } = getAttributeFeatures(attr);
                       const optionCount = attr.options?.length ?? 0;
 
                       return (
                         <div
-                          key={attrId}
-                          onClick={() => setSelectedAttributeId(attrId)}
+                          key={attr.id}
+                          onClick={() => setSelectedAttributeId(attr.id)}
                           className={`
                             mx-2 my-1 px-3 py-2.5 rounded-lg cursor-pointer transition-all
                             ${isSelected

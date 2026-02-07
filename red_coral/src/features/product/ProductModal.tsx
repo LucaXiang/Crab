@@ -33,7 +33,7 @@ export const ProductModal: React.FC = React.memo(() => {
   const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [inheritedAttributeIds, setInheritedAttributeIds] = useState<string[]>([]);
+  const [inheritedAttributeIds, setInheritedAttributeIds] = useState<number[]>([]);
   const defaultCategorySet = useRef(false);
   const initialCategoryRef = useRef<string | null>(null);
 
@@ -60,8 +60,8 @@ export const ProductModal: React.FC = React.memo(() => {
       }
       // Auto-select first category if none selected and creating a new product
       // 使用 setAsyncFormData 同时更新 formData 和 formInitialData，避免误判 dirty
-      if (categories.length > 0 && modal.action === 'CREATE' && !formData.category && !defaultCategorySet.current) {
-        setAsyncFormData({ category: categories[0].id ?? '' });
+      if (categories.length > 0 && modal.action === 'CREATE' && !formData.category_id && !defaultCategorySet.current) {
+        setAsyncFormData({ category_id: categories[0].id });
         defaultCategorySet.current = true;
       }
     }
@@ -92,8 +92,8 @@ export const ProductModal: React.FC = React.memo(() => {
   // Fetch inherited attribute IDs when category changes
   // For EDIT mode, skip the first run (server-computed data is authoritative)
   useEffect(() => {
-    if (!isProductModal || !formData.category) return;
-    const categoryStr = String(formData.category);
+    if (!isProductModal || !formData.category_id) return;
+    const categoryStr = String(formData.category_id);
     if (initialCategoryRef.current === null) {
       // First time category is set — record it, don't fetch (server data is authoritative for EDIT)
       initialCategoryRef.current = categoryStr;
@@ -103,14 +103,14 @@ export const ProductModal: React.FC = React.memo(() => {
     const fetchInherited = async () => {
       try {
         const api = createTauriClient();
-        const catAttrs = await api.listCategoryAttributes(categoryStr);
-        setInheritedAttributeIds(catAttrs.map((a) => a.id).filter(Boolean) as string[]);
+        const catAttrs = await api.listCategoryAttributes(Number(categoryStr));
+        setInheritedAttributeIds(catAttrs.map((a) => a.id).filter((id): id is number => id != null));
       } catch {
         setInheritedAttributeIds([]);
       }
     };
     fetchInherited();
-  }, [isProductModal, formData.category]);
+  }, [isProductModal, formData.category_id]);
 
   if (!isProductModal) return null;
 
@@ -145,7 +145,7 @@ export const ProductModal: React.FC = React.memo(() => {
   const handleDelete = async () => {
     if (!data?.id) return;
     try {
-      await deleteProduct(String(data.id));
+      await deleteProduct(data.id);
       toast.success(t('settings.product.product_deleted'));
       closeModal();
     } catch (e: unknown) {
@@ -174,7 +174,7 @@ export const ProductModal: React.FC = React.memo(() => {
       return;
     }
 
-    if (!formData.category) {
+    if (!formData.category_id) {
       if (categories.length === 0) {
         toast.error(t('settings.category.create_first'));
       } else {
@@ -186,7 +186,7 @@ export const ProductModal: React.FC = React.memo(() => {
     setIsSaving(true);
     try {
       // Save the selected category for next time
-      const category = categories.find(c => String(c.id) === String(formData.category));
+      const category = categories.find(c => c.id === formData.category_id);
       if (category) {
         setLastSelectedCategory(category.name);
       }
@@ -195,7 +195,7 @@ export const ProductModal: React.FC = React.memo(() => {
         await createProduct(formData, categories);
         toast.success(t('settings.product.message.created'));
       } else if (data?.id) {
-        await updateProduct(String(data.id), formData);
+        await updateProduct(data.id, formData);
         toast.success(t('settings.product.message.updated'));
       }
 
@@ -240,7 +240,7 @@ export const ProductModal: React.FC = React.memo(() => {
           name: formData.name,
           receipt_name: formData.receipt_name,
           price: rootSpec?.price ?? 0,
-          category: formData.category,
+          category_id: formData.category_id,
           image: formData.image ?? '',
           externalId: formData.externalId,
           tax_rate: formData.tax_rate ?? 0,
@@ -254,7 +254,7 @@ export const ProductModal: React.FC = React.memo(() => {
           tags: formData.tags,
         }}
         categories={categories}
-        onFieldChange={setFormField}
+        onFieldChange={setFormField as any}
         onSelectImage={handleSelectImage}
         t={t}
         inheritedAttributeIds={inheritedAttributeIds}

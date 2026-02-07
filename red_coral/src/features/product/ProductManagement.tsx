@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Utensils, Plus, Filter, Search, ListChecks, Edit3, Trash2, Settings } from 'lucide-react';
 import { useI18n } from '@/hooks/useI18n';
 import { ProtectedGate } from '@/presentation/components/auth/ProtectedGate';
-import { Permission, PrintState, EmbeddedSpec } from '@/core/domain/types';
+import { Permission, PrintState, ProductSpec } from '@/core/domain/types';
 import { useCanDeleteProduct, useCanUpdateProduct } from '@/hooks/usePermission';
 import {
   useSettingsModal,
@@ -19,14 +19,14 @@ import { toast } from '@/presentation/components/Toast';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ProductImage } from './ProductImage';
 import { formatCurrency } from '@/utils/currency';
-import { displayThingId } from '@/utils/formatting';
+import { displayId } from '@/utils/formatting';
 import { SpecificationManagementModal } from './SpecificationManagementModal';
 
 // ProductItem matches Product type from models.ts (snake_case naming)
 interface ProductItem {
-  id: string;
+  id: number;
   name: string;
-  category: string;
+  category_id: number;
   image: string;
   receipt_name?: string | null;
   sort_order?: number;
@@ -36,7 +36,7 @@ interface ProductItem {
   is_label_print_enabled?: PrintState;
   is_active?: boolean;
   external_id?: number | null;
-  specs?: EmbeddedSpec[];
+  specs?: ProductSpec[];
 }
 
 export const ProductManagement: React.FC = React.memo(() => {
@@ -70,7 +70,7 @@ export const ProductManagement: React.FC = React.memo(() => {
   const filteredProducts = useMemo(() => {
     let result = products;
     if (categoryFilter !== 'all') {
-      result = result.filter((p) => p.category === categoryFilter);
+      result = result.filter((p) => String(p.category_id) === categoryFilter);
     }
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -119,7 +119,7 @@ export const ProductManagement: React.FC = React.memo(() => {
       onConfirm: async () => {
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
         try {
-          const ids = items.map((item) => item.id).filter((id): id is string => id != null);
+          const ids = items.map((item) => item.id).filter((id): id is number => id != null);
           await getApi().bulkDeleteProducts(ids);
           // Optimistic update: remove from ProductStore
           items.forEach((item) => {
@@ -155,7 +155,7 @@ export const ProductManagement: React.FC = React.memo(() => {
                   </div>
                 )}
                 <div className="text-xs text-gray-400 mt-0.5">
-                  id: {displayThingId(item.id)}
+                  id: {displayId(item.id)}
                 </div>
               </div>
             </div>
@@ -277,7 +277,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         header: t('settings.product.header.category'),
         width: '120px',
         render: (item) => {
-          const categoryName = categories.find(c => String(c.id) === String(item.category))?.name || item.category;
+          const categoryName = categories.find(c => c.id === item.category_id)?.name || String(item.category_id);
           return (
             <span className="inline-flex items-center px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
               {categoryName}
@@ -426,7 +426,7 @@ export const ProductManagement: React.FC = React.memo(() => {
         data={filteredProducts}
         columns={columns}
         loading={loading}
-        getRowKey={(item) => item.id}
+        getRowKey={(item) => String(item.id)}
         onBatchDelete={canDeleteProduct ? handleBatchDelete : undefined}
         emptyText={t('common.empty.no_data')}
         pageSize={5}

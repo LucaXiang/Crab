@@ -55,7 +55,7 @@ export const ZoneModal: React.FC = React.memo(() => {
   const handleDelete = async () => {
     if (!data?.id) return;
     try {
-      await deleteZone(String(data.id));
+      await deleteZone(data.id);
       toast.success(t('settings.zone.zone_deleted'));
       closeModal();
     } catch (e) {
@@ -86,7 +86,7 @@ export const ZoneModal: React.FC = React.memo(() => {
         });
         toast.success(t('settings.zone.message.created'));
       } else if (data?.id) {
-        await updateZone(String(data.id), {
+        await updateZone(data.id, {
           name: zonePayload.name,
           description: zonePayload.description,
         });

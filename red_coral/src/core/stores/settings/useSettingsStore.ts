@@ -1,7 +1,7 @@
 import { persist } from 'zustand/middleware';
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import type { EmbeddedSpec, Category, Product, Tag, DiningTable, Zone, PrintState } from '@/core/domain/types';
+import type { ProductSpec, Category, Product, Tag, DiningTable, Zone, PrintState } from '@/core/domain/types';
 
 /**
  * Settings UI Store - 纯 UI 状态管理
@@ -21,7 +21,7 @@ type ModalEntity = 'TABLE' | 'ZONE' | 'PRODUCT' | 'CATEGORY' | 'TAG';
 /** TABLE 编辑数据 - API 返回 + 创建时默认值 */
 interface TableEditData extends Partial<DiningTable> {
   /** 创建时使用的默认 Zone ID */
-  defaultZoneId?: string;
+  defaultZoneId?: number;
 }
 
 /** ZONE 编辑数据 */
@@ -32,15 +32,15 @@ interface ZoneEditData extends Partial<Zone> {
 /** PRODUCT 编辑数据 - API 返回 + 创建时默认值 */
 interface ProductEditData extends Partial<Product> {
   /** 创建时使用的默认 Category ID */
-  defaultCategoryId?: string;
+  defaultCategoryId?: number;
 }
 
 /** CATEGORY 编辑数据 - API 返回 + 属性关联 */
 interface CategoryEditData extends Partial<Category> {
   /** 已绑定的属性 ID 列表 */
-  selectedAttributeIds?: string[];
+  selectedAttributeIds?: number[];
   /** 属性默认选项映射 */
-  attributeDefaultOptions?: Record<string, string[]>;
+  attributeDefaultOptions?: Record<number, number[]>;
 }
 
 /** TAG 编辑数据 */
@@ -73,37 +73,37 @@ interface ModalState<E extends ModalEntity = ModalEntity> {
  */
 interface FormData {
   // === Common ===
-  id?: string;
+  id?: number;
   name: string;
 
   // === DiningTable ===
-  zone?: string;           // Zone ID
+  zone_id?: number;           // Zone ID
   capacity?: number;
 
   // === Product ===
-  category?: string;       // Category ID
+  category_id?: number;       // Category ID
   image?: string;
   sort_order?: number;
   tax_rate?: number;
   receipt_name?: string;
   kitchen_print_name?: string;
   is_label_print_enabled?: PrintState;  // Product: -1=继承, 0=禁用, 1=启用
-  tags?: string[];         // Tag IDs
-  specs?: EmbeddedSpec[];  // 嵌入式规格
+  tags?: number[];         // Tag IDs
+  specs?: ProductSpec[];  // 嵌入式规格
   has_multi_spec?: boolean; // UI only: 是否多规格
   price?: number;          // UI only: derived from specs[root].price
   externalId?: number;     // UI only: product-level external_id
 
   // === Category & Product shared ===
   is_kitchen_print_enabled?: PrintState;  // Product: -1=继承, 0=禁用, 1=启用; Category: 0=禁用, 1=启用
-  print_destinations?: string[];  // Kitchen PrintDestination IDs (Category only)
-  label_print_destinations?: string[];  // Label PrintDestination IDs (Category only)
+  print_destinations?: number[];  // Kitchen PrintDestination IDs (Category only)
+  label_print_destinations?: number[];  // Label PrintDestination IDs (Category only)
   is_virtual?: boolean;
   is_display?: boolean;     // Virtual category display in menu
-  tag_ids?: string[];      // Virtual category tag filter
+  tag_ids?: number[];      // Virtual category tag filter
   match_mode?: 'any' | 'all';
-  selected_attribute_ids?: string[];  // UI only: 已选属性
-  attribute_default_options?: Record<string, string | string[]>;  // UI only
+  selected_attribute_ids?: number[];  // UI only: 已选属性
+  attribute_default_options?: Record<number, number | number[]>;  // UI only
 
   // === Tag ===
   color?: string;
@@ -162,10 +162,10 @@ const initialFormData: FormData = {
   id: undefined,
   name: '',
   // DiningTable
-  zone: '',
+  zone_id: undefined,
   capacity: 4,
   // Product
-  category: undefined,
+  category_id: undefined,
   image: '',
   sort_order: undefined,
   tax_rate: 10,
@@ -219,7 +219,7 @@ export const useSettingsStore = create<SettingsStore>()(
           formData = {
             ...formData,
             name: tableData?.name || '',
-            zone: tableData?.zone || tableData?.defaultZoneId || '',
+            zone_id: tableData?.zone_id ?? (tableData as TableEditData)?.defaultZoneId as number | undefined,
             capacity: tableData?.capacity ?? 4,
             is_active: tableData?.is_active ?? true,  // Default to active for new tables
           };
@@ -236,7 +236,7 @@ export const useSettingsStore = create<SettingsStore>()(
             ...formData,
             id: productData?.id ?? undefined,
             name: productData?.name || '',
-            category: productData?.category ?? productData?.defaultCategoryId,
+            category_id: productData?.category_id ?? productData?.defaultCategoryId,
             image: productData?.image || '',
             sort_order: productData?.sort_order,
             tax_rate: productData?.tax_rate ?? 10,
@@ -245,7 +245,7 @@ export const useSettingsStore = create<SettingsStore>()(
             is_kitchen_print_enabled: productData?.is_kitchen_print_enabled ?? -1,  // 默认继承分类
             is_label_print_enabled: productData?.is_label_print_enabled ?? -1,  // 默认继承分类
             is_active: productData?.is_active ?? true,  // Default to active for new products
-            tags: (productData?.tags || []).map((t) => t.id).filter(Boolean) as string[],
+            tags: (productData?.tags || []).map((t) => t.id).filter((id): id is number => id != null),
             specs: productData?.specs || [],
             has_multi_spec: (productData?.specs?.length ?? 0) > 1,
           };
@@ -421,13 +421,13 @@ function validateSettingsForm(entity: ModalEntity, formData: FormData): Record<s
   const errors: Record<string, string | undefined> = {};
   if (entity === 'TABLE') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.table.nameRequired';
-    if (!formData.zone?.trim()) errors.zone = 'settings.errors.table.zoneRequired';
+    if (!formData.zone_id) errors.zone_id = 'settings.errors.table.zoneRequired';
     if ((formData.capacity ?? 0) < 1) errors.capacity = 'settings.errors.table.capacityMin';
   } else if (entity === 'ZONE') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.zone.nameRequired';
   } else if (entity === 'PRODUCT') {
     if (!formData.name?.trim()) errors.name = 'settings.errors.product.nameRequired';
-    if (!formData.category) errors.category = 'settings.errors.product.categoryRequired';
+    if (!formData.category_id) errors.category_id = 'settings.errors.product.categoryRequired';
     // Check product-level external_id
     if (formData.externalId === undefined || formData.externalId === null) {
       errors.externalId = 'settings.external_id_required';
@@ -444,14 +444,14 @@ function computeIsDirty(entity: ModalEntity, next: FormData, initial: FormData):
   const pick = (o: FormData, keys: (keyof FormData)[]) => keys.map((k) => o[k]);
 
   if (entity === 'TABLE') {
-    const keys: (keyof FormData)[] = ['name', 'zone', 'capacity', 'is_active'];
+    const keys: (keyof FormData)[] = ['name', 'zone_id', 'capacity', 'is_active'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'ZONE') {
     const keys: (keyof FormData)[] = ['name', 'description', 'is_active'];
     return JSON.stringify(pick(next, keys)) !== JSON.stringify(pick(initial, keys));
   } else if (entity === 'PRODUCT') {
     const keys: (keyof FormData)[] = [
-      'name', 'category', 'image', 'tax_rate', 'receipt_name',
+      'name', 'category_id', 'image', 'tax_rate', 'receipt_name',
       'sort_order', 'kitchen_print_name', 'is_kitchen_print_enabled', 'is_label_print_enabled',
       'is_active', 'has_multi_spec', 'tags', 'specs',
       'selected_attribute_ids', 'attribute_default_options',

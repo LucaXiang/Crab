@@ -20,7 +20,7 @@ interface PrinterEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialData?: {
-    id?: string;
+    id?: number;
     name?: string;
     description?: string;
     printerType?: PrinterType;

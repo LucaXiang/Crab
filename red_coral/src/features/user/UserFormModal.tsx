@@ -31,7 +31,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
     username: '',
     password: '',
     displayName: '',
-    role: '' as string,
+    role_id: 0 as number,
     isActive: true,
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -46,7 +46,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         // Set default role if creating new user
         if (!editingUser && fetchedRoles.length > 0) {
            const defaultRole = fetchedRoles.find(r => r.name !== 'admin') || fetchedRoles[0];
-           setFormData(prev => ({ ...prev, role: defaultRole.name }));
+           setFormData(prev => ({ ...prev, role_id: defaultRole.id }));
         }
       })
       .catch((err) => {
@@ -61,7 +61,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         username: editingUser.username,
         password: '', // Don't populate password for editing
         displayName: editingUser.display_name || '',
-        role: String(editingUser.role_id),
+        role_id: editingUser.role_id,
         isActive: editingUser.is_active,
       });
     } else if (roles.length > 0) {
@@ -70,7 +70,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         username: '',
         password: '',
         displayName: '',
-        role: defaultRole.name,
+        role_id: defaultRole.id,
         isActive: true,
       });
     }
@@ -99,7 +99,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
         // Update user
         await updateUser(editingUser.id, {
           displayName: formData.displayName,
-          role: formData.role,
+          role_id: formData.role_id,
           isActive: formData.isActive,
         });
         toast.success(t("settings.user.message.update_success"));
@@ -109,7 +109,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           username: formData.username,
           password: formData.password,
           displayName: formData.displayName,
-          role: formData.role,
+          role_id: formData.role_id,
         });
         toast.success(t("settings.user.message.create_success"));
       }
@@ -210,8 +210,8 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
             <FormField label={t('settings.user.form.role')} required>
               <select
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                value={formData.role_id}
+                onChange={(e) => setFormData({ ...formData, role_id: Number(e.target.value) })}
                 disabled={isAdminUser}
                 className={selectClass}
               >
@@ -219,7 +219,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   let label = role.display_name;
                   if (role.name === 'admin') label = t('auth.roles.admin') || label;
                   return (
-                    <option key={role.id} value={role.name}>
+                    <option key={role.id} value={role.id}>
                       {label}
                     </option>
                   );

@@ -3,25 +3,14 @@ import { Server, Printer, Trash2, Edit2, Plus, Wifi, Monitor, ChefHat, Receipt, 
 import { useI18n } from '@/hooks/useI18n';
 import { usePrintDestinationStore } from '@/core/stores/resources';
 import { PrinterEditModal } from './PrinterEditModal';
-import type { PrintDestination } from '@/core/domain/types/api';
-
-// Inline type to avoid import issues
-interface EmbeddedPrinter {
-  printer_type: 'network' | 'driver';
-  printer_format: 'escpos' | 'label';
-  ip?: string;
-  port?: number;
-  driver_name?: string;
-  priority: number;
-  is_active: boolean;
-}
+import type { PrintDestination, Printer as PrinterModel } from '@/core/domain/types/api';
 
 interface PrintStationsTabProps {
   systemPrinters: string[];
 }
 
 // 获取打印机类型图标
-const getPrinterTypeIcon = (printer: EmbeddedPrinter) => {
+const getPrinterTypeIcon = (printer: PrinterModel) => {
   if (printer.printer_type === 'network') {
     return <Wifi size={12} className="text-blue-500" />;
   }
@@ -29,7 +18,7 @@ const getPrinterTypeIcon = (printer: EmbeddedPrinter) => {
 };
 
 // 获取打印机显示名称
-const getPrinterDisplayName = (printer: EmbeddedPrinter) => {
+const getPrinterDisplayName = (printer: PrinterModel) => {
   if (printer.printer_type === 'driver') {
     return printer.driver_name || 'Unknown Driver';
   }
@@ -59,7 +48,7 @@ export const PrintStationsTab: React.FC<PrintStationsTabProps> = ({ systemPrinte
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<{
-    id?: string;
+    id?: number;
     name?: string;
     description?: string;
     printerType?: 'driver' | 'network';

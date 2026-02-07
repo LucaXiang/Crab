@@ -58,7 +58,7 @@ export const TagModal: React.FC = React.memo(() => {
   const handleDelete = async () => {
     if (!data?.id) return;
     try {
-      await deleteTag(String(data.id));
+      await deleteTag(data.id);
       refreshData();
       toast.success(t('settings.tag.tag_deleted'));
       closeModal();
@@ -93,7 +93,7 @@ export const TagModal: React.FC = React.memo(() => {
         refreshData();
         toast.success(t('settings.tag.message.created'));
       } else if (data?.id) {
-        await updateTag(String(data.id), {
+        await updateTag(data.id, {
           name: tagPayload.name,
           color: tagPayload.color,
           display_order: tagPayload.display_order,

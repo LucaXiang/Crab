@@ -35,7 +35,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
     const [mode, setMode] = useState<ManagementMode>('MENU');
     const [operationAuthorizer, setOperationAuthorizer] = useState<{ id: string; name: string } | null>(null);
 
-    const [activeZoneId, setActiveZoneId] = useState<string>(zones[0]?.id || '');
+    const [activeZoneId, setActiveZoneId] = useState<number | 'ALL'>(zones[0]?.id ?? 'ALL');
     const allTables = useTables() as Table[];
     const [selectedTargetTable, setSelectedTargetTable] = useState<Table | null>(null);
 
@@ -46,16 +46,16 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
     // Ensure a valid initial zone when zones prop arrives or source order indicates a zone
     useEffect(() => {
         if (!zones || zones.length === 0) return;
-        if (activeZoneId) return;
-        const sourceOrder = heldOrders.find(o => o.table_id === sourceTable.id);
+        if (activeZoneId !== 'ALL') return;
+        const sourceOrder = heldOrders.find(o => o.table_id === String(sourceTable.id));
         const preferZone = sourceOrder?.zone_name ? zones.find(z => z.name === sourceOrder.zone_name) : undefined;
-        const nextZoneId = preferZone?.id || zones[0].id;
-        if (nextZoneId) setActiveZoneId(nextZoneId);
+        const nextZoneId = preferZone?.id ?? zones[0]?.id;
+        if (nextZoneId != null) setActiveZoneId(nextZoneId);
     }, [zones, heldOrders, sourceTable.id, activeZoneId]);
 
     // Get source order from active store or fallback to prop
-    const sourceOrderSnapshot = useActiveOrdersStore(state => state.getOrderByTable(sourceTable.id ));
-    const sourceOrder = sourceOrderSnapshot ? sourceOrderSnapshot : heldOrders.find(o => o.table_id === sourceTable.id);
+    const sourceOrderSnapshot = useActiveOrdersStore(state => state.getOrderByTable(String(sourceTable.id)));
+    const sourceOrder = sourceOrderSnapshot ? sourceOrderSnapshot : heldOrders.find(o => o.table_id === String(sourceTable.id));
 
     const hasPayments = useMemo(() => {
         if (!sourceOrder) return false;
@@ -67,13 +67,13 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
     const handleMerge = async () => {
         if (!selectedTargetTable || !sourceOrder) return;
         const store = useActiveOrdersStore.getState();
-        const targetSnapshot = store.getOrder(selectedTargetTable.id );
+        const targetSnapshot = store.getOrder(String(selectedTargetTable.id));
         if (!targetSnapshot) return;
 
         try {
             // Fire & forget - UI updates via WebSocket
             await orderOps.mergeOrders(sourceOrder.order_id, targetSnapshot.order_id, operationAuthorizer ?? undefined);
-            onSuccess(selectedTargetTable.id );
+            onSuccess(String(selectedTargetTable.id));
         } catch (err) {
             console.error('Merge failed:', err);
             toast.error(t('checkout.error.merge_failed'));
@@ -82,19 +82,19 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
 
     const handleMove = async () => {
         if (!selectedTargetTable || !sourceOrder) return;
-        const targetZone = zones.find(z => z.id === selectedTargetTable.zone);
+        const targetZone = zones.find(z => z.id === selectedTargetTable.zone_id);
 
         try {
             // Fire & forget - UI updates via WebSocket
             await orderOps.moveOrder(
                 sourceOrder.order_id,
-                selectedTargetTable.id ,
+                String(selectedTargetTable.id),
                 selectedTargetTable.name,
-                targetZone?.id,
+                targetZone ? String(targetZone.id) : undefined,
                 targetZone?.name,
                 operationAuthorizer ?? undefined,
             );
-            onSuccess(selectedTargetTable.id );
+            onSuccess(String(selectedTargetTable.id));
         } catch (err) {
             console.error('Move failed:', err);
             toast.error(t('checkout.error.move_failed'));
@@ -156,7 +156,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
         return allTables.filter(table => {
             if (table.id === sourceTable.id) return false; // Don't show self
 
-            const isOccupied = heldOrders.some(o => o.table_id === table.id);
+            const isOccupied = heldOrders.some(o => o.table_id === String(table.id));
 
             if (mode === 'MERGE') {
                 return isOccupied;
@@ -265,7 +265,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                 permission={Permission.TABLES_MERGE_BILL}
                 mode="intercept"
                 description={t('table.auth_required.merge')}
-                onAuthorized={(user) => { setOperationAuthorizer({ id: user.id, name: user.display_name }); setMode('MERGE'); }}
+                onAuthorized={(user) => { setOperationAuthorizer({ id: String(user.id), name: user.display_name }); setMode('MERGE'); }}
             >
                 <button
                     onClick={() => setMode('MERGE')}
@@ -289,7 +289,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                 permission={Permission.TABLES_TRANSFER}
                 mode="intercept"
                 description={t('table.auth_required.move')}
-                onAuthorized={(user) => { setOperationAuthorizer({ id: user.id, name: user.display_name }); setMode('MOVE'); }}
+                onAuthorized={(user) => { setOperationAuthorizer({ id: String(user.id), name: user.display_name }); setMode('MOVE'); }}
             >
                 <button
                     onClick={() => setMode('MOVE')}
@@ -352,7 +352,7 @@ export const TableManagementModal: React.FC<TableManagementModalProps> = ({
                     ) : (
                         <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
                             {displayedTables.map(table => {
-                                const order = heldOrders.find(o => o.table_id === table.id);
+                                const order = heldOrders.find(o => o.table_id === String(table.id));
                                 const isOccupied = !!order;
                                 const isSelected = selectedTargetTable?.id === table.id;
 

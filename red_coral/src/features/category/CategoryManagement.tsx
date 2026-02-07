@@ -28,7 +28,7 @@ interface CategoryListProps {
   isVirtual: boolean;
   searchQuery: string;
   themeColor: 'teal' | 'purple';
-  onProductOrder: (category: { id: string; name: string }) => void;
+  onProductOrder: (category: { id: number; name: string }) => void;
 }
 
 const CategoryList: React.FC<CategoryListProps> = React.memo(({
@@ -233,9 +233,9 @@ export const CategoryManagement: React.FC = React.memo(() => {
   const [searchQuery, setSearchQuery] = useState('');
   const [productOrderModal, setProductOrderModal] = useState<{
     isOpen: boolean;
-    categoryId: string;
+    categoryId: number;
     categoryName: string;
-  }>({ isOpen: false, categoryId: '', categoryName: '' });
+  }>({ isOpen: false, categoryId: 0, categoryName: '' });
 
   // Load data on mount and when dataVersion changes
   useEffect(() => {

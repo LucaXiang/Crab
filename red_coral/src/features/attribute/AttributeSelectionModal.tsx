@@ -5,12 +5,12 @@ import { ProductAttributesSection } from './ProductAttributesSection';
 interface AttributeSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedAttributeIds: string[];
-  attributeDefaultOptions?: Record<string, string | string[]>;
-  onChange: (attributeIds: string[]) => void;
-  onDefaultOptionChange?: (attributeId: string, optionIds: string[]) => void;
+  selectedAttributeIds: number[];
+  attributeDefaultOptions?: Record<number, number | number[]>;
+  onChange: (attributeIds: number[]) => void;
+  onDefaultOptionChange?: (attributeId: number, optionIds: number[]) => void;
   t: (key: string) => string;
-  inheritedAttributeIds?: string[];
+  inheritedAttributeIds?: number[];
 }
 
 export const AttributeSelectionModal: React.FC<AttributeSelectionModalProps> = ({

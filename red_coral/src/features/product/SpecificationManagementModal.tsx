@@ -9,14 +9,14 @@ import { getErrorMessage } from '@/utils/error';
 import { SpecificationFormModal } from './SpecificationFormModal';
 import { canDeleteSpec, setDefaultSpec } from './spec-utils';
 import { useProductStore } from './store';
-import type { EmbeddedSpec } from '@/core/domain/types';
+import type { ProductSpec } from '@/core/domain/types';
 
 const getApi = () => createTauriClient();
 
 interface SpecificationManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
-  productId: string;
+  productId: number;
   productName: string;
 }
 
@@ -30,12 +30,12 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
 
   // Get specs directly from store (no API call needed)
   const product = useProductStore((state) => state.items.find((p) => p.id === productId));
-  const [specs, setSpecs] = useState<EmbeddedSpec[]>([]);
+  const [specs, setSpecs] = useState<ProductSpec[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   // Form modal state
   const [formOpen, setFormOpen] = useState(false);
-  const [editingSpec, setEditingSpec] = useState<EmbeddedSpec | null>(null);
+  const [editingSpec, setEditingSpec] = useState<ProductSpec | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   // Confirm dialog state
@@ -53,16 +53,16 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
     }
   }, [isOpen, product]);
 
-  const saveSpecs = async (newSpecs: EmbeddedSpec[]) => {
+  const saveSpecs = async (newSpecs: ProductSpec[]) => {
     setIsSaving(true);
     try {
-      const updated = await getApi().updateProduct(productId, { specs: newSpecs });
+      const updated = await getApi().updateProduct(Number(productId), { specs: newSpecs });
       setSpecs(newSpecs);
 
       // Optimistic update - sync mechanism will also update via broadcast
       // This ensures immediate UI update without waiting for sync
       if (updated) {
-        useProductStore.getState().optimisticUpdate(productId, (prev) => ({
+        useProductStore.getState().optimisticUpdate(Number(productId), (prev) => ({
           ...prev,
           specs: updated.specs,
         }));
@@ -84,13 +84,13 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
     setFormOpen(true);
   };
 
-  const handleEditSpec = (spec: EmbeddedSpec, index: number) => {
+  const handleEditSpec = (spec: ProductSpec, index: number) => {
     setEditingSpec(spec);
     setEditingIndex(index);
     setFormOpen(true);
   };
 
-  const handleDeleteSpec = (spec: EmbeddedSpec, index: number) => {
+  const handleDeleteSpec = (spec: ProductSpec, index: number) => {
     if (!canDeleteSpec(spec)) {
       toast.error(t('settings.specification.message.root_cannot_delete'));
       return;
@@ -123,8 +123,8 @@ export const SpecificationManagementModal: React.FC<SpecificationManagementModal
     }
   };
 
-  const handleSaveSpec = async (spec: EmbeddedSpec, index: number | null) => {
-    let newSpecs: EmbeddedSpec[];
+  const handleSaveSpec = async (spec: ProductSpec, index: number | null) => {
+    let newSpecs: ProductSpec[];
 
     if (index === null) {
       // Create new spec

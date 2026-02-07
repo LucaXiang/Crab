@@ -4,15 +4,12 @@ import type { Category, CategoryCreate, CategoryUpdate } from '@/core/domain/typ
 
 const getApi = () => createTauriClient();
 
-// Category with guaranteed id
-type CategoryEntity = Category & { id: string };
-
-export const useCategoryStore = createCrudResourceStore<CategoryEntity, CategoryCreate, CategoryUpdate>(
+export const useCategoryStore = createCrudResourceStore<Category, CategoryCreate, CategoryUpdate>(
   'category',
-  () => getApi().listCategories() as Promise<CategoryEntity[]>,
+  () => getApi().listCategories(),
   {
-    create: (data) => getApi().createCategory(data) as Promise<CategoryEntity>,
-    update: (id, data) => getApi().updateCategory(id, data) as Promise<CategoryEntity>,
+    create: (data) => getApi().createCategory(data),
+    update: (id, data) => getApi().updateCategory(id, data),
     remove: (id) => getApi().deleteCategory(id),
   }
 );
@@ -20,7 +17,7 @@ export const useCategoryStore = createCrudResourceStore<CategoryEntity, Category
 // Convenience hooks
 export const useCategories = () => useCategoryStore((state) => state.items);
 export const useCategoriesLoading = () => useCategoryStore((state) => state.isLoading);
-export const useCategoryById = (id: string) =>
+export const useCategoryById = (id: number) =>
   useCategoryStore((state) => state.items.find((c) => c.id === id));
 
 // CRUD action hooks

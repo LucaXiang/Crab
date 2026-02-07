@@ -155,10 +155,10 @@ export interface TenantInfo {
 
 // UserInfo matching shared::client::UserInfo from Rust
 export interface UserInfo {
-  id: string;
+  id: number;
   username: string;
   display_name: string;
-  role_id: string;
+  role_id: number;
   role_name: string;
   permissions: string[];
   is_system: boolean;

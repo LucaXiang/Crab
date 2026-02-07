@@ -5,8 +5,8 @@ import { useTags } from './store';
 interface TagSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedTagIds: string[];
-  onChange: (tagIds: string[]) => void;
+  selectedTagIds: number[];
+  onChange: (tagIds: number[]) => void;
   t: (key: string) => string;
 }
 
@@ -27,7 +27,7 @@ export const TagSelectionModal: React.FC<TagSelectionModalProps> = ({
     .filter((tag) => !tag.is_system)
     .sort((a, b) => a.display_order - b.display_order);
 
-  const handleTagToggle = (tagId: string) => {
+  const handleTagToggle = (tagId: number) => {
     const newTagIds = selectedTagIds.includes(tagId)
       ? selectedTagIds.filter((id) => id !== tagId)
       : [...selectedTagIds, tagId];

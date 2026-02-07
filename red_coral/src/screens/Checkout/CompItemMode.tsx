@@ -50,10 +50,10 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
   const productInfoMap = useMemo(() => {
     const map = new Map<string, { image?: string; category?: string }>();
     order.items.forEach(item => {
-      const product = products.find(p => p.id === item.id);
+      const product = products.find(p => String(p.id) === item.id);
       map.set(item.instance_id, {
         image: product?.image,
-        category: product?.category,
+        category: product?.category_id != null ? String(product.category_id) : undefined,
       });
     });
     return map;
@@ -97,7 +97,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
 
     const result: Array<{ categoryName: string; items: typeof compableItems }> = [];
     groups.forEach((items, categoryRef) => {
-      const category = categories.find(c => c.id === categoryRef);
+      const category = categories.find(c => String(c.id) === categoryRef);
       result.push({ categoryName: category?.name || t('common.label.unknown_item'), items });
     });
     result.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
@@ -310,7 +310,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                                 permission={Permission.ORDERS_COMP}
                                 mode="intercept"
                                 description={t('checkout.comp.uncomp_auth_required')}
-                                onAuthorized={(user) => handleUncomp(item.instance_id, { id: user.id, name: user.display_name })}
+                                onAuthorized={(user) => handleUncomp(item.instance_id, { id: String(user.id), name: user.display_name })}
                               >
                                 <button
                                   disabled={isProcessing}
@@ -429,7 +429,7 @@ export const CompItemMode: React.FC<CompItemModeProps> = ({
                     permission={Permission.ORDERS_COMP}
                     mode="intercept"
                     description={t('checkout.comp.auth_required')}
-                    onAuthorized={(user) => handleConfirmComp({ id: user.id, name: user.display_name })}
+                    onAuthorized={(user) => handleConfirmComp({ id: String(user.id), name: user.display_name })}
                   >
                     <button
                       disabled={!canConfirm}

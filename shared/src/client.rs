@@ -26,10 +26,10 @@ pub struct LoginResponse {
 /// User information returned after login
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserInfo {
-    pub id: String,
+    pub id: i64,
     pub username: String,
     pub display_name: String,
-    pub role_id: String,
+    pub role_id: i64,
     pub role_name: String,
     pub permissions: Vec<String>,
     pub is_system: bool,

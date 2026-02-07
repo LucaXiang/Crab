@@ -4,13 +4,13 @@ import type { Zone } from '@/core/domain/types/api';
 
 const getApi = () => createTauriClient();
 
-export const useZoneStore = createResourceStore<Zone & { id: string }>(
+export const useZoneStore = createResourceStore<Zone>(
   'zone',
-  () => getApi().listZones() as Promise<(Zone & { id: string })[]>
+  () => getApi().listZones()
 );
 
 // Convenience hooks
 export const useZones = () => useZoneStore((state) => state.items);
 export const useZonesLoading = () => useZoneStore((state) => state.isLoading);
-export const useZoneById = (id: string) =>
+export const useZoneById = (id: number) =>
   useZoneStore((state) => state.items.find((z) => z.id === id));

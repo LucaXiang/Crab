@@ -185,12 +185,12 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
 
   const handleProtectedDelete = (authorizer?: { id: string; name: string }) => {
      if (onDelete) {
-        onDelete(authorizer || (currentUser ? { id: currentUser.id, name: currentUser.display_name ?? currentUser.username } : undefined));
+        onDelete(authorizer || (currentUser ? { id: String(currentUser.id), name: currentUser.display_name ?? currentUser.username } : undefined));
      }
   };
 
   const handleProtectedDiscount = (val: number, authorizer?: { id: string; name: string }) => {
-      onDiscountChange(val, authorizer || (currentUser ? { id: currentUser.id, name: currentUser.display_name ?? currentUser.username } : undefined));
+      onDiscountChange(val, authorizer || (currentUser ? { id: String(currentUser.id), name: currentUser.display_name ?? currentUser.username } : undefined));
   };
 
   const getEditModeTitle = () => {
@@ -255,7 +255,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                     permission={Permission.ORDERS_DISCOUNT}
                     mode="intercept"
                     description={t('pos.cart.enter_discount')}
-                    onAuthorized={(user) => openNumpad('DISC', { id: user.id, name: user.display_name })}
+                    onAuthorized={(user) => openNumpad('DISC', { id: String(user.id), name: user.display_name })}
                   >
                     <button
                       onClick={() => {
@@ -283,7 +283,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                       permission={Permission.ORDERS_DISCOUNT}
                       mode="intercept"
                       description={`${t('checkout.cart.discount')} ${d}%`}
-                      onAuthorized={(user) => handleProtectedDiscount(d === discount ? 0 : d, { id: user.id, name: user.display_name })}
+                      onAuthorized={(user) => handleProtectedDiscount(d === discount ? 0 : d, { id: String(user.id), name: user.display_name })}
                     >
                       <button
                         onClick={() => {
@@ -317,7 +317,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                 permission={Permission.ORDERS_DISCOUNT}
                 mode="intercept"
                 description={t('pos.cart.edit_final_price')}
-                onAuthorized={(user) => openNumpad('PRICE', { id: user.id, name: user.display_name })}
+                onAuthorized={(user) => openNumpad('PRICE', { id: String(user.id), name: user.display_name })}
               >
                 <div
                   className="flex items-center justify-between p-4 cursor-pointer hover:bg-blue-50/50 transition-colors group"
@@ -389,7 +389,7 @@ export const ItemActionPanel: React.FC<ItemActionPanelProps> = (props) => {
                         permission={Permission.ORDERS_CANCEL_ITEM}
                         mode="intercept"
                         description={t('common.action.delete')}
-                        onAuthorized={(user) => handleProtectedDelete({ id: user.id, name: user.display_name })}
+                        onAuthorized={(user) => handleProtectedDelete({ id: String(user.id), name: user.display_name })}
                     >
                         <button
                             onClick={() => {

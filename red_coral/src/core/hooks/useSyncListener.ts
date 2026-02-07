@@ -20,7 +20,7 @@ import type { Shift } from '@/core/domain/types/api';
 interface SyncPayload {
   resource: string;
   action: 'created' | 'updated' | 'deleted' | 'settlement_required';
-  id: string;
+  id: number;
   version: number;
   data: unknown | null;
 }

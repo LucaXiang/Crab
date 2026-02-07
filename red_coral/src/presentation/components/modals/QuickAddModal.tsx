@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { X, ShoppingBag } from 'lucide-react';
 import { formatCurrency, Currency } from '@/utils/currency';
-import { CartItem as CartItemType, Product, ItemOption, Attribute, AttributeOption, EmbeddedSpec, ProductAttribute } from '@/core/domain/types';
+import { CartItem as CartItemType, Product, ItemOption, Attribute, AttributeOption, ProductSpec, ProductAttribute } from '@/core/domain/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useCategories, useCategoryStore } from '@/features/category';
 import { useProducts, useProductStore, useProductsLoading, ProductWithPrice } from '@/features/product';
@@ -70,7 +70,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
     attributes: Attribute[];
     options: Map<string, AttributeOption[]>;
     bindings: ProductAttribute[];
-    specifications?: EmbeddedSpec[];
+    specifications?: ProductSpec[];
     hasMultiSpec?: boolean;
   } | null>(null);
 
@@ -133,14 +133,14 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
 
     // Regular category
     return products
-      .filter((p) => p.is_active && p.category === category.id)
+      .filter((p) => p.is_active && p.category_id === category.id)
       .map(mapProductWithSpec);
   }, [products, categories, selectedCategory]);
 
   // Handle product add from ProductGrid (same logic as POSScreen)
   const handleAddProduct = useCallback(async (product: Product, _startRect?: DOMRect, skipQuickAdd: boolean = false) => {
     // Get full product data from store (ProductFull includes attributes)
-    const productFull = useProductStore.getState().getById(String(product.id));
+    const productFull = useProductStore.getState().getById(product.id);
     if (!productFull) {
       console.error('Product not found in store:', product.id);
       return;
@@ -157,9 +157,9 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
         }
       });
       const allBindings: ProductAttribute[] = attrBindings.map(binding => ({
-        id: binding.id ?? null,
-        in: binding.is_inherited ? productFull.category : String(product.id),
-        out: String(binding.attribute.id),
+        id: binding.id,
+        owner_id: binding.is_inherited ? productFull.category_id : product.id,
+        attribute_id: binding.attribute.id,
         is_required: binding.is_required,
         display_order: binding.display_order,
         default_option_indices: binding.default_option_indices,
@@ -168,7 +168,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ onClose, onConfirm
 
       // Specs
       const hasMultiSpec = product.specs.length > 1;
-      const specifications: EmbeddedSpec[] = product.specs || [];
+      const specifications: ProductSpec[] = product.specs || [];
       const defaultSpec = specifications.find((s) => s.is_default) || specifications[0];
       const basePrice = defaultSpec?.price ?? 0;
 

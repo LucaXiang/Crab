@@ -13,8 +13,8 @@ import type { PriceRule } from '@/core/domain/types/api';
 export const calculatePriority = (rule: PriceRule): number => {
   // Zone weight
   let zoneWeight = 0;
-  if (rule.zone_scope === 'zone:all') zoneWeight = 0;
-  else if (rule.zone_scope === 'zone:retail') zoneWeight = 1;
+  if (rule.zone_scope === 'all') zoneWeight = 0;
+  else if (rule.zone_scope === 'retail') zoneWeight = 1;
   else zoneWeight = 2;
 
   // Product weight

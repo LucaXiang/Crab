@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { toast } from '../Toast';
-import { Attribute, AttributeOption, ItemOption, ProductAttribute, EmbeddedSpec } from '@/core/domain/types';
+import { Attribute, AttributeOption, ItemOption, ProductAttribute, ProductSpec } from '@/core/domain/types';
 import { ItemConfiguratorModal } from './ItemConfiguratorModal';
 
 interface ProductOptionsModalProps {
@@ -12,7 +12,7 @@ interface ProductOptionsModalProps {
   attributes: Attribute[];
   allOptions: Map<string, AttributeOption[]>;
   bindings?: ProductAttribute[];
-  specifications?: EmbeddedSpec[]; // Embedded specifications (use index as ID)
+  specifications?: ProductSpec[]; // Product specifications (use index as ID)
   hasMultiSpec?: boolean; // Whether this product has multiple specifications
   onConfirm: (
     selectedOptions: ItemOption[],
@@ -72,7 +72,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
       attributes.forEach((attr) => {
         const options = allOptions.get(String(attr.id)) || [];
         // binding.to is the attribute ID in AttributeBinding relation
-        const binding = bindings?.find(b => b.out === attr.id);
+        const binding = bindings?.find(b => b.attribute_id === attr.id);
 
         const optionMap = new Map<string, number>();
 
@@ -122,7 +122,7 @@ export const ProductOptionsModal: React.FC<ProductOptionsModalProps> = React.mem
 
     // Validate required attributes
     for (const attr of attributes) {
-      const binding = bindings?.find(b => b.out === attr.id);
+      const binding = bindings?.find(b => b.attribute_id === attr.id);
       if (binding?.is_required) {
         const optionMap = selections.get(String(attr.id));
         const hasSelection = optionMap && Array.from(optionMap.values()).some(qty => qty > 0);

@@ -100,7 +100,7 @@ export const AttributeForm: React.FC<AttributeFormProps> = React.memo(({
       },
       onUpdate: async (data) => {
         await updateAttribute({
-          id: String(editingAttribute!.id),
+          id: editingAttribute!.id,
           name: data.name.trim(),
           is_multi_select: data.isMultiSelect,
           max_selections: data.isMultiSelect ? data.maxSelections : null,

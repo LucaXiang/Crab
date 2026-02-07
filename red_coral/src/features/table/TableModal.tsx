@@ -55,7 +55,7 @@ export const TableModal: React.FC = React.memo(() => {
   const handleDelete = async () => {
     if (!data?.id) return;
     try {
-      await deleteTable(String(data.id));
+      await deleteTable(data.id);
       toast.success(t('settings.table.table_deleted'));
       closeModal();
     } catch (e) {
@@ -76,7 +76,7 @@ export const TableModal: React.FC = React.memo(() => {
     try {
       const tablePayload = {
         name: formData.name.trim(),
-        zone: formData.zone,
+        zone_id: formData.zone_id!,
         capacity: Math.max(1, formData.capacity ?? 1),
         is_active: formData.is_active ?? true,
       };
@@ -84,15 +84,15 @@ export const TableModal: React.FC = React.memo(() => {
       if (action === 'CREATE') {
         await createTable({
           name: tablePayload.name,
-          zone: String(tablePayload.zone),
-          capacity: Number(tablePayload.capacity),
+          zone_id: tablePayload.zone_id,
+          capacity: tablePayload.capacity,
         });
         toast.success(t('settings.table.message.created'));
       } else if (data?.id) {
-        await updateTable(String(data.id), {
+        await updateTable(data.id, {
           name: tablePayload.name,
-          zone: String(tablePayload.zone),
-          capacity: Number(tablePayload.capacity),
+          zone_id: tablePayload.zone_id,
+          capacity: tablePayload.capacity,
           is_active: tablePayload.is_active,
         });
         toast.success(t('settings.table.message.updated'));
@@ -121,11 +121,11 @@ export const TableModal: React.FC = React.memo(() => {
         formData={{
           name: formData.name,
           capacity: formData.capacity ?? 1,
-          zone: formData.zone ?? '',
+          zone_id: formData.zone_id,
           is_active: formData.is_active ?? true,
         }}
         zones={zones}
-        onFieldChange={setFormField}
+        onFieldChange={setFormField as any}
         t={t}
       />
     );

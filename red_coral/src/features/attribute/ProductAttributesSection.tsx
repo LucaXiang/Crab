@@ -4,13 +4,13 @@ import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions
 import { formatCurrency } from '@/utils/currency';
 
 interface ProductAttributesSectionProps {
-  selectedAttributeIds: string[];
-  attributeDefaultOptions?: Record<string, string | string[]>;
-  onChange: (attributeIds: string[]) => void;
-  onDefaultOptionChange?: (attributeId: string, optionIds: string[]) => void;
+  selectedAttributeIds: number[];
+  attributeDefaultOptions?: Record<number, number | number[]>;
+  onChange: (attributeIds: number[]) => void;
+  onDefaultOptionChange?: (attributeId: number, optionIds: number[]) => void;
   t: (key: string) => string;
   hideHeader?: boolean;
-  inheritedAttributeIds?: string[];
+  inheritedAttributeIds?: number[];
 }
 
 export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> = React.memo(({
@@ -49,7 +49,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
     });
   }, [selectedAttributeIds, inheritedAttributeIds]);
 
-  const handleAddAttribute = (attributeId: string) => {
+  const handleAddAttribute = (attributeId: number) => {
     onChange([...selectedAttributeIds, attributeId]);
     loadOptions(attributeId);
     setSearchTerm(''); // Clear search after adding
@@ -57,7 +57,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
     // Let's keep panel open if user wants to add more
   };
 
-  const handleRemoveAttribute = (attributeId: string) => {
+  const handleRemoveAttribute = (attributeId: number) => {
     if (inheritedAttributeIds.includes(attributeId)) return;
     onChange(selectedAttributeIds.filter(id => id !== attributeId));
     if (onDefaultOptionChange) {
@@ -75,17 +75,17 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
     return labels[type] || type;
   };
 
-  const getDefaultOptions = (attrId: string): string[] => {
+  const getDefaultOptions = (attrId: number): number[] => {
     const val = attributeDefaultOptions[attrId];
     if (Array.isArray(val)) return val;
-    if (val) return [val];
+    if (val != null) return [val];
     return [];
   };
 
   const allSelectedIds = [...selectedAttributeIds, ...inheritedAttributeIds];
-  const selectedAttributes = attributes.filter(attr => allSelectedIds.includes(String(attr.id)));
+  const selectedAttributes = attributes.filter(attr => allSelectedIds.includes(attr.id));
   const unselectedAttributes = attributes.filter(attr =>
-    !allSelectedIds.includes(String(attr.id))
+    !allSelectedIds.includes(attr.id)
   );
 
   const filteredUnselected = unselectedAttributes.filter(attr =>
@@ -140,8 +140,8 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
               ) : (
                 filteredUnselected.map(attr => (
                   <button
-                    key={String(attr.id)}
-                    onClick={() => handleAddAttribute(String(attr.id))}
+                    key={attr.id}
+                    onClick={() => handleAddAttribute(attr.id)}
                     className="w-full text-left px-3 py-2 rounded-lg hover:bg-teal-50 hover:text-teal-700 text-sm text-gray-700 flex items-center justify-between group transition-colors"
                   >
                     <span>{attr.name}</span>
@@ -169,7 +169,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
            </div>
         ) : (
           selectedAttributes.map((attr) => {
-            const attrId = String(attr.id);
+            const attrId = attr.id;
             const isMulti = attr.is_multi_select;
             const defaultOptions = getDefaultOptions(attrId);
             const options = optionsMap.get(attrId) || [];
@@ -214,7 +214,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
                       {options.map((opt) => {
-                        const optionKey = String(opt.index);
+                        const optionKey = opt.index;
                         const isDefault = defaultOptions.includes(optionKey);
                         const isOptionDisabled = isAtLimit && !isDefault;
                         return (
@@ -223,7 +223,7 @@ export const ProductAttributesSection: React.FC<ProductAttributesSectionProps> =
                             onClick={() => {
                               if (isOptionDisabled) return;
                               if (!onDefaultOptionChange) return;
-                              let newDefaults: string[];
+                              let newDefaults: number[];
                               if (isMulti) {
                                 if (isDefault) {
                                   newDefaults = defaultOptions.filter(id => id !== optionKey);

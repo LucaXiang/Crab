@@ -31,8 +31,8 @@ export interface WizardState {
   adjustment_value: number;
   // Step 3
   product_scope: 'GLOBAL' | 'CATEGORY' | 'TAG' | 'PRODUCT';
-  target: string | null;
-  /** Zone scope: "zone:all", "zone:retail", or specific zone ID */
+  target_id: number | null;
+  /** Zone scope: "all", "retail", or specific zone ID */
   zone_scope: string;
   // Step 4 - UI-only mode for form control
   time_mode: 'ALWAYS' | 'SCHEDULE' | 'ONETIME';
@@ -68,7 +68,7 @@ const getInitialState = (rule?: PriceRule | null): WizardState => {
       adjustment_type: rule.adjustment_type as 'PERCENTAGE' | 'FIXED_AMOUNT',
       adjustment_value: rule.adjustment_value,
       product_scope: rule.product_scope as WizardState['product_scope'],
-      target: rule.target,
+      target_id: rule.target_id,
       zone_scope: rule.zone_scope,
       time_mode,
       active_days: rule.active_days || [1, 2, 3, 4, 5],
@@ -89,8 +89,8 @@ const getInitialState = (rule?: PriceRule | null): WizardState => {
     adjustment_type: 'PERCENTAGE',
     adjustment_value: 10,
     product_scope: 'GLOBAL',
-    target: null,
-    zone_scope: 'zone:all',
+    target_id: null,
+    zone_scope: 'all',
     time_mode: 'ALWAYS',
     active_days: [1, 2, 3, 4, 5],
     active_start_time: '09:00',
@@ -138,7 +138,7 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({
       case 2:
         return state.adjustment_value > 0 && (state.adjustment_type !== 'PERCENTAGE' || state.adjustment_value <= 100);
       case 3:
-        return state.product_scope === 'GLOBAL' || !!state.target;
+        return state.product_scope === 'GLOBAL' || state.target_id != null;
       case 4:
         if (state.time_mode === 'SCHEDULE') {
           return state.active_days.length > 0 && !!state.active_start_time && !!state.active_end_time;
@@ -176,7 +176,7 @@ export const PriceRuleWizard: React.FC<PriceRuleWizardProps> = ({
       description: state.description.trim() || undefined,
       rule_type: state.rule_type,
       product_scope: state.product_scope,
-      target: state.target || undefined,
+      target_id: state.target_id ?? undefined,
       zone_scope: state.zone_scope,
       adjustment_type: state.adjustment_type,
       adjustment_value: state.adjustment_value,

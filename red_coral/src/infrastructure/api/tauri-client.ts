@@ -194,12 +194,12 @@ export class TauriApiClient {
     return result.tag;
   }
 
-  async updateTag(id: string, data: TagUpdate): Promise<Tag> {
+  async updateTag(id: number, data: TagUpdate): Promise<Tag> {
     const result = await invokeAndUnwrap<{ tag: Tag }>('update_tag', { id, data });
     return result.tag;
   }
 
-  async deleteTag(id: string): Promise<void> {
+  async deleteTag(id: number): Promise<void> {
     await invokeAndUnwrap<{ deleted: boolean }>('delete_tag', { id });
   }
 
@@ -215,16 +215,16 @@ export class TauriApiClient {
     return result.category;
   }
 
-  async updateCategory(id: string, data: CategoryUpdate): Promise<Category> {
+  async updateCategory(id: number, data: CategoryUpdate): Promise<Category> {
     const result = await invokeAndUnwrap<{ category: Category }>('update_category', { id, data });
     return result.category;
   }
 
-  async deleteCategory(id: string): Promise<void> {
+  async deleteCategory(id: number): Promise<void> {
     await invokeAndUnwrap<{ deleted: boolean }>('delete_category', { id });
   }
 
-  async batchUpdateCategorySortOrder(updates: { id: string; sort_order: number }[]): Promise<void> {
+  async batchUpdateCategorySortOrder(updates: { id: number; sort_order: number }[]): Promise<void> {
     await invokeAndUnwrap<{ updated: boolean }>('batch_update_category_sort_order', { updates });
   }
 
@@ -245,28 +245,28 @@ export class TauriApiClient {
     return result.product;
   }
 
-  async updateProduct(id: string, data: ProductUpdate): Promise<ProductFull> {
+  async updateProduct(id: number, data: ProductUpdate): Promise<ProductFull> {
     const result = await invokeAndUnwrap<{ product: ProductFull }>('update_product', { id, data });
     return result.product;
   }
 
-  async deleteProduct(id: string): Promise<void> {
+  async deleteProduct(id: number): Promise<void> {
     await invokeAndUnwrap<void>('delete_product', { id });
   }
 
-  async bulkDeleteProducts(ids: (string | number)[]): Promise<void> {
+  async bulkDeleteProducts(ids: number[]): Promise<void> {
     for (const id of ids) {
-      await this.deleteProduct(String(id));
+      await this.deleteProduct(id);
     }
   }
 
-  async batchUpdateProductSortOrder(updates: { id: string; sort_order: number }[]): Promise<void> {
+  async batchUpdateProductSortOrder(updates: { id: number; sort_order: number }[]): Promise<void> {
     await invokeAndUnwrap<{ updated: boolean }>('batch_update_product_sort_order', { updates });
   }
 
   // ============ Product Attributes ============
 
-  async fetchProductAttributes(productId: string): Promise<AttributeBindingFull[]> {
+  async fetchProductAttributes(productId: number): Promise<AttributeBindingFull[]> {
     return await invokeAndUnwrap<AttributeBindingFull[]>('list_product_attributes', { productId });
   }
 
@@ -275,14 +275,14 @@ export class TauriApiClient {
     return result.binding;
   }
 
-  async unbindProductAttribute(id: string): Promise<void> {
+  async unbindProductAttribute(id: number): Promise<void> {
     await invokeAndUnwrap<{ deleted: boolean }>('unbind_product_attribute', { id });
   }
 
   // ============ Category Attributes ============
 
-  async listCategoryAttributes(categoryId: string | number): Promise<Attribute[]> {
-    const data = await invokeAndUnwrap<{ templates: Attribute[] }>('list_category_attributes', { categoryId: String(categoryId) });
+  async listCategoryAttributes(categoryId: number): Promise<Attribute[]> {
+    const data = await invokeAndUnwrap<{ templates: Attribute[] }>('list_category_attributes', { categoryId });
     return data.templates;
   }
 
@@ -291,7 +291,7 @@ export class TauriApiClient {
     return result.binding;
   }
 
-  async unbindCategoryAttribute(categoryId: string, attributeId: string): Promise<void> {
+  async unbindCategoryAttribute(categoryId: number, attributeId: number): Promise<void> {
     await invokeAndUnwrap<{ deleted: boolean }>('unbind_category_attribute', { categoryId, attributeId });
   }
 
@@ -302,7 +302,7 @@ export class TauriApiClient {
     return data.templates;
   }
 
-  async getAttribute(id: string): Promise<Attribute> {
+  async getAttribute(id: number): Promise<Attribute> {
     const data = await invokeAndUnwrap<{ template: Attribute }>('get_attribute', { id });
     return data.template;
   }
@@ -312,28 +312,28 @@ export class TauriApiClient {
     return result.attribute;
   }
 
-  async updateAttribute(id: string, data: AttributeUpdate): Promise<Attribute> {
+  async updateAttribute(id: number, data: AttributeUpdate): Promise<Attribute> {
     const result = await invokeAndUnwrap<{ attribute: Attribute }>('update_attribute', { id, data });
     return result.attribute;
   }
 
-  async deleteAttribute(id: string): Promise<void> {
+  async deleteAttribute(id: number): Promise<void> {
     await invokeAndUnwrap<{ deleted: boolean }>('delete_attribute', { id });
   }
 
   // ============ Attribute Options ============
 
-  async addAttributeOption(attributeId: string, data: { name: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string; kitchen_print_name?: string; enable_quantity?: boolean; max_quantity?: number | null }): Promise<Attribute> {
+  async addAttributeOption(attributeId: number, data: { name: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string; kitchen_print_name?: string; enable_quantity?: boolean; max_quantity?: number | null }): Promise<Attribute> {
     const result = await invokeAndUnwrap<{ template: Attribute }>('add_attribute_option', { attributeId, data });
     return result.template;
   }
 
-  async updateAttributeOption(attributeId: string, index: number, data: { name?: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string; kitchen_print_name?: string; enable_quantity?: boolean; max_quantity?: number | null }): Promise<Attribute> {
+  async updateAttributeOption(attributeId: number, index: number, data: { name?: string; value_code?: string; price_modifier?: number; is_default?: boolean; display_order?: number; is_active?: boolean; receipt_name?: string; kitchen_print_name?: string; enable_quantity?: boolean; max_quantity?: number | null }): Promise<Attribute> {
     const result = await invokeAndUnwrap<{ template: Attribute }>('update_attribute_option', { attributeId, index, data });
     return result.template;
   }
 
-  async deleteAttributeOption(attributeId: string, index: number): Promise<Attribute> {
+  async deleteAttributeOption(attributeId: number, index: number): Promise<Attribute> {
     const result = await invokeAndUnwrap<{ template: Attribute }>('delete_attribute_option', { attributeId, index });
     return result.template;
   }
@@ -350,13 +350,13 @@ export class TauriApiClient {
     return result.zone;
   }
 
-  async updateZone(id: string | number, data: { name?: string; description?: string; is_active?: boolean }): Promise<Zone> {
-    const result = await invokeAndUnwrap<{ zone: Zone }>('update_zone', { id: String(id), data });
+  async updateZone(id: number, data: { name?: string; description?: string; is_active?: boolean }): Promise<Zone> {
+    const result = await invokeAndUnwrap<{ zone: Zone }>('update_zone', { id, data });
     return result.zone;
   }
 
-  async deleteZone(id: string | number): Promise<void> {
-    await invokeAndUnwrap<{ deleted: boolean }>('delete_zone', { id: String(id) });
+  async deleteZone(id: number): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('delete_zone', { id });
   }
 
   // ============ Tables ============
@@ -366,18 +366,18 @@ export class TauriApiClient {
     return data.tables;
   }
 
-  async createTable(data: { name: string; zone: string; capacity?: number }): Promise<Table> {
+  async createTable(data: { name: string; zone_id: number; capacity?: number }): Promise<Table> {
     const result = await invokeAndUnwrap<{ table: Table }>('create_table', { data });
     return result.table;
   }
 
-  async updateTable(id: string | number, data: { name?: string; zone?: string; capacity?: number; is_active?: boolean }): Promise<Table> {
-    const result = await invokeAndUnwrap<{ table: Table }>('update_table', { id: String(id), data });
+  async updateTable(id: number, data: { name?: string; zone_id?: number; capacity?: number; is_active?: boolean }): Promise<Table> {
+    const result = await invokeAndUnwrap<{ table: Table }>('update_table', { id, data });
     return result.table;
   }
 
-  async deleteTable(id: string | number): Promise<void> {
-    await invokeAndUnwrap<{ deleted: boolean }>('delete_table', { id: String(id) });
+  async deleteTable(id: number): Promise<void> {
+    await invokeAndUnwrap<{ deleted: boolean }>('delete_table', { id });
   }
 
   // ============ Print Destinations ============
@@ -392,12 +392,12 @@ export class TauriApiClient {
     return result.destination;
   }
 
-  async updatePrintDestination(id: string, data: PrintDestinationUpdate): Promise<PrintDestination> {
+  async updatePrintDestination(id: number, data: PrintDestinationUpdate): Promise<PrintDestination> {
     const result = await invokeAndUnwrap<{ destination: PrintDestination }>('update_print_destination', { id, data });
     return result.destination;
   }
 
-  async deletePrintDestination(id: string): Promise<void> {
+  async deletePrintDestination(id: number): Promise<void> {
     await invokeAndUnwrap<{ deleted: boolean }>('delete_print_destination', { id });
   }
 
@@ -408,17 +408,17 @@ export class TauriApiClient {
     return data.employees;
   }
 
-  async createEmployee(data: { username: string; password: string; role: string }): Promise<Employee> {
+  async createEmployee(data: { username: string; password: string; role_id: number }): Promise<Employee> {
     const result = await invokeAndUnwrap<{ employee: Employee }>('create_employee', { data });
     return result.employee;
   }
 
-  async updateEmployee(id: string, data: { password?: string; role?: string; is_active?: boolean }): Promise<Employee> {
+  async updateEmployee(id: number, data: { password?: string; role_id?: number; is_active?: boolean }): Promise<Employee> {
     const result = await invokeAndUnwrap<{ employee: Employee }>('update_employee', { id, data });
     return result.employee;
   }
 
-  async deleteEmployee(id: string): Promise<void> {
+  async deleteEmployee(id: number): Promise<void> {
     await invokeAndUnwrap<{ deleted: boolean }>('delete_employee', { id });
   }
 
@@ -465,11 +465,11 @@ export class TauriApiClient {
     return invokeAndUnwrap<PriceRule>('create_price_rule', { data });
   }
 
-  async updatePriceRule(id: string, data: PriceRuleUpdate): Promise<PriceRule> {
+  async updatePriceRule(id: number, data: PriceRuleUpdate): Promise<PriceRule> {
     return invokeAndUnwrap<PriceRule>('update_price_rule', { id, data });
   }
 
-  async deletePriceRule(id: string): Promise<void> {
+  async deletePriceRule(id: number): Promise<void> {
     await invokeAndUnwrap<{ deleted: boolean }>('delete_price_rule', { id });
   }
 
@@ -496,11 +496,11 @@ export class TauriApiClient {
     return invokeAndUnwrap<Shift[]>('list_shifts', params);
   }
 
-  async getShift(id: string): Promise<Shift> {
+  async getShift(id: number): Promise<Shift> {
     return invokeAndUnwrap<Shift>('get_shift', { id });
   }
 
-  async getCurrentShift(operatorId?: string): Promise<Shift | null> {
+  async getCurrentShift(operatorId?: number): Promise<Shift | null> {
     return invokeAndUnwrap<Shift | null>('get_current_shift', { operatorId });
   }
 
@@ -508,19 +508,19 @@ export class TauriApiClient {
     return invokeAndUnwrap<Shift>('open_shift', { data });
   }
 
-  async updateShift(id: string, data: ShiftUpdate): Promise<Shift> {
+  async updateShift(id: number, data: ShiftUpdate): Promise<Shift> {
     return invokeAndUnwrap<Shift>('update_shift', { id, data });
   }
 
-  async closeShift(id: string, data: ShiftClose): Promise<Shift> {
+  async closeShift(id: number, data: ShiftClose): Promise<Shift> {
     return invokeAndUnwrap<Shift>('close_shift', { id, data });
   }
 
-  async forceCloseShift(id: string, data?: ShiftForceClose): Promise<Shift> {
+  async forceCloseShift(id: number, data?: ShiftForceClose): Promise<Shift> {
     return invokeAndUnwrap<Shift>('force_close_shift', { id, data: data ?? {} });
   }
 
-  async heartbeatShift(id: string): Promise<boolean> {
+  async heartbeatShift(id: number): Promise<boolean> {
     return invokeAndUnwrap<boolean>('heartbeat_shift', { id });
   }
 
@@ -534,7 +534,7 @@ export class TauriApiClient {
     return invokeAndUnwrap<DailyReport[]>('list_daily_reports', params);
   }
 
-  async getDailyReport(id: string): Promise<DailyReport> {
+  async getDailyReport(id: number): Promise<DailyReport> {
     return invokeAndUnwrap<DailyReport>('get_daily_report', { id });
   }
 

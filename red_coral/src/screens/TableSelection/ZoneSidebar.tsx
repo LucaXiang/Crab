@@ -4,8 +4,8 @@ import { useI18n } from '@/hooks/useI18n';
 
 interface ZoneSidebarProps {
   zones: Zone[];
-  activeZoneId: string;
-  onZoneSelect: (zoneId: string) => void;
+  activeZoneId: number | 'ALL';
+  onZoneSelect: (zoneId: number | 'ALL') => void;
 }
 
 export const ZoneSidebar: React.FC<ZoneSidebarProps> = React.memo(

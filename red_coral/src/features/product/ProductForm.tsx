@@ -6,25 +6,25 @@ import { TagSelectionModal, useTags } from '@/features/tag';
 import { ProductImage } from './ProductImage';
 import { useAttributeStore, useAttributes, useAttributeActions, useOptionActions } from '@/core/stores/resources';
 import { usePriceInput } from '@/hooks/usePriceInput';
-import { Category, EmbeddedSpec, PrintState } from '@/core/domain/types';
+import { Category, ProductSpec, PrintState } from '@/core/domain/types';
 
 interface ProductFormData {
-  id?: string; // Product ID (for editing existing product)
+  id?: number; // Product ID (for editing existing product)
   name: string;
   receipt_name?: string;
   price: number;
-  category?: string;
+  category_id?: number;
   image: string;
   externalId?: number;
   tax_rate: number;
-  selected_attribute_ids?: string[];
-  attribute_default_options?: Record<string, string | string[]>; // Product-level default options (array for multi-select)
+  selected_attribute_ids?: number[];
+  attribute_default_options?: Record<number, number | number[]>; // Product-level default options (array for multi-select)
   kitchen_print_name?: string;
   is_kitchen_print_enabled?: PrintState; // Kitchen print state: -1=inherit, 0=disabled, 1=enabled
   is_label_print_enabled?: PrintState;
   is_active?: boolean;
-  specs?: EmbeddedSpec[]; // Embedded specifications
-  tags?: string[]; // Tag IDs (user + system tags)
+  specs?: ProductSpec[]; // Embedded specifications
+  tags?: number[]; // Tag IDs (user + system tags)
 }
 
 interface ProductFormProps {
@@ -33,7 +33,7 @@ interface ProductFormProps {
   onFieldChange: <K extends keyof ProductFormData>(field: K, value: ProductFormData[K]) => void;
   onSelectImage: () => void;
   t: (key: string) => string;
-  inheritedAttributeIds?: string[];
+  inheritedAttributeIds?: number[];
 }
 
 export const ProductForm: React.FC<ProductFormProps> = ({
@@ -42,7 +42,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   onFieldChange,
   onSelectImage,
   t,
-  inheritedAttributeIds = [],
+  inheritedAttributeIds = [] as number[],
 }) => {
   const [showAttributeModal, setShowAttributeModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
@@ -149,9 +149,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
           <SelectField
             label={t('settings.product.form.category')}
-            value={formData.category ?? ''}
-            onChange={(value) => onFieldChange('category', String(value))}
-            options={categories.map(c => ({ value: c.id ?? '', label: c.name }))}
+            value={formData.category_id ?? ''}
+            onChange={(value) => onFieldChange('category_id', Number(value))}
+            options={categories.map(c => ({ value: c.id, label: c.name }))}
             placeholder={t('settings.product.form.select_category')}
             required
           />
@@ -305,7 +305,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <span>
                       {t('settings.product.print.effective_state')}: {
                         (() => {
-                          const cat = categories.find(c => String(c.id) === String(formData.category));
+                          const cat = categories.find(c => c.id === formData.category_id);
                           const isEnabled = cat ? cat.is_kitchen_print_enabled : false;
                           return isEnabled ? t('common.status.enabled') : t('common.status.disabled');
                         })()
@@ -363,7 +363,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <span>
                       {t('settings.product.print.effective_state')}: {
                         (() => {
-                          const cat = categories.find(c => String(c.id) === String(formData.category));
+                          const cat = categories.find(c => c.id === formData.category_id);
                           const isEnabled = cat ? (cat.is_label_print_enabled !== false) : true;
                           return isEnabled ? t('common.status.enabled') : t('common.status.disabled');
                         })()
@@ -397,7 +397,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 const rawDefaults = formData.attribute_default_options?.[attr.id];
                 const defaultOptionIds = Array.isArray(rawDefaults)
                   ? rawDefaults
-                  : (rawDefaults ? [rawDefaults] : []);
+                  : (rawDefaults != null ? [rawDefaults] : []);
 
                 return (
                   <AttributeDisplayTag

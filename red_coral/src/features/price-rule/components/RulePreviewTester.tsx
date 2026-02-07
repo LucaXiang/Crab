@@ -33,7 +33,7 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
   const categories = useCategoryStore(state => state.items);
   const tags = useTagStore(state => state.items);
 
-  const [selectedZone, setSelectedZone] = useState<string>('zone:all');
+  const [selectedZone, setSelectedZone] = useState<string>('all');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showZonePicker, setShowZonePicker] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
@@ -47,17 +47,16 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
 
   // Get zone display name
   const getZoneName = (zoneScope: string): string => {
-    if (zoneScope === 'zone:all') return t('settings.price_rule.zone.all');
-    if (zoneScope === 'zone:retail') return t('settings.price_rule.zone.retail');
-    const zoneId = zoneScope.replace('zone:', '');
-    const zone = zones.find(z => z.id === zoneId || z.id === `zone:${zoneId}`);
-    return zone?.name || zoneId;
+    if (zoneScope === 'all') return t('settings.price_rule.zone.all');
+    if (zoneScope === 'retail') return t('settings.price_rule.zone.retail');
+    const zone = zones.find(z => String(z.id) === zoneScope);
+    return zone?.name || zoneScope;
   };
 
   // Get zone icon
   const getZoneIcon = (zoneScope: string): React.ElementType => {
-    if (zoneScope === 'zone:all') return Globe;
-    if (zoneScope === 'zone:retail') return ShoppingCart;
+    if (zoneScope === 'all') return Globe;
+    if (zoneScope === 'retail') return ShoppingCart;
     return Armchair;
   };
 
@@ -69,7 +68,7 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
     }
 
     // Check zone scope
-    if (rule.zone_scope !== 'zone:all') {
+    if (rule.zone_scope !== 'all') {
       if (rule.zone_scope !== selectedZone) {
         return {
           rule,
@@ -87,34 +86,34 @@ export const RulePreviewTester: React.FC<RulePreviewTesterProps> = ({
           // Matches all products
           break;
         case 'CATEGORY':
-          if (rule.target !== selectedProduct.category) {
-            const cat = categories.find(c => c.id === rule.target);
+          if (rule.target_id !== selectedProduct.category_id) {
+            const cat = categories.find(c => c.id === rule.target_id);
             return {
               rule,
               matched: false,
-              reason: `${t('settings.price_rule.reason.product_mismatch')} (${t('settings.price_rule.reason.only')} ${cat?.name || rule.target} ${t('settings.price_rule.reason.category')})`,
+              reason: `${t('settings.price_rule.reason.product_mismatch')} (${t('settings.price_rule.reason.only')} ${cat?.name || rule.target_id} ${t('settings.price_rule.reason.category')})`,
               adjustment: 0,
             };
           }
           break;
         case 'TAG':
-          if (!selectedProduct.tags?.some(tag => tag.id === rule.target)) {
-            const tagObj = tags.find(tg => tg.id === rule.target);
+          if (!selectedProduct.tags?.some(tag => tag.id === rule.target_id)) {
+            const tagObj = tags.find(tg => tg.id === rule.target_id);
             return {
               rule,
               matched: false,
-              reason: `${t('settings.price_rule.reason.product_mismatch')} (${t('settings.price_rule.reason.only')} ${tagObj?.name || rule.target} ${t('settings.price_rule.reason.tag')})`,
+              reason: `${t('settings.price_rule.reason.product_mismatch')} (${t('settings.price_rule.reason.only')} ${tagObj?.name || rule.target_id} ${t('settings.price_rule.reason.tag')})`,
               adjustment: 0,
             };
           }
           break;
         case 'PRODUCT':
-          if (rule.target !== selectedProduct.id) {
-            const prod = products.find(p => p.id === rule.target);
+          if (rule.target_id !== selectedProduct.id) {
+            const prod = products.find(p => p.id === rule.target_id);
             return {
               rule,
               matched: false,
-              reason: `${t('settings.price_rule.reason.product_mismatch')} (${t('settings.price_rule.reason.only')} ${prod?.name || rule.target})`,
+              reason: `${t('settings.price_rule.reason.product_mismatch')} (${t('settings.price_rule.reason.only')} ${prod?.name || rule.target_id})`,
               adjustment: 0,
             };
           }

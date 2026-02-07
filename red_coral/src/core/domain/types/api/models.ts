@@ -2,7 +2,7 @@
  * API Models - Aligned with edge-server shared models
  *
  * These types match the Rust shared::models crate.
- * All IDs are strings (SurrealDB Thing format: "table:id")
+ * All entity IDs are numbers (SQLite INTEGER PRIMARY KEY).
  */
 
 // ============ Common Types ============
@@ -18,7 +18,7 @@ export type PrintState = -1 | 0 | 1;
 // ============ Tag ============
 
 export interface Tag {
-  id: string;
+  id: number;
   name: string;
   color: string;
   display_order: number;
@@ -41,20 +41,20 @@ export interface TagUpdate {
 // ============ Category ============
 
 export interface Category {
-  id: string;
+  id: number;
   name: string;
   sort_order: number;
   /** Kitchen print destination IDs */
-  kitchen_print_destinations: string[];
+  kitchen_print_destinations: number[];
   /** Label print destination IDs */
-  label_print_destinations: string[];
+  label_print_destinations: number[];
   /** Whether kitchen printing is enabled for this category */
   is_kitchen_print_enabled: boolean;
   is_label_print_enabled: boolean;
   /** Whether this is a virtual category (filters by tags instead of direct assignment) */
   is_virtual: boolean;
   /** Tag IDs for virtual category filtering */
-  tag_ids: string[];
+  tag_ids: number[];
   /** Match mode for virtual category: "any" or "all" */
   match_mode: 'any' | 'all';
   /** Whether to display this category in POS */
@@ -65,16 +65,16 @@ export interface CategoryCreate {
   name: string;
   sort_order?: number;
   /** Kitchen print destination IDs */
-  kitchen_print_destinations?: string[];
+  kitchen_print_destinations?: number[];
   /** Label print destination IDs */
-  label_print_destinations?: string[];
+  label_print_destinations?: number[];
   /** Whether kitchen printing is enabled */
   is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
   /** Whether this is a virtual category */
   is_virtual?: boolean;
   /** Tag IDs for virtual category filtering */
-  tag_ids?: string[];
+  tag_ids?: number[];
   /** Match mode: "any" or "all" */
   match_mode?: 'any' | 'all';
   /** Whether to display this category in POS */
@@ -85,16 +85,16 @@ export interface CategoryUpdate {
   name?: string;
   sort_order?: number;
   /** Kitchen print destination IDs */
-  kitchen_print_destinations?: string[];
+  kitchen_print_destinations?: number[];
   /** Label print destination IDs */
-  label_print_destinations?: string[];
+  label_print_destinations?: number[];
   /** Whether kitchen printing is enabled */
   is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
   /** Whether this is a virtual category */
   is_virtual?: boolean;
   /** Tag IDs for virtual category filtering */
-  tag_ids?: string[];
+  tag_ids?: number[];
   /** Match mode: "any" or "all" */
   match_mode?: 'any' | 'all';
   /** Whether to display this category in POS */
@@ -103,8 +103,10 @@ export interface CategoryUpdate {
 
 // ============ Product ============
 
-/** 嵌入式规格 (文档数据库风格) */
-export interface EmbeddedSpec {
+/** Product spec (from product_spec table) */
+export interface ProductSpec {
+  id?: number;
+  product_id?: number;
   name: string;
   /** 小票显示名称 */
   receipt_name?: string;
@@ -125,7 +127,7 @@ export type Product = ProductFull;
 export interface ProductCreate {
   name: string;
   image?: string;
-  category: string;
+  category_id: number;
   sort_order?: number;
   tax_rate?: number;
   receipt_name?: string;
@@ -136,15 +138,15 @@ export interface ProductCreate {
   is_label_print_enabled?: PrintState;
   /** 菜品编号 (POS 集成，全局唯一) */
   external_id?: number | null;
-  tags?: string[];
-  /** 嵌入式规格 */
-  specs: EmbeddedSpec[];
+  tags?: number[];
+  /** 规格列表 */
+  specs: ProductSpec[];
 }
 
 export interface ProductUpdate {
   name?: string;
   image?: string;
-  category?: string;
+  category_id?: number;
   sort_order?: number;
   tax_rate?: number;
   receipt_name?: string;
@@ -156,15 +158,15 @@ export interface ProductUpdate {
   is_active?: boolean;
   /** 菜品编号 (POS 集成，全局唯一) */
   external_id?: number | null;
-  tags?: string[];
-  /** 嵌入式规格 */
-  specs?: EmbeddedSpec[];
+  tags?: number[];
+  /** 规格列表 */
+  specs?: ProductSpec[];
 }
 
 /** Attribute binding with full attribute data */
 export interface AttributeBindingFull {
-  /** Relation ID (has_attribute edge) */
-  id: string | null;
+  /** Binding ID */
+  id: number;
   /** Full attribute object */
   attribute: Attribute;
   is_required: boolean;
@@ -177,10 +179,10 @@ export interface AttributeBindingFull {
 
 /** Full product with all related data */
 export interface ProductFull {
-  id: string;
+  id: number;
   name: string;
   image: string;
-  category: string;
+  category_id: number;
   sort_order: number;
   tax_rate: number;
   receipt_name: string | null;
@@ -192,8 +194,8 @@ export interface ProductFull {
   is_active: boolean;
   /** 菜品编号 (POS 集成，全局唯一) */
   external_id: number | null;
-  /** Embedded specifications */
-  specs: EmbeddedSpec[];
+  /** Product specs */
+  specs: ProductSpec[];
   /** Attribute bindings with full attribute data */
   attributes: AttributeBindingFull[];
   /** Tags attached to this product */
@@ -203,6 +205,8 @@ export interface ProductFull {
 // ============ Attribute ============
 
 export interface AttributeOption {
+  id: number;
+  attribute_id: number;
   name: string;
   /** Price modifier in currency unit (e.g., 2.50 = €2.50) */
   price_modifier: number;
@@ -216,7 +220,7 @@ export interface AttributeOption {
 }
 
 export interface Attribute {
-  id: string;
+  id: number;
   name: string;
   is_multi_select: boolean;
   max_selections: number | null;
@@ -256,23 +260,25 @@ export interface AttributeUpdate {
 }
 
 export interface AttributeBinding {
-  id: string;
-  /** Product or Category ID (SurrealDB RELATE `in` field) */
-  in: string;
-  /** Attribute ID (SurrealDB RELATE `out` field) */
-  out: string;
+  id: number;
+  /** Owner ID (product or category) */
+  owner_id: number;
+  /** Attribute ID */
+  attribute_id: number;
   is_required: boolean;
   display_order: number;
   default_option_indices?: number[];
 }
 
 
-// ============ Embedded Printer ============
+// ============ Printer ============
 
 export type PrinterType = 'network' | 'driver';
 export type PrinterFormat = 'escpos' | 'label';
 
-export interface EmbeddedPrinter {
+export interface Printer {
+  id?: number;
+  print_destination_id?: number;
   printer_type: PrinterType;
   /** Printer format: escpos (厨房单/小票) | label (标签) */
   printer_format: PrinterFormat;
@@ -286,31 +292,31 @@ export interface EmbeddedPrinter {
 // ============ Print Destination ============
 
 export interface PrintDestination {
-  id: string;
+  id: number;
   name: string;
   description?: string;
-  printers: EmbeddedPrinter[];
+  printers: Printer[];
   is_active: boolean;
 }
 
 export interface PrintDestinationCreate {
   name: string;
   description?: string;
-  printers?: EmbeddedPrinter[];
+  printers?: Printer[];
   is_active?: boolean;
 }
 
 export interface PrintDestinationUpdate {
   name?: string;
   description?: string;
-  printers?: EmbeddedPrinter[];
+  printers?: Printer[];
   is_active?: boolean;
 }
 
 // ============ Zone ============
 
 export interface Zone {
-  id: string;
+  id: number;
   name: string;
   description: string | null;
 }
@@ -328,22 +334,22 @@ export interface ZoneUpdate {
 // ============ Dining Table ============
 
 export interface DiningTable {
-  id: string;
+  id: number;
   name: string;
-  zone: string;
+  zone_id: number;
   capacity: number;
   is_active: boolean;
 }
 
 export interface DiningTableCreate {
   name: string;
-  zone: string;
+  zone_id: number;
   capacity?: number;
 }
 
 export interface DiningTableUpdate {
   name?: string;
-  zone?: string;
+  zone_id?: number;
   capacity?: number;
   is_active?: boolean;
 }
@@ -355,15 +361,15 @@ export type ProductScope = 'GLOBAL' | 'CATEGORY' | 'TAG' | 'PRODUCT';
 export type AdjustmentType = 'PERCENTAGE' | 'FIXED_AMOUNT';
 
 export interface PriceRule {
-  id: string;
+  id: number;
   name: string;
   display_name: string;
   receipt_name: string;
   description: string | null;
   rule_type: RuleType;
   product_scope: ProductScope;
-  target: string | null;
-  /** Zone scope: "zone:all", "zone:retail", or specific zone ID like "zone:xxx" */
+  target_id: number | null;
+  /** Zone scope: "all", "retail", or specific zone ID */
   zone_scope: string;
   adjustment_type: AdjustmentType;
   adjustment_value: number;
@@ -376,7 +382,7 @@ export interface PriceRule {
   active_start_time: string | null; // HH:MM format
   active_end_time: string | null;   // HH:MM format
   is_active: boolean;
-  created_by: string | null;
+  created_by: number | null;
   created_at: number;               // Unix millis (i64)
 }
 
@@ -387,8 +393,8 @@ export interface PriceRuleCreate {
   description?: string;
   rule_type: RuleType;
   product_scope: ProductScope;
-  target?: string;
-  /** Zone scope: "zone:all", "zone:retail", or specific zone ID */
+  target_id?: number;
+  /** Zone scope: "all", "retail", or specific zone ID */
   zone_scope?: string;
   adjustment_type: AdjustmentType;
   adjustment_value: number;
@@ -400,7 +406,7 @@ export interface PriceRuleCreate {
   active_days?: number[];     // [0=Sunday, 1=Monday, ...]
   active_start_time?: string; // HH:MM format
   active_end_time?: string;   // HH:MM format
-  created_by?: string;
+  created_by?: number;
 }
 
 export interface PriceRuleUpdate {
@@ -410,8 +416,8 @@ export interface PriceRuleUpdate {
   description?: string;
   rule_type?: RuleType;
   product_scope?: ProductScope;
-  target?: string;
-  /** Zone scope: "zone:all", "zone:retail", or specific zone ID */
+  target_id?: number;
+  /** Zone scope: "all", "retail", or specific zone ID */
   zone_scope?: string;
   adjustment_type?: AdjustmentType;
   adjustment_value?: number;
@@ -429,10 +435,10 @@ export interface PriceRuleUpdate {
 // ============ Employee ============
 
 export interface Employee {
-  id: string;
+  id: number;
   username: string;
   display_name: string;
-  role: string;
+  role_id: number;
   is_system: boolean;
   is_active: boolean;
 }
@@ -442,14 +448,14 @@ export interface EmployeeCreate {
   username: string;
   password: string;
   display_name?: string;
-  role: string;
+  role_id: number;
 }
 
 export interface EmployeeUpdate {
   username?: string;
   password?: string;
   display_name?: string;
-  role?: string;
+  role_id?: number;
   is_active?: boolean;
 }
 
@@ -463,7 +469,7 @@ export type TableUpdate = DiningTableUpdate;
 // ============ Role ============
 
 export interface Role {
-  id: string;
+  id: number;
   name: string;
   display_name: string;
   description: string | null;
@@ -488,7 +494,7 @@ export interface RoleUpdate {
 }
 
 export interface RolePermission {
-  role_id: string;
+  role_id: number;
   permission: string;
 }
 
@@ -503,18 +509,13 @@ export interface RolePermissionListData {
 // ============ User (Frontend representation) ============
 
 /**
- * User type for frontend authentication state.
- * Maps to CurrentUser from login response with additional fields.
- * Note: password_hash is NOT included - it should never be sent to frontend.
- */
-/**
  * User for auth store - aligned with shared::client::UserInfo
  */
 export interface User {
-  id: string;
+  id: number;
   username: string;
   display_name: string;
-  role_id: string;
+  role_id: number;
   role_name: string;
   permissions: string[];
   is_system: boolean;
@@ -525,7 +526,7 @@ export interface User {
 // ============ Product/Category Attribute Bindings ============
 
 /**
- * ProductAttribute represents a AttributeBinding relation where 'in' is a Product
+ * ProductAttribute represents an AttributeBinding where owner is a Product
  */
 export interface ProductAttribute extends AttributeBinding {
   /** The attribute details when fetched with relations */
@@ -533,7 +534,7 @@ export interface ProductAttribute extends AttributeBinding {
 }
 
 /**
- * CategoryAttribute represents a AttributeBinding relation where 'in' is a Category
+ * CategoryAttribute represents an AttributeBinding where owner is a Category
  */
 export interface CategoryAttribute extends AttributeBinding {
   /** The attribute details when fetched with relations */
@@ -548,11 +549,11 @@ export interface CategoryAttribute extends AttributeBinding {
  */
 export interface PrintItemContext {
   // 分类
-  category_id: string;
+  category_id: number;
   category_name: string;
 
   // 商品
-  product_id: string;
+  product_id: number;
   external_id: number | null; // 菜品编号
   kitchen_name: string; // 厨房打印名称
   product_name: string; // 原始商品名
@@ -571,8 +572,8 @@ export interface PrintItemContext {
   note: string | null;
 
   // 打印目的地
-  kitchen_destinations: string[];
-  label_destinations: string[];
+  kitchen_destinations: number[];
+  label_destinations: number[];
 }
 
 /** 厨房订单菜品 */
@@ -585,9 +586,9 @@ export interface KitchenOrderItem {
  * Used for kitchen order display and reprint
  */
 export interface KitchenOrder {
-  /** Kitchen order ID (= event_id) */
+  /** Kitchen order ID (= event_id, UUID) */
   id: string;
-  /** Parent order ID */
+  /** Parent order ID (UUID) */
   order_id: string;
   /** Table name (if applicable) */
   table_name: string | null;
@@ -606,9 +607,9 @@ export interface KitchenOrder {
 export interface LabelPrintRecord {
   /** Label record ID (UUID) */
   id: string;
-  /** Parent order ID */
+  /** Parent order ID (UUID) */
   order_id: string;
-  /** Related kitchen order ID */
+  /** Related kitchen order ID (UUID) */
   kitchen_order_id: string;
   /** Table name (if applicable) */
   table_name: string | null;
@@ -633,7 +634,7 @@ export interface KitchenOrderListResponse {
  * Used for receipts, labels, and business info display
  */
 export interface StoreInfo {
-  id: string;
+  id: number;
   name: string;
   address: string;
   /** Tax identification number (NIF) */
@@ -707,9 +708,9 @@ export type ShiftStatus = 'OPEN' | 'CLOSED';
  * Used for cash tracking and shift management
  */
 export interface Shift {
-  id: string;
-  /** Operator employee ID (RecordId format: "employee:xxx") */
-  operator_id: string;
+  id: number;
+  /** Operator employee ID */
+  operator_id: number;
   /** Operator display name */
   operator_name: string;
   /** Shift status */
@@ -738,7 +739,7 @@ export interface Shift {
 
 export interface ShiftCreate {
   /** Operator employee ID */
-  operator_id: string;
+  operator_id: number;
   /** Operator display name */
   operator_name: string;
   /** Starting cash amount (default 0) */
@@ -797,7 +798,7 @@ export interface PaymentMethodBreakdown {
  * Contains aggregated sales data for a business date
  */
 export interface DailyReport {
-  id: string;
+  id: number;
   /** Business date (YYYY-MM-DD format) */
   business_date: string;
   /** Total number of orders */
@@ -827,7 +828,7 @@ export interface DailyReport {
   /** When the report was generated (Unix millis) */
   generated_at: number | null;
   /** Who generated the report (employee ID) */
-  generated_by_id: string | null;
+  generated_by_id: number | null;
   /** Who generated the report (name) */
   generated_by_name: string | null;
   /** Notes */
@@ -917,7 +918,7 @@ export interface AuditEntry {
   action: AuditAction;
   /** 资源类型 (如 "system", "order", "employee") */
   resource_type: string;
-  /** 资源 ID (如 "order:xxx", "employee:yyy") */
+  /** 资源 ID */
   resource_id: string;
   /** 操作人 ID (系统事件为 null) */
   operator_id: string | null;
@@ -943,7 +944,7 @@ export interface AuditListResponse {
 
 /** 系统问题 — 与 Rust SystemIssueRow 对齐 */
 export interface SystemIssue {
-  id: string;
+  id: number;
   source: string;
   kind: string;
   blocking: boolean;
@@ -961,6 +962,6 @@ export interface SystemIssue {
 
 /** 解决系统问题请求 */
 export interface ResolveSystemIssueRequest {
-  id: string;
+  id: number;
   response: string;
 }

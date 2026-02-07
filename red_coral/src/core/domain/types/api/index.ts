@@ -16,7 +16,7 @@ import type {
   Role,
   RolePermission,
   PriceRule,
-  EmbeddedSpec,
+  ProductSpec,
 } from './models';
 
 // API Response types - aligned with Rust server (src-tauri/src/core/response.rs)
@@ -98,10 +98,10 @@ export interface LoginResponseData {
  * Current user info - aligned with shared::client::UserInfo
  */
 export interface CurrentUser {
-  id: string;
+  id: number;
   username: string;
   display_name: string;
-  role_id: string;
+  role_id: number;
   role_name: string;
   permissions: string[];
   is_system: boolean;
@@ -158,7 +158,7 @@ export interface ProductResponse {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  specs?: EmbeddedSpec[];
+  specs?: ProductSpec[];
   tags?: Tag[];
   attributes?: ProductAttribute[];
 }
@@ -181,7 +181,7 @@ export interface CreateProductRequest {
   print_destinations?: string[];
   is_label_print_enabled?: number;
   external_id?: number;
-  specs: EmbeddedSpec[];
+  specs: ProductSpec[];
 }
 
 export interface UpdateProductRequest {
@@ -195,7 +195,7 @@ export interface UpdateProductRequest {
   print_destinations?: string[];
   is_label_print_enabled?: number;
   external_id?: number;
-  specs?: EmbeddedSpec[];
+  specs?: ProductSpec[];
 }
 
 
@@ -208,8 +208,8 @@ export interface CategoryListData {
 export interface CreateCategoryRequest {
   name: string;
   sort_order?: number;
-  kitchen_print_destinations?: string[];
-  label_print_destinations?: string[];
+  kitchen_print_destinations?: number[];
+  label_print_destinations?: number[];
   is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
 }
@@ -217,8 +217,8 @@ export interface CreateCategoryRequest {
 export interface UpdateCategoryRequest {
   name?: string;
   sort_order?: number;
-  kitchen_print_destinations?: string[];
-  label_print_destinations?: string[];
+  kitchen_print_destinations?: number[];
+  label_print_destinations?: number[];
   is_kitchen_print_enabled?: boolean;
   is_label_print_enabled?: boolean;
 }
@@ -456,7 +456,6 @@ export interface TableListData {
 export interface CreateTableRequest {
   name: string;
   zone_id?: number;
-  zone?: string;
   capacity?: number;
 }
 
@@ -478,8 +477,8 @@ export interface CategoryAttributeListData {
 }
 
 export interface CreateCategoryAttributeRequest {
-  category_id: string | number;
-  attribute_id: string | number;
+  category_id: number;
+  attribute_id: number;
   is_required?: boolean;
   display_order?: number;
   default_option_indices?: number[];
@@ -503,8 +502,8 @@ export interface ProductAttributeListData {
 }
 
 export interface CreateProductAttributeRequest {
-  product_id: string;
-  attribute_id: string;
+  product_id: number;
+  attribute_id: number;
   is_required?: boolean;
   display_order?: number;
   default_option_indices?: number[];
@@ -532,4 +531,4 @@ export interface LivenessData {
 
 
 // Note: Entity types (Product, Category, Tag, etc.) are exported from './models'
-// which contains SurrealDB-aligned types with string IDs.
+// which contains SQLite-aligned types with numeric IDs.

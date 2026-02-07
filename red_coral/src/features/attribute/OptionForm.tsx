@@ -11,7 +11,7 @@ import { useFormSubmit } from '@/shared/hooks/useFormSubmit';
 // Extended option type with index for UI (matches store type)
 interface AttributeOptionWithIndex extends AttributeOption {
   index: number;
-  attributeId: string;
+  attributeId: number;
 }
 
 // Form state uses camelCase internally
@@ -52,7 +52,7 @@ const mapToFormData = (opt: AttributeOptionWithIndex | null): OptionFormData => 
 interface OptionFormProps {
   isOpen: boolean;
   onClose: () => void;
-  attributeId: string;
+  attributeId: number;
   editingOption: AttributeOptionWithIndex | null;
 }
 

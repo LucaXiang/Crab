@@ -19,7 +19,7 @@ interface AuthStore {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   setUser: (user: User | null) => void;
-  fetchUserPermissions: (roleId: string) => Promise<void>;
+  fetchUserPermissions: (roleId: number) => Promise<void>;
   refreshToken: () => Promise<void>;
 
   // Permission Checks
@@ -28,10 +28,10 @@ interface AuthStore {
 
   // User Management Actions (Admin only)
   fetchUsers: () => Promise<User[]>;
-  createUser: (data: { username: string; password: string; displayName?: string; role: string }) => Promise<User>;
-  updateUser: (userId: string, data: { displayName?: string; role?: string; isActive?: boolean }) => Promise<User>;
-  resetPassword: (userId: string, newPassword: string) => Promise<void>;
-  deleteUser: (userId: string) => Promise<void>;
+  createUser: (data: { username: string; password: string; displayName?: string; role_id: number }) => Promise<User>;
+  updateUser: (userId: number, data: { displayName?: string; role_id?: number; isActive?: boolean }) => Promise<User>;
+  resetPassword: (userId: number, newPassword: string) => Promise<void>;
+  deleteUser: (userId: number) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -113,7 +113,7 @@ export const useAuthStore = create<AuthStore>()(
        * Note: Permissions are now included in login response,
        * so this is mainly for refreshing permissions after role changes.
        */
-      fetchUserPermissions: async (_roleId: string) => {
+      fetchUserPermissions: async (_roleId: number) => {
         // Permissions are now embedded in user object from login
         // To refresh, we should re-fetch current user from /api/auth/me
         const { user } = get();
@@ -183,60 +183,58 @@ export const useAuthStore = create<AuthStore>()(
 
       fetchUsers: async () => {
         const employees = await getApi().listEmployees();
-        // Convert Employee -> User for display
-        // Note: role_name is extracted from role_id (e.g., "role:admin" -> "admin")
         return employees.map((e) => ({
-          id: e.id ?? '',
+          id: e.id,
           username: e.username,
           display_name: e.display_name,
-          role_id: e.role,
-          role_name: e.role.replace(/^role:/, ''), // Extract name from RecordId
-          permissions: [], // Permissions not loaded for list view
+          role_id: e.role_id,
+          role_name: '', // Role name not available in list view
+          permissions: [],
           is_active: e.is_active,
           is_system: e.is_system,
         })) as User[];
       },
 
-      createUser: async (data: { username: string; password: string; displayName?: string; role: string }) => {
+      createUser: async (data: { username: string; password: string; displayName?: string; role_id: number }) => {
         const result = await getApi().createEmployee({
           username: data.username,
           password: data.password,
-          role: data.role,
+          role_id: data.role_id,
         });
         return {
-          id: result.id ?? '',
+          id: result.id,
           username: result.username,
           display_name: data.displayName || result.display_name,
-          role_id: result.role,
-          role_name: result.role.replace(/^role:/, ''),
+          role_id: result.role_id,
+          role_name: '',
           permissions: [],
           is_active: result.is_active,
           is_system: result.is_system,
         } as User;
       },
 
-      updateUser: async (userId: string, data: { displayName?: string; role?: string; isActive?: boolean }) => {
+      updateUser: async (userId: number, data: { displayName?: string; role_id?: number; isActive?: boolean }) => {
         const result = await getApi().updateEmployee(userId, {
-          role: data.role,
+          role_id: data.role_id,
           is_active: data.isActive,
         });
         return {
-          id: result.id ?? userId,
+          id: result.id,
           username: result.username,
           display_name: data.displayName || result.display_name,
-          role_id: result.role,
-          role_name: result.role.replace(/^role:/, ''),
+          role_id: result.role_id,
+          role_name: '',
           permissions: [],
           is_active: result.is_active,
           is_system: result.is_system,
         } as User;
       },
 
-      resetPassword: async (userId: string, newPassword: string) => {
+      resetPassword: async (userId: number, newPassword: string) => {
         await getApi().updateEmployee(userId, { password: newPassword });
       },
 
-      deleteUser: async (userId: string) => {
+      deleteUser: async (userId: number) => {
         await getApi().deleteEmployee(userId);
       },
     })

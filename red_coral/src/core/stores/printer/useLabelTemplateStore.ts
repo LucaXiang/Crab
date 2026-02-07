@@ -88,7 +88,7 @@ interface LabelTemplateStore {
 }
 
 interface SyncPayload {
-  id: string;
+  id: number | string;
   version: number;
   action: 'created' | 'updated' | 'deleted';
   data: unknown | null;
@@ -200,7 +200,8 @@ export const useLabelTemplateStore = create<LabelTemplateStore>((set, get) => ({
       return;
     }
 
-    const actualId = id.includes(':') ? id.split(':')[1] : id;
+    const strId = String(id);
+    const actualId = strId.includes(':') ? strId.split(':')[1] : strId;
 
     switch (action) {
       case 'created':

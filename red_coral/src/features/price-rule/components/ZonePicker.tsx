@@ -31,13 +31,13 @@ export const ZonePicker: React.FC<ZonePickerProps> = ({
   // Build zone options
   const builtInOptions: ZoneOption[] = [
     {
-      value: 'zone:all',
+      value: 'all',
       icon: Globe,
       label: t('settings.price_rule.zone.all'),
       description: t('settings.price_rule.zone.all_desc'),
     },
     {
-      value: 'zone:retail',
+      value: 'retail',
       icon: ShoppingCart,
       label: t('settings.price_rule.zone.retail'),
       description: t('settings.price_rule.zone.retail_desc'),
@@ -46,7 +46,7 @@ export const ZonePicker: React.FC<ZonePickerProps> = ({
 
   // Custom zones from store
   const customZoneOptions: ZoneOption[] = zones.map(z => ({
-      value: `zone:${z.id.replace('zone:', '')}`,
+      value: String(z.id),
       icon: Armchair,
       label: z.name,
       description: z.description || t('settings.price_rule.zone.custom_desc'),

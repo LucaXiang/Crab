@@ -86,7 +86,7 @@ export const RuleDetailPanel: React.FC<RuleDetailPanelProps> = ({
   const currentAdjustmentType = (isEditing ? editData.adjustment_type : undefined) ?? rule.adjustment_type;
   const currentAdjustmentValue = (isEditing ? editData.adjustment_value : undefined) ?? rule.adjustment_value;
   const currentProductScope = (isEditing ? editData.product_scope : undefined) ?? rule.product_scope;
-  const currentTarget = (isEditing ? editData.target : undefined) ?? rule.target;
+  const currentTarget = (isEditing ? editData.target_id : undefined) ?? rule.target_id;
   const currentZoneScope = (isEditing ? editData.zone_scope : undefined) ?? rule.zone_scope;
   const currentIsStackable = (isEditing ? editData.is_stackable : undefined) ?? rule.is_stackable;
   const currentIsExclusive = (isEditing ? editData.is_exclusive : undefined) ?? rule.is_exclusive;
@@ -102,36 +102,35 @@ export const RuleDetailPanel: React.FC<RuleDetailPanelProps> = ({
 
   // Get zone display name
   const getZoneName = (zoneScope: string): string => {
-    if (zoneScope === 'zone:all') return t('settings.price_rule.zone.all');
-    if (zoneScope === 'zone:retail') return t('settings.price_rule.zone.retail');
-    const zoneId = zoneScope.replace('zone:', '');
-    const zone = zones.find(z => z.id === zoneId || z.id === `zone:${zoneId}`);
-    return zone?.name || zoneId;
+    if (zoneScope === 'all') return t('settings.price_rule.zone.all');
+    if (zoneScope === 'retail') return t('settings.price_rule.zone.retail');
+    const zone = zones.find(z => String(z.id) === zoneScope);
+    return zone?.name || zoneScope;
   };
 
   // Get zone icon
   const getZoneIcon = (zoneScope: string): React.ElementType => {
-    if (zoneScope === 'zone:all') return Globe;
-    if (zoneScope === 'zone:retail') return ShoppingCart;
+    if (zoneScope === 'all') return Globe;
+    if (zoneScope === 'retail') return ShoppingCart;
     return Armchair;
   };
 
   // Get target display name
-  const getTargetName = (scope: ProductScope, targetId: string | null | undefined): string | null => {
-    if (!targetId) return null;
+  const getTargetName = (scope: ProductScope, targetId: number | null | undefined): string | null => {
+    if (targetId == null) return null;
 
     switch (scope) {
       case 'CATEGORY': {
         const cat = categories.find(c => c.id === targetId);
-        return cat?.name || targetId;
+        return cat?.name || String(targetId);
       }
       case 'TAG': {
         const tag = tags.find(t => t.id === targetId);
-        return tag?.name || targetId;
+        return tag?.name || String(targetId);
       }
       case 'PRODUCT': {
         const product = products.find(p => p.id === targetId);
-        return product?.name || targetId;
+        return product?.name || String(targetId);
       }
       default:
         return null;
@@ -199,7 +198,7 @@ export const RuleDetailPanel: React.FC<RuleDetailPanelProps> = ({
       adjustment_type: rule.adjustment_type,
       adjustment_value: rule.adjustment_value,
       product_scope: rule.product_scope,
-      target: rule.target,
+      target_id: rule.target_id,
       zone_scope: rule.zone_scope,
       is_stackable: rule.is_stackable,
       is_exclusive: rule.is_exclusive,
@@ -256,10 +255,10 @@ export const RuleDetailPanel: React.FC<RuleDetailPanelProps> = ({
   // Handle product scope change
   const handleProductScopeChange = (scope: ProductScope) => {
     if (scope === 'GLOBAL') {
-      updateEditData({ product_scope: scope, target: undefined });
+      updateEditData({ product_scope: scope, target_id: undefined });
     } else {
       // Clear target when changing scope (different entity types)
-      updateEditData({ product_scope: scope, target: undefined });
+      updateEditData({ product_scope: scope, target_id: undefined });
       // Open target picker if scope requires a target
       setShowTargetPicker(true);
     }
@@ -653,8 +652,8 @@ export const RuleDetailPanel: React.FC<RuleDetailPanelProps> = ({
       <TargetPicker
         isOpen={showTargetPicker}
         productScope={currentProductScope}
-        selectedTarget={currentTarget || null}
-        onSelect={target => updateEditData({ target })}
+        selectedTarget={currentTarget ?? null}
+        onSelect={target_id => updateEditData({ target_id })}
         onClose={() => setShowTargetPicker(false)}
       />
 

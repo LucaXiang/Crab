@@ -22,7 +22,7 @@ export const CartItem = React.memo<CartItemProps>(({
 }) => {
   const [isHoveringControl, setIsHoveringControl] = useState(false);
   const performanceMode = useSettingsStore(state => state.performanceMode);
-  const externalId = useProductStore(state => state.items.find(p => p.id === item.id)?.external_id);
+  const externalId = useProductStore(state => state.items.find(p => String(p.id) === item.id)?.external_id);
   const discountPercent = item.manual_discount_percent || 0;
   
   // Calculate options modifier for display (considering option quantity)

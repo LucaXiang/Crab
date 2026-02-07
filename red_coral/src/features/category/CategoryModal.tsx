@@ -41,7 +41,7 @@ export const CategoryModal: React.FC = React.memo(() => {
     if (isCategory && modal.action === 'EDIT' && categoryId) {
       const loadAttributes = async () => {
         try {
-          const { attributeIds, defaultOptions } = await loadCategoryAttributes(String(categoryId));
+          const { attributeIds, defaultOptions } = await loadCategoryAttributes(categoryId);
           setAsyncFormData({
             selected_attribute_ids: attributeIds,
             attribute_default_options: defaultOptions
@@ -87,7 +87,7 @@ export const CategoryModal: React.FC = React.memo(() => {
   const handleDelete = async () => {
     if (!data?.id) return;
     try {
-      await deleteCategory(String(data.id));
+      await deleteCategory(data.id);
       toast.success(t('settings.category.category_deleted'));
       closeModal();
     } catch (e: unknown) {
@@ -122,7 +122,7 @@ export const CategoryModal: React.FC = React.memo(() => {
         refreshData();
         toast.success(t('settings.category.create_category_success'));
       } else if (action === 'EDIT' && data?.id) {
-        await updateCategory(String(data.id), {
+        await updateCategory(data.id, {
           name: formData.name,
           print_destinations: formData.print_destinations,
           is_kitchen_print_enabled: formData.is_kitchen_print_enabled,
@@ -169,7 +169,7 @@ export const CategoryModal: React.FC = React.memo(() => {
           tag_ids: formData.tag_ids,
           match_mode: formData.match_mode,
         }}
-        onFieldChange={setFormField}
+        onFieldChange={setFormField as any}
         t={t}
         isEditMode={action === 'EDIT'}
       />

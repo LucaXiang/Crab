@@ -16,7 +16,7 @@ export const KitchenPrinterList: React.FC<KitchenPrinterListProps> = ({ systemPr
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<{
-    id?: string;
+    id?: number;
     name?: string;
     description?: string;
     printerType?: 'driver' | 'network';

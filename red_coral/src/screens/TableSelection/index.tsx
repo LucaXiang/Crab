@@ -17,7 +17,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
     const { t } = useI18n();
     const zones = useZones() as Zone[];
     const allTables = useTables() as Table[];
-    const [activeZoneId, setActiveZoneId] = useState<string>('ALL');
+    const [activeZoneId, setActiveZoneId] = useState<number | 'ALL'>('ALL');
     const [activeFilter, setActiveFilter] = useState<TableFilter>('ALL');
 
     const [selectedTableForInput, setSelectedTableForInput] = useState<Table | null>(null);
@@ -25,12 +25,12 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
 
     const [showManagementModal, setShowManagementModal] = useState(false);
     const isManageOnly = !!manageTableId;
-    
+
     // Track processed manageTableId to prevent re-opening or loops
     const processedManageIdRef = React.useRef<string | null>(null);
 
-    // Get order for a table by table_id
-    const getOrderByTable = (tableId: string) => heldOrders.find((o) => o.table_id === tableId);
+    // Get order for a table by table_id (Table.id is number, OrderSnapshot.table_id is string)
+    const getOrderByTable = (tableId: number) => heldOrders.find((o) => o.table_id === String(tableId));
 
     // Auto-open management modal if manageTableId is provided
     useEffect(() => {
@@ -43,7 +43,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
       setShowManagementModal(true);
 
       if (manageTableId !== processedManageIdRef.current) {
-        const order = getOrderByTable(manageTableId);
+        const order = heldOrders.find((o) => o.table_id === manageTableId);
         if (order && order.zone_name) {
           const targetZone = zones.find((z) => z.name === order.zone_name);
           if (targetZone && targetZone.id !== activeZoneId) {
@@ -63,8 +63,8 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
     // Calculate stats based on zone-filtered tables
     const stats = useMemo(() => {
       // First filter by zone
-      const zoneFiltered = activeZoneId && activeZoneId !== 'ALL'
-        ? allTables.filter((t) => t.zone === activeZoneId)
+      const zoneFiltered = activeZoneId !== 'ALL'
+        ? allTables.filter((t) => t.zone_id === activeZoneId)
         : allTables;
 
       return {
@@ -86,7 +86,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
     const filteredTables = useMemo(() => {
       const filtered = allTables.filter((table) => {
         // Zone filter: if not "ALL", must match selected zone
-        if (activeZoneId && activeZoneId !== 'ALL' && table.zone !== activeZoneId) {
+        if (activeZoneId !== 'ALL' && table.zone_id !== activeZoneId) {
           return false;
         }
 
@@ -120,7 +120,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
     const handleTableClick = (table: Table, isOccupied: boolean, order?: HeldOrder) => {
       if (mode === 'RETRIEVE' && !isOccupied) return;
 
-      const activeZone = zones.find(z => z.id === table.zone);
+      const activeZone = zones.find(z => z.id === table.zone_id);
 
       if (isOccupied) {
         if (mode === 'HOLD') {
@@ -140,7 +140,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
       if (selectedTableForInput) {
         const isOccupied = !!getOrderByTable(selectedTableForInput.id);
         const count = parseInt(guestInput) || (isOccupied ? 0 : 2);
-        const activeZone = zones.find(z => z.id === selectedTableForInput.zone);
+        const activeZone = zones.find(z => z.id === selectedTableForInput.zone_id);
 
         if (count > 0 || isOccupied) {
           onSelectTable(selectedTableForInput, count, activeZone);
@@ -154,7 +154,7 @@ export const TableSelectionScreen: React.FC<TableSelectionScreenProps> = React.m
 
     // Helper to get the table object for management
     const managementTable = selectedTableForInput ||
-      (manageTableId ? allTables.find((t) => t.id === manageTableId) : null) ||
+      (manageTableId ? allTables.find((t) => String(t.id) === manageTableId) : null) ||
       null;
 
     if (isManageOnly) {
