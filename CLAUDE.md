@@ -13,18 +13,12 @@ Rust workspace 架构，专注离线优先、边缘计算、mTLS 安全通信的
 | Crate | 用途 | 详细文档 |
 |-------|------|----------|
 | `shared` | 共享类型、协议、错误系统、事件溯源定义 | [`shared/CLAUDE.md`](shared/CLAUDE.md) |
-| `edge-server` | 边缘服务器 (SurrealDB + Axum + MessageBus + 事件溯源) | [`edge-server/CLAUDE.md`](edge-server/CLAUDE.md) |
+| `edge-server` | 边缘服务器 (SQLite + Axum + MessageBus + 事件溯源) | [`edge-server/CLAUDE.md`](edge-server/CLAUDE.md) |
 | `crab-client` | 统一客户端库 (Local/Remote + Typestate + 心跳重连) | [`crab-client/CLAUDE.md`](crab-client/CLAUDE.md) |
 | `crab-cert` | PKI/证书管理 (Root CA → Tenant CA → Entity) | [`crab-cert/CLAUDE.md`](crab-cert/CLAUDE.md) |
 | `crab-auth` | 认证服务器 (激活 + 订阅校验) | [`crab-auth/CLAUDE.md`](crab-auth/CLAUDE.md) |
 | `crab-printer` | ESC/POS 热敏打印底层库 (GBK 编码) | [`crab-printer/CLAUDE.md`](crab-printer/CLAUDE.md) |
 | `red_coral` | **Tauri POS 前端** (React 19 + Zustand + Tailwind) | [`red_coral/CLAUDE.md`](red_coral/CLAUDE.md) |
-
-## 技术文档
-
-| 主题 | 文档 |
-|------|------|
-| SurrealDB & SurrealQL | [`docs/SURREALDB.md`](docs/SURREALDB.md) |
 
 ## 命令
 
@@ -52,7 +46,7 @@ cd red_coral && npx tsc --noEmit    # TS 类型检查
 ┌─────────────────────────────────────────┐
 │            edge-server                   │
 │  ┌─────────┬──────────┬──────────────┐  │
-│  │ Axum API│ MessageBus│ SurrealDB   │  │
+│  │ Axum API│ MessageBus│ SQLite      │  │
 │  │ (HTTP)  │ (TCP/TLS) │ (Embedded)  │  │
 │  └─────────┴──────────┴──────────────┘  │
 │  ┌─────────┬──────────┬──────────────┐  │
@@ -83,8 +77,8 @@ TypeScript (前端) ↔ Rust (后端) 类型必须完全匹配：
 
 | 约定 | 说明 |
 |------|------|
-| **ID 格式** | 全栈统一 `"table:id"` 字符串，后端用 `RecordId`，详见 [`edge-server/CLAUDE.md`](edge-server/CLAUDE.md) |
-| **时间戳** | `i64` Unix 毫秒 (Rust `i64` / TS `number` / SurrealDB `int`) |
+| **ID 格式** | 全栈统一 i64 整数 (SQLite INTEGER PRIMARY KEY) |
+| **时间戳** | `i64` Unix 毫秒 (Rust `i64` / TS `number` / SQLite INTEGER) |
 | **金额计算** | 后端 `rust_decimal`，前端 `Currency` (decimal.js)，禁止原生浮点 |
 | **货币** | 欧元 (€)，前端用 `formatCurrency()` 格式化 |
 | **支付方式** | 统一大写: `CASH`, `CARD` |
@@ -111,7 +105,7 @@ TypeScript (前端) ↔ Rust (后端) 类型必须完全匹配：
 - ❌ 跳过类型对齐直接部署
 - ❌ 在非 mTLS 环境传输敏感数据
 - ❌ 子 crate 单独声明依赖版本
-- ❌ 使用 `surrealdb::sql::Thing` (用 `RecordId`)
+- ❌ 使用 String 格式 ID (用 i64)
 - ❌ 使用 `string` 格式的时间戳 (用 `i64` Unix 毫秒)
 - ❌ EventApplier 中执行 I/O 或副作用
 - ❌ 使用 `f64` 进行金额计算 (用 `rust_decimal`)

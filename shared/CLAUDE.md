@@ -122,7 +122,7 @@ src/
 
 **关键约定**:
 - 时间戳: `i64` Unix 毫秒 (非 string)
-- ID: `String` 格式 `"table:id"` (对应 SurrealDB RecordId)
+- ID: `i64` 整数 (SQLite INTEGER PRIMARY KEY)
 - 金额: 服务端 `rust_decimal`，前端 `decimal.js`
 - 枚举序列化: `SCREAMING_SNAKE_CASE`
 - 可选字段: `#[serde(skip_serializing_if = "Option::is_none")]`

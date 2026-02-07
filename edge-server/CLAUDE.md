@@ -56,7 +56,7 @@ src/
 │   ├── jwt.rs          # JwtService (Argon2 + JWT)
 │   ├── middleware.rs   # require_auth() + require_permission()
 │   └── permissions.rs  # RBAC 权限定义 (Admin/Manager/User)
-├── db/             # SurrealDB 数据访问层
+├── db/             # SQLite 数据访问层
 │   ├── models/         # 数据模型 (与 shared 对齐)
 │   └── repository/     # CRUD 操作
 ├── message/        # 消息总线 (TCP/TLS/Memory)
@@ -68,7 +68,7 @@ src/
 │   ├── actions/        # CommandHandler 实现 (22 命令)
 │   ├── appliers/       # EventApplier 实现 (26 事件)
 │   ├── storage.rs      # redb 持久化 (events, snapshots, queues)
-│   ├── archive.rs      # OrderArchiveService (归档到 SurrealDB 图模型)
+│   ├── archive.rs      # OrderArchiveService (归档到 SQLite)
 │   ├── archive_worker.rs # ArchiveWorker (队列处理, 并发50, 重试3次)
 │   ├── verify_scheduler.rs # 哈希链验证调度器 (启动补扫 + 每日定时)
 │   └── sync.rs         # 重连同步 API
@@ -109,7 +109,7 @@ src/
 ```rust
 pub struct ServerState {
     pub config: Config,
-    pub db: Surreal<Db>,                    // SurrealDB
+    pub pool: SqlitePool,                    // SQLite
     pub activation: ActivationService,
     pub cert_service: CertService,
     pub message_bus: MessageBusService,
@@ -166,7 +166,7 @@ OpenTable, AddItems, ModifyItem, RemoveItem, RestoreItem, CompItem, UncompItem, 
 
 ### 归档系统
 
-- **OrderArchiveService**: 归档到 SurrealDB 图模型 (RELATE 边)
+- **OrderArchiveService**: 归档到 SQLite
 - **ArchiveWorker**: 队列处理，并发 50，重试 3 次，指数退避 5s→60s
 - **VerifyScheduler**: SHA256 哈希链验证，启动补扫 + business_day_cutoff 定时
 - **Dead Letter Queue**: 永久失败的归档任务隔离
