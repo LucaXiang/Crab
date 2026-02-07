@@ -24,7 +24,8 @@ impl DbService {
             .create_if_missing(true)
             .journal_mode(SqliteJournalMode::Wal)
             .synchronous(SqliteSynchronous::Normal)
-            .pragma("foreign_keys", "ON");
+            .pragma("foreign_keys", "ON")
+            .optimize_on_close(true, None);
 
         let pool = SqlitePoolOptions::new()
             .max_connections(5)

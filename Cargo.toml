@@ -98,7 +98,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
 
 # ========== Database ==========
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "macros", "migrate", "json"] }
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite", "derive", "migrate", "json"] }
 redb = "3.0"
 
 # ========== Decimal Precision ==========

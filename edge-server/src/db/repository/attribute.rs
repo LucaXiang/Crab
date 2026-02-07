@@ -4,8 +4,7 @@
 
 use super::{RepoError, RepoResult};
 use shared::models::{
-    Attribute, AttributeBinding, AttributeCreate, AttributeOption, AttributeOptionInput,
-    AttributeUpdate,
+    Attribute, AttributeBinding, AttributeCreate, AttributeOption, AttributeUpdate,
 };
 use sqlx::SqlitePool;
 
@@ -47,6 +46,8 @@ pub async fn create(pool: &SqlitePool, data: AttributeCreate) -> RepoResult<Attr
         .as_ref()
         .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
 
+    let mut tx = pool.begin().await?;
+
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO attribute (name, is_multi_select, max_selections, default_option_indices, display_order, is_active, show_on_receipt, receipt_name, show_on_kitchen_print, kitchen_print_name) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9) RETURNING id",
     )
@@ -59,15 +60,29 @@ pub async fn create(pool: &SqlitePool, data: AttributeCreate) -> RepoResult<Attr
     .bind(&data.receipt_name)
     .bind(data.show_on_kitchen_print.unwrap_or(false))
     .bind(&data.kitchen_print_name)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await?;
 
     // Create options
     if let Some(options) = data.options {
         for opt in options {
-            create_option(pool, id, &opt).await?;
+            sqlx::query(
+                "INSERT INTO attribute_option (attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, ?8)",
+            )
+            .bind(id)
+            .bind(&opt.name)
+            .bind(opt.price_modifier)
+            .bind(opt.display_order)
+            .bind(&opt.receipt_name)
+            .bind(&opt.kitchen_print_name)
+            .bind(opt.enable_quantity)
+            .bind(opt.max_quantity)
+            .execute(&mut *tx)
+            .await?;
         }
     }
+
+    tx.commit().await?;
 
     find_by_id(pool, id)
         .await?
@@ -132,16 +147,18 @@ pub async fn update(pool: &SqlitePool, id: i64, data: AttributeUpdate) -> RepoRe
 }
 
 pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
+    let mut tx = pool.begin().await?;
     // Delete bindings first
     sqlx::query("DELETE FROM attribute_binding WHERE attribute_id = ?")
         .bind(id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     // Options cascade via FK
     sqlx::query("DELETE FROM attribute WHERE id = ?")
         .bind(id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+    tx.commit().await?;
     Ok(true)
 }
 
@@ -157,23 +174,6 @@ async fn find_options_by_attribute(pool: &SqlitePool, attribute_id: i64) -> Repo
     .fetch_all(pool)
     .await?;
     Ok(options)
-}
-
-async fn create_option(pool: &SqlitePool, attribute_id: i64, opt: &AttributeOptionInput) -> RepoResult<i64> {
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO attribute_option (attribute_id, name, price_modifier, display_order, is_active, receipt_name, kitchen_print_name, enable_quantity, max_quantity) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, ?8) RETURNING id",
-    )
-    .bind(attribute_id)
-    .bind(&opt.name)
-    .bind(opt.price_modifier)
-    .bind(opt.display_order)
-    .bind(&opt.receipt_name)
-    .bind(&opt.kitchen_print_name)
-    .bind(opt.enable_quantity)
-    .bind(opt.max_quantity)
-    .fetch_one(pool)
-    .await?;
-    Ok(id)
 }
 
 // =========================================================================

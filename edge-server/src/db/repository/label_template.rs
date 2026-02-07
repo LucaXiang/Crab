@@ -2,8 +2,7 @@
 
 use super::{RepoError, RepoResult};
 use shared::models::{
-    ImageRefEntityType, LabelField, LabelFieldInput, LabelTemplate, LabelTemplateCreate,
-    LabelTemplateUpdate,
+    ImageRefEntityType, LabelField, LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate,
 };
 use sqlx::SqlitePool;
 use std::collections::HashSet;
@@ -70,6 +69,8 @@ pub async fn create(pool: &SqlitePool, data: LabelTemplateCreate) -> RepoResult<
     }
 
     let now = shared::util::now_millis();
+    let mut tx = pool.begin().await?;
+
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO label_template (name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14) RETURNING id",
     )
@@ -87,15 +88,47 @@ pub async fn create(pool: &SqlitePool, data: LabelTemplateCreate) -> RepoResult<
     .bind(data.render_dpi)
     .bind(&data.test_data)
     .bind(now)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await?;
 
     // Create fields
     for field in &data.fields {
-        create_field(pool, id, field).await?;
+        sqlx::query(
+            "INSERT INTO label_field (template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)",
+        )
+        .bind(id)
+        .bind(&field.field_id)
+        .bind(&field.name)
+        .bind(&field.field_type)
+        .bind(field.x)
+        .bind(field.y)
+        .bind(field.width)
+        .bind(field.height)
+        .bind(field.font_size)
+        .bind(&field.font_weight)
+        .bind(&field.font_family)
+        .bind(&field.color)
+        .bind(field.rotate)
+        .bind(&field.alignment)
+        .bind(&field.data_source)
+        .bind(&field.format)
+        .bind(field.visible)
+        .bind(&field.label)
+        .bind(&field.template)
+        .bind(&field.data_key)
+        .bind(&field.source_type)
+        .bind(field.maintain_aspect_ratio)
+        .bind(&field.style)
+        .bind(&field.align)
+        .bind(&field.vertical_align)
+        .bind(&field.line_style)
+        .execute(&mut *tx)
+        .await?;
     }
 
-    // Sync image refs
+    tx.commit().await?;
+
+    // Sync image refs (non-critical, outside transaction)
     let template = get(pool, id)
         .await?
         .ok_or_else(|| RepoError::Database("Failed to create label template".into()))?;
@@ -155,15 +188,47 @@ pub async fn update(
         )));
     }
 
-    // Replace fields if provided
+    // Replace fields if provided (atomic: delete + re-create in transaction)
     if let Some(fields) = &data.fields {
+        let mut tx = pool.begin().await?;
         sqlx::query("DELETE FROM label_field WHERE template_id = ?")
             .bind(id)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
         for field in fields {
-            create_field(pool, id, field).await?;
+            sqlx::query(
+                "INSERT INTO label_field (template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)",
+            )
+            .bind(id)
+            .bind(&field.field_id)
+            .bind(&field.name)
+            .bind(&field.field_type)
+            .bind(field.x)
+            .bind(field.y)
+            .bind(field.width)
+            .bind(field.height)
+            .bind(field.font_size)
+            .bind(&field.font_weight)
+            .bind(&field.font_family)
+            .bind(&field.color)
+            .bind(field.rotate)
+            .bind(&field.alignment)
+            .bind(&field.data_source)
+            .bind(&field.format)
+            .bind(field.visible)
+            .bind(&field.label)
+            .bind(&field.template)
+            .bind(&field.data_key)
+            .bind(&field.source_type)
+            .bind(field.maintain_aspect_ratio)
+            .bind(&field.style)
+            .bind(&field.align)
+            .bind(&field.vertical_align)
+            .bind(&field.line_style)
+            .execute(&mut *tx)
+            .await?;
         }
+        tx.commit().await?;
     }
 
     let updated = get(pool, id)
@@ -226,41 +291,6 @@ async fn find_fields(pool: &SqlitePool, template_id: i64) -> RepoResult<Vec<Labe
     .fetch_all(pool)
     .await?;
     Ok(fields)
-}
-
-async fn create_field(pool: &SqlitePool, template_id: i64, input: &LabelFieldInput) -> RepoResult<i64> {
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO label_field (template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26) RETURNING id",
-    )
-    .bind(template_id)
-    .bind(&input.field_id)
-    .bind(&input.name)
-    .bind(&input.field_type)
-    .bind(input.x)
-    .bind(input.y)
-    .bind(input.width)
-    .bind(input.height)
-    .bind(input.font_size)
-    .bind(&input.font_weight)
-    .bind(&input.font_family)
-    .bind(&input.color)
-    .bind(input.rotate)
-    .bind(&input.alignment)
-    .bind(&input.data_source)
-    .bind(&input.format)
-    .bind(input.visible)
-    .bind(&input.label)
-    .bind(&input.template)
-    .bind(&input.data_key)
-    .bind(&input.source_type)
-    .bind(input.maintain_aspect_ratio)
-    .bind(&input.style)
-    .bind(&input.align)
-    .bind(&input.vertical_align)
-    .bind(&input.line_style)
-    .fetch_one(pool)
-    .await?;
-    Ok(id)
 }
 
 /// Extract image hashes from label fields

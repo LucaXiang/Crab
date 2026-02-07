@@ -156,7 +156,9 @@ pub async fn generate(
 
     let total_unpaid = total_sales - total_paid;
 
-    // Create the report
+    // Create report + breakdowns in a single transaction
+    let mut tx = pool.begin().await?;
+
     let report_id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO daily_report (business_date, total_orders, completed_orders, void_orders, total_sales, total_paid, total_unpaid, void_amount, total_tax, total_discount, total_surcharge, generated_at, generated_by_id, generated_by_name, note) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) RETURNING id",
     )
@@ -175,21 +177,16 @@ pub async fn generate(
     .bind(&operator_id)
     .bind(&operator_name)
     .bind(&data.note)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await?;
 
-    // Generate tax breakdowns from archived_order_item
-    let completed_ids_sql = "SELECT id FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED'";
-
-    // Tax breakdown by rate
+    // Tax breakdown by rate (use subquery directly — both strings are compile-time constants)
     let tax_rows: Vec<(i32, f64, f64, f64, i64)> = sqlx::query_as(
-        &format!(
-            "SELECT tax_rate, COALESCE(SUM(quantity * unit_price), 0), COALESCE(SUM((quantity * unit_price) * tax_rate / (100 + tax_rate)), 0), COALESCE(SUM(quantity * unit_price) - SUM((quantity * unit_price) * tax_rate / (100 + tax_rate)), 0), COUNT(DISTINCT order_pk) FROM archived_order_item WHERE order_pk IN ({completed_ids_sql}) GROUP BY tax_rate ORDER BY tax_rate DESC"
-        ),
+        "SELECT tax_rate, COALESCE(SUM(quantity * unit_price), 0), COALESCE(SUM((quantity * unit_price) * tax_rate / (100 + tax_rate)), 0), COALESCE(SUM(quantity * unit_price) - SUM((quantity * unit_price) * tax_rate / (100 + tax_rate)), 0), COUNT(DISTINCT order_pk) FROM archived_order_item WHERE order_pk IN (SELECT id FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED') GROUP BY tax_rate ORDER BY tax_rate DESC",
     )
     .bind(start_millis)
     .bind(end_millis)
-    .fetch_all(pool)
+    .fetch_all(&mut *tx)
     .await?;
 
     for (tax_rate, gross, tax_amt, net, order_count) in &tax_rows {
@@ -202,19 +199,17 @@ pub async fn generate(
         .bind(tax_amt)
         .bind(gross)
         .bind(*order_count as i32)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     }
 
     // Payment breakdown by method
     let payment_rows: Vec<(String, f64, i64)> = sqlx::query_as(
-        &format!(
-            "SELECT method, COALESCE(SUM(amount), 0), COUNT(*) FROM archived_order_payment WHERE order_pk IN ({completed_ids_sql}) AND cancelled = 0 GROUP BY method"
-        ),
+        "SELECT method, COALESCE(SUM(amount), 0), COUNT(*) FROM archived_order_payment WHERE order_pk IN (SELECT id FROM archived_order WHERE end_time >= ? AND end_time < ? AND status = 'COMPLETED') AND cancelled = 0 GROUP BY method",
     )
     .bind(start_millis)
     .bind(end_millis)
-    .fetch_all(pool)
+    .fetch_all(&mut *tx)
     .await?;
 
     for (method, amount, count) in &payment_rows {
@@ -225,9 +220,11 @@ pub async fn generate(
         .bind(method)
         .bind(amount)
         .bind(*count as i32)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     }
+
+    tx.commit().await?;
 
     find_by_id(pool, report_id)
         .await?

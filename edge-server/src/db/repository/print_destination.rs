@@ -2,7 +2,7 @@
 
 use super::{RepoError, RepoResult};
 use shared::models::{
-    PrintDestination, PrintDestinationCreate, PrintDestinationUpdate, Printer, PrinterInput,
+    PrintDestination, PrintDestinationCreate, PrintDestinationUpdate, Printer,
 };
 use sqlx::SqlitePool;
 
@@ -61,19 +61,35 @@ pub async fn find_by_name(pool: &SqlitePool, name: &str) -> RepoResult<Option<Pr
 }
 
 pub async fn create(pool: &SqlitePool, data: PrintDestinationCreate) -> RepoResult<PrintDestination> {
+    let mut tx = pool.begin().await?;
+
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO print_destination (name, description, is_active) VALUES (?, ?, ?) RETURNING id",
     )
     .bind(&data.name)
     .bind(&data.description)
     .bind(data.is_active)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await?;
 
     // Create printers
     for printer in &data.printers {
-        create_printer(pool, id, printer).await?;
+        sqlx::query(
+            "INSERT INTO printer (print_destination_id, printer_type, printer_format, ip, port, driver_name, priority, is_active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        )
+        .bind(id)
+        .bind(&printer.printer_type)
+        .bind(&printer.printer_format)
+        .bind(&printer.ip)
+        .bind(printer.port)
+        .bind(&printer.driver_name)
+        .bind(printer.priority)
+        .bind(printer.is_active)
+        .execute(&mut *tx)
+        .await?;
     }
+
+    tx.commit().await?;
 
     find_by_id(pool, id)
         .await?
@@ -152,19 +168,3 @@ async fn find_printers(pool: &SqlitePool, dest_id: i64) -> RepoResult<Vec<Printe
     Ok(printers)
 }
 
-async fn create_printer(pool: &SqlitePool, dest_id: i64, input: &PrinterInput) -> RepoResult<i64> {
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO printer (print_destination_id, printer_type, printer_format, ip, port, driver_name, priority, is_active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) RETURNING id",
-    )
-    .bind(dest_id)
-    .bind(&input.printer_type)
-    .bind(&input.printer_format)
-    .bind(&input.ip)
-    .bind(input.port)
-    .bind(&input.driver_name)
-    .bind(input.priority)
-    .bind(input.is_active)
-    .fetch_one(pool)
-    .await?;
-    Ok(id)
-}
