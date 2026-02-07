@@ -17,7 +17,6 @@ pub enum OrderStatus {
     Active,
     Completed,
     Void,
-    Moved,
     Merged,
 }
 

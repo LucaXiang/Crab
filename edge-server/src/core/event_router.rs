@@ -24,7 +24,6 @@ use tokio::sync::{broadcast, mpsc};
 const TERMINAL_EVENTS: &[OrderEventType] = &[
     OrderEventType::OrderCompleted,
     OrderEventType::OrderVoided,
-    OrderEventType::OrderMoved,
     OrderEventType::OrderMerged,
 ];
 

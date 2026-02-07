@@ -23,7 +23,6 @@ use tokio::sync::mpsc;
 type ArcOrderEvent = Arc<OrderEvent>;
 
 /// Terminal event types (用于 shift cash 判断)
-/// 注意: OrderMoved 不是终端事件，移桌只是换桌，订单仍然活跃
 const TERMINAL_EVENT_TYPES: &[OrderEventType] = &[
     OrderEventType::OrderCompleted,
     OrderEventType::OrderVoided,
@@ -286,7 +285,6 @@ impl ArchiveWorker {
         let action = match event.event_type {
             OrderEventType::OrderCompleted => AuditAction::OrderCompleted,
             OrderEventType::OrderVoided => AuditAction::OrderVoided,
-            OrderEventType::OrderMoved => AuditAction::OrderMoved,
             OrderEventType::OrderMerged => AuditAction::OrderMerged,
             _ => return,
         };
@@ -340,36 +338,6 @@ impl ArchiveWorker {
                 }
                 if let Some(name) = authorizer_name {
                     details["authorizer_name"] = serde_json::json!(name);
-                }
-            }
-            EventPayload::OrderMoved {
-                source_table_id,
-                source_table_name,
-                target_table_id,
-                target_table_name,
-                target_zone_id,
-                target_zone_name,
-                authorizer_id,
-                authorizer_name,
-                ..
-            } => {
-                details["source_table"] = serde_json::json!(source_table_name);
-                details["target_table"] = serde_json::json!(target_table_name);
-                if let Some(zone) = target_zone_name {
-                    details["target_zone"] = serde_json::json!(zone);
-                }
-                if let Some(id) = authorizer_id {
-                    details["authorizer_id"] = serde_json::json!(id);
-                }
-                if let Some(name) = authorizer_name {
-                    details["authorizer_name"] = serde_json::json!(name);
-                }
-                // target points to the new table
-                let _ = source_table_id; // suppress unused warning
-                if let Some(zone_id) = target_zone_id {
-                    target = Some(format!("{}@{}", target_table_id, zone_id));
-                } else {
-                    target = Some(target_table_id.clone());
                 }
             }
             EventPayload::OrderMerged {
@@ -496,8 +464,6 @@ mod tests {
     fn test_terminal_event_types() {
         assert!(TERMINAL_EVENT_TYPES.contains(&OrderEventType::OrderCompleted));
         assert!(TERMINAL_EVENT_TYPES.contains(&OrderEventType::OrderVoided));
-        // OrderMoved is NOT a terminal event - moving to another table keeps the order active
-        assert!(!TERMINAL_EVENT_TYPES.contains(&OrderEventType::OrderMoved));
         assert!(TERMINAL_EVENT_TYPES.contains(&OrderEventType::OrderMerged));
         assert!(!TERMINAL_EVENT_TYPES.contains(&OrderEventType::ItemsAdded));
     }

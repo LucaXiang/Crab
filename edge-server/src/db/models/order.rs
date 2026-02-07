@@ -17,7 +17,6 @@ use surrealdb::RecordId;
 pub enum OrderStatus {
     Completed,
     Void,
-    Moved,
     Merged,
 }
 

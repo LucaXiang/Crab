@@ -635,7 +635,6 @@
     "no_more": "没有更多了",
     "status": {
       "voided": "已作废",
-      "moved": "已转移",
       "merged": "已合并"
     },
     "void_type": {
@@ -2279,7 +2278,6 @@
         "ACTIVE": "进行中",
         "COMPLETED": "已完成",
         "VOID": "已作废",
-        "MOVED": "已转移",
         "MERGED": "已合并",
         "power_outage": "停电",
         "app_crash": "应用崩溃",
@@ -2368,7 +2366,6 @@
       "order_completed": "订单完成",
       "order_voided": "订单作废",
       "order_merged": "订单合并",
-      "order_moved": "订单转移",
       "employee_created": "创建员工",
       "employee_updated": "更新员工",
       "employee_deleted": "删除员工",

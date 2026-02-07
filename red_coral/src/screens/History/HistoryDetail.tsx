@@ -90,15 +90,13 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
 
   const isVoid = order.status === 'VOID';
   const isMerged = order.status === 'MERGED';
-  const isMoved = order.status === 'MOVED';
-
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 flex justify-between items-start">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className={`text-2xl font-bold ${isVoid || isMerged || isMoved ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+            <h1 className={`text-2xl font-bold ${isVoid || isMerged ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
               {order.receipt_number || (order.is_retail ? t('common.label.retail') : order.table_name)}
             </h1>
             {isVoid && (
@@ -109,11 +107,6 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
             {isMerged && (
               <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded uppercase">
                 {t('history.status.merged')}
-              </span>
-            )}
-            {isMoved && (
-              <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded uppercase">
-                {t('history.status.moved')}
               </span>
             )}
             <EscalatableGate permission={Permission.RECEIPTS_REPRINT}>
@@ -175,7 +168,7 @@ export const HistoryDetail: React.FC<HistoryDetailProps> = ({ order, onReprint }
         </div>
         <div className="text-right">
           <div className="text-sm text-gray-500 uppercase font-bold tracking-wider mb-1">{t('history.info.total_amount')}</div>
-          <div className={`text-3xl font-bold ${isVoid || isMerged || isMoved ? 'text-gray-400 line-through' : 'text-primary-500'}`}>
+          <div className={`text-3xl font-bold ${isVoid || isMerged ? 'text-gray-400 line-through' : 'text-primary-500'}`}>
             {formatCurrency(order.total)}
           </div>
         </div>

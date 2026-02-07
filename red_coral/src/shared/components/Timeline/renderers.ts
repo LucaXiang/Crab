@@ -38,6 +38,7 @@ import type {
   OrderNoteAddedPayload,
 } from '@/core/domain/types/orderEvent';
 import { formatCurrency } from '@/utils/currency/formatCurrency';
+import { Currency } from '@/utils/currency';
 import {
   Utensils, ShoppingBag, Coins, CheckCircle,
   Edit3, Trash2, Ban, Tag, ArrowRight, ArrowLeft, Split, Users, XCircle
@@ -776,8 +777,8 @@ const OrderDiscountAppliedRenderer: EventRenderer<OrderDiscountAppliedPayload> =
     }
     details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
     // Show surcharge if present (derived: surcharge = total - subtotal + discount)
-    const derivedSurcharge = payload.total - payload.subtotal + payload.discount;
-    if (derivedSurcharge > 0.005) {
+    const derivedSurcharge = Currency.sub(Currency.add(payload.total, payload.discount), payload.subtotal).toNumber();
+    if (Currency.gt(derivedSurcharge, 0.005)) {
       details.push(`${t('timeline.labels.surcharge')}: +${formatCurrency(derivedSurcharge)}`);
     }
     details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`);
@@ -815,8 +816,8 @@ const OrderSurchargeAppliedRenderer: EventRenderer<OrderSurchargeAppliedPayload>
     }
     details.push(`${t('timeline.labels.subtotal')}: ${formatCurrency(payload.subtotal)}`);
     // Show discount if present (derived: discount = subtotal + surcharge - total)
-    const derivedDiscount = payload.subtotal + payload.surcharge - payload.total;
-    if (derivedDiscount > 0.005) {
+    const derivedDiscount = Currency.sub(Currency.add(payload.subtotal, payload.surcharge), payload.total).toNumber();
+    if (Currency.gt(derivedDiscount, 0.005)) {
       details.push(`${t('timeline.labels.discount')}: -${formatCurrency(derivedDiscount)}`);
     }
     details.push(`${t('timeline.labels.total')}: ${formatCurrency(payload.total)}`);

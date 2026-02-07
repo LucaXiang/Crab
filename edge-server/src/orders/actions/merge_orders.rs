@@ -48,9 +48,6 @@ impl CommandHandler for MergeOrdersAction {
                     self.source_order_id
                 )));
             }
-            _ => {
-                return Err(OrderError::OrderNotFound(self.source_order_id.clone()));
-            }
         }
 
         // 3. Load target snapshot
@@ -72,9 +69,6 @@ impl CommandHandler for MergeOrdersAction {
                     "Target order {} is already merged",
                     self.target_order_id
                 )));
-            }
-            _ => {
-                return Err(OrderError::OrderNotFound(self.target_order_id.clone()));
             }
         }
 

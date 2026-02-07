@@ -36,7 +36,7 @@ impl CommandHandler for CancelPaymentAction {
             OrderStatus::Void => {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
-            OrderStatus::Moved | OrderStatus::Merged => {
+            OrderStatus::Merged => {
                 return Err(OrderError::InvalidOperation(format!(
                     "Cannot cancel payment on order with status {:?}",
                     snapshot.status

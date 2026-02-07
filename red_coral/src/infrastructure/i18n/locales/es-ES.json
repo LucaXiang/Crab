@@ -635,7 +635,6 @@
     "no_more": "No hay más",
     "status": {
       "voided": "Anulado",
-      "moved": "Movido",
       "merged": "Unido"
     },
     "void_type": {
@@ -2279,7 +2278,6 @@
         "ACTIVE": "Activo",
         "COMPLETED": "Completado",
         "VOID": "Anulado",
-        "MOVED": "Movido",
         "MERGED": "Unido",
         "power_outage": "Corte luz",
         "app_crash": "Fallo app",
@@ -2368,7 +2366,6 @@
       "order_completed": "Pedido completado",
       "order_voided": "Pedido anulado",
       "order_merged": "Pedido unido",
-      "order_moved": "Pedido movido",
       "employee_created": "Empleado creado",
       "employee_updated": "Empleado actualizado",
       "employee_deleted": "Empleado eliminado",

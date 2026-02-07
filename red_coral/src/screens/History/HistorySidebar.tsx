@@ -35,8 +35,8 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
   const filteredOrders = orders.filter(order => {
     // Filter out orders without a receipt number (e.g. unfinalized retail/prepaid)
     // User request: "Modify retail page logic to hide voided/prepaid receipts" & "If it is null, do not display it"
-    // Update: Allow VOID / MERGED / MOVED orders to be visible for audit purposes
-    if (order.status === 'VOID' || order.status === 'MERGED' || order.status === 'MOVED') return true;
+    // Update: Allow VOID / MERGED orders to be visible for audit purposes
+    if (order.status === 'VOID' || order.status === 'MERGED') return true;
     if (!order.receipt_number) return false;
     return true;
   });
@@ -80,7 +80,6 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
             {filteredOrders.map((order) => {
               const isSelected = selectedKey === order.order_id;
               const isVoid = order.status === 'VOID';
-              const isMoved = order.status === 'MOVED';
               const isMerged = order.status === 'MERGED';
               return (
                 <button
@@ -102,11 +101,9 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                           <span className="text-blue-600 bg-blue-100 px-1 rounded">{order.table_name}</span>
                         )
                       )}
-                      <span className={`px-1.5 py-0.5 rounded-full font-bold ${isVoid ? 'bg-red-100 text-red-600' : (isMoved || isMerged) ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                      <span className={`px-1.5 py-0.5 rounded-full font-bold ${isVoid ? 'bg-red-100 text-red-600' : isMerged ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                         {isVoid
                           ? t('history.status.voided').toUpperCase()
-                          : isMoved
-                          ? t('history.status.moved').toUpperCase()
                           : isMerged
                           ? t('history.status.merged').toUpperCase()
                           : t('checkout.amount.paid_status').toUpperCase()}
@@ -130,7 +127,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                           <div className="text-xs text-orange-500">{t('common.label.loss_amount')}: {formatCurrency(order.loss_amount || 0)}</div>
                         </>
                       ) : (
-                        <div className={`font-bold ${isVoid || isMoved || isMerged ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{formatCurrency(order.total)}</div>
+                        <div className={`font-bold ${isVoid || isMerged ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{formatCurrency(order.total)}</div>
                       )}
                     <ChevronRight size={16} className={`ml-auto mt-1 transition-opacity ${isSelected ? 'text-primary-400 opacity-100' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`} />
                   </div>

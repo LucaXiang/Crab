@@ -89,7 +89,7 @@ export type {
   PaymentMethod,
   OrderConnectionState,
   AppliedRule,
-  OrderStatus,  // Event sourcing status: ACTIVE | COMPLETED | VOID | MOVED | MERGED
+  OrderStatus,  // Event sourcing status: ACTIVE | COMPLETED | VOID | MERGED
   VoidType,
   LossReason,
 } from './orderEvent';

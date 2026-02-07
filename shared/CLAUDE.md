@@ -88,7 +88,7 @@ src/
 - EventPayload 与 CommandPayload 一一对应
 
 **OrderSnapshot** (完整订单状态):
-- 状态: `OrderStatus` (Active, Completed, Void, Moved, Merged)
+- 状态: `OrderStatus` (Active, Completed, Void, Merged)
 - 作废: `VoidType` (Cancelled, LossSettled) + `LossReason`
 - 服务: `ServiceType` (DineIn, Takeout)
 - 金额: original_total, subtotal, discount, surcharge, tax, total, paid, remaining

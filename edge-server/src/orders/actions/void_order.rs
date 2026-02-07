@@ -40,7 +40,7 @@ impl CommandHandler for VoidOrderAction {
             OrderStatus::Void => {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
-            _ => {
+            OrderStatus::Merged => {
                 return Err(OrderError::InvalidOperation(format!(
                     "Cannot void order in {:?} status",
                     snapshot.status
@@ -235,29 +235,6 @@ mod tests {
         let result = action.execute(&mut ctx, &metadata).await;
 
         assert!(matches!(result, Err(OrderError::OrderNotFound(_))));
-    }
-
-    #[tokio::test]
-    async fn test_void_moved_order() {
-        let storage = OrderStorage::open_in_memory().unwrap();
-        let txn = storage.begin_write().unwrap();
-
-        let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        snapshot.status = OrderStatus::Moved;
-        storage.store_snapshot(&txn, &snapshot).unwrap();
-
-        let current_seq = storage.get_next_sequence(&txn).unwrap();
-        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
-
-        let action = create_void_action("order-1", None);
-
-        let metadata = create_test_metadata();
-        let result = action.execute(&mut ctx, &metadata).await;
-
-        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
-        if let Err(OrderError::InvalidOperation(msg)) = result {
-            assert!(msg.contains("Cannot void order"));
-        }
     }
 
     #[tokio::test]

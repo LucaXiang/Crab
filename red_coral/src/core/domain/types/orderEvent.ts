@@ -727,7 +727,7 @@ export interface SyncResponse {
 /**
  * Order status
  */
-export type OrderStatus = 'ACTIVE' | 'COMPLETED' | 'VOID' | 'MOVED' | 'MERGED';
+export type OrderStatus = 'ACTIVE' | 'COMPLETED' | 'VOID' | 'MERGED';
 
 /**
  * Order snapshot (computed from event stream)

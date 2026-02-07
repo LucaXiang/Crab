@@ -40,8 +40,6 @@ pub enum AuditAction {
     OrderVoided,
     /// 订单合并
     OrderMerged,
-    /// 订单转移（换桌）
-    OrderMoved,
 
     // ═══ 管理操作 ═══
     /// 员工创建

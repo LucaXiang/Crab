@@ -9,7 +9,7 @@ const RESOURCE_ACTIONS: Record<string, AuditAction[]> = {
   system: ['system_startup', 'system_shutdown', 'system_abnormal_shutdown', 'system_long_downtime'],
   auth: ['login_success', 'login_failed', 'logout'],
   system_issue: ['resolve_system_issue'],
-  order: ['order_completed', 'order_voided', 'order_merged', 'order_moved'],
+  order: ['order_completed', 'order_voided', 'order_merged'],
   employee: ['employee_created', 'employee_updated', 'employee_deleted'],
   role: ['role_created', 'role_updated', 'role_deleted'],
   product: ['product_created', 'product_updated', 'product_deleted'],

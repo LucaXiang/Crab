@@ -38,7 +38,7 @@ impl CommandHandler for AddPaymentAction {
             OrderStatus::Void => {
                 return Err(OrderError::OrderAlreadyVoided(self.order_id.clone()));
             }
-            OrderStatus::Moved | OrderStatus::Merged => {
+            OrderStatus::Merged => {
                 return Err(OrderError::InvalidOperation(format!(
                     "Cannot add payment to order with status {:?}",
                     snapshot.status

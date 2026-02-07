@@ -565,10 +565,7 @@ impl OrdersManager {
                 OrderStatus::Active => {
                     self.storage.mark_order_active(&txn, &snapshot.order_id)?;
                 }
-                OrderStatus::Completed
-                | OrderStatus::Void
-                | OrderStatus::Merged
-                | OrderStatus::Moved => {
+                OrderStatus::Completed | OrderStatus::Void | OrderStatus::Merged => {
                     self.storage.mark_order_inactive(&txn, &snapshot.order_id)?;
                     // Queue for archive if archive service is configured
                     if self.archive_service.is_some() {
@@ -2827,11 +2824,11 @@ mod tests {
     }
 
     // ========================================================================
-    // 43. Moved/Merged 状态的订单不能添加支付
+    // 43. 移桌后仍可正常支付
     // ========================================================================
 
     #[test]
-    fn test_add_payment_to_moved_order_fails() {
+    fn test_add_payment_after_move_order() {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
@@ -2855,8 +2852,7 @@ mod tests {
         );
         manager.execute_command(move_cmd);
 
-        // MoveOrder 在当前实现中不改变订单状态为 Moved（它只是移动桌台），
-        // 而是保持 Active。验证移桌后仍然可以支付。
+        // MoveOrder 只移动桌台，订单保持 Active，仍可支付
         let pay_cmd = OrderCommand::new(
             "op-1".to_string(),
             "Test Operator".to_string(),
@@ -2871,7 +2867,7 @@ mod tests {
             },
         );
         let resp = manager.execute_command(pay_cmd);
-        assert!(resp.success, "Moved order should still accept payments (status stays Active)");
+        assert!(resp.success, "Order should accept payments after MoveOrder (status stays Active)");
     }
 
     // ========================================================================

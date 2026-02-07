@@ -160,7 +160,7 @@ execute_command(cmd)
 OpenTable, AddItems, ModifyItem, RemoveItem, RestoreItem, CompItem, UncompItem, AddPayment, CancelPayment, CompleteOrder, VoidOrder, MergeOrders, MoveOrder, SplitByItems, SplitByAmount, StartAaSplit, PayAaSplit, UpdateOrderInfo, AddOrderNote, ToggleRuleSkip, ApplyOrderDiscount, ApplyOrderSurcharge
 
 **EventRouter 分发**:
-- **Archive** (阻塞): 终结事件 (Completed, Voided, Moved, Merged)
+- **Archive** (阻塞): 终结事件 (Completed, Voided, Merged)
 - **Print** (尽力,丢弃): ItemsAdded 事件
 - **Sync** (尽力,丢弃): 所有事件
 

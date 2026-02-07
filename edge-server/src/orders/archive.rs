@@ -9,6 +9,7 @@ use crate::db::models::{
 };
 use crate::db::repository::SystemStateRepository;
 use serde::{Deserialize, Serialize};
+use rust_decimal::{Decimal, prelude::*, RoundingStrategy};
 use sha2::{Digest, Sha256};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
 use std::path::PathBuf;
@@ -529,7 +530,6 @@ impl OrderArchiveService {
         let status_str = match order.status {
             SurrealOrderStatus::Completed => "COMPLETED",
             SurrealOrderStatus::Void => "VOID",
-            SurrealOrderStatus::Moved => "MOVED",
             SurrealOrderStatus::Merged => "MERGED",
         };
 
@@ -568,16 +568,32 @@ impl OrderArchiveService {
         // Bind item fields
         for (i, item) in snapshot.items.iter().enumerate() {
             let base_price = item.original_price.unwrap_or(item.price);
-            let manual_discount_per_unit = item
+            let d_base = Decimal::from_f64(base_price).unwrap_or_default();
+            let d_qty = Decimal::from(item.quantity);
+            let d_manual_discount_per_unit = item
                 .manual_discount_percent
-                .map(|p| base_price * p / 100.0)
-                .unwrap_or(0.0);
-            let rule_discount_per_unit = item.rule_discount_amount.unwrap_or(0.0);
-            let total_discount = (manual_discount_per_unit + rule_discount_per_unit) * item.quantity as f64;
-            let surcharge_per_unit = item.rule_surcharge_amount.unwrap_or(0.0);
-            let total_surcharge = surcharge_per_unit * item.quantity as f64;
-            let unit_price = item.unit_price.unwrap_or(base_price - manual_discount_per_unit - rule_discount_per_unit + surcharge_per_unit);
-            let line_total = item.line_total.unwrap_or(unit_price * item.quantity as f64);
+                .map(|p| d_base * Decimal::from_f64(p).unwrap_or_default() / Decimal::ONE_HUNDRED)
+                .unwrap_or(Decimal::ZERO);
+            let d_rule_discount_per_unit = Decimal::from_f64(item.rule_discount_amount.unwrap_or(0.0)).unwrap_or_default();
+            let total_discount = ((d_manual_discount_per_unit + d_rule_discount_per_unit) * d_qty)
+                .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
+                .to_f64().unwrap_or_default();
+            let d_surcharge_per_unit = Decimal::from_f64(item.rule_surcharge_amount.unwrap_or(0.0)).unwrap_or_default();
+            let total_surcharge = (d_surcharge_per_unit * d_qty)
+                .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
+                .to_f64().unwrap_or_default();
+            let unit_price = if item.unit_price.is_some() {
+                item.unit_price.unwrap()
+            } else {
+                (d_base - d_manual_discount_per_unit - d_rule_discount_per_unit + d_surcharge_per_unit)
+                    .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
+                    .to_f64().unwrap_or_default()
+            };
+            let line_total = item.line_total.unwrap_or_else(|| {
+                (Decimal::from_f64(unit_price).unwrap_or_default() * d_qty)
+                    .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
+                    .to_f64().unwrap_or_default()
+            });
             let spec_name = item.selected_specification.as_ref().map(|s| s.name.clone());
             let instance_id = item.instance_id.clone();
             let paid_qty = snapshot.paid_item_quantities.get(&instance_id).copied().unwrap_or(0);
@@ -596,8 +612,8 @@ impl OrderArchiveService {
                 .bind((format!("item{}_line_total", i), line_total))
                 .bind((format!("item{}_discount_amount", i), total_discount))
                 .bind((format!("item{}_surcharge_amount", i), total_surcharge))
-                .bind((format!("item{}_rule_discount_amount", i), rule_discount_per_unit * item.quantity as f64))
-                .bind((format!("item{}_rule_surcharge_amount", i), surcharge_per_unit * item.quantity as f64))
+                .bind((format!("item{}_rule_discount_amount", i), (d_rule_discount_per_unit * d_qty).round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero).to_f64().unwrap_or_default()))
+                .bind((format!("item{}_rule_surcharge_amount", i), (d_surcharge_per_unit * d_qty).round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero).to_f64().unwrap_or_default()))
                 .bind((format!("item{}_applied_rules", i), item.applied_rules.as_ref().and_then(|rules| serde_json::to_string(rules).ok())))
                 .bind((format!("item{}_tax", i), item.tax.unwrap_or(0.0)))
                 .bind((format!("item{}_tax_rate", i), item.tax_rate.unwrap_or(0)))
@@ -958,7 +974,6 @@ impl OrderArchiveService {
         let status = match snapshot.status {
             OrderStatus::Completed => SurrealOrderStatus::Completed,
             OrderStatus::Void => SurrealOrderStatus::Void,
-            OrderStatus::Moved => SurrealOrderStatus::Moved,
             OrderStatus::Merged => SurrealOrderStatus::Merged,
             _ => {
                 return Err(ArchiveError::Conversion(format!(

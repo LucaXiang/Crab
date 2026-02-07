@@ -433,28 +433,6 @@ const OrderMergedRenderer: AuditDetailsRenderer = {
   },
 };
 
-const OrderMovedRenderer: AuditDetailsRenderer = {
-  render(_entry, details, t) {
-    const lines: AuditDetailLine[] = [];
-
-    if (details.source_table_name) {
-      lines.push({
-        label: t('audit.detail.field.source_table'),
-        value: String(details.source_table_name),
-      });
-    }
-
-    if (details.target_table_name) {
-      lines.push({
-        label: t('audit.detail.field.target_table'),
-        value: String(details.target_table_name),
-      });
-    }
-
-    return { lines, isEmpty: lines.length === 0 };
-  },
-};
-
 // ---- 班次 ----
 
 const ShiftOpenedRenderer: AuditDetailsRenderer = {
@@ -633,7 +611,6 @@ type AuditActionType =
   | 'order_completed'
   | 'order_voided'
   | 'order_merged'
-  | 'order_moved'
   | 'employee_created'
   | 'employee_updated'
   | 'employee_deleted'
@@ -695,7 +672,6 @@ export const AUDIT_RENDERERS: Partial<Record<AuditActionType, AuditDetailsRender
   order_completed: OrderCompletedRenderer,
   order_voided: OrderVoidedRenderer,
   order_merged: OrderMergedRenderer,
-  order_moved: OrderMovedRenderer,
 
   // 班次
   shift_opened: ShiftOpenedRenderer,
