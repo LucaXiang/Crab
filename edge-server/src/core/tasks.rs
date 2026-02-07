@@ -129,7 +129,7 @@ impl BackgroundTasks {
                         task = %name,
                         kind = %kind,
                         panic = %panic_msg,
-                        "🚨 Background task panicked! This is a bug that should be reported."
+                        "Background task panicked! This is a bug that should be reported."
                     );
                 }
             }
@@ -173,7 +173,7 @@ impl BackgroundTasks {
     pub fn log_summary(&self) {
         let (warmup, worker, listener, periodic) = self.count_by_kind();
         tracing::info!(
-            "📋 Background tasks registered: {} total (Worker: {}, Listener: {}, Periodic: {}, Warmup: {})",
+            "Background tasks registered: {} total (Worker: {}, Listener: {}, Periodic: {}, Warmup: {})",
             self.tasks.len(),
             worker,
             listener,
@@ -192,7 +192,7 @@ impl BackgroundTasks {
                 tracing::error!(
                     task = %task.name,
                     kind = %task.kind,
-                    "🚨 Background task unexpectedly finished! This may indicate a panic or error."
+                    "Background task unexpectedly finished! This may indicate a panic or error."
                 );
                 failed_count += 1;
             }
@@ -212,7 +212,7 @@ impl BackgroundTasks {
     ///
     /// 发送取消信号后，等待所有任务完成或超时。
     pub async fn shutdown(self) {
-        tracing::info!("🛑 Shutting down {} background tasks...", self.tasks.len());
+        tracing::info!("Shutting down {} background tasks...", self.tasks.len());
 
         // 发送取消信号
         self.shutdown.cancel();
@@ -232,7 +232,7 @@ impl BackgroundTasks {
             }
         }
 
-        tracing::info!("✅ All background tasks stopped");
+        tracing::info!("All background tasks stopped");
     }
 }
 

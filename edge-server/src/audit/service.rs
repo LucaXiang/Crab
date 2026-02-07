@@ -115,7 +115,7 @@ impl AuditService {
             let last_start_ts: i64 = lock_content.trim().parse().unwrap_or(0);
 
             tracing::warn!(
-                "⚠️ Abnormal shutdown detected — LOCK file exists (last start: {})",
+                "Abnormal shutdown detected — LOCK file exists (last start: {})",
                 last_start_ts
             );
 
@@ -190,7 +190,7 @@ impl AuditService {
             let gap = now - last_ts;
             if gap > LONG_DOWNTIME_THRESHOLD_MS {
                 let hours = gap / (60 * 60 * 1000);
-                tracing::warn!("⚠️ Long downtime detected — system offline for {}h", hours);
+                tracing::warn!("Long downtime detected — system offline for {}h", hours);
 
                 let details = serde_json::json!({
                     "last_activity_timestamp": last_ts,

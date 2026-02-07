@@ -24,7 +24,7 @@ impl AuditWorker {
 
     /// 运行 worker（阻塞直到通道关闭）
     pub async fn run(self, mut rx: tokio::sync::mpsc::Receiver<AuditLogRequest>) {
-        tracing::info!("📋 Audit log worker started");
+        tracing::info!("Audit log worker started");
 
         while let Some(req) = rx.recv().await {
             let mut last_err = None;

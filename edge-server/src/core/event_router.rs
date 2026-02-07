@@ -75,7 +75,7 @@ impl EventRouter {
 
     /// 运行路由器（阻塞直到源通道关闭）
     pub async fn run(self, mut source: broadcast::Receiver<OrderEvent>) {
-        tracing::info!("📨 Event router started");
+        tracing::info!("Event router started");
 
         loop {
             match source.recv().await {

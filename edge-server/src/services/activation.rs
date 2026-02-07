@@ -184,27 +184,27 @@ impl ActivationService {
     ) -> Result<(), AppError> {
         // 1. Check activation status
         if !self.is_activated().await {
-            tracing::info!("⏳ Server not activated");
+            tracing::info!("Server not activated");
             return Err(AppError::not_activated("Server not activated"));
         }
 
         // 2. Perform self-check (cert chain + hardware binding + credential signature + clock)
-        tracing::info!("🔍 Performing self-check...");
+        tracing::info!("Performing self-check...");
         let cached_binding = self.credential_cache.read().await.clone();
-        
+
         if let Err(e) = cert_service
             .self_check_with_binding(cached_binding.as_ref())
             .await
         {
-            tracing::error!("❌ Self-check failed: {}", e);
-            
+            tracing::error!("Self-check failed: {}", e);
+
             // 进入未绑定状态
             self.enter_unbound_state(cert_service).await;
-            
+
             return Err(e);
         }
 
-        tracing::info!("✅ Self-check passed!");
+        tracing::info!("Self-check passed!");
 
         // 3. Update last_verified_at timestamp (防止时钟篡改)
         self.update_last_verified_at().await;
@@ -236,20 +236,20 @@ impl ActivationService {
         loop {
             // 1. Check activation status
             if !self.is_activated().await {
-                tracing::info!("⏳ Server not activated. Waiting for activation signal...");
+                tracing::info!("Server not activated. Waiting for activation signal...");
                 tokio::select! {
                     _ = shutdown_token.cancelled() => {
                         tracing::info!("Shutdown requested during activation wait");
                         return Err(());
                     }
                     _ = self.notify.notified() => {
-                        tracing::info!("📡 Activation signal received!");
+                        tracing::info!("Activation signal received!");
                     }
                 }
             }
 
             // 2. Perform self-check (cert chain + hardware binding + credential signature + clock)
-            tracing::info!("🔍 Performing self-check...");
+            tracing::info!("Performing self-check...");
             let cached_binding = self.credential_cache.read().await.clone();
 
             match cert_service
@@ -257,7 +257,7 @@ impl ActivationService {
                 .await
             {
                 Ok(()) => {
-                    tracing::info!("✅ Self-check passed!");
+                    tracing::info!("Self-check passed!");
 
                     // 3. Update last_verified_at timestamp (防止时钟篡改)
                     self.update_last_verified_at().await;
@@ -265,12 +265,12 @@ impl ActivationService {
                     break; // Exit loop, continue to start server
                 }
                 Err(e) => {
-                    tracing::error!("❌ Self-check failed: {}", e);
+                    tracing::error!("Self-check failed: {}", e);
 
                     // 进入未绑定状态
                     self.enter_unbound_state(cert_service).await;
 
-                    tracing::warn!("🔄 Server entered unbound state. Waiting for reactivation...");
+                    tracing::warn!("Server entered unbound state. Waiting for reactivation...");
                     // Loop continues, will wait for activation again
                 }
             }
@@ -311,7 +311,7 @@ impl ActivationService {
             *cache = None;
         }
 
-        tracing::info!("🧹 Cleanup completed. Ready for reactivation.");
+        tracing::info!("Cleanup completed. Ready for reactivation.");
     }
 
     pub async fn is_activated(&self) -> bool {
@@ -356,13 +356,13 @@ impl ActivationService {
             *cache = Some(credential.clone());
         }
 
-        tracing::info!("🚀 Server activated!");
+        tracing::info!("Server activated!");
         self.notify.notify_waiters();
         Ok(())
     }
 
     pub async fn deactivate(&self) -> Result<(), AppError> {
-        tracing::warn!("⚠️ Deactivating server and resetting state");
+        tracing::warn!("Deactivating server and resetting state");
 
         // 1. Delete from disk
         TenantBinding::delete(&self.cert_dir)

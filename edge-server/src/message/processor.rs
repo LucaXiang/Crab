@@ -183,11 +183,11 @@ impl RequestCommandProcessor {
         let employee = match employee_repo.find_by_id(operator_id).await {
             Ok(Some(emp)) => emp,
             Ok(None) => {
-                tracing::warn!(operator_id = %operator_id, "操作者不存在");
+                tracing::warn!(operator_id = %operator_id, "Operator not found");
                 return false;
             }
             Err(e) => {
-                tracing::error!(error = %e, "查询操作者失败");
+                tracing::error!(error = %e, "Failed to query operator");
                 return false;
             }
         };
@@ -198,11 +198,11 @@ impl RequestCommandProcessor {
         let role = match role_repo.find_by_id(&role_id_str).await {
             Ok(Some(r)) => r,
             Ok(None) => {
-                tracing::warn!(role_id = %employee.role, "角色不存在");
+                tracing::warn!(role_id = %employee.role, "Role not found");
                 return false;
             }
             Err(e) => {
-                tracing::error!(error = %e, "查询角色失败");
+                tracing::error!(error = %e, "Failed to query role");
                 return false;
             }
         };

@@ -39,7 +39,7 @@ impl ShiftAutoCloseScheduler {
 
     /// 主循环：启动扫描 + cutoff 定点触发 + 配置变更响应
     pub async fn run(self) {
-        tracing::info!("🕐 Shift settlement detector started");
+        tracing::info!("Shift settlement detector started");
 
         // 启动时立即扫描一次
         self.detect_and_notify().await;
@@ -50,7 +50,7 @@ impl ShiftAutoCloseScheduler {
             let sleep_duration = Self::duration_until_next_cutoff(cutoff_time, tz);
 
             tracing::info!(
-                "🕐 Next settlement check in {} minutes (cutoff={})",
+                "Next settlement check in {} minutes (cutoff={})",
                 sleep_duration.as_secs() / 60,
                 cutoff_time.format("%H:%M")
             );
@@ -62,7 +62,7 @@ impl ShiftAutoCloseScheduler {
                 }
                 // 配置变更 → 重新计算 sleep（不检测，只重算）
                 _ = self.config_notify.notified() => {
-                    tracing::info!("🕐 Config changed, recalculating next cutoff");
+                    tracing::info!("Config changed, recalculating next cutoff");
                     // 配置变更后也扫描一次，因为新 cutoff 可能使当前班次变为过期
                     self.detect_and_notify().await;
                 }
@@ -89,7 +89,7 @@ impl ShiftAutoCloseScheduler {
             }
             Ok(shifts) => {
                 tracing::info!(
-                    "🕐 Detected {} stale shift(s), broadcasting settlement_required",
+                    "Detected {} stale shift(s), broadcasting settlement_required",
                     shifts.len()
                 );
                 for shift in &shifts {

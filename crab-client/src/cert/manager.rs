@@ -317,7 +317,7 @@ impl CertManager {
     /// - `Ok(())` if all checks pass
     /// - `Err(CertError)` with specific error if any check fails
     pub fn self_check(&self) -> Result<(), CertError> {
-        tracing::info!("🔍 Running CertManager self-check...");
+        tracing::info!("Running CertManager self-check...");
 
         // Step 1: 检查证书文件是否存在
         if !self.has_local_certificates() {
@@ -331,7 +331,7 @@ impl CertManager {
         crab_cert::verify_chain_against_root(&cert_pem, &ca_cert_pem).map_err(|e| {
             CertError::Invalid(format!("Certificate chain verification failed: {}", e))
         })?;
-        tracing::info!("  ✅ Certificate chain verified.");
+        tracing::info!("Certificate chain verified");
 
         // Step 4: 解析证书元数据并验证
         let metadata = crab_cert::CertMetadata::from_pem(&cert_pem)
@@ -348,13 +348,13 @@ impl CertManager {
         if metadata.not_after < warn_threshold {
             let days_left = (metadata.not_after - now).whole_days();
             tracing::warn!(
-                "  ⚠️ Certificate will expire in {} days (at {})",
+                "Certificate will expire in {} days (at {})",
                 days_left,
                 metadata.not_after
             );
         } else {
             tracing::info!(
-                "  ✅ Certificate validity OK (expires: {}).",
+                "Certificate validity OK (expires: {})",
                 metadata.not_after
             );
         }
@@ -368,9 +368,9 @@ impl CertManager {
                     cert_device_id, current_device_id
                 )));
             }
-            tracing::info!("  ✅ Hardware ID binding verified.");
+            tracing::info!("Hardware ID binding verified");
         } else {
-            tracing::warn!("  ⚠️ Certificate has no device_id binding (less secure).");
+            tracing::warn!("Certificate has no device_id binding (less secure)");
         }
 
         // Step 7: 验证 Credential 签名和时钟 (如果存在)
@@ -384,7 +384,7 @@ impl CertManager {
             credential
                 .verify_timestamp_signature(&ca_cert_pem)
                 .map_err(|e| CertError::Invalid(e.to_string()))?;
-            tracing::info!("  ✅ Clock integrity and timestamp signature verified.");
+            tracing::info!("Clock integrity and timestamp signature verified");
 
             // Step 7c: 验证凭证签名
             if credential.is_signed() {
@@ -402,7 +402,7 @@ impl CertManager {
                         cred_device_id, current_device_id
                     )));
                 }
-                tracing::info!("  ✅ Credential signature and device binding verified.");
+                tracing::info!("Credential signature and device binding verified");
             } else {
                 return Err(CertError::Invalid(
                     "Credential is not signed. Please re-activate to obtain a signed credential."
@@ -412,11 +412,11 @@ impl CertManager {
 
             // 检查凭证过期
             if credential.is_expired() {
-                tracing::warn!("  ⚠️ Credential token has expired (needs refresh).");
+                tracing::warn!("Credential token has expired (needs refresh)");
             }
         }
 
-        tracing::info!("✅ CertManager self-check passed.");
+        tracing::info!("CertManager self-check passed");
         Ok(())
     }
 
@@ -438,7 +438,7 @@ impl CertManager {
         // 删除凭证
         let _ = self.logout();
 
-        tracing::info!("🧹 Cleanup completed. Ready for reactivation.");
+        tracing::info!("Cleanup completed. Ready for reactivation");
         Ok(())
     }
 

@@ -233,7 +233,6 @@ impl OrderStorage {
     /// Get and increment order count atomically
     /// Returns the NEW count after increment
     pub fn next_order_count(&self) -> StorageResult<u64> {
-        tracing::debug!("next_order_count: starting");
         let txn = self.db.begin_write()?;
         let mut table = txn.open_table(SEQUENCE_TABLE)?;
         let current = table
@@ -244,7 +243,6 @@ impl OrderStorage {
         table.insert(ORDER_COUNT_KEY, next)?;
         drop(table);
         txn.commit()?;
-        tracing::debug!(current = current, next = next, "next_order_count: incremented");
         Ok(next)
     }
 

@@ -47,7 +47,7 @@ impl KitchenPrintWorker {
     ///
     /// 接收来自 EventRouter 的 mpsc 通道（已过滤为仅 ItemsAdded）
     pub async fn run(self, mut event_rx: mpsc::Receiver<ArcOrderEvent>) {
-        tracing::info!("🖨️ Kitchen print worker started");
+        tracing::info!("Kitchen print worker started");
         let executor = PrintExecutor::new();
 
         while let Some(event) = event_rx.recv().await {
@@ -82,7 +82,7 @@ impl KitchenPrintWorker {
                 tracing::info!(
                     order_id = %event.order_id,
                     kitchen_order_id = %kitchen_order_id,
-                    "🖨️ Created kitchen order"
+                    "Created kitchen order"
                 );
 
                 // Execute actual printing

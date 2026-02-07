@@ -77,7 +77,7 @@ impl VerifyScheduler {
 
     /// 主循环：启动补扫 → 周期触发
     pub async fn run(self) {
-        tracing::info!("🔍 Verify scheduler started");
+        tracing::info!("Verify scheduler started");
 
         // 1. 启动补扫
         if let Err(e) = self.catch_up().await {
@@ -87,7 +87,7 @@ impl VerifyScheduler {
         // 2. 周期循环
         self.periodic_loop().await;
 
-        tracing::info!("🔍 Verify scheduler stopped");
+        tracing::info!("Verify scheduler stopped");
     }
 
     // ========================================================================
@@ -136,7 +136,7 @@ impl VerifyScheduler {
 
         let days = (yesterday - start_date).num_days() + 1;
         tracing::info!(
-            "🔍 Catching up {} day(s) of daily verification ({} → {})",
+            "Catching up {} day(s) of daily verification ({} -> {})",
             days,
             start_date,
             yesterday
@@ -162,14 +162,14 @@ impl VerifyScheduler {
                     self.save_daily_result(&date_str, &result).await;
                     if !intact {
                         tracing::warn!(
-                            "⚠️ Daily chain verification for {} found issues (resets: {}, breaks: {}, invalid: {})",
+                            "Daily chain verification for {} found issues (resets: {}, breaks: {}, invalid: {})",
                             date_str,
                             result.chain_resets.len(),
                             result.chain_breaks.len(),
                             result.invalid_orders.len()
                         );
                     } else {
-                        tracing::info!("✅ Daily chain verification for {}: {} orders OK", date_str, total);
+                        tracing::info!("Daily chain verification for {}: {} orders OK", date_str, total);
                     }
                 }
                 Err(e) => {
@@ -197,7 +197,7 @@ impl VerifyScheduler {
             // 计算下一次触发时间
             let sleep_duration = Self::duration_until_next_cutoff(cutoff_time, self.tz);
             tracing::info!(
-                "🔍 Next verification trigger in {} minutes",
+                "Next verification trigger in {} minutes",
                 sleep_duration.as_secs() / 60
             );
 
@@ -217,7 +217,7 @@ impl VerifyScheduler {
             let start = time::date_cutoff_millis(yesterday, cutoff_time, self.tz);
             let end = time::date_cutoff_millis(next, cutoff_time, self.tz);
 
-            tracing::info!("🔍 Running daily verification for {}", date_str);
+            tracing::info!("Running daily verification for {}", date_str);
             match self.archive_service.verify_daily_chain(&date_str, start, end).await {
                 Ok(result) => {
                     let intact = result.chain_intact;
@@ -225,11 +225,11 @@ impl VerifyScheduler {
                     self.save_daily_result(&date_str, &result).await;
                     if !intact {
                         tracing::warn!(
-                            "⚠️ Daily verification for {}: issues found",
+                            "Daily verification for {}: issues found",
                             date_str
                         );
                     } else {
-                        tracing::info!("✅ Daily verification for {}: {} orders OK", date_str, total);
+                        tracing::info!("Daily verification for {}: {} orders OK", date_str, total);
                     }
                 }
                 Err(e) => {

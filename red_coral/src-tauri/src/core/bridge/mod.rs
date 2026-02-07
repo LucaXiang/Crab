@@ -788,19 +788,17 @@ impl ClientBridge {
     ///
     /// 如果已经在 Server 模式，直接返回成功（幂等操作）
     pub async fn start_server_mode(&self) -> Result<(), BridgeError> {
-        tracing::info!("[start_server_mode] Acquiring mode write lock...");
         let mut mode_guard = self.mode.write().await;
-        tracing::info!("[start_server_mode] Mode write lock acquired");
 
         // 如果已经在 Server 模式，直接返回成功
         if matches!(&*mode_guard, ClientMode::Server { .. }) {
-            tracing::info!("Already in Server mode, skipping start");
+            tracing::debug!("Already in Server mode, skipping start");
             return Ok(());
         }
 
         // 如果在 Client 模式，先停止再切换
         if matches!(&*mode_guard, ClientMode::Client { .. }) {
-            tracing::info!("Stopping Client mode to switch to Server mode...");
+            tracing::debug!("Stopping Client mode to switch to Server mode");
             *mode_guard = ClientMode::Disconnected;
         }
 
@@ -811,7 +809,7 @@ impl ClientBridge {
         let work_dir = if let Some(path) = tenant_manager.current_tenant_path() {
             // Server work_dir is {tenant}/server/
             let server_dir = path.join("server");
-            tracing::info!("Using server directory: {:?}", server_dir);
+            tracing::debug!(path = %server_dir.display(), "Using server directory");
             server_dir.to_string_lossy().to_string()
         } else {
             tracing::warn!(
@@ -828,18 +826,15 @@ impl ClientBridge {
             .message_tcp_port(server_config.message_port)
             .build();
 
-        tracing::info!("[start_server_mode] Initializing ServerState...");
         let server_state = edge_server::ServerState::initialize(&edge_config).await;
-        tracing::info!("[start_server_mode] ServerState initialized");
 
         let server_instance =
             edge_server::Server::with_state(edge_config.clone(), server_state.clone());
         let shutdown_token = server_instance.shutdown_token();
 
         let server_task = tokio::spawn(async move {
-            tracing::info!("🚀 Starting Edge Server background task...");
             if let Err(e) = server_instance.run().await {
-                tracing::error!("❌ Server run error: {}", e);
+                tracing::error!("Server run error: {}", e);
             }
         });
 
@@ -849,7 +844,7 @@ impl ClientBridge {
             .https_service()
             .router()
             .ok_or_else(|| {
-                tracing::error!("[start_server_mode] Router is None! This should not happen.");
+                tracing::error!("Router is None after ServerState initialization");
                 BridgeError::Server("Router not initialized".to_string())
             })?;
 
@@ -864,29 +859,26 @@ impl ClientBridge {
             let listener_token = shutdown_token.clone();
 
             let handle = tokio::spawn(async move {
-                tracing::info!("Message listener task started");
+                tracing::debug!("Server message listener started");
                 loop {
                     tokio::select! {
                         _ = listener_token.cancelled() => {
-                            tracing::info!("Message listener shutdown");
+                            tracing::debug!("Server message listener shutdown");
                             break;
                         }
                         result = server_rx.recv() => {
                             match result {
                                 Ok(msg) => {
-                                    tracing::info!(event_type = ?msg.event_type, "Received message from bus");
                                     // Route messages to appropriate channels
                                     use crate::events::MessageRoute;
                                     match MessageRoute::from_bus_message(msg) {
                                         MessageRoute::OrderSync(order_sync) => {
-                                            // Server Authority: emit event + snapshot together
-                                            tracing::debug!("Emitting order-sync (event + snapshot)");
                                             if let Err(e) = handle_clone.emit("order-sync", &*order_sync) {
                                                 tracing::warn!("Failed to emit order sync: {}", e);
                                             }
                                         }
                                         MessageRoute::ServerMessage(event) => {
-                                            tracing::info!(event_type = %event.event_type, "Emitting server-message");
+                                            tracing::debug!(event_type = %event.event_type, "Emitting server-message");
                                             if let Err(e) = handle_clone.emit("server-message", &event) {
                                                 tracing::warn!("Failed to emit server message: {}", e);
                                             }
@@ -905,41 +897,31 @@ impl ClientBridge {
                     }
                 }
             });
-
-            tracing::info!("Server message listener started");
             Some(handle)
         } else {
             None
         };
 
-        tracing::info!("[start_server_mode] Building CrabClient...");
         let client = CrabClient::local()
             .with_router(router)
             .with_message_channels(client_tx, server_tx)
             .build()?;
 
-        tracing::info!("[start_server_mode] Connecting CrabClient...");
         let connected_client = client.connect().await?;
 
-        tracing::info!(
-            port = server_config.http_port,
-            "Server mode initialized with In-Process client and Background Server"
-        );
-
         // 尝试加载缓存的员工会话
-        tracing::info!("[start_server_mode] Loading cached session...");
         let tenant_manager_read = self.tenant_manager.read().await;
         let cached_session = tenant_manager_read.load_current_session().ok().flatten();
         drop(tenant_manager_read);
 
         let client_state = if let Some(session) = cached_session {
-            tracing::info!("[start_server_mode] Restoring session for user: {}", session.username);
+            tracing::debug!(username = %session.username, "Restoring cached session");
             match connected_client
                 .restore_session(session.token.clone(), session.user_info.clone())
                 .await
             {
                 Ok(authenticated_client) => {
-                    tracing::info!(username = %session.username, "Restored CrabClient authenticated state");
+                    tracing::debug!(username = %session.username, "Session restored");
                     let mut tenant_manager = self.tenant_manager.write().await;
                     tenant_manager.set_current_session(session);
                     LocalClientState::Authenticated(authenticated_client)
@@ -976,6 +958,7 @@ impl ClientBridge {
             shutdown_token,
         };
 
+        let http_port = server_config.http_port;
         drop(config);
         {
             let mut config = self.config.write().await;
@@ -983,7 +966,7 @@ impl ClientBridge {
         }
         self.save_config().await?;
 
-        tracing::info!("[start_server_mode] ✅ Server mode started successfully");
+        tracing::info!(port = http_port, "Server mode started");
         Ok(())
     }
 
@@ -1514,7 +1497,7 @@ impl ClientBridge {
 
                                 *client = Some(LocalClientState::Authenticated(authenticated));
 
-                                tracing::info!(username = %username, "Employee logged in via CrabClient (local)");
+                                tracing::debug!(username = %username, "Employee logged in via CrabClient (local)");
                                 Ok(session)
                             }
                             Err((e, connected)) => {
@@ -1547,7 +1530,7 @@ impl ClientBridge {
                                 };
 
                                 *client = Some(LocalClientState::Authenticated(authenticated));
-                                tracing::info!(username = %username, "Employee re-logged in via CrabClient (local)");
+                                tracing::debug!(username = %username, "Employee re-logged in via CrabClient (local)");
                                 Ok(session)
                             }
                             Err((e, connected)) => {
@@ -1585,7 +1568,7 @@ impl ClientBridge {
                                 };
 
                                 *client = Some(RemoteClientState::Authenticated(authenticated));
-                                tracing::info!(username = %username, "Employee logged in via CrabClient (remote)");
+                                tracing::debug!(username = %username, "Employee logged in via CrabClient (remote)");
                                 Ok(session)
                             }
                             Err((e, connected)) => {
@@ -1618,7 +1601,7 @@ impl ClientBridge {
                                 };
 
                                 *client = Some(RemoteClientState::Authenticated(authenticated));
-                                tracing::info!(username = %username, "Employee re-logged in via CrabClient (remote)");
+                                tracing::debug!(username = %username, "Employee re-logged in via CrabClient (remote)");
                                 Ok(session)
                             }
                             Err((e, connected)) => {
@@ -1668,7 +1651,7 @@ impl ClientBridge {
                         LocalClientState::Authenticated(auth) => {
                             let connected = auth.logout().await;
                             *client = Some(LocalClientState::Connected(connected));
-                            tracing::info!("Employee logged out (local)");
+                            tracing::debug!("Employee logged out (local)");
                         }
                         LocalClientState::Connected(c) => {
                             *client = Some(LocalClientState::Connected(c));
@@ -1682,7 +1665,7 @@ impl ClientBridge {
                         RemoteClientState::Authenticated(auth) => {
                             let connected = auth.logout().await;
                             *client = Some(RemoteClientState::Connected(connected));
-                            tracing::info!("Employee logged out (remote)");
+                            tracing::debug!("Employee logged out (remote)");
                         }
                         RemoteClientState::Connected(c) => {
                             *client = Some(RemoteClientState::Connected(c));

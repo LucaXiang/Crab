@@ -81,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 打印横幅
     print_banner();
 
-    tracing::info!("🦀 Crab Edge Server starting...");
+    tracing::info!("Crab Edge Server starting...");
     tracing::debug!("Work directory: {}", work_dir.display());
 
     // 2. 加载配置 (从环境变量)

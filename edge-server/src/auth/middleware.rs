@@ -41,7 +41,6 @@ pub async fn require_auth(
 
     // 允许 CORS 预检的 OPTIONS 请求 (跳过认证)
     if req.method() == http::Method::OPTIONS {
-        tracing::info!("[require_auth] OPTIONS request, skipping");
         return Ok(next.run(req).await);
     }
 
@@ -53,7 +52,6 @@ pub async fn require_auth(
     // 公共 API 路由跳过认证
     let is_public_api_route = path == "/api/auth/login" || path == "/api/message/emit";
     if is_public_api_route {
-        tracing::info!("[require_auth] Public API route, skipping auth: {}", path);
         return Ok(next.run(req).await);
     }
 
@@ -159,7 +157,6 @@ pub fn require_permission(
 ///
 /// 非管理员返回 403 Forbidden
 pub async fn require_admin(req: Request, next: Next) -> Result<Response, AppError> {
-    tracing::info!("[require_admin] Called for path: {}", req.uri().path());
     let user = req
         .extensions()
         .get::<CurrentUser>()

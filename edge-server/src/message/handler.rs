@@ -70,7 +70,7 @@ impl MessageHandler {
     ///
     /// 这是一个长运行任务，应该在后台生成 (spawn)。
     pub async fn run(mut self) {
-        tracing::info!("🎯 Message handler started");
+        tracing::info!("Message handler started");
 
         loop {
             tokio::select! {

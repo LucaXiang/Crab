@@ -75,7 +75,7 @@ impl CertService {
         // 保存 Root CA
         self.save_root_ca(root_ca_pem).await?;
 
-        tracing::info!("✅ Root CA downloaded and saved successfully");
+        tracing::info!("Root CA downloaded and saved successfully");
         Ok(root_ca_pem.to_string())
     }
 
@@ -95,7 +95,7 @@ impl CertService {
             .map_err(|e| AppError::validation(format!("Edge cert validation failed: {}", e)))?;
 
         tracing::info!(
-            "✅ Certificate chain verification passed: Root CA -> Tenant CA -> Edge Cert"
+            "Certificate chain verification passed: Root CA -> Tenant CA -> Edge Cert"
         );
         Ok(())
     }
@@ -144,7 +144,7 @@ impl CertService {
         fs::write(certs_dir.join("edge_key.pem"), edge_key_pem)
             .map_err(|e| AppError::internal(format!("Failed to write edge key: {}", e)))?;
 
-        tracing::info!("📜 Certificates saved to {:?}", certs_dir);
+        tracing::info!("Certificates saved to {:?}", certs_dir);
         Ok(())
     }
 
@@ -173,7 +173,7 @@ impl CertService {
         // 此时 self_check() 已验证: 证书链 + 硬件绑定
         // 这里只需加载证书即可，无需重复验证
 
-        tracing::info!("🔒 Loading mTLS certificates from {:?}", certs_dir);
+        tracing::info!("Loading mTLS certificates from {:?}", certs_dir);
 
         // 1. Load CA certs for client verification
         let ca_pem = fs::read_to_string(&tenant_ca_path)
@@ -218,7 +218,7 @@ impl CertService {
     pub fn delete_certificates(&self) -> Result<(), AppError> {
         let certs_dir = self.work_dir.join("certs");
         if certs_dir.exists() {
-            tracing::info!("🗑️ Removing invalid certificates from {:?}", certs_dir);
+            tracing::info!("Removing invalid certificates from {:?}", certs_dir);
             std::fs::remove_dir_all(&certs_dir)
                 .map_err(|e| AppError::internal(format!("Failed to delete certs dir: {}", e)))?;
         }
@@ -271,7 +271,7 @@ impl CertService {
         &self,
         cached_binding: Option<&crate::services::tenant_binding::TenantBinding>,
     ) -> Result<(), AppError> {
-        tracing::info!("🔍 Running CertService self-check...");
+        tracing::info!("Running CertService self-check...");
         let (cert_pem, ca_pem) = self.read_certs()?;
 
         // Step 1: 验证证书对 (链 + 硬件绑定)
@@ -281,7 +281,7 @@ impl CertService {
         // - Hardware ID match
         verify_cert_pair(&cert_pem, &ca_pem)
             .map_err(|e| AppError::validation(format!("Certificate check failed: {}", e)))?;
-        tracing::info!("  ✅ Certificate chain and hardware binding verified.");
+        tracing::info!("Certificate chain and hardware binding verified.");
 
         // Step 2: 检查证书过期时间
         let metadata = crab_cert::CertMetadata::from_pem(&cert_pem)
@@ -300,13 +300,13 @@ impl CertService {
         if metadata.not_after < warn_threshold {
             let days_left = (metadata.not_after - now).whole_days();
             tracing::warn!(
-                "  ⚠️ Certificate will expire in {} days (at {})",
+                "Certificate will expire in {} days (at {})",
                 days_left,
                 metadata.not_after
             );
         } else {
             tracing::info!(
-                "  ✅ Certificate validity period OK (expires: {}).",
+                "Certificate validity period OK (expires: {}).",
                 metadata.not_after
             );
         }
@@ -326,21 +326,21 @@ impl CertService {
         if let Some(binding) = binding_to_check {
             // Step 3a: 检测时钟篡改
             binding.check_clock_tampering()?;
-            tracing::info!("  ✅ Clock integrity verified.");
+            tracing::info!("Clock integrity verified.");
 
             // Step 3b: 验证签名
             if binding.is_signed() {
                 // 使用本地的 tenant_ca.pem 验证签名
                 binding.validate(&ca_pem)?;
-                tracing::info!("  ✅ Credential.json signature and device binding verified.");
+                tracing::info!("Credential.json signature and device binding verified.");
             } else {
-                tracing::warn!("  ⚠️ Credential.json is not signed (legacy format).");
+                tracing::warn!("Credential.json is not signed (legacy format).");
             }
         } else {
-            tracing::warn!("  ⚠️ Credential.json not found (will be created on activation).");
+            tracing::warn!("Credential.json not found (will be created on activation).");
         }
 
-        tracing::info!("✅ CertService self-check passed.");
+        tracing::info!("CertService self-check passed.");
         Ok(())
     }
 
@@ -348,7 +348,7 @@ impl CertService {
     ///
     /// 当自检失败时调用，删除旧的证书文件以等待重新激活
     pub async fn cleanup_certificates(&self) -> Result<(), AppError> {
-        tracing::warn!("🧹 Cleaning up certificate files after self-check failure...");
+        tracing::warn!("Cleaning up certificate files after self-check failure...");
 
         let certs_dir = self.work_dir.join("certs");
         let edge_cert_path = certs_dir.join("edge_cert.pem");
@@ -367,7 +367,7 @@ impl CertService {
             tracing::info!("Removed tenant CA certificate file");
         }
 
-        tracing::warn!("✅ Certificate cleanup completed. Server will wait for reactivation.");
+        tracing::warn!("Certificate cleanup completed. Server will wait for reactivation.");
         Ok(())
     }
 

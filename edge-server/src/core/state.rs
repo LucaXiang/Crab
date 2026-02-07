@@ -374,7 +374,7 @@ impl ServerState {
             }
         });
 
-        tracing::info!("🔐 TLS tasks started (MessageBus TCP Server)");
+        tracing::info!("TLS tasks started (MessageBus TCP Server)");
     }
 
     /// 预热活跃订单的价格规则缓存
@@ -387,7 +387,7 @@ impl ServerState {
 
         if restored > 0 {
             tracing::info!(
-                "从 redb 恢复了 {} 个订单的规则快照",
+                "Restored {} order rule snapshots from redb",
                 restored,
             );
         }
@@ -421,13 +421,13 @@ impl ServerState {
 
         if fallback_count > 0 {
             tracing::warn!(
-                "{} 个订单从数据库回退加载规则（redb 无快照）",
+                "{} orders fell back to loading rules from database (no redb snapshot)",
                 fallback_count,
             );
         }
 
         tracing::info!(
-            "规则预热完成: {} 个活跃订单, {} 从 redb 恢复, {} 从数据库回退",
+            "Rule warmup complete: {} active orders, {} restored from redb, {} fell back to database",
             active_orders.len(),
             restored,
             fallback_count,
@@ -531,7 +531,7 @@ impl ServerState {
         let orders_manager = self.orders_manager.clone();
 
         tasks.spawn("order_sync_forwarder", TaskKind::Listener, async move {
-            tracing::info!("📦 Order sync forwarder started");
+            tracing::debug!("Order sync forwarder started");
 
             while let Some(event) = event_rx.recv().await {
                 let order_id = event.order_id.clone();
@@ -564,7 +564,7 @@ impl ServerState {
                 }
             }
 
-            tracing::info!("Sync channel closed, order sync forwarder stopping");
+            tracing::debug!("Sync channel closed, order sync forwarder stopping");
         });
     }
 
@@ -603,12 +603,12 @@ impl ServerState {
         let print_service = self.kitchen_print_service.clone();
 
         tasks.spawn("print_record_cleanup", TaskKind::Periodic, async move {
-            tracing::info!("🧹 Print record cleanup task started (interval: 1h, max_age: 3d)");
+            tracing::info!("Print record cleanup task started (interval: 1h, max_age: 3d)");
 
             // Cleanup immediately on startup
             match print_service.cleanup_old_records(MAX_AGE_SECS) {
                 Ok(count) if count > 0 => {
-                    tracing::info!("🧹 Cleaned up {} old print records on startup", count);
+                    tracing::info!("Cleaned up {} old print records on startup", count);
                 }
                 Ok(_) => {
                     tracing::debug!("No old print records to cleanup on startup");
@@ -626,7 +626,7 @@ impl ServerState {
                 interval.tick().await;
                 match print_service.cleanup_old_records(MAX_AGE_SECS) {
                     Ok(count) if count > 0 => {
-                        tracing::info!("🧹 Cleaned up {} old print records", count);
+                        tracing::info!("Cleaned up {} old print records", count);
                     }
                     Ok(_) => {
                         tracing::debug!("No old print records to cleanup");
@@ -732,9 +732,9 @@ impl ServerState {
             id: id.to_string(),
             data: data.and_then(|d| serde_json::to_value(d).ok()),
         };
-        tracing::info!(resource = %resource, action = %action, id = %id, "Broadcasting sync event");
+        tracing::debug!(resource = %resource, action = %action, id = %id, "Broadcasting sync event");
         match self.message_bus().publish(BusMessage::sync(&payload)).await {
-            Ok(_) => tracing::debug!("Sync broadcast successful"),
+            Ok(_) => {}
             Err(e) => tracing::error!("Sync broadcast failed: {}", e),
         }
     }
@@ -868,7 +868,7 @@ impl ServerState {
                 "╔══════════════════════════════════════════════════════════════════════╗"
             );
             tracing::warn!(
-                "║              ⛔ SUBSCRIPTION BLOCKED - SERVICES STOPPED             ║"
+                "║               SUBSCRIPTION BLOCKED - SERVICES STOPPED                ║"
             );
             tracing::warn!(
                 "╚══════════════════════════════════════════════════════════════════════╝"

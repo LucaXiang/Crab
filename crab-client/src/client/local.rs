@@ -138,7 +138,7 @@ impl CrabClient<Local, Connected> {
             None => return Err((ClientError::Config("HTTP client not configured".into()), self)),
         };
 
-        tracing::info!("Employee login (local): {}", username);
+        tracing::debug!("Employee login (local): {}", username);
         let response = match http.login(username, password).await {
             Ok(r) => r,
             Err(e) => return Err((e, self)),
@@ -153,14 +153,14 @@ impl CrabClient<Local, Connected> {
             http.set_token(Some(response.token)).await;
         }
 
-        tracing::info!("Employee logged in successfully (local).");
+        tracing::debug!("Employee logged in successfully (local)");
         Ok(self.transition())
     }
 
     /// Disconnects from the server.
     pub fn disconnect(mut self) -> CrabClient<Local, Disconnected> {
         self.session.clear();
-        tracing::info!("Disconnected from local server.");
+        tracing::debug!("Disconnected from local server");
         self.transition()
     }
 
@@ -355,7 +355,7 @@ impl CrabClient<Local, Authenticated> {
             http.set_token(None).await;
         }
         self.session.clear();
-        tracing::info!("Employee logged out (local).");
+        tracing::debug!("Employee logged out (local)");
         self.transition()
     }
 
@@ -366,7 +366,7 @@ impl CrabClient<Local, Authenticated> {
             http.set_token(None).await;
         }
         self.session.clear();
-        tracing::info!("Disconnected from local server.");
+        tracing::debug!("Disconnected from local server");
         self.transition()
     }
 }

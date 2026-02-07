@@ -136,7 +136,7 @@ impl HttpsService {
         })?;
 
         let addr = SocketAddr::from(([0, 0, 0, 0], self.config.http_port));
-        tracing::info!("🚀 Starting HTTPS server on {}", addr);
+        tracing::info!("Starting HTTPS server on {}", addr);
 
         let handle = axum_server::Handle::new();
 

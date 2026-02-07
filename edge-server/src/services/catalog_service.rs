@@ -159,7 +159,7 @@ impl CatalogService {
                 }
             }
         }
-        tracing::info!("📦 CatalogService: Loaded {} categories", categories.len());
+        tracing::debug!("CatalogService: Loaded {} categories", categories.len());
 
         // 2. Load all products with tags fetched (using ProductWithTags to deserialize full Tag objects)
         let products: Vec<ProductWithTags> = self
@@ -190,7 +190,7 @@ impl CatalogService {
             .await?
             .take(0)?;
 
-        tracing::info!("📦 CatalogService: Loaded {} attribute bindings", bindings.len());
+        tracing::debug!("CatalogService: Loaded {} attribute bindings", bindings.len());
 
         // Debug: log first binding's attribute options count
         if let Some(first) = bindings.first() {
@@ -283,7 +283,7 @@ impl CatalogService {
         }
 
         let products_count = self.products.read().len();
-        tracing::info!("📦 CatalogService: Loaded {} products", products_count);
+        tracing::debug!("CatalogService: Loaded {} products", products_count);
 
         Ok(())
     }

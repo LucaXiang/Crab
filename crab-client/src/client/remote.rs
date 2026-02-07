@@ -116,7 +116,7 @@ impl CrabClient<Remote, Disconnected> {
             })
             .ok();
         if self.edge_http.is_some() {
-            tracing::info!("🔐 mTLS HTTP client created for Edge Server");
+            tracing::info!("mTLS HTTP client created for Edge Server");
         }
 
         tracing::info!("Setup complete. Certificates cached for future use.");
@@ -216,7 +216,7 @@ impl CrabClient<Remote, Disconnected> {
             })
             .ok();
         if self.edge_http.is_some() {
-            tracing::info!("🔐 mTLS HTTP client created for Edge Server");
+            tracing::info!("mTLS HTTP client created for Edge Server");
         }
 
         tracing::info!("Connected using cached certificates.");
@@ -326,7 +326,7 @@ impl CrabClient<Remote, Connected> {
             }
         };
 
-        tracing::info!("Employee login: {}", username);
+        tracing::debug!("Employee login: {}", username);
 
         // Build login request
         let login_req = shared::client::LoginRequest {
@@ -386,7 +386,7 @@ impl CrabClient<Remote, Connected> {
         // Restore edge_http for future requests
         self.edge_http = Some(edge_http);
 
-        tracing::info!("Employee logged in successfully.");
+        tracing::debug!("Employee logged in successfully");
         Ok(self.transition())
     }
 
@@ -400,7 +400,7 @@ impl CrabClient<Remote, Connected> {
         self.message = None;
         self.session.clear();
 
-        tracing::info!("Disconnected from server.");
+        tracing::debug!("Disconnected from server");
         self.transition()
     }
 }
@@ -560,7 +560,7 @@ impl CrabClient<Remote, Authenticated> {
             let _ = http.logout().await;
         }
 
-        tracing::info!("Employee logged out.");
+        tracing::debug!("Employee logged out");
         self.transition()
     }
 
@@ -580,7 +580,7 @@ impl CrabClient<Remote, Authenticated> {
             let _ = http.logout().await;
         }
 
-        tracing::info!("Disconnected from server.");
+        tracing::debug!("Disconnected from server");
         self.transition()
     }
 }

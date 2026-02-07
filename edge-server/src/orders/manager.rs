@@ -274,7 +274,7 @@ impl OrdersManager {
     pub fn cache_rules(&self, order_id: &str, rules: Vec<PriceRule>) {
         // 持久化到 redb
         if let Err(e) = self.storage.store_rule_snapshot(order_id, &rules) {
-            tracing::error!(order_id = %order_id, error = %e, "持久化规则快照失败，该订单的规则定格保证降级");
+            tracing::error!(order_id = %order_id, error = %e, "Failed to persist rule snapshot, rule guarantee degraded for this order");
         }
         // 写入内存缓存
         let mut cache = self.rule_cache.write();
@@ -298,7 +298,7 @@ impl OrdersManager {
         }
         // 清除 redb 快照
         if let Err(e) = self.storage.remove_rule_snapshot(order_id) {
-            tracing::error!(order_id = %order_id, error = %e, "清除规则快照失败");
+            tracing::error!(order_id = %order_id, error = %e, "Failed to remove rule snapshot");
         }
     }
 
@@ -310,7 +310,7 @@ impl OrdersManager {
         let snapshots = match self.storage.get_all_rule_snapshots() {
             Ok(s) => s,
             Err(e) => {
-                tracing::error!(error = %e, "从 redb 恢复规则快照失败");
+                tracing::error!(error = %e, "Failed to restore rule snapshots from redb");
                 return 0;
             }
         };
@@ -334,14 +334,14 @@ impl OrdersManager {
             } else {
                 // 孤儿快照：订单已终结但规则未清除（可能是崩溃导致）
                 if let Err(e) = self.storage.remove_rule_snapshot(&order_id) {
-                    tracing::warn!(order_id = %order_id, error = %e, "清理孤儿规则快照失败");
+                    tracing::warn!(order_id = %order_id, error = %e, "Failed to clean up orphan rule snapshot");
                 }
                 orphaned += 1;
             }
         }
 
         if orphaned > 0 {
-            tracing::info!(orphaned, "清理了孤儿规则快照");
+            tracing::info!(orphaned, "Cleaned up orphan rule snapshots");
         }
 
         restored
@@ -420,7 +420,7 @@ impl OrdersManager {
         &self,
         cmd: OrderCommand,
     ) -> ManagerResult<(CommandResponse, Vec<OrderEvent>)> {
-        tracing::info!(command_id = %cmd.command_id, payload = ?cmd.payload, "Processing command");
+        tracing::debug!(command_id = %cmd.command_id, payload = ?cmd.payload, "Processing command");
         
         // 1. Idempotency check (before transaction)
         if self.storage.is_command_processed(&cmd.command_id)? {
@@ -443,7 +443,7 @@ impl OrdersManager {
         let pre_generated_receipt = match &cmd.payload {
             shared::order::OrderCommandPayload::OpenTable { .. } => {
                 let receipt = self.next_receipt_number();
-                tracing::info!(receipt_number = %receipt, "Pre-generated receipt number");
+                tracing::debug!(receipt_number = %receipt, "Pre-generated receipt number");
                 Some(receipt)
             }
             _ => None,
@@ -452,7 +452,7 @@ impl OrdersManager {
             shared::order::OrderCommandPayload::OpenTable { is_retail: true, .. } => {
                 match self.storage.next_queue_number(self.tz) {
                     Ok(qn) => {
-                        tracing::info!(queue_number = qn, "Pre-generated queue number");
+                        tracing::debug!(queue_number = qn, "Pre-generated queue number");
                         Some(qn)
                     }
                     Err(e) => {
@@ -499,7 +499,7 @@ impl OrdersManager {
                 guest_count,
                 is_retail,
             } => {
-                tracing::info!(table_id = ?table_id, table_name = ?table_name, "Processing OpenTable command");
+                tracing::debug!(table_id = ?table_id, table_name = ?table_name, "Processing OpenTable command");
                 // Use pre-generated receipt_number (generated before transaction)
                 let receipt_number = pre_generated_receipt.ok_or_else(|| {
                     OrderError::InvalidOperation("receipt_number must be pre-generated for OpenTable".to_string())

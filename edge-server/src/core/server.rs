@@ -101,9 +101,9 @@ impl Server {
 
             // 指数退避: 10s → 20s → 40s → 80s → 160s → 300s
             retry_delay = (retry_delay * 2).min(MAX_DELAY);
-            tracing::info!("🔄 Re-checked subscription (next retry in {:?})", retry_delay);
+            tracing::info!("Re-checked subscription (next retry in {:?})", retry_delay);
         }
-        tracing::info!("✅ Subscription OK, proceeding to start services");
+        tracing::info!("Subscription OK, proceeding to start services");
 
         // ═══════════════════════════════════════════════════════════════════
         // Phase 5: Start TLS-dependent tasks
@@ -115,7 +115,7 @@ impl Server {
         // Phase 6: Start HTTPS server (blocks until shutdown)
         // ═══════════════════════════════════════════════════════════════════
         let addr = std::net::SocketAddr::from(([0, 0, 0, 0], self.config.http_port));
-        tracing::info!("🦀 Crab Edge Server starting on {}", addr);
+        tracing::info!("Crab Edge Server starting on {}", addr);
 
         let token = self.shutdown_token.clone();
         let shutdown = async move {
@@ -164,11 +164,11 @@ impl Server {
             match state.load_tls_config() {
                 Ok(Some(cfg)) => return Some(cfg),
                 Ok(None) => {
-                    tracing::error!("❌ TLS certificates not found after activation!");
+                    tracing::error!("TLS certificates not found after activation!");
                     state.enter_unbound_state().await;
                 }
                 Err(e) => {
-                    tracing::error!("❌ Failed to load TLS config: {}. Entering unbound state.", e);
+                    tracing::error!("Failed to load TLS config: {}. Entering unbound state.", e);
                     state.enter_unbound_state().await;
                 }
             }

@@ -46,11 +46,11 @@ impl MessageBus {
         let final_tls_config = tls_config_override.or(self.config.tls_config.clone());
 
         let tls_acceptor = if let Some(tls_config) = final_tls_config {
-            tracing::info!("🔐 Message Bus mTLS enabled");
+            tracing::info!("Message Bus mTLS enabled");
             Some(TlsAcceptor::from(tls_config))
         } else {
             // STRICT MODE: Do not start TCP server without TLS
-            tracing::error!("❌ mTLS configuration missing. Refusing to start TCP server!");
+            tracing::error!("mTLS configuration missing. Refusing to start TCP server!");
             return Err(AppError::internal(
                 "Refusing to start TCP server without mTLS configuration",
             ));
@@ -133,7 +133,7 @@ async fn handle_client_connection(
     let transport: Arc<dyn Transport> = if let Some(acceptor) = tls_acceptor {
         match acceptor.accept(stream).await {
             Ok(tls_stream) => {
-                tracing::debug!("🔐 Client {} TLS handshake successful", addr);
+                tracing::debug!("Client {} TLS handshake successful", addr);
                 Arc::new(TlsTransport::new(tls_stream))
             }
             Err(e) => {
@@ -193,13 +193,13 @@ async fn perform_handshake(
     tracing::debug!("Waiting for handshake from {}", addr);
 
     let msg = transport.read_message().await.map_err(|e| {
-        tracing::warn!("❌ Client {} handshake error: {}", addr, e);
+        tracing::warn!("Client {} handshake error: {}", addr, e);
         e
     })?;
 
     if msg.event_type != EventType::Handshake {
         tracing::warn!(
-            "❌ Client {} failed to handshake: expected Handshake, got {}",
+            "Client {} failed to handshake: expected Handshake, got {}",
             addr,
             msg.event_type
         );
@@ -207,14 +207,14 @@ async fn perform_handshake(
     }
 
     let payload: HandshakePayload = msg.parse_payload().map_err(|e| {
-        tracing::warn!("❌ Client {} sent invalid handshake payload: {}", addr, e);
+        tracing::warn!("Client {} sent invalid handshake payload: {}", addr, e);
         AppError::invalid(format!("Invalid handshake payload: {}", e))
     })?;
 
     // Version check
     if payload.version != PROTOCOL_VERSION {
         tracing::warn!(
-            "❌ Client {} protocol version mismatch: expected {}, got {}",
+            "Client {} protocol version mismatch: expected {}, got {}",
             addr,
             PROTOCOL_VERSION,
             payload.version
@@ -237,7 +237,7 @@ async fn perform_handshake(
     if let (Some(peer_id), Some(client_name)) = (transport.peer_identity(), &payload.client_name) {
         if &peer_id != client_name {
             tracing::warn!(
-                "❌ Client {} identity mismatch: TLS cert says '{}', handshake says '{}'",
+                "Client {} identity mismatch: TLS cert says '{}', handshake says '{}'",
                 addr,
                 peer_id,
                 client_name
@@ -247,7 +247,7 @@ async fn perform_handshake(
 
             return Err(AppError::invalid("Handshake failed"));
         } else {
-            tracing::debug!("✅ Client {} identity verified via mTLS: {}", addr, peer_id);
+            tracing::debug!("Client {} identity verified via mTLS: {}", addr, peer_id);
         }
     }
 
@@ -256,7 +256,7 @@ async fn perform_handshake(
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
     tracing::debug!(
-        "✅ Client {} handshake success (v{}, client: {:?}, id: {})",
+        "Client {} handshake success (v{}, client: {:?}, id: {})",
         addr,
         payload.version,
         payload.client_name,
@@ -392,7 +392,7 @@ async fn read_client_messages(
                             tracing::warn!(
                                 target: "security",
                                 client_addr = %addr,
-                                "⚠️ Security Alert: Client attempted to send ServerCommand. Dropping message."
+                                "Security Alert: Client attempted to send ServerCommand. Dropping message."
                             );
                             continue;
                         }

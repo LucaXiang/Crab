@@ -41,8 +41,6 @@ async fn serve_uploaded_file(
     State(state): State<ServerState>,
     Path(filename): Path<String>,
 ) -> UploadFileResponse {
-    tracing::info!("[serve_uploaded_file] filename: {}", filename);
-
     // Security check: prevent path traversal
     if filename.is_empty()
         || filename.contains("..")
@@ -54,18 +52,11 @@ async fn serve_uploaded_file(
 
     // Images dir: {tenant}/server/images/
     let file_path = state.work_dir().join("images").join(&filename);
-    tracing::info!("[serve_uploaded_file] file_path: {:?}", file_path);
 
     // Read file
     match tokio::fs::read(&file_path).await {
-        Ok(content) => {
-            tracing::info!("[serve_uploaded_file] file found, size: {}", content.len());
-            UploadFileResponse::Ok(content.into())
-        }
-        Err(e) => {
-            tracing::info!("[serve_uploaded_file] file not found: {}", e);
-            UploadFileResponse::NotFound
-        }
+        Ok(content) => UploadFileResponse::Ok(content.into()),
+        Err(_) => UploadFileResponse::NotFound,
     }
 }
 

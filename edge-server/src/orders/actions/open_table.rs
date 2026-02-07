@@ -46,7 +46,7 @@ pub async fn load_matching_rules(
     let rules = match repo.find_by_zone(zone_id, is_retail).await {
         Ok(rules) => rules,
         Err(e) => {
-            tracing::error!("加载价格规则失败: {:?}", e);
+            tracing::error!("Failed to load price rules: {:?}", e);
             return vec![];
         }
     };
