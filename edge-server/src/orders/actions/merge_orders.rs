@@ -97,17 +97,29 @@ impl CommandHandler for MergeOrdersAction {
             ));
         }
 
-        // 7. Extract table info
+        // 7. Reject if either order has active AA split
+        if source_snapshot.aa_total_shares.is_some() {
+            return Err(OrderError::InvalidOperation(
+                "源订单存在 AA 分单，不能合并".to_string(),
+            ));
+        }
+        if target_snapshot.aa_total_shares.is_some() {
+            return Err(OrderError::InvalidOperation(
+                "目标订单存在 AA 分单，不能合并".to_string(),
+            ));
+        }
+
+        // 9. Extract table info
         let source_table_id = source_snapshot.table_id.clone().unwrap_or_default();
         let source_table_name = source_snapshot.table_name.clone().unwrap_or_default();
         let target_table_id = target_snapshot.table_id.clone().unwrap_or_default();
         let target_table_name = target_snapshot.table_name.clone().unwrap_or_default();
 
-        // 8. Allocate sequence numbers for both events
+        // 10. Allocate sequence numbers for both events
         let seq1 = ctx.next_sequence();
         let seq2 = ctx.next_sequence();
 
-        // 9. Create OrderMergedOut event for source order
+        // 11. Create OrderMergedOut event for source order
         let event1 = OrderEvent::new(
             seq1,
             self.source_order_id.clone(),
@@ -125,7 +137,7 @@ impl CommandHandler for MergeOrdersAction {
             },
         );
 
-        // 10. Create OrderMerged event for target order (includes source items)
+        // 12. Create OrderMerged event for target order (includes source items)
         let event2 = OrderEvent::new(
             seq2,
             self.target_order_id.clone(),
@@ -690,5 +702,61 @@ mod tests {
         let result = action.execute(&mut ctx, &metadata).await;
 
         assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+    }
+
+    #[tokio::test]
+    async fn test_merge_rejects_source_with_aa_split() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        source.aa_total_shares = Some(3);
+        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        storage.store_snapshot(&txn, &source).unwrap();
+        storage.store_snapshot(&txn, &target).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = MergeOrdersAction {
+            source_order_id: "source-1".to_string(),
+            target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        if let Err(OrderError::InvalidOperation(msg)) = result {
+            assert!(msg.contains("AA 分单"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_merge_rejects_target_with_aa_split() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        let mut target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        target.aa_total_shares = Some(2);
+        storage.store_snapshot(&txn, &source).unwrap();
+        storage.store_snapshot(&txn, &target).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        let action = MergeOrdersAction {
+            source_order_id: "source-1".to_string(),
+            target_order_id: "target-1".to_string(),
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let result = action.execute(&mut ctx, &create_test_metadata()).await;
+        assert!(matches!(result, Err(OrderError::InvalidOperation(_))));
+        if let Err(OrderError::InvalidOperation(msg)) = result {
+            assert!(msg.contains("AA 分单"));
+        }
     }
 }

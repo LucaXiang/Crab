@@ -67,7 +67,16 @@ impl EventApplier for PaymentCancelledApplier {
 
             // Rollback AA paid shares counter (unlock is handled by AaSplitCancelledApplier)
             if let Some(shares) = cancelled_aa_shares {
-                snapshot.aa_paid_shares = (snapshot.aa_paid_shares - shares).max(0);
+                let new_shares = snapshot.aa_paid_shares - shares;
+                if new_shares < 0 {
+                    tracing::warn!(
+                        order_id = %snapshot.order_id,
+                        aa_paid_shares = snapshot.aa_paid_shares,
+                        cancelled_shares = shares,
+                        "Data inconsistency: aa_paid_shares went negative, clamping to 0"
+                    );
+                }
+                snapshot.aa_paid_shares = new_shares.max(0);
             }
 
             // Recalculate totals to update unpaid_quantity and financial fields

@@ -4,7 +4,9 @@
 
 use async_trait::async_trait;
 
+use crate::orders::money::{to_decimal, to_f64};
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
+use rust_decimal::Decimal;
 use shared::order::{EventPayload, LossReason, OrderEvent, OrderEventType, OrderStatus, VoidType};
 
 /// VoidOrder action
@@ -48,10 +50,18 @@ impl CommandHandler for VoidOrderAction {
 
         // 3. Sanitize loss fields based on void_type:
         //    - CANCELLED: 正常取消，无损失，强制清空 loss 字段
-        //    - LOSS_SETTLED: 损失结算，保留 loss 字段
+        //    - LOSS_SETTLED: 损失结算，自动计算未付金额作为损失
         let (loss_reason, loss_amount) = match self.void_type {
             VoidType::Cancelled => (None, None),
-            VoidType::LossSettled => (self.loss_reason.clone(), self.loss_amount),
+            VoidType::LossSettled => {
+                let amount = self.loss_amount.unwrap_or_else(|| {
+                    let remaining =
+                        (to_decimal(snapshot.total) - to_decimal(snapshot.paid_amount))
+                            .max(Decimal::ZERO);
+                    to_f64(remaining)
+                });
+                (self.loss_reason.clone(), Some(amount))
+            }
         };
 
         // 4. Allocate sequence number
@@ -406,6 +416,44 @@ mod tests {
             assert_eq!(*void_type, VoidType::LossSettled);
             assert_eq!(*loss_reason, Some(LossReason::CustomerFled));
             assert_eq!(*loss_amount, Some(40.0));
+        } else {
+            panic!("Expected OrderVoided payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_loss_settled_auto_calculates_loss_amount() {
+        let storage = OrderStorage::open_in_memory().unwrap();
+        let txn = storage.begin_write().unwrap();
+
+        let mut snapshot = OrderSnapshot::new("order-1".to_string());
+        snapshot.status = OrderStatus::Active;
+        snapshot.total = 100.0;
+        snapshot.paid_amount = 60.0;
+        storage.store_snapshot(&txn, &snapshot).unwrap();
+
+        let current_seq = storage.get_next_sequence(&txn).unwrap();
+        let mut ctx = CommandContext::new(&txn, &storage, current_seq);
+
+        // loss_amount = None → auto-calculate as total - paid_amount = 40
+        let action = VoidOrderAction {
+            order_id: "order-1".to_string(),
+            void_type: VoidType::LossSettled,
+            loss_reason: Some(LossReason::CustomerFled),
+            loss_amount: None,
+            note: None,
+            authorizer_id: None,
+            authorizer_name: None,
+        };
+
+        let metadata = create_test_metadata();
+        let events = action.execute(&mut ctx, &metadata).await.unwrap();
+
+        if let EventPayload::OrderVoided {
+            loss_amount, ..
+        } = &events[0].payload
+        {
+            assert_eq!(*loss_amount, Some(40.0), "Should auto-calculate remaining as loss");
         } else {
             panic!("Expected OrderVoided payload");
         }
