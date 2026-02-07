@@ -265,12 +265,21 @@ impl RequestCommandProcessor {
             }
         }
 
-        // 保存 OpenTable 的信息用于后续规则加载
-        let open_table_info = if let OrderCommandPayload::OpenTable {
-            zone_id, is_retail, ..
+        // 保存需要加载规则的命令信息
+        let rule_load_info = match &command.payload {
+            OrderCommandPayload::OpenTable {
+                zone_id, is_retail, ..
+            } => Some((zone_id.clone(), *is_retail)),
+            _ => None,
+        };
+        // MoveOrder: 保存移桌信息用于规则重新加载
+        let move_order_info = if let OrderCommandPayload::MoveOrder {
+            order_id,
+            target_zone_id,
+            ..
         } = &command.payload
         {
-            Some((zone_id.clone(), *is_retail))
+            Some((order_id.clone(), target_zone_id.clone()))
         } else {
             None
         };
@@ -278,16 +287,13 @@ impl RequestCommandProcessor {
         // Execute via OrdersManager (CatalogService is injected, metadata lookup is automatic)
         let response = self.state.orders_manager().execute_command(command);
 
-        // 如果是 OpenTable 且成功执行，加载并缓存价格规则
-        if response.success
-            && let Some((zone_id, is_retail)) = open_table_info
+        if response.success {
+            // OpenTable 成功后加载并缓存价格规则
+            if let Some((zone_id, is_retail)) = rule_load_info
                 && let Some(ref order_id) = response.order_id
             {
-                // 加载匹配的价格规则
                 let rules =
                     load_matching_rules(&self.state.get_db(), zone_id.as_deref(), is_retail).await;
-
-                // 缓存到 OrdersManager
                 if !rules.is_empty() {
                     tracing::debug!(
                         order_id = %order_id,
@@ -297,6 +303,27 @@ impl RequestCommandProcessor {
                     self.state.orders_manager().cache_rules(order_id, rules);
                 }
             }
+
+            // MoveOrder 成功后：用新区域重新加载规则
+            if let Some((ref order_id, ref target_zone_id)) = move_order_info {
+                // 从 snapshot 获取 is_retail（移桌不改变 is_retail）
+                if let Ok(Some(snapshot)) = self.state.orders_manager().get_snapshot(order_id) {
+                    let rules = load_matching_rules(
+                        &self.state.get_db(),
+                        target_zone_id.as_deref(),
+                        snapshot.is_retail,
+                    )
+                    .await;
+                    tracing::debug!(
+                        order_id = %order_id,
+                        target_zone_id = ?target_zone_id,
+                        rule_count = rules.len(),
+                        "移桌后重新加载区域规则"
+                    );
+                    self.state.orders_manager().cache_rules(order_id, rules);
+                }
+            }
+        }
 
         // Return result
         if response.success {

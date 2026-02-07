@@ -594,11 +594,11 @@ impl OrdersManager {
         // 11. Commit transaction
         txn.commit().map_err(StorageError::from)?;
 
-        // 12. Clean up rule cache for terminal orders (Complete/Void/Move/Merge)
+        // 12. Clean up rule cache for terminal orders (Complete/Void/Merge)
+        // Note: MoveOrder is NOT terminal — order stays Active, rules handled by callers
         match &cmd.payload {
             shared::order::OrderCommandPayload::CompleteOrder { order_id, .. }
-            | shared::order::OrderCommandPayload::VoidOrder { order_id, .. }
-            | shared::order::OrderCommandPayload::MoveOrder { order_id, .. } => {
+            | shared::order::OrderCommandPayload::VoidOrder { order_id, .. } => {
                 self.remove_cached_rules(order_id);
             }
             shared::order::OrderCommandPayload::MergeOrders { source_order_id, .. } => {
@@ -4223,7 +4223,7 @@ mod tests {
     }
 
     #[test]
-    fn test_move_order_cleans_rules() {
+    fn test_move_order_preserves_rules() {
         let manager = create_test_manager();
 
         let order_id = open_table_with_items(
@@ -4237,7 +4237,8 @@ mod tests {
         assert!(manager.get_cached_rules(&order_id).is_some());
         assert!(manager.storage().get_rule_snapshot(&order_id).unwrap().is_some());
 
-        // 换桌
+        // 换桌 — 订单保持 Active，规则不清除
+        // （实际场景中由调用方按新区域重新加载规则）
         let move_cmd = OrderCommand::new(
             "op-1".to_string(),
             "Test Operator".to_string(),
@@ -4254,9 +4255,9 @@ mod tests {
         let resp = manager.execute_command(move_cmd);
         assert!(resp.success);
 
-        // 源订单的规则缓存和 redb 快照都应该被清除
-        assert!(manager.get_cached_rules(&order_id).is_none());
-        assert!(manager.storage().get_rule_snapshot(&order_id).unwrap().is_none());
+        // MoveOrder 不是 terminal 操作，规则保留（由调用方用新区域重载）
+        assert!(manager.get_cached_rules(&order_id).is_some());
+        assert!(manager.storage().get_rule_snapshot(&order_id).unwrap().is_some());
     }
 
     #[test]

@@ -1841,7 +1841,7 @@ impl ClientBridge {
 
         match &*mode_guard {
             ClientMode::Server { server_state, .. } => {
-                // 保存 OpenTable 信息用于后续规则加载
+                // 保存需要加载规则的命令信息
                 let open_table_info = if let OrderCommandPayload::OpenTable {
                     zone_id, is_retail, ..
                 } = &command.payload
@@ -1850,13 +1850,23 @@ impl ClientBridge {
                 } else {
                     None
                 };
+                let move_order_info = if let OrderCommandPayload::MoveOrder {
+                    order_id,
+                    target_zone_id,
+                    ..
+                } = &command.payload
+                {
+                    Some((order_id.clone(), target_zone_id.clone()))
+                } else {
+                    None
+                };
 
                 let (response, events) = server_state
                     .orders_manager()
                     .execute_command_with_events(command);
 
-                // OpenTable 成功后加载并缓存价格规则
                 if response.success {
+                    // OpenTable 成功后加载并缓存价格规则
                     if let Some((zone_id, is_retail)) = open_table_info {
                         if let Some(ref order_id) = response.order_id {
                             let rules = edge_server::orders::actions::open_table::load_matching_rules(
@@ -1874,6 +1884,25 @@ impl ClientBridge {
                                 );
                                 server_state.orders_manager().cache_rules(order_id, rules);
                             }
+                        }
+                    }
+
+                    // MoveOrder 成功后：用新区域重新加载规则
+                    if let Some((ref order_id, ref target_zone_id)) = move_order_info {
+                        if let Ok(Some(snapshot)) = server_state.orders_manager().get_snapshot(order_id) {
+                            let rules = edge_server::orders::actions::open_table::load_matching_rules(
+                                &server_state.get_db(),
+                                target_zone_id.as_deref(),
+                                snapshot.is_retail,
+                            )
+                            .await;
+                            tracing::debug!(
+                                order_id = %order_id,
+                                target_zone_id = ?target_zone_id,
+                                rule_count = rules.len(),
+                                "移桌后重新加载区域规则 (Server 模式)"
+                            );
+                            server_state.orders_manager().cache_rules(order_id, rules);
                         }
                     }
                 }
