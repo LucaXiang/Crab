@@ -687,11 +687,7 @@ impl ClientBridge {
                 // === 数据库健康状态 ===
                 let database = {
                     // 尝试执行简单查询检查数据库是否正常
-                    let db_ok: bool = server_state
-                        .db
-                        .query("SELECT count() FROM employee GROUP ALL")
-                        .await
-                        .is_ok();
+                    let db_ok: bool = server_state.pool.acquire().await.is_ok();
 
                     DatabaseHealth {
                         status: if db_ok {
@@ -1853,7 +1849,7 @@ impl ClientBridge {
                     if let Some((zone_id, is_retail)) = open_table_info {
                         if let Some(ref order_id) = response.order_id {
                             let rules = edge_server::orders::actions::open_table::load_matching_rules(
-                                &server_state.get_db(),
+                                &server_state.pool,
                                 zone_id.as_deref(),
                                 is_retail,
                             )
@@ -1874,7 +1870,7 @@ impl ClientBridge {
                     if let Some((ref order_id, ref target_zone_id)) = move_order_info {
                         if let Ok(Some(snapshot)) = server_state.orders_manager().get_snapshot(order_id) {
                             let rules = edge_server::orders::actions::open_table::load_matching_rules(
-                                &server_state.get_db(),
+                                &server_state.pool,
                                 target_zone_id.as_deref(),
                                 snapshot.is_retail,
                             )

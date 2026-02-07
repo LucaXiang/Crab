@@ -389,7 +389,7 @@ pub enum EventPayload {
 
     // ========== Price Rules ==========
     RuleSkipToggled {
-        rule_id: String,
+        rule_id: i64,
         rule_name: String,
         skipped: bool,
     },

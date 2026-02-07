@@ -149,10 +149,9 @@ pub async fn health(State(state): State<ServerState>) -> Json<HealthResponse> {
 
 /// 包含组件状态的详细健康检查
 pub async fn detailed_health(State(state): State<ServerState>) -> Json<DetailedHealthResponse> {
-    // 检查数据库
-    let db = state.get_db();
+    // 检查数据库: 使用 sqlx 简单查询验证连接
     let db_start = std::time::Instant::now();
-    let db_check = match db.health().await {
+    let db_check = match sqlx::query("SELECT 1").execute(&state.pool).await {
         Ok(_) => CheckResult::ok_with_latency(db_start.elapsed().as_millis() as u64),
         Err(e) => CheckResult::error(format!("Database error: {}", e)),
     };

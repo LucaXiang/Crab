@@ -1,155 +1,91 @@
 //! Dining Table Repository
 
-use super::{BaseRepository, RepoError, RepoResult};
-use crate::db::models::{DiningTable, DiningTableCreate, DiningTableUpdate};
-use surrealdb::engine::local::Db;
-use surrealdb::{RecordId, Surreal};
+use super::{RepoError, RepoResult};
+use shared::models::{DiningTable, DiningTableCreate, DiningTableUpdate};
+use sqlx::SqlitePool;
 
-#[derive(Clone)]
-pub struct DiningTableRepository {
-    base: BaseRepository,
+pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<DiningTable>> {
+    let tables = sqlx::query_as::<_, DiningTable>(
+        "SELECT id, name, zone_id, capacity, is_active FROM dining_table WHERE is_active = 1 ORDER BY name",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(tables)
 }
 
-impl DiningTableRepository {
-    pub fn new(db: Surreal<Db>) -> Self {
-        Self {
-            base: BaseRepository::new(db),
-        }
+pub async fn find_by_zone(pool: &SqlitePool, zone_id: i64) -> RepoResult<Vec<DiningTable>> {
+    let tables = sqlx::query_as::<_, DiningTable>(
+        "SELECT id, name, zone_id, capacity, is_active FROM dining_table WHERE zone_id = ? AND is_active = 1 ORDER BY name",
+    )
+    .bind(zone_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(tables)
+}
+
+pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<DiningTable>> {
+    let table = sqlx::query_as::<_, DiningTable>(
+        "SELECT id, name, zone_id, capacity, is_active FROM dining_table WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(table)
+}
+
+pub async fn find_by_name_in_zone(
+    pool: &SqlitePool,
+    zone_id: i64,
+    name: &str,
+) -> RepoResult<Option<DiningTable>> {
+    let table = sqlx::query_as::<_, DiningTable>(
+        "SELECT id, name, zone_id, capacity, is_active FROM dining_table WHERE zone_id = ? AND name = ? LIMIT 1",
+    )
+    .bind(zone_id)
+    .bind(name)
+    .fetch_optional(pool)
+    .await?;
+    Ok(table)
+}
+
+pub async fn create(pool: &SqlitePool, data: DiningTableCreate) -> RepoResult<DiningTable> {
+    let capacity = data.capacity.unwrap_or(4);
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO dining_table (name, zone_id, capacity) VALUES (?, ?, ?) RETURNING id",
+    )
+    .bind(&data.name)
+    .bind(data.zone_id)
+    .bind(capacity)
+    .fetch_one(pool)
+    .await?;
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::Database("Failed to create dining table".into()))
+}
+
+pub async fn update(pool: &SqlitePool, id: i64, data: DiningTableUpdate) -> RepoResult<DiningTable> {
+    let rows = sqlx::query(
+        "UPDATE dining_table SET name = COALESCE(?1, name), zone_id = COALESCE(?2, zone_id), capacity = COALESCE(?3, capacity), is_active = COALESCE(?4, is_active) WHERE id = ?5",
+    )
+    .bind(&data.name)
+    .bind(data.zone_id)
+    .bind(data.capacity)
+    .bind(data.is_active)
+    .bind(id)
+    .execute(pool)
+    .await?;
+    if rows.rows_affected() == 0 {
+        return Err(RepoError::NotFound(format!("Dining table {id} not found")));
     }
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::NotFound(format!("Dining table {id} not found")))
+}
 
-    /// Find all active dining tables
-    pub async fn find_all(&self) -> RepoResult<Vec<DiningTable>> {
-        let tables: Vec<DiningTable> = self
-            .base
-            .db()
-            .query("SELECT * FROM dining_table WHERE is_active = true ORDER BY name")
-            .await?
-            .take(0)?;
-        Ok(tables)
-    }
-
-    /// Find all tables in a zone
-    pub async fn find_by_zone(&self, zone_id: &str) -> RepoResult<Vec<DiningTable>> {
-        let zone_thing: RecordId = zone_id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid zone ID: {}", zone_id)))?;
-        let tables: Vec<DiningTable> = self
-            .base
-            .db()
-            .query(
-                "SELECT * FROM dining_table WHERE zone = $zone AND is_active = true ORDER BY name",
-            )
-            .bind(("zone", zone_thing))
-            .await?
-            .take(0)?;
-        Ok(tables)
-    }
-
-    /// Find table by id
-    pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<DiningTable>> {
-        let thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-        let table: Option<DiningTable> = self.base.db().select(thing).await?;
-        Ok(table)
-    }
-
-    /// Find table by id with zone fetched
-    pub async fn find_by_id_with_zone(&self, id: &str) -> RepoResult<Option<DiningTable>> {
-        let table_thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-        let mut result = self
-            .base
-            .db()
-            .query("SELECT * FROM dining_table WHERE id = $id")
-            .bind(("id", table_thing))
-            .await?;
-        let tables: Vec<DiningTable> = result.take(0)?;
-        Ok(tables.into_iter().next())
-    }
-
-    /// Find table by name in zone
-    pub async fn find_by_name_in_zone(
-        &self,
-        zone: &RecordId,
-        name: &str,
-    ) -> RepoResult<Option<DiningTable>> {
-        let mut result = self
-            .base
-            .db()
-            .query("SELECT * FROM dining_table WHERE zone = $zone AND name = $name LIMIT 1")
-            .bind(("zone", zone.clone()))
-            .bind(("name", name.to_string()))
-            .await?;
-        let tables: Vec<DiningTable> = result.take(0)?;
-        Ok(tables.into_iter().next())
-    }
-
-    /// Create a new dining table
-    pub async fn create(&self, data: DiningTableCreate) -> RepoResult<DiningTable> {
-        let mut result = self
-            .base
-            .db()
-            .query(
-                r#"CREATE dining_table SET
-                    name = $name,
-                    zone = $zone,
-                    capacity = $capacity,
-                    is_active = true
-                RETURN AFTER"#,
-            )
-            .bind(("name", data.name))
-            .bind(("zone", data.zone))
-            .bind(("capacity", data.capacity.unwrap_or(4)))
-            .await?;
-
-        let created: Option<DiningTable> = result.take(0)?;
-        created.ok_or_else(|| RepoError::Database("Failed to create dining table".to_string()))
-    }
-
-    /// Update a dining table
-    pub async fn update(&self, id: &str, data: DiningTableUpdate) -> RepoResult<DiningTable> {
-        let thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-
-        // 获取现有记录用于合并更新数据
-        let existing = self
-            .find_by_id(id)
-            .await?
-            .ok_or_else(|| RepoError::NotFound(format!("Dining table {} not found", id)))?;
-
-        // 手动构建 UPDATE 语句，避免 zone 被序列化为字符串
-        let name = data.name.unwrap_or(existing.name);
-        let zone = data.zone.unwrap_or(existing.zone);
-        let capacity = data.capacity.unwrap_or(existing.capacity);
-        let is_active = data.is_active.unwrap_or(existing.is_active);
-
-        let mut result = self.base
-            .db()
-            .query("UPDATE $thing SET name = $name, zone = $zone, capacity = $capacity, is_active = $is_active RETURN AFTER")
-            .bind(("thing", thing))
-            .bind(("name", name))
-            .bind(("zone", zone))
-            .bind(("capacity", capacity))
-            .bind(("is_active", is_active))
-            .await?;
-
-        result.take::<Option<DiningTable>>(0)?
-            .ok_or_else(|| RepoError::NotFound(format!("Dining table {} not found", id)))
-    }
-
-    /// Hard delete a dining table
-    pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-        self.base
-            .db()
-            .query("DELETE $thing")
-            .bind(("thing", thing))
-            .await?;
-        Ok(true)
-    }
+pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
+    sqlx::query("DELETE FROM dining_table WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(true)
 }

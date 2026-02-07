@@ -1,12 +1,8 @@
 //! Image Reference Model
-//!
-//! 图片引用计数，用于跟踪图片被哪些实体引用
 
-use super::serde_helpers;
 use serde::{Deserialize, Serialize};
-use surrealdb::RecordId;
 
-/// 实体类型枚举
+/// Entity type for image references
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ImageRefEntityType {
@@ -31,24 +27,11 @@ impl std::fmt::Display for ImageRefEntityType {
 
 /// Image reference record
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct ImageRef {
-    #[serde(default, with = "serde_helpers::option_record_id")]
-    pub id: Option<RecordId>,
-    /// 图片哈希 (SHA256)
+    pub id: i64,
     pub hash: String,
-    /// 引用实体类型
     pub entity_type: String,
-    /// 引用实体 ID
     pub entity_id: String,
-    /// 创建时间 (Unix millis)
-    #[serde(default)]
     pub created_at: i64,
-}
-
-/// Create image reference payload
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ImageRefCreate {
-    pub hash: String,
-    pub entity_type: String,
-    pub entity_id: String,
 }

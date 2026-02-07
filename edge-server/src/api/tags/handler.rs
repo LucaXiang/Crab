@@ -9,34 +9,27 @@ use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::models::{Tag, TagCreate, TagUpdate};
-use crate::db::repository::TagRepository;
+use crate::db::repository::tag;
 use crate::utils::{AppError, AppResult};
+use shared::models::{Tag, TagCreate, TagUpdate};
 
 const RESOURCE: &str = "tag";
 
 /// GET /api/tags - 获取所有标签
 pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Tag>>> {
-    let repo = TagRepository::new(state.db.clone());
-    let tags = repo
-        .find_all()
-        .await
-        ?;
+    let tags = tag::find_all(&state.pool).await?;
     Ok(Json(tags))
 }
 
 /// GET /api/tags/:id - 获取单个标签
 pub async fn get_by_id(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<Tag>> {
-    let repo = TagRepository::new(state.db.clone());
-    let tag = repo
-        .find_by_id(&id)
-        .await
-        ?
+    let t = tag::find_by_id(&state.pool, id)
+        .await?
         .ok_or_else(|| AppError::not_found(format!("Tag {} not found", id)))?;
-    Ok(Json(tag))
+    Ok(Json(t))
 }
 
 /// POST /api/tags - 创建标签
@@ -45,13 +38,9 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<TagCreate>,
 ) -> AppResult<Json<Tag>> {
-    let repo = TagRepository::new(state.db.clone());
-    let tag = repo
-        .create(payload)
-        .await
-        ?;
+    let t = tag::create(&state.pool, payload).await?;
 
-    let id = tag.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+    let id = t.id.to_string();
 
     audit_log!(
         state.audit_service,
@@ -59,75 +48,70 @@ pub async fn create(
         "tag", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = create_snapshot(&tag, "tag")
+        details = create_snapshot(&t, "tag")
     );
 
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&tag))
+        .broadcast_sync(RESOURCE, "created", &id, Some(&t))
         .await;
 
-    Ok(Json(tag))
+    Ok(Json(t))
 }
 
 /// PUT /api/tags/:id - 更新标签
 pub async fn update(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     Json(payload): Json<TagUpdate>,
 ) -> AppResult<Json<Tag>> {
-    let repo = TagRepository::new(state.db.clone());
-
     // 查询旧值（用于审计 diff）
-    let old_tag = repo
-        .find_by_id(&id)
+    let old_tag = tag::find_by_id(&state.pool, id)
         .await?
         .ok_or_else(|| AppError::not_found(format!("Tag {}", id)))?;
 
-    let tag = repo.update(&id, payload).await?;
+    let t = tag::update(&state.pool, id, payload).await?;
 
+    let id_str = id.to_string();
     audit_log!(
         state.audit_service,
         AuditAction::TagUpdated,
-        "tag", &id,
+        "tag", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = create_diff(&old_tag, &tag, "tag")
+        details = create_diff(&old_tag, &t, "tag")
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&tag))
+        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&t))
         .await;
 
-    Ok(Json(tag))
+    Ok(Json(t))
 }
 
 /// DELETE /api/tags/:id - 删除标签 (软删除)
 pub async fn delete(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
-    let repo = TagRepository::new(state.db.clone());
-    let name_for_audit = repo.find_by_id(&id).await.ok().flatten()
+    let name_for_audit = tag::find_by_id(&state.pool, id).await.ok().flatten()
         .map(|t| t.name.clone()).unwrap_or_default();
-    let result = repo
-        .delete(&id)
-        .await
-        ?;
+    let result = tag::delete(&state.pool, id).await?;
 
     if result {
+        let id_str = id.to_string();
         audit_log!(
             state.audit_service,
             AuditAction::TagDeleted,
-            "tag", &id,
+            "tag", &id_str,
             operator_id = Some(current_user.id.clone()),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
+            .broadcast_sync::<()>(RESOURCE, "deleted", &id_str, None)
             .await;
     }
 

@@ -10,9 +10,9 @@ use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::models::{AttributeBindingFull, ProductCreate, ProductFull, ProductUpdate};
-use crate::db::repository::AttributeRepository;
+use crate::db::repository::attribute;
 use crate::utils::{AppError, AppResult, ErrorCode};
+use shared::models::{AttributeBindingFull, ProductCreate, ProductFull, ProductUpdate};
 
 const RESOURCE_PRODUCT: &str = "product";
 
@@ -20,35 +20,25 @@ const RESOURCE_PRODUCT: &str = "product";
 async fn check_duplicate_external_id(
     state: &ServerState,
     external_id: i64,
-    exclude_product_id: Option<&str>,
+    exclude_product_id: Option<i64>,
 ) -> AppResult<bool> {
-    #[derive(serde::Deserialize)]
-    struct Found {
-        #[allow(dead_code)]
-        id: surrealdb::RecordId,
-    }
-
-    let found: Vec<Found> = if let Some(exclude_id) = exclude_product_id {
-        let exclude_id = exclude_id
-            .strip_prefix("product:")
-            .unwrap_or(exclude_id)
-            .to_string();
-        let mut result = state.db
-            .query("SELECT id FROM product WHERE external_id = $eid AND id != type::thing('product', $exclude) LIMIT 1")
-            .bind(("eid", external_id))
-            .bind(("exclude", exclude_id))
-            .await
-            .map_err(crate::db::repository::surreal_err_to_app)?;
-        result.take(0).unwrap_or_default()
+    let count: i64 = if let Some(exclude_id) = exclude_product_id {
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM product WHERE external_id = ?1 AND id != ?2 LIMIT 1",
+        )
+        .bind(external_id)
+        .bind(exclude_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| AppError::database(e.to_string()))?
     } else {
-        let mut result = state.db
-            .query("SELECT id FROM product WHERE external_id = $eid LIMIT 1")
-            .bind(("eid", external_id))
+        sqlx::query_scalar("SELECT COUNT(*) FROM product WHERE external_id = ?1 LIMIT 1")
+            .bind(external_id)
+            .fetch_one(&state.pool)
             .await
-            .map_err(crate::db::repository::surreal_err_to_app)?;
-        result.take(0).unwrap_or_default()
+            .map_err(|e| AppError::database(e.to_string()))?
     };
-    Ok(!found.is_empty())
+    Ok(count > 0)
 }
 
 // =============================================================================
@@ -64,20 +54,22 @@ pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Produc
 /// GET /api/products/by-category/:category_id - 按分类获取商品 (完整数据)
 pub async fn list_by_category(
     State(state): State<ServerState>,
-    Path(category_id): Path<String>,
+    Path(category_id): Path<i64>,
 ) -> AppResult<Json<Vec<ProductFull>>> {
-    let products = state.catalog_service.get_products_by_category(&category_id);
+    let products = state
+        .catalog_service
+        .get_products_by_category(&category_id.to_string());
     Ok(Json(products))
 }
 
 /// GET /api/products/:id - 获取单个商品 (完整数据)
 pub async fn get_by_id(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<ProductFull>> {
     let product = state
         .catalog_service
-        .get_product(&id)
+        .get_product(&id.to_string())
         .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
     Ok(Json(product))
 }
@@ -86,13 +78,13 @@ pub async fn get_by_id(
 /// Note: Now same as get_by_id since CatalogService always returns ProductFull
 pub async fn get_full(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
-) -> AppResult<Json<shared::models::ProductFull>> {
+    Path(id): Path<i64>,
+) -> AppResult<Json<ProductFull>> {
     let product = state
         .catalog_service
-        .get_product(&id)
+        .get_product(&id.to_string())
         .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
-    Ok(Json(product.into()))
+    Ok(Json(product))
 }
 
 /// POST /api/products - 创建商品
@@ -100,7 +92,7 @@ pub async fn create(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<ProductCreate>,
-) -> AppResult<Json<shared::models::ProductFull>> {
+) -> AppResult<Json<ProductFull>> {
     // 检查 external_id 是否已提供 (必填)
     let eid = payload.external_id.ok_or_else(|| {
         AppError::new(ErrorCode::ProductExternalIdRequired)
@@ -118,8 +110,7 @@ pub async fn create(
         .await
         ?;
 
-    let id = product.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
-    let product_for_api: shared::models::ProductFull = product.into();
+    let id = product.id.to_string();
 
     audit_log!(
         state.audit_service,
@@ -127,23 +118,25 @@ pub async fn create(
         "product", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = create_snapshot(&product_for_api, "product")
+        details = create_snapshot(&product, "product")
     );
 
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&product_for_api))
+        .broadcast_sync(RESOURCE_PRODUCT, "created", &id, Some(&product))
         .await;
 
-    Ok(Json(product_for_api))
+    Ok(Json(product))
 }
 
 /// PUT /api/products/:id - 更新商品
 pub async fn update(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     Json(payload): Json<ProductUpdate>,
-) -> AppResult<Json<shared::models::ProductFull>> {
+) -> AppResult<Json<ProductFull>> {
+    let id_str = id.to_string();
+
     tracing::debug!(
         "Product update - id: {}, tax_rate: {:?}, is_kitchen_print_enabled: {:?}",
         id,
@@ -154,13 +147,12 @@ pub async fn update(
     // 查询旧值（用于审计 diff）
     let old_product = state
         .catalog_service
-        .get_product(&id)
+        .get_product(&id_str)
         .ok_or_else(|| AppError::not_found(format!("Product {}", id)))?;
-    let old_for_audit: shared::models::ProductFull = old_product.into();
 
     // 检查 external_id 是否已被其他商品使用
     if let Some(eid) = payload.external_id {
-        if check_duplicate_external_id(&state, eid, Some(&id)).await? {
+        if check_duplicate_external_id(&state, eid, Some(id)).await? {
             return Err(AppError::new(ErrorCode::ProductExternalIdExists)
                 .with_detail("external_id", eid));
         }
@@ -168,7 +160,7 @@ pub async fn update(
 
     let product = state
         .catalog_service
-        .update_product(&id, payload)
+        .update_product(&id_str, payload)
         .await?;
 
     tracing::debug!(
@@ -177,50 +169,53 @@ pub async fn update(
         product.is_label_print_enabled
     );
 
-    let product_for_api: shared::models::ProductFull = product.into();
-
     audit_log!(
         state.audit_service,
         AuditAction::ProductUpdated,
-        "product", &id,
+        "product", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = create_diff(&old_for_audit, &product_for_api, "product")
+        details = create_diff(&old_product, &product, "product")
     );
 
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "updated", &id, Some(&product_for_api))
+        .broadcast_sync(RESOURCE_PRODUCT, "updated", &id_str, Some(&product))
         .await;
 
-    Ok(Json(product_for_api))
+    Ok(Json(product))
 }
 
 /// DELETE /api/products/:id - 删除商品
 pub async fn delete(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
+    let id_str = id.to_string();
+
     // 删除前查名称用于审计
-    let name_for_audit = state.catalog_service.get_product(&id)
-        .map(|p| p.name.clone()).unwrap_or_default();
+    let name_for_audit = state
+        .catalog_service
+        .get_product(&id_str)
+        .map(|p| p.name.clone())
+        .unwrap_or_default();
     state
         .catalog_service
-        .delete_product(&id)
+        .delete_product(&id_str)
         .await
         ?;
 
     audit_log!(
         state.audit_service,
         AuditAction::ProductDeleted,
-        "product", &id,
+        "product", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"name": name_for_audit})
     );
 
     state
-        .broadcast_sync::<()>(RESOURCE_PRODUCT, "deleted", &id, None)
+        .broadcast_sync::<()>(RESOURCE_PRODUCT, "deleted", &id_str, None)
         .await;
 
     Ok(Json(true))
@@ -229,15 +224,10 @@ pub async fn delete(
 /// GET /api/products/:id/attributes - 获取商品的属性绑定列表
 pub async fn list_product_attributes(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<Vec<AttributeBindingFull>>> {
-    let attr_repo = AttributeRepository::new(state.db.clone());
-
     // Get attribute bindings for this product
-    let bindings = attr_repo
-        .find_bindings_for_product(&id)
-        .await
-        ?;
+    let bindings = attribute::find_bindings_for_owner(&state.pool, "product", id).await?;
 
     // Convert to API type
     let result: Vec<AttributeBindingFull> = bindings
@@ -262,41 +252,55 @@ pub async fn list_product_attributes(
 /// POST /api/products/:id/tags/:tag_id - 给商品添加标签
 pub async fn add_product_tag(
     State(state): State<ServerState>,
-    Path((product_id, tag_id)): Path<(String, String)>,
-) -> AppResult<Json<shared::models::ProductFull>> {
+    Path((product_id, tag_id)): Path<(i64, i64)>,
+) -> AppResult<Json<ProductFull>> {
+    let product_id_str = product_id.to_string();
+    let tag_id_str = tag_id.to_string();
+
     let product = state
         .catalog_service
-        .add_product_tag(&product_id, &tag_id)
+        .add_product_tag(&product_id_str, &tag_id_str)
         .await
         ?;
 
     // 广播同步通知 (发送完整 ProductFull 数据)
-    let product_for_api: shared::models::ProductFull = product.into();
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&product_for_api))
+        .broadcast_sync(
+            RESOURCE_PRODUCT,
+            "updated",
+            &product_id_str,
+            Some(&product),
+        )
         .await;
 
-    Ok(Json(product_for_api))
+    Ok(Json(product))
 }
 
 /// DELETE /api/products/:id/tags/:tag_id - 从商品移除标签
 pub async fn remove_product_tag(
     State(state): State<ServerState>,
-    Path((product_id, tag_id)): Path<(String, String)>,
-) -> AppResult<Json<shared::models::ProductFull>> {
+    Path((product_id, tag_id)): Path<(i64, i64)>,
+) -> AppResult<Json<ProductFull>> {
+    let product_id_str = product_id.to_string();
+    let tag_id_str = tag_id.to_string();
+
     let product = state
         .catalog_service
-        .remove_product_tag(&product_id, &tag_id)
+        .remove_product_tag(&product_id_str, &tag_id_str)
         .await
         ?;
 
     // 广播同步通知 (发送完整 ProductFull 数据)
-    let product_for_api: shared::models::ProductFull = product.into();
     state
-        .broadcast_sync(RESOURCE_PRODUCT, "updated", &product_id, Some(&product_for_api))
+        .broadcast_sync(
+            RESOURCE_PRODUCT,
+            "updated",
+            &product_id_str,
+            Some(&product),
+        )
         .await;
 
-    Ok(Json(product_for_api))
+    Ok(Json(product))
 }
 
 // =============================================================================
@@ -306,7 +310,7 @@ pub async fn remove_product_tag(
 /// Payload for batch sort order update
 #[derive(Debug, Deserialize)]
 pub struct SortOrderUpdate {
-    pub id: String,
+    pub id: i64,
     pub sort_order: i32,
 }
 
@@ -338,12 +342,12 @@ pub async fn batch_update_sort_order(
         let result = state
             .catalog_service
             .update_product(
-                &update.id,
+                &update.id.to_string(),
                 ProductUpdate {
                     name: None,
                     sort_order: Some(update.sort_order),
                     image: None,
-                    category: None,
+                    category_id: None,
                     tax_rate: None,
                     receipt_name: None,
                     kitchen_print_name: None,

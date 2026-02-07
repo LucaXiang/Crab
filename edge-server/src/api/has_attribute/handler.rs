@@ -5,21 +5,20 @@ use axum::{
     extract::{Path, State},
 };
 use serde::{Deserialize, Serialize};
-use surrealdb::RecordId;
 
 use crate::audit::AuditAction;
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::models::{Attribute, AttributeBinding};
-use crate::db::repository::AttributeRepository;
+use crate::db::repository::attribute;
 use crate::utils::{AppError, AppResult};
+use shared::models::{Attribute, AttributeBinding};
 
 /// 创建绑定的请求体
 #[derive(Debug, Deserialize)]
 pub struct CreateBindingRequest {
-    pub product_id: String,
-    pub attribute_id: String,
+    pub product_id: i64,
+    pub attribute_id: i64,
     #[serde(default)]
     pub is_required: bool,
     #[serde(default)]
@@ -48,68 +47,35 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<CreateBindingRequest>,
 ) -> AppResult<Json<AttributeBinding>> {
-    let repo = AttributeRepository::new(state.db.clone());
+    // 查询产品的 category_id，检查分类是否已绑定此属性
+    let category_id: Option<i64> = sqlx::query_scalar(
+        "SELECT category_id FROM product WHERE id = ?",
+    )
+    .bind(payload.product_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| AppError::database(e.to_string()))?;
 
-    // Check if the product's category already has this attribute bound
-    let product_thing: RecordId = payload.product_id
-        .parse()
-        .map_err(|_| AppError::validation(format!("Invalid product ID: {}", payload.product_id)))?;
-    let attr_thing: RecordId = payload.attribute_id
-        .parse()
-        .map_err(|_| AppError::validation(format!("Invalid attribute ID: {}", payload.attribute_id)))?;
-
-    // Get product's category
-    let mut cat_result = state
-        .db
-        .query("SELECT category FROM product WHERE id = $prod")
-        .bind(("prod", product_thing))
-        .await
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-
-    #[derive(Debug, serde::Deserialize)]
-    struct CatRow {
-        category: RecordId,
-    }
-    let cat_rows: Vec<CatRow> = cat_result
-        .take(0)
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-
-    if let Some(cat_row) = cat_rows.first() {
-        // Check if category has this attribute bound
-        let mut check_result = state
-            .db
-            .query("SELECT count() as cnt FROM has_attribute WHERE in = $cat AND out = $attr GROUP ALL")
-            .bind(("cat", cat_row.category.clone()))
-            .bind(("attr", attr_thing))
-            .await
-            .map_err(crate::db::repository::surreal_err_to_app)?;
-
-        #[derive(Debug, serde::Deserialize)]
-        struct CountRow {
-            cnt: i64,
-        }
-        let count_rows: Vec<CountRow> = check_result
-            .take(0)
-            .map_err(crate::db::repository::surreal_err_to_app)?;
-
-        if count_rows.first().map(|r| r.cnt).unwrap_or(0) > 0 {
+    if let Some(cat_id) = category_id {
+        if attribute::has_binding(&state.pool, "category", cat_id, payload.attribute_id).await? {
             return Err(AppError::validation(
                 "该属性已通过分类继承绑定到此产品，不能重复添加".to_string(),
             ));
         }
     }
 
-    let binding = repo
-        .link_to_product(
-            &payload.product_id,
-            &payload.attribute_id,
-            payload.is_required,
-            payload.display_order,
-            payload.default_option_indices,
-        )
-        .await?;
+    let binding = attribute::link(
+        &state.pool,
+        "product",
+        payload.product_id,
+        payload.attribute_id,
+        payload.is_required,
+        payload.display_order,
+        payload.default_option_indices,
+    )
+    .await?;
 
-    let binding_id = binding.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+    let binding_id = binding.id.to_string();
     audit_log!(
         state.audit_service,
         AuditAction::ProductUpdated,
@@ -118,14 +84,15 @@ pub async fn create(
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
             "op": "bind_attribute",
-            "product_id": &payload.product_id,
-            "attribute_id": &payload.attribute_id,
+            "product_id": payload.product_id,
+            "attribute_id": payload.attribute_id,
         })
     );
 
     // Refresh product cache (attribute bindings changed)
-    if let Err(e) = state.catalog_service.refresh_product_cache(&payload.product_id).await {
-        tracing::warn!("Failed to refresh product cache for {}: {}", payload.product_id, e);
+    let product_id_str = payload.product_id.to_string();
+    if let Err(e) = state.catalog_service.refresh_product_cache(&product_id_str).await {
+        tracing::warn!("Failed to refresh product cache for {}: {}", product_id_str, e);
     }
 
     Ok(Json(binding))
@@ -134,26 +101,10 @@ pub async fn create(
 /// GET /api/has-attribute/{id} - 获取单个绑定
 pub async fn get_by_id(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<AttributeBinding>> {
-    // 通过 ID 查询 has_attribute 边
-    let thing: RecordId = id
-        .parse()
-        .map_err(|_| AppError::validation(format!("Invalid ID: {}", id)))?;
-    let mut result = state
-        .db
-        .query("SELECT * FROM has_attribute WHERE id = $id")
-        .bind(("id", thing))
-        .await
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-
-    let bindings: Vec<AttributeBinding> = result
-        .take(0)
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-
-    bindings
-        .into_iter()
-        .next()
+    attribute::find_binding_by_id(&state.pool, id)
+        .await?
         .map(Json)
         .ok_or_else(|| AppError::not_found(format!("Binding {} not found", id)))
 }
@@ -162,34 +113,23 @@ pub async fn get_by_id(
 pub async fn update(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     Json(payload): Json<UpdateBindingRequest>,
 ) -> AppResult<Json<AttributeBinding>> {
-    let thing: RecordId = id
-        .parse()
-        .map_err(|_| AppError::validation(format!("Invalid ID: {}", id)))?;
+    let binding = attribute::update_binding(
+        &state.pool,
+        id,
+        payload.is_required,
+        payload.display_order,
+        payload.default_option_indices,
+    )
+    .await?;
 
-    let mut result = state
-        .db
-        .query("UPDATE $thing MERGE $data RETURN AFTER")
-        .bind(("thing", thing))
-        .bind(("data", payload))
-        .await
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-
-    let bindings: Vec<AttributeBinding> = result
-        .take(0)
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-
-    let binding = bindings
-        .into_iter()
-        .next()
-        .ok_or_else(|| AppError::not_found(format!("Binding {} not found", id)))?;
-
+    let id_str = id.to_string();
     audit_log!(
         state.audit_service,
         AuditAction::ProductUpdated,
-        "attribute_binding", &id,
+        "attribute_binding", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"op": "update_binding"})
@@ -202,55 +142,38 @@ pub async fn update(
 pub async fn delete(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
-    let thing: RecordId = id
-        .parse()
-        .map_err(|_| AppError::validation(format!("Invalid ID: {}", id)))?;
+    // Get the binding before deleting (for cache refresh and audit)
+    let binding = attribute::find_binding_by_id(&state.pool, id).await?;
+    let owner_id = binding.as_ref().map(|b| b.owner_id);
+    let owner_type = binding.as_ref().map(|b| b.owner_type.clone());
 
-    // Get the product ID before deleting (for cache refresh)
-    let mut pre_result = state
-        .db
-        .query("SELECT in FROM has_attribute WHERE id = $id")
-        .bind(("id", thing.clone()))
-        .await
-        .map_err(crate::db::repository::surreal_err_to_app)?;
+    attribute::delete_binding(&state.pool, id).await?;
 
-    #[derive(Debug, serde::Deserialize)]
-    struct InRow {
-        #[serde(rename = "in", with = "crate::db::models::serde_helpers::record_id")]
-        from: RecordId,
-    }
-    let in_rows: Vec<InRow> = pre_result
-        .take(0)
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-    let product_id = in_rows.first().map(|r| r.from.to_string());
-
-    state
-        .db
-        .query("DELETE $thing")
-        .bind(("thing", thing))
-        .await
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-
+    let id_str = id.to_string();
     audit_log!(
         state.audit_service,
         AuditAction::ProductUpdated,
-        "attribute_binding", &id,
+        "attribute_binding", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
             "op": "unbind_attribute",
-            "product_id": &product_id,
+            "owner_id": owner_id,
+            "owner_type": &owner_type,
         })
     );
 
     // Refresh product cache if the binding was for a product
-    if let Some(pid) = product_id
-        && pid.starts_with("product:")
-            && let Err(e) = state.catalog_service.refresh_product_cache(&pid).await {
-                tracing::warn!("Failed to refresh product cache for {}: {}", pid, e);
+    if let (Some(oid), Some(otype)) = (owner_id, owner_type) {
+        if otype == "product" {
+            let product_id_str = oid.to_string();
+            if let Err(e) = state.catalog_service.refresh_product_cache(&product_id_str).await {
+                tracing::warn!("Failed to refresh product cache for {}: {}", product_id_str, e);
             }
+        }
+    }
 
     Ok(Json(true))
 }
@@ -258,13 +181,9 @@ pub async fn delete(
 /// GET /api/has-attribute/product/{product_id} - 获取产品的所有属性绑定
 pub async fn list_by_product(
     State(state): State<ServerState>,
-    Path(product_id): Path<String>,
+    Path(product_id): Path<i64>,
 ) -> AppResult<Json<Vec<BindingWithAttribute>>> {
-    let repo = AttributeRepository::new(state.db.clone());
-
-    let bindings = repo
-        .find_bindings_for_product(&product_id)
-        .await?;
+    let bindings = attribute::find_bindings_for_owner(&state.pool, "product", product_id).await?;
 
     let result: Vec<BindingWithAttribute> = bindings
         .into_iter()

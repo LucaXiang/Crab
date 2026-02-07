@@ -1888,11 +1888,11 @@ mod tests {
     use shared::models::price_rule::{AdjustmentType, ProductScope};
     use shared::order::AppliedRule;
 
-    fn make_applied_rule(rule_id: &str, rule_type: RuleType, adjustment_value: f64, skipped: bool) -> AppliedRule {
+    fn make_applied_rule(rule_id: i64, rule_type: RuleType, adjustment_value: f64, skipped: bool) -> AppliedRule {
         AppliedRule {
-            rule_id: rule_id.to_string(),
-            name: rule_id.to_string(),
-            display_name: rule_id.to_string(),
+            rule_id,
+            name: format!("rule-{rule_id}"),
+            display_name: format!("rule-{rule_id}"),
             receipt_name: "R".to_string(),
             rule_type,
             adjustment_type: AdjustmentType::Percentage,
@@ -1944,8 +1944,8 @@ mod tests {
         let item = make_item_with_rules(
             100.0,
             vec![
-                make_applied_rule("r1", RuleType::Discount, 5.0, false),
-                make_applied_rule("r2", RuleType::Discount, 3.0, true), // skipped
+                make_applied_rule(1, RuleType::Discount, 5.0, false),
+                make_applied_rule(2, RuleType::Discount, 3.0, true), // skipped
             ],
             Some(8.0), // legacy total (should be ignored when applied_rules present)
             None,
@@ -1960,8 +1960,8 @@ mod tests {
         let item = make_item_with_rules(
             100.0,
             vec![
-                make_applied_rule("s1", RuleType::Surcharge, 7.0, true), // skipped
-                make_applied_rule("s2", RuleType::Surcharge, 4.0, false),
+                make_applied_rule(11, RuleType::Surcharge, 7.0, true), // skipped
+                make_applied_rule(12, RuleType::Surcharge, 4.0, false),
             ],
             None,
             Some(11.0), // legacy total (should be ignored)
@@ -1976,8 +1976,8 @@ mod tests {
         let item = make_item_with_rules(
             100.0,
             vec![
-                make_applied_rule("r1", RuleType::Discount, 5.0, true),
-                make_applied_rule("r2", RuleType::Discount, 3.0, true),
+                make_applied_rule(1, RuleType::Discount, 5.0, true),
+                make_applied_rule(2, RuleType::Discount, 3.0, true),
             ],
             Some(8.0),
             None,
@@ -1991,7 +1991,7 @@ mod tests {
         let item = make_item_with_rules(
             100.0,
             vec![
-                make_applied_rule("s1", RuleType::Surcharge, 5.0, true),
+                make_applied_rule(11, RuleType::Surcharge, 5.0, true),
             ],
             None,
             Some(5.0),
@@ -2033,8 +2033,8 @@ mod tests {
         let item = make_item_with_rules(
             100.0,
             vec![
-                make_applied_rule("r1", RuleType::Discount, 5.0, false),
-                make_applied_rule("s1", RuleType::Surcharge, 10.0, false),
+                make_applied_rule(1, RuleType::Discount, 5.0, false),
+                make_applied_rule(11, RuleType::Surcharge, 10.0, false),
             ],
             None,
             None,
@@ -2048,8 +2048,8 @@ mod tests {
         let item = make_item_with_rules(
             100.0,
             vec![
-                make_applied_rule("r1", RuleType::Discount, 5.0, false),
-                make_applied_rule("s1", RuleType::Surcharge, 10.0, false),
+                make_applied_rule(1, RuleType::Discount, 5.0, false),
+                make_applied_rule(11, RuleType::Surcharge, 10.0, false),
             ],
             None,
             None,
@@ -2064,8 +2064,8 @@ mod tests {
         let item = make_item_with_rules(
             100.0,
             vec![
-                make_applied_rule("r1", RuleType::Discount, 5.0, false),
-                make_applied_rule("r2", RuleType::Discount, 3.0, true), // skipped
+                make_applied_rule(1, RuleType::Discount, 5.0, false),
+                make_applied_rule(2, RuleType::Discount, 3.0, true), // skipped
             ],
             Some(8.0),
             None,
@@ -2080,7 +2080,7 @@ mod tests {
         let item = make_item_with_rules(
             100.0,
             vec![
-                make_applied_rule("s1", RuleType::Surcharge, 10.0, true),
+                make_applied_rule(11, RuleType::Surcharge, 10.0, true),
             ],
             None,
             Some(10.0),
@@ -2094,7 +2094,7 @@ mod tests {
         // Comped item always returns 0 regardless of rules
         let mut item = make_item_with_rules(
             100.0,
-            vec![make_applied_rule("r1", RuleType::Discount, 5.0, false)],
+            vec![make_applied_rule(1, RuleType::Discount, 5.0, false)],
             Some(5.0),
             None,
         );
@@ -2108,7 +2108,7 @@ mod tests {
         // manual 60% + rule discount 50% → rule now based on after_manual
         let mut item = make_item_with_rules(
             100.0,
-            vec![make_applied_rule("r1", RuleType::Discount, 50.0, false)],
+            vec![make_applied_rule(1, RuleType::Discount, 50.0, false)],
             Some(50.0),
             None,
         );
@@ -2127,8 +2127,8 @@ mod tests {
         snapshot.items.push(make_item_with_rules(
             100.0,
             vec![
-                make_applied_rule("r1", RuleType::Discount, 10.0, true), // skipped
-                make_applied_rule("r2", RuleType::Discount, 5.0, false), // active
+                make_applied_rule(1, RuleType::Discount, 10.0, true), // skipped
+                make_applied_rule(2, RuleType::Discount, 5.0, false), // active
             ],
             Some(15.0),
             None,
@@ -2161,7 +2161,7 @@ mod tests {
 
         // Order-level discount, skipped
         snapshot.order_applied_rules = Some(vec![
-            make_applied_rule("or1", RuleType::Discount, 20.0, true), // skipped
+            make_applied_rule(101, RuleType::Discount, 20.0, true), // skipped
         ]);
         snapshot.order_rule_discount_amount = Some(20.0); // legacy
 
@@ -2181,7 +2181,7 @@ mod tests {
         snapshot.items.push(item);
 
         snapshot.order_applied_rules = Some(vec![
-            make_applied_rule("os1", RuleType::Surcharge, 15.0, true), // skipped
+            make_applied_rule(111, RuleType::Surcharge, 15.0, true), // skipped
         ]);
         snapshot.order_rule_surcharge_amount = Some(15.0);
 
@@ -2199,10 +2199,10 @@ mod tests {
         snapshot.items.push(item);
 
         snapshot.order_applied_rules = Some(vec![
-            make_applied_rule("or1", RuleType::Discount, 10.0, false),  // active
-            make_applied_rule("or2", RuleType::Discount, 20.0, true),   // skipped
-            make_applied_rule("os1", RuleType::Surcharge, 5.0, false),  // active
-            make_applied_rule("os2", RuleType::Surcharge, 8.0, true),   // skipped
+            make_applied_rule(101, RuleType::Discount, 10.0, false),  // active
+            make_applied_rule(102, RuleType::Discount, 20.0, true),   // skipped
+            make_applied_rule(111, RuleType::Surcharge, 5.0, false),  // active
+            make_applied_rule(112, RuleType::Surcharge, 8.0, true),   // skipped
         ]);
 
         recalculate_totals(&mut snapshot);
@@ -2221,7 +2221,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(make_item_with_rules(
             100.0,
-            vec![make_applied_rule("r1", RuleType::Discount, 10.0, false)],
+            vec![make_applied_rule(1, RuleType::Discount, 10.0, false)],
             Some(10.0),
             None,
         ));
@@ -2247,7 +2247,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         let mut item = make_item_with_rules(
             100.0,
-            vec![make_applied_rule("s1", RuleType::Surcharge, 10.0, true)], // skipped
+            vec![make_applied_rule(11, RuleType::Surcharge, 10.0, true)], // skipped
             None,
             Some(10.0),
         );
@@ -2269,7 +2269,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         let mut item = make_item_with_rules(
             100.0,
-            vec![make_applied_rule("s1", RuleType::Surcharge, 10.0, false)], // active
+            vec![make_applied_rule(11, RuleType::Surcharge, 10.0, false)], // active
             None,
             Some(10.0),
         );
@@ -2291,7 +2291,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(make_item_with_rules(
             100.0,
-            vec![make_applied_rule("r1", RuleType::Discount, 20.0, false)], // active: -20
+            vec![make_applied_rule(1, RuleType::Discount, 20.0, false)], // active: -20
             Some(20.0),
             None,
         ));
@@ -2318,7 +2318,7 @@ mod tests {
         // Options modifier + skipped rule → options still apply, rule doesn't
         let mut item = make_item_with_rules(
             50.0,
-            vec![make_applied_rule("r1", RuleType::Discount, 5.0, true)], // skipped
+            vec![make_applied_rule(1, RuleType::Discount, 5.0, true)], // skipped
             Some(5.0),
             None,
         );
@@ -2344,9 +2344,9 @@ mod tests {
         let item = make_item_with_rules(
             100.0,
             vec![
-                make_applied_rule("r1", RuleType::Discount, 3.0, false),
-                make_applied_rule("r2", RuleType::Discount, 4.0, false),
-                make_applied_rule("r3", RuleType::Discount, 2.5, false),
+                make_applied_rule(1, RuleType::Discount, 3.0, false),
+                make_applied_rule(2, RuleType::Discount, 4.0, false),
+                make_applied_rule(3, RuleType::Discount, 2.5, false),
             ],
             Some(9.5),
             None,
@@ -2362,7 +2362,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(make_item_with_rules(
             100.0,
-            vec![make_applied_rule("r1", RuleType::Discount, 10.0, false)],
+            vec![make_applied_rule(1, RuleType::Discount, 10.0, false)],
             Some(10.0),
             None,
         ));
@@ -2389,8 +2389,8 @@ mod tests {
     fn test_effective_order_rule_discount_skipped() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.order_applied_rules = Some(vec![
-            make_applied_rule("or1", RuleType::Discount, 10.0, false),
-            make_applied_rule("or2", RuleType::Discount, 5.0, true), // skipped
+            make_applied_rule(101, RuleType::Discount, 10.0, false),
+            make_applied_rule(102, RuleType::Discount, 5.0, true), // skipped
         ]);
         snapshot.order_rule_discount_amount = Some(15.0);
 
@@ -2403,7 +2403,7 @@ mod tests {
     fn test_effective_order_rule_surcharge_skipped() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.order_applied_rules = Some(vec![
-            make_applied_rule("os1", RuleType::Surcharge, 8.0, true), // skipped
+            make_applied_rule(111, RuleType::Surcharge, 8.0, true), // skipped
         ]);
         snapshot.order_rule_surcharge_amount = Some(8.0);
 
@@ -2437,7 +2437,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(make_item_with_rules(
             100.0,
-            vec![make_applied_rule("r1", RuleType::Discount, 20.0, false)],
+            vec![make_applied_rule(1, RuleType::Discount, 20.0, false)],
             Some(20.0),
             None,
         ));
@@ -2466,7 +2466,7 @@ mod tests {
         // Rule discount should recalculate based on after_manual price
         let mut item = make_item_with_rules(
             100.0,
-            vec![make_applied_rule("r1", RuleType::Discount, 10.0, false)],
+            vec![make_applied_rule(1, RuleType::Discount, 10.0, false)],
             None,
             None,
         );
@@ -2487,7 +2487,7 @@ mod tests {
         // Surcharge should be based on base_with_options, not after_manual
         let mut item = make_item_with_rules(
             100.0,
-            vec![make_applied_rule("s1", RuleType::Surcharge, 10.0, false)],
+            vec![make_applied_rule(11, RuleType::Surcharge, 10.0, false)],
             None,
             None,
         );
@@ -2504,7 +2504,7 @@ mod tests {
         // FixedAmount rule discount stays constant regardless of manual discount
         let mut item = make_item_with_rules(100.0, vec![], None, None);
         item.applied_rules = Some(vec![AppliedRule {
-            rule_id: "r1".to_string(),
+            rule_id: 1,
             name: "r1".to_string(),
             display_name: "r1".to_string(),
             receipt_name: "R".to_string(),
@@ -2538,7 +2538,7 @@ mod tests {
         snapshot.items.push(item);
 
         snapshot.order_applied_rules = Some(vec![
-            make_applied_rule("or1", RuleType::Discount, 10.0, false),
+            make_applied_rule(101, RuleType::Discount, 10.0, false),
         ]);
 
         recalculate_totals(&mut snapshot);
@@ -2559,7 +2559,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(make_item_with_rules(
             100.0,
-            vec![make_applied_rule("r1", RuleType::Discount, 10.0, false)],
+            vec![make_applied_rule(1, RuleType::Discount, 10.0, false)],
             None,
             None,
         ));
@@ -2588,7 +2588,7 @@ mod tests {
         snapshot.items.push(item);
 
         snapshot.order_applied_rules = Some(vec![
-            make_applied_rule("or1", RuleType::Discount, 10.0, false),
+            make_applied_rule(101, RuleType::Discount, 10.0, false),
         ]);
 
         recalculate_totals(&mut snapshot);

@@ -211,7 +211,7 @@ pub enum OrderCommandPayload {
     /// Toggle rule skip status
     ToggleRuleSkip {
         order_id: String,
-        rule_id: String,
+        rule_id: i64,
         skipped: bool,
     },
 

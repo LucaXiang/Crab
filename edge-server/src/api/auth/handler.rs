@@ -9,8 +9,9 @@ use axum::{Extension, Json, extract::State};
 use crate::audit::AuditAction;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::models::{Employee, Role};
+use crate::db::repository::{employee, role};
 use crate::AppError;
+use shared::models::Role;
 
 // Re-use shared DTOs for API consistency
 use shared::client::{EscalateRequest, EscalateResponse, LoginRequest, LoginResponse, UserInfo};
@@ -25,25 +26,16 @@ pub async fn login(
     State(state): State<ServerState>,
     Json(req): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, AppError> {
-    let db = state.get_db();
     let username = req.username.clone();
 
-    // Query employee by username
-    let mut result = db
-        .query("SELECT * FROM employee WHERE username = $username LIMIT 1")
-        .bind(("username", username.clone()))
-        .await
-        .map_err(|e| AppError::database(format!("Query failed: {}", e)))?;
-
-    let employee: Option<Employee> = result
-        .take(0)
-        .map_err(|e| AppError::database(format!("Failed to parse employee: {}", e)))?;
+    // Query employee by username (with hash for password verification)
+    let emp_with_hash = employee::find_by_username_with_hash(&state.pool, &username).await?;
 
     // Fixed delay to prevent timing attacks (before checking result)
     tokio::time::sleep(Duration::from_millis(AUTH_FIXED_DELAY_MS)).await;
 
     // Check authentication result - unified error message to prevent username enumeration
-    let employee = match employee {
+    let emp = match emp_with_hash {
         Some(e) => {
             // User found - check active status
             if !e.is_active {
@@ -51,8 +43,7 @@ pub async fn login(
             }
 
             // Verify password
-            let password_valid = e
-                .verify_password(&req.password)
+            let password_valid = employee::verify_password(&req.password, &e.hash_pass)
                 .map_err(|e| AppError::internal(format!("Password verification failed: {}", e)))?;
 
             if !password_valid {
@@ -79,18 +70,9 @@ pub async fn login(
     };
 
     // Fetch role information
-    let role_id = employee.role.clone();
-    let mut role_result = db
-        .query("SELECT * FROM $role_id")
-        .bind(("role_id", role_id))
-        .await
-        .map_err(|e| AppError::database(format!("Failed to query role: {}", e)))?;
-
-    let role: Option<Role> = role_result
-        .take(0)
-        .map_err(|e| AppError::database(format!("Failed to parse role: {}", e)))?;
-
-    let role = role.ok_or_else(|| AppError::new(shared::ErrorCode::RoleNotFound))?;
+    let role: Role = role::find_by_id(&state.pool, emp.role_id)
+        .await?
+        .ok_or_else(|| AppError::new(shared::ErrorCode::RoleNotFound))?;
 
     if !role.is_active {
         return Err(AppError::role_disabled());
@@ -98,34 +80,30 @@ pub async fn login(
 
     // Generate JWT token
     let jwt_service = state.get_jwt_service();
-    let user_id = employee
-        .id
-        .as_ref()
-        .map(|t| t.to_string())
-        .unwrap_or_default();
+    let user_id = emp.id.to_string();
 
     let token = jwt_service
         .generate_token(
             &user_id,
-            &employee.username,
-            &employee.display_name,
-            &employee.role.to_string(),
+            &emp.username,
+            &emp.display_name,
+            &emp.role_id.to_string(),
             &role.name,
             &role.permissions,
-            employee.is_system,
+            emp.is_system,
         )
         .map_err(|e| AppError::internal(format!("Failed to generate token: {}", e)))?;
 
     // Log successful login
     state.audit_service.log(
         AuditAction::LoginSuccess, "auth", format!("employee:{}", user_id),
-        Some(user_id.clone()), Some(employee.display_name.clone()),
-        serde_json::json!({"username": &employee.username}),
+        Some(user_id.clone()), Some(emp.display_name.clone()),
+        serde_json::json!({"username": &emp.username}),
     ).await;
 
     tracing::info!(
         user_id = %user_id,
-        username = %employee.username,
+        username = %emp.username,
         role = %role.name,
         "User logged in successfully"
     );
@@ -134,14 +112,14 @@ pub async fn login(
         token,
         user: UserInfo {
             id: user_id,
-            username: employee.username.clone(),
-            display_name: employee.display_name.clone(),
-            role_id: employee.role.to_string(),
+            username: emp.username,
+            display_name: emp.display_name,
+            role_id: emp.role_id.to_string(),
             role_name: role.name,
             permissions: role.permissions,
-            is_system: employee.is_system,
-            is_active: employee.is_active,
-            created_at: employee.created_at,
+            is_system: emp.is_system,
+            is_active: emp.is_active,
+            created_at: emp.created_at,
         },
     };
 
@@ -154,20 +132,16 @@ pub async fn me(
     Extension(user): Extension<CurrentUser>,
 ) -> Result<Json<UserInfo>, AppError> {
     // Query fresh employee data from database for is_active and created_at
-    let db = state.get_db();
-    let id_part = user.id.strip_prefix("employee:").unwrap_or(&user.id).to_string();
-    let mut result = db
-        .query("SELECT is_active, created_at FROM type::thing('employee', $id)")
-        .bind(("id", id_part))
-        .await
-        .map_err(|e| AppError::database(format!("Failed to query employee: {}", e)))?;
+    let id: i64 = user.id.strip_prefix("employee:")
+        .unwrap_or(&user.id)
+        .parse()
+        .map_err(|_| AppError::internal(format!("Invalid user ID: {}", user.id)))?;
 
-    let employee_data: Option<(bool, i64)> = result
-        .take::<Option<Employee>>(0)
-        .map_err(|e| AppError::database(format!("Failed to parse employee: {}", e)))?
-        .map(|e| (e.is_active, e.created_at));
+    let employee_data = employee::find_by_id(&state.pool, id).await?;
 
-    let (is_active, created_at) = employee_data.unwrap_or((true, 0));
+    let (is_active, created_at) = employee_data
+        .map(|e| (e.is_active, e.created_at))
+        .unwrap_or((true, 0));
 
     let user_info = UserInfo {
         id: user.id,
@@ -213,32 +187,22 @@ pub async fn escalate(
     Extension(current_user): Extension<CurrentUser>,
     Json(req): Json<EscalateRequest>,
 ) -> Result<Json<EscalateResponse>, AppError> {
-    let db = state.get_db();
     let username = req.username.clone();
 
-    // Query employee by username
-    let mut result = db
-        .query("SELECT * FROM employee WHERE username = $username LIMIT 1")
-        .bind(("username", username.clone()))
-        .await
-        .map_err(|e| AppError::database(format!("Query failed: {}", e)))?;
-
-    let employee: Option<Employee> = result
-        .take(0)
-        .map_err(|e| AppError::database(format!("Failed to parse employee: {}", e)))?;
+    // Query employee by username (with hash for password verification)
+    let emp_with_hash = employee::find_by_username_with_hash(&state.pool, &username).await?;
 
     // Fixed delay to prevent timing attacks
     tokio::time::sleep(Duration::from_millis(AUTH_FIXED_DELAY_MS)).await;
 
     // Check authentication result
-    let employee = match employee {
+    let emp = match emp_with_hash {
         Some(e) => {
             if !e.is_active {
                 return Err(AppError::account_disabled());
             }
 
-            let password_valid = e
-                .verify_password(&req.password)
+            let password_valid = employee::verify_password(&req.password, &e.hash_pass)
                 .map_err(|e| AppError::internal(format!("Password verification failed: {}", e)))?;
 
             if !password_valid {
@@ -263,18 +227,9 @@ pub async fn escalate(
     };
 
     // Fetch role information
-    let role_id = employee.role.clone();
-    let mut role_result = db
-        .query("SELECT * FROM $role_id")
-        .bind(("role_id", role_id))
-        .await
-        .map_err(|e| AppError::database(format!("Failed to query role: {}", e)))?;
-
-    let role: Option<Role> = role_result
-        .take(0)
-        .map_err(|e| AppError::database(format!("Failed to parse role: {}", e)))?;
-
-    let role = role.ok_or_else(|| AppError::new(shared::ErrorCode::RoleNotFound))?;
+    let role: Role = role::find_by_id(&state.pool, emp.role_id)
+        .await?
+        .ok_or_else(|| AppError::new(shared::ErrorCode::RoleNotFound))?;
 
     if !role.is_active {
         return Err(AppError::role_disabled());
@@ -303,11 +258,7 @@ pub async fn escalate(
             .with_detail("required_permission", req.required_permission.clone()));
     }
 
-    let authorizer_id = employee
-        .id
-        .as_ref()
-        .map(|t| t.to_string())
-        .unwrap_or_default();
+    let authorizer_id = emp.id.to_string();
 
     // Log successful escalation
     state.audit_service.log(
@@ -315,9 +266,9 @@ pub async fn escalate(
         "auth",
         format!("employee:{}", authorizer_id),
         Some(authorizer_id.clone()),
-        Some(employee.display_name.clone()),
+        Some(emp.display_name.clone()),
         serde_json::json!({
-            "authorizer_username": &employee.username,
+            "authorizer_username": &emp.username,
             "required_permission": &req.required_permission,
             "requester_id": &current_user.id,
             "requester_name": &current_user.display_name,
@@ -326,7 +277,7 @@ pub async fn escalate(
 
     tracing::info!(
         authorizer_id = %authorizer_id,
-        authorizer_username = %employee.username,
+        authorizer_username = %emp.username,
         required_permission = %req.required_permission,
         requester_id = %current_user.id,
         "Permission escalation successful"
@@ -335,14 +286,14 @@ pub async fn escalate(
     let response = EscalateResponse {
         authorizer: UserInfo {
             id: authorizer_id,
-            username: employee.username,
-            display_name: employee.display_name,
-            role_id: employee.role.to_string(),
+            username: emp.username,
+            display_name: emp.display_name,
+            role_id: emp.role_id.to_string(),
             role_name: role.name,
             permissions: role.permissions,
-            is_system: employee.is_system,
-            is_active: employee.is_active,
-            created_at: employee.created_at,
+            is_system: emp.is_system,
+            is_active: emp.is_active,
+            created_at: emp.created_at,
         },
     };
 

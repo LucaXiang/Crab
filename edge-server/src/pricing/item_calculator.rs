@@ -7,7 +7,7 @@
 //!
 //! Uses rust_decimal for precision calculations.
 
-use crate::db::models::{AdjustmentType, PriceRule, ProductScope, RuleType};
+use shared::models::{AdjustmentType, PriceRule, ProductScope, RuleType};
 use rust_decimal::prelude::*;
 use shared::order::AppliedRule;
 use tracing::{debug, trace};
@@ -88,7 +88,7 @@ pub fn to_f64(value: Decimal) -> f64 {
 /// - Product: 3
 pub fn calculate_effective_priority(rule: &PriceRule) -> i32 {
     let zone_weight = match rule.zone_scope.as_str() {
-        crate::db::models::ZONE_SCOPE_ALL => 0,
+        shared::models::ZONE_SCOPE_ALL => 0,
         _ => 1,
     };
 
@@ -207,7 +207,7 @@ pub fn apply_discount_rules(
             "[DiscountRules] Exclusive winner selected"
         );
         let applied = AppliedRule::from_rule(
-            &to_shared_rule(winner),
+            winner,
             to_f64(amount),
         );
         return DiscountResult {
@@ -230,7 +230,7 @@ pub fn apply_discount_rules(
         );
         total_discount += amount;
         applied_rules.push(AppliedRule::from_rule(
-            &to_shared_rule(winner),
+            winner,
             to_f64(amount),
         ));
     }
@@ -282,7 +282,7 @@ pub fn apply_discount_rules(
         for rule in &stackable_pct {
             let individual_amount = price_basis * to_decimal(rule.adjustment_value) / hundred;
             applied_rules.push(AppliedRule::from_rule(
-                &to_shared_rule(rule),
+                rule,
                 to_f64(individual_amount),
             ));
         }
@@ -298,7 +298,7 @@ pub fn apply_discount_rules(
         );
         total_discount += amount;
         applied_rules.push(AppliedRule::from_rule(
-            &to_shared_rule(rule),
+            rule,
             to_f64(amount),
         ));
     }
@@ -402,7 +402,7 @@ pub fn apply_surcharge_rules(
             "[SurchargeRules] Exclusive winner selected"
         );
         let applied = AppliedRule::from_rule(
-            &to_shared_rule(winner),
+            winner,
             to_f64(amount),
         );
         return SurchargeResult {
@@ -425,7 +425,7 @@ pub fn apply_surcharge_rules(
         );
         total_surcharge += amount;
         applied_rules.push(AppliedRule::from_rule(
-            &to_shared_rule(winner),
+            winner,
             to_f64(amount),
         ));
     }
@@ -444,7 +444,7 @@ pub fn apply_surcharge_rules(
         );
         total_surcharge += amount;
         applied_rules.push(AppliedRule::from_rule(
-            &to_shared_rule(rule),
+            rule,
             to_f64(amount),
         ));
     }
@@ -469,46 +469,6 @@ fn calculate_single_surcharge(rule: &PriceRule, price_basis: Decimal) -> Decimal
     match rule.adjustment_type {
         AdjustmentType::Percentage => price_basis * value / hundred,
         AdjustmentType::FixedAmount => value, // direct currency amount
-    }
-}
-
-// ==================== Type Conversion ====================
-
-/// Convert edge-server PriceRule to shared PriceRule for AppliedRule creation
-fn to_shared_rule(rule: &PriceRule) -> shared::models::price_rule::PriceRule {
-    shared::models::price_rule::PriceRule {
-        id: rule.id.as_ref().map(|t| t.to_string()),
-        name: rule.name.clone(),
-        display_name: rule.display_name.clone(),
-        receipt_name: rule.receipt_name.clone(),
-        description: rule.description.clone(),
-        rule_type: match rule.rule_type {
-            RuleType::Discount => shared::models::price_rule::RuleType::Discount,
-            RuleType::Surcharge => shared::models::price_rule::RuleType::Surcharge,
-        },
-        product_scope: match rule.product_scope {
-            ProductScope::Global => shared::models::price_rule::ProductScope::Global,
-            ProductScope::Category => shared::models::price_rule::ProductScope::Category,
-            ProductScope::Tag => shared::models::price_rule::ProductScope::Tag,
-            ProductScope::Product => shared::models::price_rule::ProductScope::Product,
-        },
-        target: rule.target.as_ref().map(|t| t.to_string()),
-        zone_scope: rule.zone_scope.clone(),
-        adjustment_type: match rule.adjustment_type {
-            AdjustmentType::Percentage => shared::models::price_rule::AdjustmentType::Percentage,
-            AdjustmentType::FixedAmount => shared::models::price_rule::AdjustmentType::FixedAmount,
-        },
-        adjustment_value: rule.adjustment_value,
-        is_stackable: rule.is_stackable,
-        is_exclusive: rule.is_exclusive,
-        valid_from: rule.valid_from,
-        valid_until: rule.valid_until,
-        active_days: rule.active_days.clone(),
-        active_start_time: rule.active_start_time.clone(),
-        active_end_time: rule.active_end_time.clone(),
-        is_active: rule.is_active,
-        created_by: rule.created_by.as_ref().map(|t| t.to_string()),
-        created_at: rule.created_at,
     }
 }
 
@@ -646,15 +606,15 @@ mod tests {
         exclusive: bool,
     ) -> PriceRule {
         PriceRule {
-            id: None,
+            id: 0,
             name: format!("rule_{}", value),
             display_name: format!("Rule {}", value),
             receipt_name: format!("R{}", value),
             description: None,
             rule_type,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            target_id: None,
+            zone_scope: shared::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type,
             adjustment_value: value,
             is_stackable: stackable,
@@ -929,15 +889,15 @@ mod tests {
         // Full 2x4 matrix: zone_weight(0|1) * 10 + product_weight(0|1|2|3)
         let cases: Vec<(&str, ProductScope, i32)> = vec![
             // zone:all (weight=0)
-            (crate::db::models::ZONE_SCOPE_ALL, ProductScope::Global, 0),
-            (crate::db::models::ZONE_SCOPE_ALL, ProductScope::Category, 1),
-            (crate::db::models::ZONE_SCOPE_ALL, ProductScope::Tag, 2),
-            (crate::db::models::ZONE_SCOPE_ALL, ProductScope::Product, 3),
+            (shared::models::ZONE_SCOPE_ALL, ProductScope::Global, 0),
+            (shared::models::ZONE_SCOPE_ALL, ProductScope::Category, 1),
+            (shared::models::ZONE_SCOPE_ALL, ProductScope::Tag, 2),
+            (shared::models::ZONE_SCOPE_ALL, ProductScope::Product, 3),
             // zone:retail (weight=1)
-            (crate::db::models::ZONE_SCOPE_RETAIL, ProductScope::Global, 10),
-            (crate::db::models::ZONE_SCOPE_RETAIL, ProductScope::Category, 11),
-            (crate::db::models::ZONE_SCOPE_RETAIL, ProductScope::Tag, 12),
-            (crate::db::models::ZONE_SCOPE_RETAIL, ProductScope::Product, 13),
+            (shared::models::ZONE_SCOPE_RETAIL, ProductScope::Global, 10),
+            (shared::models::ZONE_SCOPE_RETAIL, ProductScope::Category, 11),
+            (shared::models::ZONE_SCOPE_RETAIL, ProductScope::Tag, 12),
+            (shared::models::ZONE_SCOPE_RETAIL, ProductScope::Product, 13),
             // specific zone (weight=1, same as retail)
             ("zone:dining-room", ProductScope::Global, 10),
             ("zone:dining-room", ProductScope::Category, 11),
@@ -975,7 +935,7 @@ mod tests {
             30.0, // Higher discount
             false,
             false,
-            crate::db::models::ZONE_SCOPE_ALL,
+            shared::models::ZONE_SCOPE_ALL,
             ProductScope::Global,
         );
         let specific = make_rule_with_scope(
@@ -1005,7 +965,7 @@ mod tests {
             30.0, // Higher discount amount
             false,
             false,
-            crate::db::models::ZONE_SCOPE_ALL,
+            shared::models::ZONE_SCOPE_ALL,
             ProductScope::Global, // priority = 0
         );
         global.created_at = 9999; // Very new — but low priority

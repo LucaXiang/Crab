@@ -312,7 +312,7 @@ impl From<&OrderCommand> for CommandAction {
                 skipped,
             } => CommandAction::ToggleRuleSkip(ToggleRuleSkipAction {
                 order_id: order_id.clone(),
-                rule_id: rule_id.clone(),
+                rule_id: *rule_id,
                 skipped: *skipped,
             }),
             OrderCommandPayload::ApplyOrderDiscount {

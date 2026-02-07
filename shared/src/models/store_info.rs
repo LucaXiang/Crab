@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 
 /// Store information entity (singleton per tenant)
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct StoreInfo {
-    pub id: Option<String>,
+    pub id: i64,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
@@ -38,6 +39,5 @@ pub struct StoreInfoUpdate {
     pub phone: Option<String>,
     pub email: Option<String>,
     pub website: Option<String>,
-    /// 营业日分界时间 (HH:MM 格式)
     pub business_day_cutoff: Option<String>,
 }

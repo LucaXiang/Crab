@@ -1,9 +1,8 @@
 use dashmap::DashMap;
 use shared::message::{BusMessage, SyncPayload};
+use sqlx::SqlitePool;
 use std::path::PathBuf;
 use std::sync::Arc;
-use surrealdb::Surreal;
-use surrealdb::engine::local::Db;
 use tokio::sync::mpsc;
 
 use crate::audit::{AuditService, AuditWorker};
@@ -102,8 +101,8 @@ impl Default for ResourceVersions {
 pub struct ServerState {
     /// 服务器配置
     pub config: Config,
-    /// 嵌入式数据库 (SurrealDB)
-    pub db: Surreal<Db>,
+    /// SQLite connection pool
+    pub pool: SqlitePool,
     /// 激活状态管理
     pub activation: ActivationService,
     /// 证书管理服务 (mTLS)
@@ -138,7 +137,7 @@ impl ServerState {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         config: Config,
-        db: Surreal<Db>,
+        pool: SqlitePool,
         activation: ActivationService,
         cert_service: CertService,
         message_bus: MessageBusService,
@@ -154,7 +153,7 @@ impl ServerState {
     ) -> Self {
         Self {
             config,
-            db,
+            pool,
             activation,
             cert_service,
             message_bus,
@@ -195,7 +194,7 @@ impl ServerState {
         let db_service = DbService::new(&db_path_str)
             .await
             .expect("Failed to initialize database");
-        let db = db_service.db;
+        let pool = db_service.pool;
 
         // 2. Initialize Services
         let activation =
@@ -208,14 +207,14 @@ impl ServerState {
 
         // 3. Initialize CatalogService first (OrdersManager depends on it)
         let images_dir = config.images_dir();
-        let catalog_service = Arc::new(CatalogService::new(db.clone(), images_dir));
+        let catalog_service = Arc::new(CatalogService::new(pool.clone(), images_dir));
 
         // 4. Initialize OrdersManager (event sourcing) with CatalogService
         let orders_db_path = config.orders_db_file();
         let mut orders_manager =
             OrdersManager::new(&orders_db_path, config.timezone).expect("Failed to initialize orders manager");
         orders_manager.set_catalog_service(catalog_service.clone());
-        orders_manager.set_archive_service(db.clone());
+        orders_manager.set_archive_service(pool.clone());
 
         // Note: ArchiveWorker is started in start_background_tasks()
 
@@ -229,7 +228,7 @@ impl ServerState {
 
         // 7. Initialize AuditService (税务级审计日志 — SurrealDB)
         let data_dir = config.data_dir();
-        let (audit_service, audit_rx) = AuditService::new(db.clone(), &data_dir, 1024, config.timezone);
+        let (audit_service, audit_rx) = AuditService::new(pool.clone(), &data_dir, 1024, config.timezone);
 
         // 检测异常关闭和长时间停机（通过 LOCK 文件 + pending-ack.json）
         audit_service.on_startup().await;
@@ -248,7 +247,7 @@ impl ServerState {
 
         let state = Self::new(
             config.clone(),
-            db,
+            pool,
             activation,
             cert_service,
             message_bus,
@@ -406,7 +405,7 @@ impl ServerState {
             if self.orders_manager.get_cached_rules(&order.order_id).is_none() {
                 // redb 中没有快照，从数据库回退加载
                 let rules = load_matching_rules(
-                    &self.db,
+                    &self.pool,
                     order.zone_id.as_deref(),
                     order.is_retail,
                 )
@@ -452,7 +451,7 @@ impl ServerState {
         };
 
         let rules = load_matching_rules(
-            &self.db,
+            &self.pool,
             snapshot.zone_id.as_deref(),
             snapshot.is_retail,
         )
@@ -490,7 +489,7 @@ impl ServerState {
                 self.orders_manager.storage().clone(),
                 archive_service.clone(),
                 self.audit_service.clone(),
-                self.db.clone(),
+                self.pool.clone(),
             );
 
             tasks.spawn("archive_worker", TaskKind::Worker, async move {
@@ -582,7 +581,7 @@ impl ServerState {
             self.orders_manager.clone(),
             self.kitchen_print_service.clone(),
             self.catalog_service.clone(),
-            self.db.clone(),
+            self.pool.clone(),
         );
 
         tasks.spawn("kitchen_print_worker", TaskKind::Listener, async move {
@@ -650,7 +649,7 @@ impl ServerState {
         if let Some(archive_service) = self.orders_manager.archive_service() {
             let scheduler = VerifyScheduler::new(
                 archive_service.clone(),
-                self.db.clone(),
+                self.pool.clone(),
                 tasks.shutdown_token(),
                 self.config.timezone,
             );
@@ -683,8 +682,8 @@ impl ServerState {
     // ═══════════════════════════════════════════════════════════════════════
 
     /// 获取数据库实例
-    pub fn get_db(&self) -> Surreal<Db> {
-        self.db.clone()
+    pub fn get_pool(&self) -> SqlitePool {
+        self.pool.clone()
     }
 
     /// 获取工作目录

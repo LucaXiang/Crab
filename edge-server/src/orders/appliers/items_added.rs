@@ -302,7 +302,7 @@ mod tests {
         item.price = 90.0; // 10% discount already applied
         item.rule_discount_amount = Some(10.0);
         item.applied_rules = Some(vec![AppliedRule {
-            rule_id: "rule:lunch-special".to_string(),
+            rule_id: 1,
             name: "lunch-special".to_string(),
             display_name: "Lunch Special 10% Off".to_string(),
             receipt_name: "Lunch 10%".to_string(),
@@ -367,7 +367,7 @@ mod tests {
         existing.original_price = Some(100.0);
         existing.rule_discount_amount = Some(10.0);
         existing.applied_rules = Some(vec![AppliedRule {
-            rule_id: "rule:lunch".to_string(),
+            rule_id: 2,
             name: "lunch".to_string(),
             display_name: "Lunch 10%".to_string(),
             receipt_name: "LUNCH".to_string(),

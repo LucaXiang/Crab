@@ -1,109 +1,86 @@
 //! Tag Repository
 
-use super::{BaseRepository, RepoError, RepoResult};
-use crate::db::models::{Tag, TagCreate, TagUpdate};
-use surrealdb::engine::local::Db;
-use surrealdb::{RecordId, Surreal};
+use super::{RepoError, RepoResult};
+use shared::models::{Tag, TagCreate, TagUpdate};
+use sqlx::SqlitePool;
 
-const TABLE: &str = "tag";
-
-#[derive(Clone)]
-pub struct TagRepository {
-    base: BaseRepository,
+pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Tag>> {
+    let tags = sqlx::query_as::<_, Tag>(
+        "SELECT id, name, color, display_order, is_active, is_system FROM tag WHERE is_active = 1 ORDER BY display_order",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(tags)
 }
 
-impl TagRepository {
-    pub fn new(db: Surreal<Db>) -> Self {
-        Self {
-            base: BaseRepository::new(db),
-        }
+pub async fn find_all_with_inactive(pool: &SqlitePool) -> RepoResult<Vec<Tag>> {
+    let tags = sqlx::query_as::<_, Tag>(
+        "SELECT id, name, color, display_order, is_active, is_system FROM tag ORDER BY display_order",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(tags)
+}
+
+pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Tag>> {
+    let tag = sqlx::query_as::<_, Tag>(
+        "SELECT id, name, color, display_order, is_active, is_system FROM tag WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(tag)
+}
+
+pub async fn find_by_name(pool: &SqlitePool, name: &str) -> RepoResult<Option<Tag>> {
+    let tag = sqlx::query_as::<_, Tag>(
+        "SELECT id, name, color, display_order, is_active, is_system FROM tag WHERE name = ? LIMIT 1",
+    )
+    .bind(name)
+    .fetch_optional(pool)
+    .await?;
+    Ok(tag)
+}
+
+pub async fn create(pool: &SqlitePool, data: TagCreate) -> RepoResult<Tag> {
+    let color = data.color.unwrap_or_else(|| "#3B82F6".to_string());
+    let display_order = data.display_order.unwrap_or(0);
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO tag (name, color, display_order) VALUES (?, ?, ?) RETURNING id",
+    )
+    .bind(&data.name)
+    .bind(&color)
+    .bind(display_order)
+    .fetch_one(pool)
+    .await?;
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::Database("Failed to create tag".into()))
+}
+
+pub async fn update(pool: &SqlitePool, id: i64, data: TagUpdate) -> RepoResult<Tag> {
+    let rows = sqlx::query(
+        "UPDATE tag SET name = COALESCE(?1, name), color = COALESCE(?2, color), display_order = COALESCE(?3, display_order), is_active = COALESCE(?4, is_active) WHERE id = ?5",
+    )
+    .bind(&data.name)
+    .bind(&data.color)
+    .bind(data.display_order)
+    .bind(data.is_active)
+    .bind(id)
+    .execute(pool)
+    .await?;
+    if rows.rows_affected() == 0 {
+        return Err(RepoError::NotFound(format!("Tag {id} not found")));
     }
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::NotFound(format!("Tag {id} not found")))
+}
 
-    /// Find all active tags ordered by display_order
-    pub async fn find_all(&self) -> RepoResult<Vec<Tag>> {
-        let tags: Vec<Tag> = self
-            .base
-            .db()
-            .query("SELECT * FROM tag WHERE is_active = true ORDER BY display_order")
-            .await?
-            .take(0)?;
-        Ok(tags)
-    }
-
-    /// Find all tags (including inactive)
-    pub async fn find_all_with_inactive(&self) -> RepoResult<Vec<Tag>> {
-        let tags: Vec<Tag> = self
-            .base
-            .db()
-            .query("SELECT * FROM tag ORDER BY display_order")
-            .await?
-            .take(0)?;
-        Ok(tags)
-    }
-
-    /// Find tag by id
-    pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Tag>> {
-        let thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-        let tag: Option<Tag> = self.base.db().select(thing).await?;
-        Ok(tag)
-    }
-
-    /// Find tag by name
-    pub async fn find_by_name(&self, name: &str) -> RepoResult<Option<Tag>> {
-        let name_owned = name.to_string();
-        let mut result = self
-            .base
-            .db()
-            .query("SELECT * FROM tag WHERE name = $name LIMIT 1")
-            .bind(("name", name_owned))
-            .await?;
-        let tags: Vec<Tag> = result.take(0)?;
-        Ok(tags.into_iter().next())
-    }
-
-    /// Create a new tag
-    pub async fn create(&self, data: TagCreate) -> RepoResult<Tag> {
-        let tag = Tag {
-            id: None,
-            name: data.name,
-            color: data.color.unwrap_or_else(|| "#3B82F6".to_string()),
-            display_order: data.display_order.unwrap_or(0),
-            is_system: false,
-        };
-
-        let created: Option<Tag> = self.base.db().create(TABLE).content(tag).await?;
-        created.ok_or_else(|| RepoError::Database("Failed to create tag".to_string()))
-    }
-
-    /// Update a tag
-    pub async fn update(&self, id: &str, data: TagUpdate) -> RepoResult<Tag> {
-        let thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-
-        let mut result = self.base
-            .db()
-            .query("UPDATE $thing MERGE $data RETURN AFTER")
-            .bind(("thing", thing))
-            .bind(("data", data))
-            .await?;
-
-        result.take::<Option<Tag>>(0)?
-            .ok_or_else(|| RepoError::NotFound(format!("Tag {} not found", id)))
-    }
-
-    /// Hard delete a tag
-    pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-        self.base
-            .db()
-            .query("DELETE $thing")
-            .bind(("thing", thing))
-            .await?;
-        Ok(true)
-    }
+pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
+    sqlx::query("DELETE FROM tag WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(true)
 }

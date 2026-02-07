@@ -33,3 +33,9 @@ uuid.workspace = true
 
 # Logging
 tracing.workspace = true
+
+# Database (optional, feature-gated)
+sqlx = { workspace = true, features = ["derive"], optional = true }
+
+[features]
+db = ["sqlx"]

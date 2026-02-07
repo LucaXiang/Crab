@@ -10,10 +10,10 @@ use crate::audit::AuditAction;
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::models::{DailyReport, DailyReportGenerate};
-use crate::db::repository::DailyReportRepository;
+use crate::db::repository::daily_report;
 use crate::utils::{AppError, AppResult};
 use crate::utils::time;
+use shared::models::{DailyReport, DailyReportGenerate};
 
 const RESOURCE: &str = "daily_report";
 
@@ -37,14 +37,11 @@ pub async fn list(
     State(state): State<ServerState>,
     Query(query): Query<ListQuery>,
 ) -> AppResult<Json<Vec<DailyReport>>> {
-    let repo = DailyReportRepository::new(state.db.clone());
-
     let reports = if let (Some(start), Some(end)) = (query.start_date, query.end_date) {
-        repo.find_by_date_range(&start, &end).await
+        daily_report::find_by_date_range(&state.pool, &start, &end).await
     } else {
-        repo.find_all(query.limit, query.offset).await
-    }
-    ?;
+        daily_report::find_all(&state.pool, query.limit, query.offset).await
+    }?;
 
     Ok(Json(reports))
 }
@@ -52,13 +49,10 @@ pub async fn list(
 /// GET /api/daily-reports/:id - 获取单个日结报告
 pub async fn get_by_id(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<DailyReport>> {
-    let repo = DailyReportRepository::new(state.db.clone());
-    let report = repo
-        .find_by_id(&id)
-        .await
-        ?
+    let report = daily_report::find_by_id(&state.pool, id)
+        .await?
         .ok_or_else(|| AppError::not_found(format!("Daily report {} not found", id)))?;
     Ok(Json(report))
 }
@@ -68,11 +62,8 @@ pub async fn get_by_date(
     State(state): State<ServerState>,
     Path(date): Path<String>,
 ) -> AppResult<Json<DailyReport>> {
-    let repo = DailyReportRepository::new(state.db.clone());
-    let report = repo
-        .find_by_date(&date)
-        .await
-        ?
+    let report = daily_report::find_by_date(&state.pool, &date)
+        .await?
         .ok_or_else(|| AppError::not_found(format!("Daily report for {} not found", date)))?;
     Ok(Json(report))
 }
@@ -104,17 +95,17 @@ pub async fn generate(
     let operator_id = Some(current_user.id);
     let operator_name = Some(current_user.display_name);
 
-    let repo = DailyReportRepository::new(state.db.clone());
-    let report = repo
-        .generate(payload, start_millis, end_millis, operator_id, operator_name)
-        .await
-        ?;
+    let report = daily_report::generate(
+        &state.pool,
+        payload,
+        start_millis,
+        end_millis,
+        operator_id,
+        operator_name,
+    )
+    .await?;
 
-    let id = report
-        .id
-        .as_ref()
-        .map(|id| id.to_string())
-        .unwrap_or_default();
+    let id = report.id.to_string();
 
     audit_log!(
         state.audit_service,

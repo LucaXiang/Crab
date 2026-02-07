@@ -6,7 +6,7 @@ use axum::{
 };
 
 use crate::core::ServerState;
-use crate::db::repository::StoreInfoRepository;
+use crate::db::repository::store_info;
 use crate::orders::archive::{DailyChainVerification, OrderVerification};
 use crate::utils::{AppError, AppResult};
 use crate::utils::time;
@@ -43,9 +43,7 @@ pub async fn verify_daily_chain(
         .ok_or_else(|| AppError::internal("Archive service not available"))?;
 
     // 从 store_info 获取营业日分割时间
-    let store_repo = StoreInfoRepository::new(state.db.clone());
-    let cutoff = store_repo
-        .get()
+    let cutoff = store_info::get(&state.pool)
         .await
         .ok()
         .flatten()
@@ -68,5 +66,3 @@ pub async fn verify_daily_chain(
 
     Ok(Json(verification))
 }
-
-

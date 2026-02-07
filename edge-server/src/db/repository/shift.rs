@@ -1,332 +1,208 @@
 //! Shift Repository
 
-use super::{BaseRepository, RepoError, RepoResult};
-use crate::db::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
-use surrealdb::engine::local::Db;
-use surrealdb::{RecordId, Surreal};
+use super::{RepoError, RepoResult};
+use shared::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
+use sqlx::SqlitePool;
 
-/// Validate cash amount is non-negative
 fn validate_cash_amount(amount: f64, field_name: &str) -> RepoResult<()> {
     if amount < 0.0 {
         return Err(RepoError::Validation(format!(
-            "{} cannot be negative: {}",
-            field_name, amount
+            "{field_name} cannot be negative: {amount}"
         )));
     }
     Ok(())
 }
 
-#[derive(Clone)]
-pub struct ShiftRepository {
-    base: BaseRepository,
+pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Shift>> {
+    let shift = sqlx::query_as::<_, Shift>(
+        "SELECT id, operator_id, operator_name, status, start_time, end_time, starting_cash, expected_cash, actual_cash, cash_variance, abnormal_close, last_active_at, note, created_at, updated_at FROM shift WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(shift)
 }
 
-impl ShiftRepository {
-    pub fn new(db: Surreal<Db>) -> Self {
-        Self {
-            base: BaseRepository::new(db),
-        }
+pub async fn create(pool: &SqlitePool, data: ShiftCreate) -> RepoResult<Shift> {
+    validate_cash_amount(data.starting_cash, "Starting cash")?;
+
+    // Check if operator already has an open shift
+    if find_open_by_operator(pool, data.operator_id).await?.is_some() {
+        return Err(RepoError::Duplicate(
+            "Operator already has an open shift".into(),
+        ));
     }
 
-    /// Create a new shift (open shift)
-    pub async fn create(&self, data: ShiftCreate) -> RepoResult<Shift> {
-        let operator_id: RecordId = data
-            .operator_id
-            .parse()
-            .map_err(|_| RepoError::Validation("Invalid operator_id".to_string()))?;
+    let now = shared::util::now_millis();
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO shift (operator_id, operator_name, status, start_time, starting_cash, expected_cash, abnormal_close, last_active_at, note, created_at, updated_at) VALUES (?1, ?2, 'OPEN', ?3, ?4, ?4, 0, ?3, ?5, ?3, ?3) RETURNING id",
+    )
+    .bind(data.operator_id)
+    .bind(&data.operator_name)
+    .bind(now)
+    .bind(data.starting_cash)
+    .bind(&data.note)
+    .fetch_one(pool)
+    .await?;
 
-        // Validate starting cash is non-negative
-        validate_cash_amount(data.starting_cash, "Starting cash")?;
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::Database("Failed to create shift".into()))
+}
 
-        // Check if operator already has an open shift
-        let existing = self.find_open_by_operator(&data.operator_id).await?;
-        if existing.is_some() {
-            return Err(RepoError::Duplicate(
-                "Operator already has an open shift".to_string(),
-            ));
-        }
+pub async fn find_open_by_operator(pool: &SqlitePool, operator_id: i64) -> RepoResult<Option<Shift>> {
+    let shift = sqlx::query_as::<_, Shift>(
+        "SELECT id, operator_id, operator_name, status, start_time, end_time, starting_cash, expected_cash, actual_cash, cash_variance, abnormal_close, last_active_at, note, created_at, updated_at FROM shift WHERE operator_id = ? AND status = 'OPEN' LIMIT 1",
+    )
+    .bind(operator_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(shift)
+}
 
-        // Create new shift
-        let mut result = self
-            .base
-            .db()
-            .query(
-                r#"
-                CREATE shift SET
-                    operator_id = $operator_id,
-                    operator_name = $operator_name,
-                    status = 'OPEN',
-                    start_time = $now,
-                    starting_cash = $starting_cash,
-                    expected_cash = $starting_cash,
-                    abnormal_close = false,
-                    last_active_at = $now,
-                    note = $note,
-                    created_at = $now,
-                    updated_at = $now
-                RETURN AFTER;
-            "#,
-            )
-            .bind(("operator_id", operator_id))
-            .bind(("operator_name", data.operator_name))
-            .bind(("starting_cash", data.starting_cash))
-            .bind(("note", data.note))
-            .bind(("now", shared::util::now_millis()))
-            .await?;
+pub async fn find_any_open(pool: &SqlitePool) -> RepoResult<Option<Shift>> {
+    let shift = sqlx::query_as::<_, Shift>(
+        "SELECT id, operator_id, operator_name, status, start_time, end_time, starting_cash, expected_cash, actual_cash, cash_variance, abnormal_close, last_active_at, note, created_at, updated_at FROM shift WHERE status = 'OPEN' LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(shift)
+}
 
-        let shifts: Vec<Shift> = result.take(0)?;
-        shifts.into_iter().next().ok_or_else(|| {
-            RepoError::Database("Failed to create shift".to_string())
-        })
+pub async fn find_all(pool: &SqlitePool, limit: i32, offset: i32) -> RepoResult<Vec<Shift>> {
+    let shifts = sqlx::query_as::<_, Shift>(
+        "SELECT id, operator_id, operator_name, status, start_time, end_time, starting_cash, expected_cash, actual_cash, cash_variance, abnormal_close, last_active_at, note, created_at, updated_at FROM shift ORDER BY start_time DESC LIMIT ? OFFSET ?",
+    )
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
+    Ok(shifts)
+}
+
+pub async fn find_by_date_range(
+    pool: &SqlitePool,
+    start_millis: i64,
+    end_millis: i64,
+) -> RepoResult<Vec<Shift>> {
+    let shifts = sqlx::query_as::<_, Shift>(
+        "SELECT id, operator_id, operator_name, status, start_time, end_time, starting_cash, expected_cash, actual_cash, cash_variance, abnormal_close, last_active_at, note, created_at, updated_at FROM shift WHERE start_time >= ? AND start_time < ? ORDER BY start_time DESC",
+    )
+    .bind(start_millis)
+    .bind(end_millis)
+    .fetch_all(pool)
+    .await?;
+    Ok(shifts)
+}
+
+pub async fn update(pool: &SqlitePool, id: i64, data: ShiftUpdate) -> RepoResult<Shift> {
+    let now = shared::util::now_millis();
+
+    // When starting_cash changes, adjust expected_cash accordingly
+    let rows = sqlx::query(
+        "UPDATE shift SET starting_cash = COALESCE(?1, starting_cash), expected_cash = CASE WHEN ?1 IS NOT NULL THEN ?1 + (expected_cash - starting_cash) ELSE expected_cash END, note = COALESCE(?2, note), last_active_at = ?3, updated_at = ?3 WHERE id = ?4 AND status = 'OPEN'",
+    )
+    .bind(data.starting_cash)
+    .bind(&data.note)
+    .bind(now)
+    .bind(id)
+    .execute(pool)
+    .await?;
+
+    if rows.rows_affected() == 0 {
+        return Err(RepoError::NotFound(format!(
+            "Shift {id} not found or already closed"
+        )));
     }
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::NotFound(format!("Shift {id} not found")))
+}
 
-    /// Find shift by id
-    pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Shift>> {
-        let record_id: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-        let shift: Option<Shift> = self.base.db().select(record_id).await?;
-        Ok(shift)
+pub async fn close(pool: &SqlitePool, id: i64, data: ShiftClose) -> RepoResult<Shift> {
+    validate_cash_amount(data.actual_cash, "Actual cash")?;
+    let now = shared::util::now_millis();
+
+    // Compute cash_variance in application: actual_cash - expected_cash
+    // Need to read expected_cash first
+    let existing = find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::NotFound(format!("Shift {id} not found")))?;
+    let cash_variance = data.actual_cash - existing.expected_cash;
+
+    let rows = sqlx::query(
+        "UPDATE shift SET status = 'CLOSED', end_time = ?1, actual_cash = ?2, cash_variance = ?3, abnormal_close = 0, note = COALESCE(?4, note), last_active_at = ?1, updated_at = ?1 WHERE id = ?5 AND status = 'OPEN'",
+    )
+    .bind(now)
+    .bind(data.actual_cash)
+    .bind(cash_variance)
+    .bind(&data.note)
+    .bind(id)
+    .execute(pool)
+    .await?;
+
+    if rows.rows_affected() == 0 {
+        return Err(RepoError::NotFound(format!(
+            "Shift {id} not found or already closed"
+        )));
     }
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::NotFound(format!("Shift {id} not found")))
+}
 
-    /// Find open shift by operator
-    pub async fn find_open_by_operator(&self, operator_id: &str) -> RepoResult<Option<Shift>> {
-        let operator_rid: RecordId = operator_id
-            .parse()
-            .map_err(|_| RepoError::Validation("Invalid operator_id".to_string()))?;
+pub async fn force_close(pool: &SqlitePool, id: i64, data: ShiftForceClose) -> RepoResult<Shift> {
+    let now = shared::util::now_millis();
+    let note = data.note.as_deref().unwrap_or("Force closed without cash counting");
 
-        let mut result = self
-            .base
-            .db()
-            .query("SELECT * FROM shift WHERE operator_id = $op AND status = 'OPEN' LIMIT 1")
-            .bind(("op", operator_rid))
-            .await?;
+    let rows = sqlx::query(
+        "UPDATE shift SET status = 'CLOSED', end_time = ?1, abnormal_close = 1, note = ?2, last_active_at = ?1, updated_at = ?1 WHERE id = ?3 AND status = 'OPEN'",
+    )
+    .bind(now)
+    .bind(note)
+    .bind(id)
+    .execute(pool)
+    .await?;
 
-        let shifts: Vec<Shift> = result.take(0)?;
-        Ok(shifts.into_iter().next())
+    if rows.rows_affected() == 0 {
+        return Err(RepoError::NotFound(format!(
+            "Shift {id} not found or already closed"
+        )));
     }
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::NotFound(format!("Shift {id} not found")))
+}
 
-    /// Find any open shift (for startup recovery)
-    pub async fn find_any_open(&self) -> RepoResult<Option<Shift>> {
-        let mut result = self
-            .base
-            .db()
-            .query("SELECT * FROM shift WHERE status = 'OPEN' LIMIT 1")
-            .await?;
+pub async fn find_stale_shifts(pool: &SqlitePool, business_day_start: i64) -> RepoResult<Vec<Shift>> {
+    let shifts = sqlx::query_as::<_, Shift>(
+        "SELECT id, operator_id, operator_name, status, start_time, end_time, starting_cash, expected_cash, actual_cash, cash_variance, abnormal_close, last_active_at, note, created_at, updated_at FROM shift WHERE status = 'OPEN' AND start_time < ?",
+    )
+    .bind(business_day_start)
+    .fetch_all(pool)
+    .await?;
+    Ok(shifts)
+}
 
-        let shifts: Vec<Shift> = result.take(0)?;
-        Ok(shifts.into_iter().next())
-    }
+pub async fn add_cash_payment(pool: &SqlitePool, operator_id: i64, amount: f64) -> RepoResult<()> {
+    let now = shared::util::now_millis();
+    sqlx::query(
+        "UPDATE shift SET expected_cash = expected_cash + ?1, last_active_at = ?2, updated_at = ?2 WHERE operator_id = ?3 AND status = 'OPEN'",
+    )
+    .bind(amount)
+    .bind(now)
+    .bind(operator_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
 
-    /// Find all shifts (paginated, newest first)
-    pub async fn find_all(&self, limit: i32, offset: i32) -> RepoResult<Vec<Shift>> {
-        let mut result = self
-            .base
-            .db()
-            .query("SELECT * FROM shift ORDER BY start_time DESC LIMIT $limit START $offset")
-            .bind(("limit", limit))
-            .bind(("offset", offset))
-            .await?;
-
-        let shifts: Vec<Shift> = result.take(0)?;
-        Ok(shifts)
-    }
-
-    /// Find shifts by date range (Unix millis)
-    pub async fn find_by_date_range(
-        &self,
-        start_millis: i64,
-        end_millis: i64,
-    ) -> RepoResult<Vec<Shift>> {
-        let mut result = self
-            .base
-            .db()
-            .query(
-                r#"
-                SELECT * FROM shift
-                WHERE start_time >= $start AND start_time < $end
-                ORDER BY start_time DESC
-            "#,
-            )
-            .bind(("start", start_millis))
-            .bind(("end", end_millis))
-            .await?;
-
-        let shifts: Vec<Shift> = result.take(0)?;
-        Ok(shifts)
-    }
-
-    /// Update shift (only allowed when OPEN)
-    pub async fn update(&self, id: &str, data: ShiftUpdate) -> RepoResult<Shift> {
-        let record_id: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-
-        // Build update query
-        let mut result = self
-            .base
-            .db()
-            .query(
-                r#"
-                UPDATE shift SET
-                    starting_cash = IF $starting_cash != NONE THEN $starting_cash ELSE starting_cash END,
-                    expected_cash = IF $starting_cash != NONE THEN $starting_cash + (expected_cash - starting_cash) ELSE expected_cash END,
-                    note = IF $note != NONE THEN $note ELSE note END,
-                    last_active_at = $now,
-                    updated_at = $now
-                WHERE id = $id AND status = 'OPEN'
-                RETURN AFTER
-            "#,
-            )
-            .bind(("id", record_id))
-            .bind(("starting_cash", data.starting_cash))
-            .bind(("note", data.note))
-            .bind(("now", shared::util::now_millis()))
-            .await?;
-
-        let shifts: Vec<Shift> = result.take(0)?;
-        shifts.into_iter().next().ok_or_else(|| {
-            RepoError::NotFound(format!("Shift {} not found or already closed", id))
-        })
-    }
-
-    /// Close shift (正常收班)
-    pub async fn close(&self, id: &str, data: ShiftClose) -> RepoResult<Shift> {
-        let record_id: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-
-        // Validate actual cash is non-negative
-        validate_cash_amount(data.actual_cash, "Actual cash")?;
-
-        let mut result = self
-            .base
-            .db()
-            .query(
-                r#"
-                UPDATE shift SET
-                    status = 'CLOSED',
-                    end_time = $now,
-                    actual_cash = $actual_cash,
-                    cash_variance = $actual_cash - expected_cash,
-                    abnormal_close = false,
-                    note = IF $note != NONE THEN $note ELSE note END,
-                    last_active_at = $now,
-                    updated_at = $now
-                WHERE id = $id AND status = 'OPEN'
-                RETURN AFTER
-            "#,
-            )
-            .bind(("id", record_id))
-            .bind(("actual_cash", data.actual_cash))
-            .bind(("note", data.note))
-            .bind(("now", shared::util::now_millis()))
-            .await?;
-
-        let shifts: Vec<Shift> = result.take(0)?;
-        shifts.into_iter().next().ok_or_else(|| {
-            RepoError::NotFound(format!("Shift {} not found or already closed", id))
-        })
-    }
-
-    /// Force close shift (强制关闭，不盘点)
-    pub async fn force_close(&self, id: &str, data: ShiftForceClose) -> RepoResult<Shift> {
-        let record_id: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-
-        let mut result = self
-            .base
-            .db()
-            .query(
-                r#"
-                UPDATE shift SET
-                    status = 'CLOSED',
-                    end_time = $now,
-                    abnormal_close = true,
-                    note = IF $note != NONE THEN $note ELSE '强制关闭，未盘点现金' END,
-                    last_active_at = $now,
-                    updated_at = $now
-                WHERE id = $id AND status = 'OPEN'
-                RETURN AFTER
-            "#,
-            )
-            .bind(("id", record_id))
-            .bind(("note", data.note))
-            .bind(("now", shared::util::now_millis()))
-            .await?;
-
-        let shifts: Vec<Shift> = result.take(0)?;
-        shifts.into_iter().next().ok_or_else(|| {
-            RepoError::NotFound(format!("Shift {} not found or already closed", id))
-        })
-    }
-
-    /// 查询跨营业日的过期班次（只读，不修改）
-    ///
-    /// `business_day_start` - 当前营业日开始时间 (Unix millis)
-    pub async fn find_stale_shifts(&self, business_day_start: i64) -> RepoResult<Vec<Shift>> {
-        let mut result = self
-            .base
-            .db()
-            .query(
-                r#"
-                SELECT * FROM shift
-                WHERE status = 'OPEN'
-                AND start_time < $business_day_start
-            "#,
-            )
-            .bind(("business_day_start", business_day_start))
-            .await?;
-
-        let stale: Vec<Shift> = result.take(0)?;
-        Ok(stale)
-    }
-
-    /// Update expected_cash when cash payment is added
-    pub async fn add_cash_payment(&self, operator_id: &str, amount: f64) -> RepoResult<()> {
-        let operator_rid: RecordId = operator_id
-            .parse()
-            .map_err(|_| RepoError::Validation("Invalid operator_id".to_string()))?;
-
-        self.base
-            .db()
-            .query(
-                r#"
-                UPDATE shift SET
-                    expected_cash = expected_cash + $amount,
-                    last_active_at = $now,
-                    updated_at = $now
-                WHERE operator_id = $op AND status = 'OPEN'
-            "#,
-            )
-            .bind(("op", operator_rid))
-            .bind(("amount", amount))
-            .bind(("now", shared::util::now_millis()))
-            .await?;
-
-        Ok(())
-    }
-
-    /// Update heartbeat (last_active_at)
-    pub async fn heartbeat(&self, id: &str) -> RepoResult<()> {
-        let record_id: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-
-        self.base
-            .db()
-            .query(
-                r#"
-                UPDATE shift SET
-                    last_active_at = $now
-                WHERE id = $id AND status = 'OPEN'
-            "#,
-            )
-            .bind(("id", record_id))
-            .bind(("now", shared::util::now_millis()))
-            .await?;
-
-        Ok(())
-    }
+pub async fn heartbeat(pool: &SqlitePool, id: i64) -> RepoResult<()> {
+    let now = shared::util::now_millis();
+    sqlx::query("UPDATE shift SET last_active_at = ? WHERE id = ? AND status = 'OPEN'")
+        .bind(now)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
 }

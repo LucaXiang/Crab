@@ -1,179 +1,88 @@
 //! System Issue Repository
-//!
-//! 系统问题表 CRUD — 本地异常检测和远程推送的问题。
-//! 前端按 kind 渲染 i18n 对话框，远程广播则使用下发的文本。
 
-use std::collections::HashMap;
+use super::{RepoError, RepoResult};
+use shared::models::{SystemIssue, SystemIssueCreate};
+use sqlx::SqlitePool;
 
-use super::{BaseRepository, RepoResult};
-use crate::db::models::serde_helpers;
-use serde::{Deserialize, Serialize};
-use surrealdb::engine::local::Db;
-use surrealdb::Surreal;
+pub async fn create(pool: &SqlitePool, data: SystemIssueCreate) -> RepoResult<SystemIssue> {
+    let now = shared::util::now_millis();
+    let params_json =
+        serde_json::to_string(&data.params).unwrap_or_else(|_| "{}".to_string());
+    let options_json =
+        serde_json::to_string(&data.options).unwrap_or_else(|_| "[]".to_string());
 
-/// SurrealDB system_issue 记录
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SystemIssueRow {
-    #[serde(default, with = "serde_helpers::option_record_id")]
-    pub id: Option<surrealdb::RecordId>,
-    pub source: String,
-    pub kind: String,
-    pub blocking: bool,
-    pub target: Option<String>,
-    pub params: HashMap<String, String>,
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub options: Vec<String>,
-    pub status: String,
-    pub response: Option<String>,
-    pub resolved_by: Option<String>,
-    pub resolved_at: Option<i64>,
-    pub created_at: i64,
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO system_issue (source, kind, blocking, target, params, title, description, options, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'pending', ?9) RETURNING id",
+    )
+    .bind(&data.source)
+    .bind(&data.kind)
+    .bind(data.blocking)
+    .bind(&data.target)
+    .bind(&params_json)
+    .bind(&data.title)
+    .bind(&data.description)
+    .bind(&options_json)
+    .bind(now)
+    .fetch_one(pool)
+    .await?;
+
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::Database("Failed to create system_issue".into()))
 }
 
-/// 创建 system_issue 的请求
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateSystemIssue {
-    pub source: String,
-    pub kind: String,
-    pub blocking: bool,
-    #[serde(default)]
-    pub target: Option<String>,
-    #[serde(default)]
-    pub params: HashMap<String, String>,
-    #[serde(default)]
-    pub title: Option<String>,
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(default)]
-    pub options: Vec<String>,
+pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<SystemIssue>> {
+    let issue = sqlx::query_as::<_, SystemIssue>(
+        "SELECT id, source, kind, blocking, target, params, title, description, options, status, response, resolved_by, resolved_at, created_at FROM system_issue WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(issue)
 }
 
-/// 解决 system_issue 的请求
-#[derive(Debug, Clone, Deserialize)]
-pub struct ResolveSystemIssue {
-    pub id: String,
-    pub response: String,
+pub async fn find_pending(pool: &SqlitePool) -> RepoResult<Vec<SystemIssue>> {
+    let issues = sqlx::query_as::<_, SystemIssue>(
+        "SELECT id, source, kind, blocking, target, params, title, description, options, status, response, resolved_by, resolved_at, created_at FROM system_issue WHERE status = 'pending' ORDER BY created_at ASC",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(issues)
 }
 
-#[derive(Clone)]
-pub struct SystemIssueRepository {
-    base: BaseRepository,
+pub async fn find_pending_by_kind(pool: &SqlitePool, kind: &str) -> RepoResult<Vec<SystemIssue>> {
+    let issues = sqlx::query_as::<_, SystemIssue>(
+        "SELECT id, source, kind, blocking, target, params, title, description, options, status, response, resolved_by, resolved_at, created_at FROM system_issue WHERE status = 'pending' AND kind = ?",
+    )
+    .bind(kind)
+    .fetch_all(pool)
+    .await?;
+    Ok(issues)
 }
 
-impl SystemIssueRepository {
-    pub fn new(db: Surreal<Db>) -> Self {
-        Self {
-            base: BaseRepository::new(db),
-        }
+pub async fn resolve(
+    pool: &SqlitePool,
+    id: i64,
+    response: &str,
+    resolved_by: Option<&str>,
+) -> RepoResult<SystemIssue> {
+    let now = shared::util::now_millis();
+    let rows = sqlx::query(
+        "UPDATE system_issue SET status = 'resolved', response = ?1, resolved_by = ?2, resolved_at = ?3 WHERE id = ?4",
+    )
+    .bind(response)
+    .bind(resolved_by)
+    .bind(now)
+    .bind(id)
+    .execute(pool)
+    .await?;
+
+    if rows.rows_affected() == 0 {
+        return Err(RepoError::NotFound(format!(
+            "system_issue {id} not found"
+        )));
     }
-
-    /// 创建系统问题记录
-    pub async fn create(&self, data: CreateSystemIssue) -> RepoResult<SystemIssueRow> {
-        let now = shared::util::now_millis();
-        let mut result = self
-            .base
-            .db()
-            .query(
-                r#"
-                CREATE system_issue SET
-                    source      = $source,
-                    kind        = $kind,
-                    blocking    = $blocking,
-                    target      = $target,
-                    params      = $params,
-                    title       = $title,
-                    description = $description,
-                    options     = $options,
-                    status      = "pending",
-                    response    = NONE,
-                    resolved_by = NONE,
-                    resolved_at = NONE,
-                    created_at  = $created_at
-                "#,
-            )
-            .bind(("source", data.source))
-            .bind(("kind", data.kind))
-            .bind(("blocking", data.blocking))
-            .bind(("target", data.target))
-            .bind(("params", data.params))
-            .bind(("title", data.title))
-            .bind(("description", data.description))
-            .bind(("options", data.options))
-            .bind(("created_at", now))
-            .await
-            .map_err(super::RepoError::from)?;
-
-        result
-            .take::<Option<SystemIssueRow>>(0)
-            .map_err(super::RepoError::from)?
-            .ok_or_else(|| super::RepoError::Database("Failed to create system_issue".to_string()))
-    }
-
-    /// 查询所有 pending 状态的问题
-    pub async fn find_pending(&self) -> RepoResult<Vec<SystemIssueRow>> {
-        let rows: Vec<SystemIssueRow> = self
-            .base
-            .db()
-            .query(r#"SELECT * FROM system_issue WHERE status = "pending" ORDER BY created_at ASC"#)
-            .await
-            .map_err(super::RepoError::from)?
-            .take(0)
-            .map_err(super::RepoError::from)?;
-        Ok(rows)
-    }
-
-    /// 按 kind 查询 pending 状态的问题（用于去重）
-    pub async fn find_pending_by_kind(&self, kind: &str) -> RepoResult<Vec<SystemIssueRow>> {
-        let rows: Vec<SystemIssueRow> = self
-            .base
-            .db()
-            .query(
-                r#"SELECT * FROM system_issue WHERE status = "pending" AND kind = $kind"#,
-            )
-            .bind(("kind", kind.to_string()))
-            .await
-            .map_err(super::RepoError::from)?
-            .take(0)
-            .map_err(super::RepoError::from)?;
-        Ok(rows)
-    }
-
-    /// 解决一个问题
-    pub async fn resolve(
-        &self,
-        id: &str,
-        response: &str,
-        resolved_by: Option<&str>,
-    ) -> RepoResult<SystemIssueRow> {
-        let now = shared::util::now_millis();
-        let thing: surrealdb::RecordId = id
-            .parse()
-            .map_err(|_| super::RepoError::Validation(format!("Invalid ID: {}", id)))?;
-
-        let mut result = self
-            .base
-            .db()
-            .query(
-                r#"
-                UPDATE $thing SET
-                    status      = "resolved",
-                    response    = $response,
-                    resolved_by = $resolved_by,
-                    resolved_at = $resolved_at
-                RETURN AFTER
-                "#,
-            )
-            .bind(("thing", thing))
-            .bind(("response", response.to_string()))
-            .bind(("resolved_by", resolved_by.map(|s| s.to_string())))
-            .bind(("resolved_at", now))
-            .await
-            .map_err(super::RepoError::from)?;
-
-        result
-            .take::<Option<SystemIssueRow>>(0)
-            .map_err(super::RepoError::from)?
-            .ok_or_else(|| super::RepoError::NotFound(format!("system_issue {} not found", id)))
-    }
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::NotFound(format!("system_issue {id} not found")))
 }

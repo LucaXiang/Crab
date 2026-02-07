@@ -1,9 +1,8 @@
 use crate::core::ServerState;
-use crate::db::repository::system_issue::{CreateSystemIssue, SystemIssueRepository};
-use crate::db::repository::{EmployeeRepository, RoleRepository};
+use crate::db::repository::{employee, role, system_issue};
 use crate::message::{BusMessage, EventType};
 use crate::orders::actions::open_table::load_matching_rules;
-use crate::utils::AppError;
+use shared::error::AppError;
 use async_trait::async_trait;
 use shared::order::{OrderCommand, OrderCommandPayload};
 use std::sync::Arc;
@@ -124,9 +123,9 @@ impl MessageProcessor for ServerCommandProcessor {
                 options,
             } => {
                 tracing::info!("Remote system issue received: kind={}", kind);
-                let repo = SystemIssueRepository::new(self.state.get_db());
-                match repo
-                    .create(CreateSystemIssue {
+                match system_issue::create(
+                    &self.state.pool,
+                    shared::models::SystemIssueCreate {
                         source: "remote".to_string(),
                         kind: kind.clone(),
                         blocking: *blocking,
@@ -135,16 +134,12 @@ impl MessageProcessor for ServerCommandProcessor {
                         title: title.clone(),
                         description: description.clone(),
                         options: options.clone(),
-                    })
-                    .await
+                    },
+                )
+                .await
                 {
                     Ok(issue) => {
-                        // 广播 sync 事件，前端实时感知新 system_issue
-                        let id_str = issue
-                            .id
-                            .as_ref()
-                            .map(|r| r.to_string())
-                            .unwrap_or_default();
+                        let id_str = issue.id.to_string();
                         self.state
                             .broadcast_sync("system_issue", "created", &id_str, Some(&issue))
                             .await;
@@ -178,9 +173,17 @@ impl RequestCommandProcessor {
 
     /// 检查操作者是否拥有指定权限
     async fn check_operator_permission(&self, operator_id: &str, permission: &str) -> bool {
+        // operator_id from message bus is a string; parse to i64
+        let op_id: i64 = match operator_id.parse() {
+            Ok(id) => id,
+            Err(_) => {
+                tracing::warn!(operator_id = %operator_id, "Invalid operator_id format");
+                return false;
+            }
+        };
+
         // 查询员工信息
-        let employee_repo = EmployeeRepository::new(self.state.get_db());
-        let employee = match employee_repo.find_by_id(operator_id).await {
+        let employee = match employee::find_by_id(&self.state.pool, op_id).await {
             Ok(Some(emp)) => emp,
             Ok(None) => {
                 tracing::warn!(operator_id = %operator_id, "Operator not found");
@@ -193,12 +196,10 @@ impl RequestCommandProcessor {
         };
 
         // 查询角色权限
-        let role_repo = RoleRepository::new(self.state.get_db());
-        let role_id_str = employee.role.to_string();
-        let role = match role_repo.find_by_id(&role_id_str).await {
+        let role = match role::find_by_id(&self.state.pool, employee.role_id).await {
             Ok(Some(r)) => r,
             Ok(None) => {
-                tracing::warn!(role_id = %employee.role, "Role not found");
+                tracing::warn!(role_id = %employee.role_id, "Role not found");
                 return false;
             }
             Err(e) => {
@@ -293,7 +294,7 @@ impl RequestCommandProcessor {
                 && let Some(ref order_id) = response.order_id
             {
                 let rules =
-                    load_matching_rules(&self.state.get_db(), zone_id.as_deref(), is_retail).await;
+                    load_matching_rules(&self.state.pool, zone_id.as_deref(), is_retail).await;
                 if !rules.is_empty() {
                     tracing::debug!(
                         order_id = %order_id,
@@ -309,7 +310,7 @@ impl RequestCommandProcessor {
                 // 从 snapshot 获取 is_retail（移桌不改变 is_retail）
                 if let Ok(Some(snapshot)) = self.state.orders_manager().get_snapshot(order_id) {
                     let rules = load_matching_rules(
-                        &self.state.get_db(),
+                        &self.state.pool,
                         target_zone_id.as_deref(),
                         snapshot.is_retail,
                     )

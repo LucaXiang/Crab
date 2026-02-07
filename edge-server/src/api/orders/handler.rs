@@ -1,6 +1,6 @@
 //! Order API Handlers
 //!
-//! Only provides read-only access to archived orders in SurrealDB.
+//! Only provides read-only access to archived orders in SQLite.
 //! All order mutations are handled through OrderManager event sourcing.
 
 use axum::{
@@ -9,8 +9,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use crate::core::ServerState;
-use crate::db::models::OrderSummary;
-use crate::db::repository::OrderRepository;
+use crate::db::repository::order;
 use crate::utils::AppResult;
 use crate::utils::time;
 
@@ -29,7 +28,7 @@ pub struct OrderItemOptionDetail {
 /// Order item for detail view
 #[derive(Debug, Serialize)]
 pub struct OrderItemDetail {
-    pub id: String,
+    pub id: i64,
     pub instance_id: String,
     pub name: String,
     pub spec_name: Option<String>,
@@ -43,7 +42,7 @@ pub struct OrderItemDetail {
     pub surcharge_amount: f64,
     pub rule_discount_amount: f64,
     pub rule_surcharge_amount: f64,
-    pub applied_rules: Option<Vec<shared::order::AppliedRule>>,
+    pub applied_rules: Option<serde_json::Value>,
     pub note: Option<String>,
     pub is_comped: bool,
     pub selected_options: Vec<OrderItemOptionDetail>,
@@ -52,7 +51,7 @@ pub struct OrderItemDetail {
 /// Payment for detail view
 #[derive(Debug, Serialize)]
 pub struct OrderPaymentDetail {
-    pub payment_id: Option<String>,
+    pub payment_id: String,
     pub method: String,
     pub amount: f64,
     pub timestamp: i64,
@@ -65,9 +64,8 @@ pub struct OrderPaymentDetail {
 }
 
 /// Split item detail
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SplitItemDetail {
-    pub instance_id: String,
     pub name: String,
     pub quantity: i32,
     pub unit_price: f64,
@@ -76,7 +74,7 @@ pub struct SplitItemDetail {
 /// Event for detail view
 #[derive(Debug, Serialize)]
 pub struct OrderEventDetail {
-    pub event_id: String,
+    pub event_id: i64,
     pub event_type: String,
     pub timestamp: i64,
     pub payload: Option<serde_json::Value>,
@@ -85,13 +83,13 @@ pub struct OrderEventDetail {
 /// Full order detail response
 #[derive(Debug, Serialize)]
 pub struct OrderDetail {
-    pub order_id: String,
+    pub order_id: i64,
     pub receipt_number: String,
     pub table_name: Option<String>,
     pub zone_name: Option<String>,
     pub status: String,
     pub is_retail: bool,
-    pub guest_count: i32,
+    pub guest_count: Option<i32>,
     pub total: f64,
     pub paid_amount: f64,
     pub total_discount: f64,
@@ -114,18 +112,14 @@ pub struct OrderDetail {
     pub timeline: Vec<OrderEventDetail>,
 }
 
-/// Get archived order by id - uses graph traversal for items/payments/timeline
+/// Get archived order by id
 pub async fn get_by_id(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<OrderDetail>> {
-    let repo = OrderRepository::new(state.db.clone());
-    let detail = repo
-        .get_order_detail(&id)
-        .await
-        ?;
+    let detail = order::get_order_detail(&state.pool, id).await?;
 
-    // Convert from db model to API response
+    // Convert from repo model to API response
     let response = OrderDetail {
         order_id: detail.order_id,
         receipt_number: detail.receipt_number,
@@ -165,7 +159,7 @@ pub async fn get_by_id(
             surcharge_amount: i.surcharge_amount,
             rule_discount_amount: i.rule_discount_amount,
             rule_surcharge_amount: i.rule_surcharge_amount,
-            applied_rules: i.applied_rules,
+            applied_rules: i.applied_rules.and_then(|s| serde_json::from_str(&s).ok()),
             note: i.note,
             is_comped: i.is_comped,
             selected_options: i.selected_options.into_iter().map(|o| OrderItemOptionDetail {
@@ -174,28 +168,28 @@ pub async fn get_by_id(
                 price_modifier: o.price_modifier,
             }).collect(),
         }).collect(),
-        payments: detail.payments.into_iter().map(|p| OrderPaymentDetail {
-            payment_id: p.payment_id,
-            method: p.method,
-            amount: p.amount,
-            timestamp: p.timestamp,
-            cancelled: p.cancelled,
-            cancel_reason: p.cancel_reason,
-            split_type: p.split_type,
-            split_items: p.split_items.into_iter().map(|s| SplitItemDetail {
-                instance_id: s.instance_id,
-                name: s.name,
-                quantity: s.quantity,
-                unit_price: s.unit_price,
-            }).collect(),
-            aa_shares: p.aa_shares,
-            aa_total_shares: p.aa_total_shares,
+        payments: detail.payments.into_iter().map(|p| {
+            let split_items: Vec<SplitItemDetail> = p.split_items
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
+            OrderPaymentDetail {
+                payment_id: p.payment_id,
+                method: p.method,
+                amount: p.amount,
+                timestamp: p.timestamp,
+                cancelled: p.cancelled,
+                cancel_reason: p.cancel_reason,
+                split_type: p.split_type,
+                split_items,
+                aa_shares: p.aa_shares,
+                aa_total_shares: p.aa_total_shares,
+            }
         }).collect(),
         timeline: detail.timeline.into_iter().map(|e| OrderEventDetail {
             event_id: e.event_id,
             event_type: e.event_type,
             timestamp: e.timestamp,
-            payload: e.payload,
+            payload: e.payload.and_then(|s| serde_json::from_str(&s).ok()),
         }).collect(),
     };
 
@@ -205,6 +199,23 @@ pub async fn get_by_id(
 // =========================================================================
 // Order History (Archived)
 // =========================================================================
+
+/// Order summary for list view
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct OrderSummary {
+    pub order_id: i64,
+    pub receipt_number: String,
+    pub table_name: Option<String>,
+    pub status: String,
+    pub is_retail: bool,
+    pub total: f64,
+    pub guest_count: Option<i32>,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    pub void_type: Option<String>,
+    pub loss_reason: Option<String>,
+    pub loss_amount: Option<f64>,
+}
 
 /// Query params for order history
 #[derive(Debug, Deserialize)]
@@ -230,7 +241,7 @@ pub struct OrderListResponse {
     pub limit: i32,
 }
 
-/// Fetch archived order list from SurrealDB with pagination
+/// Fetch archived order list from SQLite with pagination
 pub async fn fetch_order_list(
     State(state): State<ServerState>,
     Query(params): Query<OrderHistoryQuery>,
@@ -253,62 +264,54 @@ pub async fn fetch_order_list(
     let offset = params.offset.unwrap_or(0);
     let page = if limit > 0 { offset / limit + 1 } else { 1 };
 
-    // Build WHERE clause
-    let (where_clause, search_bind) = if let Some(ref search) = params.search {
-        (
-            "WHERE end_time >= $start AND end_time < $end AND string::lowercase(receipt_number) CONTAINS $search",
-            Some(search.to_lowercase()),
+    let (orders, total) = if let Some(ref search) = params.search {
+        let search_pattern = format!("%{}%", search.to_lowercase());
+        let total: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND LOWER(receipt_number) LIKE ?3",
         )
+        .bind(start_millis)
+        .bind(end_millis)
+        .bind(&search_pattern)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap_or(0);
+
+        let rows = sqlx::query_as::<_, OrderSummary>(
+            "SELECT id AS order_id, receipt_number, table_name, UPPER(status) AS status, is_retail, total_amount AS total, guest_count, start_time, end_time, void_type, loss_reason, loss_amount FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND LOWER(receipt_number) LIKE ?3 ORDER BY end_time DESC, start_time DESC LIMIT ?4 OFFSET ?5",
+        )
+        .bind(start_millis)
+        .bind(end_millis)
+        .bind(&search_pattern)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&state.pool)
+        .await
+        .unwrap_or_default();
+
+        (rows, total)
     } else {
-        (
-            "WHERE end_time >= $start AND end_time < $end",
-            None,
+        let total: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2",
         )
+        .bind(start_millis)
+        .bind(end_millis)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap_or(0);
+
+        let rows = sqlx::query_as::<_, OrderSummary>(
+            "SELECT id AS order_id, receipt_number, table_name, UPPER(status) AS status, is_retail, total_amount AS total, guest_count, start_time, end_time, void_type, loss_reason, loss_amount FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 ORDER BY end_time DESC, start_time DESC LIMIT ?3 OFFSET ?4",
+        )
+        .bind(start_millis)
+        .bind(end_millis)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&state.pool)
+        .await
+        .unwrap_or_default();
+
+        (rows, total)
     };
-
-    // Fetch all sorted results, paginate in Rust.
-    // Workaround: SurrealDB Rust SDK embedded mode (kv-rocksdb) has a bug where
-    // LIMIT drops the first record when combined with computed fields like <string>id.
-    // The dataset is bounded by time range (typically 7 days), so in-memory pagination is fine.
-    let data_query = format!(
-        "SELECT \
-         <string>id AS order_id, \
-         receipt_number, \
-         table_name, \
-         string::uppercase(status) AS status, \
-         is_retail, \
-         total_amount AS total, \
-         guest_count, \
-         start_time, \
-         end_time, \
-         void_type, \
-         loss_reason, \
-         loss_amount \
-         FROM order {} ORDER BY end_time DESC, start_time DESC",
-        where_clause
-    );
-    let mut data_result = if let Some(ref search) = search_bind {
-        state.db
-            .query(&data_query)
-            .bind(("start", start_millis))
-            .bind(("end", end_millis))
-            .bind(("search", search.clone()))
-            .await
-    } else {
-        state.db
-            .query(&data_query)
-            .bind(("start", start_millis))
-            .bind(("end", end_millis))
-            .await
-    }.map_err(crate::db::repository::surreal_err_to_app)?;
-
-    let all_orders: Vec<OrderSummary> = data_result.take(0).map_err(crate::db::repository::surreal_err_to_app)?;
-    let total = all_orders.len() as i64;
-    let orders: Vec<OrderSummary> = all_orders
-        .into_iter()
-        .skip(offset as usize)
-        .take(limit as usize)
-        .collect();
 
     Ok(Json(OrderListResponse {
         orders,

@@ -6,29 +6,32 @@ use axum::{
 };
 
 use crate::core::ServerState;
-use crate::db::repository::system_issue::{ResolveSystemIssue, SystemIssueRow};
+use crate::db::repository::system_issue;
 use crate::utils::AppResult;
 use crate::CurrentUser;
+use shared::models::{SystemIssue, SystemIssueResolve};
 
-/// GET /api/system-issues/pending — 获取所有待处理的系统问题
+/// GET /api/system-issues/pending
 pub async fn pending(
     State(state): State<ServerState>,
-) -> AppResult<Json<Vec<SystemIssueRow>>> {
-    let repo = crate::db::repository::SystemIssueRepository::new(state.db.clone());
-    let issues = repo.find_pending().await?;
+) -> AppResult<Json<Vec<SystemIssue>>> {
+    let issues = system_issue::find_pending(&state.pool).await?;
     Ok(Json(issues))
 }
 
-/// POST /api/system-issues/resolve — 回应一个系统问题
+/// POST /api/system-issues/resolve
 pub async fn resolve(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Json(req): Json<ResolveSystemIssue>,
+    Json(req): Json<SystemIssueResolve>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let repo = crate::db::repository::SystemIssueRepository::new(state.db.clone());
-    let resolved = repo
-        .resolve(&req.id, &req.response, Some(&current_user.id))
-        .await?;
+    let resolved = system_issue::resolve(
+        &state.pool,
+        req.id,
+        &req.response,
+        Some(&current_user.id),
+    )
+    .await?;
 
     // 写审计日志（target 指向原始问题的 audit_log 条目序号）
     let audit_target = resolved.target.clone().map(|seq| format!("#{}", seq));
@@ -37,7 +40,7 @@ pub async fn resolve(
         .log_with_target(
             crate::audit::AuditAction::ResolveSystemIssue,
             "system_issue",
-            &req.id,
+            &req.id.to_string(),
             Some(current_user.id.clone()),
             Some(current_user.display_name.clone()),
             serde_json::json!({

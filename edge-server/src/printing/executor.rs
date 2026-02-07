@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use super::renderer::KitchenTicketRenderer;
 use super::types::KitchenOrder;
-use crate::db::models::print_destination::{EmbeddedPrinter, PrintDestination};
+use shared::models::{Printer, PrintDestination};
 use thiserror::Error;
 use tracing::{error, info, instrument, warn};
 
@@ -158,7 +158,7 @@ impl PrintExecutor {
     /// Send data to a specific printer
     async fn send_to_printer(
         &self,
-        printer: &EmbeddedPrinter,
+        printer: &Printer,
         data: &[u8],
     ) -> PrintExecutorResult<()> {
         match printer.printer_type.as_str() {
@@ -178,7 +178,7 @@ impl PrintExecutor {
     #[cfg(windows)]
     async fn send_to_driver_printer(
         &self,
-        printer: &EmbeddedPrinter,
+        printer: &Printer,
         data: &[u8],
     ) -> PrintExecutorResult<()> {
         use crab_printer::{Printer, WindowsPrinter};
@@ -198,7 +198,7 @@ impl PrintExecutor {
     #[cfg(not(windows))]
     async fn send_to_driver_printer(
         &self,
-        _printer: &EmbeddedPrinter,
+        _printer: &Printer,
         _data: &[u8],
     ) -> PrintExecutorResult<()> {
         Err(PrintExecutorError::PrintFailed(
@@ -209,7 +209,7 @@ impl PrintExecutor {
     /// Send to network printer (TCP 9100)
     async fn send_to_network_printer(
         &self,
-        printer: &EmbeddedPrinter,
+        printer: &Printer,
         data: &[u8],
     ) -> PrintExecutorResult<()> {
         use crab_printer::{NetworkPrinter, Printer};
@@ -219,7 +219,7 @@ impl PrintExecutor {
             .as_ref()
             .ok_or_else(|| PrintExecutorError::PrintFailed("No IP specified".to_string()))?;
 
-        let port = printer.port.unwrap_or(9100);
+        let port = printer.port.unwrap_or(9100) as u16;
 
         let net_printer = NetworkPrinter::new(ip, port)
             .map_err(|e| PrintExecutorError::PrintFailed(e.to_string()))?;

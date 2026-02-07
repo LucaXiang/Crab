@@ -9,9 +9,9 @@ use crate::audit::AuditAction;
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::models::{PrintDestination, PrintDestinationCreate, PrintDestinationUpdate};
-use crate::db::repository::PrintDestinationRepository;
+use crate::db::repository::print_destination;
 use crate::utils::{AppError, AppResult};
+use shared::models::{PrintDestination, PrintDestinationCreate, PrintDestinationUpdate};
 
 const RESOURCE: &str = "print_destination";
 
@@ -19,24 +19,17 @@ const RESOURCE: &str = "print_destination";
 pub async fn list(
     State(state): State<ServerState>,
 ) -> AppResult<Json<Vec<PrintDestination>>> {
-    let repo = PrintDestinationRepository::new(state.db.clone());
-    let items = repo
-        .find_all()
-        .await
-        ?;
+    let items = print_destination::find_all(&state.pool).await?;
     Ok(Json(items))
 }
 
 /// GET /api/print-destinations/:id - 获取单个打印目的地
 pub async fn get_by_id(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<PrintDestination>> {
-    let repo = PrintDestinationRepository::new(state.db.clone());
-    let item = repo
-        .find_by_id(&id)
-        .await
-        ?
+    let item = print_destination::find_by_id(&state.pool, id)
+        .await?
         .ok_or_else(|| AppError::not_found(format!("Print destination {} not found", id)))?;
     Ok(Json(item))
 }
@@ -47,13 +40,9 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<PrintDestinationCreate>,
 ) -> AppResult<Json<PrintDestination>> {
-    let repo = PrintDestinationRepository::new(state.db.clone());
-    let item = repo
-        .create(payload)
-        .await
-        ?;
+    let item = print_destination::create(&state.pool, payload).await?;
 
-    let id = item.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+    let id = item.id.to_string();
 
     audit_log!(
         state.audit_service,
@@ -75,26 +64,24 @@ pub async fn create(
 pub async fn update(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     Json(payload): Json<PrintDestinationUpdate>,
 ) -> AppResult<Json<PrintDestination>> {
-    let repo = PrintDestinationRepository::new(state.db.clone());
-    let item = repo
-        .update(&id, payload)
-        .await
-        ?;
+    let item = print_destination::update(&state.pool, id, payload).await?;
+
+    let id_str = id.to_string();
 
     audit_log!(
         state.audit_service,
         AuditAction::PrintDestinationUpdated,
-        "print_destination", &id,
+        "print_destination", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"name": &item.name})
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&item))
+        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&item))
         .await;
 
     Ok(Json(item))
@@ -104,31 +91,29 @@ pub async fn update(
 pub async fn delete(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
     tracing::info!(id = %id, "Deleting print destination");
-    let repo = PrintDestinationRepository::new(state.db.clone());
-    let name_for_audit = repo.find_by_id(&id).await.ok().flatten()
+    let name_for_audit = print_destination::find_by_id(&state.pool, id).await.ok().flatten()
         .map(|p| p.name.clone()).unwrap_or_default();
-    let result = repo
-        .delete(&id)
-        .await
-        ?;
+    let result = print_destination::delete(&state.pool, id).await?;
 
     tracing::info!(id = %id, result = %result, "Print destination delete result");
+
+    let id_str = id.to_string();
 
     if result {
         audit_log!(
             state.audit_service,
             AuditAction::PrintDestinationDeleted,
-            "print_destination", &id,
+            "print_destination", &id_str,
             operator_id = Some(current_user.id.clone()),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
+            .broadcast_sync::<()>(RESOURCE, "deleted", &id_str, None)
             .await;
     }
 

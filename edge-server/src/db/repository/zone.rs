@@ -1,112 +1,85 @@
 //! Zone Repository
 
-use super::{BaseRepository, RepoError, RepoResult};
-use crate::db::models::{Zone, ZoneCreate, ZoneUpdate};
-use surrealdb::engine::local::Db;
-use surrealdb::{RecordId, Surreal};
+use super::{RepoError, RepoResult};
+use shared::models::{Zone, ZoneCreate, ZoneUpdate};
+use sqlx::SqlitePool;
 
-const TABLE: &str = "zone";
-
-#[derive(Clone)]
-pub struct ZoneRepository {
-    base: BaseRepository,
+pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<Zone>> {
+    let zones = sqlx::query_as::<_, Zone>(
+        "SELECT id, name, description, is_active FROM zone WHERE is_active = 1 ORDER BY name",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(zones)
 }
 
-impl ZoneRepository {
-    pub fn new(db: Surreal<Db>) -> Self {
-        Self {
-            base: BaseRepository::new(db),
-        }
+pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<Zone>> {
+    let zone = sqlx::query_as::<_, Zone>(
+        "SELECT id, name, description, is_active FROM zone WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(zone)
+}
+
+pub async fn find_by_name(pool: &SqlitePool, name: &str) -> RepoResult<Option<Zone>> {
+    let zone = sqlx::query_as::<_, Zone>(
+        "SELECT id, name, description, is_active FROM zone WHERE name = ? LIMIT 1",
+    )
+    .bind(name)
+    .fetch_optional(pool)
+    .await?;
+    Ok(zone)
+}
+
+pub async fn create(pool: &SqlitePool, data: ZoneCreate) -> RepoResult<Zone> {
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO zone (name, description) VALUES (?, ?) RETURNING id",
+    )
+    .bind(&data.name)
+    .bind(&data.description)
+    .fetch_one(pool)
+    .await?;
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::Database("Failed to create zone".into()))
+}
+
+pub async fn update(pool: &SqlitePool, id: i64, data: ZoneUpdate) -> RepoResult<Zone> {
+    let rows = sqlx::query(
+        "UPDATE zone SET name = COALESCE(?1, name), description = COALESCE(?2, description), is_active = COALESCE(?3, is_active) WHERE id = ?4",
+    )
+    .bind(&data.name)
+    .bind(&data.description)
+    .bind(data.is_active)
+    .bind(id)
+    .execute(pool)
+    .await?;
+    if rows.rows_affected() == 0 {
+        return Err(RepoError::NotFound(format!("Zone {id} not found")));
     }
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::NotFound(format!("Zone {id} not found")))
+}
 
-    /// Find all active zones
-    pub async fn find_all(&self) -> RepoResult<Vec<Zone>> {
-        let zones: Vec<Zone> = self
-            .base
-            .db()
-            .query("SELECT * FROM zone WHERE is_active = true ORDER BY name")
-            .await?
-            .take(0)?;
-        Ok(zones)
+pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
+    // Check for active dining tables
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM dining_table WHERE zone_id = ? AND is_active = 1",
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await?;
+    if count > 0 {
+        return Err(RepoError::Validation(
+            "Cannot delete zone with active tables".into(),
+        ));
     }
-
-    /// Find zone by id
-    pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<Zone>> {
-        let thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-        let zone: Option<Zone> = self.base.db().select(thing).await?;
-        Ok(zone)
-    }
-
-    /// Find zone by name
-    pub async fn find_by_name(&self, name: &str) -> RepoResult<Option<Zone>> {
-        let name_owned = name.to_string();
-        let mut result = self
-            .base
-            .db()
-            .query("SELECT * FROM zone WHERE name = $name LIMIT 1")
-            .bind(("name", name_owned))
-            .await?;
-        let zones: Vec<Zone> = result.take(0)?;
-        Ok(zones.into_iter().next())
-    }
-
-    /// Create a new zone
-    pub async fn create(&self, data: ZoneCreate) -> RepoResult<Zone> {
-        let zone = Zone {
-            id: None,
-            name: data.name,
-            description: data.description,
-        };
-
-        let created: Option<Zone> = self.base.db().create(TABLE).content(zone).await?;
-        created.ok_or_else(|| RepoError::Database("Failed to create zone".to_string()))
-    }
-
-    /// Update a zone
-    pub async fn update(&self, id: &str, data: ZoneUpdate) -> RepoResult<Zone> {
-        let thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-
-        let mut result = self.base
-            .db()
-            .query("UPDATE $thing MERGE $data RETURN AFTER")
-            .bind(("thing", thing))
-            .bind(("data", data))
-            .await?;
-
-        result.take::<Option<Zone>>(0)?
-            .ok_or_else(|| RepoError::NotFound(format!("Zone {} not found", id)))
-    }
-
-    /// Hard delete a zone (check for tables first)
-    pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-
-        // Check if zone has dining tables
-        let mut result = self
-            .base
-            .db()
-            .query("SELECT count() FROM dining_table WHERE zone = $zone AND is_active = true GROUP ALL")
-            .bind(("zone", thing.clone()))
-            .await?;
-        let count: Option<i64> = result.take((0, "count"))?;
-
-        if count.unwrap_or(0) > 0 {
-            return Err(RepoError::Validation(
-                "Cannot delete zone with active tables".to_string(),
-            ));
-        }
-
-        self.base
-            .db()
-            .query("DELETE $thing")
-            .bind(("thing", thing))
-            .await?;
-        Ok(true)
-    }
+    sqlx::query("DELETE FROM zone WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(true)
 }

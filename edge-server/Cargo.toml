@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 # Workspace crates
-shared.workspace = true
+shared = { workspace = true, features = ["db"] }
 crab-cert.workspace = true
 crab-printer.workspace = true
 
@@ -21,8 +21,7 @@ serde_json.workspace = true
 base64.workspace = true
 
 # Database
-surrealdb.workspace = true
-surrealdb-migrations.workspace = true
+sqlx.workspace = true
 redb.workspace = true
 
 # Logging

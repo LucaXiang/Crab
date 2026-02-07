@@ -3,13 +3,12 @@
 //! Creates a new order with table information.
 
 use async_trait::async_trait;
-use surrealdb::Surreal;
-use surrealdb::engine::local::Db;
+use sqlx::SqlitePool;
 use tracing::{debug, info};
 use uuid::Uuid;
 
-use crate::db::models::PriceRule;
-use crate::db::repository::PriceRuleRepository;
+use crate::db::repository::price_rule;
+use shared::models::PriceRule;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
@@ -19,20 +18,20 @@ use shared::order::{EventPayload, OrderEvent, OrderEventType, OrderStatus};
 /// 此函数只做区域过滤，不做时间过滤。
 ///
 /// DB 层过滤：
-/// - zone_scope = "zone:all": 适用于所有区域
-/// - zone_scope = "zone:retail": 适用于零售订单 (is_retail = true)
-/// - zone_scope = "zone:xxx": 适用于特定区域 (zone_id 匹配)
+/// - zone_scope = "all": 适用于所有区域
+/// - zone_scope = "retail": 适用于零售订单 (is_retail = true)
+/// - zone_scope = "<zone_id>": 适用于特定区域 (zone_id 匹配)
 /// - is_active = true: 规则必须是激活状态
 ///
 /// # Arguments
-/// * `db` - SurrealDB 数据库连接
+/// * `pool` - SQLite 数据库连接池
 /// * `zone_id` - 区域 ID (None 表示零售订单)
 /// * `is_retail` - 是否为零售订单
 ///
 /// # Returns
 /// 返回区域匹配的活跃价格规则列表（不含时间过滤）
 pub async fn load_matching_rules(
-    db: &Surreal<Db>,
+    pool: &SqlitePool,
     zone_id: Option<&str>,
     is_retail: bool,
 ) -> Vec<PriceRule> {
@@ -42,8 +41,8 @@ pub async fn load_matching_rules(
         "[LoadRules] Loading zone-matched price rules"
     );
 
-    let repo = PriceRuleRepository::new(db.clone());
-    let rules = match repo.find_by_zone(zone_id, is_retail).await {
+    let zone_id_i64 = zone_id.and_then(|s| s.parse::<i64>().ok());
+    let rules = match price_rule::find_by_zone(pool, zone_id_i64, is_retail).await {
         Ok(rules) => rules,
         Err(e) => {
             tracing::error!("Failed to load price rules: {:?}", e);
@@ -66,7 +65,7 @@ pub async fn load_matching_rules(
             zone_scope = rule.zone_scope,
             adjustment_type = ?rule.adjustment_type,
             adjustment_value = rule.adjustment_value,
-            target = ?rule.target.as_ref().map(|t| t.to_string()),
+            target_id = ?rule.target_id,
             is_stackable = rule.is_stackable,
             is_exclusive = rule.is_exclusive,
             "[LoadRules] Matched rule detail"

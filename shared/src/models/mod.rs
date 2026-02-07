@@ -1,39 +1,44 @@
-//! 数据模型 (API DTOs)
+//! Data models
 //!
-//! 这些类型用于 REST API 请求/响应，可被客户端直接使用。
-//! 所有 ID 字段使用 String 类型，与数据库实现解耦。
+//! Shared between edge-server and frontend (via API).
+//! DB row types use `#[cfg_attr(feature = "db", derive(sqlx::FromRow))]`.
+//! All IDs are `i64` (SQLite INTEGER PRIMARY KEY).
 
 pub mod attribute;
 pub mod category;
+pub mod daily_report;
 pub mod dining_table;
 pub mod employee;
+pub mod label_template;
 pub mod price_rule;
 pub mod print_destination;
 pub mod product;
-pub mod sync;
-pub mod label_template;
+pub mod role;
+pub mod shift;
 pub mod store_info;
+pub mod sync;
+pub mod system_issue;
 pub mod system_state;
 pub mod tag;
 pub mod zone;
-
-// Operations (班次与日结)
-pub mod shift;
-pub mod daily_report;
+pub mod image_ref;
 
 // Re-exports
 pub use attribute::*;
 pub use category::*;
+pub use daily_report::*;
 pub use dining_table::*;
 pub use employee::*;
+pub use image_ref::*;
+pub use label_template::*;
 pub use price_rule::*;
 pub use print_destination::*;
 pub use product::*;
-pub use sync::*;
-pub use label_template::*;
+pub use role::*;
+pub use shift::*;
 pub use store_info::*;
+pub use sync::*;
+pub use system_issue::*;
 pub use system_state::*;
 pub use tag::*;
 pub use zone::*;
-pub use shift::*;
-pub use daily_report::*;

@@ -10,9 +10,9 @@ use crate::audit_log;
 use crate::auth::permissions::{is_valid_permission, ALL_PERMISSIONS};
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::models::{Role, RoleCreate, RoleUpdate};
-use crate::db::repository::RoleRepository;
+use crate::db::repository::role;
 use crate::utils::{AppError, AppResult};
+use shared::models::{Role, RoleCreate, RoleUpdate};
 
 /// 权限天花板校验：操作者只能分配自己拥有的权限
 fn validate_permission_ceiling(
@@ -56,13 +56,11 @@ pub async fn list(
         "Fetching roles"
     );
 
-    let repo = RoleRepository::new(state.get_db());
     let roles = if query.all.unwrap_or(false) {
-        repo.find_all_with_inactive().await
+        role::find_all_with_inactive(&state.pool).await
     } else {
-        repo.find_all().await
-    }
-    ?;
+        role::find_all(&state.pool).await
+    }?;
 
     Ok(Json(roles))
 }
@@ -70,13 +68,10 @@ pub async fn list(
 /// GET /api/roles/{id} - Get role by ID
 pub async fn get_by_id(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<Role>> {
-    let repo = RoleRepository::new(state.get_db());
-    let role = repo
-        .find_by_id(&id)
-        .await
-        ?
+    let role = role::find_by_id(&state.pool, id)
+        .await?
         .ok_or_else(|| AppError::not_found(format!("Role {} not found", id)))?;
 
     Ok(Json(role))
@@ -98,30 +93,26 @@ pub async fn create(
     // 权限天花板校验
     validate_permission_ceiling(&current_user, &payload.permissions)?;
 
-    let repo = RoleRepository::new(state.get_db());
-    let role = repo
-        .create(payload)
-        .await
-        ?;
+    let r = role::create(&state.pool, payload).await?;
 
-    let id = role.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+    let id = r.id.to_string();
     audit_log!(
         state.audit_service,
         AuditAction::RoleCreated,
         "role", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = create_snapshot(&role, "role")
+        details = create_snapshot(&r, "role")
     );
 
-    Ok(Json(role))
+    Ok(Json(r))
 }
 
 /// PUT /api/roles/{id} - Update a role
 pub async fn update(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     Json(payload): Json<RoleUpdate>,
 ) -> AppResult<Json<Role>> {
     tracing::info!(
@@ -136,33 +127,31 @@ pub async fn update(
         validate_permission_ceiling(&current_user, permissions)?;
     }
 
-    let repo = RoleRepository::new(state.get_db());
-
     // 查询旧值（用于审计 diff）
-    let old_role = repo
-        .find_by_id(&id)
+    let old_role = role::find_by_id(&state.pool, id)
         .await?
         .ok_or_else(|| AppError::not_found(format!("Role {}", id)))?;
 
-    let role = repo.update(&id, payload).await?;
+    let r = role::update(&state.pool, id, payload).await?;
 
+    let id_str = id.to_string();
     audit_log!(
         state.audit_service,
         AuditAction::RoleUpdated,
-        "role", &id,
+        "role", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = create_diff(&old_role, &role, "role")
+        details = create_diff(&old_role, &r, "role")
     );
 
-    Ok(Json(role))
+    Ok(Json(r))
 }
 
 /// DELETE /api/roles/{id} - Delete a role
 pub async fn delete(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
     tracing::info!(
         user_id = %current_user.id,
@@ -171,19 +160,16 @@ pub async fn delete(
         "Deleting role"
     );
 
-    let repo = RoleRepository::new(state.get_db());
-    let name_for_audit = repo.find_by_id(&id).await.ok().flatten()
+    let name_for_audit = role::find_by_id(&state.pool, id).await.ok().flatten()
         .map(|r| r.name.clone()).unwrap_or_default();
-    let result = repo
-        .delete(&id)
-        .await
-        ?;
+    let result = role::delete(&state.pool, id).await?;
 
     if result {
+        let id_str = id.to_string();
         audit_log!(
             state.audit_service,
             AuditAction::RoleDeleted,
-            "role", &id,
+            "role", &id_str,
             operator_id = Some(current_user.id.clone()),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"role_name": name_for_audit})
@@ -205,23 +191,20 @@ pub async fn get_all_permissions() -> AppResult<impl IntoResponse> {
 /// GET /api/roles/{id}/permissions - Get role permissions
 pub async fn get_role_permissions(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<Vec<String>>> {
-    let repo = RoleRepository::new(state.get_db());
-    let role = repo
-        .find_by_id(&id)
-        .await
-        ?
+    let r = role::find_by_id(&state.pool, id)
+        .await?
         .ok_or_else(|| AppError::not_found(format!("Role {} not found", id)))?;
 
-    Ok(Json(role.permissions))
+    Ok(Json(r.permissions))
 }
 
 /// PUT /api/roles/{id}/permissions - Update role permissions
 pub async fn update_role_permissions(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     Json(permissions): Json<Vec<String>>,
 ) -> AppResult<Json<Role>> {
     tracing::info!(
@@ -235,7 +218,6 @@ pub async fn update_role_permissions(
     // 权限天花板校验
     validate_permission_ceiling(&current_user, &permissions)?;
 
-    let repo = RoleRepository::new(state.get_db());
     let update = RoleUpdate {
         name: None,
         display_name: None,
@@ -245,21 +227,21 @@ pub async fn update_role_permissions(
     };
 
     // 查询旧值（用于审计 diff）
-    let old_role = repo
-        .find_by_id(&id)
+    let old_role = role::find_by_id(&state.pool, id)
         .await?
         .ok_or_else(|| AppError::not_found(format!("Role {}", id)))?;
 
-    let role = repo.update(&id, update).await?;
+    let r = role::update(&state.pool, id, update).await?;
 
+    let id_str = id.to_string();
     audit_log!(
         state.audit_service,
         AuditAction::RoleUpdated,
-        "role", &id,
+        "role", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = create_diff(&old_role, &role, "role")
+        details = create_diff(&old_role, &r, "role")
     );
 
-    Ok(Json(role))
+    Ok(Json(r))
 }

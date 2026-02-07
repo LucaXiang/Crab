@@ -10,10 +10,10 @@ use crate::audit::AuditAction;
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
-use crate::db::repository::{ShiftRepository, StoreInfoRepository};
+use crate::db::repository::{shift, store_info};
 use crate::utils::{AppError, AppResult};
 use crate::utils::time;
+use shared::models::{Shift, ShiftClose, ShiftCreate, ShiftForceClose, ShiftUpdate};
 
 const RESOURCE: &str = "shift";
 
@@ -37,17 +37,19 @@ pub async fn list(
     State(state): State<ServerState>,
     Query(query): Query<ListQuery>,
 ) -> AppResult<Json<Vec<Shift>>> {
-    let repo = ShiftRepository::new(state.db.clone());
-
     let tz = state.config.timezone;
     let shifts = if let (Some(start), Some(end)) = (query.start_date, query.end_date) {
         let start_date = time::parse_date(&start)?;
         let end_date = time::parse_date(&end)?;
-        repo.find_by_date_range(time::day_start_millis(start_date, tz), time::day_end_millis(end_date, tz)).await
+        shift::find_by_date_range(
+            &state.pool,
+            time::day_start_millis(start_date, tz),
+            time::day_end_millis(end_date, tz),
+        )
+        .await
     } else {
-        repo.find_all(query.limit, query.offset).await
-    }
-    ?;
+        shift::find_all(&state.pool, query.limit, query.offset).await
+    }?;
 
     Ok(Json(shifts))
 }
@@ -55,13 +57,10 @@ pub async fn list(
 /// GET /api/shifts/:id - 获取单个班次
 pub async fn get_by_id(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<Shift>> {
-    let repo = ShiftRepository::new(state.db.clone());
-    let shift = repo
-        .find_by_id(&id)
-        .await
-        ?
+    let shift = shift::find_by_id(&state.pool, id)
+        .await?
         .ok_or_else(|| AppError::not_found(format!("Shift {} not found", id)))?;
     Ok(Json(shift))
 }
@@ -69,7 +68,7 @@ pub async fn get_by_id(
 /// Query params for current shift
 #[derive(Debug, Deserialize)]
 pub struct CurrentQuery {
-    pub operator_id: Option<String>,
+    pub operator_id: Option<i64>,
 }
 
 /// GET /api/shifts/current - 获取当前班次
@@ -77,16 +76,13 @@ pub async fn get_current(
     State(state): State<ServerState>,
     Query(query): Query<CurrentQuery>,
 ) -> AppResult<Json<Option<Shift>>> {
-    let repo = ShiftRepository::new(state.db.clone());
-
-    let shift = if let Some(operator_id) = query.operator_id {
-        repo.find_open_by_operator(&operator_id).await
+    let current = if let Some(operator_id) = query.operator_id {
+        shift::find_open_by_operator(&state.pool, operator_id).await
     } else {
-        repo.find_any_open().await
-    }
-    ?;
+        shift::find_any_open(&state.pool).await
+    }?;
 
-    Ok(Json(shift))
+    Ok(Json(current))
 }
 
 /// POST /api/shifts - 开班
@@ -95,17 +91,9 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<ShiftCreate>,
 ) -> AppResult<Json<Shift>> {
-    let repo = ShiftRepository::new(state.db.clone());
-    let shift = repo
-        .create(payload)
-        .await
-        ?;
+    let s = shift::create(&state.pool, payload).await?;
 
-    let id = shift
-        .id
-        .as_ref()
-        .map(|id| id.to_string())
-        .unwrap_or_default();
+    let id = s.id.to_string();
 
     audit_log!(
         state.audit_service,
@@ -113,111 +101,101 @@ pub async fn create(
         "shift", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"starting_cash": shift.starting_cash})
+        details = serde_json::json!({"starting_cash": s.starting_cash})
     );
 
     state
-        .broadcast_sync(RESOURCE, "created", &id, Some(&shift))
+        .broadcast_sync(RESOURCE, "created", &id, Some(&s))
         .await;
 
-    Ok(Json(shift))
+    Ok(Json(s))
 }
 
 /// PUT /api/shifts/:id - 更新班次
 pub async fn update(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     Json(payload): Json<ShiftUpdate>,
 ) -> AppResult<Json<Shift>> {
-    let repo = ShiftRepository::new(state.db.clone());
-    let shift = repo
-        .update(&id, payload)
-        .await
-        ?;
+    let s = shift::update(&state.pool, id, payload).await?;
 
+    let id_str = id.to_string();
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&shift))
+        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&s))
         .await;
 
-    Ok(Json(shift))
+    Ok(Json(s))
 }
 
 /// POST /api/shifts/:id/close - 收班
 pub async fn close(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     Json(payload): Json<ShiftClose>,
 ) -> AppResult<Json<Shift>> {
-    let repo = ShiftRepository::new(state.db.clone());
-    let shift = repo
-        .close(&id, payload)
-        .await
-        ?;
+    let s = shift::close(&state.pool, id, payload).await?;
+
+    let id_str = id.to_string();
 
     audit_log!(
         state.audit_service,
         AuditAction::ShiftClosed,
-        "shift", &id,
+        "shift", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
-            "starting_cash": shift.starting_cash,
-            "expected_cash": shift.expected_cash,
-            "actual_cash": shift.actual_cash,
-            "cash_variance": shift.cash_variance,
+            "starting_cash": s.starting_cash,
+            "expected_cash": s.expected_cash,
+            "actual_cash": s.actual_cash,
+            "cash_variance": s.cash_variance,
         })
     );
 
     state
-        .broadcast_sync(RESOURCE, "closed", &id, Some(&shift))
+        .broadcast_sync(RESOURCE, "closed", &id_str, Some(&s))
         .await;
 
-    Ok(Json(shift))
+    Ok(Json(s))
 }
 
 /// POST /api/shifts/:id/force-close - 强制关闭
 pub async fn force_close(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     Json(payload): Json<ShiftForceClose>,
 ) -> AppResult<Json<Shift>> {
-    let repo = ShiftRepository::new(state.db.clone());
-    let shift = repo
-        .force_close(&id, payload)
-        .await
-        ?;
+    let s = shift::force_close(&state.pool, id, payload).await?;
+
+    let id_str = id.to_string();
 
     audit_log!(
         state.audit_service,
         AuditAction::ShiftClosed,
-        "shift", &id,
+        "shift", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({
             "forced": true,
-            "starting_cash": shift.starting_cash,
-            "expected_cash": shift.expected_cash,
+            "starting_cash": s.starting_cash,
+            "expected_cash": s.expected_cash,
         })
     );
 
     state
-        .broadcast_sync(RESOURCE, "force_closed", &id, Some(&shift))
+        .broadcast_sync(RESOURCE, "force_closed", &id_str, Some(&s))
         .await;
 
-    Ok(Json(shift))
+    Ok(Json(s))
 }
 
 /// POST /api/shifts/:id/heartbeat - 心跳更新
 pub async fn heartbeat(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
-    let repo = ShiftRepository::new(state.db.clone());
-    repo.heartbeat(&id)
-        .await
-        ?;
+    shift::heartbeat(&state.pool, id).await?;
     Ok(Json(true))
 }
 
@@ -229,9 +207,7 @@ pub async fn recover_stale(
     State(state): State<ServerState>,
 ) -> AppResult<Json<Vec<Shift>>> {
     let tz = state.config.timezone;
-    let store_repo = StoreInfoRepository::new(state.db.clone());
-    let cutoff_str = store_repo
-        .get()
+    let cutoff_str = store_info::get(&state.pool)
         .await
         .ok()
         .flatten()
@@ -242,24 +218,15 @@ pub async fn recover_stale(
     let today = time::current_business_date(cutoff, tz);
     let business_day_start = time::date_cutoff_millis(today, cutoff, tz);
 
-    let repo = ShiftRepository::new(state.db.clone());
-    let stale = repo
-        .find_stale_shifts(business_day_start)
-        .await
-        ?;
+    let stale = shift::find_stale_shifts(&state.pool, business_day_start).await?;
 
-    for shift in &stale {
-        let id = shift
-            .id
-            .as_ref()
-            .map(|id| id.to_string())
-            .unwrap_or_default();
+    for s in &stale {
+        let id = s.id.to_string();
 
         state
-            .broadcast_sync(RESOURCE, "settlement_required", &id, Some(shift))
+            .broadcast_sync(RESOURCE, "settlement_required", &id, Some(s))
             .await;
     }
 
     Ok(Json(stale))
 }
-

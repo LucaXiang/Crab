@@ -8,7 +8,7 @@ use chrono::{Duration, Datelike};
 use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
-use crate::db::repository::StoreInfoRepository;
+use crate::db::repository::store_info;
 use crate::utils::AppResult;
 use crate::utils::time;
 
@@ -17,7 +17,7 @@ use crate::utils::time;
 // ============================================================================
 
 /// Overview statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OverviewStats {
     pub revenue: f64,
     pub orders: i32,
@@ -65,9 +65,9 @@ pub struct StatisticsResponse {
 }
 
 /// Sales report item
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct SalesReportItem {
-    pub order_id: String,
+    pub order_id: i64,
     pub receipt_number: Option<String>,
     pub date: String,
     pub total: f64,
@@ -196,9 +196,7 @@ pub async fn get_statistics(
     Query(query): Query<StatisticsQuery>,
 ) -> AppResult<Json<StatisticsResponse>> {
     // Get business day cutoff from store info
-    let store_repo = StoreInfoRepository::new(state.db.clone());
-    let cutoff = store_repo
-        .get()
+    let cutoff = store_info::get(&state.pool)
         .await
         .ok()
         .flatten()
@@ -221,197 +219,134 @@ pub async fn get_statistics(
         "Fetching statistics"
     );
 
-    // Query for overview stats
-    let mut result = state.db
-        .query(r#"
-            -- Get all orders in time range (only needed fields)
-            LET $all_orders = SELECT
-                id, status, total_amount, paid_amount, guest_count,
-                discount_amount, start_time, end_time
-            FROM order
-                WHERE end_time >= $start
-                AND end_time < $end;
+    let pool = &state.pool;
 
-            -- Filter by status
-            LET $completed = SELECT * FROM $all_orders WHERE status = 'COMPLETED';
-            LET $void = SELECT * FROM $all_orders WHERE status = 'VOID';
+    // Overview: completed orders
+    let revenue: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(total_amount), 0) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'COMPLETED'",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_one(pool).await.unwrap_or(0.0);
 
-            -- Calculate totals
-            LET $total_revenue = math::sum($completed.total_amount) OR 0;
-            LET $total_orders = count($completed);
-            LET $total_customers = math::sum($completed.guest_count) OR 0;
-            LET $avg_order = IF $total_orders > 0 THEN $total_revenue / $total_orders ELSE 0 END;
-            LET $avg_guest_spend = IF $total_customers > 0 THEN $total_revenue / $total_customers ELSE 0 END;
-            LET $voided_orders = count($void);
-            LET $voided_amount = math::sum($void.total_amount) OR 0;
-            LET $total_discount = math::sum($completed.discount_amount) OR 0;
+    let total_orders: i32 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'COMPLETED'",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_one(pool).await.unwrap_or(0);
 
-            -- Payment breakdowns
-            LET $completed_ids = (SELECT VALUE id FROM $completed);
-            LET $payments = (
-                SELECT out.method AS method, out.amount AS amount
-                FROM has_payment
-                WHERE in IN $completed_ids AND out.cancelled = false
-            );
-            LET $cash = math::sum((SELECT VALUE amount FROM $payments WHERE method = 'CASH')) OR 0;
-            LET $card = math::sum((SELECT VALUE amount FROM $payments WHERE method = 'CARD')) OR 0;
-            LET $other = $total_revenue - $cash - $card;
+    let total_customers: i32 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(guest_count), 0) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'COMPLETED'",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_one(pool).await.unwrap_or(0);
 
-            -- Average dining time (minutes)
-            LET $dining_times = (
-                SELECT (end_time - start_time) / 60000 AS minutes
-                FROM $completed
-                WHERE end_time IS NOT NULL AND start_time IS NOT NULL
-            );
-            LET $avg_dining_time = math::mean($dining_times.minutes);
+    let average_order_value = if total_orders > 0 { revenue / total_orders as f64 } else { 0.0 };
+    let avg_guest_spend = if total_customers > 0 { revenue / total_customers as f64 } else { 0.0 };
 
-            RETURN {
-                revenue: $total_revenue,
-                orders: $total_orders,
-                customers: $total_customers,
-                average_order_value: $avg_order,
-                cash_revenue: $cash,
-                card_revenue: $card,
-                other_revenue: $other,
-                voided_orders: $voided_orders,
-                voided_amount: $voided_amount,
-                total_discount: $total_discount,
-                avg_guest_spend: $avg_guest_spend,
-                avg_dining_time: $avg_dining_time
-            }
-        "#)
-        .bind(("start", start_dt))
-        .bind(("end", end_dt))
-        .await
-        .map_err(crate::db::repository::surreal_err_to_app)?;
+    let voided_orders: i32 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'VOID'",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_one(pool).await.unwrap_or(0);
 
-    let overview: OverviewStats = result.take::<Option<OverviewStats>>(18)
-        .map_err(crate::db::repository::surreal_err_to_app)?
-        .unwrap_or(OverviewStats {
-            revenue: 0.0,
-            orders: 0,
-            customers: 0,
-            average_order_value: 0.0,
-            cash_revenue: 0.0,
-            card_revenue: 0.0,
-            other_revenue: 0.0,
-            voided_orders: 0,
-            voided_amount: 0.0,
-            total_discount: 0.0,
-            avg_guest_spend: 0.0,
-            avg_dining_time: None,
-        });
+    let voided_amount: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(total_amount), 0) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'VOID'",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_one(pool).await.unwrap_or(0.0);
 
-    // Query for revenue trend (hourly for today, daily for week/month)
-    let trend_query = if query.time_range == "today" {
-        // Hourly trend: group by hour bucket
-        r#"
-            SELECT
-                time::format(time::from::unix(end_time / 1000), '%H:00') AS time,
-                math::sum(total_amount) AS value
-            FROM order
-            WHERE status = 'COMPLETED'
-            AND end_time >= $start
-            AND end_time < $end
-            GROUP BY time
-            ORDER BY time
-        "#
-    } else {
-        // Daily trend: group by date bucket
-        r#"
-            SELECT
-                time::format(time::from::unix(end_time / 1000), '%m-%d') AS time,
-                math::sum(total_amount) AS value
-            FROM order
-            WHERE status = 'COMPLETED'
-            AND end_time >= $start
-            AND end_time < $end
-            GROUP BY time
-            ORDER BY time
-        "#
+    let total_discount: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(discount_amount), 0) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'COMPLETED'",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_one(pool).await.unwrap_or(0.0);
+
+    // Payment breakdowns from archived_order_payment
+    let cash_revenue: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(p.amount), 0) FROM archived_order_payment p JOIN archived_order o ON p.order_pk = o.id WHERE o.end_time >= ?1 AND o.end_time < ?2 AND o.status = 'COMPLETED' AND p.cancelled = 0 AND p.method = 'CASH'",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_one(pool).await.unwrap_or(0.0);
+
+    let card_revenue: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(p.amount), 0) FROM archived_order_payment p JOIN archived_order o ON p.order_pk = o.id WHERE o.end_time >= ?1 AND o.end_time < ?2 AND o.status = 'COMPLETED' AND p.cancelled = 0 AND p.method = 'CARD'",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_one(pool).await.unwrap_or(0.0);
+
+    let other_revenue = revenue - cash_revenue - card_revenue;
+
+    // Average dining time (minutes)
+    let avg_dining_time: Option<f64> = sqlx::query_scalar(
+        "SELECT AVG(CAST((end_time - start_time) AS REAL) / 60000.0) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 AND status = 'COMPLETED' AND end_time IS NOT NULL AND start_time IS NOT NULL",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_one(pool).await.ok().flatten();
+
+    let overview = OverviewStats {
+        revenue,
+        orders: total_orders,
+        customers: total_customers,
+        average_order_value,
+        cash_revenue,
+        card_revenue,
+        other_revenue,
+        voided_orders,
+        voided_amount,
+        total_discount,
+        avg_guest_spend,
+        avg_dining_time,
     };
 
-    let mut trend_result = state.db
-        .query(trend_query)
-        .bind(("start", start_dt))
-        .bind(("end", end_dt))
-        .await
-        .map_err(crate::db::repository::surreal_err_to_app)?;
+    // Revenue trend
+    let revenue_trend = if query.time_range == "today" {
+        // Hourly trend
+        let rows: Vec<(String, f64)> = sqlx::query_as(
+            "SELECT PRINTF('%02d:00', (end_time / 1000 / 3600) % 24) AS time, COALESCE(SUM(total_amount), 0) AS value FROM archived_order WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 GROUP BY time ORDER BY time",
+        )
+        .bind(start_dt).bind(end_dt)
+        .fetch_all(pool).await.unwrap_or_default();
 
-    let revenue_trend: Vec<RevenueTrendPoint> = trend_result.take(0)
-        .map_err(crate::db::repository::surreal_err_to_app)?;
+        rows.into_iter().map(|(t, v)| RevenueTrendPoint { time: t, value: v }).collect()
+    } else {
+        // Daily trend
+        let rows: Vec<(String, f64)> = sqlx::query_as(
+            "SELECT STRFTIME('%m-%d', end_time / 1000, 'unixepoch') AS time, COALESCE(SUM(total_amount), 0) AS value FROM archived_order WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 GROUP BY time ORDER BY time",
+        )
+        .bind(start_dt).bind(end_dt)
+        .fetch_all(pool).await.unwrap_or_default();
 
-    // Query for category sales
-    let mut category_result = state.db
-        .query(r#"
-            LET $completed_ids = (
-                SELECT VALUE id FROM order
-                WHERE status = 'COMPLETED'
-                AND end_time >= $start
-                AND end_time < $end
-            );
+        rows.into_iter().map(|(t, v)| RevenueTrendPoint { time: t, value: v }).collect()
+    };
 
-            SELECT
-                (out.category_name OR "未分类") AS name,
-                math::sum(out.line_total) AS value
-            FROM has_item
-            WHERE in IN $completed_ids
-            GROUP BY name
-            ORDER BY value DESC
-            LIMIT 10
-        "#)
-        .bind(("start", start_dt))
-        .bind(("end", end_dt))
-        .await
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-
-    #[derive(Deserialize)]
-    struct CategoryRaw {
-        name: Option<String>,
-        value: f64,
-    }
-
-    let category_raw: Vec<CategoryRaw> = category_result.take(1)
-        .map_err(crate::db::repository::surreal_err_to_app)?;
+    // Category sales from archived_order_item
+    let category_raw: Vec<(Option<String>, f64)> = sqlx::query_as(
+        "SELECT COALESCE(i.category_name, 'Unknown') AS name, COALESCE(SUM(i.line_total), 0) AS value FROM archived_order_item i JOIN archived_order o ON i.order_pk = o.id WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 GROUP BY name ORDER BY value DESC LIMIT 10",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_all(pool).await.unwrap_or_default();
 
     let category_sales: Vec<CategorySale> = category_raw
         .into_iter()
         .enumerate()
-        .map(|(i, c)| CategorySale {
-            name: c.name.unwrap_or_else(|| "Unknown".to_string()),
-            value: c.value,
+        .map(|(i, (name, value))| CategorySale {
+            name: name.unwrap_or_else(|| "Unknown".to_string()),
+            value,
             color: CATEGORY_COLORS.get(i % CATEGORY_COLORS.len())
                 .unwrap_or(&"#6B7280")
                 .to_string(),
         })
         .collect();
 
-    // Query for top products
-    let mut product_result = state.db
-        .query(r#"
-            LET $completed_ids = (
-                SELECT VALUE id FROM order
-                WHERE status = 'COMPLETED'
-                AND end_time >= $start
-                AND end_time < $end
-            );
-
-            SELECT
-                out.name AS name,
-                math::sum(out.quantity) AS sales
-            FROM has_item
-            WHERE in IN $completed_ids
-            GROUP BY out.name
-            ORDER BY sales DESC
-            LIMIT 10
-        "#)
-        .bind(("start", start_dt))
-        .bind(("end", end_dt))
-        .await
-        .map_err(crate::db::repository::surreal_err_to_app)?;
-
-    let top_products: Vec<TopProduct> = product_result.take(1)
-        .map_err(crate::db::repository::surreal_err_to_app)?;
+    // Top products from archived_order_item
+    let top_products: Vec<TopProduct> = sqlx::query_as::<_, (String, i32)>(
+        "SELECT i.name, COALESCE(SUM(i.quantity), 0) AS sales FROM archived_order_item i JOIN archived_order o ON i.order_pk = o.id WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 GROUP BY i.name ORDER BY sales DESC LIMIT 10",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_all(pool).await.unwrap_or_default()
+    .into_iter()
+    .map(|(name, sales)| TopProduct { name, sales })
+    .collect();
 
     Ok(Json(StatisticsResponse {
         overview,
@@ -427,9 +362,7 @@ pub async fn get_sales_report(
     Query(query): Query<SalesReportQuery>,
 ) -> AppResult<Json<SalesReportResponse>> {
     // Get business day cutoff from store info
-    let store_repo = StoreInfoRepository::new(state.db.clone());
-    let cutoff = store_repo
-        .get()
+    let cutoff = store_info::get(&state.pool)
         .await
         .ok()
         .flatten()
@@ -448,38 +381,22 @@ pub async fn get_sales_report(
     let page_size = 10;
     let offset = (page - 1) * page_size;
 
-    // Workaround: SurrealDB embedded mode (kv-rocksdb) drops the first record
-    // when LIMIT is combined with computed fields like <string>id on indexed fields.
-    // Dataset is bounded by time range, so in-memory pagination is fine.
-    let mut data_result = state.db
-        .query(r#"
-            SELECT
-                <string>id AS order_id,
-                receipt_number,
-                time::format(time::from::unix(end_time / 1000), '%Y-%m-%d %H:%M') AS date,
-                total_amount AS total,
-                string::uppercase(status) AS status,
-                end_time
-            FROM order
-            WHERE end_time >= $start
-            AND end_time < $end
-            ORDER BY end_time DESC
-        "#)
-        .bind(("start", start_dt))
-        .bind(("end", end_dt))
-        .await
-        .map_err(crate::db::repository::surreal_err_to_app)?;
+    let pool = &state.pool;
 
-    let all_items: Vec<SalesReportItem> = data_result.take(0)
-        .map_err(crate::db::repository::surreal_err_to_app)?;
+    let total: i32 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM archived_order WHERE end_time >= ?1 AND end_time < ?2",
+    )
+    .bind(start_dt).bind(end_dt)
+    .fetch_one(pool).await.unwrap_or(0);
 
-    let total = all_items.len() as i32;
     let total_pages = if total > 0 { (total + page_size - 1) / page_size } else { 1 };
-    let items: Vec<SalesReportItem> = all_items
-        .into_iter()
-        .skip(offset as usize)
-        .take(page_size as usize)
-        .collect();
+
+    let items: Vec<SalesReportItem> = sqlx::query_as(
+        "SELECT id AS order_id, receipt_number, STRFTIME('%Y-%m-%d %H:%M', end_time / 1000, 'unixepoch') AS date, total_amount AS total, UPPER(status) AS status FROM archived_order WHERE end_time >= ?1 AND end_time < ?2 ORDER BY end_time DESC LIMIT ?3 OFFSET ?4",
+    )
+    .bind(start_dt).bind(end_dt)
+    .bind(page_size).bind(offset)
+    .fetch_all(pool).await.unwrap_or_default();
 
     Ok(Json(SalesReportResponse {
         items,

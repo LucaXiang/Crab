@@ -10,9 +10,9 @@ use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::models::{Attribute, AttributeBinding, Category, CategoryCreate, CategoryUpdate};
-use crate::db::repository::AttributeRepository;
+use crate::db::repository::attribute;
 use crate::utils::{AppError, AppResult};
+use shared::models::{Attribute, AttributeBinding, Category, CategoryCreate, CategoryUpdate};
 
 const RESOURCE: &str = "category";
 
@@ -25,11 +25,12 @@ pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<Catego
 /// GET /api/categories/:id - 获取单个分类
 pub async fn get_by_id(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<Category>> {
+    let id_str = id.to_string();
     let category = state
         .catalog_service
-        .get_category(&id)
+        .get_category(&id_str)
         .ok_or_else(|| AppError::not_found(format!("Category {} not found", id)))?;
     Ok(Json(category))
 }
@@ -46,7 +47,7 @@ pub async fn create(
         .await
         ?;
 
-    let id = category.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+    let id = category.id.to_string();
 
     audit_log!(
         state.audit_service,
@@ -68,31 +69,33 @@ pub async fn create(
 pub async fn update(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     Json(payload): Json<CategoryUpdate>,
 ) -> AppResult<Json<Category>> {
+    let id_str = id.to_string();
+
     // 查询旧值（用于审计 diff）
     let old_category = state
         .catalog_service
-        .get_category(&id)
+        .get_category(&id_str)
         .ok_or_else(|| AppError::not_found(format!("Category {}", id)))?;
 
     let category = state
         .catalog_service
-        .update_category(&id, payload)
+        .update_category(&id_str, payload)
         .await?;
 
     audit_log!(
         state.audit_service,
         AuditAction::CategoryUpdated,
-        "category", &id,
+        "category", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
         details = create_diff(&old_category, &category, "category")
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&category))
+        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&category))
         .await;
 
     Ok(Json(category))
@@ -102,29 +105,30 @@ pub async fn update(
 pub async fn delete(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
+    let id_str = id.to_string();
     tracing::info!(id = %id, "Deleting category");
 
-    let name_for_audit = state.catalog_service.get_category(&id)
+    let name_for_audit = state.catalog_service.get_category(&id_str)
         .map(|c| c.name.clone()).unwrap_or_default();
     state
         .catalog_service
-        .delete_category(&id)
+        .delete_category(&id_str)
         .await
         ?;
 
     audit_log!(
         state.audit_service,
         AuditAction::CategoryDeleted,
-        "category", &id,
+        "category", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"name": name_for_audit})
     );
 
     state
-        .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
+        .broadcast_sync::<()>(RESOURCE, "deleted", &id_str, None)
         .await;
 
     Ok(Json(true))
@@ -137,7 +141,7 @@ pub async fn delete(
 /// Payload for batch sort order update
 #[derive(Debug, Deserialize)]
 pub struct SortOrderUpdate {
-    pub id: String,
+    pub id: i64,
     pub sort_order: i32,
 }
 
@@ -160,6 +164,7 @@ pub async fn batch_update_sort_order(
     let mut updated_count = 0;
 
     for update in &updates {
+        let id_str = update.id.to_string();
         tracing::debug!(
             id = %update.id,
             sort_order = update.sort_order,
@@ -169,7 +174,7 @@ pub async fn batch_update_sort_order(
         let result = state
             .catalog_service
             .update_category(
-                &update.id,
+                &id_str,
                 CategoryUpdate {
                     name: None,
                     sort_order: Some(update.sort_order),
@@ -181,6 +186,7 @@ pub async fn batch_update_sort_order(
                     tag_ids: None,
                     match_mode: None,
                     is_display: None,
+                    is_active: None,
                 },
             )
             .await;
@@ -227,36 +233,33 @@ pub struct BindAttributePayload {
 /// GET /api/categories/:id/attributes - 获取分类关联的属性
 pub async fn list_category_attributes(
     State(state): State<ServerState>,
-    Path(category_id): Path<String>,
+    Path(category_id): Path<i64>,
 ) -> AppResult<Json<Vec<Attribute>>> {
-    let repo = AttributeRepository::new(state.db.clone());
-    let attributes = repo
-        .find_active_by_category(&category_id)
-        .await
-        ?;
+    let bindings = attribute::find_bindings_for_owner(&state.pool, "category", category_id).await?;
+    let attributes: Vec<Attribute> = bindings.into_iter().map(|(_, attr)| attr).collect();
     Ok(Json(attributes))
 }
 
 /// POST /api/categories/:id/attributes/:attr_id - 绑定属性到分类
 pub async fn bind_category_attribute(
     State(state): State<ServerState>,
-    Path((category_id, attr_id)): Path<(String, String)>,
+    Path((category_id, attr_id)): Path<(i64, i64)>,
     Json(payload): Json<BindAttributePayload>,
 ) -> AppResult<Json<AttributeBinding>> {
-    let repo = AttributeRepository::new(state.db.clone());
-    let binding = repo
-        .link_to_category(
-            &category_id,
-            &attr_id,
-            payload.is_required.unwrap_or(false),
-            payload.display_order.unwrap_or(0),
-            payload.default_option_indices,
-        )
-        .await
-        ?;
+    let binding = attribute::link(
+        &state.pool,
+        "category",
+        category_id,
+        attr_id,
+        payload.is_required.unwrap_or(false),
+        payload.display_order.unwrap_or(0),
+        payload.default_option_indices,
+    )
+    .await?;
 
     // Refresh product cache for this category (inherited attributes changed)
-    if let Err(e) = state.catalog_service.refresh_products_in_category(&category_id).await {
+    let category_id_str = category_id.to_string();
+    if let Err(e) = state.catalog_service.refresh_products_in_category(&category_id_str).await {
         tracing::warn!("Failed to refresh products in category {}: {}", category_id, e);
     }
 
@@ -276,19 +279,17 @@ pub async fn bind_category_attribute(
 /// DELETE /api/categories/:id/attributes/:attr_id - 解绑属性与分类
 pub async fn unbind_category_attribute(
     State(state): State<ServerState>,
-    Path((category_id, attr_id)): Path<(String, String)>,
+    Path((category_id, attr_id)): Path<(i64, i64)>,
 ) -> AppResult<Json<bool>> {
-    let repo = AttributeRepository::new(state.db.clone());
-    let deleted = repo
-        .unlink_from_category(&category_id, &attr_id)
-        .await
-        ?;
+    let deleted = attribute::unlink(&state.pool, "category", category_id, attr_id).await?;
 
     // Refresh product cache for this category (inherited attributes changed)
-    if deleted
-        && let Err(e) = state.catalog_service.refresh_products_in_category(&category_id).await {
+    if deleted {
+        let category_id_str = category_id.to_string();
+        if let Err(e) = state.catalog_service.refresh_products_in_category(&category_id_str).await {
             tracing::warn!("Failed to refresh products in category {}: {}", category_id, e);
         }
+    }
 
     // 广播同步通知
     if deleted {

@@ -4,10 +4,12 @@ use serde::{Deserialize, Serialize};
 
 /// Zone entity (区域：大厅、露台、包厢等)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct Zone {
-    pub id: Option<String>,
+    pub id: i64,
     pub name: String,
     pub description: Option<String>,
+    pub is_active: bool,
 }
 
 /// Create zone payload
@@ -22,4 +24,5 @@ pub struct ZoneCreate {
 pub struct ZoneUpdate {
     pub name: Option<String>,
     pub description: Option<String>,
+    pub is_active: Option<bool>,
 }

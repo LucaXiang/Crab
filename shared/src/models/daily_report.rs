@@ -2,9 +2,12 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Tax breakdown by rate (Spain: 0%, 4%, 10%, 21%)
+/// Tax breakdown by rate (independent table)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct TaxBreakdown {
+    pub id: i64,
+    pub report_id: i64,
     /// Tax rate (0, 4, 10, 21)
     pub tax_rate: i32,
     /// Net amount (before tax)
@@ -17,9 +20,12 @@ pub struct TaxBreakdown {
     pub order_count: i32,
 }
 
-/// Payment method breakdown
+/// Payment method breakdown (independent table)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct PaymentMethodBreakdown {
+    pub id: i64,
+    pub report_id: i64,
     /// Payment method name
     pub method: String,
     /// Total amount
@@ -30,47 +36,36 @@ pub struct PaymentMethodBreakdown {
 
 /// Daily Report - end-of-day settlement report
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct DailyReport {
-    pub id: Option<String>,
+    pub id: i64,
     /// Business date (YYYY-MM-DD format)
     pub business_date: String,
-    /// Total number of orders
     pub total_orders: i32,
-    /// Completed orders count
     pub completed_orders: i32,
-    /// Voided orders count
     pub void_orders: i32,
-    /// Total sales amount
     pub total_sales: f64,
-    /// Total paid amount
     pub total_paid: f64,
-    /// Total unpaid amount
     pub total_unpaid: f64,
-    /// Voided order total amount
     pub void_amount: f64,
-    /// Total tax collected
-    #[serde(default)]
     pub total_tax: f64,
-    /// Total discount applied
-    #[serde(default)]
     pub total_discount: f64,
-    /// Total surcharge applied
-    #[serde(default)]
     pub total_surcharge: f64,
-    /// Tax breakdown by rate
+    /// When the report was generated (Unix millis)
+    pub generated_at: Option<i64>,
+    /// Who generated the report (employee identifier)
+    pub generated_by_id: Option<String>,
+    pub generated_by_name: Option<String>,
+    pub note: Option<String>,
+
+    // -- Relations (populated by application code, skipped by FromRow) --
+
+    #[cfg_attr(feature = "db", sqlx(skip))]
     #[serde(default)]
     pub tax_breakdowns: Vec<TaxBreakdown>,
-    /// Payment breakdown by method
+    #[cfg_attr(feature = "db", sqlx(skip))]
     #[serde(default)]
     pub payment_breakdowns: Vec<PaymentMethodBreakdown>,
-    /// When the report was generated (ISO 8601)
-    pub generated_at: String,
-    /// Who generated the report (employee ID)
-    pub generated_by_id: Option<String>,
-    /// Who generated the report (name)
-    pub generated_by_name: Option<String>,
-    /// Notes
-    pub note: Option<String>,
 }
 
 /// Generate daily report payload
@@ -78,6 +73,5 @@ pub struct DailyReport {
 pub struct DailyReportGenerate {
     /// Business date to generate report for (YYYY-MM-DD)
     pub business_date: String,
-    /// Notes
     pub note: Option<String>,
 }

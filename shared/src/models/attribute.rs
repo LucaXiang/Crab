@@ -2,55 +2,64 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Attribute option (embedded in Attribute)
+/// Attribute option (independent table)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct AttributeOption {
+    pub id: i64,
+    pub attribute_id: i64,
     pub name: String,
-    /// Price modifier in currency unit (positive=add, negative=subtract, e.g., 2.50 = €2.50)
+    /// Price modifier in currency unit (positive=add, negative=subtract)
     pub price_modifier: f64,
     pub display_order: i32,
+    pub is_active: bool,
     pub receipt_name: Option<String>,
     pub kitchen_print_name: Option<String>,
-
-    // === Quantity Control ===
-    /// Enable quantity control for this option (default: false)
-    /// When false, the option can only be selected once (quantity implicitly 1)
-    /// When true, user can select multiple quantities with +/- buttons
-    #[serde(default)]
+    /// Enable quantity control for this option
     pub enable_quantity: bool,
     /// Maximum quantity allowed (only effective when enable_quantity=true)
-    /// None = unlimited
-    #[serde(default)]
     pub max_quantity: Option<i32>,
 }
 
 /// Attribute entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct Attribute {
-    pub id: Option<String>,
+    pub id: i64,
     pub name: String,
-
-    // 选择模式
     pub is_multi_select: bool,
-    /// Max selections (null = unlimited)
     pub max_selections: Option<i32>,
-
-    // 默认值 (支持多选属性的多个默认)
+    /// Default option indices (JSON array of int in DB)
+    #[cfg_attr(feature = "db", sqlx(json))]
     pub default_option_indices: Option<Vec<i32>>,
-
-    // 显示
     pub display_order: i32,
-
-    // 小票
+    pub is_active: bool,
     pub show_on_receipt: bool,
     pub receipt_name: Option<String>,
-
-    // 厨打
     pub show_on_kitchen_print: bool,
     pub kitchen_print_name: Option<String>,
 
+    // -- Relations (populated by application code, skipped by FromRow) --
+
     /// Embedded options
+    #[cfg_attr(feature = "db", sqlx(skip))]
+    #[serde(default)]
     pub options: Vec<AttributeOption>,
+}
+
+/// Attribute option input (for create/update, without id/attribute_id)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttributeOptionInput {
+    pub name: String,
+    #[serde(default)]
+    pub price_modifier: f64,
+    #[serde(default)]
+    pub display_order: i32,
+    pub receipt_name: Option<String>,
+    pub kitchen_print_name: Option<String>,
+    #[serde(default)]
+    pub enable_quantity: bool,
+    pub max_quantity: Option<i32>,
 }
 
 /// Create attribute payload
@@ -65,11 +74,11 @@ pub struct AttributeCreate {
     pub receipt_name: Option<String>,
     pub show_on_kitchen_print: Option<bool>,
     pub kitchen_print_name: Option<String>,
-    pub options: Option<Vec<AttributeOption>>,
+    pub options: Option<Vec<AttributeOptionInput>>,
 }
 
 /// Update attribute payload
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AttributeUpdate {
     pub name: Option<String>,
     pub is_multi_select: Option<bool>,
@@ -80,41 +89,34 @@ pub struct AttributeUpdate {
     pub receipt_name: Option<String>,
     pub show_on_kitchen_print: Option<bool>,
     pub kitchen_print_name: Option<String>,
-    pub options: Option<Vec<AttributeOption>>,
+    pub options: Option<Vec<AttributeOptionInput>>,
+    pub is_active: Option<bool>,
 }
 
-/// Attribute binding relation (product/category -> attribute)
-///
-/// 用于建立商品或分类与属性的关联关系
+/// Attribute binding (replaces SurrealDB has_attribute graph edge)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct AttributeBinding {
-    pub id: Option<String>,
-    /// Source: product ID or category ID (SurrealDB `in` field)
-    #[serde(rename = "in")]
-    pub from: String,
-    /// Target: attribute ID (SurrealDB `out` field)
-    #[serde(rename = "out")]
-    pub to: String,
-    #[serde(default)]
+    pub id: i64,
+    /// Owner type: "product" or "category"
+    pub owner_type: String,
+    pub owner_id: i64,
+    pub attribute_id: i64,
     pub is_required: bool,
-    #[serde(default)]
     pub display_order: i32,
-    /// Override attribute's default options (optional, supports multi-select)
+    /// Override attribute's default options (JSON array of int in DB)
+    #[cfg_attr(feature = "db", sqlx(json))]
     pub default_option_indices: Option<Vec<i32>>,
 }
 
 /// Attribute binding with full attribute data (for API responses)
-///
-/// 查询 API 响应时使用，包含完整的属性对象
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeBindingFull {
-    /// Relation ID
-    pub id: Option<String>,
-    /// Full attribute object
+    pub id: i64,
+    /// Full attribute object (with options)
     pub attribute: Attribute,
     pub is_required: bool,
     pub display_order: i32,
-    /// Override attribute's default options (optional, supports multi-select)
     pub default_option_indices: Option<Vec<i32>>,
     /// Whether this binding is inherited from the product's category
     #[serde(default)]

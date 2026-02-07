@@ -4,29 +4,27 @@ use serde::{Deserialize, Serialize};
 
 /// Shift status
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[cfg_attr(feature = "db", derive(sqlx::Type))]
+#[cfg_attr(feature = "db", sqlx(rename_all = "SCREAMING_SNAKE_CASE"))]
 pub enum ShiftStatus {
-    #[serde(rename = "OPEN")]
     #[default]
     Open,
-    #[serde(rename = "CLOSED")]
     Closed,
 }
 
 /// Shift record - represents an operator's work shift
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct Shift {
-    pub id: Option<String>,
-    /// Operator employee ID
-    pub operator_id: String,
-    /// Operator display name
+    pub id: i64,
+    pub operator_id: i64,
     pub operator_name: String,
-    /// Shift status
     pub status: ShiftStatus,
     /// Shift start time (Unix timestamp millis)
     pub start_time: i64,
     /// Shift end time (Unix timestamp millis), null if still open
     pub end_time: Option<i64>,
-    /// Starting cash amount
     pub starting_cash: f64,
     /// Expected cash amount (starting + cash payments received)
     pub expected_cash: f64,
@@ -34,54 +32,41 @@ pub struct Shift {
     pub actual_cash: Option<f64>,
     /// Cash variance (actual - expected)
     pub cash_variance: Option<f64>,
-    /// Whether shift was closed abnormally (power failure, etc.)
-    #[serde(default)]
+    /// Whether shift was closed abnormally
     pub abnormal_close: bool,
     /// Last heartbeat timestamp (Unix timestamp millis)
     pub last_active_at: Option<i64>,
-    /// Notes
     pub note: Option<String>,
-    /// Created at (Unix timestamp millis)
     pub created_at: Option<i64>,
-    /// Updated at (Unix timestamp millis)
     pub updated_at: Option<i64>,
 }
 
 /// Create shift payload (open shift)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShiftCreate {
-    /// Operator employee ID
-    pub operator_id: String,
-    /// Operator display name
+    pub operator_id: i64,
     pub operator_name: String,
-    /// Starting cash amount (default 0)
     #[serde(default)]
     pub starting_cash: f64,
-    /// Notes
     pub note: Option<String>,
 }
 
 /// Close shift payload (normal close with cash counting)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShiftClose {
-    /// Actual cash counted
     pub actual_cash: f64,
-    /// Notes
     pub note: Option<String>,
 }
 
 /// Force close shift payload (abnormal close without cash counting)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ShiftForceClose {
-    /// Notes
     pub note: Option<String>,
 }
 
 /// Update shift payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShiftUpdate {
-    /// Update starting cash (only when OPEN)
     pub starting_cash: Option<f64>,
-    /// Notes
     pub note: Option<String>,
 }

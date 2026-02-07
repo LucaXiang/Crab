@@ -7,65 +7,27 @@
 //! - PrintConfigCache (product/category parts)
 //! - PriceRuleEngine DB queries
 
-use crate::db::models::{
-    serde_helpers, Attribute, AttributeBindingFull, Category, CategoryCreate, CategoryUpdate,
-    EmbeddedSpec, ImageRefEntityType, Product, ProductCreate, ProductFull, ProductUpdate, Tag,
-};
-use crate::db::repository::{ImageRefRepository, RepoError, RepoResult};
+use crate::db::repository::{attribute, image_ref, RepoError, RepoResult};
 use super::ImageCleanupService;
-use serde::{Deserialize, Serialize};
+use shared::models::{
+    AttributeBindingFull, Category, CategoryCreate, CategoryUpdate,
+    ImageRefEntityType, Product, ProductCreate, ProductFull, ProductSpec, ProductUpdate, Tag,
+};
+use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
-use surrealdb::engine::local::Db;
-use surrealdb::RecordId;
-use surrealdb::Surreal;
 
 // =============================================================================
 // Types
 // =============================================================================
 
-/// Product with tags fetched (for FETCH queries)
-#[derive(Debug, Clone, Deserialize)]
-struct ProductWithTags {
-    #[serde(default, with = "serde_helpers::option_record_id")]
-    pub id: Option<RecordId>,
-    pub name: String,
-    #[serde(default)]
-    pub image: String,
-    #[serde(with = "serde_helpers::record_id")]
-    pub category: RecordId,
-    #[serde(default)]
-    pub sort_order: i32,
-    #[serde(default)]
-    pub tax_rate: i32,
-    pub receipt_name: Option<String>,
-    pub kitchen_print_name: Option<String>,
-    #[serde(default)]
-    pub is_kitchen_print_enabled: i32,
-    #[serde(default)]
-    pub is_label_print_enabled: i32,
-    #[serde(default = "default_true")]
-    pub is_active: bool,
-    /// 菜品编号 (POS 集成)
-    pub external_id: Option<i64>,
-    /// Tags are fetched as full Tag objects
-    #[serde(default)]
-    pub tags: Vec<Tag>,
-    #[serde(default)]
-    pub specs: Vec<crate::db::models::EmbeddedSpec>,
-}
-
-fn default_true() -> bool {
-    true
-}
-
 /// Product metadata for price rule matching and tax calculation
 #[derive(Debug, Clone, Default)]
 pub struct ProductMeta {
-    pub category_id: String,   // "category:xxx"
+    pub category_id: String,   // "42" (i64 as string)
     pub category_name: String, // e.g. "饮品"
-    pub tags: Vec<String>,     // ["tag:xxx", ...]
+    pub tags: Vec<String>,     // ["1", "2", ...] (tag i64 IDs as strings)
     pub tax_rate: i32,         // Tax rate percentage (e.g., 21 for 21% IVA)
 }
 
@@ -73,7 +35,7 @@ pub struct ProductMeta {
 #[derive(Debug, Clone)]
 pub struct KitchenPrintConfig {
     pub enabled: bool,
-    pub destinations: Vec<String>, // ["print_destination:xxx", ...]
+    pub destinations: Vec<String>, // ["1", "2", ...] (print_destination i64 IDs as strings)
     pub kitchen_name: Option<String>,
 }
 
@@ -98,15 +60,13 @@ pub struct PrintDefaults {
 /// Unified catalog service for Product and Category management
 #[derive(Clone)]
 pub struct CatalogService {
-    db: Surreal<Db>,
-    /// Products cache: "product:xxx" -> ProductFull
+    pool: SqlitePool,
+    /// Products cache: "42" -> ProductFull
     products: Arc<RwLock<HashMap<String, ProductFull>>>,
-    /// Categories cache: "category:xxx" -> Category
+    /// Categories cache: "42" -> Category
     categories: Arc<RwLock<HashMap<String, Category>>>,
     /// System default print destinations
     print_defaults: Arc<RwLock<PrintDefaults>>,
-    /// Image reference repository
-    image_ref_repo: ImageRefRepository,
     /// Image cleanup service
     image_cleanup: ImageCleanupService,
 }
@@ -126,11 +86,10 @@ impl CatalogService {
     /// Create a new CatalogService
     ///
     /// `images_dir` is the path to the images directory: {tenant}/server/images/
-    pub fn new(db: Surreal<Db>, images_dir: std::path::PathBuf) -> Self {
+    pub fn new(pool: SqlitePool, images_dir: std::path::PathBuf) -> Self {
         Self {
-            image_ref_repo: ImageRefRepository::new(db.clone()),
             image_cleanup: ImageCleanupService::new(images_dir),
-            db,
+            pool,
             products: Arc::new(RwLock::new(HashMap::new())),
             categories: Arc::new(RwLock::new(HashMap::new())),
             print_defaults: Arc::new(RwLock::new(PrintDefaults::default())),
@@ -144,146 +103,168 @@ impl CatalogService {
     /// Load all products and categories into memory cache
     pub async fn warmup(&self) -> RepoResult<()> {
         // 1. Load all categories
-        let categories: Vec<Category> = self
-            .db
-            .query("SELECT * FROM category WHERE is_active = true ORDER BY sort_order")
-            .await?
-            .take(0)?;
+        let categories: Vec<Category> = sqlx::query_as(
+            "SELECT id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display FROM category WHERE is_active = 1 ORDER BY sort_order",
+        )
+        .fetch_all(&self.pool)
+        .await?;
 
+        // Load category relations (junction tables)
+        let mut cat_map: HashMap<String, Category> = HashMap::new();
+        for mut cat in categories {
+            let cat_id = cat.id;
+
+            // Kitchen print destinations
+            cat.kitchen_print_destinations = sqlx::query_scalar::<_, i64>(
+                "SELECT print_destination_id FROM category_kitchen_dest WHERE category_id = ?",
+            )
+            .bind(cat_id)
+            .fetch_all(&self.pool)
+            .await
+            .unwrap_or_default();
+
+            // Label print destinations
+            cat.label_print_destinations = sqlx::query_scalar::<_, i64>(
+                "SELECT print_destination_id FROM category_label_dest WHERE category_id = ?",
+            )
+            .bind(cat_id)
+            .fetch_all(&self.pool)
+            .await
+            .unwrap_or_default();
+
+            // Tag IDs for virtual categories
+            cat.tag_ids = sqlx::query_scalar::<_, i64>(
+                "SELECT tag_id FROM category_tag WHERE category_id = ?",
+            )
+            .bind(cat_id)
+            .fetch_all(&self.pool)
+            .await
+            .unwrap_or_default();
+
+            cat_map.insert(cat_id.to_string(), cat);
+        }
+
+        let categories_count = cat_map.len();
         {
             let mut cache = self.categories.write();
-            cache.clear();
-            for cat in &categories {
-                if let Some(id) = &cat.id {
-                    cache.insert(id.to_string(), cat.clone());
-                }
-            }
+            *cache = cat_map;
         }
-        tracing::debug!("CatalogService: Loaded {} categories", categories.len());
+        tracing::debug!(count = categories_count, "CatalogService loaded categories");
 
-        // 2. Load all products with tags fetched (using ProductWithTags to deserialize full Tag objects)
-        let products: Vec<ProductWithTags> = self
-            .db
-            .query("SELECT * FROM product WHERE is_active = true ORDER BY sort_order FETCH tags")
-            .await?
-            .take(0)?;
+        // 2. Load all active products
+        let products: Vec<Product> = sqlx::query_as(
+            "SELECT id, name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id FROM product WHERE is_active = 1 ORDER BY sort_order",
+        )
+        .fetch_all(&self.pool)
+        .await?;
 
         // 3. Load all attribute bindings with full attribute data
-        #[derive(Debug, Deserialize)]
-        struct BindingRow {
-            #[serde(default, with = "serde_helpers::option_record_id")]
-            id: Option<RecordId>,
-            #[serde(rename = "in", with = "serde_helpers::record_id")]
-            from: RecordId,
-            #[serde(rename = "out")]
-            to: Attribute,
-            #[serde(default)]
-            is_required: bool,
-            #[serde(default)]
-            display_order: i32,
-            default_option_indices: Option<Vec<i32>>,
-        }
+        //    (for all active products and categories)
+        let all_bindings = attribute::find_all_bindings_with_attributes(&self.pool).await;
 
-        let bindings: Vec<BindingRow> = self
-            .db
-            .query("SELECT * FROM has_attribute WHERE in.is_active = true FETCH out")
-            .await?
-            .take(0)?;
+        // Group bindings by (owner_type, owner_id)
+        let mut product_bindings: HashMap<i64, Vec<AttributeBindingFull>> = HashMap::new();
+        let mut category_bindings: HashMap<i64, Vec<AttributeBindingFull>> = HashMap::new();
 
-        tracing::debug!("CatalogService: Loaded {} attribute bindings", bindings.len());
-
-        // Debug: log first binding's attribute options count
-        if let Some(first) = bindings.first() {
-            tracing::debug!(
-                "📦 First binding: from={}, attr={}, options_count={}",
-                first.from,
-                first.to.name,
-                first.to.options.len()
-            );
-        }
-
-        // Group bindings by source (product or category)
-        let mut product_bindings: HashMap<String, Vec<AttributeBindingFull>> = HashMap::new();
-        let mut category_bindings: HashMap<String, Vec<AttributeBindingFull>> = HashMap::new();
-        for binding in bindings {
-            let from_id = binding.from.to_string();
-            let full = AttributeBindingFull {
-                id: binding.id,
-                attribute: binding.to,
-                is_required: binding.is_required,
-                display_order: binding.display_order,
-                default_option_indices: binding.default_option_indices,
-                is_inherited: false, // will be set correctly below
-            };
-            if from_id.starts_with("product:") {
-                product_bindings.entry(from_id).or_default().push(full);
-            } else if from_id.starts_with("category:") {
-                category_bindings.entry(from_id).or_default().push(full);
+        if let Ok(bindings) = all_bindings {
+            for (binding, attr) in bindings {
+                let full = AttributeBindingFull {
+                    id: binding.id,
+                    attribute: attr,
+                    is_required: binding.is_required,
+                    display_order: binding.display_order,
+                    default_option_indices: binding.default_option_indices,
+                    is_inherited: false,
+                };
+                if binding.owner_type == "product" {
+                    product_bindings.entry(binding.owner_id).or_default().push(full);
+                } else if binding.owner_type == "category" {
+                    category_bindings.entry(binding.owner_id).or_default().push(full);
+                }
             }
         }
 
-        // 4. Build ProductFull and store in cache
-        {
-            let mut cache = self.products.write();
-            cache.clear();
+        tracing::debug!(
+            product_bindings = product_bindings.len(),
+            category_bindings = category_bindings.len(),
+            "CatalogService loaded attribute bindings"
+        );
 
-            for product in products {
-                let product_id = match &product.id {
-                    Some(id) => id.to_string(),
-                    None => continue,
-                };
+        // 4. Build ProductFull (outside lock to avoid holding guard across .await)
+        let mut built_products = HashMap::new();
 
-                // Tags are already fetched as full Tag objects (name, color, etc.)
-                let tags = product.tags;
+        for product in products {
+            let product_id = product.id;
 
-                // Merge: category inherited attributes + product direct attributes
-                let category_id = product.category.to_string();
-                let mut attributes = product_bindings
-                    .remove(&product_id)
-                    .unwrap_or_default();
+            // Load tags
+            let tags: Vec<Tag> = sqlx::query_as(
+                "SELECT t.id, t.name, t.color, t.display_order, t.is_active, t.is_system FROM tag t JOIN product_tag pt ON t.id = pt.tag_id WHERE pt.product_id = ? AND t.is_active = 1",
+            )
+            .bind(product_id)
+            .fetch_all(&self.pool)
+            .await
+            .unwrap_or_default();
 
-                // Collect product's own attribute IDs for dedup
-                let product_attr_ids: std::collections::HashSet<String> = attributes.iter()
-                    .filter_map(|b| b.attribute.id.as_ref().map(|id| id.to_string()))
-                    .collect();
+            // Load specs
+            let specs: Vec<ProductSpec> = sqlx::query_as(
+                "SELECT id, product_id, name, price, display_order, is_default, is_active, receipt_name, is_root FROM product_spec WHERE product_id = ? AND is_active = 1 ORDER BY display_order",
+            )
+            .bind(product_id)
+            .fetch_all(&self.pool)
+            .await
+            .unwrap_or_default();
 
-                // Add inherited category attributes (skip if product already has direct binding)
-                if let Some(cat_bindings) = category_bindings.get(&category_id) {
-                    for cb in cat_bindings {
-                        let attr_id = cb.attribute.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
-                        if !product_attr_ids.contains(&attr_id) {
-                            let mut inherited = cb.clone();
-                            inherited.id = None; // Inherited bindings have no product-level edge ID
-                            inherited.is_inherited = true;
-                            attributes.push(inherited);
-                        }
+            // Merge: category inherited attributes + product direct attributes
+            let mut attributes = product_bindings
+                .remove(&product_id)
+                .unwrap_or_default();
+
+            // Collect product's own attribute IDs for dedup
+            let product_attr_ids: std::collections::HashSet<i64> = attributes
+                .iter()
+                .map(|b| b.attribute.id)
+                .collect();
+
+            // Add inherited category attributes (skip if product already has direct binding)
+            if let Some(cat_bindings) = category_bindings.get(&product.category_id) {
+                for cb in cat_bindings {
+                    if !product_attr_ids.contains(&cb.attribute.id) {
+                        let mut inherited = cb.clone();
+                        inherited.is_inherited = true;
+                        attributes.push(inherited);
                     }
                 }
-
-                let full = ProductFull {
-                    id: product.id,
-                    name: product.name,
-                    image: product.image,
-                    category: product.category,
-                    sort_order: product.sort_order,
-                    tax_rate: product.tax_rate,
-                    receipt_name: product.receipt_name,
-                    kitchen_print_name: product.kitchen_print_name,
-                    is_kitchen_print_enabled: product.is_kitchen_print_enabled,
-                    is_label_print_enabled: product.is_label_print_enabled,
-                    is_active: product.is_active,
-                    external_id: product.external_id,
-                    specs: product.specs,
-                    attributes,
-                    tags,
-                };
-
-                cache.insert(product_id, full);
             }
+
+            let full = ProductFull {
+                id: product.id,
+                name: product.name,
+                image: product.image,
+                category_id: product.category_id,
+                sort_order: product.sort_order,
+                tax_rate: product.tax_rate,
+                receipt_name: product.receipt_name,
+                kitchen_print_name: product.kitchen_print_name,
+                is_kitchen_print_enabled: product.is_kitchen_print_enabled,
+                is_label_print_enabled: product.is_label_print_enabled,
+                is_active: product.is_active,
+                external_id: product.external_id,
+                specs,
+                attributes,
+                tags,
+            };
+
+            built_products.insert(product_id.to_string(), full);
+        }
+
+        // 5. Store in cache (short lock scope, no await)
+        {
+            let mut cache = self.products.write();
+            *cache = built_products;
         }
 
         let products_count = self.products.read().len();
-        tracing::debug!("CatalogService: Loaded {} products", products_count);
+        tracing::debug!(count = products_count, "CatalogService loaded products");
 
         Ok(())
     }
@@ -323,7 +304,7 @@ impl CatalogService {
         let cache = self.products.read();
         let mut products: Vec<_> = cache
             .values()
-            .filter(|p| p.category.to_string() == category_id)
+            .filter(|p| p.category_id.to_string() == category_id)
             .cloned()
             .collect();
         products.sort_by_key(|p| p.sort_order);
@@ -344,7 +325,7 @@ impl CatalogService {
             let cache = self.products.read();
             cache
                 .iter()
-                .filter(|(_, p)| p.category.to_string() == category_id)
+                .filter(|(_, p)| p.category_id.to_string() == category_id)
                 .map(|(id, _)| id.clone())
                 .collect()
         };
@@ -360,18 +341,16 @@ impl CatalogService {
 
     /// Refresh cached products that reference a given attribute (direct or inherited)
     pub async fn refresh_products_with_attribute(&self, attribute_id: &str) -> RepoResult<()> {
+        let attr_id: i64 = attribute_id
+            .parse()
+            .map_err(|_| RepoError::Validation(format!("Invalid attribute ID: {}", attribute_id)))?;
+
         let product_ids: Vec<String> = {
             let cache = self.products.read();
             cache
                 .iter()
                 .filter(|(_, p)| {
-                    p.attributes.iter().any(|b| {
-                        b.attribute
-                            .id
-                            .as_ref()
-                            .map(|id| id.to_string() == attribute_id)
-                            .unwrap_or(false)
-                    })
+                    p.attributes.iter().any(|b| b.attribute.id == attr_id)
                 })
                 .map(|(id, _)| id.clone())
                 .collect()
@@ -404,7 +383,7 @@ impl CatalogService {
         // Validate category is not virtual
         {
             let categories = self.categories.read();
-            let cat_id = data.category.to_string();
+            let cat_id = data.category_id.to_string();
             if let Some(cat) = categories.get(&cat_id)
                 && cat.is_virtual
             {
@@ -414,61 +393,68 @@ impl CatalogService {
             }
         }
 
-        // Internal struct without serde_helpers to preserve native RecordId for SurrealDB
-        #[derive(serde::Serialize)]
-        struct InternalProduct {
-            name: String,
-            image: String,
-            category: RecordId,
-            sort_order: i32,
-            tax_rate: i32,
-            receipt_name: Option<String>,
-            kitchen_print_name: Option<String>,
-            is_kitchen_print_enabled: i32,
-            is_label_print_enabled: i32,
-            is_active: bool,
-            external_id: Option<i64>,
-            tags: Vec<RecordId>,
-            specs: Vec<EmbeddedSpec>,
+        // Insert product
+        let product_id = sqlx::query_scalar::<_, i64>(
+            "INSERT INTO product (name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10) RETURNING id",
+        )
+        .bind(&data.name)
+        .bind(data.image.as_deref().unwrap_or(""))
+        .bind(data.category_id)
+        .bind(data.sort_order.unwrap_or(0))
+        .bind(data.tax_rate.unwrap_or(0))
+        .bind(&data.receipt_name)
+        .bind(&data.kitchen_print_name)
+        .bind(data.is_kitchen_print_enabled.unwrap_or(-1))
+        .bind(data.is_label_print_enabled.unwrap_or(-1))
+        .bind(data.external_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        // Insert specs
+        for spec in &data.specs {
+            sqlx::query(
+                "INSERT INTO product_spec (product_id, name, price, display_order, is_default, is_active, receipt_name, is_root) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7)",
+            )
+            .bind(product_id)
+            .bind(&spec.name)
+            .bind(spec.price)
+            .bind(spec.display_order)
+            .bind(spec.is_default)
+            .bind(&spec.receipt_name)
+            .bind(spec.is_root)
+            .execute(&self.pool)
+            .await?;
         }
 
-        let product = InternalProduct {
-            name: data.name,
-            image: data.image.unwrap_or_default(),
-            category: data.category,
-            sort_order: data.sort_order.unwrap_or(0),
-            tax_rate: data.tax_rate.unwrap_or(0),
-            receipt_name: data.receipt_name,
-            kitchen_print_name: data.kitchen_print_name,
-            is_kitchen_print_enabled: data.is_kitchen_print_enabled.unwrap_or(-1),
-            is_label_print_enabled: data.is_label_print_enabled.unwrap_or(-1),
-            is_active: true,
-            external_id: data.external_id,
-            tags: data.tags.unwrap_or_default(),
-            specs: data.specs,
-        };
+        // Insert tags (junction table)
+        if let Some(ref tag_ids) = data.tags {
+            for tag_id in tag_ids {
+                sqlx::query("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)")
+                    .bind(product_id)
+                    .bind(*tag_id)
+                    .execute(&self.pool)
+                    .await?;
+            }
+        }
 
-        let created: Option<Product> = self.db.create("product").content(product).await?;
-        let created =
-            created.ok_or_else(|| RepoError::Database("Failed to create product".into()))?;
-
-        // Build ProductFull with empty attributes and tags (they need to be fetched separately)
-        let product_id = created.id.as_ref().map(|t| t.to_string()).unwrap_or_default();
-
-        // Fetch the created product with tags
-        let full = self.fetch_product_full(&product_id).await?;
+        // Fetch the created product with all relations
+        let product_id_str = product_id.to_string();
+        let full = self.fetch_product_full(&product_id_str).await?;
 
         // Sync image references
         let image_hashes = Self::extract_product_image_hashes(&full);
-        let _ = self
-            .image_ref_repo
-            .sync_refs(ImageRefEntityType::Product, &product_id, image_hashes)
-            .await;
+        let _ = image_ref::sync_refs(
+            &self.pool,
+            ImageRefEntityType::Product,
+            &product_id_str,
+            image_hashes,
+        )
+        .await;
 
         // Update cache
         {
             let mut cache = self.products.write();
-            cache.insert(product_id, full.clone());
+            cache.insert(product_id_str, full.clone());
         }
 
         Ok(full)
@@ -476,34 +462,32 @@ impl CatalogService {
 
     /// Update a product
     pub async fn update_product(&self, id: &str, data: ProductUpdate) -> RepoResult<ProductFull> {
-        let thing = id.parse::<RecordId>()
+        let product_id: i64 = id
+            .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", id)))?;
 
-        // Build dynamic SET clauses
-        let mut set_parts: Vec<&str> = Vec::new();
-        if data.name.is_some() { set_parts.push("name = $name"); }
-        if data.image.is_some() { set_parts.push("image = $image"); }
-        if data.category.is_some() { set_parts.push("category = $category"); }
-        if data.sort_order.is_some() { set_parts.push("sort_order = $sort_order"); }
-        if data.tax_rate.is_some() { set_parts.push("tax_rate = $tax_rate"); }
-        if data.receipt_name.is_some() { set_parts.push("receipt_name = $receipt_name"); }
-        if data.kitchen_print_name.is_some() { set_parts.push("kitchen_print_name = $kitchen_print_name"); }
-        if data.is_kitchen_print_enabled.is_some() { set_parts.push("is_kitchen_print_enabled = $is_kitchen_print_enabled"); }
-        if data.is_label_print_enabled.is_some() { set_parts.push("is_label_print_enabled = $is_label_print_enabled"); }
-        if data.is_active.is_some() { set_parts.push("is_active = $is_active"); }
-        if data.external_id.is_some() { set_parts.push("external_id = $external_id"); }
-        if data.tags.is_some() { set_parts.push("tags = $tags"); }
-        if data.specs.is_some() { set_parts.push("specs = $specs"); }
+        // Check if there's anything to update
+        let has_scalar_updates = data.name.is_some()
+            || data.image.is_some()
+            || data.category_id.is_some()
+            || data.sort_order.is_some()
+            || data.tax_rate.is_some()
+            || data.receipt_name.is_some()
+            || data.kitchen_print_name.is_some()
+            || data.is_kitchen_print_enabled.is_some()
+            || data.is_label_print_enabled.is_some()
+            || data.is_active.is_some()
+            || data.external_id.is_some();
 
-        if set_parts.is_empty() {
+        if !has_scalar_updates && data.tags.is_none() && data.specs.is_none() {
             return self.get_product(id)
                 .ok_or_else(|| RepoError::NotFound(format!("Product {} not found", id)));
         }
 
         // Validate category if changing
-        if let Some(ref new_cat) = data.category {
+        if let Some(new_cat_id) = data.category_id {
             let categories = self.categories.read();
-            let cat_id = new_cat.to_string();
+            let cat_id = new_cat_id.to_string();
             if let Some(cat) = categories.get(&cat_id)
                 && cat.is_virtual
             {
@@ -513,45 +497,82 @@ impl CatalogService {
             }
         }
 
-        let query_str = format!("UPDATE $thing SET {} RETURN AFTER", set_parts.join(", "));
-        let mut query = self.db.query(&query_str).bind(("thing", thing));
-
-        // Bind each field
-        if let Some(v) = data.name { query = query.bind(("name", v)); }
-        if let Some(v) = data.image { query = query.bind(("image", v)); }
-        if let Some(v) = data.category { query = query.bind(("category", v)); }
-        if let Some(v) = data.sort_order { query = query.bind(("sort_order", v)); }
-        if let Some(v) = data.tax_rate { query = query.bind(("tax_rate", v)); }
-        if let Some(v) = data.receipt_name { query = query.bind(("receipt_name", v)); }
-        if let Some(v) = data.kitchen_print_name { query = query.bind(("kitchen_print_name", v)); }
-        if let Some(v) = data.is_kitchen_print_enabled { query = query.bind(("is_kitchen_print_enabled", v)); }
-        if let Some(v) = data.is_label_print_enabled { query = query.bind(("is_label_print_enabled", v)); }
-        if let Some(v) = data.is_active { query = query.bind(("is_active", v)); }
-        if let Some(v) = data.external_id { query = query.bind(("external_id", v)); }
-        if let Some(v) = data.tags { query = query.bind(("tags", v)); }
-        if let Some(v) = data.specs {
-            query = query.bind(("specs", serde_json::to_value(&v).map_err(|e| RepoError::Database(format!("Failed to serialize specs: {e}")))?));
+        // Execute update of scalar fields using COALESCE pattern
+        if has_scalar_updates {
+            sqlx::query(
+                "UPDATE product SET name = COALESCE(?1, name), image = COALESCE(?2, image), category_id = COALESCE(?3, category_id), sort_order = COALESCE(?4, sort_order), tax_rate = COALESCE(?5, tax_rate), receipt_name = COALESCE(?6, receipt_name), kitchen_print_name = COALESCE(?7, kitchen_print_name), is_kitchen_print_enabled = COALESCE(?8, is_kitchen_print_enabled), is_label_print_enabled = COALESCE(?9, is_label_print_enabled), is_active = COALESCE(?10, is_active), external_id = COALESCE(?11, external_id) WHERE id = ?12",
+            )
+            .bind(&data.name)
+            .bind(&data.image)
+            .bind(data.category_id)
+            .bind(data.sort_order)
+            .bind(data.tax_rate)
+            .bind(&data.receipt_name)
+            .bind(&data.kitchen_print_name)
+            .bind(data.is_kitchen_print_enabled)
+            .bind(data.is_label_print_enabled)
+            .bind(data.is_active)
+            .bind(data.external_id)
+            .bind(product_id)
+            .execute(&self.pool)
+            .await?;
         }
 
-        let mut result = query.await?;
-        let _updated: Vec<Product> = result.take(0)?;
+        // Replace tags if provided
+        if let Some(ref tag_ids) = data.tags {
+            sqlx::query("DELETE FROM product_tag WHERE product_id = ?")
+                .bind(product_id)
+                .execute(&self.pool)
+                .await?;
+            for tag_id in tag_ids {
+                sqlx::query("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)")
+                    .bind(product_id)
+                    .bind(*tag_id)
+                    .execute(&self.pool)
+                    .await?;
+            }
+        }
+
+        // Replace specs if provided
+        if let Some(ref specs) = data.specs {
+            sqlx::query("DELETE FROM product_spec WHERE product_id = ?")
+                .bind(product_id)
+                .execute(&self.pool)
+                .await?;
+            for spec in specs {
+                sqlx::query(
+                    "INSERT INTO product_spec (product_id, name, price, display_order, is_default, is_active, receipt_name, is_root) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                )
+                .bind(product_id)
+                .bind(&spec.name)
+                .bind(spec.price)
+                .bind(spec.display_order)
+                .bind(spec.is_default)
+                .bind(spec.is_active)
+                .bind(&spec.receipt_name)
+                .bind(spec.is_root)
+                .execute(&self.pool)
+                .await?;
+            }
+        }
 
         // Fetch full product data
         let full = self.fetch_product_full(id).await?;
 
         // Sync image references and cleanup orphans
         let image_hashes = Self::extract_product_image_hashes(&full);
-        let removed_hashes = self
-            .image_ref_repo
-            .sync_refs(ImageRefEntityType::Product, id, image_hashes)
-            .await
-            .unwrap_or_default();
+        let removed_hashes = image_ref::sync_refs(
+            &self.pool,
+            ImageRefEntityType::Product,
+            id,
+            image_hashes,
+        )
+        .await
+        .unwrap_or_default();
 
         // Cleanup orphan images (do this after transaction committed)
         if !removed_hashes.is_empty() {
-            let orphans = self
-                .image_ref_repo
-                .find_orphan_hashes(&removed_hashes)
+            let orphans = image_ref::find_orphan_hashes(&self.pool, &removed_hashes)
                 .await
                 .unwrap_or_default();
             self.image_cleanup.cleanup_orphan_images(&orphans).await;
@@ -572,25 +593,44 @@ impl CatalogService {
 
     /// Delete a product
     pub async fn delete_product(&self, id: &str) -> RepoResult<()> {
-        let thing = id.parse::<RecordId>()
+        let product_id: i64 = id
+            .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", id)))?;
 
         // Get image references before deleting
-        let image_hashes = self
-            .image_ref_repo
-            .delete_entity_refs(ImageRefEntityType::Product, id)
-            .await
-            .unwrap_or_default();
+        let image_hashes = image_ref::delete_entity_refs(
+            &self.pool,
+            ImageRefEntityType::Product,
+            id,
+        )
+        .await
+        .unwrap_or_default();
 
-        // Clean up has_attribute edges
-        self.db
-            .query("DELETE has_attribute WHERE in = $product")
-            .bind(("product", thing.clone()))
+        // Clean up attribute bindings
+        sqlx::query("DELETE FROM attribute_binding WHERE owner_type = 'product' AND owner_id = ?")
+            .bind(product_id)
+            .execute(&self.pool)
+            .await?;
+
+        // Clean up tag bindings
+        sqlx::query("DELETE FROM product_tag WHERE product_id = ?")
+            .bind(product_id)
+            .execute(&self.pool)
+            .await?;
+
+        // Delete specs
+        sqlx::query("DELETE FROM product_spec WHERE product_id = ?")
+            .bind(product_id)
+            .execute(&self.pool)
             .await?;
 
         // Delete product
-        let result: Option<Product> = self.db.delete(("product", thing.key().to_string())).await?;
-        if result.is_none() {
+        let result = sqlx::query("DELETE FROM product WHERE id = ?")
+            .bind(product_id)
+            .execute(&self.pool)
+            .await?;
+
+        if result.rows_affected() == 0 {
             return Err(RepoError::NotFound(format!("Product {} not found", id)));
         }
 
@@ -602,9 +642,7 @@ impl CatalogService {
 
         // Cleanup orphan images (after transaction committed)
         if !image_hashes.is_empty() {
-            let orphans = self
-                .image_ref_repo
-                .find_orphan_hashes(&image_hashes)
+            let orphans = image_ref::find_orphan_hashes(&self.pool, &image_hashes)
                 .await
                 .unwrap_or_default();
             self.image_cleanup.cleanup_orphan_images(&orphans).await;
@@ -615,19 +653,19 @@ impl CatalogService {
 
     /// Add tag to product
     pub async fn add_product_tag(&self, product_id: &str, tag_id: &str) -> RepoResult<ProductFull> {
-        let prod_thing = product_id.parse::<RecordId>()
+        let pid: i64 = product_id
+            .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
-        let tag_thing = tag_id.parse::<RecordId>()
+        let tid: i64 = tag_id
+            .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid tag ID: {}", tag_id)))?;
 
-        // Update in DB
-        let mut result = self
-            .db
-            .query("UPDATE product SET tags += $tag WHERE id = $id RETURN AFTER")
-            .bind(("id", prod_thing))
-            .bind(("tag", tag_thing))
+        // Insert into junction table (ignore if already exists)
+        sqlx::query("INSERT OR IGNORE INTO product_tag (product_id, tag_id) VALUES (?, ?)")
+            .bind(pid)
+            .bind(tid)
+            .execute(&self.pool)
             .await?;
-        let _products: Vec<Product> = result.take(0)?;
 
         // Refresh full product and update cache
         let full = self.fetch_product_full(product_id).await?;
@@ -645,19 +683,19 @@ impl CatalogService {
         product_id: &str,
         tag_id: &str,
     ) -> RepoResult<ProductFull> {
-        let prod_thing = product_id.parse::<RecordId>()
+        let pid: i64 = product_id
+            .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
-        let tag_thing = tag_id.parse::<RecordId>()
+        let tid: i64 = tag_id
+            .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid tag ID: {}", tag_id)))?;
 
-        // Update in DB
-        let mut result = self
-            .db
-            .query("UPDATE product SET tags -= $tag WHERE id = $id RETURN AFTER")
-            .bind(("id", prod_thing))
-            .bind(("tag", tag_thing))
+        // Delete from junction table
+        sqlx::query("DELETE FROM product_tag WHERE product_id = ? AND tag_id = ?")
+            .bind(pid)
+            .bind(tid)
+            .execute(&self.pool)
             .await?;
-        let _products: Vec<Product> = result.take(0)?;
 
         // Refresh full product and update cache
         let full = self.fetch_product_full(product_id).await?;
@@ -671,90 +709,76 @@ impl CatalogService {
 
     /// Fetch full product data from DB (helper)
     async fn fetch_product_full(&self, product_id: &str) -> RepoResult<ProductFull> {
-        let thing = product_id.parse::<RecordId>()
+        let pid: i64 = product_id
+            .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid product ID: {}", product_id)))?;
 
-        // Fetch product with tags (using ProductWithTags to get full Tag objects)
-        let mut result = self
-            .db
-            .query("SELECT * FROM product WHERE id = $id FETCH tags")
-            .bind(("id", thing.clone()))
-            .await?;
-        let products: Vec<ProductWithTags> = result.take(0)?;
-        let product = products
-            .into_iter()
-            .next()
-            .ok_or_else(|| RepoError::NotFound(format!("Product {} not found", product_id)))?;
+        // Fetch product
+        let product: Product = sqlx::query_as(
+            "SELECT id, name, image, category_id, sort_order, tax_rate, receipt_name, kitchen_print_name, is_kitchen_print_enabled, is_label_print_enabled, is_active, external_id FROM product WHERE id = ?",
+        )
+        .bind(pid)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| RepoError::NotFound(format!("Product {} not found", product_id)))?;
 
-        // Fetch attribute bindings
-        #[derive(Debug, Deserialize)]
-        struct BindingRow {
-            #[serde(default, with = "serde_helpers::option_record_id")]
-            id: Option<RecordId>,
-            #[serde(rename = "out")]
-            to: Attribute,
-            #[serde(default)]
-            is_required: bool,
-            #[serde(default)]
-            display_order: i32,
-            default_option_indices: Option<Vec<i32>>,
-        }
+        // Fetch tags
+        let tags: Vec<Tag> = sqlx::query_as(
+            "SELECT t.id, t.name, t.color, t.display_order, t.is_active, t.is_system FROM tag t JOIN product_tag pt ON t.id = pt.tag_id WHERE pt.product_id = ? AND t.is_active = 1",
+        )
+        .bind(pid)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default();
+
+        // Fetch specs
+        let specs: Vec<ProductSpec> = sqlx::query_as(
+            "SELECT id, product_id, name, price, display_order, is_default, is_active, receipt_name, is_root FROM product_spec WHERE product_id = ? ORDER BY display_order",
+        )
+        .bind(pid)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default();
 
         // Fetch product's direct attribute bindings
-        let mut bindings_result = self
-            .db
-            .query("SELECT * FROM has_attribute WHERE in = $product FETCH out")
-            .bind(("product", thing))
-            .await?;
-        let bindings: Vec<BindingRow> = bindings_result.take(0)?;
-
-        let mut attributes: Vec<AttributeBindingFull> = bindings
+        let product_binding_pairs = attribute::find_bindings_for_owner(&self.pool, "product", pid).await?;
+        let mut attributes: Vec<AttributeBindingFull> = product_binding_pairs
             .into_iter()
-            .map(|b| AttributeBindingFull {
-                id: b.id,
-                attribute: b.to,
-                is_required: b.is_required,
-                display_order: b.display_order,
-                default_option_indices: b.default_option_indices,
+            .map(|(binding, attr)| AttributeBindingFull {
+                id: binding.id,
+                attribute: attr,
+                is_required: binding.is_required,
+                display_order: binding.display_order,
+                default_option_indices: binding.default_option_indices,
                 is_inherited: false,
             })
             .collect();
 
         // Merge inherited category attributes
-        let cat_thing = product.category.clone();
-        let mut cat_bindings_result = self
-            .db
-            .query("SELECT * FROM has_attribute WHERE in = $cat AND out.is_active = true FETCH out")
-            .bind(("cat", cat_thing))
-            .await?;
-        let cat_bindings: Vec<BindingRow> = cat_bindings_result.take(0)?;
-
-        let product_attr_ids: std::collections::HashSet<String> = attributes.iter()
-            .filter_map(|b| b.attribute.id.as_ref().map(|id| id.to_string()))
+        let cat_binding_pairs = attribute::find_bindings_for_owner(&self.pool, "category", product.category_id).await?;
+        let product_attr_ids: std::collections::HashSet<i64> = attributes
+            .iter()
+            .map(|b| b.attribute.id)
             .collect();
 
-        for cb in cat_bindings {
-            let attr_id = cb.to.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
-            if !product_attr_ids.contains(&attr_id) {
+        for (binding, attr) in cat_binding_pairs {
+            if !product_attr_ids.contains(&attr.id) {
                 attributes.push(AttributeBindingFull {
-                    id: None, // Inherited bindings have no product-level edge ID
-                    attribute: cb.to,
-                    is_required: cb.is_required,
-                    display_order: cb.display_order,
-                    default_option_indices: cb.default_option_indices,
+                    id: binding.id,
+                    attribute: attr,
+                    is_required: binding.is_required,
+                    display_order: binding.display_order,
+                    default_option_indices: binding.default_option_indices,
                     is_inherited: true,
                 });
             }
         }
 
-        // Tags are already fetched as full Tag objects
-        let tags = product.tags;
-
         Ok(ProductFull {
             id: product.id,
             name: product.name,
             image: product.image,
-            category: product.category,
+            category_id: product.category_id,
             sort_order: product.sort_order,
             tax_rate: product.tax_rate,
             receipt_name: product.receipt_name,
@@ -763,7 +787,7 @@ impl CatalogService {
             is_label_print_enabled: product.is_label_print_enabled,
             is_active: product.is_active,
             external_id: product.external_id,
-            specs: product.specs,
+            specs,
             attributes,
             tags,
         })
@@ -815,69 +839,53 @@ impl CatalogService {
             }
         }
 
-        let kitchen_print_destinations: Vec<RecordId> = data
-            .kitchen_print_destinations
-            .iter()
-            .filter_map(|id| id.parse().ok())
-            .collect();
+        let category_id = sqlx::query_scalar::<_, i64>(
+            "INSERT INTO category (name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display) VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7) RETURNING id",
+        )
+        .bind(&data.name)
+        .bind(data.sort_order.unwrap_or(0))
+        .bind(data.is_kitchen_print_enabled.unwrap_or(false))
+        .bind(data.is_label_print_enabled.unwrap_or(false))
+        .bind(data.is_virtual.unwrap_or(false))
+        .bind(data.match_mode.as_deref().unwrap_or("any"))
+        .bind(data.is_display.unwrap_or(true))
+        .fetch_one(&self.pool)
+        .await?;
 
-        let label_print_destinations: Vec<RecordId> = data
-            .label_print_destinations
-            .iter()
-            .filter_map(|id| id.parse().ok())
-            .collect();
-
-        let tag_ids: Vec<RecordId> = data
-            .tag_ids
-            .iter()
-            .filter_map(|id| id.parse().ok())
-            .collect();
-
-        // Internal struct without serde_helpers to preserve native RecordId for SurrealDB
-        #[derive(serde::Serialize)]
-        struct InternalCategory {
-            name: String,
-            sort_order: i32,
-            kitchen_print_destinations: Option<Vec<RecordId>>,
-            label_print_destinations: Option<Vec<RecordId>>,
-            is_kitchen_print_enabled: bool,
-            is_label_print_enabled: bool,
-            is_virtual: bool,
-            tag_ids: Vec<RecordId>,
-            match_mode: String,
-            is_display: bool,
+        // Insert kitchen print destinations
+        for dest_id in &data.kitchen_print_destinations {
+            sqlx::query("INSERT OR IGNORE INTO category_kitchen_dest (category_id, print_destination_id) VALUES (?, ?)")
+                .bind(category_id)
+                .bind(*dest_id)
+                .execute(&self.pool)
+                .await?;
         }
 
-        let category = InternalCategory {
-            name: data.name,
-            sort_order: data.sort_order.unwrap_or(0),
-            kitchen_print_destinations: if kitchen_print_destinations.is_empty() {
-                None
-            } else {
-                Some(kitchen_print_destinations)
-            },
-            label_print_destinations: if label_print_destinations.is_empty() {
-                None
-            } else {
-                Some(label_print_destinations)
-            },
-            is_kitchen_print_enabled: data.is_kitchen_print_enabled.unwrap_or(false),
-            is_label_print_enabled: data.is_label_print_enabled.unwrap_or(false),
-            is_virtual: data.is_virtual.unwrap_or(false),
-            tag_ids,
-            match_mode: data.match_mode.unwrap_or_else(|| "any".to_string()),
-            is_display: data.is_display.unwrap_or(true),
-        };
+        // Insert label print destinations
+        for dest_id in &data.label_print_destinations {
+            sqlx::query("INSERT OR IGNORE INTO category_label_dest (category_id, print_destination_id) VALUES (?, ?)")
+                .bind(category_id)
+                .bind(*dest_id)
+                .execute(&self.pool)
+                .await?;
+        }
 
-        let created: Option<Category> = self.db.create("category").content(category).await?;
-        let created =
-            created.ok_or_else(|| RepoError::Database("Failed to create category".into()))?;
+        // Insert tag IDs
+        for tag_id in &data.tag_ids {
+            sqlx::query("INSERT OR IGNORE INTO category_tag (category_id, tag_id) VALUES (?, ?)")
+                .bind(category_id)
+                .bind(*tag_id)
+                .execute(&self.pool)
+                .await?;
+        }
+
+        // Fetch back the full category
+        let created = self.fetch_category_full(category_id).await?;
 
         // Update cache
-        let category_id = created.id.as_ref().map(|t| t.to_string()).unwrap_or_default();
         {
             let mut cache = self.categories.write();
-            cache.insert(category_id, created.clone());
+            cache.insert(category_id.to_string(), created.clone());
         }
 
         Ok(created)
@@ -885,7 +893,8 @@ impl CatalogService {
 
     /// Update a category
     pub async fn update_category(&self, id: &str, data: CategoryUpdate) -> RepoResult<Category> {
-        let thing = id.parse::<RecordId>()
+        let category_id: i64 = id
+            .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid category ID: {}", id)))?;
 
         // Check existing
@@ -906,68 +915,69 @@ impl CatalogService {
             }
         }
 
-        #[derive(Serialize)]
-        struct CategoryUpdateDb {
-            #[serde(skip_serializing_if = "Option::is_none")]
-            name: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            sort_order: Option<i32>,
-            #[serde(
-                skip_serializing_if = "Option::is_none",
-                with = "serde_helpers::option_vec_record_id"
-            )]
-            kitchen_print_destinations: Option<Vec<RecordId>>,
-            #[serde(
-                skip_serializing_if = "Option::is_none",
-                with = "serde_helpers::option_vec_record_id"
-            )]
-            label_print_destinations: Option<Vec<RecordId>>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            is_kitchen_print_enabled: Option<bool>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            is_label_print_enabled: Option<bool>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            is_virtual: Option<bool>,
-            #[serde(
-                skip_serializing_if = "Option::is_none",
-                with = "serde_helpers::option_vec_record_id"
-            )]
-            tag_ids: Option<Vec<RecordId>>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            match_mode: Option<String>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            is_display: Option<bool>,
+        // Update scalar fields using COALESCE
+        sqlx::query(
+            "UPDATE category SET name = COALESCE(?1, name), sort_order = COALESCE(?2, sort_order), is_kitchen_print_enabled = COALESCE(?3, is_kitchen_print_enabled), is_label_print_enabled = COALESCE(?4, is_label_print_enabled), is_virtual = COALESCE(?5, is_virtual), match_mode = COALESCE(?6, match_mode), is_display = COALESCE(?7, is_display), is_active = COALESCE(?8, is_active) WHERE id = ?9",
+        )
+        .bind(&data.name)
+        .bind(data.sort_order)
+        .bind(data.is_kitchen_print_enabled)
+        .bind(data.is_label_print_enabled)
+        .bind(data.is_virtual)
+        .bind(&data.match_mode)
+        .bind(data.is_display)
+        .bind(data.is_active)
+        .bind(category_id)
+        .execute(&self.pool)
+        .await?;
+
+        // Replace kitchen print destinations if provided
+        if let Some(ref dests) = data.kitchen_print_destinations {
+            sqlx::query("DELETE FROM category_kitchen_dest WHERE category_id = ?")
+                .bind(category_id)
+                .execute(&self.pool)
+                .await?;
+            for dest_id in dests {
+                sqlx::query("INSERT OR IGNORE INTO category_kitchen_dest (category_id, print_destination_id) VALUES (?, ?)")
+                    .bind(category_id)
+                    .bind(*dest_id)
+                    .execute(&self.pool)
+                    .await?;
+            }
         }
 
-        let update_data = CategoryUpdateDb {
-            name: data.name,
-            sort_order: data.sort_order,
-            kitchen_print_destinations: data
-                .kitchen_print_destinations
-                .map(|ids| ids.iter().filter_map(|id| id.parse().ok()).collect()),
-            label_print_destinations: data
-                .label_print_destinations
-                .map(|ids| ids.iter().filter_map(|id| id.parse().ok()).collect()),
-            is_kitchen_print_enabled: data.is_kitchen_print_enabled,
-            is_label_print_enabled: data.is_label_print_enabled,
-            is_virtual: data.is_virtual,
-            tag_ids: data
-                .tag_ids
-                .map(|ids| ids.iter().filter_map(|id| id.parse().ok()).collect()),
-            match_mode: data.match_mode,
-            is_display: data.is_display,
-        };
+        // Replace label print destinations if provided
+        if let Some(ref dests) = data.label_print_destinations {
+            sqlx::query("DELETE FROM category_label_dest WHERE category_id = ?")
+                .bind(category_id)
+                .execute(&self.pool)
+                .await?;
+            for dest_id in dests {
+                sqlx::query("INSERT OR IGNORE INTO category_label_dest (category_id, print_destination_id) VALUES (?, ?)")
+                    .bind(category_id)
+                    .bind(*dest_id)
+                    .execute(&self.pool)
+                    .await?;
+            }
+        }
 
-        // Update and return the updated record directly
-        let mut result = self.db
-            .query("UPDATE $thing MERGE $data RETURN AFTER")
-            .bind(("thing", thing.clone()))
-            .bind(("data", update_data))
-            .await?;
+        // Replace tag IDs if provided
+        if let Some(ref tag_ids) = data.tag_ids {
+            sqlx::query("DELETE FROM category_tag WHERE category_id = ?")
+                .bind(category_id)
+                .execute(&self.pool)
+                .await?;
+            for tag_id in tag_ids {
+                sqlx::query("INSERT OR IGNORE INTO category_tag (category_id, tag_id) VALUES (?, ?)")
+                    .bind(category_id)
+                    .bind(*tag_id)
+                    .execute(&self.pool)
+                    .await?;
+            }
+        }
 
-        let updated: Option<Category> = result.take(0)?;
-        let updated =
-            updated.ok_or_else(|| RepoError::NotFound(format!("Category {} not found after update", id)))?;
+        // Fetch back the full category
+        let updated = self.fetch_category_full(category_id).await?;
 
         // Update cache
         {
@@ -980,33 +990,48 @@ impl CatalogService {
 
     /// Delete a category
     pub async fn delete_category(&self, id: &str) -> RepoResult<()> {
-        let cat_thing = id.parse::<RecordId>()
+        let category_id: i64 = id
+            .parse()
             .map_err(|_| RepoError::Validation(format!("Invalid category ID: {}", id)))?;
 
         // Check if category has products
-        let mut result = self
-            .db
-            .query("SELECT count() FROM product WHERE category = $cat AND is_active = true GROUP ALL")
-            .bind(("cat", cat_thing.clone()))
-            .await?;
-        let count: Option<i64> = result.take((0, "count"))?;
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM product WHERE category_id = ? AND is_active = 1",
+        )
+        .bind(category_id)
+        .fetch_one(&self.pool)
+        .await?;
 
-        if count.unwrap_or(0) > 0 {
+        if count > 0 {
             return Err(RepoError::Validation(
                 "Cannot delete category with active products".into(),
             ));
         }
 
-        // Clean up has_attribute edges
-        self.db
-            .query("DELETE has_attribute WHERE in = $category")
-            .bind(("category", cat_thing.clone()))
+        // Clean up attribute bindings
+        sqlx::query("DELETE FROM attribute_binding WHERE owner_type = 'category' AND owner_id = ?")
+            .bind(category_id)
+            .execute(&self.pool)
+            .await?;
+
+        // Clean up junction tables
+        sqlx::query("DELETE FROM category_kitchen_dest WHERE category_id = ?")
+            .bind(category_id)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("DELETE FROM category_label_dest WHERE category_id = ?")
+            .bind(category_id)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("DELETE FROM category_tag WHERE category_id = ?")
+            .bind(category_id)
+            .execute(&self.pool)
             .await?;
 
         // Delete category
-        self.db
-            .query("DELETE $thing")
-            .bind(("thing", cat_thing))
+        sqlx::query("DELETE FROM category WHERE id = ?")
+            .bind(category_id)
+            .execute(&self.pool)
             .await?;
 
         // Update cache
@@ -1018,6 +1043,43 @@ impl CatalogService {
         Ok(())
     }
 
+    /// Fetch a category with all its relations from DB (helper)
+    async fn fetch_category_full(&self, category_id: i64) -> RepoResult<Category> {
+        let mut cat: Category = sqlx::query_as(
+            "SELECT id, name, sort_order, is_kitchen_print_enabled, is_label_print_enabled, is_active, is_virtual, match_mode, is_display FROM category WHERE id = ?",
+        )
+        .bind(category_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| RepoError::NotFound(format!("Category {} not found", category_id)))?;
+
+        cat.kitchen_print_destinations = sqlx::query_scalar::<_, i64>(
+            "SELECT print_destination_id FROM category_kitchen_dest WHERE category_id = ?",
+        )
+        .bind(category_id)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default();
+
+        cat.label_print_destinations = sqlx::query_scalar::<_, i64>(
+            "SELECT print_destination_id FROM category_label_dest WHERE category_id = ?",
+        )
+        .bind(category_id)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default();
+
+        cat.tag_ids = sqlx::query_scalar::<_, i64>(
+            "SELECT tag_id FROM category_tag WHERE category_id = ?",
+        )
+        .bind(category_id)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default();
+
+        Ok(cat)
+    }
+
     // =========================================================================
     // Convenience Methods (for price rules, printing, etc.)
     // =========================================================================
@@ -1026,7 +1088,7 @@ impl CatalogService {
     pub fn get_product_meta(&self, product_id: &str) -> Option<ProductMeta> {
         let cache = self.products.read();
         cache.get(product_id).map(|p| {
-            let category_id = p.category.to_string();
+            let category_id = p.category_id.to_string();
             let category_name = {
                 let cat_cache = self.categories.read();
                 cat_cache.get(&category_id).map(|c| c.name.clone()).unwrap_or_default()
@@ -1034,7 +1096,7 @@ impl CatalogService {
             ProductMeta {
                 category_id,
                 category_name,
-                tags: p.tags.iter().filter_map(|t| t.id.as_ref()).map(|t| t.to_string()).collect(),
+                tags: p.tags.iter().map(|t| t.id.to_string()).collect(),
                 tax_rate: p.tax_rate,
             }
         })
@@ -1048,14 +1110,14 @@ impl CatalogService {
             .iter()
             .filter_map(|id| {
                 cache.get(id).map(|p| {
-                    let category_id = p.category.to_string();
+                    let category_id = p.category_id.to_string();
                     let category_name = cat_cache.get(&category_id).map(|c| c.name.clone()).unwrap_or_default();
                     (
                         id.clone(),
                         ProductMeta {
                             category_id,
                             category_name,
-                            tags: p.tags.iter().filter_map(|t| t.id.as_ref()).map(|t| t.to_string()).collect(),
+                            tags: p.tags.iter().map(|t| t.id.to_string()).collect(),
                             tax_rate: p.tax_rate,
                         },
                     )
@@ -1067,13 +1129,13 @@ impl CatalogService {
     /// Get kitchen print configuration for a product (with fallback chain)
     ///
     /// Priority: product.is_kitchen_print_enabled > category.is_kitchen_print_enabled
-    /// Destinations: product.destinations > category.destinations > global default
+    /// Destinations: category.destinations > global default
     pub fn get_kitchen_print_config(&self, product_id: &str) -> Option<KitchenPrintConfig> {
         let products = self.products.read();
         let product = products.get(product_id)?;
 
         let categories = self.categories.read();
-        let category = categories.get(&product.category.to_string());
+        let category = categories.get(&product.category_id.to_string());
 
         // Determine if enabled (product > category)
         let enabled = match product.is_kitchen_print_enabled {
@@ -1097,13 +1159,8 @@ impl CatalogService {
 
         // Determine destinations (category > global default)
         let destinations = if let Some(cat) = category.filter(|c| !c.is_virtual) {
-            if let Some(ref dests) = cat.kitchen_print_destinations {
-                if !dests.is_empty() {
-                    dests.iter().map(|t| t.to_string()).collect()
-                } else {
-                    let defaults = self.print_defaults.read();
-                    defaults.kitchen_destination.iter().cloned().collect()
-                }
+            if !cat.kitchen_print_destinations.is_empty() {
+                cat.kitchen_print_destinations.iter().map(|id| id.to_string()).collect()
             } else {
                 let defaults = self.print_defaults.read();
                 defaults.kitchen_destination.iter().cloned().collect()
@@ -1126,7 +1183,7 @@ impl CatalogService {
         let product = products.get(product_id)?;
 
         let categories = self.categories.read();
-        let category = categories.get(&product.category.to_string());
+        let category = categories.get(&product.category_id.to_string());
 
         // Determine if enabled (product > category)
         let enabled = match product.is_label_print_enabled {
@@ -1149,13 +1206,8 @@ impl CatalogService {
 
         // Determine destinations (category > global default)
         let destinations = if let Some(cat) = category.filter(|c| !c.is_virtual) {
-            if let Some(ref dests) = cat.label_print_destinations {
-                if !dests.is_empty() {
-                    dests.iter().map(|t| t.to_string()).collect()
-                } else {
-                    let defaults = self.print_defaults.read();
-                    defaults.label_destination.iter().cloned().collect()
-                }
+            if !cat.label_print_destinations.is_empty() {
+                cat.label_print_destinations.iter().map(|id| id.to_string()).collect()
             } else {
                 let defaults = self.print_defaults.read();
                 defaults.label_destination.iter().cloned().collect()

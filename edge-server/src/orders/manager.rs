@@ -28,7 +28,7 @@ use super::appliers::EventAction;
 use super::money;
 use super::storage::{OrderStorage, StorageError};
 use super::traits::{CommandContext, CommandHandler, CommandMetadata, EventApplier, OrderError};
-use crate::db::models::PriceRule;
+use shared::models::PriceRule;
 use crate::pricing::matcher::is_time_valid;
 use crate::services::catalog_service::ProductMeta;
 use chrono::Utc;
@@ -234,9 +234,9 @@ impl OrdersManager {
         self.catalog_service = Some(catalog_service);
     }
 
-    /// Set the archive service for SurrealDB integration
-    pub fn set_archive_service(&mut self, db: surrealdb::Surreal<surrealdb::engine::local::Db>) {
-        self.archive_service = Some(super::OrderArchiveService::new(db, self.tz));
+    /// Set the archive service for SQLite integration
+    pub fn set_archive_service(&mut self, pool: sqlx::SqlitePool) {
+        self.archive_service = Some(super::OrderArchiveService::new(pool, self.tz));
     }
 
     /// Generate next receipt number (crash-safe via redb)
@@ -4001,17 +4001,17 @@ mod tests {
     // ========================================================================
 
     fn create_test_rule(name: &str) -> PriceRule {
-        use crate::db::models::price_rule::{AdjustmentType, ProductScope, RuleType};
+        use shared::models::price_rule::{AdjustmentType, ProductScope, RuleType};
         PriceRule {
-            id: None,
+            id: 0,
             name: name.to_string(),
             display_name: name.to_string(),
             receipt_name: name.to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: "zone:all".to_string(),
+            target_id: None,
+            zone_scope: "all".to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
             is_stackable: false,
@@ -6141,7 +6141,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::ToggleRuleSkip {
                 order_id: order_id.clone(),
-                rule_id: "nonexistent-rule".to_string(),
+                rule_id: 99999,
                 skipped: true,
             },
         );
@@ -8084,7 +8084,7 @@ mod tests {
     fn toggle_rule_skip(
         manager: &OrdersManager,
         order_id: &str,
-        rule_id: &str,
+        rule_id: i64,
         skipped: bool,
     ) -> CommandResponse {
         let cmd = OrderCommand::new(
@@ -8092,7 +8092,7 @@ mod tests {
             "Test Operator".to_string(),
             OrderCommandPayload::ToggleRuleSkip {
                 order_id: order_id.to_string(),
-                rule_id: rule_id.to_string(),
+                rule_id,
                 skipped,
             },
         );
@@ -8100,18 +8100,18 @@ mod tests {
     }
 
     /// Helper: 创建百分比折扣规则
-    fn make_discount_rule(id: &str, percent: f64) -> crate::db::models::PriceRule {
-        use crate::db::models::price_rule::*;
-        crate::db::models::PriceRule {
-            id: Some(surrealdb::RecordId::from(("price_rule", id))),
+    fn make_discount_rule(id: i64, percent: f64) -> PriceRule {
+        use shared::models::price_rule::*;
+        PriceRule {
+            id,
             name: format!("discount_{}", id),
             display_name: format!("Discount {}", id),
             receipt_name: "DISC".to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: "zone:all".to_string(),
+            target_id: None,
+            zone_scope: "all".to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: percent,
             is_stackable: true,
@@ -8128,18 +8128,18 @@ mod tests {
     }
 
     /// Helper: 创建百分比附加费规则
-    fn make_surcharge_rule(id: &str, percent: f64) -> crate::db::models::PriceRule {
-        use crate::db::models::price_rule::*;
-        crate::db::models::PriceRule {
-            id: Some(surrealdb::RecordId::from(("price_rule", id))),
+    fn make_surcharge_rule(id: i64, percent: f64) -> PriceRule {
+        use shared::models::price_rule::*;
+        PriceRule {
+            id,
             name: format!("surcharge_{}", id),
             display_name: format!("Surcharge {}", id),
             receipt_name: "SURCH".to_string(),
             description: None,
             rule_type: RuleType::Surcharge,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: "zone:all".to_string(),
+            target_id: None,
+            zone_scope: "all".to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: percent,
             is_stackable: true,
@@ -8156,18 +8156,18 @@ mod tests {
     }
 
     /// Helper: 创建固定金额折扣规则
-    fn make_fixed_discount_rule(id: &str, amount: f64) -> crate::db::models::PriceRule {
-        use crate::db::models::price_rule::*;
-        crate::db::models::PriceRule {
-            id: Some(surrealdb::RecordId::from(("price_rule", id))),
+    fn make_fixed_discount_rule(id: i64, amount: f64) -> PriceRule {
+        use shared::models::price_rule::*;
+        PriceRule {
+            id,
             name: format!("fixed_discount_{}", id),
             display_name: format!("Fixed Discount {}", id),
             receipt_name: "FDISC".to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: "zone:all".to_string(),
+            target_id: None,
+            zone_scope: "all".to_string(),
             adjustment_type: AdjustmentType::FixedAmount,
             adjustment_value: amount,
             is_stackable: true,
@@ -8184,18 +8184,18 @@ mod tests {
     }
 
     /// Helper: 创建固定金额附加费规则
-    fn make_fixed_surcharge_rule(id: &str, amount: f64) -> crate::db::models::PriceRule {
-        use crate::db::models::price_rule::*;
-        crate::db::models::PriceRule {
-            id: Some(surrealdb::RecordId::from(("price_rule", id))),
+    fn make_fixed_surcharge_rule(id: i64, amount: f64) -> PriceRule {
+        use shared::models::price_rule::*;
+        PriceRule {
+            id,
             name: format!("fixed_surcharge_{}", id),
             display_name: format!("Fixed Surcharge {}", id),
             receipt_name: "FSURCH".to_string(),
             description: None,
             rule_type: RuleType::Surcharge,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: "zone:all".to_string(),
+            target_id: None,
+            zone_scope: "all".to_string(),
             adjustment_type: AdjustmentType::FixedAmount,
             adjustment_value: amount,
             is_stackable: true,
@@ -8291,7 +8291,7 @@ mod tests {
         let order_id = open_table(&manager, "T-combo-31");
 
         // 注入 10% 折扣规则
-        manager.cache_rules(&order_id, vec![make_discount_rule("rule10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 添加商品: 100€ × 2
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Steak", 100.0, 2)]);
@@ -8308,7 +8308,7 @@ mod tests {
         assert_eq!(item.original_price, Some(100.0), "original_price = catalog base");
 
         // Skip 规则 → 恢复原价
-        let r = toggle_rule_skip(&manager, &order_id, "price_rule:rule10", true);
+        let r = toggle_rule_skip(&manager, &order_id, 10, true);
         assert!(r.success, "skip failed: {:?}", r.error);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8316,7 +8316,7 @@ mod tests {
         assert_close(s.items[0].price, 100.0, "item.price after skip");
 
         // Unskip → 恢复折扣
-        let r = toggle_rule_skip(&manager, &order_id, "price_rule:rule10", false);
+        let r = toggle_rule_skip(&manager, &order_id, 10, false);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8339,7 +8339,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-combo-32");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("rule10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Wine", 100.0, 1)]);
         assert!(r.success);
@@ -8362,7 +8362,7 @@ mod tests {
 
         // Skip 规则 → 恢复到手动改价后的基础价
         let rule_id = item.applied_rules.as_ref().unwrap()[0].rule_id.clone();
-        let r = toggle_rule_skip(&manager, &order_id, &rule_id, true);
+        let r = toggle_rule_skip(&manager, &order_id, rule_id, true);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8385,7 +8385,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-combo-33");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("rule10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 商品 50€, 选项 +5€ (加大), 数量 2
         let r = add_items(&manager, &order_id, vec![
@@ -8432,7 +8432,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-combo-34");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("rule10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 商品: spec A 价格 100€
         let r = add_items(&manager, &order_id, vec![
@@ -8473,8 +8473,8 @@ mod tests {
 
         // 两个规则: 10% 折扣 + 5% 附加费
         manager.cache_rules(&order_id, vec![
-            make_discount_rule("disc10", 10.0),
-            make_surcharge_rule("surch5", 5.0),
+            make_discount_rule(10, 10.0),
+            make_surcharge_rule(5, 5.0),
         ]);
 
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Steak", 100.0, 1)]);
@@ -8489,7 +8489,7 @@ mod tests {
         assert_close(s.total, 95.0, "total");
 
         // Skip 折扣 → 只剩附加费
-        let r = toggle_rule_skip(&manager, &order_id, "price_rule:disc10", true);
+        let r = toggle_rule_skip(&manager, &order_id, 10, true);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8497,16 +8497,16 @@ mod tests {
         assert_close(s.items[0].price, 105.0, "only surcharge active");
 
         // Skip 附加费 → 无规则
-        let r = toggle_rule_skip(&manager, &order_id, "price_rule:surch5", true);
+        let r = toggle_rule_skip(&manager, &order_id, 5, true);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         assert_close(s.items[0].price, 100.0, "no rules active");
 
         // Unskip 两个
-        let r = toggle_rule_skip(&manager, &order_id, "price_rule:disc10", false);
+        let r = toggle_rule_skip(&manager, &order_id, 10, false);
         assert!(r.success);
-        let r = toggle_rule_skip(&manager, &order_id, "price_rule:surch5", false);
+        let r = toggle_rule_skip(&manager, &order_id, 5, false);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8528,7 +8528,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-combo-36");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("rule10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 两个商品
         let r = add_items(&manager, &order_id, vec![
@@ -8557,7 +8557,7 @@ mod tests {
 
         // Skip 商品规则 → subtotal 变大 → 整单折扣/附加费重算
         let rule_id = s.items[0].applied_rules.as_ref().unwrap()[0].rule_id.clone();
-        let r = toggle_rule_skip(&manager, &order_id, &rule_id, true);
+        let r = toggle_rule_skip(&manager, &order_id, rule_id, true);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8584,7 +8584,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-combo-37");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("rule10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 商品 80€, 选项 +10€ (Extra Cheese) + -3€ (No Sauce)
         let r = add_items(&manager, &order_id, vec![
@@ -8641,8 +8641,8 @@ mod tests {
 
         // 固定 5€ 折扣 + 15% 附加费
         manager.cache_rules(&order_id, vec![
-            make_fixed_discount_rule("fixdisc5", 5.0),
-            make_surcharge_rule("surch15", 15.0),
+            make_fixed_discount_rule(50, 5.0),
+            make_surcharge_rule(15, 15.0),
         ]);
 
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Salmon", 60.0, 2)]);
@@ -8657,14 +8657,14 @@ mod tests {
         assert_close(s.subtotal, 128.0, "subtotal = 64 × 2");
 
         // Skip 折扣 → unit_price = 60 + 9 = 69
-        let r = toggle_rule_skip(&manager, &order_id, "price_rule:fixdisc5", true);
+        let r = toggle_rule_skip(&manager, &order_id, 50, true);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         assert_close(s.items[0].price, 69.0, "after skip discount");
 
         // Skip 附加费 → unit_price = 60
-        let r = toggle_rule_skip(&manager, &order_id, "price_rule:surch15", true);
+        let r = toggle_rule_skip(&manager, &order_id, 15, true);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8687,7 +8687,7 @@ mod tests {
         let order_id = open_table(&manager, "T-combo-39");
 
         // 10% 折扣规则
-        manager.cache_rules(&order_id, vec![make_discount_rule("rule10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 商品1: 100€, spec A (100€), option +5€, 手动折扣 20%, qty 2
         let r = add_items(&manager, &order_id, vec![CartItemInput {
@@ -8755,7 +8755,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-combo-40");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("rule10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 100€ × 2 → subtotal = 180 (after 10% discount)
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 2)]);
@@ -8774,7 +8774,7 @@ mod tests {
 
         // Skip 规则 → total 变为 200, remaining 变为 150
         let rule_id = s.items[0].applied_rules.as_ref().unwrap()[0].rule_id.clone();
-        let r = toggle_rule_skip(&manager, &order_id, &rule_id, true);
+        let r = toggle_rule_skip(&manager, &order_id, rule_id, true);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8799,7 +8799,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-combo-41");
 
-        manager.cache_rules(&order_id, vec![make_surcharge_rule("surch10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_surcharge_rule(10, 10.0)]);
 
         // 商品 20€, 选项 +2€ × qty 3 (e.g., 3 eggs)
         let r = add_items(&manager, &order_id, vec![
@@ -8839,7 +8839,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-combo-42");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("rule5", 5.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(5, 5.0)]);
 
         // 初始: 50€, spec A, option +3€
         let r = add_items(&manager, &order_id, vec![CartItemInput {
@@ -8901,7 +8901,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-combo-43");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("rule10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // A: 100€ × 2 → 90×2=180, B: 50€ × 3 → 45×3=135
         let r = add_items(&manager, &order_id, vec![
@@ -8949,7 +8949,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-combo-44");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("rule10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 100€ × 2 → 90×2=180
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 2)]);
@@ -9008,7 +9008,7 @@ mod tests {
         let order_id = open_table(&manager, "T-combo-45");
 
         // 固定 3€ 折扣
-        manager.cache_rules(&order_id, vec![make_fixed_discount_rule("fix3", 3.0)]);
+        manager.cache_rules(&order_id, vec![make_fixed_discount_rule(30, 3.0)]);
 
         // 30€, 选项 -5€ (No Premium Ingredient), qty 2
         let r = add_items(&manager, &order_id, vec![
@@ -9069,7 +9069,7 @@ mod tests {
         let order_id = open_table(&manager, "T-bug-46");
 
         // 10% 折扣规则
-        manager.cache_rules(&order_id, vec![make_discount_rule("disc10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 100€ × 1 → 规则后 90€
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 1)]);
@@ -9108,7 +9108,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-bug-47");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("disc20", 20.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(20, 20.0)]);
 
         // 50€ × 3 → 40×3=120
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 50.0, 3)]);
@@ -9154,7 +9154,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-bug-48");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("disc15", 15.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(15, 15.0)]);
 
         // 200€ × 1 → 170
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 200.0, 1)]);
@@ -9165,8 +9165,8 @@ mod tests {
         assert_close(s.total, 170.0, "200*0.85=170");
 
         // Skip 规则 → total=200
-        let rule_id = format!("price_rule:{}", "disc15");
-        let r = toggle_rule_skip(&manager, &order_id, &rule_id, true);
+        let rule_id: i64 = 15;
+        let r = toggle_rule_skip(&manager, &order_id, rule_id, true);
         assert!(r.success);
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         assert_close(s.total, 200.0, "rule skipped → 200");
@@ -9179,7 +9179,7 @@ mod tests {
         assert!(s.items[0].applied_rules.is_some(), "rules preserved on comp");
 
         // Toggle 规则应该成功 — rules 保留在 comped item 上
-        let r = toggle_rule_skip(&manager, &order_id, &rule_id, false);
+        let r = toggle_rule_skip(&manager, &order_id, rule_id, false);
         assert!(r.success, "toggle succeeds: rules preserved on comped item");
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         assert_close(s.total, 0.0, "still comped, total stays 0");
@@ -9293,7 +9293,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-bug-51");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("disc10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 100€ × 4 → 90×4=360
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 4)]);
@@ -9319,8 +9319,8 @@ mod tests {
         assert_remaining_consistent(&s);
 
         // Skip 规则 → 源商品变为 100/个, 3个=300
-        let rule_id = format!("price_rule:{}", "disc10");
-        let r = toggle_rule_skip(&manager, &order_id, &rule_id, true);
+        let rule_id: i64 = 10;
+        let r = toggle_rule_skip(&manager, &order_id, rule_id, true);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9330,7 +9330,7 @@ mod tests {
         assert_remaining_consistent(&s);
 
         // Unskip → 回到 90/个
-        let r = toggle_rule_skip(&manager, &order_id, &rule_id, false);
+        let r = toggle_rule_skip(&manager, &order_id, rule_id, false);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9346,7 +9346,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-bug-52");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("disc10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // A: 100€×2=200→180, B: 50€×1=50→45 → total=225
         let r = add_items(&manager, &order_id, vec![
@@ -9388,7 +9388,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-bug-53");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("disc10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 80€ + 选项(+10€) = 90 → 规则后 81
         let r = add_items(&manager, &order_id, vec![
@@ -9425,7 +9425,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-bug-54");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("disc10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 100€ × 3 → 90*3=270
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 3)]);
@@ -9466,8 +9466,8 @@ mod tests {
         assert_remaining_consistent(&s);
 
         // Toggle rule skip → 100/个
-        let rule_id = format!("price_rule:{}", "disc10");
-        let r = toggle_rule_skip(&manager, &order_id, &rule_id, true);
+        let rule_id: i64 = 10;
+        let r = toggle_rule_skip(&manager, &order_id, rule_id, true);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9475,7 +9475,7 @@ mod tests {
         assert_remaining_consistent(&s);
 
         // Unskip → 90/个
-        let r = toggle_rule_skip(&manager, &order_id, &rule_id, false);
+        let r = toggle_rule_skip(&manager, &order_id, rule_id, false);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9491,7 +9491,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-bug-55");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("disc10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // A: 80€×2 → 72×2=144, B: 40€×1 → 36
         let r = add_items(&manager, &order_id, vec![
@@ -9545,7 +9545,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-bug-56");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("disc10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 60€ × 2 → 54×2=108
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 60.0, 2)]);
@@ -9592,7 +9592,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-bug-57");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("disc10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 100€ × 2 → 90×2=180
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 2)]);
@@ -9652,8 +9652,8 @@ mod tests {
 
         // 百分比折扣 10% + 固定折扣 5€
         manager.cache_rules(&order_id, vec![
-            make_discount_rule("pdisc", 10.0),
-            make_fixed_discount_rule("fdisc", 5.0),
+            make_discount_rule(100, 10.0),
+            make_fixed_discount_rule(200, 5.0),
         ]);
 
         // 100€ × 2
@@ -9667,7 +9667,7 @@ mod tests {
         assert_close(s.subtotal, 170.0, "85*2=170");
 
         // Skip 固定折扣 → 90/unit
-        let r = toggle_rule_skip(&manager, &order_id, "price_rule:fdisc", true);
+        let r = toggle_rule_skip(&manager, &order_id, 200, true);
         assert!(r.success);
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         assert_close(s.items[0].unit_price.unwrap(), 90.0, "100*0.9=90 (fixed skipped)");
@@ -9693,7 +9693,7 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table(&manager, "T-bug-59");
 
-        manager.cache_rules(&order_id, vec![make_discount_rule("disc10", 10.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 第一批: A 100€ × 1 → 90
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 1)]);
@@ -9739,7 +9739,7 @@ mod tests {
         let order_id = open_table(&manager, "T-bug-60");
 
         // 15% 折扣规则
-        manager.cache_rules(&order_id, vec![make_discount_rule("disc15", 15.0)]);
+        manager.cache_rules(&order_id, vec![make_discount_rule(15, 15.0)]);
 
         // A: 200€, 选项+20€, qty=2 → base=220, *0.85=187 → 374
         // B: 80€, qty=1 → 80*0.85=68
@@ -9777,7 +9777,7 @@ mod tests {
         assert_remaining_consistent(&s);
 
         // 4. Skip 规则 → A base=220, qty=2 → subtotal=440
-        let rule_id = "price_rule:disc15";
+        let rule_id: i64 = 15;
         let r = toggle_rule_skip(&manager, &order_id, rule_id, true);
         assert!(r.success);
 
@@ -9831,25 +9831,25 @@ mod tests {
 
     /// Helper: 创建带时间约束的折扣规则
     fn make_timed_discount_rule(
-        id: &str,
+        id: i64,
         percent: f64,
         valid_from: Option<i64>,
         valid_until: Option<i64>,
         active_days: Option<Vec<u8>>,
         active_start_time: Option<&str>,
         active_end_time: Option<&str>,
-    ) -> crate::db::models::PriceRule {
-        use crate::db::models::price_rule::*;
-        crate::db::models::PriceRule {
-            id: Some(surrealdb::RecordId::from(("price_rule", id))),
+    ) -> PriceRule {
+        use shared::models::price_rule::*;
+        PriceRule {
+            id,
             name: format!("timed_{}", id),
             display_name: format!("Timed {}", id),
             receipt_name: "DISC".to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: "zone:all".to_string(),
+            target_id: None,
+            zone_scope: "all".to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: percent,
             is_stackable: true,
@@ -9872,7 +9872,7 @@ mod tests {
         let order_id = open_table(&manager, "T-time-1");
 
         let future = shared::util::now_millis() + 3_600_000; // 1 小时后
-        let rule = make_timed_discount_rule("future", 10.0, Some(future), None, None, None, None);
+        let rule = make_timed_discount_rule(1, 10.0, Some(future), None, None, None, None);
         manager.cache_rules(&order_id, vec![rule]);
 
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Steak", 100.0, 1)]);
@@ -9890,7 +9890,7 @@ mod tests {
         let order_id = open_table(&manager, "T-time-2");
 
         let past = shared::util::now_millis() - 3_600_000; // 1 小时前
-        let rule = make_timed_discount_rule("expired", 10.0, None, Some(past), None, None, None);
+        let rule = make_timed_discount_rule(2, 10.0, None, Some(past), None, None, None);
         manager.cache_rules(&order_id, vec![rule]);
 
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Wine", 50.0, 2)]);
@@ -9909,7 +9909,7 @@ mod tests {
 
         let now = shared::util::now_millis();
         let rule = make_timed_discount_rule(
-            "active_range",
+            7,
             10.0,
             Some(now - 3_600_000), // 1小时前开始
             Some(now + 3_600_000), // 1小时后结束
@@ -9939,7 +9939,7 @@ mod tests {
 
         // 设置 active_days 只包含"明天"
         let wrong_day = (today + 1) % 7;
-        let rule = make_timed_discount_rule("wrong_day", 10.0, None, None, Some(vec![wrong_day]), None, None);
+        let rule = make_timed_discount_rule(3, 10.0, None, None, Some(vec![wrong_day]), None, None);
         manager.cache_rules(&order_id, vec![rule]);
 
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Salad", 40.0, 1)]);
@@ -9959,7 +9959,7 @@ mod tests {
         let now_local = chrono::Utc::now().with_timezone(&chrono_tz::Europe::Madrid);
         let today = now_local.format("%u").to_string().parse::<u8>().unwrap() % 7;
 
-        let rule = make_timed_discount_rule("right_day", 20.0, None, None, Some(vec![today]), None, None);
+        let rule = make_timed_discount_rule(4, 20.0, None, None, Some(vec![today]), None, None);
         manager.cache_rules(&order_id, vec![rule]);
 
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Pizza", 50.0, 2)]);
@@ -9983,7 +9983,7 @@ mod tests {
         let start = format!("{:02}:00", (hour + 3) % 24);
         let end = format!("{:02}:00", (hour + 4) % 24);
 
-        let rule = make_timed_discount_rule("off_hours", 15.0, None, None, None, Some(&start), Some(&end));
+        let rule = make_timed_discount_rule(5, 15.0, None, None, None, Some(&start), Some(&end));
         manager.cache_rules(&order_id, vec![rule]);
 
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Soup", 20.0, 3)]);
@@ -10002,7 +10002,7 @@ mod tests {
 
         let now = shared::util::now_millis();
         let expired_rule = make_timed_discount_rule(
-            "expired",
+            8,
             50.0, // 50% 折扣 — 如果被应用会很明显
             None,
             Some(now - 3_600_000), // 1小时前过期
@@ -10011,7 +10011,7 @@ mod tests {
             None,
         );
         let active_rule = make_timed_discount_rule(
-            "active",
+            9,
             10.0,
             Some(now - 3_600_000),
             Some(now + 3_600_000),
@@ -10036,7 +10036,7 @@ mod tests {
         let order_id = open_table(&manager, "T-time-8");
 
         // 没有任何时间限制
-        let rule = make_timed_discount_rule("always", 10.0, None, None, None, None, None);
+        let rule = make_timed_discount_rule(6, 10.0, None, None, None, None, None);
         manager.cache_rules(&order_id, vec![rule]);
 
         let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Bread", 10.0, 5)]);
@@ -10059,7 +10059,7 @@ mod tests {
         let wrong_day = (today + 1) % 7;
 
         let rule = make_timed_discount_rule(
-            "combo_fail",
+            11,
             10.0,
             Some(now - 3_600_000), // valid_from OK
             None,
@@ -10086,7 +10086,7 @@ mod tests {
         let now = shared::util::now_millis();
         // 规则有效
         let rule = make_timed_discount_rule(
-            "valid_now",
+            12,
             10.0,
             Some(now - 3_600_000),
             Some(now + 3_600_000),

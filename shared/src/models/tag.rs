@@ -4,13 +4,13 @@ use serde::{Deserialize, Serialize};
 
 /// Tag entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct Tag {
-    pub id: Option<String>,
+    pub id: i64,
     pub name: String,
     pub color: String,
     pub display_order: i32,
-    /// 系统标签（"热卖"、"新品"等），不可删除/改名
-    #[serde(default)]
+    pub is_active: bool,
     pub is_system: bool,
 }
 
@@ -28,4 +28,5 @@ pub struct TagUpdate {
     pub name: Option<String>,
     pub color: Option<String>,
     pub display_order: Option<i32>,
+    pub is_active: Option<bool>,
 }

@@ -2,48 +2,39 @@
 //!
 //! 启动时补扫未验证的营业日，运行期间按 `business_day_cutoff` 每日触发。
 //!
-//! 验证结果持久化到 SurrealDB `archive_verification` 表。
+//! 验证结果持久化到 SQLite `archive_verification` 表。
 
 use chrono::{NaiveDate, NaiveTime};
 use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
-use surrealdb::engine::local::Db;
-use surrealdb::Surreal;
+use sqlx::SqlitePool;
 use tokio_util::sync::CancellationToken;
 
-use crate::db::repository::StoreInfoRepository;
+use crate::db::repository::store_info;
 use crate::orders::archive::OrderArchiveService;
 use crate::utils::time;
 
 // ============================================================================
-// Verification Record (持久化到 SurrealDB)
+// Verification Record (持久化到 SQLite)
 // ============================================================================
 
-const TABLE: &str = "archive_verification";
-
-/// 验证记录（存入 SurrealDB）
+/// 验证记录（存入 SQLite archive_verification 表）
 #[derive(Debug, Serialize, Deserialize)]
 struct VerificationRecord {
     /// "daily"
     verification_type: String,
     /// 营业日标签 "2026-01-29"
     date: Option<String>,
-    total_orders: usize,
-    verified_orders: usize,
+    total_orders: i64,
+    verified_orders: i64,
     chain_intact: bool,
-    chain_resets_count: usize,
-    chain_breaks_count: usize,
-    invalid_orders_count: usize,
+    chain_resets_count: i64,
+    chain_breaks_count: i64,
+    invalid_orders_count: i64,
     /// 有异常时存储完整 JSON，无异常时 None
-    details: Option<serde_json::Value>,
+    details: Option<String>,
     /// 创建时间 (Unix millis)
     created_at: i64,
-}
-
-/// 用于查询最近验证日期
-#[derive(Debug, Deserialize)]
-struct LastDateRow {
-    date: Option<String>,
 }
 
 // ============================================================================
@@ -55,7 +46,7 @@ struct LastDateRow {
 /// 注册为 `TaskKind::Periodic`，在 `start_background_tasks()` 中启动。
 pub struct VerifyScheduler {
     archive_service: OrderArchiveService,
-    db: Surreal<Db>,
+    pool: SqlitePool,
     shutdown: CancellationToken,
     tz: Tz,
 }
@@ -63,13 +54,13 @@ pub struct VerifyScheduler {
 impl VerifyScheduler {
     pub fn new(
         archive_service: OrderArchiveService,
-        db: Surreal<Db>,
+        pool: SqlitePool,
         shutdown: CancellationToken,
         tz: Tz,
     ) -> Self {
         Self {
             archive_service,
-            db,
+            pool,
             shutdown,
             tz,
         }
@@ -251,7 +242,7 @@ impl VerifyScheduler {
         result: &crate::orders::archive::DailyChainVerification,
     ) {
         let details = if !result.chain_intact {
-            serde_json::to_value(result).ok()
+            serde_json::to_string(result).ok()
         } else {
             None
         };
@@ -259,12 +250,12 @@ impl VerifyScheduler {
         let record = VerificationRecord {
             verification_type: "daily".to_string(),
             date: Some(date.to_string()),
-            total_orders: result.total_orders,
-            verified_orders: result.verified_orders,
+            total_orders: result.total_orders as i64,
+            verified_orders: result.verified_orders as i64,
             chain_intact: result.chain_intact,
-            chain_resets_count: result.chain_resets.len(),
-            chain_breaks_count: result.chain_breaks.len(),
-            invalid_orders_count: result.invalid_orders.len(),
+            chain_resets_count: result.chain_resets.len() as i64,
+            chain_breaks_count: result.chain_breaks.len() as i64,
+            invalid_orders_count: result.invalid_orders.len() as i64,
             details,
             created_at: shared::util::now_millis(),
         };
@@ -276,6 +267,7 @@ impl VerifyScheduler {
 
     /// Fix #4: 验证失败时也写入记录（chain_intact = false, 0 订单），推进进度
     async fn save_error_daily(&self, date: &str, error: &str) {
+        let details = serde_json::json!({ "error": error }).to_string();
         let record = VerificationRecord {
             verification_type: "daily".to_string(),
             date: Some(date.to_string()),
@@ -285,7 +277,7 @@ impl VerifyScheduler {
             chain_resets_count: 0,
             chain_breaks_count: 0,
             invalid_orders_count: 0,
-            details: Some(serde_json::json!({ "error": error })),
+            details: Some(details),
             created_at: shared::util::now_millis(),
         };
 
@@ -294,16 +286,24 @@ impl VerifyScheduler {
         }
     }
 
-    /// Fix #3: 使用 upsert 写入 SurrealDB，按 (type, date) 去重
-    async fn save_record(&self, date: &str, record: VerificationRecord) -> Result<(), String> {
-        // 用 verification_type + date 作为确定性 ID，天然去重
-        let id = format!("daily_{}", date.replace('-', ""));
-        let _: Option<VerificationRecord> = self
-            .db
-            .upsert((TABLE, &id))
-            .content(record)
-            .await
-            .map_err(|e| e.to_string())?;
+    /// 使用 INSERT OR REPLACE 写入 SQLite，按 (verification_type, date) UNIQUE 约束去重
+    async fn save_record(&self, _date: &str, record: VerificationRecord) -> Result<(), String> {
+        sqlx::query(
+            "INSERT OR REPLACE INTO archive_verification (verification_type, date, total_orders, verified_orders, chain_intact, chain_resets_count, chain_breaks_count, invalid_orders_count, details, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        )
+        .bind(&record.verification_type)
+        .bind(&record.date)
+        .bind(record.total_orders)
+        .bind(record.verified_orders)
+        .bind(record.chain_intact)
+        .bind(record.chain_resets_count)
+        .bind(record.chain_breaks_count)
+        .bind(record.invalid_orders_count)
+        .bind(&record.details)
+        .bind(record.created_at)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -313,43 +313,30 @@ impl VerifyScheduler {
 
     /// 查询最近一次 daily 验证的日期
     async fn last_daily_date(&self) -> Result<Option<String>, String> {
-        let mut result = self
-            .db
-            .query(
-                r#"
-                SELECT date
-                FROM archive_verification
-                WHERE verification_type = "daily"
-                ORDER BY date DESC
-                LIMIT 1
-                "#,
-            )
-            .await
-            .map_err(|e| e.to_string())?;
+        let row: Option<(Option<String>,)> = sqlx::query_as(
+            "SELECT date FROM archive_verification WHERE verification_type = 'daily' ORDER BY date DESC LIMIT 1",
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
-        let rows: Vec<LastDateRow> = result.take(0).map_err(|e| e.to_string())?;
-        Ok(rows.into_iter().next().and_then(|r| r.date))
+        Ok(row.and_then(|r| r.0))
     }
 
     /// 查询最早的归档订单日期
     async fn earliest_order_date(&self) -> Result<Option<NaiveDate>, String> {
-        #[derive(Debug, Deserialize)]
-        struct DateRow {
-            created_at: i64,
-        }
+        let row: Option<(i64,)> = sqlx::query_as(
+            "SELECT created_at FROM archived_order ORDER BY created_at ASC LIMIT 1",
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
-        let mut result = self
-            .db
-            .query("SELECT created_at FROM order ORDER BY created_at LIMIT 1")
-            .await
-            .map_err(|e| e.to_string())?;
-
-        let rows: Vec<DateRow> = result.take(0).map_err(|e| e.to_string())?;
-        match rows.into_iter().next() {
-            Some(r) => {
-                let date = chrono::DateTime::from_timestamp_millis(r.created_at)
+        match row {
+            Some((created_at,)) => {
+                let date = chrono::DateTime::from_timestamp_millis(created_at)
                     .map(|dt| dt.date_naive())
-                    .ok_or_else(|| format!("Invalid timestamp: {}", r.created_at))?;
+                    .ok_or_else(|| format!("Invalid timestamp: {}", created_at))?;
                 Ok(Some(date))
             }
             None => Ok(None),
@@ -362,9 +349,7 @@ impl VerifyScheduler {
 
     /// 获取 business_day_cutoff (NaiveTime)
     async fn get_cutoff(&self) -> NaiveTime {
-        let store_repo = StoreInfoRepository::new(self.db.clone());
-        let cutoff_str = store_repo
-            .get()
+        let cutoff_str = store_info::get(&self.pool)
             .await
             .ok()
             .flatten()

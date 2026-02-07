@@ -27,7 +27,7 @@ use redb::{
     Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition,
     WriteTransaction,
 };
-use crate::db::models::PriceRule;
+use shared::models::PriceRule;
 use shared::order::{OrderEvent, OrderSnapshot};
 use std::path::Path;
 use std::sync::Arc;
@@ -1245,17 +1245,17 @@ mod tests {
     // ========== Rule Snapshot Tests ==========
 
     fn create_test_rule(name: &str) -> PriceRule {
-        use crate::db::models::price_rule::{AdjustmentType, ProductScope, RuleType};
+        use shared::models::price_rule::{AdjustmentType, ProductScope, RuleType};
         PriceRule {
-            id: None,
+            id: 0,
             name: name.to_string(),
             display_name: name.to_string(),
             receipt_name: name.to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: "zone:all".to_string(),
+            target_id: None,
+            zone_scope: shared::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
             is_stackable: false,

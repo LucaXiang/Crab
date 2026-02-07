@@ -2,16 +2,19 @@
 //!
 //! Logic for matching rules to products and checking time validity.
 
-use crate::db::models::{PriceRule, ProductScope};
+use shared::models::{PriceRule, ProductScope};
 use chrono::Datelike;
 use tracing::trace;
 
 /// Check if a rule matches a product based on scope
+///
+/// IDs are now i64. The caller must parse string IDs to i64 before calling,
+/// or pass i64 IDs directly.
 pub fn matches_product_scope(
     rule: &PriceRule,
-    product_id: &str,
-    category_id: Option<&str>,
-    tags: &[String],
+    product_id: i64,
+    category_id: Option<i64>,
+    tag_ids: &[i64],
 ) -> bool {
     let result = match rule.product_scope {
         ProductScope::Global => {
@@ -24,15 +27,12 @@ pub fn matches_product_scope(
             true
         }
         ProductScope::Product => {
-            if let Some(target) = &rule.target {
-                // target is RecordId like "product:xxx", product_id should also be in full format
-                // Use tb and id.to_raw() for consistent format (avoids SurrealDB's ⟨⟩ brackets)
-                let target_str = format!("{}:{}", target.table(), target.key());
-                let matches = target_str == product_id;
+            if let Some(target_id) = rule.target_id {
+                let matches = target_id == product_id;
                 trace!(
                     rule_name = %rule.name,
                     product_scope = ?rule.product_scope,
-                    target = %target_str,
+                    target_id,
                     product_id,
                     matches,
                     "[ProductScope] Product scope check"
@@ -49,16 +49,13 @@ pub fn matches_product_scope(
             }
         }
         ProductScope::Category => {
-            if let (Some(target), Some(cat_id)) = (&rule.target, category_id) {
-                // target is RecordId like "category:xxx", cat_id should also be in full format
-                // Use tb and id.to_raw() for consistent format (avoids SurrealDB's ⟨⟩ brackets)
-                let target_str = format!("{}:{}", target.table(), target.key());
-                let matches = target_str == cat_id;
+            if let (Some(target_id), Some(cat_id)) = (rule.target_id, category_id) {
+                let matches = target_id == cat_id;
                 trace!(
                     rule_name = %rule.name,
                     product_scope = ?rule.product_scope,
-                    target = %target_str,
-                    category_id = %cat_id,
+                    target_id,
+                    category_id = cat_id,
                     product_id,
                     matches,
                     "[ProductScope] Category scope check"
@@ -68,7 +65,7 @@ pub fn matches_product_scope(
                 trace!(
                     rule_name = %rule.name,
                     product_scope = ?rule.product_scope,
-                    target = ?rule.target.as_ref().map(|t| t.to_string()),
+                    target_id = ?rule.target_id,
                     category_id = ?category_id,
                     product_id,
                     "[ProductScope] Category scope - missing target or category_id"
@@ -77,17 +74,14 @@ pub fn matches_product_scope(
             }
         }
         ProductScope::Tag => {
-            if let Some(target) = &rule.target {
-                // target is RecordId like "tag:xxx", tags should also be in full format
-                // Use tb and id.to_raw() for consistent format (avoids SurrealDB's ⟨⟩ brackets)
-                let target_str = format!("{}:{}", target.table(), target.key());
-                let matches = tags.iter().any(|t| t == &target_str);
+            if let Some(target_id) = rule.target_id {
+                let matches = tag_ids.iter().any(|&t| t == target_id);
                 trace!(
                     rule_name = %rule.name,
                     product_scope = ?rule.product_scope,
-                    target = %target_str,
+                    target_id,
                     product_id,
-                    tags = ?tags,
+                    tags = ?tag_ids,
                     matches,
                     "[ProductScope] Tag scope check"
                 );
@@ -108,7 +102,7 @@ pub fn matches_product_scope(
         rule_name = %rule.name,
         product_id,
         category_id = ?category_id,
-        tags_count = tags.len(),
+        tags_count = tag_ids.len(),
         result,
         "[ProductScope] Final match result"
     );
@@ -116,9 +110,9 @@ pub fn matches_product_scope(
     result
 }
 
-/// Zone scope constants
-pub const ZONE_SCOPE_ALL: &str = "zone:all";
-pub const ZONE_SCOPE_RETAIL: &str = "zone:retail";
+// Re-export zone scope constants from shared
+pub use shared::models::ZONE_SCOPE_ALL;
+pub use shared::models::ZONE_SCOPE_RETAIL;
 
 /// Check if a rule matches the zone scope
 /// zone_scope: "zone:all" = all zones, "zone:retail" = retail only, "zone:xxx" = specific zone
@@ -217,19 +211,18 @@ pub fn is_time_valid(rule: &PriceRule, current_time: i64, tz: chrono_tz::Tz) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::models::{AdjustmentType, RuleType};
-    use surrealdb::RecordId;
+    use shared::models::{AdjustmentType, RuleType};
 
-    fn make_rule(product_scope: ProductScope, target: Option<&str>) -> PriceRule {
+    fn make_rule(product_scope: ProductScope, target_id: Option<i64>) -> PriceRule {
         PriceRule {
-            id: None,
+            id: 0,
             name: "test".to_string(),
             display_name: "Test".to_string(),
             receipt_name: "TEST".to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope,
-            target: target.map(|t| t.parse::<RecordId>().unwrap()),
+            target_id,
             zone_scope: ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
@@ -249,30 +242,28 @@ mod tests {
     #[test]
     fn test_global_scope_matches_all() {
         let rule = make_rule(ProductScope::Global, None);
-        // All IDs should be in full format "table:id"
         assert!(matches_product_scope(
             &rule,
-            "product:123",
-            Some("category:cat1"),
+            123,
+            Some(1),
             &[]
         ));
     }
 
     #[test]
     fn test_product_scope_matches_specific() {
-        let rule = make_rule(ProductScope::Product, Some("product:123"));
+        let rule = make_rule(ProductScope::Product, Some(123));
 
-        // All IDs should be in full format "table:id"
         assert!(matches_product_scope(
             &rule,
-            "product:123",
-            Some("category:cat1"),
+            123,
+            Some(1),
             &[]
         ));
         assert!(!matches_product_scope(
             &rule,
-            "product:456",
-            Some("category:cat1"),
+            456,
+            Some(1),
             &[]
         ));
     }
@@ -281,7 +272,7 @@ mod tests {
     fn test_zone_scope_all() {
         let mut rule = make_rule(ProductScope::Global, None);
         rule.zone_scope = ZONE_SCOPE_ALL.to_string();
-        assert!(matches_zone_scope(&rule, Some("zone:1"), false));
+        assert!(matches_zone_scope(&rule, Some("1"), false));
         assert!(matches_zone_scope(&rule, None, true));
     }
 
@@ -290,7 +281,7 @@ mod tests {
         let mut rule = make_rule(ProductScope::Global, None);
         rule.zone_scope = ZONE_SCOPE_RETAIL.to_string();
         assert!(matches_zone_scope(&rule, None, true));
-        assert!(!matches_zone_scope(&rule, Some("zone:1"), false));
+        assert!(!matches_zone_scope(&rule, Some("1"), false));
     }
 
     // ===========================================

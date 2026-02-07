@@ -1,258 +1,146 @@
 //! Price Rule Repository
 
-use super::{BaseRepository, RepoError, RepoResult};
-use crate::db::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope};
-use surrealdb::engine::local::Db;
-use surrealdb::{RecordId, Surreal};
+use super::{RepoError, RepoResult};
+use shared::models::{PriceRule, PriceRuleCreate, PriceRuleUpdate, ProductScope, ZONE_SCOPE_ALL};
+use sqlx::SqlitePool;
 
-#[derive(Clone)]
-pub struct PriceRuleRepository {
-    base: BaseRepository,
+pub async fn find_all(pool: &SqlitePool) -> RepoResult<Vec<PriceRule>> {
+    let rules = sqlx::query_as::<_, PriceRule>(
+        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE is_active = 1 ORDER BY created_at DESC",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(rules)
 }
 
-impl PriceRuleRepository {
-    pub fn new(db: Surreal<Db>) -> Self {
-        Self {
-            base: BaseRepository::new(db),
-        }
+/// Find active rules by zone scope (DB-level filtering)
+pub async fn find_by_zone(
+    pool: &SqlitePool,
+    zone_id: Option<i64>,
+    is_retail: bool,
+) -> RepoResult<Vec<PriceRule>> {
+    let zone_id_str = zone_id.map(|id| id.to_string()).unwrap_or_default();
+    let rules = sqlx::query_as::<_, PriceRule>(
+        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE is_active = 1 AND (zone_scope = 'all' OR (zone_scope = 'retail' AND ?1 = 1) OR zone_scope = ?2) ORDER BY created_at DESC",
+    )
+    .bind(is_retail)
+    .bind(&zone_id_str)
+    .fetch_all(pool)
+    .await?;
+    Ok(rules)
+}
+
+pub async fn find_by_scope(pool: &SqlitePool, scope: ProductScope) -> RepoResult<Vec<PriceRule>> {
+    let rules = sqlx::query_as::<_, PriceRule>(
+        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE is_active = 1 AND product_scope = ? ORDER BY created_at DESC",
+    )
+    .bind(&scope)
+    .fetch_all(pool)
+    .await?;
+    Ok(rules)
+}
+
+pub async fn find_by_id(pool: &SqlitePool, id: i64) -> RepoResult<Option<PriceRule>> {
+    let rule = sqlx::query_as::<_, PriceRule>(
+        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(rule)
+}
+
+pub async fn find_by_name(pool: &SqlitePool, name: &str) -> RepoResult<Option<PriceRule>> {
+    let rule = sqlx::query_as::<_, PriceRule>(
+        "SELECT id, name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at FROM price_rule WHERE name = ? LIMIT 1",
+    )
+    .bind(name)
+    .fetch_optional(pool)
+    .await?;
+    Ok(rule)
+}
+
+pub async fn create(pool: &SqlitePool, data: PriceRuleCreate) -> RepoResult<PriceRule> {
+    let now = shared::util::now_millis();
+    let zone_scope = data.zone_scope.unwrap_or_else(|| ZONE_SCOPE_ALL.to_string());
+    let active_days_json = data
+        .active_days
+        .as_ref()
+        .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
+
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO price_rule (name, display_name, receipt_name, description, rule_type, product_scope, target_id, zone_scope, adjustment_type, adjustment_value, is_stackable, is_exclusive, valid_from, valid_until, active_days, active_start_time, active_end_time, is_active, created_by, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 1, ?18, ?19) RETURNING id",
+    )
+    .bind(&data.name)
+    .bind(&data.display_name)
+    .bind(&data.receipt_name)
+    .bind(&data.description)
+    .bind(&data.rule_type)
+    .bind(&data.product_scope)
+    .bind(data.target_id)
+    .bind(&zone_scope)
+    .bind(&data.adjustment_type)
+    .bind(data.adjustment_value)
+    .bind(data.is_stackable.unwrap_or(true))
+    .bind(data.is_exclusive.unwrap_or(false))
+    .bind(data.valid_from)
+    .bind(data.valid_until)
+    .bind(&active_days_json)
+    .bind(&data.active_start_time)
+    .bind(&data.active_end_time)
+    .bind(data.created_by)
+    .bind(now)
+    .fetch_one(pool)
+    .await?;
+
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::Database("Failed to create price rule".into()))
+}
+
+pub async fn update(pool: &SqlitePool, id: i64, data: PriceRuleUpdate) -> RepoResult<PriceRule> {
+    let active_days_json = data
+        .active_days
+        .as_ref()
+        .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()));
+
+    let rows = sqlx::query(
+        "UPDATE price_rule SET name = COALESCE(?1, name), display_name = COALESCE(?2, display_name), receipt_name = COALESCE(?3, receipt_name), description = COALESCE(?4, description), rule_type = COALESCE(?5, rule_type), product_scope = COALESCE(?6, product_scope), target_id = COALESCE(?7, target_id), zone_scope = COALESCE(?8, zone_scope), adjustment_type = COALESCE(?9, adjustment_type), adjustment_value = COALESCE(?10, adjustment_value), is_stackable = COALESCE(?11, is_stackable), is_exclusive = COALESCE(?12, is_exclusive), valid_from = COALESCE(?13, valid_from), valid_until = COALESCE(?14, valid_until), active_days = COALESCE(?15, active_days), active_start_time = COALESCE(?16, active_start_time), active_end_time = COALESCE(?17, active_end_time), is_active = COALESCE(?18, is_active) WHERE id = ?19",
+    )
+    .bind(&data.name)
+    .bind(&data.display_name)
+    .bind(&data.receipt_name)
+    .bind(&data.description)
+    .bind(&data.rule_type)
+    .bind(&data.product_scope)
+    .bind(data.target_id)
+    .bind(&data.zone_scope)
+    .bind(&data.adjustment_type)
+    .bind(data.adjustment_value)
+    .bind(data.is_stackable)
+    .bind(data.is_exclusive)
+    .bind(data.valid_from)
+    .bind(data.valid_until)
+    .bind(&active_days_json)
+    .bind(&data.active_start_time)
+    .bind(&data.active_end_time)
+    .bind(data.is_active)
+    .bind(id)
+    .execute(pool)
+    .await?;
+
+    if rows.rows_affected() == 0 {
+        return Err(RepoError::NotFound(format!("Price rule {id} not found")));
     }
+    find_by_id(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::NotFound(format!("Price rule {id} not found")))
+}
 
-    /// Find active rules by zone scope (DB-level filtering)
-    ///
-    /// Matches rules where:
-    /// - zone_scope = "zone:all" (applies to all zones)
-    /// - zone_scope = "zone:retail" AND is_retail = true
-    /// - zone_scope = specific zone_id
-    pub async fn find_by_zone(
-        &self,
-        zone_id: Option<&str>,
-        is_retail: bool,
-    ) -> RepoResult<Vec<PriceRule>> {
-        let zone_id_owned = zone_id.unwrap_or("").to_string();
-        let rules: Vec<PriceRule> = self
-            .base
-            .db()
-            .query(
-                "SELECT * FROM price_rule WHERE is_active = true AND (
-                    zone_scope = 'zone:all'
-                    OR (zone_scope = 'zone:retail' AND $is_retail = true)
-                    OR zone_scope = $zone_id
-                ) ORDER BY created_at DESC",
-            )
-            .bind(("is_retail", is_retail))
-            .bind(("zone_id", zone_id_owned))
-            .await?
-            .take(0)?;
-        Ok(rules)
-    }
-
-    /// Find all active price rules
-    pub async fn find_all(&self) -> RepoResult<Vec<PriceRule>> {
-        let rules: Vec<PriceRule> = self
-            .base
-            .db()
-            .query("SELECT * FROM price_rule WHERE is_active = true ORDER BY created_at DESC")
-            .await?
-            .take(0)?;
-        Ok(rules)
-    }
-
-    /// Find active rules by scope
-    pub async fn find_by_scope(&self, scope: ProductScope) -> RepoResult<Vec<PriceRule>> {
-        let rules: Vec<PriceRule> = self
-            .base
-            .db()
-            .query("SELECT * FROM price_rule WHERE is_active = true AND product_scope = $scope ORDER BY created_at DESC")
-            .bind(("scope", scope))
-            .await?
-            .take(0)?;
-        Ok(rules)
-    }
-
-    /// Find rules applicable to a product (global + category + tag + product-specific)
-    pub async fn find_for_product(&self, product_id: &str) -> RepoResult<Vec<PriceRule>> {
-        let pid_owned = product_id.to_string();
-        let mut result = self
-            .base
-            .db()
-            .query(
-                r#"
-                LET $prod = type::thing("product", $pid);
-                LET $product = (SELECT * FROM product WHERE id = $prod)[0];
-                LET $cat = $product.category;
-                LET $tags = $product.tags;
-
-                SELECT * FROM price_rule
-                WHERE is_active = true AND (
-                    product_scope = "GLOBAL" OR
-                    (product_scope = "PRODUCT" AND target = $prod) OR
-                    (product_scope = "CATEGORY" AND target = $cat) OR
-                    (product_scope = "TAG" AND target IN $tags)
-                )
-                ORDER BY created_at DESC;
-                "#,
-            )
-            .bind(("pid", pid_owned))
-            .await?;
-        let rules: Vec<PriceRule> = result.take(0)?;
-        Ok(rules)
-    }
-
-    /// Find rule by id
-    pub async fn find_by_id(&self, id: &str) -> RepoResult<Option<PriceRule>> {
-        let thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-        let rule: Option<PriceRule> = self.base.db().select(thing).await?;
-        Ok(rule)
-    }
-
-    /// Find rule by name
-    pub async fn find_by_name(&self, name: &str) -> RepoResult<Option<PriceRule>> {
-        let name_owned = name.to_string();
-        let mut result = self
-            .base
-            .db()
-            .query("SELECT * FROM price_rule WHERE name = $name LIMIT 1")
-            .bind(("name", name_owned))
-            .await?;
-        let rules: Vec<PriceRule> = result.take(0)?;
-        Ok(rules.into_iter().next())
-    }
-
-    /// Create a new price rule
-    pub async fn create(&self, data: PriceRuleCreate) -> RepoResult<PriceRule> {
-        // Convert target string to RecordId if provided
-        let target_thing: Option<RecordId> = data.target.as_ref().and_then(|t| t.parse().ok());
-
-        let mut result = self
-            .base
-            .db()
-            .query(
-                r#"CREATE price_rule SET
-                    name = $name,
-                    display_name = $display_name,
-                    receipt_name = $receipt_name,
-                    description = $description,
-                    rule_type = $rule_type,
-                    product_scope = $product_scope,
-                    target = $target,
-                    zone_scope = $zone_scope,
-                    adjustment_type = $adjustment_type,
-                    adjustment_value = $adjustment_value,
-                    is_stackable = $is_stackable,
-                    is_exclusive = $is_exclusive,
-                    valid_from = $valid_from,
-                    valid_until = $valid_until,
-                    active_days = $active_days,
-                    active_start_time = $active_start_time,
-                    active_end_time = $active_end_time,
-                    is_active = true,
-                    created_by = $created_by,
-                    created_at = $now
-                RETURN AFTER"#,
-            )
-            .bind(("name", data.name))
-            .bind(("display_name", data.display_name))
-            .bind(("receipt_name", data.receipt_name))
-            .bind(("description", data.description))
-            .bind(("rule_type", data.rule_type))
-            .bind(("product_scope", data.product_scope))
-            .bind(("target", target_thing))
-            .bind(("zone_scope", data.zone_scope.unwrap_or_else(|| crate::db::models::ZONE_SCOPE_ALL.to_string())))
-            .bind(("adjustment_type", data.adjustment_type))
-            .bind(("adjustment_value", data.adjustment_value))
-            .bind(("is_stackable", data.is_stackable.unwrap_or(true)))
-            .bind(("is_exclusive", data.is_exclusive.unwrap_or(false)))
-            .bind(("valid_from", data.valid_from))
-            .bind(("valid_until", data.valid_until))
-            .bind(("active_days", data.active_days))
-            .bind(("active_start_time", data.active_start_time))
-            .bind(("active_end_time", data.active_end_time))
-            .bind(("created_by", data.created_by))
-            .bind(("now", shared::util::now_millis()))
-            .await?;
-
-        let created: Option<PriceRule> = result.take(0)?;
-        created.ok_or_else(|| RepoError::Database("Failed to create price rule".to_string()))
-    }
-
-    /// Update a price rule
-    pub async fn update(&self, id: &str, data: PriceRuleUpdate) -> RepoResult<PriceRule> {
-        let thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-
-        // Convert target string to RecordId if provided
-        let target_thing: Option<RecordId> = data.target.as_ref().and_then(|t| t.parse().ok());
-
-        let mut result = self.base
-            .db()
-            .query(
-                r#"UPDATE $thing SET
-                    name = $name OR name,
-                    display_name = $display_name OR display_name,
-                    receipt_name = $receipt_name OR receipt_name,
-                    description = $description OR description,
-                    rule_type = $rule_type OR rule_type,
-                    product_scope = $product_scope OR product_scope,
-                    target = IF $has_target THEN $target ELSE target END,
-                    zone_scope = $zone_scope OR zone_scope,
-                    adjustment_type = $adjustment_type OR adjustment_type,
-                    adjustment_value = IF $has_adj_value THEN $adjustment_value ELSE adjustment_value END,
-                    is_stackable = IF $has_stackable THEN $is_stackable ELSE is_stackable END,
-                    is_exclusive = IF $has_exclusive THEN $is_exclusive ELSE is_exclusive END,
-                    valid_from = IF $has_valid_from THEN $valid_from ELSE valid_from END,
-                    valid_until = IF $has_valid_until THEN $valid_until ELSE valid_until END,
-                    active_days = IF $has_active_days THEN $active_days ELSE active_days END,
-                    active_start_time = $active_start_time OR active_start_time,
-                    active_end_time = $active_end_time OR active_end_time,
-                    is_active = IF $has_is_active THEN $is_active ELSE is_active END
-                RETURN AFTER"#,
-            )
-            .bind(("thing", thing))
-            .bind(("name", data.name))
-            .bind(("display_name", data.display_name))
-            .bind(("receipt_name", data.receipt_name))
-            .bind(("description", data.description))
-            .bind(("rule_type", data.rule_type))
-            .bind(("product_scope", data.product_scope))
-            .bind(("has_target", data.target.is_some()))
-            .bind(("target", target_thing))
-            .bind(("zone_scope", data.zone_scope))
-            .bind(("adjustment_type", data.adjustment_type))
-            .bind(("has_adj_value", data.adjustment_value.is_some()))
-            .bind(("adjustment_value", data.adjustment_value))
-            .bind(("has_stackable", data.is_stackable.is_some()))
-            .bind(("is_stackable", data.is_stackable))
-            .bind(("has_exclusive", data.is_exclusive.is_some()))
-            .bind(("is_exclusive", data.is_exclusive))
-            .bind(("has_valid_from", data.valid_from.is_some()))
-            .bind(("valid_from", data.valid_from))
-            .bind(("has_valid_until", data.valid_until.is_some()))
-            .bind(("valid_until", data.valid_until))
-            .bind(("has_active_days", data.active_days.is_some()))
-            .bind(("active_days", data.active_days))
-            .bind(("active_start_time", data.active_start_time))
-            .bind(("active_end_time", data.active_end_time))
-            .bind(("has_is_active", data.is_active.is_some()))
-            .bind(("is_active", data.is_active))
-            .await?;
-
-        result.take::<Option<PriceRule>>(0)?
-            .ok_or_else(|| RepoError::NotFound(format!("Price rule {} not found", id)))
-    }
-
-    /// Hard delete a price rule
-    pub async fn delete(&self, id: &str) -> RepoResult<bool> {
-        let thing: RecordId = id
-            .parse()
-            .map_err(|_| RepoError::Validation(format!("Invalid ID: {}", id)))?;
-        self.base
-            .db()
-            .query("DELETE $thing")
-            .bind(("thing", thing))
-            .await?;
-        Ok(true)
-    }
+pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
+    sqlx::query("DELETE FROM price_rule WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(true)
 }

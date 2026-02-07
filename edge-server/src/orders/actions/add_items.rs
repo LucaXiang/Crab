@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use tracing::{debug, info};
 
-use crate::db::models::PriceRule;
+use shared::models::PriceRule;
 use crate::services::catalog_service::ProductMeta;
 use crate::orders::reducer::input_to_snapshot_with_rules;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
@@ -74,7 +74,7 @@ impl CommandHandler for AddItemsAction {
                 is_stackable = rule.is_stackable,
                 is_exclusive = rule.is_exclusive,
                 is_active = rule.is_active,
-                target = ?rule.target.as_ref().map(|t| t.to_string()),
+                target_id = ?rule.target_id,
                 "[AddItems] Available rule"
             );
         }
@@ -86,9 +86,17 @@ impl CommandHandler for AddItemsAction {
             .map(|(idx, item)| {
                 // Get product metadata from cache for rule matching
                 let meta = self.product_metadata.get(&item.product_id);
-                let category_id = meta.map(|m| m.category_id.as_str());
-                let empty_tags: Vec<String> = Vec::new();
-                let tags = meta.map(|m| m.tags.as_slice()).unwrap_or(&empty_tags);
+                // Parse string IDs to i64 for rule matching
+                // product_id is in "table:key" format in CartItemInput, extract the numeric part
+                let product_id_i64: i64 = item.product_id
+                    .split(':')
+                    .last()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0);
+                let category_id: Option<i64> = meta.and_then(|m| m.category_id.parse().ok());
+                let tag_ids: Vec<i64> = meta
+                    .map(|m| m.tags.iter().filter_map(|t| t.parse().ok()).collect())
+                    .unwrap_or_default();
 
                 debug!(
                     item_idx = idx,
@@ -99,11 +107,11 @@ impl CommandHandler for AddItemsAction {
                     quantity = item.quantity,
                     manual_discount_percent = ?item.manual_discount_percent,
                     category_id = ?category_id,
-                    tags_count = tags.len(),
+                    tags_count = tag_ids.len(),
                     "[AddItems] Processing item"
                 );
 
-                let mut snapshot = input_to_snapshot_with_rules(item, &rules_refs, category_id, tags);
+                let mut snapshot = input_to_snapshot_with_rules(item, &rules_refs, product_id_i64, category_id, &tag_ids);
 
                 // Set tax_rate and category_name from product metadata
                 snapshot.tax_rate = meta.map(|m| m.tax_rate);

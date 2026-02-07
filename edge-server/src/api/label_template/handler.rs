@@ -4,60 +4,42 @@ use axum::{
     Json,
     extract::{Extension, Path, State},
 };
-use surrealdb::RecordId;
 
 use crate::audit::AuditAction;
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::models::{LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate};
-use crate::db::repository::LabelTemplateRepository;
+use crate::db::repository::label_template;
 use crate::utils::{AppError, AppResult};
+use shared::models::{LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate};
 
-const TABLE: &str = "label_template";
 const RESOURCE: &str = "label_template";
 
 /// GET /api/label-templates - List all active label templates
 pub async fn list(State(state): State<ServerState>) -> AppResult<Json<Vec<LabelTemplate>>> {
-    let repo = LabelTemplateRepository::new(state.db.clone(), state.images_dir());
-    let templates = repo
-        .list()
-        .await
-        ?;
+    let templates = label_template::list(&state.pool).await?;
     Ok(Json(templates))
 }
 
 /// GET /api/label-templates/all - List all label templates (including inactive)
 pub async fn list_all(State(state): State<ServerState>) -> AppResult<Json<Vec<LabelTemplate>>> {
-    let repo = LabelTemplateRepository::new(state.db.clone(), state.images_dir());
-    let templates = repo
-        .list_all()
-        .await
-        ?;
+    let templates = label_template::list_all(&state.pool).await?;
     Ok(Json(templates))
 }
 
 /// GET /api/label-templates/default - Get the default label template
 pub async fn get_default(State(state): State<ServerState>) -> AppResult<Json<Option<LabelTemplate>>> {
-    let repo = LabelTemplateRepository::new(state.db.clone(), state.images_dir());
-    let template = repo
-        .get_default()
-        .await
-        ?;
+    let template = label_template::get_default(&state.pool).await?;
     Ok(Json(template))
 }
 
 /// GET /api/label-templates/:id - Get a label template by ID
 pub async fn get_by_id(
     State(state): State<ServerState>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<LabelTemplate>> {
-    let record_id = RecordId::from_table_key(TABLE, &id);
-    let repo = LabelTemplateRepository::new(state.db.clone(), state.images_dir());
-    let template = repo
-        .get(&record_id)
-        .await
-        ?
+    let template = label_template::get(&state.pool, id)
+        .await?
         .ok_or_else(|| AppError::not_found(format!("Label template {} not found", id)))?;
     Ok(Json(template))
 }
@@ -68,13 +50,9 @@ pub async fn create(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<LabelTemplateCreate>,
 ) -> AppResult<Json<LabelTemplate>> {
-    let repo = LabelTemplateRepository::new(state.db.clone(), state.images_dir());
-    let template = repo
-        .create(payload)
-        .await
-        ?;
+    let template = label_template::create(&state.pool, payload).await?;
 
-    let id = template.id.as_ref().map(|id| id.to_string()).unwrap_or_default();
+    let id = template.id.to_string();
 
     audit_log!(
         state.audit_service,
@@ -96,27 +74,24 @@ pub async fn create(
 pub async fn update(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
     Json(payload): Json<LabelTemplateUpdate>,
 ) -> AppResult<Json<LabelTemplate>> {
-    let record_id = RecordId::from_table_key(TABLE, &id);
-    let repo = LabelTemplateRepository::new(state.db.clone(), state.images_dir());
-    let template = repo
-        .update(&record_id, payload)
-        .await
-        ?;
+    let template = label_template::update(&state.pool, id, payload).await?;
+
+    let id_str = id.to_string();
 
     audit_log!(
         state.audit_service,
         AuditAction::LabelTemplateUpdated,
-        "label_template", &id,
+        "label_template", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
         details = serde_json::json!({"name": &template.name})
     );
 
     state
-        .broadcast_sync(RESOURCE, "updated", &id, Some(&template))
+        .broadcast_sync(RESOURCE, "updated", &id_str, Some(&template))
         .await;
 
     Ok(Json(template))
@@ -126,29 +101,26 @@ pub async fn update(
 pub async fn delete(
     State(state): State<ServerState>,
     Extension(current_user): Extension<CurrentUser>,
-    Path(id): Path<String>,
+    Path(id): Path<i64>,
 ) -> AppResult<Json<bool>> {
-    let record_id = RecordId::from_table_key(TABLE, &id);
-    let repo = LabelTemplateRepository::new(state.db.clone(), state.images_dir());
-    let name_for_audit = repo.get(&record_id).await.ok().flatten()
+    let name_for_audit = label_template::get(&state.pool, id).await.ok().flatten()
         .map(|t| t.name.clone()).unwrap_or_default();
-    let result = repo
-        .delete(&record_id)
-        .await
-        ?;
+    let result = label_template::delete(&state.pool, id).await?;
+
+    let id_str = id.to_string();
 
     if result {
         audit_log!(
             state.audit_service,
             AuditAction::LabelTemplateDeleted,
-            "label_template", &id,
+            "label_template", &id_str,
             operator_id = Some(current_user.id.clone()),
             operator_name = Some(current_user.display_name.clone()),
             details = serde_json::json!({"name": name_for_audit})
         );
 
         state
-            .broadcast_sync::<()>(RESOURCE, "deleted", &id, None)
+            .broadcast_sync::<()>(RESOURCE, "deleted", &id_str, None)
             .await;
     }
 

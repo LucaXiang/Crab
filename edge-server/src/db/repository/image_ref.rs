@@ -1,198 +1,124 @@
 //! Image Reference Repository
-//!
-//! 管理图片引用计数，支持同步引用和查找孤儿图片
 
-use super::{BaseRepository, RepoResult};
-use crate::db::models::{ImageRef, ImageRefEntityType};
-use surrealdb::engine::local::Db;
-use surrealdb::Surreal;
+use super::RepoResult;
+use shared::models::{ImageRef, ImageRefEntityType};
+use sqlx::SqlitePool;
 use std::collections::HashSet;
 
-#[allow(dead_code)]
-const TABLE: &str = "image_ref";
+/// Sync image references for an entity.
+/// Returns the list of removed hashes (for orphan detection).
+pub async fn sync_refs(
+    pool: &SqlitePool,
+    entity_type: ImageRefEntityType,
+    entity_id: &str,
+    current_hashes: HashSet<String>,
+) -> RepoResult<Vec<String>> {
+    let entity_type_str = entity_type.as_str();
 
-#[derive(Clone)]
-pub struct ImageRefRepository {
-    base: BaseRepository,
+    // 1. Get existing refs
+    let existing = get_entity_refs(pool, entity_type, entity_id).await?;
+    let existing_hashes: HashSet<String> = existing.iter().map(|r| r.hash.clone()).collect();
+
+    // 2. Diff
+    let to_add: Vec<&String> = current_hashes.difference(&existing_hashes).collect();
+    let to_remove: Vec<String> = existing_hashes.difference(&current_hashes).cloned().collect();
+
+    // 3. Create new refs
+    let now = shared::util::now_millis();
+    for hash in &to_add {
+        sqlx::query(
+            "INSERT INTO image_ref (hash, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?)",
+        )
+        .bind(hash.as_str())
+        .bind(entity_type_str)
+        .bind(entity_id)
+        .bind(now)
+        .execute(pool)
+        .await?;
+    }
+
+    // 4. Delete removed refs
+    if !to_remove.is_empty() {
+        for hash in &to_remove {
+            sqlx::query(
+                "DELETE FROM image_ref WHERE entity_type = ? AND entity_id = ? AND hash = ?",
+            )
+            .bind(entity_type_str)
+            .bind(entity_id)
+            .bind(hash)
+            .execute(pool)
+            .await?;
+        }
+        return Ok(to_remove);
+    }
+
+    Ok(vec![])
 }
 
-impl ImageRefRepository {
-    pub fn new(db: Surreal<Db>) -> Self {
-        Self {
-            base: BaseRepository::new(db),
-        }
-    }
+/// Delete all image references for an entity. Returns removed hashes.
+pub async fn delete_entity_refs(
+    pool: &SqlitePool,
+    entity_type: ImageRefEntityType,
+    entity_id: &str,
+) -> RepoResult<Vec<String>> {
+    let entity_type_str = entity_type.as_str();
 
-    /// 同步实体的图片引用
-    ///
-    /// 1. 获取实体现有的引用
-    /// 2. 计算差异（新增/移除）
-    /// 3. 批量创建新引用
-    /// 4. 批量删除旧引用
-    /// 5. 返回被移除引用的 hash 列表（供调用方检查是否成为孤儿）
-    pub async fn sync_refs(
-        &self,
-        entity_type: ImageRefEntityType,
-        entity_id: &str,
-        current_hashes: HashSet<String>,
-    ) -> RepoResult<Vec<String>> {
-        let entity_type_str = entity_type.as_str().to_string();
-        let entity_id_owned = entity_id.to_string();
+    let refs = get_entity_refs(pool, entity_type, entity_id).await?;
+    let hashes: Vec<String> = refs.into_iter().map(|r| r.hash).collect();
 
-        // 1. 获取现有引用
-        let existing: Vec<ImageRef> = self
-            .base
-            .db()
-            .query("SELECT * FROM image_ref WHERE entity_type = $entity_type AND entity_id = $entity_id")
-            .bind(("entity_type", entity_type_str.clone()))
-            .bind(("entity_id", entity_id_owned.clone()))
-            .await?
-            .take(0)?;
+    sqlx::query("DELETE FROM image_ref WHERE entity_type = ? AND entity_id = ?")
+        .bind(entity_type_str)
+        .bind(entity_id)
+        .execute(pool)
+        .await?;
 
-        let existing_hashes: HashSet<String> = existing.iter().map(|r| r.hash.clone()).collect();
+    Ok(hashes)
+}
 
-        // 2. 计算差异
-        let to_add: Vec<String> = current_hashes.difference(&existing_hashes).cloned().collect();
-        let to_remove: Vec<String> = existing_hashes.difference(&current_hashes).cloned().collect();
-
-        // 3. 批量创建新引用
-        for hash in &to_add {
-            self.base
-                .db()
-                .query(
-                    "CREATE image_ref CONTENT {
-                        hash: $hash,
-                        entity_type: $entity_type,
-                        entity_id: $entity_id,
-                        created_at: $now
-                    }",
-                )
-                .bind(("hash", hash.clone()))
-                .bind(("entity_type", entity_type_str.clone()))
-                .bind(("entity_id", entity_id_owned.clone()))
-                .bind(("now", shared::util::now_millis()))
-                .await?;
-        }
-
-        // 4. 批量删除旧引用
-        if !to_remove.is_empty() {
-            self.base
-                .db()
-                .query(
-                    "DELETE image_ref WHERE entity_type = $entity_type AND entity_id = $entity_id AND hash IN $hashes",
-                )
-                .bind(("entity_type", entity_type_str))
-                .bind(("entity_id", entity_id_owned))
-                .bind(("hashes", to_remove.clone()))
-                .await?;
-
-            // 返回被移除的 hash
-            return Ok(to_remove);
-        }
-
-        Ok(vec![])
-    }
-
-    /// 删除实体的所有图片引用
-    ///
-    /// 返回被删除的 hash 列表（供调用方检查是否成为孤儿）
-    pub async fn delete_entity_refs(
-        &self,
-        entity_type: ImageRefEntityType,
-        entity_id: &str,
-    ) -> RepoResult<Vec<String>> {
-        let entity_type_str = entity_type.as_str().to_string();
-        let entity_id_owned = entity_id.to_string();
-
-        // 先获取所有引用的 hash
-        let refs: Vec<ImageRef> = self
-            .base
-            .db()
-            .query("SELECT * FROM image_ref WHERE entity_type = $entity_type AND entity_id = $entity_id")
-            .bind(("entity_type", entity_type_str.clone()))
-            .bind(("entity_id", entity_id_owned.clone()))
-            .await?
-            .take(0)?;
-
-        let hashes: Vec<String> = refs.into_iter().map(|r| r.hash).collect();
-
-        // 删除所有引用
-        self.base
-            .db()
-            .query("DELETE image_ref WHERE entity_type = $entity_type AND entity_id = $entity_id")
-            .bind(("entity_type", entity_type_str))
-            .bind(("entity_id", entity_id_owned))
+/// Count references for a hash
+pub async fn count_refs(pool: &SqlitePool, hash: &str) -> RepoResult<i64> {
+    let count =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM image_ref WHERE hash = ?")
+            .bind(hash)
+            .fetch_one(pool)
             .await?;
+    Ok(count)
+}
 
-        Ok(hashes)
+/// Find orphan hashes (hashes with zero references)
+pub async fn find_orphan_hashes(pool: &SqlitePool, hashes: &[String]) -> RepoResult<Vec<String>> {
+    if hashes.is_empty() {
+        return Ok(vec![]);
     }
 
-    /// 统计图片的引用数
-    pub async fn count_refs(&self, hash: &str) -> RepoResult<i64> {
-        let hash_owned = hash.to_string();
-        let mut result = self
-            .base
-            .db()
-            .query("SELECT count() FROM image_ref WHERE hash = $hash GROUP ALL")
-            .bind(("hash", hash_owned))
-            .await?;
-
-        let count: Option<i64> = result.take((0, "count"))?;
-        Ok(count.unwrap_or(0))
-    }
-
-    /// 找出没有引用的图片 hash（孤儿图片）
-    ///
-    /// 输入一组 hash，返回其中引用数为 0 的 hash
-    pub async fn find_orphan_hashes(&self, hashes: &[String]) -> RepoResult<Vec<String>> {
-        if hashes.is_empty() {
-            return Ok(vec![]);
+    // Find which hashes still have references
+    let mut referenced = HashSet::new();
+    for hash in hashes {
+        let count = count_refs(pool, hash).await?;
+        if count > 0 {
+            referenced.insert(hash.clone());
         }
-
-        // Batch query: find hashes that still have references
-        #[derive(serde::Deserialize)]
-        struct HashCount {
-            hash: String,
-        }
-
-        let referenced: Vec<HashCount> = self
-            .base
-            .db()
-            .query(
-                "SELECT hash FROM image_ref WHERE hash IN $hashes GROUP BY hash",
-            )
-            .bind(("hashes", hashes.to_vec()))
-            .await?
-            .take(0)?;
-
-        let referenced_set: HashSet<String> = referenced.into_iter().map(|r| r.hash).collect();
-
-        // Hashes not in the referenced set are orphans
-        Ok(hashes
-            .iter()
-            .filter(|h| !referenced_set.contains(*h))
-            .cloned()
-            .collect())
     }
 
-    /// 获取实体的所有图片引用
-    pub async fn get_entity_refs(
-        &self,
-        entity_type: ImageRefEntityType,
-        entity_id: &str,
-    ) -> RepoResult<Vec<ImageRef>> {
-        let entity_type_str = entity_type.as_str().to_string();
-        let entity_id_owned = entity_id.to_string();
+    Ok(hashes
+        .iter()
+        .filter(|h| !referenced.contains(*h))
+        .cloned()
+        .collect())
+}
 
-        let refs: Vec<ImageRef> = self
-            .base
-            .db()
-            .query("SELECT * FROM image_ref WHERE entity_type = $entity_type AND entity_id = $entity_id")
-            .bind(("entity_type", entity_type_str))
-            .bind(("entity_id", entity_id_owned))
-            .await?
-            .take(0)?;
-
-        Ok(refs)
-    }
+/// Get all image references for an entity
+pub async fn get_entity_refs(
+    pool: &SqlitePool,
+    entity_type: ImageRefEntityType,
+    entity_id: &str,
+) -> RepoResult<Vec<ImageRef>> {
+    let refs = sqlx::query_as::<_, ImageRef>(
+        "SELECT id, hash, entity_type, entity_id, created_at FROM image_ref WHERE entity_type = ? AND entity_id = ?",
+    )
+    .bind(entity_type.as_str())
+    .bind(entity_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(refs)
 }

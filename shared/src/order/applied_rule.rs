@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AppliedRule {
     // === Rule Identity ===
-    pub rule_id: String,
+    pub rule_id: i64,
     pub name: String,
     pub display_name: String,
     pub receipt_name: String,
@@ -18,11 +18,11 @@ pub struct AppliedRule {
 
     // === Scope Info ===
     pub product_scope: ProductScope,
-    /// Zone scope: "zone:all", "zone:retail", or specific zone ID
+    /// Zone scope: "all", "retail", or specific zone ID
     pub zone_scope: String,
 
     // === Calculation Info ===
-    /// Original value (10 = 10% or ¥10)
+    /// Original value (10 = 10% or €10)
     pub adjustment_value: f64,
     /// Calculated amount after applying rule
     pub calculated_amount: f64,
@@ -42,7 +42,7 @@ impl AppliedRule {
         calculated_amount: f64,
     ) -> Self {
         Self {
-            rule_id: rule.id.clone().unwrap_or_default(),
+            rule_id: rule.id,
             name: rule.name.clone(),
             display_name: rule.display_name.clone(),
             receipt_name: rule.receipt_name.clone(),
@@ -67,15 +67,15 @@ mod tests {
     #[test]
     fn test_applied_rule_from_rule() {
         let rule = PriceRule {
-            id: Some("rule-1".to_string()),
+            id: 1,
             name: "lunch".to_string(),
             display_name: "Lunch Discount".to_string(),
             receipt_name: "LUNCH".to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: "zone:all".to_string(),
+            target_id: None,
+            zone_scope: "all".to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
             is_stackable: true,
@@ -87,19 +87,19 @@ mod tests {
             active_end_time: None,
             is_active: true,
             created_by: None,
-            created_at: 1704067200000, // 2024-01-01T00:00:00Z in millis
+            created_at: 1704067200000,
         };
 
         let applied = AppliedRule::from_rule(&rule, 5.0);
 
-        assert_eq!(applied.rule_id, "rule-1");
+        assert_eq!(applied.rule_id, 1);
         assert_eq!(applied.name, "lunch");
         assert_eq!(applied.display_name, "Lunch Discount");
         assert_eq!(applied.receipt_name, "LUNCH");
         assert_eq!(applied.rule_type, RuleType::Discount);
         assert_eq!(applied.adjustment_type, AdjustmentType::Percentage);
         assert_eq!(applied.product_scope, ProductScope::Global);
-        assert_eq!(applied.zone_scope, "zone:all");
+        assert_eq!(applied.zone_scope, "all");
         assert_eq!(applied.adjustment_value, 10.0);
         assert_eq!(applied.calculated_amount, 5.0);
         assert!(applied.is_stackable);
@@ -110,14 +110,14 @@ mod tests {
     #[test]
     fn test_applied_rule_serialization() {
         let applied = AppliedRule {
-            rule_id: "rule-1".to_string(),
+            rule_id: 1,
             name: "test".to_string(),
             display_name: "Test".to_string(),
             receipt_name: "TEST".to_string(),
             rule_type: RuleType::Discount,
             adjustment_type: AdjustmentType::Percentage,
             product_scope: ProductScope::Global,
-            zone_scope: "zone:all".to_string(),
+            zone_scope: "all".to_string(),
             adjustment_value: 10.0,
             calculated_amount: 5.0,
             is_stackable: true,
@@ -133,16 +133,15 @@ mod tests {
 
     #[test]
     fn test_applied_rule_skipped_default() {
-        // Test that skipped defaults to false when deserializing without it
         let json = r#"{
-            "rule_id": "rule-1",
+            "rule_id": 1,
             "name": "test",
             "display_name": "Test",
             "receipt_name": "TEST",
             "rule_type": "DISCOUNT",
             "adjustment_type": "PERCENTAGE",
             "product_scope": "GLOBAL",
-            "zone_scope": "zone:all",
+            "zone_scope": "all",
             "adjustment_value": 10.0,
             "calculated_amount": 5.0,
             "is_stackable": true,

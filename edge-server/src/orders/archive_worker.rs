@@ -10,13 +10,12 @@ use super::archive::OrderArchiveService;
 use super::money::{to_decimal, to_f64};
 use super::storage::{OrderStorage, PendingArchive};
 use crate::audit::{AuditAction, AuditService};
-use crate::db::repository::{PaymentRepository, ShiftRepository};
+use crate::db::repository::{payment, shift};
 use rust_decimal::prelude::*;
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot};
+use sqlx::SqlitePool;
 use std::sync::Arc;
 use std::time::Duration;
-use surrealdb::engine::local::Db;
-use surrealdb::Surreal;
 use tokio::sync::mpsc;
 
 /// Arc-wrapped OrderEvent (from EventRouter)
@@ -44,7 +43,7 @@ pub struct ArchiveWorker {
     storage: OrderStorage,
     archive_service: OrderArchiveService,
     audit_service: Arc<AuditService>,
-    db: Surreal<Db>,
+    pool: SqlitePool,
     semaphore: Arc<tokio::sync::Semaphore>,
 }
 
@@ -53,13 +52,13 @@ impl ArchiveWorker {
         storage: OrderStorage,
         archive_service: OrderArchiveService,
         audit_service: Arc<AuditService>,
-        db: Surreal<Db>,
+        pool: SqlitePool,
     ) -> Self {
         Self {
             storage,
             archive_service,
             audit_service,
-            db,
+            pool,
             semaphore: Arc::new(tokio::sync::Semaphore::new(ARCHIVE_CONCURRENCY)),
         }
     }
@@ -250,8 +249,7 @@ impl ArchiveWorker {
             .map(|e| (Some(e.operator_id.as_str()), Some(e.operator_name.as_str())))
             .unwrap_or((None, None));
 
-        let repo = PaymentRepository::new(self.db.clone());
-        match repo.create_from_snapshot(snapshot, op_id, op_name).await {
+        match payment::create_from_snapshot(&self.pool, snapshot, op_id, op_name).await {
             Ok(count) => {
                 tracing::info!(
                     order_id = %snapshot.order_id,
@@ -434,9 +432,19 @@ impl ArchiveWorker {
             return;
         };
 
-        let shift_repo = ShiftRepository::new(self.db.clone());
         let cash_amount = to_f64(cash_total);
-        if let Err(e) = shift_repo.add_cash_payment(&operator_id, cash_amount).await {
+        let op_id: i64 = match operator_id.parse() {
+            Ok(id) => id,
+            Err(_) => {
+                tracing::warn!(
+                    order_id = %snapshot.order_id,
+                    operator_id = %operator_id,
+                    "Invalid operator_id format for cash tracking"
+                );
+                return;
+            }
+        };
+        if let Err(e) = shift::add_cash_payment(&self.pool, op_id, cash_amount).await {
             // Log but don't fail the archive - shift tracking is secondary
             tracing::warn!(
                 order_id = %snapshot.order_id,

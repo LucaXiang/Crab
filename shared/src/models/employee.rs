@@ -2,19 +2,17 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Employee entity (without password)
+/// Employee entity (without password hash)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct Employee {
-    pub id: Option<String>,
+    pub id: i64,
     pub username: String,
-    /// Display name (e.g., "张三")
     pub display_name: String,
-    /// Role reference (String ID)
-    pub role: String,
-    /// System-created employee (e.g., built-in admin)
-    #[serde(default)]
+    pub role_id: i64,
     pub is_system: bool,
     pub is_active: bool,
+    pub created_at: i64,
 }
 
 /// Create employee payload
@@ -23,8 +21,7 @@ pub struct EmployeeCreate {
     pub username: String,
     pub password: String,
     pub display_name: Option<String>,
-    /// Role reference (String ID)
-    pub role: String,
+    pub role_id: i64,
 }
 
 /// Update employee payload
@@ -33,7 +30,6 @@ pub struct EmployeeUpdate {
     pub username: Option<String>,
     pub password: Option<String>,
     pub display_name: Option<String>,
-    /// Role reference (String ID)
-    pub role: Option<String>,
+    pub role_id: Option<i64>,
     pub is_active: Option<bool>,
 }

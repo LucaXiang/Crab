@@ -3,19 +3,15 @@
 use axum::{Json, extract::State};
 
 use crate::core::ServerState;
-use crate::db::models::{Order, SystemState, SystemStateUpdate};
-use crate::db::repository::SystemStateRepository;
+use crate::db::repository::system_state;
 use crate::utils::AppResult;
+use shared::models::{SystemState, SystemStateUpdate};
 
 const RESOURCE: &str = "system_state";
 
 /// Get current system state
 pub async fn get(State(state): State<ServerState>) -> AppResult<Json<SystemState>> {
-    let repo = SystemStateRepository::new(state.db.clone());
-    let system_state = repo
-        .get_or_create()
-        .await
-        ?;
+    let system_state = system_state::get_or_create(&state.pool).await?;
     Ok(Json(system_state))
 }
 
@@ -24,11 +20,7 @@ pub async fn update(
     State(state): State<ServerState>,
     Json(payload): Json<SystemStateUpdate>,
 ) -> AppResult<Json<SystemState>> {
-    let repo = SystemStateRepository::new(state.db.clone());
-    let system_state = repo
-        .update(payload)
-        .await
-        ?;
+    let system_state = system_state::update(&state.pool, payload).await?;
 
     state
         .broadcast_sync(RESOURCE, "updated", "main", Some(&system_state))
@@ -37,22 +29,12 @@ pub async fn update(
     Ok(Json(system_state))
 }
 
-/// Initialize genesis request
-#[derive(Debug, serde::Deserialize)]
-pub struct InitGenesisRequest {
-    pub genesis_hash: String,
-}
-
 /// Initialize genesis hash
 pub async fn init_genesis(
     State(state): State<ServerState>,
-    Json(payload): Json<InitGenesisRequest>,
+    Json(payload): Json<shared::models::InitGenesisRequest>,
 ) -> AppResult<Json<SystemState>> {
-    let repo = SystemStateRepository::new(state.db.clone());
-    let system_state = repo
-        .init_genesis(payload.genesis_hash)
-        .await
-        ?;
+    let system_state = system_state::init_genesis(&state.pool, payload.genesis_hash).await?;
 
     state
         .broadcast_sync(RESOURCE, "genesis_initialized", "main", Some(&system_state))
@@ -73,11 +55,9 @@ pub async fn update_last_order(
     State(state): State<ServerState>,
     Json(payload): Json<UpdateLastOrderRequest>,
 ) -> AppResult<Json<SystemState>> {
-    let repo = SystemStateRepository::new(state.db.clone());
-    let system_state = repo
-        .update_last_order(&payload.order_id, payload.order_hash)
-        .await
-        ?;
+    let system_state =
+        system_state::update_last_order(&state.pool, &payload.order_id, payload.order_hash)
+            .await?;
 
     state
         .broadcast_sync(RESOURCE, "last_order_updated", "main", Some(&system_state))
@@ -98,25 +78,16 @@ pub async fn update_sync_state(
     State(state): State<ServerState>,
     Json(payload): Json<UpdateSyncStateRequest>,
 ) -> AppResult<Json<SystemState>> {
-    let repo = SystemStateRepository::new(state.db.clone());
-    let system_state = repo
-        .update_sync_state(&payload.synced_up_to_id, payload.synced_up_to_hash)
-        .await
-        ?;
+    let system_state = system_state::update_sync_state(
+        &state.pool,
+        &payload.synced_up_to_id,
+        payload.synced_up_to_hash,
+    )
+    .await?;
 
     state
         .broadcast_sync(RESOURCE, "sync_state_updated", "main", Some(&system_state))
         .await;
 
     Ok(Json(system_state))
-}
-
-/// Get pending orders for sync
-pub async fn get_pending_sync(State(state): State<ServerState>) -> AppResult<Json<Vec<Order>>> {
-    let repo = SystemStateRepository::new(state.db.clone());
-    let orders = repo
-        .get_pending_sync_orders()
-        .await
-        ?;
-    Ok(Json(orders))
 }

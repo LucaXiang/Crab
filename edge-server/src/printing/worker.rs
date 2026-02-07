@@ -3,15 +3,14 @@
 //! 监听打印事件通道，执行厨房打印。
 //! 通过 EventRouter 解耦，不直接依赖 OrdersManager。
 
-use crate::db::repository::PrintDestinationRepository;
+use crate::db::repository::print_destination;
 use crate::orders::OrdersManager;
 use crate::printing::{KitchenPrintService, PrintExecutor};
 use crate::services::CatalogService;
 use shared::order::OrderEvent;
+use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::Arc;
-use surrealdb::engine::local::Db;
-use surrealdb::Surreal;
 use tokio::sync::mpsc;
 
 /// Arc-wrapped OrderEvent (from EventRouter)
@@ -25,7 +24,7 @@ pub struct KitchenPrintWorker {
     orders_manager: Arc<OrdersManager>,
     kitchen_print_service: Arc<KitchenPrintService>,
     catalog_service: Arc<CatalogService>,
-    db: Surreal<Db>,
+    pool: SqlitePool,
 }
 
 impl KitchenPrintWorker {
@@ -33,13 +32,13 @@ impl KitchenPrintWorker {
         orders_manager: Arc<OrdersManager>,
         kitchen_print_service: Arc<KitchenPrintService>,
         catalog_service: Arc<CatalogService>,
-        db: Surreal<Db>,
+        pool: SqlitePool,
     ) -> Self {
         Self {
             orders_manager,
             kitchen_print_service,
             catalog_service,
-            db,
+            pool,
         }
     }
 
@@ -117,8 +116,7 @@ impl KitchenPrintWorker {
         };
 
         // Load print destinations
-        let repo = PrintDestinationRepository::new(self.db.clone());
-        let destinations = match repo.find_all().await {
+        let destinations = match print_destination::find_all(&self.pool).await {
             Ok(d) => d,
             Err(e) => {
                 tracing::error!(error = ?e, "Failed to load print destinations");
@@ -128,7 +126,7 @@ impl KitchenPrintWorker {
 
         let dest_map: HashMap<String, _> = destinations
             .into_iter()
-            .filter_map(|d| d.id.as_ref().map(|id| (id.to_string(), d.clone())))
+            .map(|d| (d.id.to_string(), d))
             .collect();
 
         if let Err(e) = executor.print_kitchen_order(&order, &dest_map).await {

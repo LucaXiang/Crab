@@ -7,7 +7,7 @@
 //!
 //! Uses functions from item_calculator for rule application logic.
 
-use crate::db::models::PriceRule;
+use shared::models::PriceRule;
 use rust_decimal::prelude::*;
 use shared::order::AppliedRule;
 
@@ -121,7 +121,7 @@ pub fn calculate_order_price(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::models::{AdjustmentType, ProductScope, RuleType};
+    use shared::models::{AdjustmentType, ProductScope, RuleType};
     /// Helper to create a test rule
     fn make_rule(
         rule_type: RuleType,
@@ -131,15 +131,15 @@ mod tests {
         exclusive: bool,
     ) -> PriceRule {
         PriceRule {
-            id: None,
+            id: 0,
             name: format!("rule_{}", value),
             display_name: format!("Rule {}", value),
             receipt_name: format!("R{}", value),
             description: None,
             rule_type,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            target_id: None,
+            zone_scope: shared::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type,
             adjustment_value: value,
             is_stackable: stackable,

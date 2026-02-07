@@ -2,7 +2,7 @@
 //!
 //! `AuditService` 是审计日志的核心服务，提供：
 //! - 日志写入（通过 mpsc 通道异步接收）
-//! - 日志查询（直接读取 SurrealDB）
+//! - 日志查询（直接读取 SQLite）
 //! - 链哈希生成（外部工具可导出验证）
 //! - 系统生命周期管理（LOCK 文件 + 24h 间隔检测）
 //! - 启动异常检测 → 写入 system_issue 表（前端通过 system-issues API 渲染对话框）
@@ -11,13 +11,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use chrono_tz::Tz;
 use std::sync::Arc;
-use surrealdb::engine::local::Db;
-use surrealdb::Surreal;
+use sqlx::SqlitePool;
 use tokio::sync::mpsc;
 
 use super::storage::{AuditStorage, AuditStorageError};
 use super::types::*;
-use crate::db::repository::system_issue::{CreateSystemIssue, SystemIssueRepository};
+use crate::db::repository::system_issue;
+use shared::models::SystemIssueCreate;
 
 /// LOCK 文件名
 const LOCK_FILE_NAME: &str = "audit.lock";
@@ -38,7 +38,7 @@ pub struct AuditLogRequest {
 
 /// 审计日志服务
 ///
-/// 通过 mpsc 通道接收日志请求，异步写入 SurrealDB。
+/// 通过 mpsc 通道接收日志请求，异步写入 SQLite。
 /// 查询操作直接读取 storage。
 ///
 /// ## LOCK 文件机制
@@ -55,7 +55,7 @@ pub struct AuditLogRequest {
 /// 渲染阻塞式对话框要求用户回应。
 pub struct AuditService {
     storage: AuditStorage,
-    db: Surreal<Db>,
+    pool: SqlitePool,
     tx: mpsc::Sender<AuditLogRequest>,
     lock_path: PathBuf,
     tz: Tz,
@@ -74,17 +74,17 @@ impl AuditService {
     ///
     /// `data_dir` — 数据目录（LOCK 文件存放位置）
     pub fn new(
-        db: Surreal<Db>,
+        pool: SqlitePool,
         data_dir: &std::path::Path,
         buffer_size: usize,
         tz: Tz,
     ) -> (Arc<Self>, mpsc::Receiver<AuditLogRequest>) {
         let (tx, rx) = mpsc::channel(buffer_size);
         let lock_path = data_dir.join(LOCK_FILE_NAME);
-        let storage = AuditStorage::new(db.clone());
+        let storage = AuditStorage::new(pool.clone());
         let service = Arc::new(Self {
             storage,
-            db,
+            pool,
             tx,
             lock_path,
             tz,
@@ -99,7 +99,6 @@ impl AuditService {
     /// 2. 写入 system_issue 表（前端对话框渲染）
     pub async fn on_startup(&self) {
         let now = shared::util::now_millis();
-        let issue_repo = SystemIssueRepository::new(self.db.clone());
 
         // 先采集最后一条审计日志的时间戳（必须在写入新条目之前，否则长时间停机检测会读到刚写入的条目）
         let last_audit_timestamp = self
@@ -147,15 +146,16 @@ impl AuditService {
             };
 
             // 去重：如果已有同类型未解决的 issue，不重复创建
-            match issue_repo.find_pending_by_kind("abnormal_shutdown").await {
+            match system_issue::find_pending_by_kind(&self.pool, "abnormal_shutdown").await {
                 Ok(existing) if existing.is_empty() => {
                     let mut params = HashMap::new();
                     let formatted_ts = chrono::DateTime::from_timestamp_millis(last_start_ts)
                         .map(|dt| dt.with_timezone(&self.tz).format("%Y-%m-%d %H:%M").to_string())
                         .unwrap_or_else(|| last_start_ts.to_string());
                     params.insert("last_start_timestamp".to_string(), formatted_ts);
-                    if let Err(e) = issue_repo
-                        .create(CreateSystemIssue {
+                    if let Err(e) = system_issue::create(
+                        &self.pool,
+                        SystemIssueCreate {
                             source: "local".to_string(),
                             kind: "abnormal_shutdown".to_string(),
                             blocking: true,
@@ -170,8 +170,9 @@ impl AuditService {
                                 "maintenance_restart".to_string(),
                                 "other".to_string(),
                             ],
-                        })
-                        .await
+                        },
+                    )
+                    .await
                     {
                         tracing::error!("Failed to create system_issue for abnormal shutdown: {:?}", e);
                     }
@@ -219,12 +220,13 @@ impl AuditService {
                 };
 
                 // 去重：如果已有同类型未解决的 issue，不重复创建
-                match issue_repo.find_pending_by_kind("long_downtime").await {
+                match system_issue::find_pending_by_kind(&self.pool, "long_downtime").await {
                     Ok(existing) if existing.is_empty() => {
                         let mut params = HashMap::new();
                         params.insert("downtime_hours".to_string(), hours.to_string());
-                        if let Err(e) = issue_repo
-                            .create(CreateSystemIssue {
+                        if let Err(e) = system_issue::create(
+                            &self.pool,
+                            SystemIssueCreate {
                                 source: "local".to_string(),
                                 kind: "long_downtime".to_string(),
                                 blocking: true,
@@ -238,8 +240,9 @@ impl AuditService {
                                     "vacation".to_string(),
                                     "other".to_string(),
                                 ],
-                            })
-                            .await
+                            },
+                        )
+                        .await
                         {
                             tracing::error!("Failed to create system_issue for long downtime: {:?}", e);
                         }

@@ -4,30 +4,29 @@ use serde::{Deserialize, Serialize};
 
 /// System state entity (哈希链状态缓存)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
 pub struct SystemState {
-    pub id: Option<String>,
+    pub id: i64,
     pub genesis_hash: Option<String>,
-    /// Last order reference (String ID)
-    pub last_order: Option<String>,
+    pub last_order_id: Option<String>,
     pub last_order_hash: Option<String>,
-    /// Sync state reference (String ID)
-    pub synced_up_to: Option<String>,
+    pub synced_up_to_id: Option<String>,
     pub synced_up_to_hash: Option<String>,
-    pub last_sync_time: Option<String>,
+    pub last_sync_time: Option<i64>,
     pub order_count: i32,
-    pub created_at: Option<String>,
-    pub updated_at: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 /// Update system state payload
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SystemStateUpdate {
     pub genesis_hash: Option<String>,
-    pub last_order: Option<String>,
+    pub last_order_id: Option<String>,
     pub last_order_hash: Option<String>,
-    pub synced_up_to: Option<String>,
+    pub synced_up_to_id: Option<String>,
     pub synced_up_to_hash: Option<String>,
-    pub last_sync_time: Option<String>,
+    pub last_sync_time: Option<i64>,
     pub order_count: Option<i32>,
 }
 

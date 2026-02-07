@@ -9,19 +9,15 @@ use crate::audit::AuditAction;
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
-use crate::db::models::{StoreInfo, StoreInfoUpdate};
-use crate::db::repository::StoreInfoRepository;
+use crate::db::repository::store_info;
 use crate::utils::AppResult;
+use shared::models::{StoreInfo, StoreInfoUpdate};
 
 const RESOURCE: &str = "store_info";
 
 /// Get current store info
 pub async fn get(State(state): State<ServerState>) -> AppResult<Json<StoreInfo>> {
-    let repo = StoreInfoRepository::new(state.db.clone());
-    let store_info = repo
-        .get_or_create()
-        .await
-        ?;
+    let store_info = store_info::get_or_create(&state.pool).await?;
     Ok(Json(store_info))
 }
 
@@ -31,11 +27,7 @@ pub async fn update(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<StoreInfoUpdate>,
 ) -> AppResult<Json<StoreInfo>> {
-    let repo = StoreInfoRepository::new(state.db.clone());
-    let store_info = repo
-        .update(payload)
-        .await
-        ?;
+    let store_info = store_info::update(&state.pool, payload).await?;
 
     audit_log!(
         state.audit_service,

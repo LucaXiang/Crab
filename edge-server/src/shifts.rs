@@ -13,7 +13,7 @@ use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
 use crate::core::ServerState;
-use crate::db::repository::{ShiftRepository, StoreInfoRepository};
+use crate::db::repository::{shift, store_info};
 use crate::utils::time;
 
 const RESOURCE: &str = "shift";
@@ -82,8 +82,7 @@ impl ShiftAutoCloseScheduler {
         let today = time::current_business_date(cutoff_time, tz);
         let business_day_start = time::date_cutoff_millis(today, cutoff_time, tz);
 
-        let repo = ShiftRepository::new(self.state.db.clone());
-        match repo.find_stale_shifts(business_day_start).await {
+        match shift::find_stale_shifts(&self.state.pool, business_day_start).await {
             Ok(shifts) if shifts.is_empty() => {
                 tracing::debug!("No stale shifts detected");
             }
@@ -92,15 +91,11 @@ impl ShiftAutoCloseScheduler {
                     "Detected {} stale shift(s), broadcasting settlement_required",
                     shifts.len()
                 );
-                for shift in &shifts {
-                    let id = shift
-                        .id
-                        .as_ref()
-                        .map(|id| id.to_string())
-                        .unwrap_or_default();
+                for s in &shifts {
+                    let id = s.id.to_string();
 
                     self.state
-                        .broadcast_sync(RESOURCE, "settlement_required", &id, Some(shift))
+                        .broadcast_sync(RESOURCE, "settlement_required", &id, Some(s))
                         .await;
                 }
             }
@@ -112,9 +107,7 @@ impl ShiftAutoCloseScheduler {
 
     /// 获取 cutoff 时间（每次从 DB 读取，支持动态修改）
     async fn get_cutoff_time(&self) -> NaiveTime {
-        let store_repo = StoreInfoRepository::new(self.state.db.clone());
-        let cutoff_str = store_repo
-            .get()
+        let cutoff_str = store_info::get(&self.state.pool)
             .await
             .ok()
             .flatten()

@@ -1,21 +1,17 @@
 //! Order Archiving Service
 //!
-//! Archives completed orders from redb to SurrealDB with hash chain integrity.
-//! Uses graph model with RELATE edges for items, options, payments, events.
+//! Archives completed orders from redb to SQLite with hash chain integrity.
+//! Uses relational model with foreign keys for items, options, payments, events.
 //! All archive operations are atomic - either everything succeeds or nothing is written.
 
-use crate::db::models::{
-    Order as SurrealOrder, OrderStatus as SurrealOrderStatus, SplitItem,
-};
-use crate::db::repository::SystemStateRepository;
-use serde::{Deserialize, Serialize};
-use rust_decimal::{Decimal, prelude::*, RoundingStrategy};
+use crate::db::repository::system_state;
+use rust_decimal::{prelude::*, Decimal, RoundingStrategy};
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
+use sqlx::SqlitePool;
 use std::path::PathBuf;
 use std::sync::Arc;
-use surrealdb::engine::local::Db;
-use surrealdb::Surreal;
 use thiserror::Error;
 use tokio::sync::{Mutex, Semaphore};
 
@@ -39,6 +35,12 @@ impl From<ArchiveError> for shared::error::AppError {
             ArchiveError::HashChain(msg) => AppError::internal(msg),
             ArchiveError::Conversion(msg) => AppError::internal(msg),
         }
+    }
+}
+
+impl From<sqlx::Error> for ArchiveError {
+    fn from(err: sqlx::Error) -> Self {
+        ArchiveError::Database(err.to_string())
     }
 }
 
@@ -87,8 +89,6 @@ pub struct DailyChainVerification {
     pub invalid_orders: Vec<OrderVerification>,
 }
 
-
-
 /// 断联事故导致的链重置
 #[derive(Debug, Serialize)]
 pub struct ChainReset {
@@ -111,17 +111,17 @@ pub struct ChainBreak {
 // DB query helper types for verification
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, sqlx::FromRow)]
 struct VerifyOrderRow {
-    order_id: String,
+    id: i64,
     receipt_number: String,
     prev_hash: String,
     curr_hash: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, sqlx::FromRow)]
 struct VerifyEventRow {
-    event_id: String,
+    id: i64,
     event_type: String,
     prev_hash: String,
     curr_hash: String,
@@ -134,11 +134,10 @@ const RETRY_BASE_DELAY_MS: u64 = 1000;
 /// Maximum concurrent archive tasks
 const MAX_CONCURRENT_ARCHIVES: usize = 5;
 
-/// Service for archiving orders to SurrealDB
+/// Service for archiving orders to SQLite
 #[derive(Clone)]
 pub struct OrderArchiveService {
-    db: Surreal<Db>,
-    system_state_repo: SystemStateRepository,
+    pool: SqlitePool,
     /// Semaphore to limit concurrent archive tasks
     archive_semaphore: Arc<Semaphore>,
     /// Mutex to ensure hash chain updates are serialized (prevents race conditions)
@@ -150,15 +149,14 @@ pub struct OrderArchiveService {
 }
 
 impl OrderArchiveService {
-    pub fn new(db: Surreal<Db>, tz: chrono_tz::Tz) -> Self {
+    pub fn new(pool: SqlitePool, tz: chrono_tz::Tz) -> Self {
         let bad_archive_dir = std::env::current_dir()
             .unwrap_or_else(|_| PathBuf::from("."))
             .join("data")
             .join("bad_archives");
 
         Self {
-            db: db.clone(),
-            system_state_repo: SystemStateRepository::new(db),
+            pool,
             archive_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_ARCHIVES)),
             hash_chain_lock: Arc::new(Mutex::new(())),
             bad_archive_dir,
@@ -171,9 +169,7 @@ impl OrderArchiveService {
     /// Format: FAC{YYYYMMDD}{sequence}
     /// Example: FAC2026012410001
     pub async fn generate_next_receipt_number(&self) -> ArchiveResult<String> {
-        let next_num = self
-            .system_state_repo
-            .get_next_order_number()
+        let next_num = system_state::get_next_order_number(&self.pool)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
@@ -288,19 +284,16 @@ impl OrderArchiveService {
         snapshot: &OrderSnapshot,
         events: &[OrderEvent],
     ) -> ArchiveResult<()> {
-        // 0. Check idempotency - skip if already archived
-        let receipt = snapshot.receipt_number.clone();
-        let exists: Option<bool> = self
-            .db
-            .query("SELECT count() > 0 AS exists FROM order WHERE receipt_number = $receipt GROUP ALL")
-            .bind(("receipt", receipt.clone()))
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?
-            .take::<Option<serde_json::Value>>(0)
-            .map_err(|e| ArchiveError::Database(e.to_string()))?
-            .and_then(|v| v.get("exists").and_then(|e| e.as_bool()));
+        // 0. Idempotency check
+        let exists: bool = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM archived_order WHERE receipt_number = ?)",
+        )
+        .bind(&snapshot.receipt_number)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        if exists == Some(true) {
+        if exists {
             tracing::info!(order_id = %snapshot.order_id, "Order already archived, skipping");
             return Ok(());
         }
@@ -309,9 +302,7 @@ impl OrderArchiveService {
         let _hash_lock = self.hash_chain_lock.lock().await;
 
         // 1. Get last order hash from system_state
-        let system_state = self
-            .system_state_repo
-            .get_or_create()
+        let system_state = system_state::get_or_create(&self.pool)
             .await
             .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
@@ -340,332 +331,288 @@ impl OrderArchiveService {
             .map(|e| (Some(e.operator_id.clone()), Some(e.operator_name.clone())))
             .unwrap_or((None, None));
 
-        // 4. Convert snapshot to order struct for building query
-        tracing::info!(
-            order_id = %snapshot.order_id,
-            status = ?snapshot.status,
-            void_type = ?snapshot.void_type,
-            loss_reason = ?snapshot.loss_reason,
-            loss_amount = ?snapshot.loss_amount,
-            "Archive: snapshot void metadata before conversion"
-        );
+        // 4. Status string
+        let status_str = match snapshot.status {
+            OrderStatus::Completed => "COMPLETED",
+            OrderStatus::Void => "VOID",
+            OrderStatus::Merged => "MERGED",
+            _ => {
+                return Err(ArchiveError::Conversion(format!(
+                    "Cannot archive order with status {:?}",
+                    snapshot.status
+                )))
+            }
+        };
 
-        let surreal_order =
-            self.convert_snapshot_to_order(snapshot, prev_hash, order_hash.clone(), operator_id, operator_name)?;
+        let now = shared::util::now_millis();
 
-        tracing::info!(
-            order_id = %snapshot.order_id,
-            void_type = ?surreal_order.void_type,
-            loss_reason = ?surreal_order.loss_reason,
-            loss_amount = ?surreal_order.loss_amount,
-            "Archive: converted SurrealOrder void metadata"
-        );
-
-        tracing::info!(
+        tracing::debug!(
             order_id = %snapshot.order_id,
             items_count = snapshot.items.len(),
             payments_count = snapshot.payments.len(),
             events_count = events.len(),
-            "Archiving order to SurrealDB (atomic transaction)"
+            "Archiving order (atomic transaction)"
         );
 
-        // 5. Build and execute atomic transaction
-        self.execute_archive_transaction(snapshot, events, &surreal_order, &order_hash).await?;
+        // 5. Begin SQLite transaction
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        tracing::info!(order_id = %snapshot.order_id, "Order archived to SurrealDB (graph model)");
-        Ok(())
-    }
+        // 5a. INSERT archived_order
+        let order_pk = sqlx::query_scalar::<_, i64>(
+            "INSERT INTO archived_order (\
+                receipt_number, zone_name, table_name, status, is_retail, guest_count, \
+                original_total, subtotal, total_amount, paid_amount, \
+                discount_amount, surcharge_amount, comp_total_amount, \
+                order_manual_discount_amount, order_manual_surcharge_amount, \
+                order_rule_discount_amount, order_rule_surcharge_amount, \
+                tax, start_time, end_time, \
+                operator_id, operator_name, \
+                void_type, loss_reason, loss_amount, void_note, \
+                prev_hash, curr_hash, created_at\
+            ) VALUES (\
+                ?1, ?2, ?3, ?4, ?5, ?6, \
+                ?7, ?8, ?9, ?10, \
+                ?11, ?12, ?13, \
+                ?14, ?15, \
+                ?16, ?17, \
+                ?18, ?19, ?20, \
+                ?21, ?22, \
+                ?23, ?24, ?25, ?26, \
+                ?27, ?28, ?29\
+            ) RETURNING id",
+        )
+        .bind(&snapshot.receipt_number)
+        .bind(&snapshot.zone_name)
+        .bind(&snapshot.table_name)
+        .bind(status_str)
+        .bind(snapshot.is_retail)
+        .bind(snapshot.guest_count as i32)
+        .bind(snapshot.original_total)
+        .bind(snapshot.subtotal)
+        .bind(snapshot.total)
+        .bind(snapshot.paid_amount)
+        .bind(snapshot.total_discount)
+        .bind(snapshot.total_surcharge)
+        .bind(snapshot.comp_total_amount)
+        .bind(snapshot.order_manual_discount_amount)
+        .bind(snapshot.order_manual_surcharge_amount)
+        .bind(snapshot.order_rule_discount_amount.unwrap_or(0.0))
+        .bind(snapshot.order_rule_surcharge_amount.unwrap_or(0.0))
+        .bind(snapshot.tax)
+        .bind(snapshot.start_time)
+        .bind(snapshot.end_time)
+        .bind(&operator_id)
+        .bind(&operator_name)
+        .bind(
+            snapshot
+                .void_type
+                .as_ref()
+                .map(|v| {
+                    serde_json::to_value(v)
+                        .ok()
+                        .and_then(|val| val.as_str().map(String::from))
+                        .unwrap_or_default()
+                }),
+        )
+        .bind(
+            snapshot
+                .loss_reason
+                .as_ref()
+                .map(|r| {
+                    serde_json::to_value(r)
+                        .ok()
+                        .and_then(|val| val.as_str().map(String::from))
+                        .unwrap_or_default()
+                }),
+        )
+        .bind(snapshot.loss_amount)
+        .bind(&snapshot.void_note)
+        .bind(&prev_hash)
+        .bind(&order_hash)
+        .bind(now)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-    /// Execute the entire archive as a single atomic transaction
-    async fn execute_archive_transaction(
-        &self,
-        snapshot: &OrderSnapshot,
-        events: &[OrderEvent],
-        order: &SurrealOrder,
-        order_hash: &str,
-    ) -> ArchiveResult<()> {
-        // Build a single transaction query
-        let mut query = String::from("BEGIN TRANSACTION;\n");
-
-        // Create order
-        query.push_str(
-            r#"
-            LET $order = CREATE order SET
-                receipt_number = $receipt_number,
-                zone_name = $zone_name,
-                table_name = $table_name,
-                status = $status,
-                is_retail = $is_retail,
-                guest_count = $guest_count,
-                original_total = $original_total,
-                subtotal = $subtotal,
-                total_amount = $total_amount,
-                paid_amount = $paid_amount,
-                discount_amount = $discount_amount,
-                surcharge_amount = $surcharge_amount,
-                comp_total_amount = $comp_total_amount,
-                order_manual_discount_amount = $order_manual_discount_amount,
-                order_manual_surcharge_amount = $order_manual_surcharge_amount,
-                order_rule_discount_amount = $order_rule_discount_amount,
-                order_rule_surcharge_amount = $order_rule_surcharge_amount,
-                tax = $tax,
-                start_time = $start_time,
-                end_time = $end_time,
-                operator_id = $operator_id,
-                operator_name = $operator_name,
-                void_type = $void_type,
-                loss_reason = $loss_reason,
-                loss_amount = $loss_amount,
-                void_note = $void_note,
-                prev_hash = $prev_hash,
-                curr_hash = $curr_hash,
-                created_at = $now;
-            "#,
-        );
-
-        // For each item, create item and its options, then RELATE
-        for (i, item) in snapshot.items.iter().enumerate() {
-            let var_name = format!("$item{}", i);
-            query.push_str(&format!(
-                r#"
-                LET {} = CREATE order_item SET
-                    spec = $item{}_spec,
-                    instance_id = $item{}_instance_id,
-                    name = $item{}_name,
-                    spec_name = $item{}_spec_name,
-                    category_name = $item{}_category_name,
-                    price = $item{}_price,
-                    quantity = $item{}_quantity,
-                    unpaid_quantity = $item{}_unpaid_quantity,
-                    unit_price = $item{}_unit_price,
-                    line_total = $item{}_line_total,
-                    discount_amount = $item{}_discount_amount,
-                    surcharge_amount = $item{}_surcharge_amount,
-                    rule_discount_amount = $item{}_rule_discount_amount,
-                    rule_surcharge_amount = $item{}_rule_surcharge_amount,
-                    applied_rules = $item{}_applied_rules,
-                    tax = $item{}_tax,
-                    tax_rate = $item{}_tax_rate,
-                    note = $item{}_note,
-                    is_comped = $item{}_is_comped;
-                RELATE ($order[0].id)->has_item->({}[0].id);
-                "#,
-                var_name,
-                i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i,
-                var_name
-            ));
-
-            // Create options for this item
-            if let Some(options) = &item.selected_options {
-                for (j, _opt) in options.iter().enumerate() {
-                    query.push_str(&format!(
-                        r#"
-                        LET $item{}_opt{} = CREATE order_item_option SET
-                            attribute_name = $item{}_opt{}_attr,
-                            option_name = $item{}_opt{}_name,
-                            price = $item{}_opt{}_price;
-                        RELATE ({}[0].id)->has_option->($item{}_opt{}[0].id);
-                        "#,
-                        i, j, i, j, i, j, i, j, var_name, i, j
-                    ));
-                }
-            }
-        }
-
-        // For each payment, create and RELATE
-        for i in 0..snapshot.payments.len() {
-            query.push_str(&format!(
-                r#"
-                LET $payment{} = CREATE order_payment SET
-                    seq = $payment{}_seq,
-                    payment_id = $payment{}_payment_id,
-                    method = $payment{}_method,
-                    amount = $payment{}_amount,
-                    time = $payment{}_time,
-                    cancelled = $payment{}_cancelled,
-                    cancel_reason = $payment{}_cancel_reason,
-                    split_type = $payment{}_split_type,
-                    split_items = $payment{}_split_items,
-                    aa_shares = $payment{}_aa_shares,
-                    aa_total_shares = $payment{}_aa_total_shares;
-                RELATE ($order[0].id)->has_payment->($payment{}[0].id);
-                "#,
-                i, i, i, i, i, i, i, i, i, i, i, i, i
-            ));
-        }
-
-        // For each event, create and RELATE
-        for i in 0..events.len() {
-            query.push_str(&format!(
-                r#"
-                LET $event{} = CREATE order_event SET
-                    seq = $event{}_seq,
-                    event_type = $event{}_type,
-                    timestamp = $event{}_timestamp,
-                    data = $event{}_data,
-                    prev_hash = $event{}_prev_hash,
-                    curr_hash = $event{}_curr_hash;
-                RELATE ($order[0].id)->has_event->($event{}[0].id);
-                "#,
-                i, i, i, i, i, i, i, i
-            ));
-        }
-
-        // Update system_state (use UPSERT to ensure record exists)
-        query.push_str(
-            r#"
-            UPSERT system_state:main SET
-                last_order = $order[0].id,
-                last_order_hash = $order_hash,
-                updated_at = $now;
-            COMMIT TRANSACTION;
-            RETURN { success: true, order_id: <string>$order[0].id };
-            "#,
-        );
-
-        // Build the query with all bindings
-        let mut db_query = self.db.query(&query);
-
-        // Bind order fields
-        let status_str = match order.status {
-            SurrealOrderStatus::Completed => "COMPLETED",
-            SurrealOrderStatus::Void => "VOID",
-            SurrealOrderStatus::Merged => "MERGED",
-        };
-
-        db_query = db_query
-            .bind(("receipt_number", order.receipt_number.clone()))
-            .bind(("zone_name", order.zone_name.clone()))
-            .bind(("table_name", order.table_name.clone()))
-            .bind(("status", status_str))
-            .bind(("is_retail", order.is_retail))
-            .bind(("guest_count", order.guest_count))
-            .bind(("original_total", order.original_total))
-            .bind(("subtotal", order.subtotal))
-            .bind(("total_amount", order.total_amount))
-            .bind(("paid_amount", order.paid_amount))
-            .bind(("discount_amount", order.discount_amount))
-            .bind(("surcharge_amount", order.surcharge_amount))
-            .bind(("comp_total_amount", order.comp_total_amount))
-            .bind(("order_manual_discount_amount", order.order_manual_discount_amount))
-            .bind(("order_manual_surcharge_amount", order.order_manual_surcharge_amount))
-            .bind(("order_rule_discount_amount", order.order_rule_discount_amount))
-            .bind(("order_rule_surcharge_amount", order.order_rule_surcharge_amount))
-            .bind(("tax", order.tax))
-            .bind(("start_time", order.start_time))
-            .bind(("end_time", order.end_time))
-            .bind(("operator_id", order.operator_id.clone()))
-            .bind(("operator_name", order.operator_name.clone()))
-            .bind(("void_type", order.void_type.clone()))
-            .bind(("loss_reason", order.loss_reason.clone()))
-            .bind(("loss_amount", order.loss_amount))
-            .bind(("void_note", order.void_note.clone()))
-            .bind(("prev_hash", order.prev_hash.clone()))
-            .bind(("curr_hash", order.curr_hash.clone()))
-            .bind(("order_hash", order_hash.to_string()))
-            .bind(("now", shared::util::now_millis()));
-
-        // Bind item fields
-        for (i, item) in snapshot.items.iter().enumerate() {
+        // 5b. INSERT items and their options
+        for item in &snapshot.items {
+            // Compute item prices using Decimal
             let base_price = item.original_price.unwrap_or(item.price);
             let d_base = Decimal::from_f64(base_price).unwrap_or_default();
             let d_qty = Decimal::from(item.quantity);
             let d_manual_discount_per_unit = item
                 .manual_discount_percent
-                .map(|p| d_base * Decimal::from_f64(p).unwrap_or_default() / Decimal::ONE_HUNDRED)
+                .map(|p| {
+                    d_base * Decimal::from_f64(p).unwrap_or_default() / Decimal::ONE_HUNDRED
+                })
                 .unwrap_or(Decimal::ZERO);
-            let d_rule_discount_per_unit = Decimal::from_f64(item.rule_discount_amount.unwrap_or(0.0)).unwrap_or_default();
-            let total_discount = ((d_manual_discount_per_unit + d_rule_discount_per_unit) * d_qty)
-                .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
-                .to_f64().unwrap_or_default();
-            let d_surcharge_per_unit = Decimal::from_f64(item.rule_surcharge_amount.unwrap_or(0.0)).unwrap_or_default();
+            let d_rule_discount_per_unit =
+                Decimal::from_f64(item.rule_discount_amount.unwrap_or(0.0)).unwrap_or_default();
+            let total_discount =
+                ((d_manual_discount_per_unit + d_rule_discount_per_unit) * d_qty)
+                    .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
+                    .to_f64()
+                    .unwrap_or_default();
+            let d_surcharge_per_unit =
+                Decimal::from_f64(item.rule_surcharge_amount.unwrap_or(0.0)).unwrap_or_default();
             let total_surcharge = (d_surcharge_per_unit * d_qty)
                 .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
-                .to_f64().unwrap_or_default();
+                .to_f64()
+                .unwrap_or_default();
             let unit_price = if item.unit_price.is_some() {
                 item.unit_price.unwrap()
             } else {
-                (d_base - d_manual_discount_per_unit - d_rule_discount_per_unit + d_surcharge_per_unit)
+                (d_base - d_manual_discount_per_unit - d_rule_discount_per_unit
+                    + d_surcharge_per_unit)
                     .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
-                    .to_f64().unwrap_or_default()
+                    .to_f64()
+                    .unwrap_or_default()
             };
             let line_total = item.line_total.unwrap_or_else(|| {
                 (Decimal::from_f64(unit_price).unwrap_or_default() * d_qty)
                     .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
-                    .to_f64().unwrap_or_default()
+                    .to_f64()
+                    .unwrap_or_default()
             });
-            let spec_name = item.selected_specification.as_ref().map(|s| s.name.clone());
+            let spec_name = item
+                .selected_specification
+                .as_ref()
+                .map(|s| s.name.clone());
             let instance_id = item.instance_id.clone();
-            let paid_qty = snapshot.paid_item_quantities.get(&instance_id).copied().unwrap_or(0);
+            let paid_qty = snapshot
+                .paid_item_quantities
+                .get(&instance_id)
+                .copied()
+                .unwrap_or(0);
             let unpaid_quantity = (item.quantity - paid_qty).max(0);
+            let rule_discount_total = (d_rule_discount_per_unit * d_qty)
+                .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
+                .to_f64()
+                .unwrap_or_default();
+            let rule_surcharge_total = (d_surcharge_per_unit * d_qty)
+                .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
+                .to_f64()
+                .unwrap_or_default();
 
-            db_query = db_query
-                .bind((format!("item{}_spec", i), item.id.clone()))
-                .bind((format!("item{}_instance_id", i), instance_id))
-                .bind((format!("item{}_name", i), item.name.clone()))
-                .bind((format!("item{}_spec_name", i), spec_name))
-                .bind((format!("item{}_category_name", i), item.category_name.clone()))
-                .bind((format!("item{}_price", i), base_price))
-                .bind((format!("item{}_quantity", i), item.quantity))
-                .bind((format!("item{}_unpaid_quantity", i), unpaid_quantity))
-                .bind((format!("item{}_unit_price", i), unit_price))
-                .bind((format!("item{}_line_total", i), line_total))
-                .bind((format!("item{}_discount_amount", i), total_discount))
-                .bind((format!("item{}_surcharge_amount", i), total_surcharge))
-                .bind((format!("item{}_rule_discount_amount", i), (d_rule_discount_per_unit * d_qty).round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero).to_f64().unwrap_or_default()))
-                .bind((format!("item{}_rule_surcharge_amount", i), (d_surcharge_per_unit * d_qty).round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero).to_f64().unwrap_or_default()))
-                .bind((format!("item{}_applied_rules", i), item.applied_rules.as_ref().and_then(|rules| serde_json::to_string(rules).ok())))
-                .bind((format!("item{}_tax", i), item.tax.unwrap_or(0.0)))
-                .bind((format!("item{}_tax_rate", i), item.tax_rate.unwrap_or(0)))
-                .bind((format!("item{}_note", i), item.note.clone()))
-                .bind((format!("item{}_is_comped", i), item.is_comped));
+            let item_pk = sqlx::query_scalar::<_, i64>(
+                "INSERT INTO archived_order_item (\
+                    order_pk, spec, instance_id, name, spec_name, price, \
+                    quantity, unpaid_quantity, unit_price, line_total, \
+                    discount_amount, surcharge_amount, \
+                    rule_discount_amount, rule_surcharge_amount, \
+                    tax, tax_rate, category_name, applied_rules, note, is_comped\
+                ) VALUES (\
+                    ?1, ?2, ?3, ?4, ?5, ?6, \
+                    ?7, ?8, ?9, ?10, \
+                    ?11, ?12, \
+                    ?13, ?14, \
+                    ?15, ?16, ?17, ?18, ?19, ?20\
+                ) RETURNING id",
+            )
+            .bind(order_pk)
+            .bind(&item.id)
+            .bind(&instance_id)
+            .bind(&item.name)
+            .bind(&spec_name)
+            .bind(base_price)
+            .bind(item.quantity)
+            .bind(unpaid_quantity)
+            .bind(unit_price)
+            .bind(line_total)
+            .bind(total_discount)
+            .bind(total_surcharge)
+            .bind(rule_discount_total)
+            .bind(rule_surcharge_total)
+            .bind(item.tax.unwrap_or(0.0))
+            .bind(item.tax_rate.unwrap_or(0))
+            .bind(&item.category_name)
+            .bind(
+                item.applied_rules
+                    .as_ref()
+                    .and_then(|rules| serde_json::to_string(rules).ok()),
+            )
+            .bind(&item.note)
+            .bind(item.is_comped)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-            // Bind option fields
+            // Options
             if let Some(options) = &item.selected_options {
-                for (j, opt) in options.iter().enumerate() {
-                    db_query = db_query
-                        .bind((format!("item{}_opt{}_attr", i, j), opt.attribute_name.clone()))
-                        .bind((format!("item{}_opt{}_name", i, j), opt.option_name.clone()))
-                        .bind((format!("item{}_opt{}_price", i, j), opt.price_modifier.unwrap_or(0.0)));
+                for opt in options {
+                    sqlx::query(
+                        "INSERT INTO archived_order_item_option (\
+                            item_pk, attribute_name, option_name, price\
+                        ) VALUES (?1, ?2, ?3, ?4)",
+                    )
+                    .bind(item_pk)
+                    .bind(&opt.attribute_name)
+                    .bind(&opt.option_name)
+                    .bind(opt.price_modifier.unwrap_or(0.0))
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| ArchiveError::Database(e.to_string()))?;
                 }
             }
         }
 
-        // Bind payment fields
+        // 5c. INSERT payments
         for (i, payment) in snapshot.payments.iter().enumerate() {
-            // Serialize split_items to JSON string (SurrealDB SDK has issues with Vec binding)
-            let split_items_str: Option<String> = payment
-                .split_items
-                .as_ref()
-                .map(|items| {
-                    let split_items: Vec<SplitItem> = items.iter().map(|si| SplitItem {
+            // Serialize split_items to JSON string
+            let split_items_str: Option<String> = payment.split_items.as_ref().map(|items| {
+                #[derive(serde::Serialize)]
+                struct ArchiveSplitItem {
+                    instance_id: String,
+                    name: String,
+                    quantity: i32,
+                    unit_price: f64,
+                }
+                let archive_items: Vec<ArchiveSplitItem> = items
+                    .iter()
+                    .map(|si| ArchiveSplitItem {
                         instance_id: si.instance_id.clone(),
                         name: si.name.clone(),
                         quantity: si.quantity,
                         unit_price: si.unit_price.unwrap_or(si.price),
-                    }).collect();
-                    serde_json::to_string(&split_items).unwrap_or_else(|_| "[]".to_string())
-                });
+                    })
+                    .collect();
+                serde_json::to_string(&archive_items).unwrap_or_else(|_| "[]".to_string())
+            });
 
-            db_query = db_query
-                .bind((format!("payment{}_seq", i), i as i64))
-                .bind((format!("payment{}_payment_id", i), payment.payment_id.clone()))
-                .bind((format!("payment{}_method", i), payment.method.clone()))
-                .bind((format!("payment{}_amount", i), payment.amount))
-                .bind((format!("payment{}_time", i), payment.timestamp))
-                .bind((format!("payment{}_cancelled", i), payment.cancelled))
-                .bind((format!("payment{}_cancel_reason", i), payment.cancel_reason.clone()))
-                .bind((format!("payment{}_split_type", i), payment.split_type.as_ref().map(|st| {
-                    serde_json::to_value(st).ok()
-                        .and_then(|v| v.as_str().map(String::from))
-                        .unwrap_or_default()
-                })))
-                .bind((format!("payment{}_split_items", i), split_items_str))
-                .bind((format!("payment{}_aa_shares", i), payment.aa_shares))
-                .bind((format!("payment{}_aa_total_shares", i), snapshot.aa_total_shares));
+            sqlx::query(
+                "INSERT INTO archived_order_payment (\
+                    order_pk, seq, payment_id, method, amount, time, \
+                    cancelled, cancel_reason, \
+                    split_type, split_items, aa_shares, aa_total_shares\
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            )
+            .bind(order_pk)
+            .bind(i as i32)
+            .bind(&payment.payment_id)
+            .bind(&payment.method)
+            .bind(payment.amount)
+            .bind(payment.timestamp)
+            .bind(payment.cancelled)
+            .bind(&payment.cancel_reason)
+            .bind(payment.split_type.as_ref().map(|st| {
+                serde_json::to_value(st)
+                    .ok()
+                    .and_then(|v| v.as_str().map(String::from))
+                    .unwrap_or_default()
+            }))
+            .bind(&split_items_str)
+            .bind(payment.aa_shares)
+            .bind(snapshot.aa_total_shares)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
         }
 
-        // Bind event fields
+        // 5d. INSERT events
         for (i, event) in events.iter().enumerate() {
             let prev_event_hash = if i == 0 {
                 "order_start".to_string()
@@ -681,27 +628,39 @@ impl OrderArchiveService {
                 .unwrap_or_else(|| format!("{:?}", event.event_type).to_uppercase());
 
             // Serialize payload to JSON string
-            let payload_str = serde_json::to_string(&event.payload)
-                .unwrap_or_else(|_| "{}".to_string());
+            let payload_str =
+                serde_json::to_string(&event.payload).unwrap_or_else(|_| "{}".to_string());
 
-            db_query = db_query
-                .bind((format!("event{}_seq", i), i as i64))
-                .bind((format!("event{}_type", i), event_type_str))
-                .bind((format!("event{}_timestamp", i), event.timestamp))
-                .bind((format!("event{}_data", i), payload_str))
-                .bind((format!("event{}_prev_hash", i), prev_event_hash))
-                .bind((format!("event{}_curr_hash", i), curr_event_hash));
+            sqlx::query(
+                "INSERT INTO archived_order_event (\
+                    order_pk, seq, event_type, timestamp, data, prev_hash, curr_hash\
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            )
+            .bind(order_pk)
+            .bind(i as i32)
+            .bind(&event_type_str)
+            .bind(event.timestamp)
+            .bind(&payload_str)
+            .bind(&prev_event_hash)
+            .bind(&curr_event_hash)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
         }
 
-        // Execute the transaction
-        let result = db_query.await.map_err(|e| ArchiveError::Database(e.to_string()))?;
+        // 5e. Update system_state
+        sqlx::query("UPDATE system_state SET last_order_hash = ?1, updated_at = ?2 WHERE id = 1")
+            .bind(&order_hash)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
-        // Check for errors in response
-        let errors = result.check();
-        if let Err(e) = errors {
-            return Err(ArchiveError::Database(e.to_string()));
-        }
+        tx.commit()
+            .await
+            .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
+        tracing::info!(order_id = %snapshot.order_id, "Order archived successfully");
         Ok(())
     }
 
@@ -748,59 +707,27 @@ impl OrderArchiveService {
     /// 验证单个订单的事件哈希链完整性
     pub async fn verify_order(&self, receipt_number: &str) -> ArchiveResult<OrderVerification> {
         // 1. 查询订单
-        let mut result = self
-            .db
-            .query(
-                r#"
-                SELECT
-                    <string>id AS order_id,
-                    receipt_number,
-                    prev_hash,
-                    curr_hash
-                FROM order
-                WHERE receipt_number = $receipt
-                "#,
-            )
-            .bind(("receipt", receipt_number.to_string()))
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+        let order: VerifyOrderRow = sqlx::query_as::<_, VerifyOrderRow>(
+            "SELECT id, receipt_number, prev_hash, curr_hash \
+             FROM archived_order WHERE receipt_number = ?",
+        )
+        .bind(receipt_number)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| ArchiveError::Database(e.to_string()))?
+        .ok_or_else(|| {
+            ArchiveError::Database(format!("Order not found: {}", receipt_number))
+        })?;
 
-        let order: VerifyOrderRow = result
-            .take::<Vec<VerifyOrderRow>>(0)
-            .map_err(|e| ArchiveError::Database(e.to_string()))?
-            .into_iter()
-            .next()
-            .ok_or_else(|| {
-                ArchiveError::Database(format!("Order not found: {}", receipt_number))
-            })?;
-
-        // 2. 查询该订单的所有事件（按 timestamp 排序）
-        //    使用 record ID 变量绑定，通过 graph traversal 查询
-        let order_record_id: surrealdb::RecordId = order
-            .order_id
-            .parse()
-            .map_err(|e: surrealdb::Error| ArchiveError::Database(e.to_string()))?;
-
-        let mut event_result = self
-            .db
-            .query(
-                r#"
-                SELECT
-                    <string>id AS event_id,
-                    event_type,
-                    prev_hash,
-                    curr_hash
-                FROM $order_id->has_event->order_event
-                ORDER BY timestamp
-                "#,
-            )
-            .bind(("order_id", order_record_id))
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        let events: Vec<VerifyEventRow> = event_result
-            .take(0)
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+        // 2. 查询该订单的所有事件（按 seq 排序）
+        let events: Vec<VerifyEventRow> = sqlx::query_as::<_, VerifyEventRow>(
+            "SELECT id, event_type, prev_hash, curr_hash \
+             FROM archived_order_event WHERE order_pk = ? ORDER BY seq",
+        )
+        .bind(order.id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         // 3. 验证事件链连续性
         let mut invalid_events = Vec::new();
@@ -816,7 +743,7 @@ impl OrderArchiveService {
             if event.prev_hash != expected_prev {
                 events_chain_valid = false;
                 invalid_events.push(EventVerification {
-                    event_id: event.event_id.clone(),
+                    event_id: event.id.to_string(),
                     event_type: event.event_type.clone(),
                     expected_prev_hash: expected_prev,
                     actual_prev_hash: event.prev_hash.clone(),
@@ -827,7 +754,7 @@ impl OrderArchiveService {
 
         Ok(OrderVerification {
             receipt_number: order.receipt_number,
-            order_id: order.order_id,
+            order_id: order.id.to_string(),
             prev_hash: order.prev_hash,
             curr_hash: order.curr_hash,
             events_chain_valid,
@@ -846,64 +773,34 @@ impl OrderArchiveService {
         start: i64,
         end: i64,
     ) -> ArchiveResult<DailyChainVerification> {
-
         // 1. 查询当天所有订单，按 created_at 排序
-        let mut result = self
-            .db
-            .query(
-                r#"
-                SELECT
-                    <string>id AS order_id,
-                    receipt_number,
-                    prev_hash,
-                    curr_hash,
-                    created_at
-                FROM order
-                WHERE created_at >= $start AND created_at < $end
-                ORDER BY created_at
-                "#,
-            )
-            .bind(("start", start))
-            .bind(("end", end))
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        let orders: Vec<VerifyOrderRow> = result
-            .take(0)
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
+        let orders: Vec<VerifyOrderRow> = sqlx::query_as::<_, VerifyOrderRow>(
+            "SELECT id, receipt_number, prev_hash, curr_hash \
+             FROM archived_order \
+             WHERE created_at >= ?1 AND created_at < ?2 \
+             ORDER BY created_at",
+        )
+        .bind(start)
+        .bind(end)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         let total_orders = orders.len();
 
         // 2. 查询范围之前最后一个订单的 curr_hash
-        let mut prev_result = self
-            .db
-            .query(
-                r#"
-                SELECT curr_hash, created_at
-                FROM order
-                WHERE created_at < $start
-                ORDER BY created_at DESC
-                LIMIT 1
-                "#,
-            )
-            .bind(("start", start))
-            .await
-            .map_err(|e| ArchiveError::Database(e.to_string()))?;
-
-        #[derive(Debug, Deserialize)]
-        struct HashRow {
-            curr_hash: String,
-        }
-
-        let prev_day_hash = prev_result
-            .take::<Vec<HashRow>>(0)
-            .map_err(|e| ArchiveError::Database(e.to_string()))?
-            .into_iter()
-            .next()
-            .map(|r| r.curr_hash);
+        let prev_day_hash: Option<String> = sqlx::query_scalar::<_, String>(
+            "SELECT curr_hash FROM archived_order \
+             WHERE created_at < ? \
+             ORDER BY created_at DESC LIMIT 1",
+        )
+        .bind(start)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| ArchiveError::Database(e.to_string()))?;
 
         // 确定当天第一个订单的 expected prev_hash
-        // 有前一天订单 → 用其 curr_hash；没有 → 用第一个订单自身的 prev_hash（不猜）
+        // 有前一天订单 -> 用其 curr_hash；没有 -> 用第一个订单自身的 prev_hash（不猜）
         let expected_first_prev = prev_day_hash.unwrap_or_else(|| {
             orders
                 .first()
@@ -960,72 +857,6 @@ impl OrderArchiveService {
             invalid_orders,
         })
     }
-
-
-
-    fn convert_snapshot_to_order(
-        &self,
-        snapshot: &OrderSnapshot,
-        prev_hash: String,
-        curr_hash: String,
-        operator_id: Option<String>,
-        operator_name: Option<String>,
-    ) -> ArchiveResult<SurrealOrder> {
-        let status = match snapshot.status {
-            OrderStatus::Completed => SurrealOrderStatus::Completed,
-            OrderStatus::Void => SurrealOrderStatus::Void,
-            OrderStatus::Merged => SurrealOrderStatus::Merged,
-            _ => {
-                return Err(ArchiveError::Conversion(format!(
-                    "Cannot archive order with status {:?}",
-                    snapshot.status
-                )))
-            }
-        };
-
-        Ok(SurrealOrder {
-            id: None,
-            receipt_number: snapshot.receipt_number.clone(),
-            zone_name: snapshot.zone_name.clone(),
-            table_name: snapshot.table_name.clone(),
-            status,
-            is_retail: snapshot.is_retail,
-            guest_count: Some(snapshot.guest_count),
-            original_total: snapshot.original_total,
-            subtotal: snapshot.subtotal,
-            total_amount: snapshot.total,
-            paid_amount: snapshot.paid_amount,
-            discount_amount: snapshot.total_discount,
-            surcharge_amount: snapshot.total_surcharge,
-            comp_total_amount: snapshot.comp_total_amount,
-            order_manual_discount_amount: snapshot.order_manual_discount_amount,
-            order_manual_surcharge_amount: snapshot.order_manual_surcharge_amount,
-            order_rule_discount_amount: snapshot.order_rule_discount_amount.unwrap_or(0.0),
-            order_rule_surcharge_amount: snapshot.order_rule_surcharge_amount.unwrap_or(0.0),
-            tax: snapshot.tax,
-            start_time: snapshot.start_time,
-            end_time: snapshot.end_time,
-            void_type: snapshot.void_type.as_ref().map(|v| {
-                serde_json::to_value(v).ok()
-                    .and_then(|val| val.as_str().map(String::from))
-                    .unwrap_or_default()
-            }),
-            loss_reason: snapshot.loss_reason.as_ref().map(|r| {
-                serde_json::to_value(r).ok()
-                    .and_then(|val| val.as_str().map(String::from))
-                    .unwrap_or_default()
-            }),
-            loss_amount: snapshot.loss_amount,
-            void_note: snapshot.void_note.clone(),
-            operator_id,
-            operator_name,
-            prev_hash,
-            curr_hash,
-            related_order_id: None,
-            created_at: snapshot.start_time,
-        })
-    }
-
 }
 
 #[cfg(test)]
@@ -1212,7 +1043,7 @@ mod tests {
         for i in 0..count {
             let curr = format!("event_hash_{}", i);
             events.push(VerifyEventRow {
-                event_id: format!("order_event:{}", i),
+                id: i as i64,
                 event_type: "TABLE_OPENED".to_string(),
                 prev_hash: prev,
                 curr_hash: curr.clone(),
@@ -1235,7 +1066,7 @@ mod tests {
             if event.prev_hash != expected_prev {
                 valid = false;
                 invalid.push(EventVerification {
-                    event_id: event.event_id.clone(),
+                    event_id: event.id.to_string(),
                     event_type: event.event_type.clone(),
                     expected_prev_hash: expected_prev,
                     actual_prev_hash: event.prev_hash.clone(),
@@ -1263,7 +1094,7 @@ mod tests {
         let (valid, invalid) = validate_event_chain(&events);
         assert!(!valid);
         assert_eq!(invalid.len(), 1);
-        assert_eq!(invalid[0].event_id, "order_event:0");
+        assert_eq!(invalid[0].event_id, "0");
         assert_eq!(invalid[0].expected_prev_hash, "order_start");
         assert_eq!(invalid[0].actual_prev_hash, "wrong_start");
     }
@@ -1277,7 +1108,7 @@ mod tests {
         let (valid, invalid) = validate_event_chain(&events);
         assert!(!valid);
         assert_eq!(invalid.len(), 1);
-        assert_eq!(invalid[0].event_id, "order_event:2");
+        assert_eq!(invalid[0].event_id, "2");
         assert_eq!(invalid[0].expected_prev_hash, "event_hash_1");
         assert_eq!(invalid[0].actual_prev_hash, "tampered");
     }
@@ -1291,8 +1122,8 @@ mod tests {
         let (valid, invalid) = validate_event_chain(&events);
         assert!(!valid);
         assert_eq!(invalid.len(), 2);
-        assert_eq!(invalid[0].event_id, "order_event:1");
-        assert_eq!(invalid[1].event_id, "order_event:3");
+        assert_eq!(invalid[0].event_id, "1");
+        assert_eq!(invalid[1].event_id, "3");
     }
 
     #[test]
@@ -1310,7 +1141,7 @@ mod tests {
         for i in 0..count {
             let curr = format!("order_hash_{}", i);
             orders.push(VerifyOrderRow {
-                order_id: format!("order:{}", i),
+                id: i as i64,
                 receipt_number: format!("FAC202601290{:04}", i + 1),
                 prev_hash: prev,
                 curr_hash: curr.clone(),
@@ -1366,7 +1197,7 @@ mod tests {
     #[test]
     fn test_order_chain_broken_first_order() {
         let orders = build_valid_order_chain(3, "genesis");
-        // Validate with wrong expected prev — simulates missing previous day data
+        // Validate with wrong expected prev -- simulates missing previous day data
         let (intact, first_break) = validate_order_chain(&orders, "wrong_genesis");
         assert!(!intact);
         let brk = first_break.unwrap();

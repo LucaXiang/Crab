@@ -1,244 +1,275 @@
 //! Label Template Repository
 
-use super::{BaseRepository, ImageRefRepository, RepoError, RepoResult};
-use crate::db::models::{ImageRefEntityType, LabelField, LabelTemplate, LabelTemplateCreate, LabelTemplateUpdate};
-use crate::services::ImageCleanupService;
+use super::{RepoError, RepoResult};
+use shared::models::{
+    ImageRefEntityType, LabelField, LabelFieldInput, LabelTemplate, LabelTemplateCreate,
+    LabelTemplateUpdate,
+};
+use sqlx::SqlitePool;
 use std::collections::HashSet;
-use surrealdb::engine::local::Db;
-use surrealdb::{RecordId, Surreal};
 
-#[derive(Clone)]
-pub struct LabelTemplateRepository {
-    base: BaseRepository,
-    image_ref_repo: ImageRefRepository,
-    image_cleanup: ImageCleanupService,
+pub async fn list(pool: &SqlitePool) -> RepoResult<Vec<LabelTemplate>> {
+    let mut templates = sqlx::query_as::<_, LabelTemplate>(
+        "SELECT id, name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at FROM label_template WHERE is_active = 1 ORDER BY name",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    for t in &mut templates {
+        t.fields = find_fields(pool, t.id).await?;
+    }
+    Ok(templates)
 }
 
-impl LabelTemplateRepository {
-    pub fn new(db: Surreal<Db>, images_dir: std::path::PathBuf) -> Self {
-        Self {
-            image_ref_repo: ImageRefRepository::new(db.clone()),
-            image_cleanup: ImageCleanupService::new(images_dir),
-            base: BaseRepository::new(db),
-        }
+pub async fn list_all(pool: &SqlitePool) -> RepoResult<Vec<LabelTemplate>> {
+    let mut templates = sqlx::query_as::<_, LabelTemplate>(
+        "SELECT id, name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at FROM label_template ORDER BY name",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    for t in &mut templates {
+        t.fields = find_fields(pool, t.id).await?;
     }
+    Ok(templates)
+}
 
-    /// List all label templates
-    pub async fn list(&self) -> RepoResult<Vec<LabelTemplate>> {
-        let templates: Vec<LabelTemplate> = self
-            .base
-            .db()
-            .query("SELECT * FROM label_template WHERE is_active = true ORDER BY name")
-            .await?
-            .take(0)?;
-        Ok(templates)
+pub async fn get(pool: &SqlitePool, id: i64) -> RepoResult<Option<LabelTemplate>> {
+    let mut template = sqlx::query_as::<_, LabelTemplate>(
+        "SELECT id, name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at FROM label_template WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some(ref mut t) = template {
+        t.fields = find_fields(pool, t.id).await?;
     }
+    Ok(template)
+}
 
-    /// List all label templates (including inactive)
-    pub async fn list_all(&self) -> RepoResult<Vec<LabelTemplate>> {
-        let templates: Vec<LabelTemplate> = self
-            .base
-            .db()
-            .query("SELECT * FROM label_template ORDER BY name")
-            .await?
-            .take(0)?;
-        Ok(templates)
+pub async fn get_default(pool: &SqlitePool) -> RepoResult<Option<LabelTemplate>> {
+    let mut template = sqlx::query_as::<_, LabelTemplate>(
+        "SELECT id, name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at FROM label_template WHERE is_default = 1 AND is_active = 1 LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some(ref mut t) = template {
+        t.fields = find_fields(pool, t.id).await?;
     }
+    Ok(template)
+}
 
-    /// Get a label template by ID
-    pub async fn get(&self, id: &RecordId) -> RepoResult<Option<LabelTemplate>> {
-        let template: Option<LabelTemplate> = self.base.db().select(id.clone()).await?;
-        Ok(template)
-    }
-
-    /// Get the default label template
-    pub async fn get_default(&self) -> RepoResult<Option<LabelTemplate>> {
-        let templates: Vec<LabelTemplate> = self
-            .base
-            .db()
-            .query("SELECT * FROM label_template WHERE is_default = true AND is_active = true LIMIT 1")
-            .await?
-            .take(0)?;
-        Ok(templates.into_iter().next())
-    }
-
-    /// Create a new label template
-    pub async fn create(&self, data: LabelTemplateCreate) -> RepoResult<LabelTemplate> {
-        // If this is set as default, unset other defaults first
-        if data.is_default {
-            self.base
-                .db()
-                .query("UPDATE label_template SET is_default = false WHERE is_default = true")
-                .await?;
-        }
-
-        // Create the template with timestamps - let SurrealDB generate the ID
-        let template: Option<LabelTemplate> = self
-            .base
-            .db()
-            .query(
-                "CREATE label_template CONTENT {
-                    name: $name,
-                    description: $description,
-                    width: $width,
-                    height: $height,
-                    fields: $fields,
-                    is_default: $is_default,
-                    is_active: $is_active,
-                    padding_mm_x: $padding_mm_x,
-                    padding_mm_y: $padding_mm_y,
-                    render_dpi: $render_dpi,
-                    test_data: $test_data,
-                    created_at: $now,
-                    updated_at: $now
-                }",
-            )
-            .bind(("name", data.name.clone()))
-            .bind(("description", data.description.clone()))
-            .bind(("width", data.width))
-            .bind(("height", data.height))
-            .bind(("fields", data.fields.clone()))
-            .bind(("is_default", data.is_default))
-            .bind(("is_active", data.is_active))
-            .bind(("padding_mm_x", data.padding_mm_x))
-            .bind(("padding_mm_y", data.padding_mm_y))
-            .bind(("render_dpi", data.render_dpi))
-            .bind(("test_data", data.test_data.clone()))
-            .bind(("now", shared::util::now_millis()))
-            .await?
-            .take(0)?;
-
-        let template =
-            template.ok_or_else(|| RepoError::Database("Failed to create label template".to_string()))?;
-
-        // Sync image references
-        if let Some(id) = &template.id {
-            let image_hashes = Self::extract_image_hashes(&template.fields);
-            let _ = self
-                .image_ref_repo
-                .sync_refs(ImageRefEntityType::LabelTemplate, &id.to_string(), image_hashes)
-                .await;
-        }
-
-        Ok(template)
-    }
-
-    /// Update a label template
-    pub async fn update(&self, id: &RecordId, data: LabelTemplateUpdate) -> RepoResult<LabelTemplate> {
-        // If setting as default, unset other defaults first
-        if data.is_default == Some(true) {
-            self.base
-                .db()
-                .query("UPDATE label_template SET is_default = false WHERE is_default = true AND id != $id")
-                .bind(("id", id.clone()))
-                .await?;
-        }
-
-        // Merge update data with timestamp
-        let mut merge_data = serde_json::to_value(&data)
-            .map_err(|e| RepoError::Database(format!("Serialize error: {}", e)))?;
-        if let Some(obj) = merge_data.as_object_mut() {
-            obj.insert("updated_at".to_string(), serde_json::json!(shared::util::now_millis()));
-        }
-        let mut result = self
-            .base
-            .db()
-            .query("UPDATE $id MERGE $data RETURN AFTER")
-            .bind(("id", id.clone()))
-            .bind(("data", merge_data))
+pub async fn create(pool: &SqlitePool, data: LabelTemplateCreate) -> RepoResult<LabelTemplate> {
+    // If this is set as default, unset other defaults first
+    if data.is_default {
+        sqlx::query("UPDATE label_template SET is_default = 0 WHERE is_default = 1")
+            .execute(pool)
             .await?;
-
-        let updated: Option<LabelTemplate> = result.take(0)?;
-        let updated =
-            updated.ok_or_else(|| RepoError::NotFound(format!("Label template {} not found", id)))?;
-
-        // Sync image references and cleanup orphans
-        let image_hashes = Self::extract_image_hashes(&updated.fields);
-        let removed_hashes = self
-            .image_ref_repo
-            .sync_refs(ImageRefEntityType::LabelTemplate, &id.to_string(), image_hashes)
-            .await
-            .unwrap_or_default();
-
-        // Cleanup orphan images
-        if !removed_hashes.is_empty() {
-            let orphans = self
-                .image_ref_repo
-                .find_orphan_hashes(&removed_hashes)
-                .await
-                .unwrap_or_default();
-            self.image_cleanup.cleanup_orphan_images(&orphans).await;
-        }
-
-        Ok(updated)
     }
 
-    /// Delete a label template (soft delete by setting is_active = false)
-    pub async fn delete(&self, id: &RecordId) -> RepoResult<bool> {
-        // Get image references before soft delete
-        let image_hashes = self
-            .image_ref_repo
-            .delete_entity_refs(ImageRefEntityType::LabelTemplate, &id.to_string())
-            .await
-            .unwrap_or_default();
+    let now = shared::util::now_millis();
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO label_template (name, description, width, height, padding, is_default, is_active, width_mm, height_mm, padding_mm_x, padding_mm_y, render_dpi, test_data, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14) RETURNING id",
+    )
+    .bind(&data.name)
+    .bind(&data.description)
+    .bind(data.width)
+    .bind(data.height)
+    .bind(data.padding)
+    .bind(data.is_default)
+    .bind(data.is_active)
+    .bind(data.width_mm)
+    .bind(data.height_mm)
+    .bind(data.padding_mm_x)
+    .bind(data.padding_mm_y)
+    .bind(data.render_dpi)
+    .bind(&data.test_data)
+    .bind(now)
+    .fetch_one(pool)
+    .await?;
 
-        let _: Option<LabelTemplate> = self
-            .base
-            .db()
-            .update(id.clone())
-            .merge(LabelTemplateUpdate {
-                is_active: Some(false),
-                ..Default::default()
-            })
+    // Create fields
+    for field in &data.fields {
+        create_field(pool, id, field).await?;
+    }
+
+    // Sync image refs
+    let template = get(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::Database("Failed to create label template".into()))?;
+
+    let image_hashes = extract_image_hashes(&template.fields);
+    if !image_hashes.is_empty() {
+        let _ = super::image_ref::sync_refs(
+            pool,
+            ImageRefEntityType::LabelTemplate,
+            &id.to_string(),
+            image_hashes,
+        )
+        .await;
+    }
+
+    Ok(template)
+}
+
+pub async fn update(
+    pool: &SqlitePool,
+    id: i64,
+    data: LabelTemplateUpdate,
+) -> RepoResult<LabelTemplate> {
+    // If setting as default, unset other defaults first
+    if data.is_default == Some(true) {
+        sqlx::query("UPDATE label_template SET is_default = 0 WHERE is_default = 1 AND id != ?")
+            .bind(id)
+            .execute(pool)
             .await?;
+    }
 
-        // Cleanup orphan images
-        if !image_hashes.is_empty() {
-            let orphans = self
-                .image_ref_repo
-                .find_orphan_hashes(&image_hashes)
-                .await
-                .unwrap_or_default();
-            self.image_cleanup.cleanup_orphan_images(&orphans).await;
+    let now = shared::util::now_millis();
+    let rows = sqlx::query(
+        "UPDATE label_template SET name = COALESCE(?1, name), description = COALESCE(?2, description), width = COALESCE(?3, width), height = COALESCE(?4, height), padding = COALESCE(?5, padding), is_default = COALESCE(?6, is_default), is_active = COALESCE(?7, is_active), width_mm = COALESCE(?8, width_mm), height_mm = COALESCE(?9, height_mm), padding_mm_x = COALESCE(?10, padding_mm_x), padding_mm_y = COALESCE(?11, padding_mm_y), render_dpi = COALESCE(?12, render_dpi), test_data = COALESCE(?13, test_data), updated_at = ?14 WHERE id = ?15",
+    )
+    .bind(&data.name)
+    .bind(&data.description)
+    .bind(data.width)
+    .bind(data.height)
+    .bind(data.padding)
+    .bind(data.is_default)
+    .bind(data.is_active)
+    .bind(data.width_mm)
+    .bind(data.height_mm)
+    .bind(data.padding_mm_x)
+    .bind(data.padding_mm_y)
+    .bind(data.render_dpi)
+    .bind(&data.test_data)
+    .bind(now)
+    .bind(id)
+    .execute(pool)
+    .await?;
+
+    if rows.rows_affected() == 0 {
+        return Err(RepoError::NotFound(format!(
+            "Label template {id} not found"
+        )));
+    }
+
+    // Replace fields if provided
+    if let Some(fields) = &data.fields {
+        sqlx::query("DELETE FROM label_field WHERE template_id = ?")
+            .bind(id)
+            .execute(pool)
+            .await?;
+        for field in fields {
+            create_field(pool, id, field).await?;
         }
-
-        Ok(true)
     }
 
-    /// Hard delete a label template
-    pub async fn hard_delete(&self, id: &RecordId) -> RepoResult<bool> {
-        // Get image references before deleting
-        let image_hashes = self
-            .image_ref_repo
-            .delete_entity_refs(ImageRefEntityType::LabelTemplate, &id.to_string())
-            .await
-            .unwrap_or_default();
+    let updated = get(pool, id)
+        .await?
+        .ok_or_else(|| RepoError::NotFound(format!("Label template {id} not found")))?;
 
-        let deleted: Option<LabelTemplate> = self.base.db().delete(id.clone()).await?;
+    // Sync image refs
+    let image_hashes = extract_image_hashes(&updated.fields);
+    let _ = super::image_ref::sync_refs(
+        pool,
+        ImageRefEntityType::LabelTemplate,
+        &id.to_string(),
+        image_hashes,
+    )
+    .await;
 
-        // Cleanup orphan images
-        if !image_hashes.is_empty() {
-            let orphans = self
-                .image_ref_repo
-                .find_orphan_hashes(&image_hashes)
-                .await
-                .unwrap_or_default();
-            self.image_cleanup.cleanup_orphan_images(&orphans).await;
-        }
+    Ok(updated)
+}
 
-        Ok(deleted.is_some())
-    }
+pub async fn delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
+    // Clean up image refs
+    let _ = super::image_ref::delete_entity_refs(
+        pool,
+        ImageRefEntityType::LabelTemplate,
+        &id.to_string(),
+    )
+    .await;
 
-    /// Extract image hashes from label template fields
-    ///
-    /// Returns hashes from fields where source_type == "image" and template is not empty
-    fn extract_image_hashes(fields: &[LabelField]) -> HashSet<String> {
-        fields
-            .iter()
-            .filter(|f| f.source_type.as_deref() == Some("image"))
-            .filter_map(|f| f.template.as_ref())
-            .filter(|t| !t.is_empty())
-            .cloned()
-            .collect()
-    }
+    // Soft delete
+    sqlx::query("UPDATE label_template SET is_active = 0 WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(true)
+}
+
+pub async fn hard_delete(pool: &SqlitePool, id: i64) -> RepoResult<bool> {
+    let _ = super::image_ref::delete_entity_refs(
+        pool,
+        ImageRefEntityType::LabelTemplate,
+        &id.to_string(),
+    )
+    .await;
+
+    // Fields cascade via FK
+    let result = sqlx::query("DELETE FROM label_template WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+// ── Fields ──────────────────────────────────────────────────────────────
+
+async fn find_fields(pool: &SqlitePool, template_id: i64) -> RepoResult<Vec<LabelField>> {
+    let fields = sqlx::query_as::<_, LabelField>(
+        "SELECT id, template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style FROM label_field WHERE template_id = ?",
+    )
+    .bind(template_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(fields)
+}
+
+async fn create_field(pool: &SqlitePool, template_id: i64, input: &LabelFieldInput) -> RepoResult<i64> {
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO label_field (template_id, field_id, name, field_type, x, y, width, height, font_size, font_weight, font_family, color, rotate, alignment, data_source, format, visible, label, template, data_key, source_type, maintain_aspect_ratio, style, align, vertical_align, line_style) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26) RETURNING id",
+    )
+    .bind(template_id)
+    .bind(&input.field_id)
+    .bind(&input.name)
+    .bind(&input.field_type)
+    .bind(input.x)
+    .bind(input.y)
+    .bind(input.width)
+    .bind(input.height)
+    .bind(input.font_size)
+    .bind(&input.font_weight)
+    .bind(&input.font_family)
+    .bind(&input.color)
+    .bind(input.rotate)
+    .bind(&input.alignment)
+    .bind(&input.data_source)
+    .bind(&input.format)
+    .bind(input.visible)
+    .bind(&input.label)
+    .bind(&input.template)
+    .bind(&input.data_key)
+    .bind(&input.source_type)
+    .bind(input.maintain_aspect_ratio)
+    .bind(&input.style)
+    .bind(&input.align)
+    .bind(&input.vertical_align)
+    .bind(&input.line_style)
+    .fetch_one(pool)
+    .await?;
+    Ok(id)
+}
+
+/// Extract image hashes from label fields
+fn extract_image_hashes(fields: &[LabelField]) -> HashSet<String> {
+    fields
+        .iter()
+        .filter(|f| f.source_type.as_deref() == Some("image"))
+        .filter_map(|f| f.template.as_ref())
+        .filter(|t| !t.is_empty())
+        .cloned()
+        .collect()
 }

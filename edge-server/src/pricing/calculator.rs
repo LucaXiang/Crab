@@ -3,7 +3,7 @@
 //! Logic for calculating price adjustments from matched rules.
 //! Uses rust_decimal for precise calculations, stores as f64.
 
-use crate::db::models::{AdjustmentType, PriceRule, RuleType};
+use shared::models::{AdjustmentType, PriceRule, RuleType};
 use rust_decimal::prelude::*;
 
 /// Rounding strategy for monetary values (2 decimal places, half-up)
@@ -169,7 +169,7 @@ pub fn calculate_adjustments(rules: &[&PriceRule], base_price: f64) -> PriceAdju
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::models::ProductScope;
+    use shared::models::ProductScope;
     fn make_rule(
         rule_type: RuleType,
         adjustment_type: AdjustmentType,
@@ -177,15 +177,15 @@ mod tests {
         stackable: bool,
     ) -> PriceRule {
         PriceRule {
-            id: None,
+            id: 0,
             name: "test".to_string(),
             display_name: "Test".to_string(),
             receipt_name: "TEST".to_string(),
             description: None,
             rule_type,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            target_id: None,
+            zone_scope: shared::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type,
             adjustment_value: value,
             is_stackable: stackable,

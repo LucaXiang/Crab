@@ -157,7 +157,7 @@ impl KitchenPrintService {
 
         // Get category info
         let (category_id, category_name) = if let Some(ref p) = product {
-            let cat_id = p.category.to_string();
+            let cat_id = p.category_id.to_string();
             let cat_name = catalog
                 .get_category(&cat_id)
                 .map(|c| c.name.clone())

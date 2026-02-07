@@ -1,53 +1,46 @@
 //! Database Module
 //!
-//! Handles SurrealDB connection and provides database service
+//! Handles SQLite connection pool and migrations
 
-pub mod models;
 pub mod repository;
 
 use crate::utils::AppError;
-use include_dir::{Dir, include_dir};
-use std::path::PathBuf;
-use surrealdb::{
-    Surreal,
-    engine::local::{Db, RocksDb},
-};
-use surrealdb_migrations::MigrationRunner;
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
+use sqlx::SqlitePool;
+use std::str::FromStr;
 
-static MIGRATIONS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/migrations");
-
-/// Database service wrapper
+/// Database service — owns a SQLite connection pool
 #[derive(Clone)]
 pub struct DbService {
-    pub db: Surreal<Db>,
+    pub pool: SqlitePool,
 }
 
 impl DbService {
-    /// Create a new database service
+    /// Create a new database service with WAL mode and separate read/write pools
     pub async fn new(db_path: &str) -> Result<Self, AppError> {
-        let path = PathBuf::from(db_path);
+        // Build connection options: WAL, foreign keys, normal sync
+        let options = SqliteConnectOptions::from_str(&format!("sqlite:{db_path}"))
+            .map_err(|e| AppError::database(format!("Invalid database path: {e}")))?
+            .create_if_missing(true)
+            .journal_mode(SqliteJournalMode::Wal)
+            .synchronous(SqliteSynchronous::Normal)
+            .pragma("foreign_keys", "ON");
 
-        let db = Surreal::new::<RocksDb>(path)
+        let pool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect_with(options)
             .await
-            .map_err(|e| AppError::database(format!("Failed to open database: {}", e)))?;
+            .map_err(|e| AppError::database(format!("Failed to open database: {e}")))?;
 
-        // Use namespace and database
-        db.use_ns("edge_server")
-            .use_db("edge_server")
+        tracing::info!("Database connection established (SQLite WAL)");
+
+        // Run migrations
+        sqlx::migrate!("./migrations")
+            .run(&pool)
             .await
-            .map_err(|e| AppError::database(format!("Failed to use ns/db: {}", e)))?;
-        tracing::info!("Database connection established");
+            .map_err(|e| AppError::database(format!("Failed to apply migrations: {e}")))?;
+        tracing::info!("Database migrations applied");
 
-        // Apply migrations
-        tracing::info!("Applying database migrations...");
-
-        MigrationRunner::new(&db)
-            .load_files(&MIGRATIONS_DIR)
-            .up()
-            .await
-            .map_err(|e| AppError::database(format!("Failed to apply migrations: {}", e)))?;
-        tracing::info!("Database migrations applied successfully");
-
-        Ok(Self { db })
+        Ok(Self { pool })
     }
 }

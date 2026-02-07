@@ -8,7 +8,7 @@
 //! Note: Event application logic has been moved to the appliers module.
 //! Use `EventAction` from `super::appliers` to apply events to snapshots.
 
-use crate::db::models::PriceRule;
+use shared::models::PriceRule;
 use crate::pricing::{calculate_item_price, matches_product_scope};
 use shared::order::CartItemSnapshot;
 use tracing::debug;
@@ -79,7 +79,7 @@ pub(crate) fn generate_instance_id_from_parts(
 /// This is a convenience function that calls `input_to_snapshot_with_rules` with empty rules
 /// and no product metadata (for cases where rule matching is not needed).
 pub fn input_to_snapshot(input: &shared::order::CartItemInput) -> CartItemSnapshot {
-    input_to_snapshot_with_rules(input, &[], None, &[])
+    input_to_snapshot_with_rules(input, &[], 0, None, &[])
 }
 
 /// Convert CartItemInput to CartItemSnapshot with price rules applied
@@ -92,41 +92,43 @@ pub fn input_to_snapshot(input: &shared::order::CartItemInput) -> CartItemSnapsh
 /// # Arguments
 /// * `input` - The cart item input to convert
 /// * `rules` - Cached price rules (will be filtered by product scope)
+/// * `product_id` - Product's i64 ID for scope matching
 /// * `category_id` - Product's category ID for scope matching (from backend cache)
-/// * `tags` - Product's tags for scope matching (from backend cache)
+/// * `tag_ids` - Product's tag IDs for scope matching (from backend cache)
 ///
 /// # Returns
 /// A CartItemSnapshot with calculated prices and applied rules
 pub fn input_to_snapshot_with_rules(
     input: &shared::order::CartItemInput,
     rules: &[&PriceRule],
-    category_id: Option<&str>,
-    tags: &[String],
+    product_id: i64,
+    category_id: Option<i64>,
+    tag_ids: &[i64],
 ) -> CartItemSnapshot {
     debug!(
-        product_id = %input.product_id,
+        product_id,
         product_name = %input.name,
         input_price = input.price,
         original_price = ?input.original_price,
         manual_discount_percent = ?input.manual_discount_percent,
         rules_count = rules.len(),
         category_id = ?category_id,
-        tags_count = tags.len(),
+        tags_count = tag_ids.len(),
         "[Reducer] input_to_snapshot_with_rules called"
     );
 
     // Filter rules by product scope matching
-    // Uses category_id and tags from backend product metadata cache
+    // Uses category_id and tag_ids from backend product metadata cache
     let matched_rules: Vec<&PriceRule> = rules
         .iter()
         .filter(|rule| {
-            matches_product_scope(rule, &input.product_id, category_id, tags)
+            matches_product_scope(rule, product_id, category_id, tag_ids)
         })
         .copied()
         .collect();
 
     debug!(
-        product_id = %input.product_id,
+        product_id,
         total_rules = rules.len(),
         matched_rules_count = matched_rules.len(),
         "[Reducer] Filtered rules by product scope"
@@ -334,7 +336,7 @@ mod tests {
             authorizer_name: None,
         };
 
-        let snapshot = input_to_snapshot_with_rules(&input, &[], None, &[]);
+        let snapshot = input_to_snapshot_with_rules(&input, &[], 1, None, &[]);
 
         assert_eq!(snapshot.price, 100.0);
         assert!(snapshot.rule_discount_amount.is_none());
@@ -344,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_input_to_snapshot_with_rules_discount() {
-        use crate::db::models::{AdjustmentType, ProductScope, RuleType};
+        use shared::models::{AdjustmentType, ProductScope, RuleType};
         let input = shared::order::CartItemInput {
             product_id: "product:1".to_string(),
             name: "Test Product".to_string(),
@@ -361,15 +363,15 @@ mod tests {
 
         // 10% discount rule
         let discount_rule = PriceRule {
-            id: None,
+            id: 0,
             name: "test_discount".to_string(),
             display_name: "Test Discount".to_string(),
             receipt_name: "TD".to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            target_id: None,
+            zone_scope: shared::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
             is_stackable: true,
@@ -385,7 +387,7 @@ mod tests {
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
-        let snapshot = input_to_snapshot_with_rules(&input, &rules, None, &[]);
+        let snapshot = input_to_snapshot_with_rules(&input, &rules, 1, None, &[]);
 
         // $100 - 10% = $90
         assert_eq!(snapshot.price, 90.0);
@@ -397,7 +399,7 @@ mod tests {
 
     #[test]
     fn test_input_to_snapshot_with_rules_and_options() {
-        use crate::db::models::{AdjustmentType, ProductScope, RuleType};
+        use shared::models::{AdjustmentType, ProductScope, RuleType};
         use shared::order::ItemOption;
 
         let input = shared::order::CartItemInput {
@@ -433,15 +435,15 @@ mod tests {
 
         // 10% discount rule
         let discount_rule = PriceRule {
-            id: None,
+            id: 0,
             name: "test_discount".to_string(),
             display_name: "Test Discount".to_string(),
             receipt_name: "TD".to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            target_id: None,
+            zone_scope: shared::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
             is_stackable: true,
@@ -457,7 +459,7 @@ mod tests {
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
-        let snapshot = input_to_snapshot_with_rules(&input, &rules, None, &[]);
+        let snapshot = input_to_snapshot_with_rules(&input, &rules, 1, None, &[]);
 
         // Base: $100 + $5 + $2 = $107
         // 10% discount on $107 = $10.70
@@ -468,8 +470,7 @@ mod tests {
 
     #[test]
     fn test_input_to_snapshot_with_manual_and_rule_discount() {
-        use crate::db::models::{AdjustmentType, ProductScope, RuleType};
-
+        use shared::models::{AdjustmentType, ProductScope, RuleType};
 
         let input = shared::order::CartItemInput {
             product_id: "product:1".to_string(),
@@ -487,15 +488,15 @@ mod tests {
 
         // 10% rule discount
         let discount_rule = PriceRule {
-            id: None,
+            id: 0,
             name: "test_discount".to_string(),
             display_name: "Test Discount".to_string(),
             receipt_name: "TD".to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            target_id: None,
+            zone_scope: shared::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
             is_stackable: true,
@@ -511,7 +512,7 @@ mod tests {
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
-        let snapshot = input_to_snapshot_with_rules(&input, &rules, None, &[]);
+        let snapshot = input_to_snapshot_with_rules(&input, &rules, 1, None, &[]);
 
         // $100 base
         // 10% manual discount -> $90
@@ -523,8 +524,7 @@ mod tests {
 
     #[test]
     fn test_instance_id_consistent_with_or_without_rules() {
-        use crate::db::models::{AdjustmentType, ProductScope, RuleType};
-
+        use shared::models::{AdjustmentType, ProductScope, RuleType};
 
         // Same input for both cases
         let input = shared::order::CartItemInput {
@@ -542,19 +542,19 @@ mod tests {
         };
 
         // Case 1: Without rules (e.g., cache miss)
-        let snapshot_no_rules = input_to_snapshot_with_rules(&input, &[], None, &[]);
+        let snapshot_no_rules = input_to_snapshot_with_rules(&input, &[], 1, None, &[]);
 
         // Case 2: With a 10% discount rule
         let discount_rule = PriceRule {
-            id: None,
+            id: 0,
             name: "test_discount".to_string(),
             display_name: "Test Discount".to_string(),
             receipt_name: "TD".to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            target_id: None,
+            zone_scope: shared::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
             is_stackable: true,
@@ -570,7 +570,7 @@ mod tests {
         };
 
         let rules: Vec<&PriceRule> = vec![&discount_rule];
-        let snapshot_with_rules = input_to_snapshot_with_rules(&input, &rules, None, &[]);
+        let snapshot_with_rules = input_to_snapshot_with_rules(&input, &rules, 1, None, &[]);
 
         // Prices are different (as expected)
         assert_eq!(snapshot_no_rules.price, 100.0);
@@ -586,13 +586,11 @@ mod tests {
 
     #[test]
     fn test_product_scope_filtering() {
-        use crate::db::models::{AdjustmentType, ProductScope, RuleType};
+        use shared::models::{AdjustmentType, ProductScope, RuleType};
 
-        use surrealdb::RecordId;
-
-        // Item for product:p1
+        // Item for product with id=1
         let input = shared::order::CartItemInput {
-            product_id: "product:p1".to_string(),
+            product_id: "product:1".to_string(),
             name: "Product 1".to_string(),
             price: 100.0,
             original_price: None,
@@ -607,15 +605,15 @@ mod tests {
 
         // Global scope rule - should apply to all products
         let global_rule = PriceRule {
-            id: None,
+            id: 0,
             name: "global_discount".to_string(),
             display_name: "Global Discount".to_string(),
             receipt_name: "GD".to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Global,
-            target: None,
-            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            target_id: None,
+            zone_scope: shared::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::Percentage,
             adjustment_value: 10.0,
             is_stackable: true,
@@ -630,17 +628,17 @@ mod tests {
             created_at: shared::util::now_millis(),
         };
 
-        // Product-specific rule for product:p1 - should apply
+        // Product-specific rule for product id=1 - should apply
         let product_p1_rule = PriceRule {
-            id: None,
+            id: 0,
             name: "product_p1_discount".to_string(),
             display_name: "P1 Discount".to_string(),
             receipt_name: "P1D".to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Product,
-            target: Some(RecordId::from_table_key("product", "p1")),
-            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            target_id: Some(1),
+            zone_scope: shared::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::FixedAmount,
             adjustment_value: 5.0,
             is_stackable: true,
@@ -655,17 +653,17 @@ mod tests {
             created_at: shared::util::now_millis(),
         };
 
-        // Product-specific rule for product:p2 - should NOT apply to p1
+        // Product-specific rule for product id=2 - should NOT apply to product 1
         let product_p2_rule = PriceRule {
-            id: None,
+            id: 0,
             name: "product_p2_discount".to_string(),
             display_name: "P2 Discount".to_string(),
             receipt_name: "P2D".to_string(),
             description: None,
             rule_type: RuleType::Discount,
             product_scope: ProductScope::Product,
-            target: Some(RecordId::from_table_key("product", "p2")),
-            zone_scope: crate::db::models::ZONE_SCOPE_ALL.to_string(),
+            target_id: Some(2),
+            zone_scope: shared::models::ZONE_SCOPE_ALL.to_string(),
             adjustment_type: AdjustmentType::FixedAmount,
             adjustment_value: 50.0, // Large discount that should NOT apply
             is_stackable: true,
@@ -681,9 +679,8 @@ mod tests {
         };
 
         // Pass ALL rules - filtering should happen inside input_to_snapshot_with_rules
-        // category_id and tags come from backend product metadata cache (None for this test)
         let rules: Vec<&PriceRule> = vec![&global_rule, &product_p1_rule, &product_p2_rule];
-        let snapshot = input_to_snapshot_with_rules(&input, &rules, None, &[]);
+        let snapshot = input_to_snapshot_with_rules(&input, &rules, 1, None, &[]);
 
         // Expected calculation:
         // - Global 10%: $100 * 10% = $10 discount
