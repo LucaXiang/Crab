@@ -7,7 +7,7 @@ import englishLayout from 'simple-keyboard-layouts/build/layouts/english';
 import chineseLayout from 'simple-keyboard-layouts/build/layouts/chinese';
 import { useVirtualKeyboardStore, useVirtualKeyboardVisible, useVirtualKeyboardLayout, useVirtualKeyboardLanguage } from '@/core/stores/ui/useVirtualKeyboardStore';
 import type { KeyboardLanguage } from '@/core/stores/ui/useVirtualKeyboardStore';
-import { handleKeyboardChange, getCurrentInputValue, scrollActiveElementIntoView } from './useKeyboardInput';
+import { handleKeyboardChange, getCurrentInputValue, scrollActiveElementIntoView, resetContentOffset } from './useKeyboardInput';
 import { Z_INDEX } from '@/shared/constants/zIndex';
 
 import PinyinEngine from 'pinyin-engine';
@@ -72,15 +72,16 @@ const numberLayout = {
     '1 2 3',
     '4 5 6',
     '7 8 9',
-    '. 0 {bksp}',
+    '. 0 {bksp} {close}',
   ],
 };
 
 const numberDisplay: Record<string, string> = {
   '{bksp}': '⌫',
+  '{close}': '✓',
 };
 
-/** Display labels for text layout (space is set dynamically per language) */
+/** Display labels for text layout (lang is set dynamically per language) */
 const textDisplay: Record<string, string> = {
   '{bksp}': '⌫',
   '{enter}': '↵',
@@ -89,13 +90,14 @@ const textDisplay: Record<string, string> = {
   '{tab}': '⇥',
   '{symbols}': '?123',
   '{abc}': 'ABC',
-  '{lang}': '🌐',
+  '{space}': ' ',
+  '{close}': '✓',
 };
 
-const spaceLabel: Record<KeyboardLanguage, string> = {
-  spanish: 'español',
-  english: 'English',
-  chinese: '中文',
+const langLabel: Record<KeyboardLanguage, string> = {
+  spanish: '🌐 ES',
+  english: '🌐 EN',
+  chinese: '🌐 中',
 };
 
 /** Symbols layout */
@@ -104,12 +106,12 @@ const symbolsLayout = {
     '1 2 3 4 5 6 7 8 9 0',
     '@ # € % & - + ( )',
     '{abc} ! ? / \' " : ; {bksp}',
-    '{lang} {abc} {space}',
+    '{lang} {abc} {space} {close}',
   ],
 };
 
-/** Bottom row for text layouts */
-const TEXT_BOTTOM_ROW = '{lang} {symbols} {space} @ .';
+/** Bottom row for text layouts (iPad-style: globe | 123 | space | . | done) */
+const TEXT_BOTTOM_ROW = '{lang} {symbols} {space} . {close}';
 
 /** Replace the original bottom row (.com @ {space}) with our balanced layout */
 function patchBottomRow(layout: Record<string, string[]>): Record<string, string[]> {
@@ -154,6 +156,7 @@ export const VirtualKeyboard: React.FC = () => {
     if (visible && keyboardRef.current) {
       const val = getCurrentInputValue();
       keyboardRef.current.setInput(val);
+      keyboardRef.current.setCaretPosition(val.length);
     }
   }, [visible, activeElement]);
 
@@ -162,6 +165,7 @@ export const VirtualKeyboard: React.FC = () => {
     if (!visible) {
       setVkbHeight(0);
       document.body.classList.remove('vkb-visible');
+      resetContentOffset();
       return;
     }
 
@@ -207,7 +211,9 @@ export const VirtualKeyboard: React.FC = () => {
     setLayoutName('default');
     layoutNameRef.current = 'default';
     if (keyboardRef.current) {
-      keyboardRef.current.setInput(getCurrentInputValue());
+      const val = getCurrentInputValue();
+      keyboardRef.current.setInput(val);
+      keyboardRef.current.setCaretPosition(val.length);
     }
   }, [layout, language]);
 
@@ -224,6 +230,7 @@ export const VirtualKeyboard: React.FC = () => {
         const current = keyboardRef.current.getInput();
         if (el.value !== current) {
           keyboardRef.current.setInput(el.value);
+          keyboardRef.current.setCaretPosition(el.value.length);
         }
       }
     };
@@ -239,11 +246,39 @@ export const VirtualKeyboard: React.FC = () => {
     };
   }, [visible]);
 
+  const bkspRef = useRef(false);
+
   const onChange = useCallback((input: string) => {
+    // Skip onChange fired by simple-keyboard after we handled {bksp} manually
+    if (bkspRef.current) {
+      bkspRef.current = false;
+      return;
+    }
     handleKeyboardChange(input);
   }, []);
 
   const onKeyPress = useCallback((button: string) => {
+    // Handle backspace manually — simple-keyboard's internal caret often drifts to 0,
+    // making its built-in {bksp} a no-op. We read the DOM value directly and delete
+    // the last character ourselves, then re-sync the keyboard's internal state.
+    if (button === '{bksp}') {
+      const val = getCurrentInputValue();
+      if (val.length > 0) {
+        const newVal = val.slice(0, -1);
+        bkspRef.current = true;
+        handleKeyboardChange(newVal);
+        if (keyboardRef.current) {
+          keyboardRef.current.setInput(newVal);
+        }
+      } else {
+        bkspRef.current = true;
+      }
+      return;
+    }
+    if (button === '{close}') {
+      useVirtualKeyboardStore.getState().hide();
+      return;
+    }
     if (button === '{lang}') {
       useVirtualKeyboardStore.getState().cycleLanguage();
       return;
@@ -290,7 +325,7 @@ export const VirtualKeyboard: React.FC = () => {
       : layoutsByLanguage[language];
   const currentDisplay = isNumber
     ? numberDisplay
-    : { ...textDisplay, '{space}': spaceLabel[language] };
+    : { ...textDisplay, '{lang}': langLabel[language] };
 
   return (
     <div
