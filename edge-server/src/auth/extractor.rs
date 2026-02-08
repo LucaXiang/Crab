@@ -44,7 +44,8 @@ impl FromRequestParts<ServerState> for CurrentUser {
         let jwt_service = state.get_jwt_service();
         match jwt_service.validate_token(token) {
             Ok(claims) => {
-                let user = CurrentUser::from(claims);
+                let user = CurrentUser::try_from(claims)
+                    .map_err(|e| AppError::invalid_token(format!("Malformed JWT claims: {}", e)))?;
 
                 // Store in extensions for potential reuse
                 parts.extensions.insert(user.clone());

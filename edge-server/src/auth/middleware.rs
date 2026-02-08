@@ -73,7 +73,8 @@ pub async fn require_auth(
     // 验证令牌
     match jwt_service.validate_token(token) {
         Ok(claims) => {
-            let user = CurrentUser::from(claims);
+            let user = CurrentUser::try_from(claims)
+                .map_err(|e| AppError::invalid_token(format!("Malformed JWT claims: {}", e)))?;
             req.extensions_mut().insert(user);
             Ok(next.run(req).await)
         }

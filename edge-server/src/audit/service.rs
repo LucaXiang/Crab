@@ -111,7 +111,10 @@ impl AuditService {
         // 1. 检测异常关闭：LOCK 文件存在
         if self.lock_path.exists() {
             let lock_content = std::fs::read_to_string(&self.lock_path).unwrap_or_default();
-            let last_start_ts: i64 = lock_content.trim().parse().unwrap_or(0);
+            let last_start_ts: i64 = lock_content.trim().parse().unwrap_or_else(|_| {
+                tracing::warn!("Corrupted LOCK file content: '{}'", lock_content.trim());
+                0
+            });
 
             tracing::warn!(
                 "Abnormal shutdown detected — LOCK file exists (last start: {})",

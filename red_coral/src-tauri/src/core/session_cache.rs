@@ -156,8 +156,19 @@ impl SessionCache {
             last_online_login: session.logged_in_at,
         };
 
-        self.data.employees.insert(username.to_string(), cached);
-        self.save()?;
+        let old = self.data.employees.insert(username.to_string(), cached);
+        if let Err(e) = self.save() {
+            // Rollback: restore previous memory state to stay consistent with disk
+            match old {
+                Some(prev) => {
+                    self.data.employees.insert(username.to_string(), prev);
+                }
+                None => {
+                    self.data.employees.remove(username);
+                }
+            }
+            return Err(e);
+        }
 
         tracing::debug!(username = %username, "Employee cache updated");
 

@@ -79,13 +79,59 @@ impl<T: Serialize> From<Result<T, String>> for ApiResponse<T> {
     }
 }
 
+/// Map ClientError to the most specific ErrorCode
+fn client_error_to_code(err: &crab_client::ClientError) -> ErrorCode {
+    use crab_client::ClientError;
+    match err {
+        // Connection
+        ClientError::Connection(_) => ErrorCode::BridgeConnectionFailed,
+        ClientError::ConnectionClosed(_) => ErrorCode::ClientDisconnected,
+        ClientError::Request(_) => ErrorCode::NetworkError,
+        ClientError::Timeout(_) => ErrorCode::TimeoutError,
+        // TLS / Certificate
+        ClientError::Tls(_) | ClientError::Certificate(_) => ErrorCode::CertificateInvalid,
+        ClientError::NoCertificates => ErrorCode::BridgeNotConnected,
+        ClientError::CertificateExpired => ErrorCode::LicenseExpired,
+        // Auth
+        ClientError::Auth(_) => ErrorCode::InvalidCredentials,
+        ClientError::Unauthorized(_) => ErrorCode::NotAuthenticated,
+        ClientError::SessionExpired => ErrorCode::SessionExpired,
+        ClientError::Forbidden(_) => ErrorCode::PermissionDenied,
+        // Request-level
+        ClientError::NotFound(_) => ErrorCode::NotFound,
+        ClientError::Validation(_) => ErrorCode::ValidationFailed,
+        ClientError::NotSupported(_) | ClientError::InvalidState(_) => ErrorCode::InvalidRequest,
+        ClientError::Config(_) => ErrorCode::ConfigError,
+        // API error (handled separately before this function is called)
+        ClientError::Api { .. } => ErrorCode::InternalError,
+        // Protocol / serialization
+        ClientError::Serialization(_) | ClientError::InvalidMessage(_)
+        | ClientError::InvalidResponse(_) | ClientError::Protocol(_) => ErrorCode::InternalError,
+        ClientError::Io(_) | ClientError::Internal(_) => ErrorCode::InternalError,
+    }
+}
+
+/// Map TenantError to the most specific ErrorCode
+fn tenant_error_to_code(err: &super::tenant_manager::TenantError) -> ErrorCode {
+    use super::tenant_manager::TenantError;
+    match err {
+        TenantError::NotFound(_) => ErrorCode::TenantNotFound,
+        TenantError::NoTenantSelected => ErrorCode::TenantNotSelected,
+        TenantError::Certificate(_) => ErrorCode::CertificateInvalid,
+        TenantError::Network(_) => ErrorCode::NetworkError,
+        TenantError::AuthFailed(_) => ErrorCode::ActivationFailed,
+        TenantError::OfflineNotAvailable(_) => ErrorCode::NotAuthenticated,
+        TenantError::SessionCache(_) | TenantError::Io(_) => ErrorCode::InternalError,
+    }
+}
+
 /// 从 BridgeError 创建错误响应
-/// 会自动提取服务端返回的 error code
+/// 会自动提取服务端返回的 error code，非 API 错误映射到最匹配的 ErrorCode
 impl<T: Serialize> ApiResponse<T> {
     pub fn from_bridge_error(err: BridgeError) -> Self {
         match &err {
             BridgeError::Client(client_err) => {
-                // 检查是否是 API 错误（包含服务端的 error code）
+                // API 错误：直接保留服务端的 error code + details
                 if let crab_client::ClientError::Api { code, message, details } = client_err {
                     return Self {
                         code: Some(*code as u16),
@@ -102,16 +148,50 @@ impl<T: Serialize> ApiResponse<T> {
                         }),
                     };
                 }
-                // 其他 client 错误
+                // 非 API 错误：映射到正确的 ErrorCode
+                let code = client_error_to_code(client_err);
                 Self {
-                    code: Some(ErrorCode::DatabaseError.code()),
-                    message: format!("Client error: {}", client_err),
+                    code: Some(code.code()),
+                    message: client_err.to_string(),
                     data: None,
                     details: None,
                 }
             }
-            _ => Self {
-                code: Some(ErrorCode::DatabaseError.code()),
+            BridgeError::NotInitialized => Self {
+                code: Some(ErrorCode::BridgeNotInitialized.code()),
+                message: err.to_string(),
+                data: None,
+                details: None,
+            },
+            BridgeError::NotAuthenticated => Self {
+                code: Some(ErrorCode::NotAuthenticated.code()),
+                message: err.to_string(),
+                data: None,
+                details: None,
+            },
+            BridgeError::Config(_) => Self {
+                code: Some(ErrorCode::ConfigError.code()),
+                message: err.to_string(),
+                data: None,
+                details: None,
+            },
+            BridgeError::Tenant(tenant_err) => {
+                let code = tenant_error_to_code(tenant_err);
+                Self {
+                    code: Some(code.code()),
+                    message: err.to_string(),
+                    data: None,
+                    details: None,
+                }
+            }
+            BridgeError::NotImplemented(_) | BridgeError::AlreadyRunning(_) => Self {
+                code: Some(ErrorCode::InvalidRequest.code()),
+                message: err.to_string(),
+                data: None,
+                details: None,
+            },
+            BridgeError::Server(_) | BridgeError::Io(_) => Self {
+                code: Some(ErrorCode::InternalError.code()),
                 message: err.to_string(),
                 data: None,
                 details: None,

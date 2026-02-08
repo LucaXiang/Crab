@@ -264,7 +264,8 @@ impl OrderStorage {
         use rand::Rng;
 
         let today = chrono::Utc::now().with_timezone(&tz).format("%Y%m%d").to_string();
-        let today_u64: u64 = today.parse().unwrap_or(0);
+        // SAFETY: chrono %Y%m%d always produces a valid u64 like "20260208"
+        let today_u64: u64 = today.parse().expect("chrono %Y%m%d format is always a valid u64");
 
         let txn = self.db.begin_write()?;
         let mut table = txn.open_table(SEQUENCE_TABLE)?;

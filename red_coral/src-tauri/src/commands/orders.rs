@@ -21,13 +21,13 @@ pub struct FetchOrderListParams {
 /// Order summary for list view (matches backend OrderSummary)
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct OrderSummary {
-    pub order_id: String,
+    pub order_id: i64,
     pub receipt_number: String,
     pub table_name: Option<String>,
     pub status: String,
     pub is_retail: bool,
     pub total: f64,
-    pub guest_count: i32,
+    pub guest_count: Option<i32>,
     pub start_time: i64,
     pub end_time: Option<i64>,
     // === Void Metadata ===
@@ -102,11 +102,11 @@ pub async fn fetch_order_list(
 #[tauri::command]
 pub async fn fetch_order_detail(
     bridge: State<'_, Arc<ClientBridge>>,
-    order_id: String,
+    order_id: i64,
 ) -> Result<ApiResponse<serde_json::Value>, String> {
 
     match bridge
-        .get::<serde_json::Value>(&format!("/api/orders/{}", encode(&order_id)))
+        .get::<serde_json::Value>(&format!("/api/orders/{}", order_id))
         .await
     {
         Ok(detail) => Ok(ApiResponse::success(detail)),

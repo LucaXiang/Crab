@@ -208,9 +208,16 @@ pub fn validate_item_changes(changes: &ItemChanges) -> Result<(), OrderError> {
 }
 
 /// Convert f64 to Decimal for calculation
+///
+/// Input values should be pre-validated via `require_finite()` at the boundary.
+/// If NaN/Infinity somehow reaches here, logs an error and returns ZERO
+/// to avoid silent data corruption in financial calculations.
 #[inline]
 pub fn to_decimal(value: f64) -> Decimal {
-    Decimal::from_f64(value).unwrap_or_default()
+    Decimal::from_f64(value).unwrap_or_else(|| {
+        tracing::error!(value = ?value, "Non-finite f64 in monetary calculation, defaulting to zero");
+        Decimal::ZERO
+    })
 }
 
 /// Convert Decimal back to f64 for storage, rounded to 2 decimal places
@@ -219,7 +226,8 @@ pub fn to_f64(value: Decimal) -> f64 {
     value
         .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
         .to_f64()
-        .unwrap_or_default()
+        // SAFETY: Decimal rounded to 2dp is always representable as f64
+        .expect("rounded Decimal always converts to f64")
 }
 
 /// Compute effective per-unit rule discount, dynamically recalculating from `adjustment_value`.

@@ -234,7 +234,13 @@ impl ImageCacheService {
         let cache_dir = self.paths.cache_images_dir();
 
         for hash in hashes {
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
+            let permit = match semaphore.clone().acquire_owned().await {
+                Ok(p) => p,
+                Err(_) => {
+                    tracing::error!("Image download semaphore closed unexpectedly");
+                    break;
+                }
+            };
             let hash = hash.clone();
             let cache_dir = cache_dir.clone();
             let ctx = ctx.clone();
@@ -299,7 +305,13 @@ impl ImageCacheService {
                 continue;
             }
 
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
+            let permit = match semaphore.clone().acquire_owned().await {
+                Ok(p) => p,
+                Err(_) => {
+                    tracing::error!("Image download semaphore closed unexpectedly");
+                    break;
+                }
+            };
             let hash = hash.clone();
             let cache_dir = cache_dir.clone();
             let ctx = ctx.clone();

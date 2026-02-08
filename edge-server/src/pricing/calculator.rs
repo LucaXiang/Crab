@@ -10,9 +10,15 @@ use rust_decimal::prelude::*;
 const DECIMAL_PLACES: u32 = 2;
 
 /// Convert f64 to Decimal for calculation
+///
+/// Values come from DB-stored PriceRules (always finite).
+/// Logs error if NaN/Infinity somehow appears.
 #[inline]
 fn to_decimal(value: f64) -> Decimal {
-    Decimal::from_f64(value).unwrap_or_default()
+    Decimal::from_f64(value).unwrap_or_else(|| {
+        tracing::error!(value = ?value, "Non-finite f64 in price calculation, defaulting to zero");
+        Decimal::ZERO
+    })
 }
 
 /// Convert Decimal back to f64 for storage, rounded to 2 decimal places
@@ -21,7 +27,8 @@ fn to_f64(value: Decimal) -> f64 {
     value
         .round_dp_with_strategy(DECIMAL_PLACES, RoundingStrategy::MidpointAwayFromZero)
         .to_f64()
-        .unwrap_or_default()
+        // SAFETY: Decimal rounded to 2dp is always representable as f64
+        .expect("rounded Decimal always converts to f64")
 }
 
 /// Calculated adjustment result

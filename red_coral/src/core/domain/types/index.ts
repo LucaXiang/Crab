@@ -182,7 +182,7 @@ export interface TopProduct {
 }
 
 export interface SalesReportItem {
-  order_id: string;
+  order_id: number;
   receipt_number: string | null;
   date: string;
   total: number;

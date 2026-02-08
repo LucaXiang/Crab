@@ -13,13 +13,13 @@ import type { AppliedRule } from './orderEvent';
 
 /** Order summary for list view (matches backend OrderSummary) */
 export interface ArchivedOrderSummary {
-  order_id: string;
+  order_id: number;
   receipt_number: string;
   table_name: string | null;
   status: string;
   is_retail: boolean;
   total: number;
-  guest_count: number;
+  guest_count: number | null;
   start_time: number; // milliseconds
   end_time: number | null; // milliseconds
   // === Void Metadata ===
@@ -57,7 +57,7 @@ export interface ArchivedItemOption {
 
 /** Order item for detail view */
 export interface ArchivedOrderItem {
-  id: string;
+  id: number;
   instance_id: string;
   name: string;
   spec_name: string | null;
@@ -113,13 +113,13 @@ export type ArchivedLossReason = 'CUSTOMER_FLED' | 'CUSTOMER_INSOLVENT' | 'OTHER
 
 /** Full order detail (matches backend OrderDetail) */
 export interface ArchivedOrderDetail {
-  order_id: string;
+  order_id: number;
   receipt_number: string;
   table_name: string | null;
   zone_name: string | null;
   status: string;
   is_retail: boolean;
-  guest_count: number;
+  guest_count: number | null;
   total: number;
   paid_amount: number;
   total_discount: number;

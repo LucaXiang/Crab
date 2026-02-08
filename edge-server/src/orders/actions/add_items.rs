@@ -12,6 +12,9 @@ use crate::orders::reducer::input_to_snapshot_with_rules;
 use crate::orders::traits::{CommandContext, CommandHandler, CommandMetadata, OrderError};
 use shared::order::{CartItemInput, EventPayload, OrderEvent, OrderEventType, OrderStatus};
 
+/// Maximum items per AddItems command (防止内存爆炸)
+const MAX_ITEMS_PER_COMMAND: usize = 200;
+
 /// AddItems action
 #[derive(Debug, Clone)]
 pub struct AddItemsAction {
@@ -30,6 +33,20 @@ impl CommandHandler for AddItemsAction {
         ctx: &mut CommandContext<'_>,
         metadata: &CommandMetadata,
     ) -> Result<Vec<OrderEvent>, OrderError> {
+        // 0. Validate items count
+        if self.items.is_empty() {
+            return Err(OrderError::InvalidOperation(
+                "Items cannot be empty".to_string(),
+            ));
+        }
+        if self.items.len() > MAX_ITEMS_PER_COMMAND {
+            return Err(OrderError::InvalidOperation(format!(
+                "Too many items ({}), maximum is {}",
+                self.items.len(),
+                MAX_ITEMS_PER_COMMAND
+            )));
+        }
+
         // 1. Validate input items
         for item in &self.items {
             crate::orders::money::validate_cart_item(item)?;

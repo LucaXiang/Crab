@@ -5,7 +5,8 @@
 //! All archive operations are atomic - either everything succeeds or nothing is written.
 
 use crate::db::repository::system_state;
-use rust_decimal::{Decimal, RoundingStrategy, prelude::*};
+use super::money::{to_decimal, to_f64};
+use rust_decimal::Decimal;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use shared::order::{OrderEvent, OrderEventType, OrderSnapshot, OrderStatus};
@@ -431,40 +432,29 @@ impl OrderArchiveService {
         for item in &snapshot.items {
             // Compute item prices using Decimal
             let base_price = if item.original_price > 0.0 { item.original_price } else { item.price };
-            let d_base = Decimal::from_f64(base_price).unwrap_or_default();
+            let d_base = to_decimal(base_price);
             let d_qty = Decimal::from(item.quantity);
             let d_manual_discount_per_unit = item
                 .manual_discount_percent
-                .map(|p| d_base * Decimal::from_f64(p).unwrap_or_default() / Decimal::ONE_HUNDRED)
+                .map(|p| d_base * to_decimal(p) / Decimal::ONE_HUNDRED)
                 .unwrap_or(Decimal::ZERO);
-            let d_rule_discount_per_unit =
-                Decimal::from_f64(item.rule_discount_amount).unwrap_or_default();
-            let total_discount = ((d_manual_discount_per_unit + d_rule_discount_per_unit) * d_qty)
-                .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
-                .to_f64()
-                .unwrap_or_default();
-            let d_surcharge_per_unit =
-                Decimal::from_f64(item.rule_surcharge_amount).unwrap_or_default();
-            let total_surcharge = (d_surcharge_per_unit * d_qty)
-                .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
-                .to_f64()
-                .unwrap_or_default();
+            let d_rule_discount_per_unit = to_decimal(item.rule_discount_amount);
+            let total_discount =
+                to_f64((d_manual_discount_per_unit + d_rule_discount_per_unit) * d_qty);
+            let d_surcharge_per_unit = to_decimal(item.rule_surcharge_amount);
+            let total_surcharge = to_f64(d_surcharge_per_unit * d_qty);
             let unit_price = if item.unit_price > 0.0 || item.is_comped {
                 item.unit_price
             } else {
-                (d_base - d_manual_discount_per_unit - d_rule_discount_per_unit
-                    + d_surcharge_per_unit)
-                    .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
-                    .to_f64()
-                    .unwrap_or_default()
+                to_f64(
+                    d_base - d_manual_discount_per_unit - d_rule_discount_per_unit
+                        + d_surcharge_per_unit,
+                )
             };
             let line_total = if item.line_total > 0.0 || item.is_comped {
                 item.line_total
             } else {
-                (Decimal::from_f64(unit_price).unwrap_or_default() * d_qty)
-                    .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
-                    .to_f64()
-                    .unwrap_or_default()
+                to_f64(to_decimal(unit_price) * d_qty)
             };
             let spec_name = item.selected_specification.as_ref().map(|s| s.name.clone());
             let instance_id = item.instance_id.clone();
@@ -474,14 +464,8 @@ impl OrderArchiveService {
                 .copied()
                 .unwrap_or(0);
             let unpaid_quantity = (item.quantity - paid_qty).max(0);
-            let rule_discount_total = (d_rule_discount_per_unit * d_qty)
-                .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
-                .to_f64()
-                .unwrap_or_default();
-            let rule_surcharge_total = (d_surcharge_per_unit * d_qty)
-                .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
-                .to_f64()
-                .unwrap_or_default();
+            let rule_discount_total = to_f64(d_rule_discount_per_unit * d_qty);
+            let rule_surcharge_total = to_f64(d_surcharge_per_unit * d_qty);
 
             let item_pk = sqlx::query_scalar::<_, i64>(
                 "INSERT INTO archived_order_item (\
@@ -677,7 +661,9 @@ impl OrderArchiveService {
         hasher.update(b"\x00");
         hasher.update(snapshot.receipt_number.as_bytes());
         hasher.update(b"\x00");
-        let status_str = serde_json::to_string(&snapshot.status).unwrap_or_default();
+        // SAFETY: OrderStatus derives Serialize and always succeeds
+        let status_str = serde_json::to_string(&snapshot.status)
+            .expect("OrderStatus serialization is infallible");
         hasher.update(status_str.as_bytes());
         hasher.update(b"\x00");
         hasher.update(last_event_hash.as_bytes());
@@ -692,10 +678,14 @@ impl OrderArchiveService {
         hasher.update(event.order_id.as_bytes());
         hasher.update(b"\x00");
         hasher.update(event.sequence.to_le_bytes());
-        let event_type_str = serde_json::to_string(&event.event_type).unwrap_or_default();
+        // SAFETY: OrderEventType derives Serialize and always succeeds
+        let event_type_str = serde_json::to_string(&event.event_type)
+            .expect("OrderEventType serialization is infallible");
         hasher.update(event_type_str.as_bytes());
         hasher.update(b"\x00");
-        let payload_json = serde_json::to_string(&event.payload).unwrap_or_default();
+        // SAFETY: EventPayload derives Serialize and always succeeds
+        let payload_json = serde_json::to_string(&event.payload)
+            .expect("EventPayload serialization is infallible");
         hasher.update(payload_json.as_bytes());
         format!("{:x}", hasher.finalize())
     }

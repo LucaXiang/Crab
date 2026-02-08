@@ -23,31 +23,14 @@ impl ClientBridge {
                     LocalClientState::Connected(connected) => {
                         match connected.login(username, password).await {
                             Ok(authenticated) => {
-                                let user_info = authenticated.me().cloned().ok_or_else(|| {
-                                    BridgeError::Client(crab_client::ClientError::Auth(
-                                        "No user info after login".into(),
-                                    ))
-                                })?;
-                                let token = authenticated.token().unwrap_or_default().to_string();
-                                let expires_at =
-                                    super::super::session_cache::EmployeeSession::parse_jwt_exp(&token);
-
-                                let session = super::super::session_cache::EmployeeSession {
-                                    username: username.to_string(),
-                                    token,
-                                    user_info,
-                                    login_mode: super::super::session_cache::LoginMode::Online,
-                                    expires_at,
-                                    logged_in_at: shared::util::now_millis(),
-                                };
-
+                                // Restore state FIRST to prevent state loss
+                                // if me()/token() returns None
                                 *client = Some(LocalClientState::Authenticated(authenticated));
-
+                                let session = extract_local_session(client, username)?;
                                 tracing::debug!(username = %username, "Employee logged in via CrabClient (local)");
                                 Ok(session)
                             }
                             Err((e, connected)) => {
-                                // 登录失败，恢复 Connected 状态
                                 *client = Some(LocalClientState::Connected(connected));
                                 Err(BridgeError::Client(e))
                             }
@@ -57,30 +40,12 @@ impl ClientBridge {
                         let connected = auth.logout().await;
                         match connected.login(username, password).await {
                             Ok(authenticated) => {
-                                let user_info = authenticated.me().cloned().ok_or_else(|| {
-                                    BridgeError::Client(crab_client::ClientError::Auth(
-                                        "No user info after login".into(),
-                                    ))
-                                })?;
-                                let token = authenticated.token().unwrap_or_default().to_string();
-                                let expires_at =
-                                    super::super::session_cache::EmployeeSession::parse_jwt_exp(&token);
-
-                                let session = super::super::session_cache::EmployeeSession {
-                                    username: username.to_string(),
-                                    token,
-                                    user_info,
-                                    login_mode: super::super::session_cache::LoginMode::Online,
-                                    expires_at,
-                                    logged_in_at: shared::util::now_millis(),
-                                };
-
                                 *client = Some(LocalClientState::Authenticated(authenticated));
+                                let session = extract_local_session(client, username)?;
                                 tracing::debug!(username = %username, "Employee re-logged in via CrabClient (local)");
                                 Ok(session)
                             }
                             Err((e, connected)) => {
-                                // 登录失败，恢复 Connected 状态
                                 *client = Some(LocalClientState::Connected(connected));
                                 Err(BridgeError::Client(e))
                             }
@@ -95,30 +60,12 @@ impl ClientBridge {
                     RemoteClientState::Connected(connected) => {
                         match connected.login(username, password).await {
                             Ok(authenticated) => {
-                                let user_info = authenticated.me().cloned().ok_or_else(|| {
-                                    BridgeError::Client(crab_client::ClientError::Auth(
-                                        "No user info after login".into(),
-                                    ))
-                                })?;
-                                let token = authenticated.token().unwrap_or_default().to_string();
-                                let expires_at =
-                                    super::super::session_cache::EmployeeSession::parse_jwt_exp(&token);
-
-                                let session = super::super::session_cache::EmployeeSession {
-                                    username: username.to_string(),
-                                    token,
-                                    user_info,
-                                    login_mode: super::super::session_cache::LoginMode::Online,
-                                    expires_at,
-                                    logged_in_at: shared::util::now_millis(),
-                                };
-
                                 *client = Some(RemoteClientState::Authenticated(authenticated));
+                                let session = extract_remote_session(client, username)?;
                                 tracing::debug!(username = %username, "Employee logged in via CrabClient (remote)");
                                 Ok(session)
                             }
                             Err((e, connected)) => {
-                                // 登录失败，恢复 Connected 状态
                                 *client = Some(RemoteClientState::Connected(connected));
                                 Err(BridgeError::Client(e))
                             }
@@ -128,30 +75,12 @@ impl ClientBridge {
                         let connected = auth.logout().await;
                         match connected.login(username, password).await {
                             Ok(authenticated) => {
-                                let user_info = authenticated.me().cloned().ok_or_else(|| {
-                                    BridgeError::Client(crab_client::ClientError::Auth(
-                                        "No user info after login".into(),
-                                    ))
-                                })?;
-                                let token = authenticated.token().unwrap_or_default().to_string();
-                                let expires_at =
-                                    super::super::session_cache::EmployeeSession::parse_jwt_exp(&token);
-
-                                let session = super::super::session_cache::EmployeeSession {
-                                    username: username.to_string(),
-                                    token,
-                                    user_info,
-                                    login_mode: super::super::session_cache::LoginMode::Online,
-                                    expires_at,
-                                    logged_in_at: shared::util::now_millis(),
-                                };
-
                                 *client = Some(RemoteClientState::Authenticated(authenticated));
+                                let session = extract_remote_session(client, username)?;
                                 tracing::debug!(username = %username, "Employee re-logged in via CrabClient (remote)");
                                 Ok(session)
                             }
                             Err((e, connected)) => {
-                                // 登录失败，恢复 Connected 状态
                                 *client = Some(RemoteClientState::Connected(connected));
                                 Err(BridgeError::Client(e))
                             }
@@ -231,4 +160,76 @@ impl ClientBridge {
 
         Ok(())
     }
+}
+
+/// Extract session from already-restored local client state.
+/// Client is guaranteed to be in Authenticated state when called.
+fn extract_local_session(
+    client: &Option<LocalClientState>,
+    username: &str,
+) -> Result<super::super::session_cache::EmployeeSession, BridgeError> {
+    let auth_ref = match client.as_ref() {
+        Some(LocalClientState::Authenticated(a)) => a,
+        _ => unreachable!("client must be Authenticated when extract_local_session is called"),
+    };
+
+    let user_info = auth_ref.me().cloned().ok_or_else(|| {
+        BridgeError::Client(crab_client::ClientError::Auth(
+            "No user info after login".into(),
+        ))
+    })?;
+    let token = auth_ref
+        .token()
+        .ok_or_else(|| {
+            BridgeError::Client(crab_client::ClientError::Auth(
+                "No token received after login".into(),
+            ))
+        })?
+        .to_string();
+    let expires_at = super::super::session_cache::EmployeeSession::parse_jwt_exp(&token);
+
+    Ok(super::super::session_cache::EmployeeSession {
+        username: username.to_string(),
+        token,
+        user_info,
+        login_mode: super::super::session_cache::LoginMode::Online,
+        expires_at,
+        logged_in_at: shared::util::now_millis(),
+    })
+}
+
+/// Extract session from already-restored remote client state.
+/// Client is guaranteed to be in Authenticated state when called.
+fn extract_remote_session(
+    client: &Option<RemoteClientState>,
+    username: &str,
+) -> Result<super::super::session_cache::EmployeeSession, BridgeError> {
+    let auth_ref = match client.as_ref() {
+        Some(RemoteClientState::Authenticated(a)) => a,
+        _ => unreachable!("client must be Authenticated when extract_remote_session is called"),
+    };
+
+    let user_info = auth_ref.me().cloned().ok_or_else(|| {
+        BridgeError::Client(crab_client::ClientError::Auth(
+            "No user info after login".into(),
+        ))
+    })?;
+    let token = auth_ref
+        .token()
+        .ok_or_else(|| {
+            BridgeError::Client(crab_client::ClientError::Auth(
+                "No token received after login".into(),
+            ))
+        })?
+        .to_string();
+    let expires_at = super::super::session_cache::EmployeeSession::parse_jwt_exp(&token);
+
+    Ok(super::super::session_cache::EmployeeSession {
+        username: username.to_string(),
+        token,
+        user_info,
+        login_mode: super::super::session_cache::LoginMode::Online,
+        expires_at,
+        logged_in_at: shared::util::now_millis(),
+    })
 }

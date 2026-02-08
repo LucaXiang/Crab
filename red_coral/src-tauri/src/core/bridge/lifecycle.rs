@@ -275,8 +275,8 @@ impl ClientBridge {
                 })
                 .await
                 {
-                    Ok(Ok(())) => tracing::info!("Server tasks completed gracefully"),
-                    Ok(Err(e)) if e.is_cancelled() => tracing::info!("Server task cancelled"),
+                    Ok(Ok(())) => tracing::debug!("Server tasks completed gracefully"),
+                    Ok(Err(e)) if e.is_cancelled() => tracing::debug!("Server task cancelled"),
                     Ok(Err(e)) => tracing::error!("Server task panicked: {}", e),
                     Err(_) => {
                         tracing::warn!("Server shutdown timed out (10s), aborting remaining tasks");
@@ -344,7 +344,7 @@ impl ClientBridge {
                     loop {
                         tokio::select! {
                             _ = token.cancelled() => {
-                                tracing::info!("Client message listener shutdown");
+                                tracing::debug!("Client message listener shutdown");
                                 break;
                             }
                             result = rx.recv() => {
@@ -380,7 +380,7 @@ impl ClientBridge {
                     }
                 });
 
-                tracing::info!("Client message listener started");
+                tracing::debug!("Client message listener started");
 
                 // 重连事件监听 (心跳失败或网络断开时触发)
                 let mut reconnect_rx = mc.subscribe_reconnect();
@@ -394,7 +394,7 @@ impl ClientBridge {
                     loop {
                         tokio::select! {
                             _ = token.cancelled() => {
-                                tracing::info!("Client reconnect listener shutdown");
+                                tracing::debug!("Client reconnect listener shutdown");
                                 break;
                             }
                             result = reconnect_rx.recv() => {
@@ -445,7 +445,7 @@ impl ClientBridge {
                     }
                 });
 
-                tracing::info!("Client reconnection listener started");
+                tracing::debug!("Client reconnection listener started");
 
                 // 心跳状态监听 (每次心跳成功/失败都会触发)
                 let mut heartbeat_rx = mc.subscribe_heartbeat();
@@ -456,7 +456,7 @@ impl ClientBridge {
                     loop {
                         tokio::select! {
                             _ = token.cancelled() => {
-                                tracing::info!("Client heartbeat listener shutdown");
+                                tracing::debug!("Client heartbeat listener shutdown");
                                 break;
                             }
                             result = heartbeat_rx.recv() => {
@@ -479,7 +479,7 @@ impl ClientBridge {
                     }
                 });
 
-                tracing::info!("Client heartbeat listener started");
+                tracing::debug!("Client heartbeat listener started");
             }
         }
 
@@ -558,8 +558,8 @@ impl ClientBridge {
             })
             .await
             {
-                Ok(Ok(())) => tracing::info!("Server tasks completed gracefully"),
-                Ok(Err(e)) if e.is_cancelled() => tracing::info!("Server task cancelled"),
+                Ok(Ok(())) => tracing::debug!("Server tasks completed gracefully"),
+                Ok(Err(e)) if e.is_cancelled() => tracing::debug!("Server task cancelled"),
                 Ok(Err(e)) => tracing::error!("Server task panicked: {}", e),
                 Err(_) => {
                     tracing::warn!("Server shutdown timed out (10s), aborting remaining tasks");

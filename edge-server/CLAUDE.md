@@ -62,7 +62,10 @@ src/
 ├── message/        # 消息总线 (TCP/TLS/Memory)
 ├── orders/         # 订单事件溯源 [核心模块]
 │   ├── traits.rs       # CommandHandler + EventApplier trait
-│   ├── manager.rs      # OrdersManager (命令执行 + 事件分发)
+│   ├── manager/        # OrdersManager (命令执行 + 事件分发)
+│   │   ├── mod.rs      # 核心命令处理逻辑 (563 行)
+│   │   ├── error.rs    # ManagerError + ManagerResult 类型
+│   │   └── tests/      # 188 测试 (按职责分 6 文件: core/boundary/rules/flows/combos/rules_combo)
 │   ├── reducer.rs      # 价格规则集成
 │   ├── money.rs        # 金额计算 (rust_decimal)
 │   ├── actions/        # CommandHandler 实现 (22 命令)

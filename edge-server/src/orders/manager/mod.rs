@@ -236,7 +236,10 @@ impl OrdersManager {
             Ok((response, events)) => {
                 // Broadcast events after successful commit
                 for event in events {
-                    let _ = self.event_tx.send(event);
+                    if self.event_tx.send(event).is_err() {
+                        tracing::warn!("Event broadcast failed: no active receivers");
+                        break;
+                    }
                 }
                 response
             }
@@ -257,7 +260,10 @@ impl OrdersManager {
             Ok((response, events)) => {
                 // Broadcast events after successful commit
                 for event in &events {
-                    let _ = self.event_tx.send(event.clone());
+                    if self.event_tx.send(event.clone()).is_err() {
+                        tracing::warn!("Event broadcast failed: no active receivers");
+                        break;
+                    }
                 }
                 (response, events)
             }

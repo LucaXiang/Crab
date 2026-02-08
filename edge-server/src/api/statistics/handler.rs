@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::ServerState;
 use crate::db::repository::store_info;
-use crate::utils::AppResult;
+use crate::utils::{AppError, AppResult};
 use crate::utils::time;
 
 // ============================================================================
@@ -235,7 +235,7 @@ pub async fn get_statistics(
          FROM archived_order WHERE end_time >= ?1 AND end_time < ?2",
     )
     .bind(start_dt).bind(end_dt)
-    .fetch_one(pool).await.unwrap_or((0.0, 0, 0, 0, 0.0, 0.0, None));
+    .fetch_one(pool).await.map_err(|e| AppError::database(e.to_string()))?;
 
     let average_order_value = if total_orders > 0 { revenue / total_orders as f64 } else { 0.0 };
     let avg_guest_spend = if total_customers > 0 { revenue / total_customers as f64 } else { 0.0 };
@@ -250,7 +250,7 @@ pub async fn get_statistics(
          WHERE o.end_time >= ?1 AND o.end_time < ?2 AND o.status = 'COMPLETED' AND p.cancelled = 0",
     )
     .bind(start_dt).bind(end_dt)
-    .fetch_one(pool).await.unwrap_or((0.0, 0.0));
+    .fetch_one(pool).await.map_err(|e| AppError::database(e.to_string()))?;
 
     let other_revenue = revenue - cash_revenue - card_revenue;
 
@@ -276,7 +276,7 @@ pub async fn get_statistics(
             "SELECT PRINTF('%02d:00', (end_time / 1000 / 3600) % 24) AS time, COALESCE(SUM(total_amount), 0) AS value FROM archived_order WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 GROUP BY time ORDER BY time",
         )
         .bind(start_dt).bind(end_dt)
-        .fetch_all(pool).await.unwrap_or_default();
+        .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
 
         rows.into_iter().map(|(t, v)| RevenueTrendPoint { time: t, value: v }).collect()
     } else {
@@ -285,7 +285,7 @@ pub async fn get_statistics(
             "SELECT STRFTIME('%m-%d', end_time / 1000, 'unixepoch') AS time, COALESCE(SUM(total_amount), 0) AS value FROM archived_order WHERE status = 'COMPLETED' AND end_time >= ?1 AND end_time < ?2 GROUP BY time ORDER BY time",
         )
         .bind(start_dt).bind(end_dt)
-        .fetch_all(pool).await.unwrap_or_default();
+        .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
 
         rows.into_iter().map(|(t, v)| RevenueTrendPoint { time: t, value: v }).collect()
     };
@@ -295,7 +295,7 @@ pub async fn get_statistics(
         "SELECT COALESCE(i.category_name, 'Unknown') AS name, COALESCE(SUM(i.line_total), 0) AS value FROM archived_order_item i JOIN archived_order o ON i.order_pk = o.id WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 GROUP BY name ORDER BY value DESC LIMIT 10",
     )
     .bind(start_dt).bind(end_dt)
-    .fetch_all(pool).await.unwrap_or_default();
+    .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?;
 
     let category_sales: Vec<CategorySale> = category_raw
         .into_iter()
@@ -314,7 +314,7 @@ pub async fn get_statistics(
         "SELECT i.name, COALESCE(SUM(i.quantity), 0) AS sales FROM archived_order_item i JOIN archived_order o ON i.order_pk = o.id WHERE o.status = 'COMPLETED' AND o.end_time >= ?1 AND o.end_time < ?2 GROUP BY i.name ORDER BY sales DESC LIMIT 10",
     )
     .bind(start_dt).bind(end_dt)
-    .fetch_all(pool).await.unwrap_or_default()
+    .fetch_all(pool).await.map_err(|e| AppError::database(e.to_string()))?
     .into_iter()
     .map(|(name, sales)| TopProduct { name, sales })
     .collect();

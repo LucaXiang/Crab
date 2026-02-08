@@ -246,7 +246,7 @@ impl TenantManager {
             .map_err(|e| TenantError::Network(e.to_string()))?;
 
         if !resp.status().is_success() {
-            let text = resp.text().await.unwrap_or_default();
+            let text = resp.text().await.unwrap_or_else(|e| format!("<failed to read body: {}>", e));
             return Err(TenantError::AuthFailed(format!(
                 "Activation failed: {}",
                 text

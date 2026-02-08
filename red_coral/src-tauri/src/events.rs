@@ -23,8 +23,15 @@ pub struct ServerMessageEvent {
 
 impl From<BusMessage> for ServerMessageEvent {
     fn from(msg: BusMessage) -> Self {
-        // Parse payload bytes to JSON value, fallback to null on error
-        let payload = serde_json::from_slice(&msg.payload).unwrap_or(serde_json::Value::Null);
+        let payload = serde_json::from_slice(&msg.payload).unwrap_or_else(|e| {
+            tracing::warn!(
+                event_type = %msg.event_type,
+                error = %e,
+                payload_len = msg.payload.len(),
+                "Failed to parse BusMessage payload as JSON"
+            );
+            serde_json::Value::Null
+        });
 
         Self {
             event_type: msg.event_type.to_string(),

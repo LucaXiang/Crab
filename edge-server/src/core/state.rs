@@ -233,10 +233,23 @@ impl ServerState {
         // 检测异常关闭和长时间停机（通过 LOCK 文件 + pending-ack.json）
         audit_service.on_startup().await;
 
-        // 启动审计日志 worker
+        // 启动审计日志 worker (with panic catching)
         let audit_worker = AuditWorker::new(audit_service.storage().clone());
         tokio::spawn(async move {
-            audit_worker.run(audit_rx).await;
+            let result = futures::FutureExt::catch_unwind(
+                std::panic::AssertUnwindSafe(audit_worker.run(audit_rx)),
+            )
+            .await;
+            if let Err(panic_info) = result {
+                let msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                    (*s).to_string()
+                } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "Unknown panic".to_string()
+                };
+                tracing::error!(panic = %msg, "Audit worker panicked! Audit logs may be lost.");
+            }
         });
 
         // 8. Config change notifier (唤醒依赖配置的调度器)

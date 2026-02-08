@@ -142,7 +142,13 @@ src/
 src-tauri/src/
 ├── core/
 │   ├── bridge/             # ClientBridge (Server/Client 双模式)
-│   │   ├── mod.rs          # 模式切换 + 生命周期
+│   │   ├── mod.rs          # 结构体定义 + 构造函数
+│   │   ├── lifecycle.rs    # 模式生命周期 (启动/停止/恢复/重建)
+│   │   ├── order_es.rs     # 订单事件溯源 API
+│   │   ├── api.rs          # 通用 API 透传
+│   │   ├── auth.rs         # 员工认证
+│   │   ├── activation.rs   # 设备激活
+│   │   ├── state.rs        # 状态查询 (AppState)
 │   │   ├── types.rs        # AppState 枚举
 │   │   └── config.rs       # Server/Client 配置
 │   ├── response.rs         # ApiResponse 类型定义

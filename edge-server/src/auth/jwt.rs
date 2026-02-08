@@ -51,10 +51,16 @@ impl Default for JwtConfig {
 
         Self {
             secret,
-            expiration_minutes: std::env::var("JWT_EXPIRATION_MINUTES")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(43200), // 默认 30 天 (一个月)
+            expiration_minutes: match std::env::var("JWT_EXPIRATION_MINUTES") {
+                Ok(s) => s.parse().unwrap_or_else(|_| {
+                    tracing::warn!(
+                        "Invalid JWT_EXPIRATION_MINUTES='{}', using default 43200 (30 days)",
+                        s
+                    );
+                    43200
+                }),
+                Err(_) => 43200, // 默认 30 天
+            },
             issuer: std::env::var("JWT_ISSUER").unwrap_or_else(|_| "edge-server".to_string()),
             audience: std::env::var("JWT_AUDIENCE").unwrap_or_else(|_| "edge-clients".to_string()),
         }
@@ -323,8 +329,14 @@ pub struct CurrentUser {
     pub is_system: bool,
 }
 
-impl From<Claims> for CurrentUser {
-    fn from(claims: Claims) -> Self {
+impl TryFrom<Claims> for CurrentUser {
+    type Error = JwtError;
+
+    fn try_from(claims: Claims) -> Result<Self, Self::Error> {
+        let id = claims.sub.parse::<i64>().map_err(|_| {
+            JwtError::InvalidToken(format!("Invalid user ID in JWT sub: '{}'", claims.sub))
+        })?;
+
         let permissions = if claims.permissions.is_empty() {
             vec![]
         } else {
@@ -335,15 +347,15 @@ impl From<Claims> for CurrentUser {
                 .collect()
         };
 
-        Self {
-            id: claims.sub.parse::<i64>().unwrap_or(0),
+        Ok(Self {
+            id,
             username: claims.username,
             display_name: claims.display_name,
             role_id: claims.role_id,
             role_name: claims.role_name,
             permissions,
             is_system: claims.is_system,
-        }
+        })
     }
 }
 

@@ -9,7 +9,7 @@ import { getErrorMessage } from '@/utils/error';
 interface OrderDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  orderId: string | null;
+  orderId: number | null;
 }
 
 export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({

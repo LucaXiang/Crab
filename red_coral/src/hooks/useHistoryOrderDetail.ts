@@ -16,7 +16,7 @@ interface UseHistoryOrderDetailResult {
  * Backend returns ArchivedOrderDetail directly.
  * No frontend conversion needed.
  */
-export const useHistoryOrderDetail = (order_id: string | null): UseHistoryOrderDetailResult => {
+export const useHistoryOrderDetail = (order_id: number | null): UseHistoryOrderDetailResult => {
   const [order, setOrder] = useState<ArchivedOrderDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -114,7 +114,13 @@ impl ArchiveWorker {
 
     /// 带并发限制的订单处理
     async fn process_order_concurrent(&self, order_id: &str) {
-        let _permit = self.semaphore.acquire().await.expect("semaphore is never closed");
+        let _permit = match self.semaphore.acquire().await {
+            Ok(permit) => permit,
+            Err(_) => {
+                tracing::error!(order_id = %order_id, "Archive semaphore closed, skipping");
+                return;
+            }
+        };
         self.process_order(order_id).await;
     }
 
@@ -153,7 +159,13 @@ impl ArchiveWorker {
             );
             // Move to dead letter queue for manual recovery
             let error = entry.last_error.as_deref().unwrap_or("Unknown error");
-            let _ = self.storage.move_to_dead_letter(&entry.order_id, error);
+            if let Err(e) = self.storage.move_to_dead_letter(&entry.order_id, error) {
+                tracing::error!(
+                    order_id = %entry.order_id,
+                    error = %e,
+                    "Failed to move order to dead letter queue"
+                );
+            }
             return false;
         }
 
@@ -210,7 +222,9 @@ impl ArchiveWorker {
             Ok(Some(s)) => s,
             Ok(None) => {
                 tracing::warn!(order_id = %order_id, "Snapshot not found, removing from queue");
-                let _ = self.storage.remove_from_pending(order_id);
+                if let Err(e) = self.storage.remove_from_pending(order_id) {
+                    tracing::error!(order_id = %order_id, error = %e, "Failed to remove from pending queue");
+                }
                 return None;
             }
             Err(e) => {

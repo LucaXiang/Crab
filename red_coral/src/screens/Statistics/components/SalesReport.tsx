@@ -34,7 +34,7 @@ export const SalesReport: React.FC<SalesReportProps> = ({
   const [sortOrder, setSortOrder] = useState<string>('desc');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState('');

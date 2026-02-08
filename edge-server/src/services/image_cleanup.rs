@@ -4,7 +4,6 @@
 
 use std::path::PathBuf;
 use tokio::fs;
-use tracing::{info, warn};
 
 /// 图片清理服务
 #[derive(Clone)]
@@ -34,21 +33,17 @@ impl ImageCleanupService {
             if file_path.exists() {
                 match fs::remove_file(&file_path).await {
                     Ok(_) => {
-                        info!("🗑️ Deleted orphan image: {}", hash);
                         deleted_count += 1;
                     }
                     Err(e) => {
-                        warn!("⚠️ Failed to delete orphan image {}: {}", hash, e);
+                        tracing::warn!(hash = %hash, error = %e, "Failed to delete orphan image");
                     }
                 }
-            } else {
-                // 文件不存在，可能已被删除
-                info!("📁 Orphan image not found (already deleted?): {}", hash);
             }
         }
 
         if deleted_count > 0 {
-            info!("🧹 Cleaned up {} orphan image(s)", deleted_count);
+            tracing::info!(count = deleted_count, "Orphan images cleaned up");
         }
 
         deleted_count
@@ -65,4 +60,3 @@ impl ImageCleanupService {
         self.images_dir.join(format!("{}.jpg", hash))
     }
 }
-
