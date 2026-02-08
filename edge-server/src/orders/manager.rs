@@ -701,12 +701,12 @@ mod tests {
         OrdersManager::with_storage(storage)
     }
 
-    fn create_open_table_cmd(operator_id: &str) -> OrderCommand {
+    fn create_open_table_cmd(operator_id: i64) -> OrderCommand {
         OrderCommand::new(
-            operator_id.to_string(),
+            operator_id,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T1".to_string()),
+                table_id: Some(1),
                 table_name: Some("Table 1".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -719,7 +719,7 @@ mod tests {
     #[test]
     fn test_open_table() {
         let manager = create_test_manager();
-        let cmd = create_open_table_cmd("op-1");
+        let cmd = create_open_table_cmd(1);
 
         let response = manager.execute_command(cmd);
 
@@ -732,13 +732,13 @@ mod tests {
 
         let snapshot = snapshot.unwrap();
         assert_eq!(snapshot.status, OrderStatus::Active);
-        assert_eq!(snapshot.table_id, Some("T1".to_string()));
+        assert_eq!(snapshot.table_id, Some(1));
     }
 
     #[test]
     fn test_idempotency() {
         let manager = create_test_manager();
-        let cmd = create_open_table_cmd("op-1");
+        let cmd = create_open_table_cmd(1);
 
         let response1 = manager.execute_command(cmd.clone());
         assert!(response1.success);
@@ -759,18 +759,18 @@ mod tests {
         let manager = create_test_manager();
 
         // Open table
-        let open_cmd = create_open_table_cmd("op-1");
+        let open_cmd = create_open_table_cmd(1);
         let open_response = manager.execute_command(open_cmd);
         let order_id = open_response.order_id.unwrap();
 
         // Add items
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![CartItemInput {
-                    product_id: "product:p1".to_string(),
+                    product_id: 1,
                     name: "Test Product".to_string(),
                     price: 10.0,
                     original_price: None,
@@ -799,18 +799,18 @@ mod tests {
         let manager = create_test_manager();
 
         // Open table
-        let open_cmd = create_open_table_cmd("op-1");
+        let open_cmd = create_open_table_cmd(1);
         let open_response = manager.execute_command(open_cmd);
         let order_id = open_response.order_id.unwrap();
 
         // Add items
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![CartItemInput {
-                    product_id: "product:p1".to_string(),
+                    product_id: 1,
                     name: "Test Product".to_string(),
                     price: 10.0,
                     original_price: None,
@@ -828,7 +828,7 @@ mod tests {
 
         // Add payment
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -850,7 +850,7 @@ mod tests {
 
         // Complete order (receipt_number comes from snapshot)
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -870,13 +870,13 @@ mod tests {
         let manager = create_test_manager();
 
         // Open table
-        let open_cmd = create_open_table_cmd("op-1");
+        let open_cmd = create_open_table_cmd(1);
         let open_response = manager.execute_command(open_cmd);
         let order_id = open_response.order_id.unwrap();
 
         // Void order
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
@@ -905,7 +905,7 @@ mod tests {
         let mut rx = manager.subscribe();
 
         // Open table
-        let open_cmd = create_open_table_cmd("op-1");
+        let open_cmd = create_open_table_cmd(1);
         let _ = manager.execute_command(open_cmd);
 
         // Should receive event
@@ -919,16 +919,16 @@ mod tests {
 
     fn open_table_with_items(
         manager: &OrdersManager,
-        table_id: &str,
+        table_id: i64,
         items: Vec<CartItemInput>,
     ) -> String {
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some(table_id.to_string()),
+                table_id: Some(table_id),
                 table_name: Some(format!("Table {}", table_id)),
-                zone_id: Some("zone:z1".to_string()),
+                zone_id: Some(1),
                 zone_name: Some("Zone A".to_string()),
                 guest_count: 2,
                 is_retail: false,
@@ -940,7 +940,7 @@ mod tests {
 
         if !items.is_empty() {
             let add_cmd = OrderCommand::new(
-                "op-1".to_string(),
+                1,
                 "Test Operator".to_string(),
                 OrderCommandPayload::AddItems {
                     order_id: order_id.clone(),
@@ -954,9 +954,9 @@ mod tests {
         order_id
     }
 
-    fn simple_item(product_id: &str, name: &str, price: f64, quantity: i32) -> CartItemInput {
+    fn simple_item(product_id: i64, name: &str, price: f64, quantity: i32) -> CartItemInput {
         CartItemInput {
-            product_id: product_id.to_string(),
+            product_id,
             name: name.to_string(),
             price,
             original_price: None,
@@ -979,16 +979,16 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-rebuild",
+            111,
             vec![
-                simple_item("product:p1", "Coffee", 4.5, 2),
-                simple_item("product:p2", "Tea", 3.0, 1),
+                simple_item(1, "Coffee", 4.5, 2),
+                simple_item(2, "Tea", 3.0, 1),
             ],
         );
 
         // Add a payment
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -1028,24 +1028,24 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-move-1",
-            vec![simple_item("product:p1", "Coffee", 5.0, 1)],
+            201,
+            vec![simple_item(1, "Coffee", 5.0, 1)],
         );
 
         // Verify initial zone
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert_eq!(snapshot.zone_id, Some("zone:z1".to_string()));
+        assert_eq!(snapshot.zone_id, Some(1));
         assert_eq!(snapshot.zone_name, Some("Zone A".to_string()));
 
         // Move to a different table in a different zone
         let move_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MoveOrder {
                 order_id: order_id.clone(),
-                target_table_id: "T-move-2".to_string(),
+                target_table_id: 328,
                 target_table_name: "Table T-move-2".to_string(),
-                target_zone_id: Some("zone:z2".to_string()),
+                target_zone_id: Some(2),
                 target_zone_name: Some("Zone B".to_string()),
                 authorizer_id: None,
                 authorizer_name: None,
@@ -1055,10 +1055,10 @@ mod tests {
         assert!(resp.success);
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
-        assert_eq!(snapshot.table_id, Some("T-move-2".to_string()));
+        assert_eq!(snapshot.table_id, Some(328));
         assert_eq!(
             snapshot.zone_id,
-            Some("zone:z2".to_string()),
+            Some(2),
             "zone_id should be updated after MoveOrder"
         );
         assert_eq!(
@@ -1079,13 +1079,13 @@ mod tests {
         // Source order with items and partial payment
         let source_id = open_table_with_items(
             &manager,
-            "T-merge-src",
-            vec![simple_item("product:p1", "Coffee", 10.0, 2)],
+            202,
+            vec![simple_item(1, "Coffee", 10.0, 2)],
         );
 
         // Pay partially on source
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: source_id.clone(),
@@ -1105,13 +1105,13 @@ mod tests {
         // Target order
         let target_id = open_table_with_items(
             &manager,
-            "T-merge-tgt",
-            vec![simple_item("product:p2", "Tea", 8.0, 1)],
+            203,
+            vec![simple_item(2, "Tea", 8.0, 1)],
         );
 
         // Merge source → target should be rejected
         let merge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MergeOrders {
                 source_order_id: source_id.clone(),
@@ -1142,13 +1142,13 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-overpay",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            204,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         // Pay way more than the total — should be rejected
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -1179,13 +1179,13 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-cancel-repay",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            205,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         // Pay with CARD
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -1206,7 +1206,7 @@ mod tests {
 
         // Cancel the payment
         let cancel_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CancelPayment {
                 order_id: order_id.clone(),
@@ -1225,7 +1225,7 @@ mod tests {
 
         // Re-pay with CASH
         let repay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -1245,7 +1245,7 @@ mod tests {
 
         // Complete
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -1266,10 +1266,10 @@ mod tests {
     #[test]
     fn test_complete_empty_order() {
         let manager = create_test_manager();
-        let order_id = open_table_with_items(&manager, "T-empty", vec![]);
+        let order_id = open_table_with_items(&manager, 100, vec![]);
 
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -1295,16 +1295,16 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-seq",
-            vec![simple_item("product:p1", "Coffee", 5.0, 1)],
+            206,
+            vec![simple_item(1, "Coffee", 5.0, 1)],
         );
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p2", "Tea", 3.0, 1)],
+                items: vec![simple_item(2, "Tea", 3.0, 1)],
             },
         );
         manager.execute_command(add_cmd);
@@ -1334,10 +1334,10 @@ mod tests {
         let manager = create_test_manager();
 
         let cmd1 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-dup".to_string()),
+                table_id: Some(307),
                 table_name: Some("Table Dup".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -1349,10 +1349,10 @@ mod tests {
         assert!(resp1.success);
 
         let cmd2 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-dup".to_string()),
+                table_id: Some(307),
                 table_name: Some("Table Dup".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -1371,10 +1371,10 @@ mod tests {
     #[test]
     fn test_void_already_voided_order_fails() {
         let manager = create_test_manager();
-        let order_id = open_table_with_items(&manager, "T-void-twice", vec![]);
+        let order_id = open_table_with_items(&manager, 101, vec![]);
 
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
@@ -1390,7 +1390,7 @@ mod tests {
         assert!(resp.success);
 
         let void_cmd2 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
@@ -1415,16 +1415,16 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-mc-1",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            207,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let move_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MoveOrder {
                 order_id: order_id.clone(),
-                target_table_id: "T-mc-2".to_string(),
+                target_table_id: 329,
                 target_table_name: "Table 2".to_string(),
                 target_zone_id: None,
                 target_zone_name: None,
@@ -1436,7 +1436,7 @@ mod tests {
         assert!(resp.success);
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -1451,7 +1451,7 @@ mod tests {
         manager.execute_command(pay_cmd);
 
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -1463,7 +1463,7 @@ mod tests {
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
         assert_eq!(snapshot.status, OrderStatus::Completed);
-        assert_eq!(snapshot.table_id, Some("T-mc-2".to_string()));
+        assert_eq!(snapshot.table_id, Some(329));
     }
 
     // ========================================================================
@@ -1475,10 +1475,10 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-si",
+            208,
             vec![
-                simple_item("product:p1", "Coffee", 10.0, 2),
-                simple_item("product:p2", "Tea", 8.0, 1),
+                simple_item(1, "Coffee", 10.0, 2),
+                simple_item(2, "Tea", 8.0, 1),
             ],
         );
 
@@ -1488,7 +1488,7 @@ mod tests {
 
         // Split pay: 2x Coffee = 20.0
         let split_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::SplitByItems {
                 order_id: order_id.clone(),
@@ -1510,7 +1510,7 @@ mod tests {
 
         // Pay remaining: Tea = 8.0
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -1525,7 +1525,7 @@ mod tests {
         manager.execute_command(pay_cmd);
 
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -1548,13 +1548,13 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-aa",
-            vec![simple_item("product:p1", "Coffee", 30.0, 1)],
+            209,
+            vec![simple_item(1, "Coffee", 30.0, 1)],
         );
 
         // Start AA: 3 shares, pay 1
         let start_aa_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::StartAaSplit {
                 order_id: order_id.clone(),
@@ -1574,7 +1574,7 @@ mod tests {
 
         // Pay share 2
         let pay_aa_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::PayAaSplit {
                 order_id: order_id.clone(),
@@ -1588,7 +1588,7 @@ mod tests {
 
         // Pay share 3 (last — should get exact remaining)
         let pay_aa_last = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::PayAaSplit {
                 order_id: order_id.clone(),
@@ -1606,7 +1606,7 @@ mod tests {
 
         // Complete
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -1629,7 +1629,7 @@ mod tests {
         let manager = create_test_manager();
 
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
                 table_id: None,
@@ -1657,7 +1657,7 @@ mod tests {
     fn test_execute_command_with_events_returns_events() {
         let manager = create_test_manager();
 
-        let cmd = create_open_table_cmd("op-1");
+        let cmd = create_open_table_cmd(1);
         let (resp, events) = manager.execute_command_with_events(cmd);
 
         assert!(resp.success);
@@ -1675,14 +1675,14 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-events",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            210,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let seq_before = manager.get_current_sequence().unwrap();
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -1711,17 +1711,17 @@ mod tests {
 
         let source_id = open_table_with_items(
             &manager,
-            "T-ms",
-            vec![simple_item("product:p1", "Coffee", 5.0, 1)],
+            211,
+            vec![simple_item(1, "Coffee", 5.0, 1)],
         );
         let target_id = open_table_with_items(
             &manager,
-            "T-mt",
-            vec![simple_item("product:p2", "Tea", 3.0, 1)],
+            212,
+            vec![simple_item(2, "Tea", 3.0, 1)],
         );
 
         let merge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MergeOrders {
                 source_order_id: source_id.clone(),
@@ -1753,7 +1753,7 @@ mod tests {
         let manager = create_test_manager();
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: "nonexistent".to_string(),
@@ -1769,7 +1769,7 @@ mod tests {
         assert!(!resp.success);
 
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: "nonexistent".to_string(),
@@ -1780,7 +1780,7 @@ mod tests {
         assert!(!resp.success);
 
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: "nonexistent".to_string(),
@@ -1805,12 +1805,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-closed",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            213,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -1825,7 +1825,7 @@ mod tests {
         manager.execute_command(pay_cmd);
 
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -1835,11 +1835,11 @@ mod tests {
         manager.execute_command(complete_cmd);
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p2", "Tea", 5.0, 1)],
+                items: vec![simple_item(2, "Tea", 5.0, 1)],
             },
         );
         let resp = manager.execute_command(add_cmd);
@@ -1861,8 +1861,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-zero-price",
-            vec![simple_item("product:p1", "Free Sample", 0.0, 1)],
+            214,
+            vec![simple_item(1, "Free Sample", 0.0, 1)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -1873,7 +1873,7 @@ mod tests {
 
         // 零总额可以直接完成
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -1893,10 +1893,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-nan-price".to_string()),
+                table_id: Some(308),
                 table_name: Some("Table NaN".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -1908,11 +1908,11 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p1", "NaN Item", f64::NAN, 2)],
+                items: vec![simple_item(1, "NaN Item", f64::NAN, 2)],
             },
         );
         let resp = manager.execute_command(add_cmd);
@@ -1928,10 +1928,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-inf-price".to_string()),
+                table_id: Some(309),
                 table_name: Some("Table Inf".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -1943,11 +1943,11 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p1", "Infinity Item", f64::INFINITY, 1)],
+                items: vec![simple_item(1, "Infinity Item", f64::INFINITY, 1)],
             },
         );
         let resp = manager.execute_command(add_cmd);
@@ -1963,10 +1963,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-neg-price".to_string()),
+                table_id: Some(310),
                 table_name: Some("Table Neg".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -1978,11 +1978,11 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p1", "Negative Item", -10.0, 1)],
+                items: vec![simple_item(1, "Negative Item", -10.0, 1)],
             },
         );
         let resp = manager.execute_command(add_cmd);
@@ -1998,8 +1998,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-large",
-            vec![simple_item("product:p1", "Expensive Item", 99999.99, 100)],
+            215,
+            vec![simple_item(1, "Expensive Item", 99999.99, 100)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -2017,10 +2017,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-f64max".to_string()),
+                table_id: Some(311),
                 table_name: Some("Table Max".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2032,11 +2032,11 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p1", "Max Item", f64::MAX, 1)],
+                items: vec![simple_item(1, "Max Item", f64::MAX, 1)],
             },
         );
         let resp = manager.execute_command(add_cmd);
@@ -2052,10 +2052,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-zero-qty".to_string()),
+                table_id: Some(312),
                 table_name: Some("Table Zero Qty".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2067,11 +2067,11 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p1", "Zero Qty", 10.0, 0)],
+                items: vec![simple_item(1, "Zero Qty", 10.0, 0)],
             },
         );
         let resp = manager.execute_command(add_cmd);
@@ -2087,10 +2087,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-neg-qty".to_string()),
+                table_id: Some(313),
                 table_name: Some("Table Neg Qty".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2102,11 +2102,11 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p1", "Negative Qty", 10.0, -3)],
+                items: vec![simple_item(1, "Negative Qty", 10.0, -3)],
             },
         );
         let resp = manager.execute_command(add_cmd);
@@ -2122,10 +2122,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-maxqty".to_string()),
+                table_id: Some(314),
                 table_name: Some("Table Max Qty".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2137,11 +2137,11 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p1", "Max Qty", 0.01, i32::MAX)],
+                items: vec![simple_item(1, "Max Qty", 0.01, i32::MAX)],
             },
         );
         let resp = manager.execute_command(add_cmd);
@@ -2153,8 +2153,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-max-allowed-qty",
-            vec![simple_item("product:p1", "Max Allowed", 0.01, 9999)],
+            216,
+            vec![simple_item(1, "Max Allowed", 0.01, 9999)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -2173,10 +2173,10 @@ mod tests {
 
         // Open table
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-over-disc".to_string()),
+                table_id: Some(315),
                 table_name: Some("Table Over Discount".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2189,12 +2189,12 @@ mod tests {
 
         // Add item with 200% discount
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![CartItemInput {
-                    product_id: "product:p1".to_string(),
+                    product_id: 1,
                     name: "Over Discounted".to_string(),
                     price: 100.0,
                     original_price: None,
@@ -2221,10 +2221,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-neg-disc".to_string()),
+                table_id: Some(316),
                 table_name: Some("Table Neg Discount".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2236,12 +2236,12 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![CartItemInput {
-                    product_id: "product:p1".to_string(),
+                    product_id: 1,
                     name: "Neg Discount Item".to_string(),
                     price: 100.0,
                     original_price: None,
@@ -2268,12 +2268,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-nan-pay",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            217,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -2298,12 +2298,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-inf-pay",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            218,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -2328,12 +2328,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-maxpay",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            219,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -2358,10 +2358,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-multi-edge".to_string()),
+                table_id: Some(317),
                 table_name: Some("Table Multi Edge".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2374,14 +2374,14 @@ mod tests {
 
         // 正常商品 + 零价格商品
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![
-                    simple_item("product:p1", "Normal", 25.50, 2),
-                    simple_item("product:p2", "Free", 0.0, 1),
-                    simple_item("product:p3", "Cheap", 0.01, 100),
+                    simple_item(1, "Normal", 25.50, 2),
+                    simple_item(2, "Free", 0.0, 1),
+                    simple_item(3, "Cheap", 0.01, 100),
                 ],
             },
         );
@@ -2394,7 +2394,7 @@ mod tests {
 
         // 支付并完成
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -2409,7 +2409,7 @@ mod tests {
         manager.execute_command(pay_cmd);
 
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -2433,10 +2433,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-opts".to_string()),
+                table_id: Some(318),
                 table_name: Some("Table Opts".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2448,19 +2448,19 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![CartItemInput {
-                    product_id: "product:p1".to_string(),
+                    product_id: 1,
                     name: "Pizza".to_string(),
                     price: 12.0,
                     original_price: None,
                     quantity: 1,
                     selected_options: Some(vec![
                         shared::order::ItemOption {
-                            attribute_id: "attr:size".to_string(),
+                            attribute_id: 1,
                             attribute_name: "Size".to_string(),
                             option_idx: 2,
                             option_name: "Large".to_string(),
@@ -2468,7 +2468,7 @@ mod tests {
                             quantity: 1,
                         },
                         shared::order::ItemOption {
-                            attribute_id: "attr:topping".to_string(),
+                            attribute_id: 2,
                             attribute_name: "Topping".to_string(),
                             option_idx: 0,
                             option_name: "Extra Cheese".to_string(),
@@ -2503,10 +2503,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-neg-opt".to_string()),
+                table_id: Some(319),
                 table_name: Some("Table Neg Opt".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2518,18 +2518,18 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![CartItemInput {
-                    product_id: "product:p1".to_string(),
+                    product_id: 1,
                     name: "Special".to_string(),
                     price: 10.0,
                     original_price: None,
                     quantity: 1,
                     selected_options: Some(vec![shared::order::ItemOption {
-                        attribute_id: "attr:mod".to_string(),
+                        attribute_id: 3,
                         attribute_name: "Mod".to_string(),
                         option_idx: 0,
                         option_name: "Smaller".to_string(),
@@ -2564,12 +2564,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-short-tender",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            220,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -2594,10 +2594,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-combo".to_string()),
+                table_id: Some(320),
                 table_name: Some("Table Combo".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2609,18 +2609,18 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![CartItemInput {
-                    product_id: "product:p1".to_string(),
+                    product_id: 1,
                     name: "Combo Item".to_string(),
                     price: 33.33,
                     original_price: None,
                     quantity: 3,
                     selected_options: Some(vec![shared::order::ItemOption {
-                        attribute_id: "attr:size".to_string(),
+                        attribute_id: 1,
                         attribute_name: "Size".to_string(),
                         option_idx: 1,
                         option_name: "Large".to_string(),
@@ -2656,13 +2656,13 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-nan-complete",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            221,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         // NaN payment — 被输入验证拒绝
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -2679,7 +2679,7 @@ mod tests {
 
         // 尝试完成 — 应该失败因为没有成功的支付
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -2699,10 +2699,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-rebuild-edge".to_string()),
+                table_id: Some(321),
                 table_name: Some("Table Rebuild Edge".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2715,13 +2715,13 @@ mod tests {
 
         // 添加零价格商品
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![
-                    simple_item("product:p1", "Free", 0.0, 5),
-                    simple_item("product:p2", "Penny", 0.01, 99),
+                    simple_item(1, "Free", 0.0, 5),
+                    simple_item(2, "Penny", 0.01, 99),
                 ],
             },
         );
@@ -2746,10 +2746,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-small-amounts".to_string()),
+                table_id: Some(322),
                 table_name: Some("Table Small".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2761,14 +2761,14 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         // 添加 10 次，每次 1 个 0.1 的商品
-        for i in 0..10 {
+        for i in 0i64..10 {
             let add_cmd = OrderCommand::new(
-                "op-1".to_string(),
+                1,
                 "Test Operator".to_string(),
                 OrderCommandPayload::AddItems {
                     order_id: order_id.clone(),
                     items: vec![CartItemInput {
-                        product_id: format!("product:p{}", i),
+                        product_id: i + 1,
                         name: format!("Item {}", i),
                         price: 0.1,
                         original_price: None,
@@ -2800,12 +2800,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-nan-tender",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            222,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -2832,17 +2832,17 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-moved-pay",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            223,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         // Move order
         let move_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MoveOrder {
                 order_id: order_id.clone(),
-                target_table_id: "T-moved-pay-2".to_string(),
+                target_table_id: 330,
                 target_table_name: "Table 2".to_string(),
                 target_zone_id: None,
                 target_zone_name: None,
@@ -2854,7 +2854,7 @@ mod tests {
 
         // MoveOrder 只移动桌台，订单保持 Active，仍可支付
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -2879,13 +2879,13 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-tolerance",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            224,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         // 支付 9.99 — 差 0.01，在容差内
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -2900,7 +2900,7 @@ mod tests {
         manager.execute_command(pay_cmd);
 
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -2916,13 +2916,13 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-below-tol",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            225,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         // 支付 9.98 — 差 0.02，超出容差
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -2937,7 +2937,7 @@ mod tests {
         manager.execute_command(pay_cmd);
 
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -2957,10 +2957,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-no-double".to_string()),
+                table_id: Some(323),
                 table_name: Some("Table No Double".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -2975,19 +2975,19 @@ mod tests {
         // Expected: base_with_options=25.0, discount=2.5, unit_price=22.5
         // qty=2 → subtotal=45.0
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![CartItemInput {
-                    product_id: "product:p1".to_string(),
+                    product_id: 1,
                     name: "Steak".to_string(),
                     price: 20.0,
                     original_price: None,
                     quantity: 2,
                     selected_options: Some(vec![
                         shared::order::ItemOption {
-                            attribute_id: "attr:sauce".to_string(),
+                            attribute_id: 4,
                             attribute_name: "Sauce".to_string(),
                             option_idx: 0,
                             option_name: "BBQ".to_string(),
@@ -2995,7 +2995,7 @@ mod tests {
                             quantity: 1,
                         },
                         shared::order::ItemOption {
-                            attribute_id: "attr:side".to_string(),
+                            attribute_id: 5,
                             attribute_name: "Side".to_string(),
                             option_idx: 1,
                             option_name: "Fries".to_string(),
@@ -3037,10 +3037,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-mod-cons".to_string()),
+                table_id: Some(324),
                 table_name: Some("Table Mod Consistency".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -3053,18 +3053,18 @@ mod tests {
 
         // Add item: price=15.0, options=+2.5, no discount, qty=3
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![CartItemInput {
-                    product_id: "product:p1".to_string(),
+                    product_id: 1,
                     name: "Pasta".to_string(),
                     price: 15.0,
                     original_price: None,
                     quantity: 3,
                     selected_options: Some(vec![shared::order::ItemOption {
-                        attribute_id: "attr:cheese".to_string(),
+                        attribute_id: 6,
                         attribute_name: "Cheese".to_string(),
                         option_idx: 0,
                         option_name: "Extra".to_string(),
@@ -3090,7 +3090,7 @@ mod tests {
 
         // Modify: add 20% discount
         let modify_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ModifyItem {
                 order_id: order_id.clone(),
@@ -3140,13 +3140,13 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-void-add",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            226,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         // Void
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
@@ -3162,11 +3162,11 @@ mod tests {
 
         // Try to add items
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p2", "Tea", 5.0, 1)],
+                items: vec![simple_item(2, "Tea", 5.0, 1)],
             },
         );
         let resp = manager.execute_command(add_cmd);
@@ -3178,12 +3178,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-void-pay",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            227,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
@@ -3198,7 +3198,7 @@ mod tests {
         manager.execute_command(void_cmd);
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -3217,10 +3217,10 @@ mod tests {
     #[test]
     fn test_complete_voided_order_fails() {
         let manager = create_test_manager();
-        let order_id = open_table_with_items(&manager, "T-void-complete", vec![]);
+        let order_id = open_table_with_items(&manager, 102, vec![]);
 
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
@@ -3235,7 +3235,7 @@ mod tests {
         manager.execute_command(void_cmd);
 
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -3255,13 +3255,13 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-comp-void",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            228,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         // Pay + complete
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -3276,7 +3276,7 @@ mod tests {
         manager.execute_command(pay_cmd);
 
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -3287,7 +3287,7 @@ mod tests {
 
         // Try to void
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
@@ -3308,12 +3308,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-dbl-complete",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            229,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -3328,7 +3328,7 @@ mod tests {
         manager.execute_command(pay_cmd);
 
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -3339,7 +3339,7 @@ mod tests {
         assert!(resp1.success);
 
         let complete_cmd2 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -3359,15 +3359,15 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-mod-nan",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            230,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
         let instance_id = snapshot.items[0].instance_id.clone();
 
         let modify_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ModifyItem {
                 order_id: order_id.clone(),
@@ -3394,15 +3394,15 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-mod-neg",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            231,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
         let instance_id = snapshot.items[0].instance_id.clone();
 
         let modify_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ModifyItem {
                 order_id: order_id.clone(),
@@ -3429,15 +3429,15 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-mod-nan-disc",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            232,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
         let instance_id = snapshot.items[0].instance_id.clone();
 
         let modify_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ModifyItem {
                 order_id: order_id.clone(),
@@ -3464,15 +3464,15 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-mod-disc-150",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            233,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
         let instance_id = snapshot.items[0].instance_id.clone();
 
         let modify_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ModifyItem {
                 order_id: order_id.clone(),
@@ -3499,15 +3499,15 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-mod-zeroq",
-            vec![simple_item("product:p1", "Coffee", 10.0, 2)],
+            234,
+            vec![simple_item(1, "Coffee", 10.0, 2)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
         let instance_id = snapshot.items[0].instance_id.clone();
 
         let modify_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ModifyItem {
                 order_id: order_id.clone(),
@@ -3536,10 +3536,10 @@ mod tests {
     #[test]
     fn test_add_empty_items_array() {
         let manager = create_test_manager();
-        let order_id = open_table_with_items(&manager, "T-empty-arr", vec![]);
+        let order_id = open_table_with_items(&manager, 103, vec![]);
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
@@ -3555,11 +3555,11 @@ mod tests {
 
         // 验证可以继续添加正常商品 (不进入死胡同)
         let add_cmd2 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+                items: vec![simple_item(1, "Coffee", 10.0, 1)],
             },
         );
         let resp2 = manager.execute_command(add_cmd2);
@@ -3573,12 +3573,12 @@ mod tests {
     #[test]
     fn test_merge_voided_source_fails() {
         let manager = create_test_manager();
-        let source_id = open_table_with_items(&manager, "T-merge-vs", vec![]);
-        let target_id = open_table_with_items(&manager, "T-merge-vt", vec![]);
+        let source_id = open_table_with_items(&manager, 104, vec![]);
+        let target_id = open_table_with_items(&manager, 105, vec![]);
 
         // Void source
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: source_id.clone(),
@@ -3593,7 +3593,7 @@ mod tests {
         manager.execute_command(void_cmd);
 
         let merge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MergeOrders {
                 source_order_id: source_id.clone(),
@@ -3609,12 +3609,12 @@ mod tests {
     #[test]
     fn test_merge_into_voided_target_fails() {
         let manager = create_test_manager();
-        let source_id = open_table_with_items(&manager, "T-merge-ts", vec![]);
-        let target_id = open_table_with_items(&manager, "T-merge-tt", vec![]);
+        let source_id = open_table_with_items(&manager, 106, vec![]);
+        let target_id = open_table_with_items(&manager, 107, vec![]);
 
         // Void target
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: target_id.clone(),
@@ -3629,7 +3629,7 @@ mod tests {
         manager.execute_command(void_cmd);
 
         let merge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MergeOrders {
                 source_order_id: source_id.clone(),
@@ -3645,10 +3645,10 @@ mod tests {
     #[test]
     fn test_merge_self_fails() {
         let manager = create_test_manager();
-        let order_id = open_table_with_items(&manager, "T-self-merge", vec![]);
+        let order_id = open_table_with_items(&manager, 108, vec![]);
 
         let merge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MergeOrders {
                 source_order_id: order_id.clone(),
@@ -3670,12 +3670,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-aa-zero",
-            vec![simple_item("product:p1", "Coffee", 30.0, 1)],
+            235,
+            vec![simple_item(1, "Coffee", 30.0, 1)],
         );
 
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::StartAaSplit {
                 order_id: order_id.clone(),
@@ -3694,12 +3694,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-aa-one",
-            vec![simple_item("product:p1", "Coffee", 30.0, 1)],
+            236,
+            vec![simple_item(1, "Coffee", 30.0, 1)],
         );
 
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::StartAaSplit {
                 order_id: order_id.clone(),
@@ -3718,12 +3718,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-aa-exceed",
-            vec![simple_item("product:p1", "Coffee", 30.0, 1)],
+            237,
+            vec![simple_item(1, "Coffee", 30.0, 1)],
         );
 
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::StartAaSplit {
                 order_id: order_id.clone(),
@@ -3742,13 +3742,13 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-aa-overpay",
-            vec![simple_item("product:p1", "Coffee", 30.0, 1)],
+            238,
+            vec![simple_item(1, "Coffee", 30.0, 1)],
         );
 
         // Start AA: 3 shares, pay 2
         let start_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::StartAaSplit {
                 order_id: order_id.clone(),
@@ -3763,7 +3763,7 @@ mod tests {
 
         // Try to pay 3 more shares (only 1 remaining)
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::PayAaSplit {
                 order_id: order_id.clone(),
@@ -3785,13 +3785,13 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-dbl-cancel",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            239,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         // Pay
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -3810,7 +3810,7 @@ mod tests {
 
         // Cancel once
         let cancel1 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CancelPayment {
                 order_id: order_id.clone(),
@@ -3825,7 +3825,7 @@ mod tests {
 
         // Cancel again (should fail)
         let cancel2 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CancelPayment {
                 order_id: order_id.clone(),
@@ -3848,22 +3848,22 @@ mod tests {
         let manager = create_test_manager();
         let _order1 = open_table_with_items(
             &manager,
-            "T-occ-1",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            240,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
         let order2 = open_table_with_items(
             &manager,
-            "T-occ-2",
-            vec![simple_item("product:p2", "Tea", 5.0, 1)],
+            241,
+            vec![simple_item(2, "Tea", 5.0, 1)],
         );
 
         // Move order2 to T-occ-1 (occupied)
         let move_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MoveOrder {
                 order_id: order2.clone(),
-                target_table_id: "T-occ-1".to_string(),
+                target_table_id: 240,
                 target_table_name: "Table 1".to_string(),
                 target_zone_id: None,
                 target_zone_name: None,
@@ -3884,8 +3884,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-mod-comp",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            242,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -3893,7 +3893,7 @@ mod tests {
 
         // Pay + complete
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -3907,7 +3907,7 @@ mod tests {
         );
         manager.execute_command(pay_cmd);
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -3918,7 +3918,7 @@ mod tests {
 
         // Try to modify
         let modify_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ModifyItem {
                 order_id: order_id.clone(),
@@ -3949,12 +3949,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-neg-pay-amt",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            243,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -3975,12 +3975,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-zero-pay-amt",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            244,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -4128,7 +4128,7 @@ mod tests {
         let manager = create_test_manager();
 
         // 开台
-        let open_cmd = create_open_table_cmd("op-1");
+        let open_cmd = create_open_table_cmd(1);
         let resp = manager.execute_command(open_cmd);
         let order_id = resp.order_id.unwrap();
 
@@ -4138,11 +4138,11 @@ mod tests {
 
         // 加菜
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+                items: vec![simple_item(1, "Coffee", 10.0, 1)],
             },
         );
         manager.execute_command(add_cmd);
@@ -4153,7 +4153,7 @@ mod tests {
 
         // 支付实际 total
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -4170,7 +4170,7 @@ mod tests {
 
         // 完成订单
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -4189,7 +4189,7 @@ mod tests {
         let manager = create_test_manager();
 
         // 开台
-        let open_cmd = create_open_table_cmd("op-1");
+        let open_cmd = create_open_table_cmd(1);
         let resp = manager.execute_command(open_cmd);
         let order_id = resp.order_id.unwrap();
 
@@ -4199,7 +4199,7 @@ mod tests {
 
         // 作废订单
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
@@ -4224,8 +4224,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-rule-move",
-            vec![simple_item("product:p1", "Coffee", 5.0, 1)],
+            245,
+            vec![simple_item(1, "Coffee", 5.0, 1)],
         );
 
         // 缓存规则
@@ -4236,13 +4236,13 @@ mod tests {
         // 换桌 — 订单保持 Active，规则不清除
         // （实际场景中由调用方按新区域重新加载规则）
         let move_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MoveOrder {
                 order_id: order_id.clone(),
-                target_table_id: "T-rule-move-2".to_string(),
+                target_table_id: 331,
                 target_table_name: "Table T-rule-move-2".to_string(),
-                target_zone_id: Some("zone:z2".to_string()),
+                target_zone_id: Some(2),
                 target_zone_name: Some("Zone B".to_string()),
                 authorizer_id: None,
                 authorizer_name: None,
@@ -4263,15 +4263,15 @@ mod tests {
         // 源订单
         let source_id = open_table_with_items(
             &manager,
-            "T-rule-merge-src",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)],
+            246,
+            vec![simple_item(1, "Coffee", 10.0, 1)],
         );
 
         // 目标订单
         let target_id = open_table_with_items(
             &manager,
-            "T-rule-merge-tgt",
-            vec![simple_item("product:p2", "Tea", 8.0, 1)],
+            247,
+            vec![simple_item(2, "Tea", 8.0, 1)],
         );
 
         // 给源订单缓存规则
@@ -4281,7 +4281,7 @@ mod tests {
 
         // 合并 source → target
         let merge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MergeOrders {
                 source_order_id: source_id.clone(),
@@ -4306,14 +4306,14 @@ mod tests {
 
     /// 创建带选项的商品
     fn item_with_options(
-        product_id: &str,
+        product_id: i64,
         name: &str,
         price: f64,
         quantity: i32,
         options: Vec<shared::order::ItemOption>,
     ) -> CartItemInput {
         CartItemInput {
-            product_id: product_id.to_string(),
+            product_id,
             name: name.to_string(),
             price,
             original_price: None,
@@ -4329,14 +4329,14 @@ mod tests {
 
     /// 创建带折扣的商品
     fn item_with_discount(
-        product_id: &str,
+        product_id: i64,
         name: &str,
         price: f64,
         quantity: i32,
         discount_percent: f64,
     ) -> CartItemInput {
         CartItemInput {
-            product_id: product_id.to_string(),
+            product_id,
             name: name.to_string(),
             price,
             original_price: None,
@@ -4353,7 +4353,7 @@ mod tests {
     /// 快速支付
     fn pay_order(manager: &OrdersManager, order_id: &str, amount: f64, method: &str) -> CommandResponse {
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.to_string(),
@@ -4371,7 +4371,7 @@ mod tests {
     /// 快速完成订单
     fn complete_order(manager: &OrdersManager, order_id: &str) -> CommandResponse {
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.to_string(),
@@ -4384,7 +4384,7 @@ mod tests {
     /// 快速作废订单
     fn void_order_helper(manager: &OrdersManager, order_id: &str, void_type: VoidType) -> CommandResponse {
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.to_string(),
@@ -4414,7 +4414,7 @@ mod tests {
     /// 打开零售订单
     fn open_retail_order(manager: &OrdersManager) -> String {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
                 table_id: None,
@@ -4446,12 +4446,12 @@ mod tests {
 
         // 1. 开台
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-dine-flow".to_string()),
+                table_id: Some(325),
                 table_name: Some("Table Dine Flow".to_string()),
-                zone_id: Some("zone:z1".to_string()),
+                zone_id: Some(1),
                 zone_name: Some("Zone A".to_string()),
                 guest_count: 4,
                 is_retail: false,
@@ -4469,14 +4469,14 @@ mod tests {
 
         // 2. 添加 3 种商品
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![
-                    simple_item("product:coffee", "Coffee", 5.0, 2),      // 10.0
-                    simple_item("product:tea", "Tea", 3.0, 3),            // 9.0
-                    simple_item("product:cake", "Cake", 12.50, 1),        // 12.50
+                    simple_item(10, "Coffee", 5.0, 2),      // 10.0
+                    simple_item(11, "Tea", 3.0, 3),            // 9.0
+                    simple_item(12, "Cake", 12.50, 1),        // 12.50
                 ],
             },
         );
@@ -4494,7 +4494,7 @@ mod tests {
             .instance_id.clone();
 
         let modify_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ModifyItem {
                 order_id: order_id.clone(),
@@ -4549,11 +4549,11 @@ mod tests {
 
         // 2. 添加商品
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p1", "Item", 15.0, 2)],
+                items: vec![simple_item(1, "Item", 15.0, 2)],
             },
         );
         manager.execute_command(add_cmd);
@@ -4563,7 +4563,7 @@ mod tests {
 
         // 4. 完成 (指定服务类型为外带)
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -4588,13 +4588,13 @@ mod tests {
         // 开台 + 添加商品
         let order_id = open_table_with_items(
             &manager,
-            "T-loss",
-            vec![simple_item("product:p1", "Expensive Item", 100.0, 1)],
+            248,
+            vec![simple_item(1, "Expensive Item", 100.0, 1)],
         );
 
         // 损失结算作废
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
@@ -4602,7 +4602,7 @@ mod tests {
                 loss_reason: Some(shared::order::LossReason::CustomerFled),
                 loss_amount: Some(100.0),
                 note: Some("Customer fled without paying".to_string()),
-                authorizer_id: Some("auth:1".to_string()),
+                authorizer_id: Some(1),
                 authorizer_name: Some("Manager".to_string()),
             },
         );
@@ -4625,11 +4625,11 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-multi-split",
+            249,
             vec![
-                simple_item("product:p1", "Item A", 20.0, 2),  // 40
-                simple_item("product:p2", "Item B", 15.0, 2),  // 30
-                simple_item("product:p3", "Item C", 10.0, 1),  // 10
+                simple_item(1, "Item A", 20.0, 2),  // 40
+                simple_item(2, "Item B", 15.0, 2),  // 30
+                simple_item(3, "Item C", 10.0, 1),  // 10
             ],
         );
 
@@ -4640,7 +4640,7 @@ mod tests {
 
         // 第一次分单: 支付 Item A 的 1 个 (20.0)
         let split_cmd1 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::SplitByItems {
                 order_id: order_id.clone(),
@@ -4663,7 +4663,7 @@ mod tests {
 
         // 第二次分单: 支付 Item B 的 2 个 (30.0)
         let split_cmd2 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::SplitByItems {
                 order_id: order_id.clone(),
@@ -4704,13 +4704,13 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-amount-split",
-            vec![simple_item("product:p1", "Total Item", 100.0, 1)],
+            250,
+            vec![simple_item(1, "Total Item", 100.0, 1)],
         );
 
         // 第一次金额分单: 30%
         let split_cmd1 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::SplitByAmount {
                 order_id: order_id.clone(),
@@ -4728,7 +4728,7 @@ mod tests {
 
         // 第二次金额分单: 30%
         let split_cmd2 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::SplitByAmount {
                 order_id: order_id.clone(),
@@ -4762,13 +4762,13 @@ mod tests {
         // 100 元订单，3 人 AA
         let order_id = open_table_with_items(
             &manager,
-            "T-aa-3way",
-            vec![simple_item("product:p1", "Shared Meal", 100.0, 1)],
+            251,
+            vec![simple_item(1, "Shared Meal", 100.0, 1)],
         );
 
         // StartAaSplit: 3 人，先付 1 份
         let start_aa = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::StartAaSplit {
                 order_id: order_id.clone(),
@@ -4790,7 +4790,7 @@ mod tests {
 
         // PayAaSplit: 第二份
         let pay_aa_2 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::PayAaSplit {
                 order_id: order_id.clone(),
@@ -4807,7 +4807,7 @@ mod tests {
 
         // PayAaSplit: 第三份 (最后一份应该拿剩余金额)
         let pay_aa_3 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::PayAaSplit {
                 order_id: order_id.clone(),
@@ -4840,20 +4840,20 @@ mod tests {
         // 源订单
         let source_id = open_table_with_items(
             &manager,
-            "T-merge-src-2",
-            vec![simple_item("product:p1", "Coffee", 5.0, 2)], // 10
+            252,
+            vec![simple_item(1, "Coffee", 5.0, 2)], // 10
         );
 
         // 目标订单
         let target_id = open_table_with_items(
             &manager,
-            "T-merge-tgt-2",
-            vec![simple_item("product:p2", "Tea", 4.0, 1)], // 4
+            253,
+            vec![simple_item(2, "Tea", 4.0, 1)], // 4
         );
 
         // 合并
         let merge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MergeOrders {
                 source_order_id: source_id.clone(),
@@ -4875,11 +4875,11 @@ mod tests {
 
         // 继续在目标订单添加商品
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: target_id.clone(),
-                items: vec![simple_item("product:p3", "Cake", 6.0, 1)],
+                items: vec![simple_item(3, "Cake", 6.0, 1)],
             },
         );
         let resp = manager.execute_command(add_cmd);
@@ -4905,19 +4905,19 @@ mod tests {
         // 订单 1: T1
         let order1 = open_table_with_items(
             &manager,
-            "T1-move",
-            vec![simple_item("product:p1", "Item 1", 10.0, 1)],
+            401,
+            vec![simple_item(1, "Item 1", 10.0, 1)],
         );
 
         // 移桌: T1 → T2
         let move_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MoveOrder {
                 order_id: order1.clone(),
-                target_table_id: "T2-move".to_string(),
+                target_table_id: 400,
                 target_table_name: "Table 2".to_string(),
-                target_zone_id: Some("zone:z2".to_string()),
+                target_zone_id: Some(2),
                 target_zone_name: Some("Zone B".to_string()),
                 authorizer_id: None,
                 authorizer_name: None,
@@ -4927,19 +4927,19 @@ mod tests {
         assert!(resp.success);
 
         let snapshot = manager.get_snapshot(&order1).unwrap().unwrap();
-        assert_eq!(snapshot.table_id, Some("T2-move".to_string()));
-        assert_eq!(snapshot.zone_id, Some("zone:z2".to_string()));
+        assert_eq!(snapshot.table_id, Some(400));
+        assert_eq!(snapshot.zone_id, Some(2));
 
         // 订单 2: T3
         let order2 = open_table_with_items(
             &manager,
-            "T3-move",
-            vec![simple_item("product:p2", "Item 2", 20.0, 1)],
+            403,
+            vec![simple_item(2, "Item 2", 20.0, 1)],
         );
 
         // 合并: T2 (order1) → T3 (order2)
         let merge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MergeOrders {
                 source_order_id: order1.clone(),
@@ -4974,8 +4974,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-chain",
-            vec![simple_item("product:p1", "Test Item", 10.0, 5)], // 50
+            254,
+            vec![simple_item(1, "Test Item", 10.0, 5)], // 50
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -4984,7 +4984,7 @@ mod tests {
 
         // ModifyItem: 数量 5 → 3
         let modify_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ModifyItem {
                 order_id: order_id.clone(),
@@ -5007,7 +5007,7 @@ mod tests {
 
         // RemoveItem: 移除 2 个
         let remove_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::RemoveItem {
                 order_id: order_id.clone(),
@@ -5027,7 +5027,7 @@ mod tests {
 
         // 再移除剩下的 1 个
         let remove_cmd2 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::RemoveItem {
                 order_id: order_id.clone(),
@@ -5061,8 +5061,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-partial-remove",
-            vec![simple_item("product:p1", "Item", 10.0, 5)], // 50
+            255,
+            vec![simple_item(1, "Item", 10.0, 5)], // 50
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -5070,7 +5070,7 @@ mod tests {
 
         // 移除 2 个
         let remove_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::RemoveItem {
                 order_id: order_id.clone(),
@@ -5099,13 +5099,13 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-disc-sur",
-            vec![simple_item("product:p1", "Item", 100.0, 1)],
+            256,
+            vec![simple_item(1, "Item", 100.0, 1)],
         );
 
         // 应用 10% 折扣
         let discount_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderDiscount {
                 order_id: order_id.clone(),
@@ -5124,7 +5124,7 @@ mod tests {
 
         // 应用 15 元附加费
         let surcharge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderSurcharge {
                 order_id: order_id.clone(),
@@ -5152,10 +5152,10 @@ mod tests {
 
         // 添加带 10% 手动折扣的商品
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-dual-disc".to_string()),
+                table_id: Some(326),
                 table_name: Some("Table".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -5167,11 +5167,11 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![item_with_discount("product:p1", "Item", 100.0, 1, 10.0)], // 90 after item discount
+                items: vec![item_with_discount(1, "Item", 100.0, 1, 10.0)], // 90 after item discount
             },
         );
         manager.execute_command(add_cmd);
@@ -5182,7 +5182,7 @@ mod tests {
 
         // 应用 5% 订单级折扣
         let discount_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderDiscount {
                 order_id: order_id.clone(),
@@ -5209,8 +5209,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-comp-uncomp",
-            vec![simple_item("product:p1", "Item", 25.0, 2)], // 50
+            257,
+            vec![simple_item(1, "Item", 25.0, 2)], // 50
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -5219,14 +5219,14 @@ mod tests {
 
         // Comp 2 个
         let comp_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompItem {
                 order_id: order_id.clone(),
                 instance_id: instance_id.clone(),
                 quantity: 2,
                 reason: "Birthday gift".to_string(),
-                authorizer_id: "auth:1".to_string(),
+                authorizer_id: 1,
                 authorizer_name: "Manager".to_string(),
             },
         );
@@ -5242,12 +5242,12 @@ mod tests {
 
         // Uncomp
         let uncomp_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::UncompItem {
                 order_id: order_id.clone(),
                 instance_id: comped_item.instance_id.clone(),
-                authorizer_id: "auth:1".to_string(),
+                authorizer_id: 1,
                 authorizer_name: "Manager".to_string(),
             },
         );
@@ -5269,8 +5269,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-partial-comp",
-            vec![simple_item("product:p1", "Item", 10.0, 5)], // 50
+            258,
+            vec![simple_item(1, "Item", 10.0, 5)], // 50
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -5278,14 +5278,14 @@ mod tests {
 
         // Comp 2 个 (部分)
         let comp_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompItem {
                 order_id: order_id.clone(),
                 instance_id: instance_id.clone(),
                 quantity: 2,
                 reason: "Promotion".to_string(),
-                authorizer_id: "auth:1".to_string(),
+                authorizer_id: 1,
                 authorizer_name: "Manager".to_string(),
             },
         );
@@ -5317,8 +5317,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-large-precision",
-            vec![simple_item("product:p1", "Expensive", 99999.99, 100)],
+            259,
+            vec![simple_item(1, "Expensive", 99999.99, 100)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -5340,10 +5340,10 @@ mod tests {
         let manager = create_test_manager();
 
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some("T-options".to_string()),
+                table_id: Some(327),
                 table_name: Some("Table".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -5355,18 +5355,18 @@ mod tests {
         let order_id = resp.order_id.unwrap();
 
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
                 items: vec![item_with_options(
-                    "product:pizza",
+                    1,
                     "Pizza",
                     15.0,
                     1,
                     vec![
                         shared::order::ItemOption {
-                            attribute_id: "attr:size".to_string(),
+                            attribute_id: 1,
                             attribute_name: "Size".to_string(),
                             option_idx: 1,
                             option_name: "Large".to_string(),
@@ -5374,7 +5374,7 @@ mod tests {
                             quantity: 1,
                         },
                         shared::order::ItemOption {
-                            attribute_id: "attr:topping".to_string(),
+                            attribute_id: 2,
                             attribute_name: "Topping".to_string(),
                             option_idx: 0,
                             option_name: "Extra Cheese".to_string(),
@@ -5408,8 +5408,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-completed-reject",
-            vec![simple_item("product:p1", "Item", 10.0, 1)],
+            260,
+            vec![simple_item(1, "Item", 10.0, 1)],
         );
 
         // 支付并完成
@@ -5419,11 +5419,11 @@ mod tests {
 
         // 测试 AddItems
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p2", "New Item", 5.0, 1)],
+                items: vec![simple_item(2, "New Item", 5.0, 1)],
             },
         );
         let resp = manager.execute_command(add_cmd);
@@ -5431,7 +5431,7 @@ mod tests {
 
         // 测试 AddPayment
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -5448,7 +5448,7 @@ mod tests {
 
         // 测试 VoidOrder
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
@@ -5465,11 +5465,11 @@ mod tests {
 
         // 测试 MoveOrder
         let move_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MoveOrder {
                 order_id: order_id.clone(),
-                target_table_id: "T-new".to_string(),
+                target_table_id: 332,
                 target_table_name: "New Table".to_string(),
                 target_zone_id: None,
                 target_zone_name: None,
@@ -5490,8 +5490,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-voided-reject",
-            vec![simple_item("product:p1", "Item", 10.0, 1)],
+            261,
+            vec![simple_item(1, "Item", 10.0, 1)],
         );
 
         // 作废订单
@@ -5500,11 +5500,11 @@ mod tests {
 
         // 测试 AddItems
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p2", "New Item", 5.0, 1)],
+                items: vec![simple_item(2, "New Item", 5.0, 1)],
             },
         );
         let resp = manager.execute_command(add_cmd);
@@ -5512,7 +5512,7 @@ mod tests {
 
         // 测试 AddPayment
         let pay_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.clone(),
@@ -5529,7 +5529,7 @@ mod tests {
 
         // 测试 CompleteOrder
         let complete_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompleteOrder {
                 order_id: order_id.clone(),
@@ -5550,13 +5550,13 @@ mod tests {
 
         let source_id = open_table_with_items(
             &manager,
-            "T-merged-source",
-            vec![simple_item("product:p1", "Item", 10.0, 1)],
+            262,
+            vec![simple_item(1, "Item", 10.0, 1)],
         );
         let target_id = open_table_with_items(
             &manager,
-            "T-merged-target",
-            vec![simple_item("product:p2", "Item 2", 10.0, 1)],
+            263,
+            vec![simple_item(2, "Item 2", 10.0, 1)],
         );
 
         // 合并前两个订单都在活跃列表
@@ -5565,7 +5565,7 @@ mod tests {
 
         // 合并
         let merge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::MergeOrders {
                 source_order_id: source_id.clone(),
@@ -5593,8 +5593,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-update-info",
-            vec![simple_item("product:p1", "Item", 100.0, 1)],
+            264,
+            vec![simple_item(1, "Item", 100.0, 1)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -5603,7 +5603,7 @@ mod tests {
 
         // 更新 guest_count
         let update_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::UpdateOrderInfo {
                 order_id: order_id.clone(),
@@ -5627,11 +5627,11 @@ mod tests {
     fn test_add_note_overwrites_previous() {
         let manager = create_test_manager();
 
-        let order_id = open_table_with_items(&manager, "T-note", vec![]);
+        let order_id = open_table_with_items(&manager, 109, vec![]);
 
         // 添加第一个备注
         let note_cmd1 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddOrderNote {
                 order_id: order_id.clone(),
@@ -5645,7 +5645,7 @@ mod tests {
 
         // 添加第二个备注 (应覆盖)
         let note_cmd2 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddOrderNote {
                 order_id: order_id.clone(),
@@ -5665,11 +5665,11 @@ mod tests {
     fn test_clear_note_with_empty_string() {
         let manager = create_test_manager();
 
-        let order_id = open_table_with_items(&manager, "T-clear-note", vec![]);
+        let order_id = open_table_with_items(&manager, 110, vec![]);
 
         // 添加备注
         let note_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddOrderNote {
                 order_id: order_id.clone(),
@@ -5683,7 +5683,7 @@ mod tests {
 
         // 用空字符串清除
         let clear_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddOrderNote {
                 order_id: order_id.clone(),
@@ -5711,8 +5711,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-pay-cycle",
-            vec![simple_item("product:p1", "Item", 30.0, 1)],
+            265,
+            vec![simple_item(1, "Item", 30.0, 1)],
         );
 
         // 第一次支付
@@ -5723,7 +5723,7 @@ mod tests {
 
         // 取消第一次支付
         let cancel_cmd1 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CancelPayment {
                 order_id: order_id.clone(),
@@ -5747,7 +5747,7 @@ mod tests {
 
         // 取消第二次支付
         let cancel_cmd2 = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CancelPayment {
                 order_id: order_id.clone(),
@@ -5786,8 +5786,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-aa-no-mix",
-            vec![simple_item("product:p1", "Item", 100.0, 2)],
+            266,
+            vec![simple_item(1, "Item", 100.0, 2)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -5795,7 +5795,7 @@ mod tests {
 
         // 开始 AA 分单
         let start_aa = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::StartAaSplit {
                 order_id: order_id.clone(),
@@ -5810,7 +5810,7 @@ mod tests {
 
         // 尝试菜品分单应该失败
         let item_split_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::SplitByItems {
                 order_id: order_id.clone(),
@@ -5837,10 +5837,10 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-comp-pay",
+            267,
             vec![
-                simple_item("product:p1", "Item A", 10.0, 1),
-                simple_item("product:p2", "Item B", 10.0, 1),
+                simple_item(1, "Item A", 10.0, 1),
+                simple_item(2, "Item B", 10.0, 1),
             ],
         );
 
@@ -5850,14 +5850,14 @@ mod tests {
 
         // Comp Item A
         let comp_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompItem {
                 order_id: order_id.clone(),
                 instance_id: item_a_id,
                 quantity: 1,
                 reason: "Gift".to_string(),
-                authorizer_id: "auth:1".to_string(),
+                authorizer_id: 1,
                 authorizer_name: "Manager".to_string(),
             },
         );
@@ -5888,8 +5888,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-amount-blocks-item",
-            vec![simple_item("product:p1", "Item", 100.0, 2)],
+            268,
+            vec![simple_item(1, "Item", 100.0, 2)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -5897,7 +5897,7 @@ mod tests {
 
         // 金额分单
         let amount_split = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::SplitByAmount {
                 order_id: order_id.clone(),
@@ -5914,7 +5914,7 @@ mod tests {
 
         // 尝试菜品分单应该失败
         let item_split = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::SplitByItems {
                 order_id: order_id.clone(),
@@ -5941,12 +5941,12 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-cancel-nonexistent",
-            vec![simple_item("product:p1", "Item", 10.0, 1)],
+            269,
+            vec![simple_item(1, "Item", 10.0, 1)],
         );
 
         let cancel_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CancelPayment {
                 order_id: order_id.clone(),
@@ -5969,8 +5969,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-split-overpay",
-            vec![simple_item("product:p1", "Item", 10.0, 1)],
+            270,
+            vec![simple_item(1, "Item", 10.0, 1)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -5978,7 +5978,7 @@ mod tests {
 
         // 尝试支付超过可用数量
         let split_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::SplitByItems {
                 order_id: order_id.clone(),
@@ -6005,8 +6005,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-remove-excess",
-            vec![simple_item("product:p1", "Item", 10.0, 2)],
+            271,
+            vec![simple_item(1, "Item", 10.0, 2)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -6014,7 +6014,7 @@ mod tests {
 
         // 尝试移除 5 个，但只有 2 个
         let remove_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::RemoveItem {
                 order_id: order_id.clone(),
@@ -6038,8 +6038,8 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-comp-excess",
-            vec![simple_item("product:p1", "Item", 10.0, 2)],
+            272,
+            vec![simple_item(1, "Item", 10.0, 2)],
         );
 
         let snapshot = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -6047,14 +6047,14 @@ mod tests {
 
         // 尝试 comp 5 个，但只有 2 个
         let comp_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompItem {
                 order_id: order_id.clone(),
                 instance_id,
                 quantity: 5,
                 reason: "Test".to_string(),
-                authorizer_id: "auth:1".to_string(),
+                authorizer_id: 1,
                 authorizer_name: "Manager".to_string(),
             },
         );
@@ -6071,13 +6071,13 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-clear-discount",
-            vec![simple_item("product:p1", "Item", 100.0, 1)],
+            273,
+            vec![simple_item(1, "Item", 100.0, 1)],
         );
 
         // 应用折扣
         let discount_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderDiscount {
                 order_id: order_id.clone(),
@@ -6094,7 +6094,7 @@ mod tests {
 
         // 清除折扣 (两个参数都为 None)
         let clear_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderDiscount {
                 order_id: order_id.clone(),
@@ -6122,13 +6122,13 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-rule-skip",
-            vec![simple_item("product:p1", "Item", 100.0, 1)],
+            274,
+            vec![simple_item(1, "Item", 100.0, 1)],
         );
 
         // 尝试 toggle 不存在的规则应失败
         let toggle_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ToggleRuleSkip {
                 order_id: order_id.clone(),
@@ -6149,13 +6149,13 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-fixed-discount",
-            vec![simple_item("product:p1", "Item", 100.0, 1)],
+            275,
+            vec![simple_item(1, "Item", 100.0, 1)],
         );
 
         // 应用 25 元固定折扣
         let discount_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderDiscount {
                 order_id: order_id.clone(),
@@ -6182,13 +6182,13 @@ mod tests {
 
         let order_id = open_table_with_items(
             &manager,
-            "T-pct-surcharge",
-            vec![simple_item("product:p1", "Item", 100.0, 1)],
+            276,
+            vec![simple_item(1, "Item", 100.0, 1)],
         );
 
         // 应用 10% 附加费
         let surcharge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderSurcharge {
                 order_id: order_id.clone(),
@@ -6218,7 +6218,7 @@ mod tests {
         changes: shared::order::ItemChanges,
     ) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ModifyItem {
                 order_id: order_id.to_string(),
@@ -6235,7 +6235,7 @@ mod tests {
     /// Helper: 添加支付
     fn pay(manager: &OrdersManager, order_id: &str, amount: f64, method: &str) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddPayment {
                 order_id: order_id.to_string(),
@@ -6257,7 +6257,7 @@ mod tests {
         payment_id: &str,
     ) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CancelPayment {
                 order_id: order_id.to_string(),
@@ -6273,7 +6273,7 @@ mod tests {
     /// Helper: 整单折扣
     fn apply_discount(manager: &OrdersManager, order_id: &str, percent: f64) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderDiscount {
                 order_id: order_id.to_string(),
@@ -6289,7 +6289,7 @@ mod tests {
     /// Helper: 清除整单折扣
     fn clear_discount(manager: &OrdersManager, order_id: &str) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderDiscount {
                 order_id: order_id.to_string(),
@@ -6310,7 +6310,7 @@ mod tests {
         method: &str,
     ) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::SplitByItems {
                 order_id: order_id.to_string(),
@@ -6330,14 +6330,14 @@ mod tests {
             .map(|i| i.unpaid_quantity)
             .unwrap_or(1);
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompItem {
                 order_id: order_id.to_string(),
                 instance_id: instance_id.to_string(),
                 quantity: qty,
                 reason: "test comp".to_string(),
-                authorizer_id: "user-1".to_string(),
+                authorizer_id: 1,
                 authorizer_name: "Test".to_string(),
             },
         );
@@ -6400,8 +6400,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-1",
-            vec![simple_item("product:p1", "Coffee", 10.0, 3)], // total=30
+            277,
+            vec![simple_item(1, "Coffee", 10.0, 3)], // total=30
         );
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -6448,8 +6448,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-2",
-            vec![simple_item("product:p1", "Coffee", 10.0, 4)], // total=40
+            278,
+            vec![simple_item(1, "Coffee", 10.0, 4)], // total=40
         );
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -6510,10 +6510,10 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-3",
+            279,
             vec![
-                simple_item("product:p1", "Coffee", 10.0, 3), // 30
-                simple_item("product:p2", "Tea", 8.0, 2),     // 16 → total=46
+                simple_item(1, "Coffee", 10.0, 3), // 30
+                simple_item(2, "Tea", 8.0, 2),     // 16 → total=46
             ],
         );
 
@@ -6565,10 +6565,10 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-4",
+            280,
             vec![
-                simple_item("product:p1", "Coffee", 10.0, 2), // 20
-                simple_item("product:p2", "Tea", 5.0, 2),     // 10 → total=30
+                simple_item(1, "Coffee", 10.0, 2), // 20
+                simple_item(2, "Tea", 5.0, 2),     // 10 → total=30
             ],
         );
 
@@ -6615,8 +6615,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-5",
-            vec![simple_item("product:p1", "Coffee", 10.0, 2)], // 20
+            281,
+            vec![simple_item(1, "Coffee", 10.0, 2)], // 20
         );
 
         // 100% discount
@@ -6641,13 +6641,13 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-6",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)], // 10
+            282,
+            vec![simple_item(1, "Coffee", 10.0, 1)], // 10
         );
 
         // Fixed discount of 50 on a 10 order
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderDiscount {
                 order_id: order_id.clone(),
@@ -6674,8 +6674,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-7",
-            vec![simple_item("product:p1", "Coffee", 10.0, 3)], // 30
+            283,
+            vec![simple_item(1, "Coffee", 10.0, 3)], // 30
         );
 
         // Pay 15
@@ -6709,10 +6709,10 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-8",
+            284,
             vec![
-                simple_item("product:p1", "Coffee", 10.0, 2), // 20
-                simple_item("product:p2", "Tea", 5.0, 2),     // 10
+                simple_item(1, "Coffee", 10.0, 2), // 20
+                simple_item(2, "Tea", 5.0, 2),     // 10
             ], // total=30
         );
 
@@ -6769,8 +6769,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-9",
-            vec![simple_item("product:p1", "Coffee", 10.0, 5)], // 50
+            285,
+            vec![simple_item(1, "Coffee", 10.0, 5)], // 50
         );
 
         // Pay 20, then 15
@@ -6816,11 +6816,11 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-10",
+            286,
             vec![
-                simple_item("product:p1", "Steak", 25.0, 2),  // 50
-                simple_item("product:p2", "Wine", 15.0, 2),   // 30
-                simple_item("product:p3", "Bread", 3.0, 1),   // 3
+                simple_item(1, "Steak", 25.0, 2),  // 50
+                simple_item(2, "Wine", 15.0, 2),   // 30
+                simple_item(3, "Bread", 3.0, 1),   // 3
             ], // total=83
         );
 
@@ -6874,17 +6874,17 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-11",
-            vec![simple_item("product:p1", "Coffee", 10.0, 2)], // 20
+            287,
+            vec![simple_item(1, "Coffee", 10.0, 2)], // 20
         );
 
         // Add same product again
         let add_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.clone(),
-                items: vec![simple_item("product:p1", "Coffee", 10.0, 3)],
+                items: vec![simple_item(1, "Coffee", 10.0, 3)],
             },
         );
         let r = manager.execute_command(add_cmd);
@@ -6922,8 +6922,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-12",
-            vec![simple_item("product:p1", "Coffee", 10.0, 3)], // 30
+            288,
+            vec![simple_item(1, "Coffee", 10.0, 3)], // 30
         );
 
         // Pay 10
@@ -6957,8 +6957,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-13",
-            vec![simple_item("product:p1", "Coffee", 10.0, 5)], // 50
+            289,
+            vec![simple_item(1, "Coffee", 10.0, 5)], // 50
         );
 
         // Pay 30
@@ -6967,7 +6967,7 @@ mod tests {
 
         // Void with loss settled (auto-calculate loss)
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
@@ -6999,8 +6999,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-14",
-            vec![simple_item("product:p1", "Coffee", 10.0, 1)], // 10
+            290,
+            vec![simple_item(1, "Coffee", 10.0, 1)], // 10
         );
 
         // Pay 10.00 exact — should succeed
@@ -7024,10 +7024,10 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-15",
+            291,
             vec![
-                simple_item("product:p1", "Coffee", 10.0, 2), // 20
-                simple_item("product:p2", "Tea", 8.0, 1),     // 8 → total=28
+                simple_item(1, "Coffee", 10.0, 2), // 20
+                simple_item(2, "Tea", 8.0, 1),     // 8 → total=28
             ],
         );
 
@@ -7044,7 +7044,7 @@ mod tests {
 
         // 3. 5% order surcharge → total = 18 - 1.8 + 0.9 = 17.1
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderSurcharge {
                 order_id: order_id.clone(),
@@ -7078,7 +7078,7 @@ mod tests {
     /// Helper: 整单附加费
     fn apply_surcharge(manager: &OrdersManager, order_id: &str, percent: f64) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderSurcharge {
                 order_id: order_id.to_string(),
@@ -7094,7 +7094,7 @@ mod tests {
     /// Helper: 整单固定附加费
     fn apply_surcharge_fixed(manager: &OrdersManager, order_id: &str, amount: f64) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderSurcharge {
                 order_id: order_id.to_string(),
@@ -7110,7 +7110,7 @@ mod tests {
     /// Helper: 整单固定折扣
     fn apply_discount_fixed(manager: &OrdersManager, order_id: &str, amount: f64) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderDiscount {
                 order_id: order_id.to_string(),
@@ -7126,7 +7126,7 @@ mod tests {
     /// Helper: 删除商品
     fn remove_item(manager: &OrdersManager, order_id: &str, instance_id: &str, qty: Option<i32>) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::RemoveItem {
                 order_id: order_id.to_string(),
@@ -7143,12 +7143,12 @@ mod tests {
     /// Helper: uncomp 商品
     fn uncomp_item(manager: &OrdersManager, order_id: &str, instance_id: &str) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::UncompItem {
                 order_id: order_id.to_string(),
                 instance_id: instance_id.to_string(),
-                authorizer_id: "user-1".to_string(),
+                authorizer_id: 1,
                 authorizer_name: "Test".to_string(),
             },
         );
@@ -7158,7 +7158,7 @@ mod tests {
     /// Helper: 添加更多商品
     fn add_items(manager: &OrdersManager, order_id: &str, items: Vec<CartItemInput>) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::AddItems {
                 order_id: order_id.to_string(),
@@ -7185,8 +7185,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-16",
-            vec![simple_item("product:p1", "Steak", 30.0, 3)], // 90
+            292,
+            vec![simple_item(1, "Steak", 30.0, 3)], // 90
         );
 
         // 3 payments: 25, 35, 20
@@ -7227,10 +7227,10 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-17",
+            293,
             vec![
-                simple_item("product:p1", "Coffee", 10.0, 4), // 40
-                simple_item("product:p2", "Tea", 5.0, 2),     // 10 → total=50
+                simple_item(1, "Coffee", 10.0, 4), // 40
+                simple_item(2, "Tea", 5.0, 2),     // 10 → total=50
             ],
         );
 
@@ -7282,11 +7282,11 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-18",
+            294,
             vec![
-                simple_item("product:p1", "Steak", 20.0, 2),  // 40
-                simple_item("product:p2", "Wine", 15.0, 2),   // 30
-                simple_item("product:p3", "Bread", 3.0, 1),   // 3  → total=73
+                simple_item(1, "Steak", 20.0, 2),  // 40
+                simple_item(2, "Wine", 15.0, 2),   // 30
+                simple_item(3, "Bread", 3.0, 1),   // 3  → total=73
             ],
         );
 
@@ -7350,8 +7350,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-19",
-            vec![simple_item("product:p1", "Coffee", 10.0, 6)], // 60
+            295,
+            vec![simple_item(1, "Coffee", 10.0, 6)], // 60
         );
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -7444,10 +7444,10 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-20",
+            296,
             vec![
-                simple_item("product:p1", "Steak", 25.0, 2),  // 50
-                simple_item("product:p2", "Wine", 12.0, 3),   // 36 → total=86
+                simple_item(1, "Steak", 25.0, 2),  // 50
+                simple_item(2, "Wine", 12.0, 3),   // 36 → total=86
             ],
         );
 
@@ -7483,7 +7483,7 @@ mod tests {
         assert_remaining_consistent(&s);
 
         // 5. Add 2 more wines (same product, no discount → different instance_id)
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p2", "Wine", 12.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(2, "Wine", 12.0, 2)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -7507,8 +7507,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-21",
-            vec![simple_item("product:p1", "Coffee", 10.0, 5)], // 50
+            297,
+            vec![simple_item(1, "Coffee", 10.0, 5)], // 50
         );
 
         // 1. 20% order discount → total = 50 - 10 = 40
@@ -7544,7 +7544,7 @@ mod tests {
         // 6. Remove surcharge → total = 50
         //    (surcharge_percent doesn't accept 0, use None/None to clear)
         let clear_surcharge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderSurcharge {
                 order_id: order_id.clone(),
@@ -7570,8 +7570,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-22",
-            vec![simple_item("product:p1", "Coffee", 5.0, 2)], // 10
+            298,
+            vec![simple_item(1, "Coffee", 5.0, 2)], // 10
         );
 
         // 固定折扣 30 on total 10 → clamp to 0
@@ -7612,10 +7612,10 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-23",
+            299,
             vec![
-                simple_item("product:p1", "Coffee", 10.0, 2), // 20
-                simple_item("product:p2", "Tea", 5.0, 4),     // 20 → total=40
+                simple_item(1, "Coffee", 10.0, 2), // 20
+                simple_item(2, "Tea", 5.0, 4),     // 20 → total=40
             ],
         );
 
@@ -7660,8 +7660,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-24",
-            vec![simple_item("product:p1", "Coffee", 10.0, 6)], // 60
+            300,
+            vec![simple_item(1, "Coffee", 10.0, 6)], // 60
         );
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -7733,11 +7733,11 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-25",
+            301,
             vec![
-                simple_item("product:p1", "Steak", 20.0, 2),  // 40
-                simple_item("product:p2", "Wine", 10.0, 3),   // 30
-                simple_item("product:p3", "Bread", 2.0, 2),   // 4  → total=74
+                simple_item(1, "Steak", 20.0, 2),  // 40
+                simple_item(2, "Wine", 10.0, 3),   // 30
+                simple_item(3, "Bread", 2.0, 2),   // 4  → total=74
             ],
         );
 
@@ -7778,7 +7778,7 @@ mod tests {
 
         // 6. Void with loss → auto-calculate loss_amount = total - paid
         let void_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::VoidOrder {
                 order_id: order_id.clone(),
@@ -7806,12 +7806,12 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-26",
-            vec![simple_item("product:p1", "Coffee", 10.0, 2)], // 20
+            302,
+            vec![simple_item(1, "Coffee", 10.0, 2)], // 20
         );
 
         // Add 3 more coffees → 5 total, 50
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Coffee", 10.0, 3)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Coffee", 10.0, 3)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -7830,7 +7830,7 @@ mod tests {
         assert!((s.total - 30.0).abs() < 0.01);
 
         // Add tea
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p2", "Tea", 5.0, 4)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(2, "Tea", 5.0, 4)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -7854,10 +7854,10 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-27",
+            303,
             vec![
-                simple_item("product:p1", "Steak", 30.0, 2),  // 60
-                simple_item("product:p2", "Salad", 8.0, 1),   // 8  → total=68
+                simple_item(1, "Steak", 30.0, 2),  // 60
+                simple_item(2, "Salad", 8.0, 1),   // 8  → total=68
             ],
         );
 
@@ -7921,8 +7921,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-28",
-            vec![simple_item("product:p1", "Coffee", 10.0, 10)], // 100
+            304,
+            vec![simple_item(1, "Coffee", 10.0, 10)], // 100
         );
 
         // 20% discount → discount = 20, total = 80
@@ -7946,7 +7946,7 @@ mod tests {
         // Remove surcharge → total = 100
         //    (surcharge_percent doesn't accept 0, use None/None to clear)
         let clear_surcharge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderSurcharge {
                 order_id: order_id.clone(),
@@ -7972,8 +7972,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-29",
-            vec![simple_item("product:p1", "Coffee", 7.5, 8)], // 60
+            305,
+            vec![simple_item(1, "Coffee", 7.5, 8)], // 60
         );
 
         let payments = vec![5.0, 10.5, 3.0, 15.0, 7.5, 9.0];
@@ -8013,10 +8013,10 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-combo-30",
+            306,
             vec![
-                simple_item("product:p1", "A", 20.0, 3),  // 60
-                simple_item("product:p2", "B", 15.0, 2),  // 30 → subtotal=90
+                simple_item(1, "A", 20.0, 3),  // 60
+                simple_item(2, "B", 15.0, 2),  // 30 → subtotal=90
             ],
         );
 
@@ -8053,14 +8053,14 @@ mod tests {
     // ========================================================================
 
     /// Helper: 开台（不加商品）
-    fn open_table(manager: &OrdersManager, table_id: &str) -> String {
+    fn open_table(manager: &OrdersManager, table_id: i64) -> String {
         let open_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some(table_id.to_string()),
+                table_id: Some(table_id),
                 table_name: Some(format!("Table {}", table_id)),
-                zone_id: Some("zone:z1".to_string()),
+                zone_id: Some(1),
                 zone_name: Some("Zone A".to_string()),
                 guest_count: 2,
                 is_retail: false,
@@ -8079,7 +8079,7 @@ mod tests {
         skipped: bool,
     ) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ToggleRuleSkip {
                 order_id: order_id.to_string(),
@@ -8176,14 +8176,14 @@ mod tests {
 
     /// Helper: 带规格的商品
     fn item_with_spec(
-        product_id: &str,
+        product_id: i64,
         name: &str,
         price: f64,
         quantity: i32,
         spec: shared::order::SpecificationInfo,
     ) -> CartItemInput {
         CartItemInput {
-            product_id: product_id.to_string(),
+            product_id,
             name: name.to_string(),
             price,
             original_price: None,
@@ -8198,9 +8198,9 @@ mod tests {
     }
 
     /// Helper: 创建选项
-    fn make_option(attr_id: &str, attr_name: &str, idx: i32, opt_name: &str, modifier: f64) -> shared::order::ItemOption {
+    fn make_option(attr_id: i64, attr_name: &str, idx: i32, opt_name: &str, modifier: f64) -> shared::order::ItemOption {
         shared::order::ItemOption {
-            attribute_id: attr_id.to_string(),
+            attribute_id: attr_id,
             attribute_name: attr_name.to_string(),
             option_idx: idx,
             option_name: opt_name.to_string(),
@@ -8210,9 +8210,9 @@ mod tests {
     }
 
     /// Helper: 创建规格
-    fn make_spec(id: &str, name: &str, price: Option<f64>) -> shared::order::SpecificationInfo {
+    fn make_spec(id: i64, name: &str, price: Option<f64>) -> shared::order::SpecificationInfo {
         shared::order::SpecificationInfo {
-            id: id.to_string(),
+            id,
             name: name.to_string(),
             receipt_name: None,
             price,
@@ -8251,13 +8251,13 @@ mod tests {
     #[test]
     fn test_combo_rule_skip_unskip_cycle() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-31");
+        let order_id = open_table(&manager, 31);
 
         // 注入 10% 折扣规则
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 添加商品: 100€ × 2
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Steak", 100.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Steak", 100.0, 2)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8300,11 +8300,11 @@ mod tests {
     #[test]
     fn test_combo_rule_then_manual_reprice() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-32");
+        let order_id = open_table(&manager, 32);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Wine", 100.0, 1)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Wine", 100.0, 1)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8346,15 +8346,15 @@ mod tests {
     #[test]
     fn test_combo_options_manual_discount_rule() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-33");
+        let order_id = open_table(&manager, 33);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 商品 50€, 选项 +5€ (加大), 数量 2
         let r = add_items(&manager, &order_id, vec![
             item_with_options(
-                "product:p1", "Coffee", 50.0, 2,
-                vec![make_option("attr:size", "Size", 1, "Large", 5.0)],
+                1, "Coffee", 50.0, 2,
+                vec![make_option(1, "Size", 1, "Large", 5.0)],
             ),
         ]);
         assert!(r.success);
@@ -8393,13 +8393,13 @@ mod tests {
     #[test]
     fn test_combo_spec_change_with_rule() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-34");
+        let order_id = open_table(&manager, 34);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 商品: spec A 价格 100€
         let r = add_items(&manager, &order_id, vec![
-            item_with_spec("product:p1", "Pasta", 100.0, 1, make_spec("spec:a", "Regular", Some(100.0))),
+            item_with_spec(1, "Pasta", 100.0, 1, make_spec(1, "Regular", Some(100.0))),
         ]);
         assert!(r.success);
 
@@ -8412,7 +8412,7 @@ mod tests {
             &manager, &order_id, &iid,
             combo_changes(
                 Some(150.0), None, None, None,
-                Some(make_spec("spec:b", "Premium", Some(150.0))),
+                Some(make_spec(2, "Premium", Some(150.0))),
             ),
         );
         assert!(r.success);
@@ -8432,7 +8432,7 @@ mod tests {
     #[test]
     fn test_combo_multiple_rules_selective_skip() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-35");
+        let order_id = open_table(&manager, 35);
 
         // 两个规则: 10% 折扣 + 5% 附加费
         manager.cache_rules(&order_id, vec![
@@ -8440,7 +8440,7 @@ mod tests {
             make_surcharge_rule(5, 5.0),
         ]);
 
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Steak", 100.0, 1)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Steak", 100.0, 1)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8489,14 +8489,14 @@ mod tests {
     #[test]
     fn test_combo_item_rule_plus_order_discount_surcharge() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-36");
+        let order_id = open_table(&manager, 36);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 两个商品
         let r = add_items(&manager, &order_id, vec![
-            simple_item("product:p1", "A", 100.0, 1), // rule: 90
-            simple_item("product:p2", "B", 50.0, 2),  // rule: 45 × 2 = 90
+            simple_item(1, "A", 100.0, 1), // rule: 90
+            simple_item(2, "B", 50.0, 2),  // rule: 45 × 2 = 90
         ]);
         assert!(r.success);
 
@@ -8545,17 +8545,17 @@ mod tests {
     #[test]
     fn test_combo_options_modifier_change() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-37");
+        let order_id = open_table(&manager, 37);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 商品 80€, 选项 +10€ (Extra Cheese) + -3€ (No Sauce)
         let r = add_items(&manager, &order_id, vec![
             item_with_options(
-                "product:p1", "Burger", 80.0, 1,
+                1, "Burger", 80.0, 1,
                 vec![
-                    make_option("attr:topping", "Topping", 0, "Extra Cheese", 10.0),
-                    make_option("attr:sauce", "Sauce", 1, "No Sauce", -3.0),
+                    make_option(2, "Topping", 0, "Extra Cheese", 10.0),
+                    make_option(3, "Sauce", 1, "No Sauce", -3.0),
                 ],
             ),
         ]);
@@ -8573,7 +8573,7 @@ mod tests {
             &manager, &order_id, &iid,
             combo_changes(
                 None, None, None,
-                Some(vec![make_option("attr:topping", "Topping", 2, "Extra Meat", 15.0)]),
+                Some(vec![make_option(2, "Topping", 2, "Extra Meat", 15.0)]),
                 None,
             ),
         );
@@ -8600,7 +8600,7 @@ mod tests {
     #[test]
     fn test_combo_fixed_and_percent_rules_stacking() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-38");
+        let order_id = open_table(&manager, 38);
 
         // 固定 5€ 折扣 + 15% 附加费
         manager.cache_rules(&order_id, vec![
@@ -8608,7 +8608,7 @@ mod tests {
             make_surcharge_rule(15, 15.0),
         ]);
 
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Salmon", 60.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Salmon", 60.0, 2)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8647,20 +8647,20 @@ mod tests {
     #[test]
     fn test_combo_kitchen_sink() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-39");
+        let order_id = open_table(&manager, 39);
 
         // 10% 折扣规则
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 商品1: 100€, spec A (100€), option +5€, 手动折扣 20%, qty 2
         let r = add_items(&manager, &order_id, vec![CartItemInput {
-            product_id: "product:p1".to_string(),
+            product_id: 1,
             name: "Deluxe Plate".to_string(),
             price: 100.0,
             original_price: None,
             quantity: 2,
-            selected_options: Some(vec![make_option("attr:side", "Side", 0, "Truffle Fries", 5.0)]),
-            selected_specification: Some(make_spec("spec:a", "Regular", Some(100.0))),
+            selected_options: Some(vec![make_option(4, "Side", 0, "Truffle Fries", 5.0)]),
+            selected_specification: Some(make_spec(1, "Regular", Some(100.0))),
             manual_discount_percent: Some(20.0),
             note: None,
             authorizer_id: None,
@@ -8678,7 +8678,7 @@ mod tests {
         assert_close(s.subtotal, 151.2, "subtotal = 75.6 × 2");
 
         // 加第二个商品: 简单 30€ × 3
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p2", "Bread", 30.0, 3)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(2, "Bread", 30.0, 3)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8716,12 +8716,12 @@ mod tests {
     #[test]
     fn test_combo_rule_partial_pay_skip_pay_remaining() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-40");
+        let order_id = open_table(&manager, 40);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 100€ × 2 → subtotal = 180 (after 10% discount)
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "A", 100.0, 2)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8760,16 +8760,16 @@ mod tests {
     #[test]
     fn test_combo_option_quantity_with_rule() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-41");
+        let order_id = open_table(&manager, 41);
 
         manager.cache_rules(&order_id, vec![make_surcharge_rule(10, 10.0)]);
 
         // 商品 20€, 选项 +2€ × qty 3 (e.g., 3 eggs)
         let r = add_items(&manager, &order_id, vec![
             item_with_options(
-                "product:p1", "Ramen", 20.0, 1,
+                1, "Ramen", 20.0, 1,
                 vec![shared::order::ItemOption {
-                    attribute_id: "attr:egg".to_string(),
+                    attribute_id: 7,
                     attribute_name: "Eggs".to_string(),
                     option_idx: 0,
                     option_name: "Extra Egg".to_string(),
@@ -8800,19 +8800,19 @@ mod tests {
     #[test]
     fn test_combo_modify_everything_at_once() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-42");
+        let order_id = open_table(&manager, 42);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(5, 5.0)]);
 
         // 初始: 50€, spec A, option +3€
         let r = add_items(&manager, &order_id, vec![CartItemInput {
-            product_id: "product:p1".to_string(),
+            product_id: 1,
             name: "Salad".to_string(),
             price: 50.0,
             original_price: None,
             quantity: 1,
-            selected_options: Some(vec![make_option("attr:dressing", "Dressing", 0, "Vinaigrette", 3.0)]),
-            selected_specification: Some(make_spec("spec:a", "Small", Some(50.0))),
+            selected_options: Some(vec![make_option(5, "Dressing", 0, "Vinaigrette", 3.0)]),
+            selected_specification: Some(make_spec(1, "Small", Some(50.0))),
             manual_discount_percent: None,
             note: None,
             authorizer_id: None,
@@ -8833,8 +8833,8 @@ mod tests {
                 Some(60.0),
                 None,
                 Some(10.0),
-                Some(vec![make_option("attr:dressing", "Dressing", 1, "Caesar", 8.0)]),
-                Some(make_spec("spec:b", "Large", Some(60.0))),
+                Some(vec![make_option(5, "Dressing", 1, "Caesar", 8.0)]),
+                Some(make_spec(2, "Large", Some(60.0))),
             ),
         );
         assert!(r.success);
@@ -8862,14 +8862,14 @@ mod tests {
     #[test]
     fn test_combo_split_by_items_with_rule() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-43");
+        let order_id = open_table(&manager, 43);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // A: 100€ × 2 → 90×2=180, B: 50€ × 3 → 45×3=135
         let r = add_items(&manager, &order_id, vec![
-            simple_item("product:p1", "A", 100.0, 2),
-            simple_item("product:p2", "B", 50.0, 3),
+            simple_item(1, "A", 100.0, 2),
+            simple_item(2, "B", 50.0, 3),
         ]);
         assert!(r.success);
 
@@ -8910,12 +8910,12 @@ mod tests {
     #[test]
     fn test_combo_rule_comp_uncomp() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-44");
+        let order_id = open_table(&manager, 44);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 100€ × 2 → 90×2=180
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "A", 100.0, 2)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -8924,14 +8924,14 @@ mod tests {
 
         // Comp 1 个（不是全部）
         let comp_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompItem {
                 order_id: order_id.clone(),
                 instance_id: iid.clone(),
                 quantity: 1,
                 reason: "test comp".to_string(),
-                authorizer_id: "user-1".to_string(),
+                authorizer_id: 1,
                 authorizer_name: "Test".to_string(),
             },
         );
@@ -8968,7 +8968,7 @@ mod tests {
     #[test]
     fn test_combo_negative_option_with_fixed_discount() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-combo-45");
+        let order_id = open_table(&manager, 45);
 
         // 固定 3€ 折扣
         manager.cache_rules(&order_id, vec![make_fixed_discount_rule(30, 3.0)]);
@@ -8976,8 +8976,8 @@ mod tests {
         // 30€, 选项 -5€ (No Premium Ingredient), qty 2
         let r = add_items(&manager, &order_id, vec![
             item_with_options(
-                "product:p1", "Soup", 30.0, 2,
-                vec![make_option("attr:ingredient", "Ingredient", 0, "No Truffle", -5.0)],
+                1, "Soup", 30.0, 2,
+                vec![make_option(6, "Ingredient", 0, "No Truffle", -5.0)],
             ),
         ]);
         assert!(r.success);
@@ -9010,14 +9010,14 @@ mod tests {
         quantity: i32,
     ) -> CommandResponse {
         let cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::CompItem {
                 order_id: order_id.to_string(),
                 instance_id: instance_id.to_string(),
                 quantity,
                 reason: "test comp".to_string(),
-                authorizer_id: "user-1".to_string(),
+                authorizer_id: 1,
                 authorizer_name: "Test".to_string(),
             },
         );
@@ -9029,13 +9029,13 @@ mod tests {
     #[test]
     fn test_full_comp_uncomp_preserves_applied_rules() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-46");
+        let order_id = open_table(&manager, 46);
 
         // 10% 折扣规则
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 100€ × 1 → 规则后 90€
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 1)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "A", 100.0, 1)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9069,12 +9069,12 @@ mod tests {
     #[test]
     fn test_partial_comp_uncomp_merge_preserves_rules() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-47");
+        let order_id = open_table(&manager, 47);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(20, 20.0)]);
 
         // 50€ × 3 → 40×3=120
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 50.0, 3)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "A", 50.0, 3)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9115,12 +9115,12 @@ mod tests {
     #[test]
     fn test_rule_skip_comp_toggle_uncomp_rules_preserved() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-48");
+        let order_id = open_table(&manager, 48);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(15, 15.0)]);
 
         // 200€ × 1 → 170
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 200.0, 1)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "A", 200.0, 1)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9166,8 +9166,8 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-bug-49",
-            vec![simple_item("product:p1", "A", 100.0, 1)],
+            49,
+            vec![simple_item(1, "A", 100.0, 1)],
         );
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9210,10 +9210,10 @@ mod tests {
         let manager = create_test_manager();
         let order_id = open_table_with_items(
             &manager,
-            "T-bug-50",
+            50,
             vec![
-                simple_item("product:p1", "A", 50.0, 2), // 100
-                simple_item("product:p2", "B", 30.0, 1), // 30 → total=130
+                simple_item(1, "A", 50.0, 2), // 100
+                simple_item(2, "B", 30.0, 1), // 30 → total=130
             ],
         );
 
@@ -9254,12 +9254,12 @@ mod tests {
     #[test]
     fn test_rule_partial_pay_partial_comp_toggle() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-51");
+        let order_id = open_table(&manager, 51);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 100€ × 4 → 90×4=360
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 4)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "A", 100.0, 4)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9307,14 +9307,14 @@ mod tests {
     #[test]
     fn test_two_items_rule_comp_order_discount() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-52");
+        let order_id = open_table(&manager, 52);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // A: 100€×2=200→180, B: 50€×1=50→45 → total=225
         let r = add_items(&manager, &order_id, vec![
-            simple_item("product:p1", "A", 100.0, 2),
-            simple_item("product:p2", "B", 50.0, 1),
+            simple_item(1, "A", 100.0, 2),
+            simple_item(2, "B", 50.0, 1),
         ]);
         assert!(r.success);
 
@@ -9349,15 +9349,15 @@ mod tests {
     #[test]
     fn test_options_rule_comp_uncomp_modify_options() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-53");
+        let order_id = open_table(&manager, 53);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 80€ + 选项(+10€) = 90 → 规则后 81
         let r = add_items(&manager, &order_id, vec![
             item_with_options(
-                "product:p1", "Steak", 80.0, 1,
-                vec![make_option("attr:side", "Side", 0, "Premium Fries", 10.0)],
+                1, "Steak", 80.0, 1,
+                vec![make_option(4, "Side", 0, "Premium Fries", 10.0)],
             ),
         ]);
         assert!(r.success);
@@ -9386,12 +9386,12 @@ mod tests {
     #[test]
     fn test_rule_split_pay_cancel_toggle() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-54");
+        let order_id = open_table(&manager, 54);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 100€ × 3 → 90*3=270
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 3)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "A", 100.0, 3)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9452,14 +9452,14 @@ mod tests {
     #[test]
     fn test_multi_items_rule_selective_comp_split_pay() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-55");
+        let order_id = open_table(&manager, 55);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // A: 80€×2 → 72×2=144, B: 40€×1 → 36
         let r = add_items(&manager, &order_id, vec![
-            simple_item("product:p1", "A", 80.0, 2),
-            simple_item("product:p2", "B", 40.0, 1),
+            simple_item(1, "A", 80.0, 2),
+            simple_item(2, "B", 40.0, 1),
         ]);
         assert!(r.success);
 
@@ -9506,12 +9506,12 @@ mod tests {
     #[test]
     fn test_modify_qty_rule_partial_comp_modify_price() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-56");
+        let order_id = open_table(&manager, 56);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 60€ × 2 → 54×2=108
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 60.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "A", 60.0, 2)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9553,12 +9553,12 @@ mod tests {
     #[test]
     fn test_rule_surcharge_comp_cancel_surcharge() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-57");
+        let order_id = open_table(&manager, 57);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 100€ × 2 → 90×2=180
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "A", 100.0, 2)]);
         assert!(r.success);
 
         // 10% 整单附加费 → subtotal=180, surcharge=18, total=198
@@ -9579,7 +9579,7 @@ mod tests {
 
         // 取消附加费
         let clear_surcharge_cmd = OrderCommand::new(
-            "op-1".to_string(),
+            1,
             "Test Operator".to_string(),
             OrderCommandPayload::ApplyOrderSurcharge {
                 order_id: order_id.clone(),
@@ -9611,7 +9611,7 @@ mod tests {
     #[test]
     fn test_fixed_percent_rules_comp_uncomp_skip_cross() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-58");
+        let order_id = open_table(&manager, 58);
 
         // 百分比折扣 10% + 固定折扣 5€
         manager.cache_rules(&order_id, vec![
@@ -9621,7 +9621,7 @@ mod tests {
 
         // 100€ × 2
         // base=100, percent disc=10 → 90, fixed disc=5 → 85 per unit
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "A", 100.0, 2)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9654,12 +9654,12 @@ mod tests {
     #[test]
     fn test_add_items_twice_rule_comp_first_batch() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-59");
+        let order_id = open_table(&manager, 59);
 
         manager.cache_rules(&order_id, vec![make_discount_rule(10, 10.0)]);
 
         // 第一批: A 100€ × 1 → 90
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 1)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "A", 100.0, 1)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9667,7 +9667,7 @@ mod tests {
         assert_close(s.total, 90.0, "A=90");
 
         // 第二批: B 50€ × 2 → 45×2=90
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p2", "B", 50.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(2, "B", 50.0, 2)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9699,7 +9699,7 @@ mod tests {
     #[test]
     fn test_kitchen_sink_all_interactions() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-bug-60");
+        let order_id = open_table(&manager, 60);
 
         // 15% 折扣规则
         manager.cache_rules(&order_id, vec![make_discount_rule(15, 15.0)]);
@@ -9709,10 +9709,10 @@ mod tests {
         // total = 374+68 = 442
         let r = add_items(&manager, &order_id, vec![
             item_with_options(
-                "product:p1", "A", 200.0, 2,
-                vec![make_option("attr:add", "Add-on", 0, "Truffle", 20.0)],
+                1, "A", 200.0, 2,
+                vec![make_option(7, "Add-on", 0, "Truffle", 20.0)],
             ),
-            simple_item("product:p2", "B", 80.0, 1),
+            simple_item(2, "B", 80.0, 1),
         ]);
         assert!(r.success);
 
@@ -9832,13 +9832,13 @@ mod tests {
     #[test]
     fn test_add_items_filters_rule_valid_from_future() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-time-1");
+        let order_id = open_table(&manager, 201);
 
         let future = shared::util::now_millis() + 3_600_000; // 1 小时后
         let rule = make_timed_discount_rule(1, 10.0, Some(future), None, None, None, None);
         manager.cache_rules(&order_id, vec![rule]);
 
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Steak", 100.0, 1)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Steak", 100.0, 1)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9850,13 +9850,13 @@ mod tests {
     #[test]
     fn test_add_items_filters_rule_valid_until_expired() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-time-2");
+        let order_id = open_table(&manager, 202);
 
         let past = shared::util::now_millis() - 3_600_000; // 1 小时前
         let rule = make_timed_discount_rule(2, 10.0, None, Some(past), None, None, None);
         manager.cache_rules(&order_id, vec![rule]);
 
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Wine", 50.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Wine", 50.0, 2)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9868,7 +9868,7 @@ mod tests {
     #[test]
     fn test_add_items_applies_rule_within_valid_range() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-time-3");
+        let order_id = open_table(&manager, 203);
 
         let now = shared::util::now_millis();
         let rule = make_timed_discount_rule(
@@ -9882,7 +9882,7 @@ mod tests {
         );
         manager.cache_rules(&order_id, vec![rule]);
 
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Pasta", 100.0, 1)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Pasta", 100.0, 1)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9894,7 +9894,7 @@ mod tests {
     #[test]
     fn test_add_items_filters_rule_wrong_day() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-time-4");
+        let order_id = open_table(&manager, 204);
 
         // 获取当前是星期几 (0=Sun, 1=Mon, ..., 6=Sat)
         let now_local = chrono::Utc::now().with_timezone(&chrono_tz::Europe::Madrid);
@@ -9905,7 +9905,7 @@ mod tests {
         let rule = make_timed_discount_rule(3, 10.0, None, None, Some(vec![wrong_day]), None, None);
         manager.cache_rules(&order_id, vec![rule]);
 
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Salad", 40.0, 1)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Salad", 40.0, 1)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9917,7 +9917,7 @@ mod tests {
     #[test]
     fn test_add_items_applies_rule_matching_day() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-time-5");
+        let order_id = open_table(&manager, 205);
 
         let now_local = chrono::Utc::now().with_timezone(&chrono_tz::Europe::Madrid);
         let today = now_local.format("%u").to_string().parse::<u8>().unwrap() % 7;
@@ -9925,7 +9925,7 @@ mod tests {
         let rule = make_timed_discount_rule(4, 20.0, None, None, Some(vec![today]), None, None);
         manager.cache_rules(&order_id, vec![rule]);
 
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Pizza", 50.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Pizza", 50.0, 2)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9937,7 +9937,7 @@ mod tests {
     #[test]
     fn test_add_items_filters_rule_outside_time_window() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-time-6");
+        let order_id = open_table(&manager, 206);
 
         // 构造一个绝对不在当前时间的窗口: 凌晨 03:00-04:00（除非真的在这个时间运行测试）
         // 使用更安全的方法：当前时间 +3h 到 +4h
@@ -9949,7 +9949,7 @@ mod tests {
         let rule = make_timed_discount_rule(5, 15.0, None, None, None, Some(&start), Some(&end));
         manager.cache_rules(&order_id, vec![rule]);
 
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Soup", 20.0, 3)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Soup", 20.0, 3)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9961,7 +9961,7 @@ mod tests {
     #[test]
     fn test_add_items_mixed_expired_and_active_rules() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-time-7");
+        let order_id = open_table(&manager, 207);
 
         let now = shared::util::now_millis();
         let expired_rule = make_timed_discount_rule(
@@ -9984,7 +9984,7 @@ mod tests {
         );
         manager.cache_rules(&order_id, vec![expired_rule, active_rule]);
 
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Fish", 200.0, 1)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Fish", 200.0, 1)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -9996,13 +9996,13 @@ mod tests {
     #[test]
     fn test_add_items_no_time_constraint_always_applies() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-time-8");
+        let order_id = open_table(&manager, 208);
 
         // 没有任何时间限制
         let rule = make_timed_discount_rule(6, 10.0, None, None, None, None, None);
         manager.cache_rules(&order_id, vec![rule]);
 
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Bread", 10.0, 5)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Bread", 10.0, 5)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -10014,7 +10014,7 @@ mod tests {
     #[test]
     fn test_add_items_valid_from_ok_but_wrong_day() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-time-9");
+        let order_id = open_table(&manager, 209);
 
         let now = shared::util::now_millis();
         let now_local = chrono::Utc::now().with_timezone(&chrono_tz::Europe::Madrid);
@@ -10032,7 +10032,7 @@ mod tests {
         );
         manager.cache_rules(&order_id, vec![rule]);
 
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "Cake", 30.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "Cake", 30.0, 2)]);
         assert!(r.success);
 
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
@@ -10044,7 +10044,7 @@ mod tests {
     #[test]
     fn test_add_items_second_batch_also_checks_time() {
         let manager = create_test_manager();
-        let order_id = open_table(&manager, "T-time-10");
+        let order_id = open_table(&manager, 210);
 
         let now = shared::util::now_millis();
         // 规则有效
@@ -10060,13 +10060,13 @@ mod tests {
         manager.cache_rules(&order_id, vec![rule]);
 
         // 第一批加菜
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p1", "A", 100.0, 1)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(1, "A", 100.0, 1)]);
         assert!(r.success);
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         assert_eq!(s.subtotal, 90.0); // 10% off
 
         // 第二批加菜（规则仍然有效）
-        let r = add_items(&manager, &order_id, vec![simple_item("product:p2", "B", 50.0, 2)]);
+        let r = add_items(&manager, &order_id, vec![simple_item(2, "B", 50.0, 2)]);
         assert!(r.success);
         let s = manager.get_snapshot(&order_id).unwrap().unwrap();
         // A: 90, B: 45×2=90 → 180

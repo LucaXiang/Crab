@@ -934,12 +934,12 @@ mod tests {
             order_id: order_id.to_string(),
             timestamp: shared::util::now_millis(),
             client_timestamp: None,
-            operator_id: "test_op".to_string(),
+            operator_id: 1,
             operator_name: "Test Operator".to_string(),
             command_id: uuid::Uuid::new_v4().to_string(),
             event_type: OrderEventType::TableOpened,
             payload: EventPayload::TableOpened {
-                table_id: Some("T1".to_string()),
+                table_id: Some(1),
                 table_name: Some("Table 1".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -954,7 +954,7 @@ mod tests {
     fn create_test_snapshot(order_id: &str) -> OrderSnapshot {
         let mut snapshot = OrderSnapshot {
             order_id: order_id.to_string(),
-            table_id: Some("T1".to_string()),
+            table_id: Some(1),
             table_name: Some("Table 1".to_string()),
             zone_id: None,
             zone_name: None,

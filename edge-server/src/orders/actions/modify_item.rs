@@ -342,7 +342,7 @@ mod tests {
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
             command_id: "cmd-1".to_string(),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
@@ -350,13 +350,13 @@ mod tests {
 
     fn create_test_item(
         instance_id: &str,
-        product_id: &str,
+        product_id: i64,
         name: &str,
         price: f64,
         quantity: i32,
     ) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: product_id.to_string(),
+            id: product_id,
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price,
@@ -394,7 +394,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create order with item
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 2);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 2);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -451,7 +451,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create order with item quantity=5
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 5);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 5);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -466,7 +466,7 @@ mod tests {
                 manual_discount_percent: Some(10.0),
                 ..Default::default()
             },
-            authorizer_id: Some("manager-1".to_string()),
+            authorizer_id: Some(1),
             authorizer_name: Some("Manager".to_string()),
         };
 
@@ -499,7 +499,7 @@ mod tests {
             assert_ne!(results[1].instance_id, "item-1"); // New instance_id
             assert_eq!(results[1].manual_discount_percent, Some(10.0));
 
-            assert_eq!(authorizer_id.as_deref(), Some("manager-1"));
+            assert_eq!(*authorizer_id, Some(1));
             assert_eq!(authorizer_name.as_deref(), Some("Manager"));
         } else {
             panic!("Expected ItemModified payload");
@@ -511,7 +511,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 100.0, 1);
+        let item = create_test_item("item-1", 1, "Test Product", 100.0, 1);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -553,7 +553,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -583,7 +583,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -613,7 +613,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Completed;
         snapshot.items.push(item);
@@ -645,7 +645,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Void;
         snapshot.items.push(item);
@@ -677,7 +677,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -707,7 +707,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -792,7 +792,7 @@ mod tests {
         assert_eq!(
             determine_operation(&ItemChanges {
                 selected_specification: Some(shared::order::SpecificationInfo {
-                    id: "spec-1".to_string(),
+                    id: 1,
                     name: "Large".to_string(),
 
                     receipt_name: None,
@@ -812,7 +812,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -820,7 +820,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let new_options = vec![shared::order::ItemOption {
-            attribute_id: "attribute:a1".to_string(),
+            attribute_id: 1,
             attribute_name: "Size".to_string(),
             option_idx: 1,
             option_name: "Large".to_string(),
@@ -864,7 +864,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -872,7 +872,7 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let new_spec = shared::order::SpecificationInfo {
-            id: "spec-1".to_string(),
+            id: 1,
             name: "Large".to_string(),
             receipt_name: Some("L".to_string()),
             price: Some(15.0),
@@ -919,7 +919,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 2);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 2);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -946,7 +946,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -977,7 +977,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Item has manual_discount_percent = None
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -1008,7 +1008,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let opts = vec![shared::order::ItemOption {
-            attribute_id: "attribute:a1".to_string(),
+            attribute_id: 1,
             attribute_name: "Size".to_string(),
             option_idx: 1,
             option_name: "Large".to_string(),
@@ -1016,7 +1016,7 @@ mod tests {
             quantity: 1,
         }];
 
-        let mut item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let mut item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         item.selected_options = Some(opts.clone());
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -1048,13 +1048,13 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         let spec = shared::order::SpecificationInfo {
-            id: "0".to_string(),
+            id: 0,
             name: "CCC".to_string(),
             receipt_name: None,
             price: Some(10.0),
         };
 
-        let mut item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let mut item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         item.selected_specification = Some(spec.clone());
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -1082,7 +1082,7 @@ mod tests {
 
     #[test]
     fn test_has_actual_changes_detects_real_changes() {
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 2);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 2);
 
         // Different price → true
         assert!(has_actual_changes(
@@ -1107,7 +1107,7 @@ mod tests {
             &item,
             &ItemChanges {
                 selected_options: Some(vec![shared::order::ItemOption {
-                    attribute_id: "a1".to_string(),
+                    attribute_id: 1,
                     attribute_name: "Size".to_string(),
                     option_idx: 1,
                     option_name: "Large".to_string(),
@@ -1123,7 +1123,7 @@ mod tests {
             &item,
             &ItemChanges {
                 selected_specification: Some(shared::order::SpecificationInfo {
-                    id: "0".to_string(),
+                    id: 0,
                     name: "Large".to_string(),
 
                     receipt_name: None,
@@ -1142,7 +1142,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut item = create_test_item("item-1", "product:p1", "Test Product", 5.0, 5);
+        let mut item = create_test_item("item-1", 1, "Test Product", 5.0, 5);
         item.unpaid_quantity = 3; // 5 total - 2 paid = 3 unpaid
         let mut snapshot = create_active_order_with_item("order-1", item);
         snapshot.paid_item_quantities.insert("item-1".to_string(), 2);
@@ -1192,7 +1192,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 10);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 10);
         let mut snapshot = create_active_order_with_item("order-1", item);
         snapshot.paid_item_quantities.insert("item-1".to_string(), 3);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -1208,7 +1208,7 @@ mod tests {
                 manual_discount_percent: Some(50.0),
                 ..Default::default()
             },
-            authorizer_id: Some("admin".to_string()),
+            authorizer_id: Some(2),
             authorizer_name: Some("Admin".to_string()),
         };
 
@@ -1235,7 +1235,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 5);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 5);
         let mut snapshot = create_active_order_with_item("order-1", item);
         snapshot.paid_item_quantities.insert("item-1".to_string(), 2);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -1277,7 +1277,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 5);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 5);
         let snapshot = create_active_order_with_item("order-1", item);
         // No paid_item_quantities
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -1293,7 +1293,7 @@ mod tests {
                 manual_discount_percent: Some(50.0),
                 ..Default::default()
             },
-            authorizer_id: Some("admin".to_string()),
+            authorizer_id: Some(2),
             authorizer_name: Some("Admin".to_string()),
         };
 
@@ -1319,7 +1319,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut item = create_test_item("item-1", "product:p1", "Comp Beer", 5.0, 1);
+        let mut item = create_test_item("item-1", 1, "Comp Beer", 5.0, 1);
         item.is_comped = true;
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();

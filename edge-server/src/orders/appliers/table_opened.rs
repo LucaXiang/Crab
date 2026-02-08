@@ -54,15 +54,15 @@ mod tests {
         let event = OrderEvent::new(
             1,
             "order-1".to_string(),
-            "user-1".to_string(),
+            1,
             "Test User".to_string(),
             "cmd-1".to_string(),
             Some(1234567890),
             shared::order::OrderEventType::TableOpened,
             EventPayload::TableOpened {
-                table_id: Some("T1".to_string()),
+                table_id: Some(1),
                 table_name: Some("Table 1".to_string()),
-                zone_id: Some("Z1".to_string()),
+                zone_id: Some(1),
                 zone_name: Some("Zone 1".to_string()),
                 guest_count: 4,
                 is_retail: false,
@@ -74,7 +74,7 @@ mod tests {
         let applier = TableOpenedApplier;
         applier.apply(&mut snapshot, &event);
 
-        assert_eq!(snapshot.table_id, Some("T1".to_string()));
+        assert_eq!(snapshot.table_id, Some(1));
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
         assert_eq!(snapshot.guest_count, 4);
         assert_eq!(snapshot.status, OrderStatus::Active);

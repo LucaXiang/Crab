@@ -136,7 +136,7 @@ mod tests {
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
             command_id: "cmd-1".to_string(),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
@@ -144,13 +144,13 @@ mod tests {
 
     fn create_test_item(
         instance_id: &str,
-        product_id: &str,
+        product_id: i64,
         name: &str,
         price: f64,
         quantity: i32,
     ) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: product_id.to_string(),
+            id: product_id,
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price,
@@ -188,7 +188,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create order with item
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 2);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 2);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -235,7 +235,7 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create order with item quantity=5
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 5);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 5);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -247,7 +247,7 @@ mod tests {
             instance_id: "item-1".to_string(),
             quantity: Some(2), // Partial: only remove 2 of 5
             reason: None,
-            authorizer_id: Some("manager-1".to_string()),
+            authorizer_id: Some(1),
             authorizer_name: Some("Manager".to_string()),
         };
 
@@ -265,7 +265,7 @@ mod tests {
         {
             assert_eq!(instance_id, "item-1");
             assert_eq!(*quantity, Some(2));
-            assert_eq!(authorizer_id.as_deref(), Some("manager-1"));
+            assert_eq!(*authorizer_id, Some(1));
             assert_eq!(authorizer_name.as_deref(), Some("Manager"));
         } else {
             panic!("Expected ItemRemoved payload");
@@ -277,7 +277,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -304,7 +304,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -331,7 +331,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -358,7 +358,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -385,7 +385,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Completed;
         snapshot.items.push(item);
@@ -414,7 +414,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 1);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 1);
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Void;
         snapshot.items.push(item);
@@ -466,7 +466,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Expensive Wine", 150.0, 1);
+        let item = create_test_item("item-1", 1, "Expensive Wine", 150.0, 1);
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
 
@@ -478,7 +478,7 @@ mod tests {
             instance_id: "item-1".to_string(),
             quantity: None,
             reason: Some("Wrong order".to_string()),
-            authorizer_id: Some("manager-1".to_string()),
+            authorizer_id: Some(1),
             authorizer_name: Some("Floor Manager".to_string()),
         };
 
@@ -498,7 +498,7 @@ mod tests {
             assert_eq!(item_name, "Expensive Wine");
             assert_eq!(*quantity, None);
             assert_eq!(reason.as_deref(), Some("Wrong order"));
-            assert_eq!(authorizer_id.as_deref(), Some("manager-1"));
+            assert_eq!(*authorizer_id, Some(1));
             assert_eq!(authorizer_name.as_deref(), Some("Floor Manager"));
         } else {
             panic!("Expected ItemRemoved payload");
@@ -512,7 +512,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut item = create_test_item("item-1", "product:p1", "Comp Dessert", 8.0, 1);
+        let mut item = create_test_item("item-1", 1, "Comp Dessert", 8.0, 1);
         item.is_comped = true;
         let snapshot = create_active_order_with_item("order-1", item);
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -545,7 +545,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 6);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 6);
         let mut snapshot = create_active_order_with_item("order-1", item);
         snapshot.paid_item_quantities.insert("item-1".to_string(), 2); // 2 paid, 4 unpaid
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -579,7 +579,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
         let mut snapshot = create_active_order_with_item("order-1", item);
         snapshot.paid_item_quantities.insert("item-1".to_string(), 3); // fully paid
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -607,7 +607,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 6);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 6);
         let mut snapshot = create_active_order_with_item("order-1", item);
         snapshot.paid_item_quantities.insert("item-1".to_string(), 4); // 4 paid, 2 unpaid
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -635,7 +635,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 6);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 6);
         let mut snapshot = create_active_order_with_item("order-1", item);
         snapshot.paid_item_quantities.insert("item-1".to_string(), 4); // 4 paid, 2 unpaid
         storage.store_snapshot(&txn, &snapshot).unwrap();
@@ -667,7 +667,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let item = create_test_item("item-1", "product:p1", "Test Product", 10.0, 3);
+        let item = create_test_item("item-1", 1, "Test Product", 10.0, 3);
         let snapshot = create_active_order_with_item("order-1", item);
         // No paid_item_quantities entry
         storage.store_snapshot(&txn, &snapshot).unwrap();

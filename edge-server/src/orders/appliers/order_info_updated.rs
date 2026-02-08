@@ -67,7 +67,7 @@ mod tests {
         OrderEvent::new(
             seq,
             order_id.to_string(),
-            "user-1".to_string(),
+            1,
             "Test User".to_string(),
             "cmd-1".to_string(),
             Some(1234567890),
@@ -331,7 +331,7 @@ mod tests {
         let event = OrderEvent::new(
             2,
             "order-1".to_string(),
-            "user-1".to_string(),
+            1,
             "Test User".to_string(),
             "cmd-1".to_string(),
             Some(1234567890),

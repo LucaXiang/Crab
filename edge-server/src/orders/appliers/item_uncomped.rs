@@ -70,14 +70,14 @@ mod tests {
 
     fn create_test_item(
         instance_id: &str,
-        product_id: &str,
+        product_id: i64,
         name: &str,
         price: f64,
         quantity: i32,
         is_comped: bool,
     ) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: product_id.to_string(),
+            id: product_id,
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price,
@@ -115,7 +115,7 @@ mod tests {
             quantity: 2,
             original_price,
             reason: "VIP".to_string(),
-            authorizer_id: "manager-1".to_string(),
+            authorizer_id: 100,
             authorizer_name: "Manager".to_string(),
             timestamp: 1234567890,
         }
@@ -131,7 +131,7 @@ mod tests {
         OrderEvent::new(
             seq,
             order_id.to_string(),
-            "user-1".to_string(),
+            1,
             "Test User".to_string(),
             "cmd-1".to_string(),
             Some(1234567890),
@@ -141,7 +141,7 @@ mod tests {
                 item_name: "Product A".to_string(),
                 restored_price,
                 merged_into,
-                authorizer_id: "manager-1".to_string(),
+                authorizer_id: 100,
                 authorizer_name: "Manager".to_string(),
             },
         )
@@ -151,9 +151,9 @@ mod tests {
     fn test_uncomp_merge_back() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         // Source item (3 remaining after split)
-        snapshot.items.push(create_test_item("item-1", "product:p1", "Product A", 10.0, 3, false));
+        snapshot.items.push(create_test_item("item-1", 1, "Product A", 10.0, 3, false));
         // Comped item (2 comped)
-        snapshot.items.push(create_test_item("item-1::comp::uuid-1", "product:p1", "Product A", 0.0, 2, true));
+        snapshot.items.push(create_test_item("item-1::comp::uuid-1", 1, "Product A", 0.0, 2, true));
         snapshot.comps.push(create_comp_record("item-1::comp::uuid-1", "item-1", 10.0));
 
         let event = create_item_uncomped_event(
@@ -179,7 +179,7 @@ mod tests {
     fn test_uncomp_no_merge_restore_price() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         // Full comped item (source == instance)
-        let mut item = create_test_item("item-1", "product:p1", "Product A", 0.0, 2, true);
+        let mut item = create_test_item("item-1", 1, "Product A", 0.0, 2, true);
         item.original_price = Some(10.0);
         snapshot.items.push(item);
         snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0));
@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn test_uncomp_updates_checksum() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        let mut item = create_test_item("item-1", "product:p1", "Product A", 0.0, 1, true);
+        let mut item = create_test_item("item-1", 1, "Product A", 0.0, 1, true);
         item.original_price = Some(10.0);
         snapshot.items.push(item);
         snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0));
@@ -223,7 +223,7 @@ mod tests {
     #[test]
     fn test_uncomp_updates_sequence() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
-        let mut item = create_test_item("item-1", "product:p1", "Product A", 0.0, 1, true);
+        let mut item = create_test_item("item-1", 1, "Product A", 0.0, 1, true);
         item.original_price = Some(10.0);
         snapshot.items.push(item);
         snapshot.comps.push(create_comp_record("item-1", "item-1", 10.0));

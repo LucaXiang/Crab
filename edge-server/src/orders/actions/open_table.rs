@@ -184,7 +184,7 @@ mod tests {
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
             command_id: "cmd-1".to_string(),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
@@ -199,9 +199,9 @@ mod tests {
         let mut ctx = CommandContext::new(&txn, &storage, current_seq);
 
         let action = OpenTableAction {
-            table_id: Some("T1".to_string()),
+            table_id: Some(1),
             table_name: Some("Table 1".to_string()),
-            zone_id: Some("Z1".to_string()),
+            zone_id: Some(1),
             zone_name: Some("Zone A".to_string()),
             guest_count: 4,
             is_retail: false,
@@ -224,7 +224,7 @@ mod tests {
         // Create an existing active order at table T1
         let mut existing = OrderSnapshot::new("existing-order".to_string());
         existing.status = OrderStatus::Active;
-        existing.table_id = Some("T1".to_string());
+        existing.table_id = Some(1);
         existing.table_name = Some("Table 1".to_string());
         storage.store_snapshot(&txn, &existing).unwrap();
         storage.mark_order_active(&txn, "existing-order").unwrap();
@@ -234,7 +234,7 @@ mod tests {
 
         // Try to open a new order at the same table
         let action = OpenTableAction {
-            table_id: Some("T1".to_string()),
+            table_id: Some(1),
             table_name: Some("Table 1".to_string()),
             zone_id: None,
             zone_name: None,

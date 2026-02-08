@@ -617,7 +617,7 @@ mod tests {
     #[test]
     fn test_calculate_item_total_no_discount() {
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 10.99,
@@ -648,7 +648,7 @@ mod tests {
     #[test]
     fn test_calculate_item_total_with_discount() {
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 100.0,
@@ -680,7 +680,7 @@ mod tests {
     fn test_calculate_item_total_33_percent_discount() {
         // Edge case: 33% discount on $100 should be $67.00
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 100.0,
@@ -741,7 +741,7 @@ mod tests {
         // 100 items at $0.01 each
         let items: Vec<CartItemSnapshot> = (0..100)
             .map(|i| CartItemSnapshot {
-                id: format!("p{}", i),
+                id: i as i64,
                 instance_id: format!("i{}", i),
                 name: "Penny Item".to_string(),
                 price: 0.01,
@@ -776,7 +776,7 @@ mod tests {
 
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 100.0,
@@ -813,7 +813,7 @@ mod tests {
 
         // Add another item - total changes, is_pre_payment should reset
         snapshot.items.push(CartItemSnapshot {
-            id: "p2".to_string(),
+            id: 2,
             instance_id: "i2".to_string(),
             name: "Item 2".to_string(),
             price: 50.0,
@@ -848,7 +848,7 @@ mod tests {
 
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 100.0,
@@ -938,7 +938,7 @@ mod tests {
     #[test]
     fn test_unit_price_negative_base_clamped_to_zero() {
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: -50.0,
@@ -970,7 +970,7 @@ mod tests {
     #[test]
     fn test_unit_price_discount_exceeding_100_percent() {
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 100.0,
@@ -1002,7 +1002,7 @@ mod tests {
     #[test]
     fn test_unit_price_nan_price_becomes_zero() {
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: f64::NAN,
@@ -1033,7 +1033,7 @@ mod tests {
     #[test]
     fn test_unit_price_infinity_price_becomes_zero() {
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: f64::INFINITY,
@@ -1064,7 +1064,7 @@ mod tests {
     #[test]
     fn test_unit_price_negative_discount_increases_price() {
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 100.0,
@@ -1100,7 +1100,7 @@ mod tests {
     #[test]
     fn test_calculate_item_total_negative_quantity() {
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 10.0,
@@ -1132,7 +1132,7 @@ mod tests {
     #[test]
     fn test_calculate_item_total_zero_quantity() {
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 10.0,
@@ -1164,7 +1164,7 @@ mod tests {
     fn test_calculate_item_total_large_quantity_times_price() {
         // 大数量 × 大价格，但在 Decimal 范围内
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 999999.99,
@@ -1205,7 +1205,7 @@ mod tests {
 
         // 正常商品
         snapshot.items.push(CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Normal".to_string(),
             price: 10.0,
@@ -1231,7 +1231,7 @@ mod tests {
 
         // 零价格商品
         snapshot.items.push(CartItemSnapshot {
-            id: "p2".to_string(),
+            id: 2,
             instance_id: "i2".to_string(),
             name: "Free".to_string(),
             price: 0.0,
@@ -1268,7 +1268,7 @@ mod tests {
 
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.items.push(CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 50.0,
@@ -1332,7 +1332,7 @@ mod tests {
         // Scenario: reducer sets original_price=Some(spec_price), price=item_final
         // money.rs should use original_price as base, add options, not double-count
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Pizza".to_string(),
             price: 16.50,                     // item_final from reducer (already includes options)
@@ -1341,7 +1341,7 @@ mod tests {
             unpaid_quantity: 1,
             selected_options: Some(vec![
                 shared::order::ItemOption {
-                    attribute_id: "attr:size".to_string(),
+                    attribute_id: 1,
                     attribute_name: "Size".to_string(),
                     option_idx: 2,
                     option_name: "Large".to_string(),
@@ -1349,7 +1349,7 @@ mod tests {
                     quantity: 1,
                 },
                 shared::order::ItemOption {
-                    attribute_id: "attr:topping".to_string(),
+                    attribute_id: 2,
                     attribute_name: "Topping".to_string(),
                     option_idx: 0,
                     option_name: "Extra Cheese".to_string(),
@@ -1386,7 +1386,7 @@ mod tests {
     fn test_rule_discount_plus_options_plus_manual_discount() {
         // Full combination: rule_discount + options + manual_discount
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 85.0,                      // item_final from reducer
@@ -1394,7 +1394,7 @@ mod tests {
             quantity: 2,
             unpaid_quantity: 2,
             selected_options: Some(vec![shared::order::ItemOption {
-                attribute_id: "attr:a1".to_string(),
+                attribute_id: 1,
                 attribute_name: "Extra".to_string(),
                 option_idx: 0,
                 option_name: "Cheese".to_string(),
@@ -1436,7 +1436,7 @@ mod tests {
         // Test that option price_modifier is multiplied by quantity
         // Scenario: +鸡蛋 ×3 with price_modifier=2.0 should add 6.0 to the price
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Noodles".to_string(),
             price: 16.0,                      // item_final from reducer
@@ -1445,7 +1445,7 @@ mod tests {
             unpaid_quantity: 1,
             selected_options: Some(vec![
                 shared::order::ItemOption {
-                    attribute_id: "attr:egg".to_string(),
+                    attribute_id: 1,
                     attribute_name: "加蛋".to_string(),
                     option_idx: 0,
                     option_name: "鸡蛋".to_string(),
@@ -1485,7 +1485,7 @@ mod tests {
     fn test_multiple_options_with_different_quantities() {
         // Test multiple options with different quantities
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Burger".to_string(),
             price: 17.0,
@@ -1494,7 +1494,7 @@ mod tests {
             unpaid_quantity: 2,
             selected_options: Some(vec![
                 shared::order::ItemOption {
-                    attribute_id: "attr:cheese".to_string(),
+                    attribute_id: 1,
                     attribute_name: "Cheese".to_string(),
                     option_idx: 0,
                     option_name: "Cheddar".to_string(),
@@ -1502,7 +1502,7 @@ mod tests {
                     quantity: 2,                // 2 slices
                 },
                 shared::order::ItemOption {
-                    attribute_id: "attr:bacon".to_string(),
+                    attribute_id: 2,
                     attribute_name: "Bacon".to_string(),
                     option_idx: 0,
                     option_name: "Crispy".to_string(),
@@ -1543,7 +1543,7 @@ mod tests {
     #[test]
     fn test_rule_discount_exceeding_price_clamps_to_zero() {
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: 5.0,
@@ -1743,7 +1743,7 @@ mod tests {
             manual_discount_percent: None,
             note: None,
             selected_options: Some(vec![shared::order::ItemOption {
-                attribute_id: "attr:1".to_string(),
+                attribute_id: 1,
                 attribute_name: "Size".to_string(),
                 option_idx: 0,
                 option_name: "Large".to_string(),
@@ -1763,7 +1763,7 @@ mod tests {
             manual_discount_percent: None,
             note: None,
             selected_options: Some(vec![shared::order::ItemOption {
-                attribute_id: "attr:1".to_string(),
+                attribute_id: 1,
                 attribute_name: "Size".to_string(),
                 option_idx: 0,
                 option_name: "Large".to_string(),
@@ -1913,7 +1913,7 @@ mod tests {
         legacy_surcharge: Option<f64>,
     ) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Item".to_string(),
             price: original_price,
@@ -2323,7 +2323,7 @@ mod tests {
             None,
         );
         item.selected_options = Some(vec![shared::order::ItemOption {
-            attribute_id: "attr:size".to_string(),
+            attribute_id: 1,
             attribute_name: "Size".to_string(),
             option_idx: 1,
             option_name: "Large".to_string(),
@@ -2610,7 +2610,7 @@ mod tests {
 
         // Item with options that have quantity > 1
         let item = CartItemSnapshot {
-            id: "p1".to_string(),
+            id: 1,
             instance_id: "i1".to_string(),
             name: "Noodles".to_string(),
             price: 16.0,                      // base 10 + options 6
@@ -2619,7 +2619,7 @@ mod tests {
             unpaid_quantity: 2,
             selected_options: Some(vec![
                 shared::order::ItemOption {
-                    attribute_id: "attr:egg".to_string(),
+                    attribute_id: 1,
                     attribute_name: "加蛋".to_string(),
                     option_idx: 0,
                     option_name: "鸡蛋".to_string(),

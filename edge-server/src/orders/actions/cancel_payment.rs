@@ -128,7 +128,7 @@ mod tests {
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
             command_id: "cmd-1".to_string(),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
@@ -174,7 +174,7 @@ mod tests {
             order_id: "order-1".to_string(),
             payment_id: "payment-1".to_string(),
             reason: Some("Customer changed mind".to_string()),
-            authorizer_id: Some("manager-1".to_string()),
+            authorizer_id: Some(1),
             authorizer_name: Some("Manager".to_string()),
         };
 
@@ -199,7 +199,7 @@ mod tests {
             assert_eq!(method, "CARD");
             assert_eq!(*amount, 50.0);
             assert_eq!(*reason, Some("Customer changed mind".to_string()));
-            assert_eq!(*authorizer_id, Some("manager-1".to_string()));
+            assert_eq!(*authorizer_id, Some(1));
             assert_eq!(*authorizer_name, Some("Manager".to_string()));
         } else {
             panic!("Expected PaymentCancelled payload");

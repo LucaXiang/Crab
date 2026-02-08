@@ -94,7 +94,7 @@ mod tests {
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
             command_id: "cmd-1".to_string(),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
@@ -436,7 +436,7 @@ mod tests {
 
         let metadata = CommandMetadata {
             command_id: "test-cmd-123".to_string(),
-            operator_id: "operator-456".to_string(),
+            operator_id: 456,
             operator_name: "John Doe".to_string(),
             timestamp: 9999999999,
         };
@@ -444,7 +444,7 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
         assert_eq!(events[0].command_id, "test-cmd-123");
-        assert_eq!(events[0].operator_id, "operator-456");
+        assert_eq!(events[0].operator_id, 456);
         assert_eq!(events[0].operator_name, "John Doe");
     }
 }

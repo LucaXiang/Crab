@@ -98,7 +98,7 @@ mod tests {
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
             command_id: "cmd-1".to_string(),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
@@ -124,7 +124,7 @@ mod tests {
 
     fn create_test_item_with_rule(rule_id: i64) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: "product:p1".to_string(),
+            id: 1,
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,
@@ -323,7 +323,7 @@ mod tests {
         let mut rule = create_test_applied_rule(1);
         rule.skipped = true;
         snapshot.items = vec![CartItemSnapshot {
-            id: "product:p1".to_string(),
+            id: 1,
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,
@@ -390,7 +390,7 @@ mod tests {
 
         let metadata = CommandMetadata {
             command_id: "cmd-toggle-1".to_string(),
-            operator_id: "manager-1".to_string(),
+            operator_id: 100,
             operator_name: "Manager".to_string(),
             timestamp: 9999999999,
         };
@@ -399,7 +399,7 @@ mod tests {
         let event = &events[0];
 
         assert_eq!(event.command_id, "cmd-toggle-1");
-        assert_eq!(event.operator_id, "manager-1");
+        assert_eq!(event.operator_id, 100);
         assert_eq!(event.operator_name, "Manager");
         assert_eq!(event.client_timestamp, Some(9999999999));
     }
@@ -415,7 +415,7 @@ mod tests {
         let mut rule = create_test_applied_rule(1);
         rule.skipped = true; // already skipped
         snapshot.items = vec![CartItemSnapshot {
-            id: "product:p1".to_string(),
+            id: 1,
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,
@@ -470,7 +470,7 @@ mod tests {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
         snapshot.items = vec![CartItemSnapshot {
-            id: "product:p1".to_string(),
+            id: 1,
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price: 10.0,

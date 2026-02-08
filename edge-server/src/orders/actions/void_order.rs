@@ -100,7 +100,7 @@ mod tests {
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
             command_id: "cmd-1".to_string(),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
@@ -299,7 +299,7 @@ mod tests {
 
         let metadata = CommandMetadata {
             command_id: "cmd-void-1".to_string(),
-            operator_id: "manager-1".to_string(),
+            operator_id: 2,
             operator_name: "Manager".to_string(),
             timestamp: 9999999999,
         };
@@ -309,7 +309,7 @@ mod tests {
 
         // Verify event metadata
         assert_eq!(event.command_id, "cmd-void-1");
-        assert_eq!(event.operator_id, "manager-1");
+        assert_eq!(event.operator_id, 2);
         assert_eq!(event.operator_name, "Manager");
         // Note: event.timestamp is server-generated (now), client_timestamp is from metadata
         assert_eq!(event.client_timestamp, Some(9999999999));

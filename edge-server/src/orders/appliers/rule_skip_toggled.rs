@@ -67,7 +67,7 @@ mod tests {
         calculated_amount: f64,
     ) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: "product:1".to_string(),
+            id: 1,
             instance_id: instance_id.to_string(),
             name: "Test Product".to_string(),
             price,
@@ -123,7 +123,7 @@ mod tests {
         OrderEvent::new(
             seq,
             order_id.to_string(),
-            "user-1".to_string(),
+            1,
             "Test User".to_string(),
             "cmd-1".to_string(),
             Some(1234567890),
@@ -201,7 +201,7 @@ mod tests {
 
         // Simple item without item-level rules
         snapshot.items.push(CartItemSnapshot {
-            id: "product:1".to_string(),
+            id: 1,
             instance_id: "inst-1".to_string(),
             name: "Test Product".to_string(),
             price: 100.0,
@@ -466,7 +466,7 @@ mod tests {
             1, shared::models::price_rule::RuleType::Discount, 10.0, 6.0,
         );
         item.selected_options = Some(vec![shared::order::ItemOption {
-            attribute_id: "attr:size".to_string(),
+            attribute_id: 1,
             attribute_name: "Size".to_string(),
             option_idx: 1,
             option_name: "Large".to_string(),
@@ -599,7 +599,7 @@ mod tests {
 
         // Item with two rules
         snapshot.items.push(CartItemSnapshot {
-            id: "product:1".to_string(),
+            id: 1,
             instance_id: "inst-1".to_string(),
             name: "Test Product".to_string(),
             price: 82.0,

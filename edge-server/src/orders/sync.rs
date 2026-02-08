@@ -254,12 +254,12 @@ mod tests {
         OrdersManager::with_storage(storage)
     }
 
-    fn create_open_table_cmd(operator_id: &str, table_id: &str) -> shared::order::OrderCommand {
+    fn create_open_table_cmd(operator_id: i64, table_id: i64) -> shared::order::OrderCommand {
         shared::order::OrderCommand::new(
-            operator_id.to_string(),
+            operator_id,
             "Test Operator".to_string(),
             OrderCommandPayload::OpenTable {
-                table_id: Some(table_id.to_string()),
+                table_id: Some(table_id),
                 table_name: Some(format!("Table {}", table_id)),
                 zone_id: None,
                 zone_name: None,
@@ -288,10 +288,10 @@ mod tests {
         let sync_service = SyncService::new(manager.clone());
 
         // Create some orders
-        let cmd1 = create_open_table_cmd("op-1", "T1");
+        let cmd1 = create_open_table_cmd(1, 1);
         manager.execute_command(cmd1);
 
-        let cmd2 = create_open_table_cmd("op-1", "T2");
+        let cmd2 = create_open_table_cmd(1, 2);
         manager.execute_command(cmd2);
 
         // Sync from beginning
@@ -316,7 +316,7 @@ mod tests {
         let sync_service = SyncService::new(manager.clone());
 
         // Create an order
-        let cmd = create_open_table_cmd("op-1", "T1");
+        let cmd = create_open_table_cmd(1, 1);
         manager.execute_command(cmd);
 
         // Sync with current sequence
@@ -334,7 +334,7 @@ mod tests {
         let sync_service = SyncService::new(manager.clone());
 
         // Create an order
-        let cmd = create_open_table_cmd("op-1", "T1");
+        let cmd = create_open_table_cmd(1, 1);
         let response = manager.execute_command(cmd);
         let order_id = response.order_id.unwrap();
 
@@ -360,7 +360,7 @@ mod tests {
             order_id: "o1".to_string(),
             timestamp: 0,
             client_timestamp: None,
-            operator_id: "op".to_string(),
+            operator_id: 1,
             operator_name: "Op".to_string(),
             command_id: "c1".to_string(),
             event_type: shared::order::OrderEventType::TableOpened,
@@ -387,7 +387,7 @@ mod tests {
             order_id: "o1".to_string(),
             timestamp: 0,
             client_timestamp: None,
-            operator_id: "op".to_string(),
+            operator_id: 1,
             operator_name: "Op".to_string(),
             command_id: "c3".to_string(),
             event_type: shared::order::OrderEventType::TableOpened,

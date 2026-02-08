@@ -118,12 +118,12 @@ mod tests {
             order_id: "order-123".to_string(),
             timestamp: 1705900000000,
             client_timestamp: None,
-            operator_id: "op-001".to_string(),
+            operator_id: 1,
             operator_name: "Test Operator".to_string(),
             command_id: "cmd-001".to_string(),
             event_type: OrderEventType::TableOpened,
             payload: EventPayload::TableOpened {
-                table_id: Some("t-001".to_string()),
+                table_id: Some(1),
                 table_name: Some("A1".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -137,7 +137,7 @@ mod tests {
         // Create a minimal OrderSnapshot
         let order_snapshot = OrderSnapshot {
             order_id: "order-123".to_string(),
-            table_id: Some("t-001".to_string()),
+            table_id: Some(1),
             table_name: Some("A1".to_string()),
             zone_id: None,
             zone_name: None,

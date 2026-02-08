@@ -499,7 +499,7 @@ mod tests {
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
             command_id: "cmd-1".to_string(),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
@@ -508,11 +508,11 @@ mod tests {
     fn create_active_order_with_items(order_id: &str) -> OrderSnapshot {
         let mut snapshot = OrderSnapshot::new(order_id.to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot.table_id = Some("dining_table:t1".to_string());
+        snapshot.table_id = Some(1);
         snapshot.table_name = Some("Table 1".to_string());
 
         let item1 = CartItemSnapshot {
-            id: "product:1".to_string(),
+            id: 1,
             instance_id: "item-1".to_string(),
             name: "Coffee".to_string(),
             price: 10.0,
@@ -536,7 +536,7 @@ mod tests {
             tax_rate: None,
         };
         let item2 = CartItemSnapshot {
-            id: "product:2".to_string(),
+            id: 2,
             instance_id: "item-2".to_string(),
             name: "Tea".to_string(),
             price: 8.0,

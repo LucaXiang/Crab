@@ -856,7 +856,7 @@ mod tests {
     fn create_test_snapshot() -> OrderSnapshot {
         OrderSnapshot {
             order_id: "test-order-1".to_string(),
-            table_id: Some("T1".to_string()),
+            table_id: Some(1),
             table_name: Some("Table 1".to_string()),
             zone_id: None,
             zone_name: None,
@@ -914,12 +914,12 @@ mod tests {
             order_id: order_id.to_string(),
             timestamp: 1704067200000,
             client_timestamp: None,
-            operator_id: "op-1".to_string(),
+            operator_id: 1,
             operator_name: "Test Operator".to_string(),
             command_id: format!("cmd-{}", sequence),
             event_type: OrderEventType::TableOpened,
             payload: shared::order::EventPayload::TableOpened {
-                table_id: Some("T1".to_string()),
+                table_id: Some(1),
                 table_name: Some("Table 1".to_string()),
                 zone_id: None,
                 zone_name: None,
@@ -970,7 +970,7 @@ mod tests {
 
         // Modify payload
         event2.payload = shared::order::EventPayload::TableOpened {
-            table_id: Some("T2".to_string()), // Different table
+            table_id: Some(2), // Different table
             table_name: Some("Table 2".to_string()),
             zone_id: None,
             zone_name: None,

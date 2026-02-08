@@ -77,7 +77,7 @@ mod tests {
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
             command_id: "cmd-1".to_string(),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
@@ -252,7 +252,7 @@ mod tests {
 
         let metadata = CommandMetadata {
             command_id: "test-cmd-123".to_string(),
-            operator_id: "operator-456".to_string(),
+            operator_id: 456,
             operator_name: "John Doe".to_string(),
             timestamp: 9999999999,
         };
@@ -261,7 +261,7 @@ mod tests {
 
         let event = &events[0];
         assert_eq!(event.command_id, "test-cmd-123");
-        assert_eq!(event.operator_id, "operator-456");
+        assert_eq!(event.operator_id, 456);
         assert_eq!(event.operator_name, "John Doe");
         assert_eq!(event.sequence, current_seq + 1);
         assert_eq!(event.event_type, OrderEventType::OrderNoteAdded);

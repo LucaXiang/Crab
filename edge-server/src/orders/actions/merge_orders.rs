@@ -169,23 +169,23 @@ mod tests {
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
             command_id: "cmd-1".to_string(),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
     }
 
-    fn create_active_order(order_id: &str, table_id: &str, table_name: &str) -> OrderSnapshot {
+    fn create_active_order(order_id: &str, table_id: i64, table_name: &str) -> OrderSnapshot {
         let mut snapshot = OrderSnapshot::new(order_id.to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot.table_id = Some(table_id.to_string());
+        snapshot.table_id = Some(table_id);
         snapshot.table_name = Some(table_name.to_string());
         snapshot
     }
 
     fn create_test_item(instance_id: &str, name: &str) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: "product:1".to_string(),
+            id: 1,
             instance_id: instance_id.to_string(),
             name: name.to_string(),
             price: 10.0,
@@ -216,8 +216,8 @@ mod tests {
         let txn = storage.begin_write().unwrap();
 
         // Create source and target orders
-        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
-        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        let source = create_active_order("source-1", 1, "Table 1");
+        let target = create_active_order("target-1", 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -245,7 +245,7 @@ mod tests {
             ..
         } = &events[0].payload
         {
-            assert_eq!(target_table_id, "dining_table:t2");
+            assert_eq!(*target_table_id, 2);
             assert_eq!(target_table_name, "Table 2");
         } else {
             panic!("Expected OrderMergedOut payload");
@@ -263,7 +263,7 @@ mod tests {
             ..
         } = &events[1].payload
         {
-            assert_eq!(source_table_id, "dining_table:t1");
+            assert_eq!(*source_table_id, 1);
             assert_eq!(source_table_name, "Table 1");
             assert!(items.is_empty());
             assert!(payments.is_empty());
@@ -278,11 +278,11 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        let mut source = create_active_order("source-1", 1, "Table 1");
         source.items.push(create_test_item("item-1", "Coffee"));
         source.items.push(create_test_item("item-2", "Tea"));
 
-        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        let target = create_active_order("target-1", 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -318,7 +318,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        let target = create_active_order("target-1", 2, "Table 2");
         storage.store_snapshot(&txn, &target).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -342,7 +342,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        let source = create_active_order("source-1", 1, "Table 1");
         storage.store_snapshot(&txn, &source).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -368,7 +368,7 @@ mod tests {
 
         let mut source = OrderSnapshot::new("source-1".to_string());
         source.status = OrderStatus::Completed;
-        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        let target = create_active_order("target-1", 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -395,7 +395,7 @@ mod tests {
 
         let mut source = OrderSnapshot::new("source-1".to_string());
         source.status = OrderStatus::Void;
-        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        let target = create_active_order("target-1", 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -422,7 +422,7 @@ mod tests {
 
         let mut source = OrderSnapshot::new("source-1".to_string());
         source.status = OrderStatus::Merged;
-        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        let target = create_active_order("target-1", 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -447,7 +447,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        let source = create_active_order("source-1", 1, "Table 1");
         let mut target = OrderSnapshot::new("target-1".to_string());
         target.status = OrderStatus::Completed;
         storage.store_snapshot(&txn, &source).unwrap();
@@ -474,7 +474,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        let source = create_active_order("source-1", 1, "Table 1");
         let mut target = OrderSnapshot::new("target-1".to_string());
         target.status = OrderStatus::Void;
         storage.store_snapshot(&txn, &source).unwrap();
@@ -501,7 +501,7 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let order = create_active_order("order-1", "dining_table:t1", "Table 1");
+        let order = create_active_order("order-1", 1, "Table 1");
         storage.store_snapshot(&txn, &order).unwrap();
 
         let current_seq = storage.get_next_sequence(&txn).unwrap();
@@ -525,8 +525,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
-        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        let source = create_active_order("source-1", 1, "Table 1");
+        let target = create_active_order("target-1", 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -553,8 +553,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
-        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        let source = create_active_order("source-1", 1, "Table 1");
+        let target = create_active_order("target-1", 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -570,7 +570,7 @@ mod tests {
 
         let metadata = CommandMetadata {
             command_id: "test-cmd-123".to_string(),
-            operator_id: "operator-456".to_string(),
+            operator_id: 456,
             operator_name: "John Doe".to_string(),
             timestamp: 9999999999,
         };
@@ -580,7 +580,7 @@ mod tests {
         // Both events should have same metadata
         for event in &events {
             assert_eq!(event.command_id, "test-cmd-123");
-            assert_eq!(event.operator_id, "operator-456");
+            assert_eq!(event.operator_id, 456);
             assert_eq!(event.operator_name, "John Doe");
         }
     }
@@ -621,7 +621,7 @@ mod tests {
             ..
         } = &events[0].payload
         {
-            assert_eq!(target_table_id, "");
+            assert_eq!(*target_table_id, 0);
             assert_eq!(target_table_name, "");
         } else {
             panic!("Expected OrderMergedOut payload");
@@ -635,7 +635,7 @@ mod tests {
             ..
         } = &events[1].payload
         {
-            assert_eq!(source_table_id, "");
+            assert_eq!(*source_table_id, 0);
             assert_eq!(source_table_name, "");
             assert!(payments.is_empty());
             assert_eq!(*paid_amount, 0.0);
@@ -649,9 +649,9 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        let mut source = create_active_order("source-1", 1, "Table 1");
         source.paid_amount = 5.0;
-        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        let target = create_active_order("target-1", 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -676,8 +676,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
-        let mut target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        let source = create_active_order("source-1", 1, "Table 1");
+        let mut target = create_active_order("target-1", 2, "Table 2");
         target.paid_amount = 15.0;
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
@@ -703,9 +703,9 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let mut source = create_active_order("source-1", "dining_table:t1", "Table 1");
+        let mut source = create_active_order("source-1", 1, "Table 1");
         source.aa_total_shares = Some(3);
-        let target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        let target = create_active_order("target-1", 2, "Table 2");
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();
 
@@ -731,8 +731,8 @@ mod tests {
         let storage = OrderStorage::open_in_memory().unwrap();
         let txn = storage.begin_write().unwrap();
 
-        let source = create_active_order("source-1", "dining_table:t1", "Table 1");
-        let mut target = create_active_order("target-1", "dining_table:t2", "Table 2");
+        let source = create_active_order("source-1", 1, "Table 1");
+        let mut target = create_active_order("target-1", 2, "Table 2");
         target.aa_total_shares = Some(2);
         storage.store_snapshot(&txn, &source).unwrap();
         storage.store_snapshot(&txn, &target).unwrap();

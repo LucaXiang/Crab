@@ -62,7 +62,7 @@ mod tests {
         OrderEvent::new(
             seq,
             order_id.to_string(),
-            "user-1".to_string(),
+            1,
             "Test User".to_string(),
             "cmd-1".to_string(),
             Some(1234567890),
@@ -197,7 +197,7 @@ mod tests {
     fn test_order_completed_preserves_existing_data() {
         let mut snapshot = OrderSnapshot::new("order-1".to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot.table_id = Some("dining_table:t1".to_string());
+        snapshot.table_id = Some(1);
         snapshot.table_name = Some("Table 1".to_string());
         snapshot.total = 150.0;
         snapshot.subtotal = 150.0;
@@ -209,7 +209,7 @@ mod tests {
         applier.apply(&mut snapshot, &event);
 
         // Existing data should be preserved
-        assert_eq!(snapshot.table_id, Some("dining_table:t1".to_string()));
+        assert_eq!(snapshot.table_id, Some(1));
         assert_eq!(snapshot.table_name, Some("Table 1".to_string()));
         assert_eq!(snapshot.total, 150.0);
         assert_eq!(snapshot.subtotal, 150.0);
@@ -288,7 +288,7 @@ mod tests {
         let event = OrderEvent::new(
             1,
             "order-1".to_string(),
-            "user-1".to_string(),
+            1,
             "Test User".to_string(),
             "cmd-1".to_string(),
             Some(1234567890),

@@ -107,7 +107,7 @@ mod tests {
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
             command_id: "cmd-1".to_string(),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
@@ -116,9 +116,9 @@ mod tests {
     fn create_active_order(order_id: &str) -> OrderSnapshot {
         let mut snapshot = OrderSnapshot::new(order_id.to_string());
         snapshot.status = OrderStatus::Active;
-        snapshot.table_id = Some("dining_table:t1".to_string());
+        snapshot.table_id = Some(1);
         snapshot.table_name = Some("Table 1".to_string());
-        snapshot.zone_id = Some("zone:z1".to_string());
+        snapshot.zone_id = Some(1);
         snapshot.zone_name = Some("Zone A".to_string());
         snapshot
     }
@@ -136,9 +136,9 @@ mod tests {
 
         let action = MoveOrderAction {
             order_id: "order-1".to_string(),
-            target_table_id: "dining_table:t2".to_string(),
+            target_table_id: 2,
             target_table_name: "Table 2".to_string(),
-            target_zone_id: Some("zone:z2".to_string()),
+            target_zone_id: Some(2),
             target_zone_name: Some("Zone B".to_string()),
             authorizer_id: None,
             authorizer_name: None,
@@ -163,12 +163,12 @@ mod tests {
             ..
         } = &event.payload
         {
-            assert_eq!(source_table_id, "dining_table:t1");
+            assert_eq!(*source_table_id, 1);
             assert_eq!(source_table_name, "Table 1");
-            assert_eq!(target_table_id, "dining_table:t2");
+            assert_eq!(*target_table_id, 2);
             assert_eq!(target_table_name, "Table 2");
-            assert_eq!(*target_zone_id, Some("zone:z2".to_string()));
-            assert_eq!(*target_zone_name, Some("Zone B".to_string()));
+            assert_eq!(*target_zone_id, Some(2));
+            assert_eq!(target_zone_name.as_deref(), Some("Zone B"));
             assert!(items.is_empty());
         } else {
             panic!("Expected OrderMoved payload");
@@ -182,7 +182,7 @@ mod tests {
 
         let mut snapshot = create_active_order("order-1");
         let item = CartItemSnapshot {
-            id: "product:1".to_string(),
+            id: 1,
             instance_id: "item-1".to_string(),
             name: "Coffee".to_string(),
             price: 10.0,
@@ -213,7 +213,7 @@ mod tests {
 
         let action = MoveOrderAction {
             order_id: "order-1".to_string(),
-            target_table_id: "dining_table:t3".to_string(),
+            target_table_id: 3,
             target_table_name: "Table 3".to_string(),
             target_zone_id: None,
             target_zone_name: None,
@@ -247,7 +247,7 @@ mod tests {
 
         let action = MoveOrderAction {
             order_id: "order-1".to_string(),
-            target_table_id: "dining_table:t2".to_string(),
+            target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
@@ -275,7 +275,7 @@ mod tests {
 
         let action = MoveOrderAction {
             order_id: "order-1".to_string(),
-            target_table_id: "dining_table:t2".to_string(),
+            target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
@@ -299,7 +299,7 @@ mod tests {
 
         let action = MoveOrderAction {
             order_id: "nonexistent".to_string(),
-            target_table_id: "dining_table:t2".to_string(),
+            target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
@@ -326,7 +326,7 @@ mod tests {
 
         let action = MoveOrderAction {
             order_id: "order-1".to_string(),
-            target_table_id: "dining_table:t2".to_string(),
+            target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
@@ -353,7 +353,7 @@ mod tests {
 
         let action = MoveOrderAction {
             order_id: "order-1".to_string(),
-            target_table_id: "dining_table:t2".to_string(),
+            target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
@@ -363,7 +363,7 @@ mod tests {
 
         let metadata = CommandMetadata {
             command_id: "test-cmd-123".to_string(),
-            operator_id: "operator-456".to_string(),
+            operator_id: 456,
             operator_name: "John Doe".to_string(),
             timestamp: 9999999999,
         };
@@ -371,7 +371,7 @@ mod tests {
         let events = action.execute(&mut ctx, &metadata).await.unwrap();
 
         assert_eq!(events[0].command_id, "test-cmd-123");
-        assert_eq!(events[0].operator_id, "operator-456");
+        assert_eq!(events[0].operator_id, 456);
         assert_eq!(events[0].operator_name, "John Doe");
     }
 
@@ -390,7 +390,7 @@ mod tests {
 
         let action = MoveOrderAction {
             order_id: "order-1".to_string(),
-            target_table_id: "dining_table:t2".to_string(),
+            target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
@@ -408,7 +408,7 @@ mod tests {
         } = &events[0].payload
         {
             // Default to empty string when source table info is None
-            assert_eq!(source_table_id, "");
+            assert_eq!(*source_table_id, 0);
             assert_eq!(source_table_name, "");
         } else {
             panic!("Expected OrderMoved payload");
@@ -423,7 +423,7 @@ mod tests {
         // Create order-1 at dining_table:t1
         let mut snapshot1 = OrderSnapshot::new("order-1".to_string());
         snapshot1.status = OrderStatus::Active;
-        snapshot1.table_id = Some("dining_table:t1".to_string());
+        snapshot1.table_id = Some(1);
         snapshot1.table_name = Some("Table 1".to_string());
         storage.store_snapshot(&txn, &snapshot1).unwrap();
         storage.mark_order_active(&txn, "order-1").unwrap();
@@ -431,7 +431,7 @@ mod tests {
         // Create order-2 at dining_table:t2
         let mut snapshot2 = OrderSnapshot::new("order-2".to_string());
         snapshot2.status = OrderStatus::Active;
-        snapshot2.table_id = Some("dining_table:t2".to_string());
+        snapshot2.table_id = Some(2);
         snapshot2.table_name = Some("Table 2".to_string());
         storage.store_snapshot(&txn, &snapshot2).unwrap();
         storage.mark_order_active(&txn, "order-2").unwrap();
@@ -442,7 +442,7 @@ mod tests {
         // Try to move order-1 to dining_table:t2 (which is occupied by order-2)
         let action = MoveOrderAction {
             order_id: "order-1".to_string(),
-            target_table_id: "dining_table:t2".to_string(),
+            target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,
@@ -464,7 +464,7 @@ mod tests {
         // Create order-1 at dining_table:t1
         let mut snapshot1 = OrderSnapshot::new("order-1".to_string());
         snapshot1.status = OrderStatus::Active;
-        snapshot1.table_id = Some("dining_table:t1".to_string());
+        snapshot1.table_id = Some(1);
         snapshot1.table_name = Some("Table 1".to_string());
         storage.store_snapshot(&txn, &snapshot1).unwrap();
         storage.mark_order_active(&txn, "order-1").unwrap();
@@ -475,7 +475,7 @@ mod tests {
         // Move order-1 to dining_table:t1 (same table - should succeed as a no-op)
         let action = MoveOrderAction {
             order_id: "order-1".to_string(),
-            target_table_id: "dining_table:t1".to_string(),
+            target_table_id: 1,
             target_table_name: "Table 1".to_string(),
             target_zone_id: None,
             target_zone_name: None,
@@ -503,7 +503,7 @@ mod tests {
 
         let action = MoveOrderAction {
             order_id: "order-1".to_string(),
-            target_table_id: "dining_table:t2".to_string(),
+            target_table_id: 2,
             target_table_name: "Table 2".to_string(),
             target_zone_id: None,
             target_zone_name: None,

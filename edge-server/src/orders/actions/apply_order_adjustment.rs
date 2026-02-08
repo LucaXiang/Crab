@@ -219,7 +219,7 @@ mod tests {
     fn create_test_metadata() -> CommandMetadata {
         CommandMetadata {
             command_id: "cmd-1".to_string(),
-            operator_id: "user-1".to_string(),
+            operator_id: 1,
             operator_name: "Test User".to_string(),
             timestamp: 1234567890,
         }
@@ -227,7 +227,7 @@ mod tests {
 
     fn create_test_item(price: f64, quantity: i32) -> CartItemSnapshot {
         CartItemSnapshot {
-            id: "product:p1".to_string(),
+            id: 1,
             instance_id: "item-1".to_string(),
             name: "Test Product".to_string(),
             price,
@@ -280,7 +280,7 @@ mod tests {
             order_id: "order-1".to_string(),
             discount_percent: Some(10.0),
             discount_fixed: None,
-            authorizer_id: Some("mgr-1".to_string()),
+            authorizer_id: Some(1),
             authorizer_name: Some("Manager".to_string()),
         };
 
@@ -572,7 +572,7 @@ mod tests {
             order_id: "order-1".to_string(),
             surcharge_percent: None,
             surcharge_amount: Some(15.0),
-            authorizer_id: Some("mgr-1".to_string()),
+            authorizer_id: Some(1),
             authorizer_name: Some("Manager".to_string()),
         };
 
@@ -893,7 +893,7 @@ mod tests {
 
         let metadata = CommandMetadata {
             command_id: "cmd-discount-1".to_string(),
-            operator_id: "manager-1".to_string(),
+            operator_id: 100,
             operator_name: "Manager".to_string(),
             timestamp: 9999999999,
         };
@@ -902,7 +902,7 @@ mod tests {
         let event = &events[0];
 
         assert_eq!(event.command_id, "cmd-discount-1");
-        assert_eq!(event.operator_id, "manager-1");
+        assert_eq!(event.operator_id, 100);
         assert_eq!(event.operator_name, "Manager");
         assert_eq!(event.client_timestamp, Some(9999999999));
         assert_eq!(event.order_id, "order-1");

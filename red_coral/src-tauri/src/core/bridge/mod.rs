@@ -1825,7 +1825,7 @@ impl ClientBridge {
                     zone_id, is_retail, ..
                 } = &command.payload
                 {
-                    Some((zone_id.clone(), *is_retail))
+                    Some((*zone_id, *is_retail))
                 } else {
                     None
                 };
@@ -1835,7 +1835,7 @@ impl ClientBridge {
                     ..
                 } = &command.payload
                 {
-                    Some((order_id.clone(), target_zone_id.clone()))
+                    Some((order_id.clone(), *target_zone_id))
                 } else {
                     None
                 };

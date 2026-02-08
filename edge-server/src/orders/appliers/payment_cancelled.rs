@@ -151,13 +151,13 @@ mod tests {
         method: &str,
         amount: f64,
         reason: Option<String>,
-        authorizer_id: Option<String>,
+        authorizer_id: Option<i64>,
         authorizer_name: Option<String>,
     ) -> OrderEvent {
         OrderEvent::new(
             seq,
             order_id.to_string(),
-            "user-1".to_string(),
+            1,
             "Test User".to_string(),
             "cmd-1".to_string(),
             Some(1234567890),
@@ -450,7 +450,7 @@ mod tests {
         
         // Add items so recalculate_totals computes correct total
         let item = CartItemSnapshot {
-            id: "product:1".to_string(),
+            id: 1,
             instance_id: "inst-1".to_string(),
             name: "Coffee".to_string(),
             price: 100.0,
@@ -517,7 +517,7 @@ mod tests {
 
         // Add an item with 5 quantity (3 remain unpaid)
         let item = CartItemSnapshot {
-            id: "product:1".to_string(),
+            id: 1,
             instance_id: "inst-1".to_string(),
             name: "Coffee".to_string(),
             price: 10.0,
@@ -590,7 +590,7 @@ mod tests {
 
         // Order has a different item (different instance_id due to discount)
         let modified_item = CartItemSnapshot {
-            id: "product:1".to_string(),
+            id: 1,
             instance_id: "inst-2".to_string(), // Different instance_id after modification
             name: "Coffee (10% off)".to_string(),
             price: 9.0,
@@ -617,7 +617,7 @@ mod tests {
 
         // Split payment was for original items (inst-1) before modification
         let original_item = CartItemSnapshot {
-            id: "product:1".to_string(),
+            id: 1,
             instance_id: "inst-1".to_string(), // Original instance_id
             name: "Coffee".to_string(),
             price: 10.0,
@@ -698,7 +698,7 @@ mod tests {
 
         // 分单支付后：原 inst-1 只剩 2 个（属性被修改后 instance_id 变为 inst-1-modified）
         let modified_item = CartItemSnapshot {
-            id: "product:cola".to_string(),
+            id: 2,
             instance_id: "inst-1-modified".to_string(),
             name: "Cola (加冰)".to_string(),
             price: 10.0,
@@ -725,7 +725,7 @@ mod tests {
 
         // 分单支付记录里保存了原始 inst-1 的 2 个可乐
         let original_split_item = CartItemSnapshot {
-            id: "product:cola".to_string(),
+            id: 2,
             instance_id: "inst-1".to_string(),
             name: "Cola".to_string(),
             price: 10.0,
@@ -812,7 +812,7 @@ mod tests {
 
         // 修改后的可乐 (inst-modified)
         let modified_item = CartItemSnapshot {
-            id: "product:cola".to_string(),
+            id: 2,
             instance_id: "inst-modified".to_string(),
             name: "Cola (加冰)".to_string(),
             price: 10.0,
@@ -839,7 +839,7 @@ mod tests {
 
         // 用户又加了 1 个原始可乐 (同 instance_id = inst-original)
         let re_added_item = CartItemSnapshot {
-            id: "product:cola".to_string(),
+            id: 2,
             instance_id: "inst-original".to_string(),
             name: "Cola".to_string(),
             price: 10.0,
@@ -866,7 +866,7 @@ mod tests {
 
         // 分单支付记录里保存了原始 inst-original 的 2 个可乐
         let original_split_item = CartItemSnapshot {
-            id: "product:cola".to_string(),
+            id: 2,
             instance_id: "inst-original".to_string(),
             name: "Cola".to_string(),
             price: 10.0,
@@ -937,7 +937,7 @@ mod tests {
         snapshot.paid_amount = 50.0;
 
         let item = CartItemSnapshot {
-            id: "product:1".to_string(),
+            id: 1,
             instance_id: "inst-1".to_string(),
             name: "Coffee".to_string(),
             price: 10.0,
