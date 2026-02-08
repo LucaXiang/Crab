@@ -5,7 +5,7 @@ use axum::{
     extract::{Extension, State},
 };
 
-use crate::audit::AuditAction;
+use crate::audit::{create_diff, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
@@ -27,6 +27,7 @@ pub async fn update(
     Extension(current_user): Extension<CurrentUser>,
     Json(payload): Json<StoreInfoUpdate>,
 ) -> AppResult<Json<StoreInfo>> {
+    let old_store_info = store_info::get_or_create(&state.pool).await?;
     let store_info = store_info::update(&state.pool, payload).await?;
 
     audit_log!(
@@ -35,7 +36,7 @@ pub async fn update(
         "store_info", "store_info:main",
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &store_info.name})
+        details = create_diff(&old_store_info, &store_info, "store_info")
     );
 
     state

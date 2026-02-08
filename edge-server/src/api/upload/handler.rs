@@ -101,7 +101,7 @@ fn validate_image(data: &[u8], ext: &str) -> Result<(), AppError> {
 /// - Database stores the hash, not the full path
 pub async fn upload(
     State(state): State<ServerState>,
-    Extension(_current_user): Extension<CurrentUser>,
+    Extension(current_user): Extension<CurrentUser>,
     mut multipart: Multipart,
 ) -> Result<Json<UploadResponse>, AppError> {
     // Images dir: {tenant}/server/images/
@@ -193,8 +193,8 @@ pub async fn upload(
         crate::audit::AuditAction::StoreInfoChanged,
         "upload",
         format!("image:{}", hash),
-        None,
-        None,
+        Some(current_user.id.clone()),
+        Some(current_user.display_name.clone()),
         serde_json::json!({
             "original_name": original_name,
             "filename": filename,

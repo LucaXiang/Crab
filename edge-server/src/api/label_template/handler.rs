@@ -5,7 +5,7 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::AuditAction;
+use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
@@ -60,7 +60,7 @@ pub async fn create(
         "label_template", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &template.name})
+        details = create_snapshot(&template, "label_template")
     );
 
     state
@@ -77,6 +77,10 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<LabelTemplateUpdate>,
 ) -> AppResult<Json<LabelTemplate>> {
+    let old_template = label_template::get(&state.pool, id)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("Label template {} not found", id)))?;
+
     let template = label_template::update(&state.pool, id, payload).await?;
 
     let id_str = id.to_string();
@@ -87,7 +91,7 @@ pub async fn update(
         "label_template", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &template.name})
+        details = create_diff(&old_template, &template, "label_template")
     );
 
     state

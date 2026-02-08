@@ -5,7 +5,7 @@ use axum::{
     extract::{Extension, Path, State},
 };
 
-use crate::audit::AuditAction;
+use crate::audit::{create_diff, create_snapshot, AuditAction};
 use crate::audit_log;
 use crate::auth::CurrentUser;
 use crate::core::ServerState;
@@ -50,7 +50,7 @@ pub async fn create(
         "print_destination", &id,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &item.name})
+        details = create_snapshot(&item, "print_destination")
     );
 
     state
@@ -67,6 +67,10 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(payload): Json<PrintDestinationUpdate>,
 ) -> AppResult<Json<PrintDestination>> {
+    let old_item = print_destination::find_by_id(&state.pool, id)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("Print destination {} not found", id)))?;
+
     let item = print_destination::update(&state.pool, id, payload).await?;
 
     let id_str = id.to_string();
@@ -77,7 +81,7 @@ pub async fn update(
         "print_destination", &id_str,
         operator_id = Some(current_user.id.clone()),
         operator_name = Some(current_user.display_name.clone()),
-        details = serde_json::json!({"name": &item.name})
+        details = create_diff(&old_item, &item, "print_destination")
     );
 
     state
