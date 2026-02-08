@@ -6,7 +6,7 @@ import { CartCheckoutBar } from './cart/CartCheckoutBar';
 
 // Using new granular selectors
 import {
-  useCartStore,
+  useCart,
   useTotalAmount,
   useIsCartEmpty,
   useCartActions
@@ -32,8 +32,7 @@ const SidebarInner: React.FC<SidebarProps> = ({
 	  onRestoreDraft,
 	  onCheckout,
 	}) => {
-	  const cartState = useCartStore((state) => state);
-	  const cart = cartState.cart;
+	  const cart = useCart();
 	  const totalAmount = useTotalAmount();
 	  const isCartEmpty = useIsCartEmpty();
 	  const { updateCartItem, removeFromCart, clearCart, incrementItemQuantity } = useCartActions();
@@ -56,11 +55,11 @@ const SidebarInner: React.FC<SidebarProps> = ({
 	  }, []);
 
 	  // Wrap update/remove to match CartItemDetailModal expected signature
-	  const handleUpdateItem = useCallback((instanceId: string, updates: Partial<CartItem>, _authorizer?: { id: string; name: string }) => {
+	  const handleUpdateItem = useCallback((instanceId: string, updates: Partial<CartItem>, _authorizer?: { id: number; name: string }) => {
 		updateCartItem(instanceId, updates);
 	  }, [updateCartItem]);
 
-	  const handleRemoveItem = useCallback((instanceId: string, _authorizer?: { id: string; name: string }) => {
+	  const handleRemoveItem = useCallback((instanceId: string, _authorizer?: { id: number; name: string }) => {
 		removeFromCart(instanceId);
 	  }, [removeFromCart]);
 

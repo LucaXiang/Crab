@@ -1,4 +1,5 @@
 import { createResourceStore } from '@/core/stores/factory/createResourceStore';
+import { useShallow } from 'zustand/react/shallow';
 import { createTauriClient } from '@/infrastructure/api';
 import type { Table } from '@/core/domain/types/api';
 
@@ -15,4 +16,6 @@ export const useTablesLoading = () => useTableStore((state) => state.isLoading);
 export const useTableById = (id: number) =>
   useTableStore((state) => state.items.find((t) => t.id === id));
 export const useTablesByZone = (zoneId: number) =>
-  useTableStore((state) => state.items.filter((t) => t.zone_id === zoneId));
+  useTableStore(
+    useShallow((state) => state.items.filter((t) => t.zone_id === zoneId))
+  );

@@ -1,4 +1,5 @@
 import { createResourceStore } from '@/core/stores/factory/createResourceStore';
+import { useShallow } from 'zustand/react/shallow';
 import { createTauriClient } from '@/infrastructure/api';
 import type { PriceRule } from '@/core/domain/types/api';
 
@@ -15,4 +16,6 @@ export const usePriceRulesLoading = () => usePriceRuleStore((state) => state.isL
 export const usePriceRuleById = (id: number) =>
   usePriceRuleStore((state) => state.items.find((r) => r.id === id));
 export const useActivePriceRules = () =>
-  usePriceRuleStore((state) => state.items.filter((r) => r.is_active));
+  usePriceRuleStore(
+    useShallow((state) => state.items.filter((r) => r.is_active))
+  );

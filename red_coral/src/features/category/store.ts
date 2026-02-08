@@ -1,4 +1,5 @@
 import { createCrudResourceStore } from '@/core/stores/factory/createResourceStore';
+import { useShallow } from 'zustand/react/shallow';
 import { createTauriClient } from '@/infrastructure/api';
 import type { Category, CategoryCreate, CategoryUpdate } from '@/core/domain/types/api';
 
@@ -28,19 +29,23 @@ export const useCategoryActions = () => ({
   fetchAll: useCategoryStore.getState().fetchAll,
 });
 
-// Virtual/Regular category selectors
+// Virtual/Regular category selectors (useShallow for stable array references)
 export const useVirtualCategories = () =>
-  useCategoryStore((state) =>
-    state.items
-      .filter((c) => c.is_virtual)
-      .sort((a, b) => a.sort_order - b.sort_order)
+  useCategoryStore(
+    useShallow((state) =>
+      state.items
+        .filter((c) => c.is_virtual)
+        .sort((a, b) => a.sort_order - b.sort_order)
+    )
   );
 
 export const useRegularCategories = () =>
-  useCategoryStore((state) =>
-    state.items
-      .filter((c) => !c.is_virtual)
-      .sort((a, b) => a.sort_order - b.sort_order)
+  useCategoryStore(
+    useShallow((state) =>
+      state.items
+        .filter((c) => !c.is_virtual)
+        .sort((a, b) => a.sort_order - b.sort_order)
+    )
   );
 
 export const useCategoryByName = (name: string) =>

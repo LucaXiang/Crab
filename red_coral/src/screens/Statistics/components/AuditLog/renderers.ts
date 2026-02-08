@@ -327,19 +327,27 @@ const OrderCompletedRenderer: AuditDetailsRenderer = {
   render(_entry, details, t) {
     const lines: AuditDetailLine[] = [];
 
-    // 总金额
-    if (details.final_total != null) {
-      lines.push({
-        label: t('audit.detail.field.final_total'),
-        value: formatCurrency(details.final_total as number),
-      });
-    }
-
     // 小票号
     if (details.receipt_number) {
       lines.push({
         label: t('audit.detail.field.receipt_number'),
         value: String(details.receipt_number),
+      });
+    }
+
+    // 总金额
+    if (details.total != null) {
+      lines.push({
+        label: t('audit.detail.field.total'),
+        value: formatCurrency(details.total as number),
+      });
+    }
+
+    // 商品数
+    if (details.item_count != null) {
+      lines.push({
+        label: t('audit.detail.field.item_count'),
+        value: String(details.item_count),
       });
     }
 
@@ -356,6 +364,14 @@ const OrderCompletedRenderer: AuditDetailsRenderer = {
       });
     }
 
+    // 桌台
+    if (details.table_name) {
+      lines.push({
+        label: t('audit.detail.field.table_name'),
+        value: String(details.table_name),
+      });
+    }
+
     return { lines, isEmpty: lines.length === 0 };
   },
 };
@@ -364,6 +380,14 @@ const OrderVoidedRenderer: AuditDetailsRenderer = {
   render(_entry, details, t) {
     const lines: AuditDetailLine[] = [];
 
+    // 小票号
+    if (details.receipt_number) {
+      lines.push({
+        label: t('audit.detail.field.receipt_number'),
+        value: String(details.receipt_number),
+      });
+    }
+
     // 作废类型
     if (details.void_type) {
       const voidTypeKey = `checkout.void.type.${(details.void_type as string).toLowerCase()}`;
@@ -371,6 +395,14 @@ const OrderVoidedRenderer: AuditDetailsRenderer = {
         label: t('audit.detail.field.void_type'),
         value: t(voidTypeKey),
         valueClass: details.void_type === 'LOSS_SETTLED' ? 'text-orange-600' : 'text-red-600',
+      });
+    }
+
+    // 总金额
+    if (details.total != null) {
+      lines.push({
+        label: t('audit.detail.field.total'),
+        value: formatCurrency(details.total as number),
       });
     }
 
@@ -392,11 +424,19 @@ const OrderVoidedRenderer: AuditDetailsRenderer = {
       });
     }
 
-    // 备注
-    if (details.note) {
+    // 备注 (后端字段名: void_note)
+    if (details.void_note) {
       lines.push({
         label: t('audit.detail.field.note'),
-        value: String(details.note),
+        value: String(details.void_note),
+      });
+    }
+
+    // 授权人
+    if (details.authorizer_name) {
+      lines.push({
+        label: t('audit.detail.field.authorizer_name'),
+        value: String(details.authorizer_name),
       });
     }
 
@@ -408,24 +448,51 @@ const OrderMergedRenderer: AuditDetailsRenderer = {
   render(_entry, details, t) {
     const lines: AuditDetailLine[] = [];
 
-    if (details.source_table_name) {
+    // 小票号
+    if (details.receipt_number) {
+      lines.push({
+        label: t('audit.detail.field.receipt_number'),
+        value: String(details.receipt_number),
+      });
+    }
+
+    // 来源桌台 (后端字段名: source_table)
+    if (details.source_table) {
       lines.push({
         label: t('audit.detail.field.source_table'),
-        value: String(details.source_table_name),
+        value: String(details.source_table),
       });
     }
 
-    if (details.target_table_name) {
+    // 合并商品数
+    if (details.merged_item_count != null) {
       lines.push({
-        label: t('audit.detail.field.target_table'),
-        value: String(details.target_table_name),
+        label: t('audit.detail.field.merged_item_count'),
+        value: String(details.merged_item_count),
       });
     }
 
+    // 合并已付金额
     if (details.merged_paid_amount != null) {
       lines.push({
         label: t('audit.detail.field.merged_paid_amount'),
         value: formatCurrency(details.merged_paid_amount as number),
+      });
+    }
+
+    // 总金额
+    if (details.total != null) {
+      lines.push({
+        label: t('audit.detail.field.total'),
+        value: formatCurrency(details.total as number),
+      });
+    }
+
+    // 授权人
+    if (details.authorizer_name) {
+      lines.push({
+        label: t('audit.detail.field.authorizer_name'),
+        value: String(details.authorizer_name),
       });
     }
 
@@ -571,6 +638,50 @@ const ResolveSystemIssueRenderer: AuditDetailsRenderer = {
 
 // ---- 认证 ----
 
+const LoginSuccessRenderer: AuditDetailsRenderer = {
+  render(_entry, details, t) {
+    const lines: AuditDetailLine[] = [];
+
+    if (details.username) {
+      lines.push({
+        label: t('audit.detail.field.username'),
+        value: String(details.username),
+      });
+    }
+
+    return { lines, isEmpty: lines.length === 0 };
+  },
+};
+
+const EscalationSuccessRenderer: AuditDetailsRenderer = {
+  render(_entry, details, t) {
+    const lines: AuditDetailLine[] = [];
+
+    if (details.requester_name) {
+      lines.push({
+        label: t('audit.detail.field.requester_name'),
+        value: String(details.requester_name),
+      });
+    }
+
+    if (details.required_permission) {
+      lines.push({
+        label: t('audit.detail.field.required_permission'),
+        value: String(details.required_permission),
+      });
+    }
+
+    if (details.authorizer_username) {
+      lines.push({
+        label: t('audit.detail.field.authorizer_name'),
+        value: String(details.authorizer_username),
+      });
+    }
+
+    return { lines, isEmpty: lines.length === 0 };
+  },
+};
+
 const LoginFailedRenderer: AuditDetailsRenderer = {
   render(_entry, details, t) {
     const lines: AuditDetailLine[] = [];
@@ -608,6 +719,7 @@ type AuditActionType =
   | 'login_success'
   | 'login_failed'
   | 'logout'
+  | 'escalation_success'
   | 'order_completed'
   | 'order_voided'
   | 'order_merged'
@@ -664,9 +776,10 @@ export const AUDIT_RENDERERS: Partial<Record<AuditActionType, AuditDetailsRender
   resolve_system_issue: ResolveSystemIssueRenderer,
 
   // 认证
-  login_success: createSnapshotRenderer(),
+  login_success: LoginSuccessRenderer,
   login_failed: LoginFailedRenderer,
-  logout: createSnapshotRenderer(),
+  logout: LoginSuccessRenderer,
+  escalation_success: EscalationSuccessRenderer,
 
   // 订单
   order_completed: OrderCompletedRenderer,
@@ -736,7 +849,7 @@ export const AUDIT_RENDERERS: Partial<Record<AuditActionType, AuditDetailsRender
   daily_report_generated: createSnapshotRenderer(),
 
   // 配置
-  print_config_changed: createDiffRenderer(),
+  print_config_changed: createSnapshotRenderer(),
   store_info_changed: createDiffRenderer(),
 };
 

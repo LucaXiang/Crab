@@ -235,7 +235,7 @@ export class TauriApiClient {
     return data.products;
   }
 
-  async getProductFull(id: string): Promise<ProductFull> {
+  async getProductFull(id: number): Promise<ProductFull> {
     const result = await invokeAndUnwrap<{ product: ProductFull }>('get_product_full', { id });
     return result.product;
   }
@@ -438,7 +438,7 @@ export class TauriApiClient {
     return invokeAndUnwrap<LabelTemplate[]>('list_label_templates');
   }
 
-  async getLabelTemplate(id: string): Promise<LabelTemplate> {
+  async getLabelTemplate(id: number): Promise<LabelTemplate> {
     return invokeAndUnwrap<LabelTemplate>('get_label_template', { id });
   }
 
@@ -446,11 +446,11 @@ export class TauriApiClient {
     return invokeAndUnwrap<LabelTemplate>('create_label_template', { data });
   }
 
-  async updateLabelTemplate(id: string, data: LabelTemplateUpdate): Promise<LabelTemplate> {
+  async updateLabelTemplate(id: number, data: LabelTemplateUpdate): Promise<LabelTemplate> {
     return invokeAndUnwrap<LabelTemplate>('update_label_template', { id, data });
   }
 
-  async deleteLabelTemplate(id: string): Promise<boolean> {
+  async deleteLabelTemplate(id: number): Promise<boolean> {
     return invokeAndUnwrap<boolean>('delete_label_template', { id });
   }
 
@@ -479,7 +479,7 @@ export class TauriApiClient {
     return invokeAndUnwrap<RoleListData>('list_roles');
   }
 
-  async getRolePermissions(roleId: string): Promise<RolePermissionListData> {
+  async getRolePermissions(roleId: number): Promise<RolePermissionListData> {
     return invokeAndUnwrap<RolePermissionListData>('get_role_permissions', { roleId });
   }
 

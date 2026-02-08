@@ -65,11 +65,8 @@ export const useShiftStore = create<ShiftStore>((set, get) => ({
       return shift;
     } catch (error) {
       console.error('Failed to fetch current shift:', error);
-      set({
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch shift',
-      });
-      return null;
+      set({ isLoading: false });
+      throw error;
     }
   },
 
