@@ -4,7 +4,6 @@
 
 use std::sync::Arc;
 use tauri::State;
-use urlencoding::encode;
 
 use crate::core::response::{ApiResponse, ErrorCode, TableListData, ZoneListData};
 use crate::core::ClientBridge;
@@ -30,10 +29,10 @@ pub async fn list_zones(
 #[tauri::command]
 pub async fn get_zone(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<Zone>, String> {
     match bridge
-        .get::<Zone>(&format!("/api/zones/{}", encode(&id)))
+        .get::<Zone>(&format!("/api/zones/{}", id))
         .await
     {
         Ok(zone) => Ok(ApiResponse::success(zone)),
@@ -61,11 +60,11 @@ pub async fn create_zone(
 #[tauri::command]
 pub async fn update_zone(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
     data: ZoneUpdate,
 ) -> Result<ApiResponse<Zone>, String> {
     match bridge
-        .put::<Zone, _>(&format!("/api/zones/{}", encode(&id)), &data)
+        .put::<Zone, _>(&format!("/api/zones/{}", id), &data)
         .await
     {
         Ok(zone) => Ok(ApiResponse::success(zone)),
@@ -79,10 +78,10 @@ pub async fn update_zone(
 #[tauri::command]
 pub async fn delete_zone(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<crate::core::DeleteData>, String> {
     match bridge
-        .delete::<bool>(&format!("/api/zones/{}", encode(&id)))
+        .delete::<bool>(&format!("/api/zones/{}", id))
         .await
     {
         Ok(success) => Ok(ApiResponse::success(crate::core::DeleteData {
@@ -113,10 +112,10 @@ pub async fn list_tables(
 #[tauri::command]
 pub async fn list_tables_by_zone(
     bridge: State<'_, Arc<ClientBridge>>,
-    zone_id: String,
+    zone_id: i64,
 ) -> Result<ApiResponse<TableListData>, String> {
     match bridge
-        .get::<Vec<DiningTable>>(&format!("/api/tables/zone/{}", encode(&zone_id)))
+        .get::<Vec<DiningTable>>(&format!("/api/tables/zone/{}", zone_id))
         .await
     {
         Ok(tables) => Ok(ApiResponse::success(TableListData { tables })),
@@ -130,10 +129,10 @@ pub async fn list_tables_by_zone(
 #[tauri::command]
 pub async fn get_table(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<DiningTable>, String> {
     match bridge
-        .get::<DiningTable>(&format!("/api/tables/{}", encode(&id)))
+        .get::<DiningTable>(&format!("/api/tables/{}", id))
         .await
     {
         Ok(table) => Ok(ApiResponse::success(table)),
@@ -161,11 +160,11 @@ pub async fn create_table(
 #[tauri::command]
 pub async fn update_table(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
     data: DiningTableUpdate,
 ) -> Result<ApiResponse<DiningTable>, String> {
     match bridge
-        .put::<DiningTable, _>(&format!("/api/tables/{}", encode(&id)), &data)
+        .put::<DiningTable, _>(&format!("/api/tables/{}", id), &data)
         .await
     {
         Ok(table) => Ok(ApiResponse::success(table)),
@@ -179,10 +178,10 @@ pub async fn update_table(
 #[tauri::command]
 pub async fn delete_table(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<crate::core::DeleteData>, String> {
     match bridge
-        .delete::<bool>(&format!("/api/tables/{}", encode(&id)))
+        .delete::<bool>(&format!("/api/tables/{}", id))
         .await
     {
         Ok(success) => Ok(ApiResponse::success(crate::core::DeleteData {

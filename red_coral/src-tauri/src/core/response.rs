@@ -212,37 +212,17 @@ pub struct TableListData {
 
 // ============ Roles ============
 
-/// Role entity matching edge-server Role model
-#[derive(Debug, Clone, Serialize, serde::Deserialize)]
-pub struct Role {
-    pub id: Option<String>,
-    pub name: String,
-    #[serde(default)]
-    pub display_name: String,
-    pub description: Option<String>,
-    #[serde(default)]
-    pub permissions: Vec<String>,
-    #[serde(default)]
-    pub is_system: bool,
-    #[serde(default = "default_true")]
-    pub is_active: bool,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-/// Role Permission entity
+/// Role Permission entity (constructed from API response)
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct RolePermission {
-    pub role_id: String,
+    pub role_id: i64,
     pub permission: String,
 }
 
 /// Roles 列表
 #[derive(Debug, Clone, Serialize)]
 pub struct RoleListData {
-    pub roles: Vec<Role>,
+    pub roles: Vec<shared::models::Role>,
 }
 
 /// Role Permissions 列表

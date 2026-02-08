@@ -4,17 +4,16 @@
 
 use std::sync::Arc;
 use tauri::State;
-use urlencoding::encode;
 
 use crate::core::response::{
-    ApiResponse, DeleteData, EmployeeListData, ErrorCode, PriceRuleListData, Role, RoleListData,
+    ApiResponse, DeleteData, EmployeeListData, ErrorCode, PriceRuleListData, RoleListData,
     RolePermission, RolePermissionListData,
 };
 use crate::core::ClientBridge;
 use shared::models::{
     Employee, EmployeeCreate, EmployeeUpdate, InitGenesisRequest, LabelTemplate,
     LabelTemplateCreate, LabelTemplateUpdate, PriceRule, PriceRuleCreate, PriceRuleUpdate,
-    StoreInfo, StoreInfoUpdate, SystemState, SystemStateUpdate, UpdateLastOrderRequest,
+    Role, StoreInfo, StoreInfoUpdate, SystemState, SystemStateUpdate, UpdateLastOrderRequest,
     UpdateSyncStateRequest,
 };
 
@@ -144,10 +143,10 @@ pub async fn list_label_templates(
 #[tauri::command]
 pub async fn get_label_template(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<LabelTemplate>, String> {
 
-    match bridge.get(&format!("/api/label-templates/{}", encode(&id))).await {
+    match bridge.get(&format!("/api/label-templates/{}", id)).await {
         Ok(template) => Ok(ApiResponse::success(template)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::NotFound,
@@ -174,12 +173,12 @@ pub async fn create_label_template(
 #[tauri::command]
 pub async fn update_label_template(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
     data: LabelTemplateUpdate,
 ) -> Result<ApiResponse<LabelTemplate>, String> {
 
     match bridge
-        .put(&format!("/api/label-templates/{}", encode(&id)), &data)
+        .put(&format!("/api/label-templates/{}", id), &data)
         .await
     {
         Ok(template) => Ok(ApiResponse::success(template)),
@@ -193,11 +192,11 @@ pub async fn update_label_template(
 #[tauri::command]
 pub async fn delete_label_template(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<bool>, String> {
 
     match bridge
-        .delete::<bool>(&format!("/api/label-templates/{}", encode(&id)))
+        .delete::<bool>(&format!("/api/label-templates/{}", id))
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(deleted)),
@@ -244,10 +243,10 @@ pub async fn list_all_employees(
 #[tauri::command]
 pub async fn get_employee(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<Employee>, String> {
 
-    match bridge.get(&format!("/api/employees/{}", encode(&id))).await {
+    match bridge.get(&format!("/api/employees/{}", id)).await {
         Ok(employee) => Ok(ApiResponse::success(employee)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::EmployeeNotFound,
@@ -274,12 +273,12 @@ pub async fn create_employee(
 #[tauri::command]
 pub async fn update_employee(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
     data: EmployeeUpdate,
 ) -> Result<ApiResponse<Employee>, String> {
 
     match bridge
-        .put(&format!("/api/employees/{}", encode(&id)), &data)
+        .put(&format!("/api/employees/{}", id), &data)
         .await
     {
         Ok(employee) => Ok(ApiResponse::success(employee)),
@@ -293,11 +292,11 @@ pub async fn update_employee(
 #[tauri::command]
 pub async fn delete_employee(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<DeleteData>, String> {
 
     match bridge
-        .delete::<bool>(&format!("/api/employees/{}", encode(&id)))
+        .delete::<bool>(&format!("/api/employees/{}", id))
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
@@ -344,11 +343,11 @@ pub async fn list_active_price_rules(
 #[tauri::command]
 pub async fn get_price_rule(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<PriceRule>, String> {
 
     match bridge
-        .get(&format!("/api/price-rules/{}", encode(&id)))
+        .get(&format!("/api/price-rules/{}", id))
         .await
     {
         Ok(rule) => Ok(ApiResponse::success(rule)),
@@ -377,12 +376,12 @@ pub async fn create_price_rule(
 #[tauri::command]
 pub async fn update_price_rule(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
     data: PriceRuleUpdate,
 ) -> Result<ApiResponse<PriceRule>, String> {
 
     match bridge
-        .put(&format!("/api/price-rules/{}", encode(&id)), &data)
+        .put(&format!("/api/price-rules/{}", id), &data)
         .await
     {
         Ok(rule) => Ok(ApiResponse::success(rule)),
@@ -396,11 +395,11 @@ pub async fn update_price_rule(
 #[tauri::command]
 pub async fn delete_price_rule(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<DeleteData>, String> {
 
     match bridge
-        .delete::<bool>(&format!("/api/price-rules/{}", encode(&id)))
+        .delete::<bool>(&format!("/api/price-rules/{}", id))
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
@@ -430,10 +429,10 @@ pub async fn list_roles(
 #[tauri::command]
 pub async fn get_role(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<Role>, String> {
 
-    match bridge.get(&format!("/api/roles/{}", encode(&id))).await {
+    match bridge.get(&format!("/api/roles/{}", id)).await {
         Ok(role) => Ok(ApiResponse::success(role)),
         Err(e) => Ok(ApiResponse::error_with_code(
             ErrorCode::RoleNotFound,
@@ -460,12 +459,12 @@ pub async fn create_role(
 #[tauri::command]
 pub async fn update_role(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
     data: serde_json::Value,
 ) -> Result<ApiResponse<Role>, String> {
 
     match bridge
-        .put(&format!("/api/roles/{}", encode(&id)), &data)
+        .put(&format!("/api/roles/{}", id), &data)
         .await
     {
         Ok(role) => Ok(ApiResponse::success(role)),
@@ -479,11 +478,11 @@ pub async fn update_role(
 #[tauri::command]
 pub async fn delete_role(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<DeleteData>, String> {
 
     match bridge
-        .delete::<bool>(&format!("/api/roles/{}", encode(&id)))
+        .delete::<bool>(&format!("/api/roles/{}", id))
         .await
     {
         Ok(deleted) => Ok(ApiResponse::success(DeleteData { deleted })),
@@ -497,18 +496,18 @@ pub async fn delete_role(
 #[tauri::command]
 pub async fn get_role_permissions(
     bridge: State<'_, Arc<ClientBridge>>,
-    role_id: String,
+    role_id: i64,
 ) -> Result<ApiResponse<RolePermissionListData>, String> {
     // API 返回 Vec<String>，需要转换为 Vec<RolePermission>
     match bridge
-        .get::<Vec<String>>(&format!("/api/roles/{}/permissions", encode(&role_id)))
+        .get::<Vec<String>>(&format!("/api/roles/{}/permissions", role_id))
         .await
     {
         Ok(permission_strings) => {
             let permissions = permission_strings
                 .into_iter()
                 .map(|p| RolePermission {
-                    role_id: role_id.clone(),
+                    role_id,
                     permission: p,
                 })
                 .collect();
@@ -538,13 +537,13 @@ pub async fn get_all_permissions(
 #[tauri::command]
 pub async fn update_role_permissions(
     bridge: State<'_, Arc<ClientBridge>>,
-    role_id: String,
+    role_id: i64,
     permissions: Vec<String>,
 ) -> Result<ApiResponse<()>, String> {
 
     match bridge
         .put::<(), _>(
-            &format!("/api/roles/{}/permissions", encode(&role_id)),
+            &format!("/api/roles/{}/permissions", role_id),
             &permissions,
         )
         .await

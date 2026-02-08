@@ -1,24 +1,13 @@
 //! 员工认证命令
 
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::State;
 
 use crate::core::response::ErrorCode;
 use crate::core::session_cache::EmployeeSession;
 use crate::core::{ApiResponse, AuthData, ClientBridge};
-
-/// 提权响应中的授权人信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EscalateAuthorizer {
-    pub id: String,
-    pub username: String,
-    pub display_name: String,
-    pub role_id: String,
-    pub role_name: String,
-    pub permissions: Vec<String>,
-    pub is_system: bool,
-}
+use shared::client::{EscalateResponse, UserInfo};
 
 /// 统一登录命令 (使用 ClientBridge)
 ///
@@ -76,20 +65,15 @@ pub async fn escalate_permission(
     username: String,
     password: String,
     required_permission: String,
-) -> Result<ApiResponse<EscalateAuthorizer>, String> {
+) -> Result<ApiResponse<UserInfo>, String> {
     #[derive(Serialize)]
-    struct EscalateRequest {
+    struct EscalateReq {
         username: String,
         password: String,
         required_permission: String,
     }
 
-    #[derive(Deserialize)]
-    struct EscalateResponse {
-        authorizer: EscalateAuthorizer,
-    }
-
-    let request = EscalateRequest {
+    let request = EscalateReq {
         username,
         password,
         required_permission,

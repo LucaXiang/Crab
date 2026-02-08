@@ -51,10 +51,10 @@ pub async fn list_shifts(
 #[tauri::command]
 pub async fn get_shift(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<Shift>, String> {
     match bridge
-        .get::<Shift>(&format!("/api/shifts/{}", encode(&id)))
+        .get::<Shift>(&format!("/api/shifts/{}", id))
         .await
     {
         Ok(shift) => Ok(ApiResponse::success(shift)),
@@ -65,11 +65,11 @@ pub async fn get_shift(
 #[tauri::command]
 pub async fn get_current_shift(
     bridge: State<'_, Arc<ClientBridge>>,
-    operator_id: Option<String>,
+    operator_id: Option<i64>,
 ) -> Result<ApiResponse<Option<Shift>>, String> {
 
     let path = match operator_id {
-        Some(id) => format!("/api/shifts/current?operator_id={}", encode(&id)),
+        Some(id) => format!("/api/shifts/current?operator_id={}", id),
         None => "/api/shifts/current".to_string(),
     };
 
@@ -93,11 +93,11 @@ pub async fn open_shift(
 #[tauri::command]
 pub async fn update_shift(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
     data: ShiftUpdate,
 ) -> Result<ApiResponse<Shift>, String> {
     match bridge
-        .put::<Shift, _>(&format!("/api/shifts/{}", encode(&id)), &data)
+        .put::<Shift, _>(&format!("/api/shifts/{}", id), &data)
         .await
     {
         Ok(shift) => Ok(ApiResponse::success(shift)),
@@ -108,11 +108,11 @@ pub async fn update_shift(
 #[tauri::command]
 pub async fn close_shift(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
     data: ShiftClose,
 ) -> Result<ApiResponse<Shift>, String> {
     match bridge
-        .post::<Shift, _>(&format!("/api/shifts/{}/close", encode(&id)), &data)
+        .post::<Shift, _>(&format!("/api/shifts/{}/close", id), &data)
         .await
     {
         Ok(shift) => Ok(ApiResponse::success(shift)),
@@ -123,11 +123,11 @@ pub async fn close_shift(
 #[tauri::command]
 pub async fn force_close_shift(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
     data: ShiftForceClose,
 ) -> Result<ApiResponse<Shift>, String> {
     match bridge
-        .post::<Shift, _>(&format!("/api/shifts/{}/force-close", encode(&id)), &data)
+        .post::<Shift, _>(&format!("/api/shifts/{}/force-close", id), &data)
         .await
     {
         Ok(shift) => Ok(ApiResponse::success(shift)),
@@ -138,10 +138,10 @@ pub async fn force_close_shift(
 #[tauri::command]
 pub async fn heartbeat_shift(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<bool>, String> {
     match bridge
-        .post::<bool, _>(&format!("/api/shifts/{}/heartbeat", encode(&id)), &())
+        .post::<bool, _>(&format!("/api/shifts/{}/heartbeat", id), &())
         .await
     {
         Ok(result) => Ok(ApiResponse::success(result)),
@@ -199,10 +199,10 @@ pub async fn list_daily_reports(
 #[tauri::command]
 pub async fn get_daily_report(
     bridge: State<'_, Arc<ClientBridge>>,
-    id: String,
+    id: i64,
 ) -> Result<ApiResponse<DailyReport>, String> {
     match bridge
-        .get::<DailyReport>(&format!("/api/daily-reports/{}", encode(&id)))
+        .get::<DailyReport>(&format!("/api/daily-reports/{}", id))
         .await
     {
         Ok(report) => Ok(ApiResponse::success(report)),
