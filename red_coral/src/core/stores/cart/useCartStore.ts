@@ -59,8 +59,6 @@ function areSpecificationsEqual(
 interface CartStore {
   // State
   cart: CartItem[];
-  receiptNumber?: string;
-
   // Computed
   totalAmount: number;
   itemCount: number;
@@ -73,14 +71,12 @@ interface CartStore {
   setItemQuantity: (instanceId: string, quantity: number) => void;
   clearCart: () => void;
   setCart: (items: CartItem[]) => void;
-  setReceiptNumber: (number: string) => void;
   calculateTotal: () => void;
 }
 
 export const useCartStore = create<CartStore>((set, get) => ({
   // Initial State
   cart: [],
-  receiptNumber: undefined,
   totalAmount: 0,
   itemCount: 0,
 
@@ -186,7 +182,6 @@ export const useCartStore = create<CartStore>((set, get) => ({
   clearCart: () => {
     set({
       cart: [],
-      receiptNumber: undefined,
       totalAmount: 0,
       itemCount: 0
     });
@@ -195,10 +190,6 @@ export const useCartStore = create<CartStore>((set, get) => ({
   setCart: (items: CartItem[]) => {
     set({ cart: items });
     get().calculateTotal();
-  },
-
-  setReceiptNumber: (number: string) => {
-    set({ receiptNumber: number });
   },
 
   calculateTotal: () => {
@@ -252,6 +243,5 @@ export const useCartActions = () => useCartStore(
     setItemQuantity: state.setItemQuantity,
     clearCart: state.clearCart,
     setCart: state.setCart,
-    setReceiptNumber: state.setReceiptNumber
   }))
 );

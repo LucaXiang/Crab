@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { createPortal } from 'react-dom';
-import { HeldOrder, CompletedOrder } from '@/core/domain/types';
+import { HeldOrder } from '@/core/domain/types';
 import { LoadingScreen } from '@/presentation/components/LoadingScreen';
 
 // Lazy load heavy screens
@@ -13,7 +13,6 @@ interface POSOverlaysProps {
   screen: 'POS' | 'HISTORY' | 'SETTINGS' | 'STATISTICS';
   viewMode: 'pos' | 'checkout';
   checkoutOrder: HeldOrder | null;
-  completedOrders?: CompletedOrder[];
   onCheckoutCancel: () => void;
   onCheckoutComplete: () => void;
   onSetScreen: (screen: 'POS' | 'HISTORY' | 'SETTINGS' | 'STATISTICS') => void;

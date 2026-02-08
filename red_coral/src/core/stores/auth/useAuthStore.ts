@@ -19,7 +19,6 @@ interface AuthStore {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   setUser: (user: User | null) => void;
-  fetchUserPermissions: (roleId: number) => Promise<void>;
   refreshToken: () => Promise<void>;
 
   // Permission Checks
@@ -104,21 +103,6 @@ export const useAuthStore = create<AuthStore>()(
           set({ user, permissions: [], isAuthenticated: false });
         } else {
           set({ user, permissions: user.permissions ?? [], isAuthenticated: true });
-        }
-      },
-
-      /**
-       * Fetch permissions for a role
-       * 
-       * Note: Permissions are now included in login response,
-       * so this is mainly for refreshing permissions after role changes.
-       */
-      fetchUserPermissions: async (_roleId: number) => {
-        // Permissions are now embedded in user object from login
-        // To refresh, we should re-fetch current user from /api/auth/me
-        const { user } = get();
-        if (user?.permissions) {
-          set({ permissions: user.permissions });
         }
       },
 

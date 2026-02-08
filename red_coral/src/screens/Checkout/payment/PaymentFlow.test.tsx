@@ -72,9 +72,7 @@ vi.mock('@/services/paymentService', () => ({
 
 vi.mock('@/stores/useCartStore', () => ({
   useCartStore: {
-    getState: () => ({
-      setReceiptNumber: () => {}
-    })
+    getState: () => ({})
   }
 }));
 
@@ -95,7 +93,6 @@ const baseOrder: any = {
   guestCount: 2,
   startTime: Date.now(),
   items: [],
-  timeline: []
 };
 
 describe('PaymentFlow', () => {

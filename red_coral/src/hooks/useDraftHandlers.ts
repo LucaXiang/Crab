@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { CartItem, DraftOrder, PaymentRecord, OrderEvent } from '@/core/domain/types';
+import { CartItem, DraftOrder, PaymentRecord } from '@/core/domain/types';
 import { useCartStore } from '@/core/stores/cart/useCartStore';
 
 interface UseDraftHandlersParams {
@@ -59,7 +59,6 @@ export function useDraftHandlers(params: UseDraftHandlersParams) {
       created_at: now,
       updated_at: now,
       last_sequence: 0,
-      timeline: [] as OrderEvent[],
     };
     saveDraft(draft);
     clearCart();

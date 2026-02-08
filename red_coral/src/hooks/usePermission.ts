@@ -53,14 +53,6 @@ export const useCanManageTables = () => {
 };
 
 /**
- * Check if user can view reports
- */
-export const useCanViewReports = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.REPORTS_VIEW);
-};
-
-/**
  * Check if user can manage settings
  */
 export const useCanManageSettings = () => {
@@ -76,11 +68,4 @@ export const useCanManageShifts = () => {
   return hasPermission(PermissionValues.SHIFTS_MANAGE);
 };
 
-/**
- * Check if user can manage price rules
- */
-export const useCanManagePriceRules = () => {
-  const { hasPermission } = usePermission();
-  return hasPermission(PermissionValues.PRICE_RULES_MANAGE);
-};
 

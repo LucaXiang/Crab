@@ -110,18 +110,12 @@ export type CartItem = import('./orderEvent').CartItemSnapshot;
 export type PaymentRecord = import('./orderEvent').PaymentRecord;
 
 /**
- * HeldOrder is OrderSnapshot plus optional timeline
- *
- * Timeline is optional and stores OrderEvent[] (服务端权威类型).
- * UI 层使用 Renderer 按需格式化，不存储转换后的数据。
+ * HeldOrder = OrderSnapshot (服务端权威快照)
+ * Timeline 通过 useActiveOrdersStore.timelines 或 ArchivedOrderDetail.timeline 独立获取
  */
-export type HeldOrder = import('./orderEvent').OrderSnapshot & {
-  // Timeline: 存储原始 OrderEvent[]，UI 层按需格式化
-  timeline?: import('./orderEvent').OrderEvent[];
-};
+export type HeldOrder = import('./orderEvent').OrderSnapshot;
 
 export type DraftOrder = HeldOrder;
-export type CompletedOrder = HeldOrder;
 
 // Permission type and constants
 // 简化权限系统：12 个可配置权限 + 1 个管理员专属权限

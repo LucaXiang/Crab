@@ -37,13 +37,8 @@ const UnpaidItemRowInner: React.FC<UnpaidItemRowProps> = ({
   const hasMultiSpec = item.selected_specification?.is_multi_spec;
   const hasOptions = item.selected_options && item.selected_options.length > 0;
   const hasNote = item.note && item.note.trim().length > 0;
-  const activeRules = (item.applied_rules ?? []).filter(r => !r.skipped);
-  const totalRuleDiscount = activeRules
-    .filter(r => r.rule_type === 'DISCOUNT')
-    .reduce((sum, r) => sum + r.calculated_amount, 0);
-  const totalRuleSurcharge = activeRules
-    .filter(r => r.rule_type === 'SURCHARGE')
-    .reduce((sum, r) => sum + r.calculated_amount, 0);
+  const totalRuleDiscount = item.rule_discount_amount ?? 0;
+  const totalRuleSurcharge = item.rule_surcharge_amount ?? 0;
 
   const clickHandlers = useLongPress(
     () => {},
