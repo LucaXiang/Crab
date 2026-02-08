@@ -203,10 +203,9 @@ pub async fn delete(
     // Refresh product cache if the binding was for a product
     if let (Some(oid), Some(otype)) = (owner_id, owner_type)
         && otype == "product"
+        && let Err(e) = state.catalog_service.refresh_product_cache(oid).await
     {
-        if let Err(e) = state.catalog_service.refresh_product_cache(oid).await {
-            tracing::warn!("Failed to refresh product cache for {}: {}", oid, e);
-        }
+        tracing::warn!("Failed to refresh product cache for {}: {}", oid, e);
     }
 
     Ok(Json(true))

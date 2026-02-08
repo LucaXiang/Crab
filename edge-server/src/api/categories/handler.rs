@@ -281,10 +281,10 @@ pub async fn unbind_category_attribute(
     let deleted = attribute::unlink(&state.pool, "category", category_id, attr_id).await?;
 
     // Refresh product cache for this category (inherited attributes changed)
-    if deleted {
-        if let Err(e) = state.catalog_service.refresh_products_in_category(category_id).await {
-            tracing::warn!("Failed to refresh products in category {}: {}", category_id, e);
-        }
+    if deleted
+        && let Err(e) = state.catalog_service.refresh_products_in_category(category_id).await
+    {
+        tracing::warn!("Failed to refresh products in category {}: {}", category_id, e);
     }
 
     // 广播同步通知
